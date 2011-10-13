@@ -225,7 +225,7 @@ uint SnpDataset::ReconcileLiftover(std::multimap<SNP, SNP>& converted, std::ostr
 					uint rs=0, pos=0, role=0;
 					file.read((char*)&rs, 4);
 					file.read((char*)&pos, 4);
-					file.read((char*)&role, 1);
+					file.read((char*)&role, 4);
 
 					// If this works, we are success
 					uint index = FindSnp(chrom + 1, MakeRSID(rs).c_str(), pos, 1);
@@ -300,7 +300,7 @@ uint SnpDataset::AlignData() {
 					uint rs=0, pos=0, role=0;
 					file.read((char*)&rs, 4);
 					file.read((char*)&pos, 4);
-					file.read((char*)&role, 1);
+					file.read((char*)&role, 4);
 
 					uint index = FindSnp(chrom + 1, MakeRSID(rs).c_str(), pos);
 					if (index < (uint)-1) {
@@ -337,7 +337,7 @@ void SnpDataset::SaveArchiveBinary(const char *filename) {
 			uint rsid = ExtractRsInt(s.RSID());
 			file.write((char*)&rsid, 4);
 			file.write((char*)&(s.pos), 4);
-			file.write((char*)&(s.role), 1);
+			file.write((char*)&(s.role), 4);
 		}
 
 	}
@@ -390,7 +390,7 @@ uint SnpDataset::LoadData(const char *filename, const std::set<std::string>& ori
 					int rs=0, pos=0, role=0;
 					file.read((char*)&rs, 4);
 					file.read((char*)&pos, 4);
-					file.read((char*)&role, 1);
+					file.read((char*)&role, 4);
 					std::string rsid = Utility::_RSID(rs);
 					if (rsids.find(rsid) != rsids.end() || rsids.size() == 0) {
 						AddSNP(chrom, pos, rsid.c_str(), role);
@@ -644,10 +644,10 @@ void AddChromosome(std::ofstream& file, char *ch, int count, int max) {
 	file.write((char*)&max, 4);
 }
 
-void AddSNP(std::ofstream& file, int rs, int pos, char role) {
+void AddSNP(std::ofstream& file, int rs, int pos, int role) {
 	file.write((char*)&rs, 4);
 	file.write((char*)&pos, 4);
-	file.write(&role, 1);
+	file.write((char*)&role, 4);
 }
 
 TEST_F(SnpDatasetTest, TestLoadBadFilename) {
