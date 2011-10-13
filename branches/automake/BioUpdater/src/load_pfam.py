@@ -16,7 +16,7 @@ class PFamMetaGroup(bioloader.Pathway):
 	def __init__(self, groupTypeID, groupID, name, desc):
 		bioloader.Pathway.__init__(self, groupTypeID, groupID, name, desc)
 		self.pathways			= dict()		#This is a link to actual pathway objects
-
+	
 	def AddAssociation(self, groupID, gene):
 		if groupID in self.children:
 			self.pathways[groupID].AddGene(gene)
@@ -32,7 +32,7 @@ class PFamMetaGroup(bioloader.Pathway):
 			newGroup				= PFamMetaGroup(self.groupTypeID, groupID, fields[1], biosettings.MakeAscii(fields[9]))
 			self.children[groupID] 	= self.name
 			self.pathways[groupID]  = newGroup
-
+	
 	def Commit(self, biosettings):
 		biosettings.CommitPathway(self.groupTypeID, self.groupID, self.name, self.desc)
 		for pathway in self.pathways:
@@ -56,39 +56,37 @@ class PFamLoader(bioloader.BioLoader):
 		for name in submetaNames:
 			self.submetas[name] = PFamMetaGroup(id, subID, name, "PFam:%s" % name)
 			subID += 1
-		
+	
 	def Commit(self):
 		for name in self.submetas:
 			self.biosettings.RelatePathways(self.groupID, self.submetas[name].groupID, self.submetas[name].name, "")
 			self.submetas[name].Commit(self.biosettings)		#Do local stuff
 		self.biosettings.Commit()
-
+	
 	#we have to have uniProt gene IDs loaded as well as a group of items indexed by the pfam_acc id
-
+	
 	#seq_info.txt		ftp://ftp.sanger.ac.uk/pub/databases/Pfam/current_release/database_files/seq_info.txt.gz
 	#Field Name -> Column Translations:
 	#pfamA_acc		Column 0
 	#pfamseq_acc	Column 6
 	def LoadAssociations(self, filename):
-
-		#get rid of some annoying dos crap
-		os.system("dos2unix %s" % (filename))
 		print "Loading associations from file, ", filename
 		errReport					= open("%s.errors" % (filename), "w")
-		reader = csv.reader(open(filename), delimiter='\t', quotechar="'")
+		reader = csv.reader(open(filename,"rU"), delimiter='\t', quotechar="'")
 		for cleanWords in reader:
-			groupID				= self.pfLookup[cleanWords[0]]
-			assoc 				= self.biosettings.regions.AliasToGeneID([cleanWords[6]])
-			if len(assoc) == 1:
-				assocID 		= list(assoc)[0]
-				for meta in self.submetas:
-					print>>errReport, "-- %s -> %s (%s : %s)" % (groupID, assocID, cleanWords[0], cleanWords[6])
-					self.submetas[meta].AddAssociation(groupID, assocID)
+			if (cleanWords[0] in self.pfLookup):
+				groupID				= self.pfLookup[cleanWords[0]]
+				assoc 				= self.biosettings.regions.AliasToGeneID([cleanWords[6]])
+				if len(assoc) == 1:
+					assocID 		= list(assoc)[0]
+					for meta in self.submetas:
+						print>>errReport, "-- %s -> %s (%s : %s)" % (groupID, assocID, cleanWords[0], cleanWords[6])
+						self.submetas[meta].AddAssociation(groupID, assocID)
+				else:
+					print>>errReport, "-- %s -> Unknown ID: %s (%s)" % (cleanWords[0], cleanWords[6], assoc)
 			else:
-				
-				print>>errReport, "-- %s -> Unknown ID: %s (%s)" % (cleanWords[0], cleanWords[6], assoc)
-
-
+				print>>errReport, "-- %s -> Unknown Group" % (cleanWords[0])
+	
 	def LoadGroupData(self, filename):
 		reader = csv.reader(open(filename), delimiter='\t', quotechar="'", escapechar="\\")
 		for cleanWords in reader:
@@ -98,9 +96,7 @@ class PFamLoader(bioloader.BioLoader):
 			id						= self.biosettings.NextID()
 			self.pfLookup[cleanWords[1]] = id
 			self.submetas[metaGroupName].AddGroup(cleanWords, id)
-
-
-
+	
 	def Load(self, force=True):
 		os.system("rm -rf pfam")
 		cwd 					= os.getcwd()
@@ -113,6 +109,7 @@ class PFamLoader(bioloader.BioLoader):
 		seqFile				= self.FetchViaHTTP("ftp://ftp.sanger.ac.uk/pub/databases/Pfam/current_release/database_files/seq_info.txt.gz")
 		#seqFile				= "seq_info.txt.gz"
 		seqFile				= self._ExtractGZ(seqFile)
+		os.system("dos2unix %s" % (seqFile))
 		
 		self.biosettings.PurgeGroupData(self.groupID)
 		for submeta in self.submetas:
@@ -126,14 +123,16 @@ class PFamLoader(bioloader.BioLoader):
 		
 		self.Commit()
 		os.chdir(cwd)
+
+
 if __name__ == '__main__':
 	filename = None
 	if len(sys.argv) > 1:
 		filename 			= sys.argv[1]
-		
+	
 	bioDB					= biosettings.BioSettings(filename)
 	bioDB.OpenDB()
 	loader					= PFamLoader(bioDB)
 	loader.Load()
-
+	
 	bioDB.Commit()
