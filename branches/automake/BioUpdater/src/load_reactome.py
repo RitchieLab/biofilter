@@ -26,7 +26,7 @@ class ReactomeEntity:
 		self.parents	= set()
 		self.childLinks		= []
 		self.groupTypeID = groupTypeID	#DB Key for group Type (reaction/pathway)
-
+	
 	def AddChild(self, entity, table):
 		"""Add a child to the local system. This will be used to parse out all genes that are "contained". For a reaction,
 			this shouldn't be anything but genes"""
@@ -35,15 +35,15 @@ class ReactomeEntity:
 		else:
 			self.children.add(entity)
 		self.childLinks.append((entity.name, table))
-
+	
 	def AddParent(self, entity):
 		self.parents.add(entity)
-		
+	
 	def AddGene(self, gene_id):
 		"""Adds a gene to the gene_list associated directly with this entity."""
 		print "Adding gene (%s) to group (%s)" % (gene_id, self.name)
 		self.genes.add(gene_id)
-
+	
 	def GetGenes(self, visited, entityLookup):
 		gene_list = set(self.genes)
 		
@@ -51,7 +51,7 @@ class ReactomeEntity:
 		for child in self.children:
 			gene_list = gene_list.union(entityLookup[child.id].GetGenes(visited, entityLookup))
 		return gene_list
-
+	
 	def GetSelectiveGenes(self, visited, entityLookup):
 		gene_list = set(self.genes)
 		
@@ -59,21 +59,21 @@ class ReactomeEntity:
 			if (entityLookup[child.id].type not in ["Reaction","Pathway"]):
 				gene_list = gene_list.union(entityLookup[child.id].GetGenes(visited, entityLookup))
 		return gene_list
-
+	
 	def Commit(self, cursor, typeID, groupID, entityLookup):
 		self.groupID = groupID
 		doContinue = False
-
+		
 		#if self.type != "Pathway" and self.type != "Reaction":
 		#	return groupID
-
+		
 		genes = self.GetSelectiveGenes(set(), entityLookup)
 		try:
 			cursor.execute("INSERT INTO groups VALUES (?,?,?,?)", (self.groupTypeID, groupID, self.name, "%s-%s" % (self.type, self.desc)))
 			doContinue=True
 		except sqlite3.Error, e:
 				print e[0], typeID, self.groupID, self.name, self.desc
-
+		
 		if doContinue:
 			if len(genes) == 0:
 				print "No genes associated with group %s (%s) of type %s" % (self.name, groupID, self.type)
@@ -87,7 +87,7 @@ class ReactomeEntity:
 			return groupID +1
 		else:
 			return groupID
-
+	
 	def CommitRelationships(self, cursor, entityLookup):
 		"""This has to be done after all commits are finished, since the group assignment is done at that point"""
 		if self.type != "Pathway" and self.type != "Reaction":
@@ -112,7 +112,7 @@ class ReactomeEntity:
 				cursor.execute("INSERT INTO group_relationships VALUES (?,?,?,?)", (self.groupID, entityLookup[parent.id].groupID, self.type, entityLookup[parent.id].type))
 			except sqlite3.Error, e:
 				print e[0], self.groupID, entityLookup[parent.id].groupID
-
+	
 	def Print(self, indentionLevel, visited):
 		"""Display contents. indentionLevel allows N tabs, visited allows us to avoid recursive loops""" 
 		s=''
@@ -124,32 +124,36 @@ class ReactomeEntity:
 		visited.add(self.id)
 		print "%s(*%s*, %s, %s [%s])" %(s, self.id, self.name, self.desc, self.type)
 		print "Genes: ", self.genes
-				
+		
 		for child in self.children:
 			child.Print(indentionLevel+1, visited)
-	
+
 
 class ReactomeLoader(bioloader.BioLoader):
 	def __init__(self, biosettings, id=9):
 		bioloader.BioLoader.__init__(self, biosettings, id)
 		biosettings.LoadAliases()
 		self.entityLookup						= dict()
-
+	
 	def RefreshDatabase(self, force=True):
 		localFilename = self.FetchViaHTTP("http://www.reactome.org/download/current/sql.gz")
 		localFilename = self._ExtractGZ(localFilename)
-
+		
 		timestamp					= time.localtime(os.path.getmtime(localFilename))
 		if force or self.CheckTimestampAgainstServer(timestamp, self.groupID):
+			#TODO: fix reactome refresh with configurable database settings
+			pass
+			"""
 			print "mysql -h rogue -u torstees -p'SMOJ2010' -e \"DROP DATABASE IF EXISTS reactome; CREATE DATABASE reactome;\""
 			os.system("mysql -h rogue -u torstees -p'SMOJ2010' -e \"DROP DATABASE IF EXISTS reactome; CREATE DATABASE reactome;\"")
-	
+			
 			print "cat %s | mysql -h rogue -u torstees -p'SMOJ2010' reactome" % (localFilename)
 			os.system("cat %s | mysql -h rogue -u torstees -p'SMOJ2010' reactome" % (localFilename))
-
+			"""
+	
 	def LoadSimpleBaseEntity(self, dbCursor, tableName, typeID):
 		"""Loads entities which don't have matching DatabaseObject entries...."""
-		sql = """SELECT DB_ID FROM reactome.%s""" % tableName
+		sql = """SELECT DB_ID FROM %s""" % tableName
 		dbCursor.execute(sql)
 		rows = dbCursor.fetchall()
 		if len(rows) == 0:
@@ -163,10 +167,10 @@ class ReactomeLoader(bioloader.BioLoader):
 				name = tableName + str(row[0])
 				newEntity = ReactomeEntity(tableName, row[0], name, name, self.groupID)
 				self.entityLookup[row[0]] = newEntity
-		
+	
 	def LoadEWAS(self, cursor):
 		"""Entity w Accession Seq table is different from most of the others, and has it's links built in (1 to 1 relationship, apparently)"""
-		cursor.execute("SELECT DB_ID, referenceEntity FROM reactome.EntityWithAccessionedSequence")
+		cursor.execute("SELECT DB_ID, referenceEntity FROM EntityWithAccessionedSequence")
 		rows = cursor.fetchall()
 		associationsMade = 0
 		for row in rows:
@@ -180,10 +184,10 @@ class ReactomeLoader(bioloader.BioLoader):
 				associationsMade+=1
 		report = ' ' * (10-len(str(associationsMade))) + str(associationsMade) + " out of "  + ' ' * (10-len(str(len(rows)))) + str(len(rows))
 		print "%s associations made -- EWAS " %(report)
-
+	
 	def LoadCatalystActivities(self, cursor):
 		"""Catalyst Activity table is different from most of the others, and has it's links built in (1 to 1 relationship, apparently)"""
-		cursor.execute("SELECT DB_ID, physicalEntity FROM reactome.CatalystActivity")
+		cursor.execute("SELECT DB_ID, physicalEntity FROM CatalystActivity")
 		rows = cursor.fetchall()
 		associationsMade = 0
 		for row in rows:
@@ -197,10 +201,10 @@ class ReactomeLoader(bioloader.BioLoader):
 				associationsMade+=1
 		report = ' ' * (10-len(str(associationsMade))) + str(associationsMade) + " out of "  + ' ' * (10-len(str(len(rows)))) + str(len(rows))
 		print "%s associations made -- CatalystActivity " %(report)
-
+	
 	def LoadEWAS(self, cursor):
 		"""Entity w Accession Seq table is different from most of the others, and has it's links built in (1 to 1 relationship, apparently)"""
-		cursor.execute("SELECT DB_ID, referenceEntity FROM reactome.EntityWithAccessionedSequence")
+		cursor.execute("SELECT DB_ID, referenceEntity FROM EntityWithAccessionedSequence")
 		rows = cursor.fetchall()
 		associationsMade = 0
 		for row in rows:
@@ -214,10 +218,10 @@ class ReactomeLoader(bioloader.BioLoader):
 				associationsMade+=1
 		report = ' ' * (10-len(str(associationsMade))) + str(associationsMade) + " out of "  + ' ' * (10-len(str(len(rows)))) + str(len(rows))
 		print "%s associations made -- EWAS " %(report)
-
+	
 	def LoadCatalystActivities(self, cursor):
 		"""Catalyst Activity table is different from most of the others, and has it's links built in (1 to 1 relationship, apparently)"""
-		cursor.execute("SELECT DB_ID, physicalEntity FROM reactome.CatalystActivity")
+		cursor.execute("SELECT DB_ID, physicalEntity FROM CatalystActivity")
 		rows = cursor.fetchall()
 		associationsMade = 0
 		for row in rows:
@@ -231,12 +235,12 @@ class ReactomeLoader(bioloader.BioLoader):
 				associationsMade+=1
 		report = ' ' * (10-len(str(associationsMade))) + str(associationsMade) + " out of "  + ' ' * (10-len(str(len(rows)))) + str(len(rows))
 		print "%s associations made -- CatalystActivity " %(report)
-		
+	
 	def LoadAssociation(self, dbCursor, tableName):
-		sql = "SELECT * FROM reactome.%s" % tableName
+		sql = "SELECT * FROM %s" % tableName
 		dbCursor.execute(sql)
 		rows = dbCursor.fetchall()
-
+		
 		associationsMade = 0
 		for row in rows:
 				dbID = int(row[0])
@@ -251,16 +255,15 @@ class ReactomeLoader(bioloader.BioLoader):
 						associationsMade+=1
 		report = ' ' * (10-len(str(associationsMade))) + str(associationsMade) + " out of "  + ' ' * (10-len(str(len(rows)))) + str(len(rows))
 		print "%s associations made -- %s " %(report, tableName)		
-
+	
 	def LoadReferencePeptideToGene(self, cursor):
 		sql = """SELECT DISTINCT a.DB_ID, c.identifier , d.name
 				FROM 
-					reactome.EntityWithAccessionedSequence a 
-					INNER JOIN reactome.ReferenceGeneProduct_2_referenceGene b ON a.referenceEntity=b.DB_ID 
-					INNER JOIN reactome.ReferenceEntity c ON b.referenceGene=c.DB_ID
-					INNER JOIN reactome.ReferenceDatabase_2_name d ON c.referenceDatabase=d.DB_ID
+					EntityWithAccessionedSequence a 
+					INNER JOIN ReferenceGeneProduct_2_referenceGene b ON a.referenceEntity=b.DB_ID 
+					INNER JOIN ReferenceEntity c ON b.referenceGene=c.DB_ID
+					INNER JOIN ReferenceDatabase_2_name d ON c.referenceDatabase=d.DB_ID
 				WHERE d.name='Entrez Gene'"""
-
 		# 
 		cursor.execute(sql)
 		rows=cursor.fetchall()
@@ -281,37 +284,34 @@ class ReactomeLoader(bioloader.BioLoader):
 			else:
 				if superDebug:
 					print "Can't find, ", dbID
-		
+	
 	def LoadBaseEntity(self, dbCursor, tableName):
 		"""Loads entities and populates the entity structure accordingly"""
 		sql = """SELECT a.DB_ID, b._displayName AS description,
 						c.identifier AS name, b._class AS type
-					FROM reactome.%s a
-						INNER JOIN reactome.DatabaseObject b ON a.DB_ID=b.DB_ID
-						INNER JOIN reactome.StableIdentifier c ON b.stableIdentifier=c.DB_ID""" % (tableName)
+					FROM %s a
+						INNER JOIN DatabaseObject b ON a.DB_ID=b.DB_ID
+						INNER JOIN StableIdentifier c ON b.stableIdentifier=c.DB_ID""" % (tableName)
 		dbCursor.execute(sql)
 		rows = dbCursor.fetchall()
-
+		
 		if len(rows) == 0:
 			print tableName, "...............Returned an empty set. Trying a simpler query"
 			self.LoadSimpleBaseEntity(dbCursor, tableName)
 		for row in rows:
-			
 			if row[0] in self.entityLookup:
 				#print "We have a duplicate in our entity IDs!", row[0]
 				pass
 			else:
 				newEntity = ReactomeEntity(row[3], row[0], row[2], row[1], self.groupID)
 				self.entityLookup[row[0]] = newEntity
-
-
-
+	
 	def Load(self, sourceDB):
 		"""Extract data from the database, sourceDB"""
 		cwd 					= os.getcwd()
 		os.system("mkdir -p reactome")
 		os.chdir("reactome")
-
+		
 		c=sourceDB.ensembl.cursor()
 		self.LoadBaseEntity(c, "Pathway")
 		self.LoadBaseEntity(c, "BlackBoxEvent")
@@ -336,7 +336,7 @@ class ReactomeLoader(bioloader.BioLoader):
 		#self.LoadAssociation(c, "ReactionlikeEvent_2_")
 		self.LoadReferencePeptideToGene(c)
 		os.chdir(cwd)
-
+	
 	def Commit(self):
 		self.biosettings.PurgeGroupData(self.groupID)
 		timestamp					= time.localtime(time.time())
@@ -353,12 +353,13 @@ class ReactomeLoader(bioloader.BioLoader):
 		for entity in self.entityLookup:
 			self.entityLookup[entity].CommitRelationships(dbCursor, self.entityLookup)
 		return groupID
-	
+
+
 if __name__ == '__main__':
 	filename = None
 	if len(sys.argv) > 1:
 		filename 			= sys.argv[1]
-		
+	
 	bioDB					= biosettings.BioSettings(filename)
 	bioDB.OpenDB()
 	loader					= ReactomeLoader(bioDB)
