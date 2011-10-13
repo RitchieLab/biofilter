@@ -50,6 +50,7 @@ def LoadKB(dbFilename, kbLoads, doReset = False, refreshEnsembl = False):
 			ncbiLoader.InitLog("snps.log")
 			cwd				= os.getcwd()
 			ensembl			= GetEnsembl(bioDB, refreshEnsembl)
+			os.system("mkdir -p NCBI")
 			os.chdir("NCBI")
 			#ncbiLoader.UpdateSNPs(chromosomes, "variations", ensembl)
 			os.chdir(cwd)
@@ -93,8 +94,8 @@ def LoadKB(dbFilename, kbLoads, doReset = False, refreshEnsembl = False):
 		elif kb == "dip":
 			loader					= load_dip.DIPLoader(bioDB)
 			loader.InitLog()
-			loader.Load()
-			bioDB.Commit()
+			#loader.Load()
+			#bioDB.Commit()
 			loader.CloseLog()
 		elif kb == "mint":
 			loader					= load_mint.MintLoader(bioDB)
