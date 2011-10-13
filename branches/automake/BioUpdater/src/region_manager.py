@@ -12,6 +12,7 @@ aliasTypeIDs			= { 1:"Ensembl", 13:"Entrez ID", 1300:"Entrez Gene", 1301:"Entrez
 
 class GenomicRegion:
 	nextID						= 2000000000
+	
 	def NextID(self):
 		nextid					= GenomicRegion.nextID
 		GenomicRegion.nextID 	+= 1
@@ -19,14 +20,13 @@ class GenomicRegion:
 	
 	def Reset(self):
 		GenomicRegion.nextID	= 100
-
+	
 	def AddAlias(self, typeID, alias):
 		if typeID == 1:
 			self.ensemblID = alias
 		elif typeID == 13:
 			self.geneID		= alias
-		
-
+	
 	def __init__(self, chrom):
 		self.primaryName		= ''
 		self.geneID				= 0
@@ -37,7 +37,7 @@ class GenomicRegion:
 		self.doCommit			= False					# This basically is used to avoid recommiting the data when we just loaded it from the database
 		self.hgnc				= 0
 		self.ensemblID			= ""
-		
+	
 	def InitViaEnsembl(self, geneID, label, ensemblID, start, stop, description):
 		self.geneID				= geneID
 		self.ensemblID			= ensemblID
@@ -45,29 +45,27 @@ class GenomicRegion:
 		self.stop				= stop
 		self.primaryName		= label
 		self.description		= description
-		
-		
+	
 	def InitStub(self, geneID, accID, proteinAcc):
 		self.geneID				= geneID
 		self.description		= "%s %s" % (accID, proteinAcc)
-		
-
+	
 	def InitViaEntrez(self, geneID, start, stop):
 		self.geneID				= geneID
 		self.start				= start
 		self.stop				= stop
 		self.primaryName 		= "%s" % geneID
-		
+	
 	def UpdateFromEntrez(self, primaryName, ensemblID, hgnc, chromosome, mapPosition, desc):
 		self.ensemblID			= ensemblID
 		self.chrom				= chromosome
 		self.desc				= desc
 		self.primaryName		= primaryName
 		self.hgnc				= hgnc
-
+	
 	def Print(self, file):
 		print>>file, "Gene(%s): %s (%s) %s" % (self.geneID, self.primaryName, self.ensemblID, self.desc)
-
+	
 	def Commit(self, cursor, aliases):
 		#if self.primaryName in aliases[1300] and len(aliases[1300][self.primaryName]) > 1:
 		#	print "Resetting primary name, due to bad stuff: %s" % (self.primaryName)
@@ -77,11 +75,12 @@ class GenomicRegion:
 			cursor.execute("INSERT INTO region_bounds VALUES (?,0,?,?)", (self.geneID, self.start, self.stop))
 		except sqlite3.Error, e:
 			print "Unable to insert %s:%s (%s) into Regions table -- %s" % (self.geneID, self.primaryName, aliases[1300][self.primaryName], e.args[0])
-
+		
 		try:
 			cursor.execute("INSERT INTO region_alias (region_alias_type_id, alias, gene_id, gene_count) VALUES (?, ?, ?, ?)", (1300, self.primaryName, self.geneID, 1))
 		except:
 			print "Unable to add alias %s to gene, %s : %s"% (self.primaryName, self.geneID, e.args[0])
+
 
 class RegionManager:
 	def __init__(self):
@@ -100,19 +99,20 @@ class RegionManager:
 		if int(oldID) in self.historic:
 			print "Duplicate historic SNP: %s -> %s \t\t%s -> %s" % (oldID, self.historic[int(oldID)], oldID, newID)
 		self.historic[int(oldID)] = newID
-		
+	
 	def InitAliases(self):
 		"""Just a way to initialize the aliases sets"""
 		for type in aliasTypeIDs:
 			if type in self.aliases:
 				print "Dropping Alaises: %s"% (len(self.aliases[type]))
 			self.aliases[type] = dict()
+	
 	def AddEntrezStub(self, geneID, accID, proteinAcc):
 		if accID[:2] == "NT":
 			gene								= GenomicRegion("??")
 			gene.InitStub(geneID, accID, proteinAcc)
 			self.stubs[geneID]					= gene
-
+	
 	def AddEntrezGene(self, entrezID, accID, start, stop, strand, proteinAcc, mRNAaccID):
 		if accID[:2] == "NC":
 			gene								= GenomicRegion("??")
@@ -121,18 +121,17 @@ class RegionManager:
 			self.AddAlias(13,"%s" % entrezID, gene.geneID)
 			self.AddAlias(2, "%s" % proteinAcc, gene.geneID)
 			self.AddAlias(3, "%s"% mRNAaccID, gene.geneID)
-			
 		elif accID[:2] == "NT":
 			#print "Trying to add NT"
 			if entrezID not in self.genes:
 				print>>sys.stderr, "We have an NC type ID without a preceeding NT: Entrez: %s    Acc ID: %s" % (entrezID, accID)
 		else:
 			print "What? No way to id this one! %s" % (accID)
-
+	
 	def PrintStubReport(self):
 		for item in self.stubs:
 			print "%s - %s " % (item.geneID, item.desc)
-
+	
 	def UpdateEntrezGene(self, entrezID, primaryName, aliasList, ensemblID, hgnc, chromosome, mapPosition, desc):
 		if entrezID in self.genes:
 			self.genes[entrezID].UpdateFromEntrez(primaryName, ensemblID, hgnc, chromosome, mapPosition, desc)
@@ -150,6 +149,7 @@ class RegionManager:
 			return False
 			print "Skipping UpdateEntrezGene due to absence in gene list: %s,%s,%s,%s" % (entrezID, primaryName, aliasList, ensemblID)
 		return True
+	
 	def AddPseudoRegion(self, chrom, label, ensemblID, start, stop, description):
 		gene							= GenomicRegion(chrom)
 		geneID							= gene.NextID()
@@ -171,14 +171,14 @@ class RegionManager:
 			#print "%s:%s:%s:%s:%s:%s:%s" % (chrom, gID, label, ensemblID, start, stop, description)
 		self.AddAlias(1, ensemblID, geneID)
 		return geneID
-		
+	
 	def AddRegion(self, chrom, gID, label, ensemblID, start, stop, description):
 		geneID 								= int(gID)
 		rValue = False
 		if geneID > 0:
 			if geneID not in self.genes:
 				rValue							= True
-
+				
 				#These are coming from Ensembl, and we don't want primary name collisions to occur because of
 				#ensembl...they are too generous with their naming scheme...so, if it's in the primary name
 				#then we will drop that gene name altogether
@@ -187,12 +187,10 @@ class RegionManager:
 				if label not in self.primaryNames:
 					self.primaryNames[label]	= set()
 				self.primaryNames[label].add(geneID)
-
 				
 				gene							= GenomicRegion(chrom)
 				gene.InitViaEnsembl(geneID, label, ensemblID, start, stop, description)
 				self.genes[geneID] 			= gene
-				
 				
 				#print "------Added new region: ", chrom, gID, label, ensemblID
 			#else:
@@ -205,12 +203,12 @@ class RegionManager:
 			print "------Refusing to add region: ", chrom, gID, label, ensemblID
 			#print "%s, %s, %s, %s, %s, %s (%s)" % (chrom, gene.geneID, ensemblID, start, stop, description, len(self.genes))
 		return rValue
-
+	
 	def AddEnsemblID(self, geneID, ensemblID):
 		if geneID in self.genes and len(ensemblID.strip()) > 0:
 			self.AddAlias(1, ensemblID, geneID)
 			self.genes[geneID].ensemblID = ensemblID
-
+	
 	def AddAlias(self, aliasTypeID, alias, geneID):
 		alias = alias.strip()
 		if alias == "-" or len(alias) == 0:
@@ -222,7 +220,7 @@ class RegionManager:
 			self.aliases[aliasTypeID][alias].add(int(geneID))
 		else:
 			print "Skipping alias: %s -> %s" % (geneID, alias)
-
+	
 	def AddAliasToEnsemblID(self, alias, ensemblID, type):
 		if ensemblID in self.genes:
 			geneID = self.genes[ensemblID].geneID
@@ -245,7 +243,6 @@ class RegionManager:
 					print "%s - %s ==> %s" % (aliases, alias, self.aliases[type][alias])
 					return list(self.aliases[type][alias])
 		return []
-
 	
 	def LoadGenesOnChromosome(self, chromosome, c):
 		csel = "c"+str(chromosome)+"_%"
@@ -261,12 +258,12 @@ SELECT DISTINCT
 	e.description
 
 FROM 
-    ensembl.gene AS a
-    INNER JOIN ensembl.gene_stable_id AS b ON (a.gene_id=b.gene_id)
-    INNER JOIN ensembl.seq_region c ON a.seq_region_id = c.seq_region_id
-    INNER JOIN ensembl.transcript d ON a.gene_id=d.gene_id
-    INNER JOIN ensembl.object_xref x ON d.canonical_translation_id=x.ensembl_id
-    INNER JOIN ensembl.xref e ON x.xref_id=e.xref_id
+    gene AS a
+    INNER JOIN gene_stable_id AS b ON (a.gene_id=b.gene_id)
+    INNER JOIN seq_region c ON a.seq_region_id = c.seq_region_id
+    INNER JOIN transcript d ON a.gene_id=d.gene_id
+    INNER JOIN object_xref x ON d.canonical_translation_id=x.ensembl_id
+    INNER JOIN xref e ON x.xref_id=e.xref_id
 
 WHERE 
     x.ensembl_object_type='Translation'
@@ -274,8 +271,6 @@ WHERE
     AND e.external_db_id IN (2000,2200,1300)
     AND coord_system_id=%s
 ORDER BY e.external_db_id, e.dbprimary_acc""", (chromosome, 2))
-
-
 		
 		rows = c.fetchall()
 		geneCount					= 0
@@ -328,16 +323,14 @@ ORDER BY e.external_db_id, e.dbprimary_acc""", (chromosome, 2))
 					geneIDs			= self.AliasToGeneID([stableID])
 					for id in geneIDs:
 						self.AddAlias(dbID, name, id)
-
-				
-	
+		
 		print "Chromosome :  %s" % (chromosome)
 		print "\tNew Genes: %s (out of %s)" % (geneCount, totalGenes)
 		print "\tStubs IDd: %s (out of %s)" % (stubCount, totalStubs)
 		print "\tEnsembl  : %s" % (ensemblUpdate)
 		print "\tUpdated  : %s" % (totalUpdates)
 		print "\tSkipped  : %s" % (totalSkipped)
-
+	
 	def LoadGenesOnChromosome2(self, chromosome, c):
 		csel = "c"+str(chromosome)+"_%"
 		c.execute("""
@@ -352,12 +345,12 @@ SELECT DISTINCT
 	GROUP_CONCAT(DISTINCT IF(e.external_db_id=2000,e.dbprimary_acc,'') SEPARATOR ' ') AS trembl_id,
 	GROUP_CONCAT(DISTINCT IF(e.external_db_id=2200,e.dbprimary_acc,'') SEPARATOR ' ') AS swissprot_id
 FROM 
-    ensembl.gene AS a
-    INNER JOIN ensembl.gene_stable_id AS b ON (a.gene_id=b.gene_id)
-    INNER JOIN ensembl.seq_region c ON a.seq_region_id = c.seq_region_id
-    INNER JOIN ensembl.transcript d ON a.gene_id=d.gene_id
-    INNER JOIN ensembl.object_xref x ON d.canonical_translation_id=x.ensembl_id
-    INNER JOIN ensembl.xref e ON x.xref_id=e.xref_id
+    gene AS a
+    INNER JOIN gene_stable_id AS b ON (a.gene_id=b.gene_id)
+    INNER JOIN seq_region c ON a.seq_region_id = c.seq_region_id
+    INNER JOIN transcript d ON a.gene_id=d.gene_id
+    INNER JOIN object_xref x ON d.canonical_translation_id=x.ensembl_id
+    INNER JOIN xref e ON x.xref_id=e.xref_id
 
 WHERE 
     x.ensembl_object_type='Translation'
@@ -365,8 +358,6 @@ WHERE
     AND e.external_db_id IN (2000,2200,1300)
     AND coord_system_id=%s
 GROUP BY b.gene_id""", (chromosome, 2))
-
-
 		
 		rows = c.fetchall()
 		geneCount					= 0
@@ -425,14 +416,14 @@ GROUP BY b.gene_id""", (chromosome, 2))
 					self.AddAlias(2200, a, id)
 				for u in uniprotIDs:
 					self.AddAlias(2000, u, id)
-				
-	
+		
 		print "Chromosome :  %s" % (chromosome)
 		print "\tNew Genes: %s (out of %s)" % (geneCount, totalGenes)
 		print "\tStubs IDd: %s (out of %s)" % (stubCount, totalStubs)
 		print "\tEnsembl  : %s" % (ensemblUpdate)
 		print "\tUpdated  : %s" % (totalUpdates)
 		print "\tSkipped  : %s" % (totalSkipped)
+	
 	def LoadAliasesFromEnsembl(self, ensembl):
 		self.InitAliases()
 		cur = ensembl.cursor()
@@ -441,13 +432,13 @@ GROUP BY b.gene_id""", (chromosome, 2))
 			if aliasTypeID != 1:
 				cur.execute("""
 					SELECT DISTINCT  d.gene_id, e.stable_id, a.dbprimary_acc, a.display_label, a.description
-					FROM (SELECT dbprimary_acc, display_label, description, ensembl.xref.xref_id 
-								FROM ensembl.xref
+					FROM (SELECT dbprimary_acc, display_label, description, xref.xref_id 
+								FROM xref
 								WHERE external_db_id=%s) AS a
-					NATURAL JOIN ensembl.object_xref AS b
-					INNER JOIN ensembl.translation AS c ON b.ensembl_id=c.translation_id
-					INNER JOIN ensembl.transcript AS d ON c.transcript_id=d.transcript_id
-					INNER JOIN ensembl.gene_stable_id as e ON e.gene_id=d.gene_id""", (aliasTypeID, ))
+					NATURAL JOIN object_xref AS b
+					INNER JOIN translation AS c ON b.ensembl_id=c.translation_id
+					INNER JOIN transcript AS d ON c.transcript_id=d.transcript_id
+					INNER JOIN gene_stable_id as e ON e.gene_id=d.gene_id""", (aliasTypeID, ))
 				for row in cur.fetchall():
 					self.AddAliasToEnsemblID(row[2], row[1], aliasTypeID)
 					if aliasTypeID == 2000:
@@ -467,7 +458,7 @@ GROUP BY b.gene_id""", (chromosome, 2))
 				print>>file, id[0], id[1]
 			file.close()
 		self.doCommit							= True
-		
+	
 	def LoadRegionData(self, db):
 		if len(self.genes) == 0:
 			c										= db.cursor()
@@ -481,7 +472,7 @@ GROUP BY b.gene_id""", (chromosome, 2))
 				gene.commit							= False
 				self.genes[gene.id]					= gene
 		self.LoadAliasesFromDB(db)
-
+	
 	def LoadAliasesFromDB(self, db):
 		if len(self.aliases[1300]) == 0:
 			print "Attempting to load aliases from sqlite database"
@@ -505,7 +496,7 @@ GROUP BY b.gene_id""", (chromosome, 2))
 			print "Aliases already loaded"
 		
 		cursor										= db.cursor()
-			
+	
 	def RunTest(self, geneName, aliasType):
 		geneIDs										= self.AliasToGeneID([geneName])
 		if len(geneIDs) == 0:
@@ -513,7 +504,7 @@ GROUP BY b.gene_id""", (chromosome, 2))
 			for alias in self.aliases[aliasType]:
 				if alias[:2] == geneName[:2]:
 					print "%s : %s" % (alias, self.aliases[aliasType])
-			
+	
 	def Commit(self, dest):
 		if self.doCommit:
 			cur = dest.cursor()
@@ -547,13 +538,13 @@ GROUP BY b.gene_id""", (chromosome, 2))
 				else:
 					redirectedGeneCount += 1
 			print "Skipping commit of %s genes due to it's presence as a redirected gene ID" % (redirectedGeneCount)
-
+			
 			for oldID in self.historic:
 				newID = self.historic[oldID]
 				if newID != "-":
 					#print "History: %s -> %s" % (oldID, newID)
 					self.AddAlias(1301, "%s" % oldID, "%s" % (int(newID)))
-					
+			
 			#And now, for the aliases
 			for aType in self.aliases:
 				aliasType = aType
@@ -568,7 +559,7 @@ GROUP BY b.gene_id""", (chromosome, 2))
 						#if aliasType != 1 or len(genes) == 1:
 						#print "%s - %s" % (len(genes), alias)
 						geneCount = len(genes - set(self.historic.keys()))
-
+						
 						#we don't want to rely on entrez for ensembl IDs, if they are ambiguous
 						if aType != 11 or len(genes) == 1:
 							if aType == 11:
@@ -605,5 +596,5 @@ GROUP BY b.gene_id""", (chromosome, 2))
 					else:
 						primaryOverlaps += 1
 				print "Comitting Aliases: %s : %s (%s, %s) out of %s" % (aliasType, aliasesCommited, notsingularEnsembl, primaryOverlaps, len(self.aliases[aliasType]))
-
+			
 			dest.commit()
