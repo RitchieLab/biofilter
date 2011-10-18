@@ -190,31 +190,31 @@ void Main::PrintHelp() {
 	std::cerr<<"usage: biofilter <configuration file> \n";
 #endif
 	std::cerr<<"\nbiofilter is a standalone application for use in investigating possible SNP associations\n"
-			"\tin a set of data which, through biological knowledge, might be worth investigating\n";
+	           "\tin a set of data which, through biological knowledge, might be worth investigating\n";
 	std::cerr<<"Optional Commands Include:\n";
 	std::cerr<<"\t-S [--sample-config]                       -- Print sample configuration to std-out\n";
 	std::cerr<<"\t--report-gene-coverage gene-list-filename  -- Reports the snp count for the genes in genelist \n"
-		 <<"\t                                              for the snps in snp-source\n";
+	         <<"\t                                              for the snps in snp-source\n";
 /*	std::cerr<<"\t--filter-by-genes gene-list-filename       -- Lists gene name and rsid for each SNP inside each gene.\n"
-		 <<"\t                                              gene names and rsids can both appear multiple times.\n";
+	         <<"\t                                              gene names and rsids can both appear multiple times.\n";
 	std::cerr<<"\t--inject-gene-information analysis-results chrom-col rs-col gene-list  \n"
-		 <<"\t                                              Injects gene(s) at the end of the CSV file and writes the\n"
-		 <<"\t                                              combined data to a new file.\n";
+	         <<"\t                                              Injects gene(s) at the end of the CSV file and writes the\n"
+	         <<"\t                                              combined data to a new file.\n";
 */	std::cerr<<"\t-W [--write-models] min-impl max-models    -- Writes model list to files limitted to those with min-impl\n"
-		 <<"\t                                              or greater with a target snp-snp model count of max-models\n";
+	         <<"\t                                              or greater with a target snp-snp model count of max-models\n";
 	std::cerr<<"\t--marker-info                              -- Reports each SNP and it's position/chromosome\n"
-		 <<"\t                                              in a format acceptable by haploview\n";
+	         <<"\t                                              in a format acceptable by haploview\n";
 	std::cerr<<"\t-g [--gene-file] gene-filename (ALL)       -- File containing one or more gene alias (or ALL) to be used\n"
-		 <<"\t                                              in conjunction with gene centric reports (such as those listed below)\n";
+	         <<"\t                                              in conjunction with gene centric reports (such as those listed below)\n";
 	std::cerr<<"\t--snp-report                               -- Reports all genes each SNP is found in (from genes listed \n"
-		 <<"\t                                              in file or all known to biofilter\n";
+	         <<"\t                                              in file or all known to biofilter\n";
 	std::cerr<<"\t--map-snps-to-gene                         -- Reports all genes each SNP is found along with information\n"
-		 <<"\t                                              describing the SNPs relationship to that gene (INTERIOR, etc)\n";
+	         <<"\t                                              describing the SNPs relationship to that gene (INTERIOR, etc)\n";
 	std::cerr<<"\t--list-genes                               -- Lists all genes that are covered by at least one SNP\n";
 	std::cerr<<"\t--genes alias_list alias_type              -- Lists all genes present in the database that match one of the comma \n"
-		 <<"\t                                              separated. Either or both can also be ALL, which will show them all. \n";
+	         <<"\t                                              separated. Either or both can also be ALL, which will show them all. \n";
 /*	std::cerr<<"\t--model-report  model-list-filename        -- Generates a report containing the Genes and groups\n"
-		 <<"\t                                              associated with each two snp model listed in the file\n";
+	         <<"\t                                              associated with each two snp model listed in the file\n";
 */	std::cerr<<"\nOptional Parameters Include:\n";
 	std::cerr<<"\t-s [--snps] <snps filename>                -- Override the snp source file on the commandline\n";
 	std::cerr<<"\t-v [--variants] <mapfile>                  -- Override the map source file (this takes precedence over --snps\n";
@@ -223,14 +223,16 @@ void Main::PrintHelp() {
 	std::cerr<<"\t-B [--build] <build version>               -- Define the build associated with map files (35, 36, 37)\n";
 	std::cerr<<"\t-D [--detailed-coverage]                   -- (used with -C) adds extra details to coverage report\n";
 	std::cerr<<"\t-X (--export-snp-models) min-impl max-models\n"
-		 <<"\t                                           -- Writes Snp-Snp Models to file. This assumes a pre-existing \n"
-		 <<"\t                                              gene-gene model file \n";
+	         <<"\t                                           -- Writes Snp-Snp Models to file. This assumes a pre-existing \n"
+	         <<"\t                                              gene-gene model file \n";
 /*	std::cerr<<"\t-m [--show-models]                         -- Writes contents of model file to screen in human\n"
-	 	 <<"\t                                              readable form\n";
+	         <<"\t                                              readable form\n";
 	std::cerr<<"\t-l [--load-ld] <ld filename>               -- Loads LD information from the file, filename, and\n"
-		 <<"\t                                              adjusts the gene boundaries accordingly\n";
-	std::cerr<<"\t-G [--list-groups] [criteria]              -- Adds group search criteria and produces a list of\n"
-		<<"\t                                               group IDs that match the criteria\n";
+	         <<"\t                                              adjusts the gene boundaries accordingly\n";
+*/
+	std::cerr<<"\t-d [--add-group] <filename>                -- Adds a meta group containing data from the file, filename\n";
+/*	std::cerr<<"\t-G [--list-groups] [criteria]              -- Adds group search criteria and produces a list of\n"
+	         <<"\t                                               group IDs that match the criteria\n";
 	std::cerr<<"\t-h [--html-reports] yes/no                 -- Turns HTML Reporting on/off\n";
 	std::cerr<<"\t-q [--quiet]                               -- Silences general output during processing. Reports and errors are still produced\n";
 */
@@ -238,9 +240,9 @@ void Main::PrintHelp() {
 	std::cerr<<"\t-P [--list-populations]                    -- Lists all available Population based LD boundary options\n";
 	std::cerr<<"\t-p [--set-population] pop                  -- Override the configurations population setting (NO-LD, CEUDP1.0, etc)\n";
 	std::cerr<<"\t--optimize                                 -- Updates internal structures to allow faster access. This\n"
-		 <<"\t                                              is usually done prior to release\n";
+	         <<"\t                                              is usually done prior to release\n";
 	std::cerr<<"\t--strip-optimization                       -- Strips the optimization out (this is helpful to allow data\n"
-		 <<"\t                                              imports to run more quickly) \n";
+	         <<"\t                                              imports to run more quickly) \n";
 	std::cerr<<"\t--ldspline ldconfig                        -- Imports LD-Spline variations using ldconfig as a guide\n";
 	std::cerr<<"\t--fix-variations var-filename-path         -- Sets the path (and filename) to the appropriate variation file.\n";
 	std::cerr<<"\t                                              This should only be done if the file needs to be moved to a new location.\n";
@@ -347,6 +349,17 @@ int Main::ParseCmd(int curr, int argc, char **argv) {
 			return -1;
 		}
 		return nextCmd + 1;
+	}
+	if (strcmp(argv[curr], "-d")==0 || strcmp(argv[curr], "--add-group")==0) {
+		if (nextCmd < argc) {
+			cfg.AppendValue("ADD_GROUP", argv[nextCmd++]);
+		}
+		else {
+			action = BiofilterAction::ParseError;
+			std::cerr<<"--add-group must be followed by a filename\n";
+			return -1;
+		}
+		return nextCmd;
 	}
 	if (strcmp(argv[curr], "-g")==0 || strcmp(argv[curr], "--gene-file")==0) {
 		if (nextCmd < argc) {
