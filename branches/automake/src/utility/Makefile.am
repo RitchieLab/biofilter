@@ -1,4 +1,5 @@
 noinst_LTLIBRARIES = libutility.la
+
 libutility_la_SOURCES = \
 	filetools.h \
 	lineparser.h \

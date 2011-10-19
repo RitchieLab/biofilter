@@ -1,6 +1,11 @@
 noinst_LTLIBRARIES = libknowledge.la
-libknowledge_la_LIBADD = ../utility/libutility.la
-AM_CPPFLAGS = -I $(top_srcdir)/src
+
+libknowledge_la_LIBADD = \
+	$(top_srcdir)/src/utility/libutility.la
+
+AM_CPPFLAGS = \
+	-I $(top_srcdir)/src
+
 libknowledge_la_SOURCES = \
 	snptranslator.h \
 	chromosome.h \

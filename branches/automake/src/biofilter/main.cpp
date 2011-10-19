@@ -1,7 +1,12 @@
+#include <iostream>
+#ifdef USE_MPI
+#include <mpi.h>
+#endif
+
 #include "main.h"
 #include "timestamp.h"
-#include <iostream>
 #include "utility/exception.h"
+
 
 namespace Biofilter {
 
@@ -173,9 +178,9 @@ void Main::PrintBanner()  {
 		std::cerr<<"biofilter "<<APPMAJOR<<"."<<APPMINOR<<"."
 			 <<APPBUGFIX<<" ("<<BUILD_NUMBER<<") "<<BUILD_TYPE<<"  "<<BUILD_DATE<<"\n";
 #ifdef USE_MPI
-		cout<<"* This application is compiled to run on parallel computing systems using MPI\n";
-##else
-		cout<<"* (serial)\n";
+		std::cerr<<"* This application is compiled to run on parallel computing systems using MPI\n";
+#else
+		std::cerr<<"* (serial)\n";
 #endif
 		std::cerr<<"\nMarylyn Ritchie, William Bush and Eric Torstenson\nPlease forward any comments or errors to biofilter@chgr.mc.vanderbilt.edu\n\n";
 	}
@@ -185,7 +190,7 @@ void Main::PrintHelp() {
 	silentRun = false;
 	PrintBanner();
 #ifdef USE_MPI
-	cerr<<"usage: biofilter <configuration file> [ [command] ...] [ [parameter] ...]\n";
+	std::cerr<<"usage: biofilter <configuration file> [ [command] ...] [ [parameter] ...]\n";
 #else
 	std::cerr<<"usage: biofilter <configuration file> \n";
 #endif

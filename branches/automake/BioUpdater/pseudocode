@@ -45,6 +45,7 @@ ncbi_loader.UpdateGenes()
 
 http://www.ensembl.org/info/docs/api/core/core_schema.html
 
+
 SELECT DISTINCT  
     e.dbprimary_acc,
     c.name AS chromosome, 
