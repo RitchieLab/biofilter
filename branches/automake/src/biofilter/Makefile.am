@@ -9,7 +9,7 @@ __top_srcdir__bin_biofilter_LDADD = \
 	$(SOCI_LIB) $(SOCI_SQLITE_LIB)
 
 AM_CPPFLAGS = \
-	-I $(top_srcdir)/src \
+	-I$(top_srcdir)/src \
 	$(BOOST_CPPFLAGS) $(BOOST_FILESYSTEM_CPPFLAGS) $(BOOST_SYSTEM_CPPFLAGS) $(BOOST_REGEX_CPPFLAGS) \
 	$(SOCI_CPPFLAGS) $(SOCI_SQLITE_CPPFLAGS)
 
