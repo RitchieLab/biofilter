@@ -1,196 +1,189 @@
 basicsample.o: basicsample.cpp ../utility/types.h basicsample.h \
-  chrompool.h minchrom.h ../utility/random.h ../utility/types.h \
-  ../random/randomc.h chromosome.h locus.h locusassociation.h \
-  ../utility/rbtree.h growthrate.h distmappingfn.h individual.h \
-  ../utility/utility.h ../utility/types.h ../utility/stringlookup.h \
-  ../utility/utility.h ../utility/basiclog.h ../utility/genolookup.h \
-  ../utility/typelookup.h ../utility/genobplookup.h \
-  ../utility/genolookup.h ../utility/generatereport.h \
-  ../utility/genotypeparser.h ../utility/binarrayparser.h \
-  ../utility/lineparser.h ../utility/strings.h \
-  ../utility/configurationparser.h ../utility/lineparser.h \
-  ../utility/application.h ../utility/basiclog.h \
-  ../utility/casecontrolstatus.h ../utility/random.h diseasemodel.h \
-  diseaselocus.h ../utility/strings.h blocklistnodefourgammetes.h \
-  blocklistnode.h locreport.h locselection.h ../utility/exception.h \
-  penetrancemodel.h poolmanager.h pedigreesample.h meantable.h \
-  ../utility/lineparser.h ../simulation/poolmanager.h
+ chrompool.h minchrom.h ../utility/random.h ../utility/types.h \
+ ../random/randomc.h chromosome.h locus.h locusassociation.h \
+ ../utility/rbtree.h growthrate.h distmappingfn.h individual.h \
+ ../utility/utility.h ../utility/stringlookup.h ../utility/utility.h \
+ ../utility/basiclog.h ../utility/genolookup.h ../utility/typelookup.h \
+ ../utility/genobplookup.h ../utility/genolookup.h \
+ ../utility/generatereport.h ../utility/genotypeparser.h \
+ ../utility/binarrayparser.h ../utility/lineparser.h ../utility/strings.h \
+ ../utility/configurationparser.h ../utility/lineparser.h \
+ ../utility/application.h ../utility/basiclog.h \
+ ../utility/casecontrolstatus.h ../utility/random.h diseasemodel.h \
+ diseaselocus.h ../utility/strings.h blocklistnodefourgammetes.h \
+ blocklistnode.h locreport.h locselection.h ../utility/exception.h \
+ penetrancemodel.h poolmanager.h pedigreesample.h meantable.h \
+ ../simulation/poolmanager.h
 blocklistnode.o: blocklistnode.cpp blocklistnode.h locus.h \
-  ../utility/random.h ../utility/types.h ../random/randomc.h
+ ../utility/random.h ../utility/types.h ../random/randomc.h
 blocklistnodefourgammetes.o: blocklistnodefourgammetes.cpp \
-  blocklistnodefourgammetes.h blocklistnode.h locus.h ../utility/random.h \
-  ../utility/types.h ../random/randomc.h ../utility/strings.h
+ blocklistnodefourgammetes.h blocklistnode.h locus.h ../utility/random.h \
+ ../utility/types.h ../random/randomc.h ../utility/strings.h
 chromosome.o: chromosome.cpp chromosome.h ../utility/random.h \
-  ../utility/types.h ../random/randomc.h locus.h locusassociation.h \
-  ../utility/types.h ../utility/rbtree.h minchrom.h kinshipcalculator.h
+ ../utility/types.h ../random/randomc.h locus.h locusassociation.h \
+ ../utility/types.h ../utility/rbtree.h minchrom.h kinshipcalculator.h
 diseasemodel.o: diseasemodel.cpp diseasemodel.h ../utility/types.h \
-  diseaselocus.h
+ diseaselocus.h
 distmappingfn.o: distmappingfn.cpp distmappingfn.h ../utility/types.h
 exponentialgrowth.o: exponentialgrowth.cpp exponentialgrowth.h \
-  growthrate.h ../utility/random.h ../utility/types.h ../random/randomc.h
+ growthrate.h ../utility/random.h ../utility/types.h ../random/randomc.h
 gamodel.o: gamodel.cpp gamodel.h penfilemodel.h penetrancemodel.h \
-  diseasemodel.h ../utility/types.h diseaselocus.h poolmanager.h \
-  chrompool.h minchrom.h ../utility/random.h ../utility/types.h \
-  ../random/randomc.h chromosome.h locus.h locusassociation.h \
-  ../utility/rbtree.h growthrate.h distmappingfn.h individual.h \
-  ../utility/utility.h ../utility/types.h ../utility/stringlookup.h \
-  ../utility/utility.h ../utility/basiclog.h ../utility/genolookup.h \
-  ../utility/typelookup.h ../utility/genobplookup.h \
-  ../utility/genolookup.h ../utility/generatereport.h \
-  ../utility/genotypeparser.h ../utility/binarrayparser.h \
-  ../utility/lineparser.h ../utility/strings.h \
-  ../utility/configurationparser.h ../utility/lineparser.h \
-  ../utility/application.h ../utility/basiclog.h \
-  ../utility/casecontrolstatus.h ../utility/random.h ../utility/strings.h \
-  blocklistnodefourgammetes.h blocklistnode.h locreport.h locselection.h \
-  ../utility/exception.h
+ diseasemodel.h ../utility/types.h diseaselocus.h poolmanager.h \
+ chrompool.h minchrom.h ../utility/random.h ../utility/types.h \
+ ../random/randomc.h chromosome.h locus.h locusassociation.h \
+ ../utility/rbtree.h growthrate.h distmappingfn.h individual.h \
+ ../utility/utility.h ../utility/stringlookup.h ../utility/utility.h \
+ ../utility/basiclog.h ../utility/genolookup.h ../utility/typelookup.h \
+ ../utility/genobplookup.h ../utility/genolookup.h \
+ ../utility/generatereport.h ../utility/genotypeparser.h \
+ ../utility/binarrayparser.h ../utility/lineparser.h ../utility/strings.h \
+ ../utility/configurationparser.h ../utility/lineparser.h \
+ ../utility/application.h ../utility/basiclog.h \
+ ../utility/casecontrolstatus.h ../utility/random.h ../utility/strings.h \
+ blocklistnodefourgammetes.h blocklistnode.h locreport.h locselection.h \
+ ../utility/exception.h
 kinshipcalculator.o: kinshipcalculator.cpp kinshipcalculator.h \
-  ../utility/types.h ../utility/rbtree.h
+ ../utility/types.h ../utility/rbtree.h
 locus.o: locus.cpp locus.h ../utility/random.h ../utility/types.h \
-  ../random/randomc.h
+ ../random/randomc.h
 locusassociation.o: locusassociation.cpp locusassociation.h \
-  ../utility/types.h ../utility/random.h ../utility/types.h \
-  ../random/randomc.h ../utility/strings.h
+ ../utility/types.h ../utility/random.h ../utility/types.h \
+ ../random/randomc.h ../utility/strings.h
 locreport.o: locreport.cpp locreport.h locus.h ../utility/random.h \
-  ../utility/types.h ../random/randomc.h blocklistnode.h locselection.h \
-  ../utility/types.h ../utility/rbtree.h chrompool.h minchrom.h \
-  chromosome.h locusassociation.h growthrate.h distmappingfn.h \
-  individual.h ../utility/utility.h ../utility/types.h \
-  ../utility/stringlookup.h ../utility/utility.h ../utility/basiclog.h \
-  ../utility/genolookup.h ../utility/typelookup.h \
-  ../utility/genobplookup.h ../utility/genolookup.h \
-  ../utility/generatereport.h ../utility/genotypeparser.h \
-  ../utility/binarrayparser.h ../utility/lineparser.h \
-  ../utility/strings.h ../utility/configurationparser.h \
-  ../utility/lineparser.h ../utility/application.h ../utility/basiclog.h \
-  ../utility/casecontrolstatus.h ../utility/random.h diseasemodel.h \
-  diseaselocus.h ../utility/strings.h blocklistnodefourgammetes.h \
-  ../utility/exception.h
+ ../utility/types.h ../random/randomc.h blocklistnode.h locselection.h \
+ ../utility/types.h ../utility/rbtree.h chrompool.h minchrom.h \
+ chromosome.h locusassociation.h growthrate.h distmappingfn.h \
+ individual.h ../utility/utility.h ../utility/stringlookup.h \
+ ../utility/utility.h ../utility/basiclog.h ../utility/genolookup.h \
+ ../utility/typelookup.h ../utility/genobplookup.h \
+ ../utility/genolookup.h ../utility/generatereport.h \
+ ../utility/genotypeparser.h ../utility/binarrayparser.h \
+ ../utility/lineparser.h ../utility/strings.h \
+ ../utility/configurationparser.h ../utility/lineparser.h \
+ ../utility/application.h ../utility/basiclog.h \
+ ../utility/casecontrolstatus.h ../utility/random.h diseasemodel.h \
+ diseaselocus.h ../utility/strings.h blocklistnodefourgammetes.h \
+ ../utility/exception.h
 locselection.o: locselection.cpp locselection.h ../utility/types.h \
-  locus.h ../utility/random.h ../utility/types.h ../random/randomc.h \
-  blocklistnode.h ../utility/rbtree.h
+ locus.h ../utility/random.h ../utility/types.h ../random/randomc.h \
+ blocklistnode.h ../utility/rbtree.h
 logisticgrowth.o: logisticgrowth.cpp logisticgrowth.h ../utility/types.h \
-  growthrate.h ../utility/random.h ../utility/types.h ../random/randomc.h
+ growthrate.h ../utility/random.h ../utility/types.h ../random/randomc.h
 lineargrowth.o: lineargrowth.cpp lineargrowth.h growthrate.h \
-  ../utility/random.h ../utility/types.h ../random/randomc.h
+ ../utility/random.h ../utility/types.h ../random/randomc.h
 individual.o: individual.cpp individual.h chromosome.h \
-  ../utility/random.h ../utility/types.h ../random/randomc.h locus.h \
-  locusassociation.h ../utility/types.h ../utility/rbtree.h \
-  ../utility/utility.h ../utility/types.h ../utility/stringlookup.h \
-  ../utility/utility.h ../utility/basiclog.h ../utility/genolookup.h \
-  ../utility/typelookup.h ../utility/genobplookup.h \
-  ../utility/genolookup.h ../utility/generatereport.h \
-  ../utility/genotypeparser.h ../utility/binarrayparser.h \
-  ../utility/lineparser.h ../utility/strings.h \
-  ../utility/configurationparser.h ../utility/lineparser.h \
-  ../utility/application.h ../utility/basiclog.h \
-  ../utility/casecontrolstatus.h ../utility/random.h diseasemodel.h \
-  diseaselocus.h ../utility/strings.h penetrancemodel.h poolmanager.h \
-  chrompool.h minchrom.h growthrate.h distmappingfn.h \
-  blocklistnodefourgammetes.h blocklistnode.h locreport.h locselection.h \
-  ../utility/exception.h
+ ../utility/random.h ../utility/types.h ../random/randomc.h locus.h \
+ locusassociation.h ../utility/types.h ../utility/rbtree.h \
+ ../utility/utility.h ../utility/stringlookup.h ../utility/utility.h \
+ ../utility/basiclog.h ../utility/genolookup.h ../utility/typelookup.h \
+ ../utility/genobplookup.h ../utility/genolookup.h \
+ ../utility/generatereport.h ../utility/genotypeparser.h \
+ ../utility/binarrayparser.h ../utility/lineparser.h ../utility/strings.h \
+ ../utility/configurationparser.h ../utility/lineparser.h \
+ ../utility/application.h ../utility/basiclog.h \
+ ../utility/casecontrolstatus.h ../utility/random.h diseasemodel.h \
+ diseaselocus.h ../utility/strings.h penetrancemodel.h poolmanager.h \
+ chrompool.h minchrom.h growthrate.h distmappingfn.h \
+ blocklistnodefourgammetes.h blocklistnode.h locreport.h locselection.h \
+ ../utility/exception.h
 meantable.o: meantable.cpp meantable.h penetrancemodel.h diseasemodel.h \
-  ../utility/types.h diseaselocus.h poolmanager.h chrompool.h minchrom.h \
-  ../utility/random.h ../utility/types.h ../random/randomc.h chromosome.h \
-  locus.h locusassociation.h ../utility/rbtree.h growthrate.h \
-  distmappingfn.h individual.h ../utility/utility.h ../utility/types.h \
-  ../utility/stringlookup.h ../utility/utility.h ../utility/basiclog.h \
-  ../utility/genolookup.h ../utility/typelookup.h \
-  ../utility/genobplookup.h ../utility/genolookup.h \
-  ../utility/generatereport.h ../utility/genotypeparser.h \
-  ../utility/binarrayparser.h ../utility/lineparser.h \
-  ../utility/strings.h ../utility/configurationparser.h \
-  ../utility/lineparser.h ../utility/application.h ../utility/basiclog.h \
-  ../utility/casecontrolstatus.h ../utility/random.h ../utility/strings.h \
-  blocklistnodefourgammetes.h blocklistnode.h locreport.h locselection.h \
-  ../utility/exception.h ../utility/lineparser.h \
-  ../simulation/poolmanager.h
+ ../utility/types.h diseaselocus.h poolmanager.h chrompool.h minchrom.h \
+ ../utility/random.h ../utility/types.h ../random/randomc.h chromosome.h \
+ locus.h locusassociation.h ../utility/rbtree.h growthrate.h \
+ distmappingfn.h individual.h ../utility/utility.h \
+ ../utility/stringlookup.h ../utility/utility.h ../utility/basiclog.h \
+ ../utility/genolookup.h ../utility/typelookup.h \
+ ../utility/genobplookup.h ../utility/genolookup.h \
+ ../utility/generatereport.h ../utility/genotypeparser.h \
+ ../utility/binarrayparser.h ../utility/lineparser.h ../utility/strings.h \
+ ../utility/configurationparser.h ../utility/lineparser.h \
+ ../utility/application.h ../utility/basiclog.h \
+ ../utility/casecontrolstatus.h ../utility/random.h ../utility/strings.h \
+ blocklistnodefourgammetes.h blocklistnode.h locreport.h locselection.h \
+ ../utility/exception.h ../simulation/poolmanager.h
 minchrom.o: minchrom.cpp minchrom.h ../utility/types.h \
-  ../utility/random.h ../utility/types.h ../random/randomc.h chromosome.h \
-  locus.h locusassociation.h ../utility/rbtree.h
+ ../utility/random.h ../utility/types.h ../random/randomc.h chromosome.h \
+ locus.h locusassociation.h ../utility/rbtree.h
 pedigreereferencesample.o: pedigreereferencesample.cpp \
-  pedigreereferencesample.h templatedpedigree.h pedigreesample.h \
-  ../utility/types.h basicsample.h chrompool.h minchrom.h \
-  ../utility/random.h ../utility/types.h ../random/randomc.h chromosome.h \
-  locus.h locusassociation.h ../utility/rbtree.h growthrate.h \
-  distmappingfn.h individual.h ../utility/utility.h ../utility/types.h \
-  ../utility/stringlookup.h ../utility/utility.h ../utility/basiclog.h \
-  ../utility/genolookup.h ../utility/typelookup.h \
-  ../utility/genobplookup.h ../utility/genolookup.h \
-  ../utility/generatereport.h ../utility/genotypeparser.h \
-  ../utility/binarrayparser.h ../utility/lineparser.h \
-  ../utility/strings.h ../utility/configurationparser.h \
-  ../utility/lineparser.h ../utility/application.h ../utility/basiclog.h \
-  ../utility/casecontrolstatus.h ../utility/random.h diseasemodel.h \
-  diseaselocus.h ../utility/strings.h blocklistnodefourgammetes.h \
-  blocklistnode.h locreport.h locselection.h ../utility/exception.h \
-  penetrancemodel.h poolmanager.h
+ pedigreereferencesample.h templatedpedigree.h pedigreesample.h \
+ ../utility/types.h basicsample.h chrompool.h minchrom.h \
+ ../utility/random.h ../utility/types.h ../random/randomc.h chromosome.h \
+ locus.h locusassociation.h ../utility/rbtree.h growthrate.h \
+ distmappingfn.h individual.h ../utility/utility.h \
+ ../utility/stringlookup.h ../utility/utility.h ../utility/basiclog.h \
+ ../utility/genolookup.h ../utility/typelookup.h \
+ ../utility/genobplookup.h ../utility/genolookup.h \
+ ../utility/generatereport.h ../utility/genotypeparser.h \
+ ../utility/binarrayparser.h ../utility/lineparser.h ../utility/strings.h \
+ ../utility/configurationparser.h ../utility/lineparser.h \
+ ../utility/application.h ../utility/basiclog.h \
+ ../utility/casecontrolstatus.h ../utility/random.h diseasemodel.h \
+ diseaselocus.h ../utility/strings.h blocklistnodefourgammetes.h \
+ blocklistnode.h locreport.h locselection.h ../utility/exception.h \
+ penetrancemodel.h poolmanager.h
 pedigreesample.o: pedigreesample.cpp pedigreesample.h ../utility/types.h \
-  basicsample.h chrompool.h minchrom.h ../utility/random.h \
-  ../utility/types.h ../random/randomc.h chromosome.h locus.h \
-  locusassociation.h ../utility/rbtree.h growthrate.h distmappingfn.h \
-  individual.h ../utility/utility.h ../utility/types.h \
-  ../utility/stringlookup.h ../utility/utility.h ../utility/basiclog.h \
-  ../utility/genolookup.h ../utility/typelookup.h \
-  ../utility/genobplookup.h ../utility/genolookup.h \
-  ../utility/generatereport.h ../utility/genotypeparser.h \
-  ../utility/binarrayparser.h ../utility/lineparser.h \
-  ../utility/strings.h ../utility/configurationparser.h \
-  ../utility/lineparser.h ../utility/application.h ../utility/basiclog.h \
-  ../utility/casecontrolstatus.h ../utility/random.h diseasemodel.h \
-  diseaselocus.h ../utility/strings.h blocklistnodefourgammetes.h \
-  blocklistnode.h locreport.h locselection.h ../utility/exception.h \
-  penetrancemodel.h poolmanager.h meantable.h ../utility/lineparser.h \
-  ../simulation/poolmanager.h
+ basicsample.h chrompool.h minchrom.h ../utility/random.h \
+ ../utility/types.h ../random/randomc.h chromosome.h locus.h \
+ locusassociation.h ../utility/rbtree.h growthrate.h distmappingfn.h \
+ individual.h ../utility/utility.h ../utility/stringlookup.h \
+ ../utility/utility.h ../utility/basiclog.h ../utility/genolookup.h \
+ ../utility/typelookup.h ../utility/genobplookup.h \
+ ../utility/genolookup.h ../utility/generatereport.h \
+ ../utility/genotypeparser.h ../utility/binarrayparser.h \
+ ../utility/lineparser.h ../utility/strings.h \
+ ../utility/configurationparser.h ../utility/lineparser.h \
+ ../utility/application.h ../utility/basiclog.h \
+ ../utility/casecontrolstatus.h ../utility/random.h diseasemodel.h \
+ diseaselocus.h ../utility/strings.h blocklistnodefourgammetes.h \
+ blocklistnode.h locreport.h locselection.h ../utility/exception.h \
+ penetrancemodel.h poolmanager.h meantable.h ../simulation/poolmanager.h
 penetranceeval.o: penetranceeval.cpp penetranceeval.h
 penfilemodel.o: penfilemodel.cpp penfilemodel.h penetrancemodel.h \
-  diseasemodel.h ../utility/types.h diseaselocus.h poolmanager.h \
-  chrompool.h minchrom.h ../utility/random.h ../utility/types.h \
-  ../random/randomc.h chromosome.h locus.h locusassociation.h \
-  ../utility/rbtree.h growthrate.h distmappingfn.h individual.h \
-  ../utility/utility.h ../utility/types.h ../utility/stringlookup.h \
-  ../utility/utility.h ../utility/basiclog.h ../utility/genolookup.h \
-  ../utility/typelookup.h ../utility/genobplookup.h \
-  ../utility/genolookup.h ../utility/generatereport.h \
-  ../utility/genotypeparser.h ../utility/binarrayparser.h \
-  ../utility/lineparser.h ../utility/strings.h \
-  ../utility/configurationparser.h ../utility/lineparser.h \
-  ../utility/application.h ../utility/basiclog.h \
-  ../utility/casecontrolstatus.h ../utility/random.h ../utility/strings.h \
-  blocklistnodefourgammetes.h blocklistnode.h locreport.h locselection.h \
-  ../utility/exception.h
+ diseasemodel.h ../utility/types.h diseaselocus.h poolmanager.h \
+ chrompool.h minchrom.h ../utility/random.h ../utility/types.h \
+ ../random/randomc.h chromosome.h locus.h locusassociation.h \
+ ../utility/rbtree.h growthrate.h distmappingfn.h individual.h \
+ ../utility/utility.h ../utility/stringlookup.h ../utility/utility.h \
+ ../utility/basiclog.h ../utility/genolookup.h ../utility/typelookup.h \
+ ../utility/genobplookup.h ../utility/genolookup.h \
+ ../utility/generatereport.h ../utility/genotypeparser.h \
+ ../utility/binarrayparser.h ../utility/lineparser.h ../utility/strings.h \
+ ../utility/configurationparser.h ../utility/lineparser.h \
+ ../utility/application.h ../utility/basiclog.h \
+ ../utility/casecontrolstatus.h ../utility/random.h ../utility/strings.h \
+ blocklistnodefourgammetes.h blocklistnode.h locreport.h locselection.h \
+ ../utility/exception.h
 poolmanager.o: poolmanager.cpp poolmanager.h ../utility/types.h \
-  chrompool.h minchrom.h ../utility/random.h ../utility/types.h \
-  ../random/randomc.h chromosome.h locus.h locusassociation.h \
-  ../utility/rbtree.h growthrate.h distmappingfn.h individual.h \
-  ../utility/utility.h ../utility/types.h ../utility/stringlookup.h \
-  ../utility/utility.h ../utility/basiclog.h ../utility/genolookup.h \
-  ../utility/typelookup.h ../utility/genobplookup.h \
-  ../utility/genolookup.h ../utility/generatereport.h \
-  ../utility/genotypeparser.h ../utility/binarrayparser.h \
-  ../utility/lineparser.h ../utility/strings.h \
-  ../utility/configurationparser.h ../utility/lineparser.h \
-  ../utility/application.h ../utility/basiclog.h \
-  ../utility/casecontrolstatus.h ../utility/random.h diseasemodel.h \
-  diseaselocus.h ../utility/strings.h blocklistnodefourgammetes.h \
-  blocklistnode.h locreport.h locselection.h ../utility/exception.h \
-  basicsample.h penetrancemodel.h
+ chrompool.h minchrom.h ../utility/random.h ../utility/types.h \
+ ../random/randomc.h chromosome.h locus.h locusassociation.h \
+ ../utility/rbtree.h growthrate.h distmappingfn.h individual.h \
+ ../utility/utility.h ../utility/stringlookup.h ../utility/utility.h \
+ ../utility/basiclog.h ../utility/genolookup.h ../utility/typelookup.h \
+ ../utility/genobplookup.h ../utility/genolookup.h \
+ ../utility/generatereport.h ../utility/genotypeparser.h \
+ ../utility/binarrayparser.h ../utility/lineparser.h ../utility/strings.h \
+ ../utility/configurationparser.h ../utility/lineparser.h \
+ ../utility/application.h ../utility/basiclog.h \
+ ../utility/casecontrolstatus.h ../utility/random.h diseasemodel.h \
+ diseaselocus.h ../utility/strings.h blocklistnodefourgammetes.h \
+ blocklistnode.h locreport.h locselection.h ../utility/exception.h \
+ basicsample.h penetrancemodel.h
 richardslogistic.o: richardslogistic.cpp richardslogistic.h \
-  logisticgrowth.h ../utility/types.h growthrate.h ../utility/random.h \
-  ../utility/types.h ../random/randomc.h
+ logisticgrowth.h ../utility/types.h growthrate.h ../utility/random.h \
+ ../utility/types.h ../random/randomc.h
 templatedpedigree.o: templatedpedigree.cpp templatedpedigree.h \
-  pedigreesample.h ../utility/types.h basicsample.h chrompool.h \
-  minchrom.h ../utility/random.h ../utility/types.h ../random/randomc.h \
-  chromosome.h locus.h locusassociation.h ../utility/rbtree.h \
-  growthrate.h distmappingfn.h individual.h ../utility/utility.h \
-  ../utility/types.h ../utility/stringlookup.h ../utility/utility.h \
-  ../utility/basiclog.h ../utility/genolookup.h ../utility/typelookup.h \
-  ../utility/genobplookup.h ../utility/genolookup.h \
-  ../utility/generatereport.h ../utility/genotypeparser.h \
-  ../utility/binarrayparser.h ../utility/lineparser.h \
-  ../utility/strings.h ../utility/configurationparser.h \
-  ../utility/lineparser.h ../utility/application.h ../utility/basiclog.h \
-  ../utility/casecontrolstatus.h ../utility/random.h diseasemodel.h \
-  diseaselocus.h ../utility/strings.h blocklistnodefourgammetes.h \
-  blocklistnode.h locreport.h locselection.h ../utility/exception.h \
-  penetrancemodel.h poolmanager.h
+ pedigreesample.h ../utility/types.h basicsample.h chrompool.h minchrom.h \
+ ../utility/random.h ../utility/types.h ../random/randomc.h chromosome.h \
+ locus.h locusassociation.h ../utility/rbtree.h growthrate.h \
+ distmappingfn.h individual.h ../utility/utility.h \
+ ../utility/stringlookup.h ../utility/utility.h ../utility/basiclog.h \
+ ../utility/genolookup.h ../utility/typelookup.h \
+ ../utility/genobplookup.h ../utility/genolookup.h \
+ ../utility/generatereport.h ../utility/genotypeparser.h \
+ ../utility/binarrayparser.h ../utility/lineparser.h ../utility/strings.h \
+ ../utility/configurationparser.h ../utility/lineparser.h \
+ ../utility/application.h ../utility/basiclog.h \
+ ../utility/casecontrolstatus.h ../utility/random.h diseasemodel.h \
+ diseaselocus.h ../utility/strings.h blocklistnodefourgammetes.h \
+ blocklistnode.h locreport.h locselection.h ../utility/exception.h \
+ penetrancemodel.h poolmanager.h

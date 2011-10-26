@@ -16,6 +16,7 @@
 #include <fstream>
 #include <sstream>
 #include <vector>
+#include <cstring>
 #include "types.h"
 #include "strings.h"
 #include <map>

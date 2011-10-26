@@ -15,6 +15,7 @@
 #include <fstream>
 #include "snpholder.h"
 #include <iostream>
+#include <stdlib.h>
 namespace Biofilter {
 /**
 * @brief encapsulates a bit more information specific to a region(gene)

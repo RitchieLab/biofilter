@@ -2,28 +2,28 @@ application.o: application.cpp application.h types.h basiclog.h
 basiclog.o: basiclog.cpp basiclog.h types.h
 binarrayparser.o: binarrayparser.cpp binarrayparser.h
 casecontrolstatus.o: casecontrolstatus.cpp casecontrolstatus.h types.h \
-  random.h ../random/randomc.h
+ random.h ../random/randomc.h
 configurationparser.o: configurationparser.cpp configurationparser.h \
-  lineparser.h types.h strings.h
+ lineparser.h types.h strings.h
 executionlog.o: executionlog.cpp executionlog.h types.h exception.h \
-  strings.h
+ strings.h
 filebuffer.o: filebuffer.cpp filebuffer.h
 genolookup.o: genolookup.cpp genolookup.h typelookup.h types.h
 genobplookup.o: genobplookup.cpp genobplookup.h genolookup.h typelookup.h \
-  types.h
+ types.h
 generatereport.o: generatereport.cpp generatereport.h
 genotypeparser.o: genotypeparser.cpp genotypeparser.h
 lineparser.o: lineparser.cpp lineparser.h types.h strings.h exception.h
 random.o: random.cpp random.h types.h ../random/randomc.h
 stringlookup.o: stringlookup.cpp stringlookup.h utility.h \
-  ../utility/types.h ../utility/stringlookup.h ../utility/basiclog.h \
-  ../utility/types.h ../utility/genolookup.h ../utility/typelookup.h \
-  ../utility/genobplookup.h ../utility/genolookup.h \
-  ../utility/generatereport.h ../utility/genotypeparser.h \
-  ../utility/binarrayparser.h ../utility/lineparser.h \
-  ../utility/strings.h ../utility/configurationparser.h \
-  ../utility/lineparser.h ../utility/application.h ../utility/basiclog.h \
-  ../utility/casecontrolstatus.h ../utility/random.h ../random/randomc.h
+ ../utility/types.h ../utility/stringlookup.h ../utility/basiclog.h \
+ ../utility/types.h ../utility/genolookup.h ../utility/typelookup.h \
+ ../utility/genobplookup.h ../utility/genolookup.h \
+ ../utility/generatereport.h ../utility/genotypeparser.h \
+ ../utility/binarrayparser.h ../utility/lineparser.h ../utility/strings.h \
+ ../utility/configurationparser.h ../utility/lineparser.h \
+ ../utility/application.h ../utility/basiclog.h \
+ ../utility/casecontrolstatus.h ../utility/random.h ../random/randomc.h
 strings.o: strings.cpp strings.h types.h exception.h
 typelookup.o: typelookup.cpp typelookup.h
 types.o: types.cpp types.h
