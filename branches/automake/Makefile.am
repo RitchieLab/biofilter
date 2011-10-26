@@ -5,4 +5,4 @@ SUBDIRS = \
 	src/liftover \
 	src/biofilter
 
-ACLOCAL_AMFLAGS = -I./make/m4
+ACLOCAL_AMFLAGS = -I ./make/m4
