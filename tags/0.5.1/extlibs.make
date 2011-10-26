@@ -29,7 +29,11 @@ else
         #SOCI_LINKS:=-L/usr/local/lib -L/usr/local/lib64 /usr/local/lib/libsoci_sqlite3-gcc-3_0.a /usr/local/lib/libsoci_core-gcc-3_0.a -lsqlite3 -ldl -lpthread
 	#To build on our cheeses, I have to uncomment this line....need to streamline this 
 	SOCI_LINKS:=-L/usr/local/lib -L/usr/local/lib64 /usr/local/lib64/libsoci_sqlite3-gcc-3_0.a /usr/local/lib64/libsoci_core-gcc-3_0.a /usr/local/lib64/libsqlite3.a -ldl -lpthread
-	SOCI_LINES:=-L/usr/local/lib -L/usr/local/lib64 -lsoci_sqlite3-gcc-3_0 -lsoci_core-gcc-3_0 -lsqlite3 -ldl -lpthread
+	#SOCI_LINES:=-L/usr/local/lib -L/usr/local/lib64 -lsoci_sqlite3-gcc-3_0 -lsoci_core-gcc-3_0 -lsqlite3 -ldl -lpthread
+	
+	# for bx.psu
+	SOCI_CPPFLAGS:=-I/afs/bx.psu.edu/depot/data/ritchie_lab/usr/tools/include
+	SOCI_LINKS:=-L/afs/bx.psu.edu/depot/data/ritchie_lab/usr/tools/lib -lsoci_sqlite3 -lsoci_core -lsqlite3 -ldl -lpthread
 endif
 endif
 
