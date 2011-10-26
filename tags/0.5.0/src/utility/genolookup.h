@@ -15,6 +15,8 @@
 #include "typelookup.h"
 #include "types.h"
 #include <string>
+#include <cstring>
+#include <stdio.h>
 #include <vector>
 #include <assert.h>
 

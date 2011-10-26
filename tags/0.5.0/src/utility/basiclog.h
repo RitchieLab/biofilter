@@ -14,6 +14,7 @@
 #include <cstdarg>
 #include <fstream>
 #include <iostream>
+#include <cstring>
 #include "types.h"
 
 namespace Utility {

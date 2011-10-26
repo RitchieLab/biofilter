@@ -2,6 +2,7 @@
 #define UTILITY_STRINGS_H
 
 #include <string>
+#include <cstring>
 #include <vector>
 #include "types.h"
 #include <sstream>

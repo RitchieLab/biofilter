@@ -89,48 +89,50 @@ DEPENDANTLIBS=$(patsubst %, $(LIBPATH)/lib%$(EXEC_PREFIX)$(LIBSUFFIX).a, $(LOCAL
 
 all: $(BINPATH)/biofilter$(LIBSUFFIX)
 
-.PHONY: clean test serial parallel genomesim
+#.PHONY: clean test serial parallel genomesim
+.PHONY: clean test serial parallel
 
 
-mdrpdt: $(BINPATH)/mdr-pdt$(EXEC_PREFIX)
+#mdrpdt: $(BINPATH)/mdr-pdt$(EXEC_PREFIX)
 
 bc:
 	@echo "Building Binary Compression"
 	@$(MAKE) -C $(ROOTPATH)/src/tools -fmake.binarycompress $(RELEASEMODE) $(PROJECT_OPTIONS)
+
+
+#serial: $(BINPATH)/mdr-pdt
+#parallel: $(BINPATH)/mdr-pdtp
+
+#vampire:
+#	@echo "Building Parallel for vampire cluster";
+#	@$(MAKE) -C $(ROOTPATH) $(BINPATH)/mdr-pdtp USE_MPI=1 $(PROJECT_OPTIONS) VAMPIRE=1
 	
+#power: 
+#	@echo "Building Basic power application";
+#	@$(MAKE) -C $(ROOTPATH)/src/mdrpdt -fmake.power  $(PROJECT_OPTIONS)
 
+#powerp: $(BINPATH)/mdr-pdtp
+#	@echo "Building Basic parallel power application";
+#	@$(MAKE) -C $(ROOTPATH)/src/mdrpdt -fmake.power USE_MPI=1 $(PROJECT_OPTIONS)
 
-serial: $(BINPATH)/mdr-pdt
-parallel: $(BINPATH)/mdr-pdtp
-vampire:
-	@echo "Building Parallel for vampire cluster";
-	@$(MAKE) -C $(ROOTPATH) $(BINPATH)/mdr-pdtp USE_MPI=1 $(PROJECT_OPTIONS) VAMPIRE=1
-	
-power: 
-	@echo "Building Basic power application";
-	@$(MAKE) -C $(ROOTPATH)/src/mdrpdt -fmake.power  $(PROJECT_OPTIONS)
+#power-vampire: $(BINPATH)/mdr-pdtp
+#	@echo "Building Basic power application for vampire";
+#	@$(MAKE) -C $(ROOTPATH)/src/mdrpdt -fmake.power USE_MPI=1 $(PROJECT_OPTIONS) VAMPIRE=1
 
-powerp: $(BINPATH)/mdr-pdtp
-	@echo "Building Basic parallel power application";
-	@$(MAKE) -C $(ROOTPATH)/src/mdrpdt -fmake.power USE_MPI=1 $(PROJECT_OPTIONS)
-
-power-vampire: $(BINPATH)/mdr-pdtp
-	@echo "Building Basic power application for vampire";
-	@$(MAKE) -C $(ROOTPATH)/src/mdrpdt -fmake.power USE_MPI=1 $(PROJECT_OPTIONS) VAMPIRE=1
-gs-gui: $(BINPATH)/wxGenomeSIMLA$(LIBSUFFIX)
-simla: $(LIBPATH)/libsimla$(LIBSUFFIX).a
-ga: $(LIBPATH)/libga$(LIBSUFFIX).a
-simpen: $(LIBPATH)/libsimpen$(LIBSUFFIX).a
+#gs-gui: $(BINPATH)/wxGenomeSIMLA$(LIBSUFFIX)
+#simla: $(LIBPATH)/libsimla$(LIBSUFFIX).a
+#ga: $(LIBPATH)/libga$(LIBSUFFIX).a
+#simpen: $(LIBPATH)/libsimpen$(LIBSUFFIX).a
 simulation: $(LIBPATH)/libsimulation$(LIBSUFFIX).a
 utility: $(LIBPATH)/libutility$(LIBSUFFIX).a
 random: $(LIBPATH)/librandom$(LIBSUFFIX).a
-genomesim: $(LIBPATH)/libgenomesim$(LIBSUFFIX).a
-pngwriter: $(LIBPATH)/libpngwriter$(LIBSUFFIX).a
+#genomesim: $(LIBPATH)/libgenomesim$(LIBSUFFIX).a
+#pngwriter: $(LIBPATH)/libpngwriter$(LIBSUFFIX).a
 biofilter: $(BINPATH)/biofilter$(LIBSUFFIX)
 
-test: $(BINPATH)/test/mdrpdt.test
-	@echo "Building Basic power application";
-	@$(MAKE) -C $(ROOTPATH)/src/genomesim $(PROJECT_OPTIONS) 
+#test: $(BINPATH)/test/mdrpdt.test
+#	@echo "Building Basic power application";
+#	@$(MAKE) -C $(ROOTPATH)/src/genomesim $(PROJECT_OPTIONS) 
 
 release:
 	make COMPAT=32 
@@ -142,34 +144,34 @@ clean:
 	@$(MAKE) -C $(ROOTPATH)/src/genetics $(RELEASEMODE) clean
 	@$(MAKE) -C $(ROOTPATH)/src/utility $(RELEASEMODE) clean
 	@$(MAKE) -C $(ROOTPATH)/src/simulation $(RELEASEMODE) clean
-	@$(MAKE) -C $(ROOTPATH)/src/genomesim $(RELEASEMODE) clean
+#	@$(MAKE) -C $(ROOTPATH)/src/genomesim $(RELEASEMODE) clean
 
 cleantmps:
 	@$(MAKE) -C $(ROOTPATH)/src/genetics $(RELEASEMODE) cleantmps
 	@$(MAKE) -C $(ROOTPATH)/src/utility $(RELEASEMODE) cleantmps
 	@$(MAKE) -C $(ROOTPATH)/src/simulation $(RELEASEMODE) cleantmps
-	@$(MAKE) -C $(ROOTPATH)/src/genomesim $(RELEASEMODE) cleantmps
+#	@$(MAKE) -C $(ROOTPATH)/src/genomesim $(RELEASEMODE) cleantmps
 
 $(BINPATH)/biofilter$(LIBSUFFIX): $(DEPENDANTLIBS)
 	$(MAKE) -C $(ROOTPATH)/src/biofilter $(RELEASEMODE) $(PROJECT_OPTIONS)
 
-$(BINPATH)/wxGenomeSIMLA$(LIBSUFFIX): $(DEPENDANTLIBS)
-	@$(MAKE) -C $(ROOTPATH)/src/wxgenomesimla $(RELEASEMODE) $(PROJECT_OPTIONS)
+#$(BINPATH)/wxGenomeSIMLA$(LIBSUFFIX): $(DEPENDANTLIBS)
+#	@$(MAKE) -C $(ROOTPATH)/src/wxgenomesimla $(RELEASEMODE) $(PROJECT_OPTIONS)
 
-$(BINPATH)/genomeSIMLA$(LIBSUFFIX):  $(DEPENDANTLIBS)
-	@$(MAKE) -C $(ROOTPATH)/src/genomesim $(RELEASEMODE) $(PROJECT_OPTIONS)
+#$(BINPATH)/genomeSIMLA$(LIBSUFFIX):  $(DEPENDANTLIBS)
+#	@$(MAKE) -C $(ROOTPATH)/src/genomesim $(RELEASEMODE) $(PROJECT_OPTIONS)
 
-$(BINPATH)/genomeSIMLAp:  	$(DEPENDANTLIBS)
-	@$(MAKE) -C $(ROOTPATH)/src/genomesim $(RELEASEMODE) $(PROJECT_OPTIONS)
+#$(BINPATH)/genomeSIMLAp:  	$(DEPENDANTLIBS)
+#	@$(MAKE) -C $(ROOTPATH)/src/genomesim $(RELEASEMODE) $(PROJECT_OPTIONS)
 
-$(BINPATH)/mdr-pdt-power: 	$(DEPENDANTLIBS)
-	@$(MAKE) -C $(ROOTPATH)/src/mdrpdt -f$(ROOTPATH)/src/make.power $(RELEASEMODE) $(PROJECT_OPTIONS)
+#$(BINPATH)/mdr-pdt-power: 	$(DEPENDANTLIBS)
+#	@$(MAKE) -C $(ROOTPATH)/src/mdrpdt -f$(ROOTPATH)/src/make.power $(RELEASEMODE) $(PROJECT_OPTIONS)
 
-$(BINPATH)/mdr-pdt: $(DEPENDANTLIBS)
-	@$(MAKE) -C $(ROOTPATH)/src/mdrpdt $(RELEASEMODE) $(PROJECT_OPTIONS) USE_MPI=0 
+#$(BINPATH)/mdr-pdt: $(DEPENDANTLIBS)
+#	@$(MAKE) -C $(ROOTPATH)/src/mdrpdt $(RELEASEMODE) $(PROJECT_OPTIONS) USE_MPI=0 
 
-$(BINPATH)/mdr-pdtp: $(DEPENDANTLIBS)
-	@$(MAKE) -C $(ROOTPATH)/src/mdrpdt $(RELEASEMODE) $(PROJECT_OPTIONS) USE_MPI=1
+#$(BINPATH)/mdr-pdtp: $(DEPENDANTLIBS)
+#	@$(MAKE) -C $(ROOTPATH)/src/mdrpdt $(RELEASEMODE) $(PROJECT_OPTIONS) USE_MPI=1
 
 $(LIBPATH)/libgenetics$(LIBSUFFIX).a:
 	$(TERM_CYAN)
@@ -183,29 +185,29 @@ $(LIBPATH)/librandom$(LIBSUFFIX).a:
 	$(TERM_RESET)
 	@$(MAKE) -C $(ROOTPATH)/src/random $(RELEASEMODE) $(PROJECT_OPTIONS)
 	
-$(LIBPATH)/libpngwriter$(LIBSUFFIX).a:
-	$(TERM_CYAN)
-	@echo "Building $@ $^"
-	$(TERM_RESET)
-	@$(MAKE) -C $(ROOTPATH)/src/pngwriter $(RELEASEMODE) $(PROJECT_OPTIONS)
+#$(LIBPATH)/libpngwriter$(LIBSUFFIX).a:
+#	$(TERM_CYAN)
+#	@echo "Building $@ $^"
+#	$(TERM_RESET)
+#	@$(MAKE) -C $(ROOTPATH)/src/pngwriter $(RELEASEMODE) $(PROJECT_OPTIONS)
 
-$(LIBPATH)/libsimpen$(LIBSUFFIX).a:
-	$(TERM_CYAN)
-	@echo "Building $@ $^"
-	$(TERM_RESET)
-	@$(MAKE) -C $(ROOTPATH)/src/simpen $(RELEASEMODE) $(PROJECT_OPTIONS)
+#$(LIBPATH)/libsimpen$(LIBSUFFIX).a:
+#	$(TERM_CYAN)
+#	@echo "Building $@ $^"
+#	$(TERM_RESET)
+#	@$(MAKE) -C $(ROOTPATH)/src/simpen $(RELEASEMODE) $(PROJECT_OPTIONS)
 
-$(LIBPATH)/libsimla$(LIBSUFFIX).a:
-	$(TERM_CYAN)
-	@echo "Building $@ $^"
-	$(TERM_RESET)
-	@$(MAKE) -C $(ROOTPATH)/src/simla $(RELEASEMODE) $(PROJECT_OPTIONS)
+#$(LIBPATH)/libsimla$(LIBSUFFIX).a:
+#	$(TERM_CYAN)
+#	@echo "Building $@ $^"
+#	$(TERM_RESET)
+#	@$(MAKE) -C $(ROOTPATH)/src/simla $(RELEASEMODE) $(PROJECT_OPTIONS)
 
-$(LIBPATH)/libga$(LIBSUFFIX).a:
-	$(TERM_CYAN)
-	@echo "Building $@ $^"
-	$(TERM_RESET)
-	@$(MAKE) -C $(ROOTPATH)/src/ga $(RELEASEMODE) $(PROJECT_OPTIONS)
+#$(LIBPATH)/libga$(LIBSUFFIX).a:
+#	$(TERM_CYAN)
+#	@echo "Building $@ $^"
+#	$(TERM_RESET)
+#	@$(MAKE) -C $(ROOTPATH)/src/ga $(RELEASEMODE) $(PROJECT_OPTIONS)
 
 $(LIBPATH)/libsimulation$(LIBSUFFIX).a:
 	$(TERM_CYAN)
@@ -219,6 +221,5 @@ $(LIBPATH)/libutility$(LIBSUFFIX).a:
 	$(TERM_RESET)
 	@$(MAKE) -C $(ROOTPATH)/src/utility $(RELEASEMODE) $(PROJECT_OPTIONS)
 
-
-$(BINPATH)/test/mdrpdt.test: $(patsubst %, $(LIBPATH)/lib%$(LIBSUFFIX).a, $(LOCAL_LIBS))
-	@$(MAKE) -C $(ROOTPATH)/test $(RELEASEMODE) $(PROJECT_OPTIONS)
+#$(BINPATH)/test/mdrpdt.test: $(patsubst %, $(LIBPATH)/lib%$(LIBSUFFIX).a, $(LOCAL_LIBS))
+#	@$(MAKE) -C $(ROOTPATH)/test $(RELEASEMODE) $(PROJECT_OPTIONS)
