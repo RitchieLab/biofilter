@@ -268,7 +268,7 @@ class NCBI_Loader(bioloader.BioLoader):
 					print "Ensembl and RefSEQ out of date: %s:%s ->  ( rs%s , rs%s )"% (chrom, snp.pos, snp.rsid, roles[snp.pos][0])
 				else:
 					withRoles += 1
-			dest.write(struct.pack('IIc', int(snp.rsid), int(snp.pos), "%c" % roleID))
+			dest.write(struct.pack('III', int(snp.rsid), int(snp.pos), int(roleID)))
 			print>>snpLog, "%s\t%s\t%s\t%s" % (chrom, snp.rsid, snp.pos, roleID)
 
 		print>>sys.stderr, "%s SNPs (%s not in ensembl) added for chromosome: %s (%s unvalidated SNPs were ignored)" % (withRoles, withoutRoles, chrom, unvalidatedSNPs)
