@@ -12,6 +12,7 @@
 //
 #ifndef __SNP_SNP_MODEL_H
 #define __SNP_SNP_MODEL_H
+
 #include "biomodel.h"
 #include <set>
 #include <vector>

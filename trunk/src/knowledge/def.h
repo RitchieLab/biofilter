@@ -9,6 +9,9 @@
 #ifndef DEF_H
 #define	DEF_H
 
+#include <stdlib.h>
+#include <string.h>
+
 #include "utility/types.h"
 
 namespace Knowledge {
