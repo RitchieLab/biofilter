@@ -1,7 +1,7 @@
 noinst_LTLIBRARIES = libldspline.la
 
 libldspline_la_LIBADD = \
-	$(top_srcdir)/src/utility/libutility.la
+	../utility/libutility.la
 
 AM_CPPFLAGS = \
 	-I$(top_srcdir)/src
