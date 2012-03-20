@@ -5,7 +5,10 @@ libutility_la_SOURCES = \
 	lineparser.h \
 	locus.h \
 	strings.h \
+	types.h \
+	exception.h \
 	filetools.cpp \
 	lineparser.cpp \
 	locus.cpp \
-	strings.cpp 
+	strings.cpp \
+	exception.cpp

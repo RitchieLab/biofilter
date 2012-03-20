@@ -24,6 +24,14 @@ __top_srcdir__bin_biofilter_SOURCES = \
 	main.h \
 	task.h \
 	taskgenecoverage.h \
+	taskgenereport.h \
+	taskmarkerinfo.h \
+	tasksnpgenemap.h \
+	taskgenegenemodelreport.h \
+	timestamp.h \
+	tasksnpsnpmodelarchive.h \
+	taskgenebased.h \
+	tasksnpreport.h \
 	application.cpp \
 	configuration.cpp \
 	ldsplineimporter.cpp \

@@ -11,6 +11,7 @@ libliftover_la_SOURCES = \
 	converter.h \
 	converterdb.h \
 	region.h \
+	snp.h \
 	chain.cpp \
 	converter.cpp \
 	converterdb.cpp \

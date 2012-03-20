@@ -7,10 +7,12 @@ AM_CPPFLAGS = \
 	-I$(top_srcdir)/src
 
 libknowledge_la_SOURCES = \
-	snptranslator.h \
+	biomodel.h \
 	chromosome.h \
+	def.h \
 	genegenemodel.h \
 	genegenemodelarchive.h \
+	group.h \
 	groupmanager.h \
 	groupmanagerdb.h \
 	region.h \
@@ -19,10 +21,12 @@ libknowledge_la_SOURCES = \
 	regionmanagerdb.h \
 	snpdataset.h \
 	snpsnpmodel.h \
+	biomodel.cpp \
 	chromosome.cpp \
 	def.cpp \
 	genegenemodel.cpp \
 	genegenemodelarchive.cpp \
+	group.cpp \
 	groupmanager.cpp \
 	groupmanagerdb.cpp \
 	region.cpp \
