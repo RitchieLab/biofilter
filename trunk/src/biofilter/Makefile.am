@@ -1,4 +1,4 @@
-bin_PROGRAMS = $(top_srcdir)/bin/biofilter
+bin_PROGRAMS = biofilter
 
 __top_srcdir__bin_biofilter_LDADD = \
 	../utility/libutility.la \
@@ -17,7 +17,7 @@ AM_LDFLAGS = \
 	$(BOOST_LDFLAGS) $(BOOST_FILESYSTEM_LDFLAGS) $(BOOST_SYSTEM_LDFLAGS) $(BOOST_REGEX_LDFLAGS) \
 	$(SOCI_LDFLAGS) $(SOCI_SQLITE_LDFLAGS)
 
-__top_srcdir__bin_biofilter_SOURCES = \
+biofilter_SOURCES = \
 	application.h \
 	configuration.h \
 	ldsplineimporter.h \
