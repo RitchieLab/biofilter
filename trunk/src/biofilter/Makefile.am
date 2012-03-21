@@ -1,6 +1,6 @@
 bin_PROGRAMS = biofilter
 
-__top_srcdir__bin_biofilter_LDADD = \
+biofilter_LDADD = \
 	../utility/libutility.la \
 	../knowledge/libknowledge.la \
 	../ldspline/libldspline.la \
