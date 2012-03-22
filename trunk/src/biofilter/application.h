@@ -149,6 +149,8 @@ public:
 	
 	std::vector<uint> ManagerIDs();
 	Knowledge::GroupManagerDB& GroupManager(uint idx);
+
+
 protected:
 	uint GetPopID(const char *pop);
 
@@ -167,6 +169,7 @@ protected:
 	std::multimap<uint, uint> geneLookup;
 	Knowledge::GeneGeneModelArchive geneGeneModels;
 public:
+	static bool useDataDir;
 	static bool errorExit;										///< When exiting on errors, we won't report the files that "would" have been generated.
 	LiftOver::ConverterDB buildConverter;					///< Converter structure for map files (using liftover chains)
 };

@@ -14,9 +14,13 @@
 #include "ldsplineimporter.h"
 #include "liftover/converterdb.h"
 
+// Use the boost filesystem library to work with OS-independent paths
+#include <boost/filesystem.hpp>
+
 namespace Biofilter {
 
 bool Application::errorExit = false;
+bool Application::useDataDir = false;
 
 std::string Application::GetReportLog() {
 	return reportLog.str();
@@ -283,13 +287,29 @@ uint Application::LoadGroupDataByName(Utility::StringArray& userDefinedGroups,
 
 
 void Application::InitBiofilter(const char *filename, bool reportVersion) {
-	dbFilename				= filename;
-	if (!Utility::FileExists(dbFilename.c_str())) {
+	dbFilename = filename;
+	boost::filesystem::path dbPath = boost::filesystem::path(dbFilename);
+	bool fileFound = false;
+	if (boost::filesystem::is_regular_file(dbPath)) {
+		fileFound = true;
+	}else{
+		#ifdef DATA_DIR
+			if (dbPath.is_relative()){
+				dbPath = (boost::filesystem::path(std::string(DATA_DIR))/=(dbPath));
+				if (boost::filesystem::is_regular_file(dbPath)){
+					fileFound=true;
+					useDataDir = true;
+				}
+			}
+		#endif
+	}
+
+	if (!fileFound){
 		throw Utility::Exception::FileNotFound(filename);
 	}
 
 	try {
-		std::string cnxParam = "dbname="+std::string(dbFilename)+" timeout=2500";
+		std::string cnxParam = "dbname="+std::string(dbPath.c_str())+" timeout=2500";
 		sociDB.open(soci::sqlite3, cnxParam.c_str());
 		std::string dbSnp, ensembl, hapmap, build, variations;
 		sociDB<<"SELECT version FROM versions WHERE element='ncbi'", soci::into(dbSnp);
@@ -308,7 +328,11 @@ void Application::InitBiofilter(const char *filename, bool reportVersion) {
 			std::cerr<<std::setw(38)<<std::right<<"Genome Build : "<<build<<"\n";
 
 		}
-		dataset.SetVariationsFilename(variationFilename.c_str());
+
+		if(useDataDir){
+			boost::filesystem::path var_path = boost::filesystem::path(variationFilename);
+			variationFilename = std::string((boost::filesystem::path(std::string(DATA_DIR))/=var_path).c_str());
+		}
 
 	} catch (soci::soci_error const &e) {
 		std::cerr<<"Problems were encountered trying to open the database, "<<dbFilename<<". Error: "<<e.what()<<"\n";
