@@ -35,6 +35,7 @@ AC_CONFIG_FILES([
 		src/ldspline/Makefile
 		src/liftover/Makefile
 		src/biofilter/Makefile
+		BioUpdater/Makefile
 ])
 
 AC_OUTPUT
