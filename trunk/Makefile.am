@@ -9,4 +9,4 @@ SUBDIRS = \
 ACLOCAL_AMFLAGS = -I ./make/m4
 
 # This is here to prevent installation of LOKI during a distcheck
-AM_DISTCHECK_CONFIGURE_FLAGS="--enable-loki=no"
+DISTCHECK_CONFIGURE_FLAGS=--disable-loki
