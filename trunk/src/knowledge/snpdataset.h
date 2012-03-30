@@ -46,7 +46,7 @@ public:
     * @return
     */
 	uint LoadData(const std::set<std::string>& rsids, std::set<std::string>& snpsFound);
-	uint LoadData(const char *filename, const std::set<std::string>& rsids, std::set<std::string>& snpsFound);
+	uint LoadData(const std::string& filename, const std::set<std::string>& rsids, std::set<std::string>& snpsFound);
 	uint LoadMapData(const char *filename, uint uscBuildVersion, bool performAlignment);
 	/**
 	 * LoadData from a SnpArray-which is likely the result of parsing a marker info file

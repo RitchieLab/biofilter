@@ -27,11 +27,12 @@ uint GroupManagerDB::LoadFromDB(soci::session& sociDB,
 	std::string groupConstraint = "";
 	if (ids.size() > 0)
 		groupConstraint = " AND group_id IN (" + Utility::Join(ids, ",") + ") ";
-	if (groupNames.size() > 0)
+	if (groupNames.size() > 0){
 		if (ids.size() > 0)
 			groupConstraint = " AND ( group_id IN (" + Utility::Join(ids, ",") + ") OR group_name IN ('" + Utility::Join(groupNames, "', '") + "'))";
 		else
 			groupConstraint = " AND group_name IN ('" + Utility::Join(groupNames, "', '") + "')";
+	}
 
 	soci::rowset<soci::row> rs = (sociDB.prepare<<"SELECT group_id from groups WHERE group_type_id="<<id<<groupConstraint);
 	for (soci::rowset<soci::row>::const_iterator itr = rs.begin(); itr != rs.end(); itr++) {

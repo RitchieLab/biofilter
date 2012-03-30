@@ -344,15 +344,15 @@ void SnpDataset::SaveArchiveBinary(const char *filename) {
 }
 
 uint SnpDataset::LoadData(const std::set<std::string>& rsids, std::set<std::string>& snpsFound) {
-	return LoadData(variationsFilename.c_str(), rsids, snpsFound);
+	return LoadData(variationsFilename, rsids, snpsFound);
 }
 
-uint SnpDataset::LoadData(const char *filename, const std::set<std::string>& origrsids, std::set<std::string>& snpsFound) {
+uint SnpDataset::LoadData(const std::string& filename, const std::set<std::string>& origrsids, std::set<std::string>& snpsFound) {
 	if (!boost::filesystem::exists(boost::filesystem::path(filename)))
-		throw Utility::Exception::FileNotFound(filename);
-	std::ifstream file(filename, std::ios::binary);
+		throw Utility::Exception::FileNotFound(filename.c_str());
+	std::ifstream file(filename.c_str(), std::ios::binary);
 	if (!file.good()) 
-		throw Utility::Exception::FileIO(filename, "Unable to open file.");
+		throw Utility::Exception::FileIO(filename.c_str(), "Unable to open file.");
 
 	
 	std::set<std::string>::const_iterator itr = origrsids.begin();
@@ -405,7 +405,7 @@ uint SnpDataset::LoadData(const char *filename, const std::set<std::string>& ori
 	}
 	std::cerr<<"                  Total SNPs loaded : "<<count<<"\n";
 	if (count == 0) 
-		throw Utility::Exception::FileIO(filename, "Improper file type");
+		throw Utility::Exception::FileIO(filename.c_str(), "Improper file type");
 
 	return count;
 }

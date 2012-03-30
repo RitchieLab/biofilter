@@ -331,8 +331,10 @@ void Application::InitBiofilter(const char *filename, bool reportVersion) {
 
 		if(useDataDir){
 			boost::filesystem::path var_path = boost::filesystem::path(variationFilename);
-			variationFilename = std::string((boost::filesystem::path(std::string(DATA_DIR))/=var_path).c_str());
+			variationFilename = std::string((boost::filesystem::path(std::string(DATA_DIR))/=variationFilename).c_str());
 		}
+
+		dataset.SetVariationsFilename(variationFilename.c_str());
 
 	} catch (soci::soci_error const &e) {
 		std::cerr<<"Problems were encountered trying to open the database, "<<dbFilename<<". Error: "<<e.what()<<"\n";
