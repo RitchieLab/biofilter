@@ -172,7 +172,7 @@ public:
 	static bool errorExit;										///< When exiting on errors, we won't report the files that "would" have been generated.
 	LiftOver::ConverterDB buildConverter;					///< Converter structure for map files (using liftover chains)
 private:
-	static bool useDataDir;
+	static std::string knowledgeDir;
 };
 
 inline

@@ -20,7 +20,7 @@
 namespace Biofilter {
 
 bool Application::errorExit = false;
-bool Application::useDataDir = false;
+std::string Application::knowledgeDir = "";
 
 std::string Application::GetReportLog() {
 	return reportLog.str();
@@ -298,7 +298,6 @@ void Application::InitBiofilter(const char *filename, bool reportVersion) {
 				dbPath = (boost::filesystem::path(std::string(DATA_DIR))/=(dbPath));
 				if (boost::filesystem::is_regular_file(dbPath)){
 					fileFound=true;
-					useDataDir = true;
 				}
 			}
 		#endif
@@ -307,6 +306,9 @@ void Application::InitBiofilter(const char *filename, bool reportVersion) {
 	if (!fileFound){
 		throw Utility::Exception::FileNotFound(filename);
 	}
+
+	// Set the directory of the knowledge database here
+	knowledgeDir = dbPath.parent_path().string();
 
 	try {
 		std::string cnxParam = "dbname="+std::string(dbPath.c_str())+" timeout=2500";
@@ -329,10 +331,7 @@ void Application::InitBiofilter(const char *filename, bool reportVersion) {
 
 		}
 
-		if(useDataDir){
-			boost::filesystem::path var_path = boost::filesystem::path(variationFilename);
-			variationFilename = std::string((boost::filesystem::path(std::string(DATA_DIR))/=variationFilename).c_str());
-		}
+		variationFilename = (boost::filesystem::path(knowledgeDir)/=variationFilename).string();
 
 		dataset.SetVariationsFilename(variationFilename.c_str());
 

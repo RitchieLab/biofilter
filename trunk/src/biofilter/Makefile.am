@@ -38,3 +38,6 @@ biofilter_SOURCES = \
 	main.cpp \
 	task.cpp \
 	taskgenecoverage.cpp
+
+doc_DATA=\
+	$(top_srcdir)/doc/manual.doc
