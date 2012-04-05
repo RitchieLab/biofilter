@@ -46,7 +46,7 @@ Configuration::~Configuration() {
 }
 
 void Configuration::Init() {
-	InitKey("SETTINGS_DB",				Utility::ENV("SETTINGS_DB", BIODB).c_str(),  "BioFilter data");
+	InitKey("SETTINGS_DB",				"knowledge.bio",  "BioFilter data");
 	InitKey("MAX_GENE_COUNT",			"30",					"Max number of genes before we ignore the group");
 	InitKey("RS_SOURCE",					"",					"The source file for the RS numbers in your dataset\n#This is used as an alternative to a MAP_SOURCE file");
 	InitKey("MAP_SOURCE",				"",					"User specified chrom-rsid-gen_dist-bp_location (plink 4 column format)\n#Chromosomes can be 1-22,X,Y,XY,MT\n#Must be accompanied with MAP_GENOME_BUILD");

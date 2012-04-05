@@ -314,7 +314,7 @@ int Main::ParseCmd(int curr, int argc, char **argv) {
 		action = BiofilterAction::ListPopulationIDs;
 		return nextCmd;
 	}
-	if (strcmp(argv[curr], "-D")==0) {
+	if (strcmp(argv[curr], "-D") == 0 || strcmp(argv[curr], "--detailed")==0) {
 		cfg.SetValue("DETAILED_REPORTS", "ON");
 		return nextCmd;
 	}
