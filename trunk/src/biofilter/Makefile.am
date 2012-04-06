@@ -40,5 +40,5 @@ biofilter_SOURCES = \
 	taskgenecoverage.cpp
 
 EXTRA_DIST=\
-	$(top_srcdir)/doc/manual.doc \
+	$(top_srcdir)/doc/manual.odt \
 	$(top_srcdir)/examples
