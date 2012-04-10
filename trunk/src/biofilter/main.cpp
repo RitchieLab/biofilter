@@ -8,6 +8,8 @@
 #include "utility/exception.h"
 #include "config.h"
 
+#include <algorithm>
+
 
 namespace Biofilter {
 
@@ -67,7 +69,8 @@ void Main::RunCommands() {
 			{
 				std::vector<std::string> keywords;
 				std::string s = cfg.GetLine("GROUP_SEARCH_CRITERIA");
-				if (s != "All")
+				std::transform(s.begin(), s.end(), s.begin(), (int(*)(int)) std::toupper);
+				if (s != "ALL")
 					keywords = Utility::Split(s.c_str(), ",");
 				
 				app.ListGroupIDs(std::cout, keywords);

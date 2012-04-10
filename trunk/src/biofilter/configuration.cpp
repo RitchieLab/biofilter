@@ -196,8 +196,10 @@ void Configuration::ExecuteConfiguration(Application* app) {
 	app->SetReportPrefix(GetString("REPORT_PREFIX").c_str());
 	app->UseHtmlReports(GetBoolean("HTML_REPORTS"));
 	
-	
-
+	// Force the marker info report if snp models are exported
+	if(GetBoolean("EXPORT_SNP_MODELS")){
+		SetValue("MARKER_INFO_REPORT", "ON");
+	}
 
 	//Build out the task list
 	AddTask("GENE_REPORT", new Task::GeneReport());
