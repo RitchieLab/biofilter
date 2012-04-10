@@ -224,13 +224,18 @@ std::map<std::string, uint> GroupManager::LoadArchive(const char *filename,
 				if (words[0] == "CHILDREN") {
 					childrenDesc.push_back(alias);
 				}
-				uint id = regions(alias);
-				if (id < (uint)-1) {
-					group.regions.insert(id);
-					regions.AddMetaID(group.id, groupType, id);
+				else{
+					for (uint j = 0; j < words.size(); j++){
+						uint id = regions(words[j]);
+						if (id < (uint)-1) {
+							group.regions.insert(id);
+							regions.AddMetaID(group.id, groupType, id);
+						}
+						else
+							unmatchedAliases.push_back(words[j]);
+					}
 				}
-				else
-					unmatchedAliases.push_back(alias);
+
 			}
 		}
 		std::cerr<<"User Defined Group ("<<group.name<<" : Type "<<MetaGroup::ConvertType(groupType)<<" ) : "<<group.regions.size()<<"\n";

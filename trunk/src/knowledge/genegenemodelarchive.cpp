@@ -66,6 +66,9 @@ void GeneGeneModelArchive::WriteToArchive(const char *filename, const RegionMana
 		uint count = models.size();
 		file.write((char*)&count, 4);
 	}
+	else{
+		file << "Gene 1" << "\t" << "Gene 2" << "\t" << "Implication Index\n";
+	}
 
 	iterator itr = models.begin();
 	iterator end = models.end();

@@ -438,9 +438,14 @@ void SnpDataset::WriteMarkerInfo(const char *filename, char sep) {
 	std::ofstream file(filename);
 
 	uint count = markers.size();
+	file<<"ID"<<sep<<"Chrom"<<sep<<"Pos"<<sep<<"SNP Index";
+	if(detailedReport){
+		file << sep << "Role";
+	}
+	file << "\n";
 	for (uint i=0; i<count; i++) {
 		SNP &s = markers[i];
-		file<<s.RSID()<<sep<<(int)s.chrom<<sep<<s.pos;
+		file<<s.RSID()<<sep<<(int)s.chrom<<sep<<s.pos<<sep<<i;
 		if (detailedReport)
 			file<<sep<<roleDescription[s.role];
 		file<<"\n";

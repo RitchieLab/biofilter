@@ -53,6 +53,10 @@ void SnpSnpModelArchive::ExecuteTask() {
 		file.close();
 		file.open(filename.c_str(), std::ios::binary);
 	}
+	else{
+		file << "SNP 1\tSNP 2\tImplication Index\n";
+	}
+
 	while (itr != end) {
 		scores[itr->ImplicationIndex()]++;
 		itr++->Write(file);

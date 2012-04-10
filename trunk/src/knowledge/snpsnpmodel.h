@@ -123,8 +123,10 @@ std::string SnpSnpModel::ToFLString() const {
 	std::vector<uint>::const_iterator itr = snps.begin();
 	std::vector<uint>::const_iterator end = snps.end();
 	while (itr != end)
-		ss<<std::setw(MAX_RS_LENGTH)<<std::right<<*itr++;
-	ss<<std::setw(MAX_II_LENGTH)<<std::right<<std::setprecision(1)<<ImplicationIndex();
+		ss<<*itr++<<"\t";
+		//ss<<std::setw(MAX_RS_LENGTH)<<std::right<<*itr++;
+	//ss<<std::setw(MAX_II_LENGTH)<<std::right<<std::setprecision(1)<<ImplicationIndex();
+	ss<<std::setprecision(1)<<ImplicationIndex();
 	return ss.str();
 }
 

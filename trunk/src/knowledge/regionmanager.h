@@ -268,9 +268,11 @@ void RegionManager::AddMetaID(uint id, MetaGroup::Type groupType, uint regionId)
 
 inline
 void RegionManager::WriteArchive(std::ostream& file, const char *sep) {
-	file<<"Region Name"<<sep<<"True Begin"<<sep<<"True End"<<sep<<"Eff. Begin"<<sep<<"Eff. End"<<sep<<"Groups"<<sep<<"Aliases"<<sep<<"SNPs"<<"\n";
+	file<<"Gene Index"<<sep<<"Region Name"<<sep<<"True Begin"<<sep<<"True End"<<sep<<"Eff. Begin"<<sep<<"Eff. End"<<sep<<"Groups"<<sep<<"Aliases"<<sep<<"SNPs"<<"\n";
 
+	int i = -1;
 	for (RegionCollection::iterator itr=regions.begin(); itr<regions.end(); itr++) {
+		file << ++i <<sep;
 		itr->WriteToArchive(file, sep);
 	}
 
