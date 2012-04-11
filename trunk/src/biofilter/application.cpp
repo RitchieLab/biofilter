@@ -63,7 +63,7 @@ void Application::ListGroupIDs(std::ostream& os, Utility::StringArray& searchLis
 	std::string clause = "";
 
 	if (searchList.size() > 0) 
-		clause = std::string("WHERE ( group_name LIKE '%") + Utility::Join(searchList, "%' OR group_name LIKE '%") + "%' OR group_desc LIKE '%" + Utility::Join(searchList, "%' OR group_desc LIKE '%'") + "%') ";
+		clause = std::string("WHERE ( group_name LIKE '%") + Utility::Join(searchList, "%' OR group_name LIKE '%") + "%' OR group_desc LIKE '%" + Utility::Join(searchList, "%' OR group_desc LIKE '%") + "%') ";
 	os<<"ID\tName\tDescription\n";
 	soci::rowset<soci::row> rs = (sociDB.prepare << "SELECT group_id, group_name, group_desc FROM groups "<<clause);
 	for (soci::rowset<soci::row>::const_iterator itr = rs.begin(); itr != rs.end(); ++itr) {

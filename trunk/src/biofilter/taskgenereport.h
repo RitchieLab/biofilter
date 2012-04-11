@@ -25,8 +25,6 @@ public:
 	virtual std::string GetFileDescription() { return "Region Details Report";}
 
 	void ExecuteTask();
-private:
-	std::string filename;
 };
 
 inline
