@@ -12,34 +12,53 @@ namespace Biofilter {
 
 void GeneCoverage::GenerateTxtReport(const char *filename) {
 	if (datasets.size() > 0) {
-		if (Task::detailedReport)
-			return GenerateDetailedTxtReport(filename);
+		//if (Task::detailedReport)
+		//	return GenerateDetailedTxtReport(filename);
 		std::ofstream file(filename);
 		uint regionCount = regions->Size();
 		file<<"Gene,Total";
+		if (Task::detailedReport){
+			file << ",All SNPs";
+		}
 		std::map<std::string, Knowledge::SnpDataset>::iterator itr = datasets.begin();
 		std::map<std::string, Knowledge::SnpDataset>::iterator end = datasets.end();
 
 		while (itr != end) {
-			file<<","<<itr++->first;
+			file<<","<<itr->first;
+			if (Task::detailedReport){
+				file << "," << itr->first << " SNPs";
+			}
+			++itr;
 		}
 		file<<"\n";
 
 		for (uint i=0; i<regionCount; i++) {
-			std::vector<int> counts;
 			Knowledge::Region &r = (*regions)[i];
 			std::set<Knowledge::SnpDataset::SNP> totalSnps;
 
 			snps->RangeSnpLookup(r.chrom, r.effStart, r.effEnd, totalSnps);
 
-			counts.push_back(totalSnps.size());
+			file << r.name << "," << totalSnps.size();
+
+			if (Task::detailedReport){
+				std::set<Knowledge::SnpDataset::SNP>::iterator sItr = totalSnps.begin();
+				std::set<Knowledge::SnpDataset::SNP>::iterator sEnd = totalSnps.end();
+				uint count = 0;
+				file<<",";
+				while (sItr != sEnd)  {
+					if (count++)
+						file<<":";
+					file<<sItr++->RSID();
+				}
+			}
+
 
 			itr = datasets.begin();
 
 			while (itr != end) {
 				std::set<Knowledge::SnpDataset::SNP> localSnps;
 				itr->second.RangeSnpLookup(r.chrom, r.effStart, r.effEnd, localSnps);
-				Knowledge::SnpDataset::SnpArray common;
+				std::set<Knowledge::SnpDataset::SNP> common;
 
 				std::set_intersection(totalSnps.begin(),
 						totalSnps.end(),
@@ -47,10 +66,21 @@ void GeneCoverage::GenerateTxtReport(const char *filename) {
 						localSnps.end(),
 						std::inserter(common, common.begin()));
 
-				counts.push_back(common.size());
+				file<<","<<common.size();
+				if (Task::detailedReport){
+					std::set<Knowledge::SnpDataset::SNP>::iterator cItr = common.begin();
+					std::set<Knowledge::SnpDataset::SNP>::iterator cEnd = common.end();
+					uint ccount = 0;
+					file << ",";
+					while (cItr != cEnd)  {
+						if (ccount++)
+							file<<":";
+						file<<cItr++->RSID();
+					}
+				}
 				itr++;
 			}
-			file<<r.name<<","<<Utility::Join<std::vector<int> >(counts, ",")<<"\n";
+			file<<"\n";
 		}
 	} else {
 		std::cerr<<"Coverage Reports require at least 1 coverage platform\n";
@@ -154,7 +184,7 @@ void GeneCoverage::AddSources(Utility::StringArray& rsFiles, Utility::StringArra
 			Utility::StringArray lines = Utility::RsIDs(fileContents.c_str(), "\n");
 			std::set<std::string> rsIDs;
 			rsIDs.insert(lines.begin(), lines.end());
-			snps->GetFragment(rsIDs, datasets[Utility::ExtractBaseFilename(filename.c_str())]);
+			snps->GetFragment(rsIDs, datasets[filename]);
 		}
 
 		//Map files

@@ -218,9 +218,10 @@ void RegionManager::GenerateGeneReport(const char *filename, SnpDataset& dataset
 	std::ofstream file(filename);
 	RegionCollection::iterator itr = regions.begin();
 	RegionCollection::iterator end = regions.end();
-	file<<"Gene Name,Eff. Start,Eff. Stop,Alias List,Start,End";
+	file<<"Gene Name,Chrom,Eff. Start,Eff. Stop,True Start,True Stop,Alias List";
 	if (Knowledge::SnpDataset::detailedReport)
-		file<<",SNPs\n";
+		file<<",SNPs";
+	file << "\n";
 	while (itr != end) {
 		Knowledge::Region &r =*itr++;
 		file<<r.name<<","

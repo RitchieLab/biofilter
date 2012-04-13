@@ -82,7 +82,8 @@ SnpSnpModel::~SnpSnpModel() { }
 
 inline
 bool SnpSnpModel::operator<(const SnpSnpModel& other) const {
-	return snps < other.snps;
+	return (implicationIndex == other.implicationIndex) ?
+			snps < other.snps : implicationIndex > other.implicationIndex;
 }
 
 

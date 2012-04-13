@@ -26,7 +26,7 @@ void RegionManagerDB::GenerateLookupTable(std::map<uint, uint>& lookup) {
 void RegionManagerDB::LoadRegionAliases(soci::session& sociDB, Utility::StringArray& aliasList, std::map<std::string, uint>& aliasToID) {
 	std::string conditions = "";
 	if (aliasList.size() > 0)
-		conditions = " WHERE alias IN (" + Utility::Join(aliasList, ",") + ")";
+		conditions = " WHERE alias IN ('" + Utility::Join(aliasList, "','") + "')";
 
 	soci::rowset<soci::row> rs = (sociDB.prepare <<"SELECT gene_id, alias FROM region_alias"<<conditions);
 

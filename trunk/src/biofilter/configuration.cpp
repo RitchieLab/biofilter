@@ -186,7 +186,7 @@ void Configuration::ExecuteConfiguration(Application* app) {
 	Knowledge::Region::DuplicateDD_Weight				= GetDouble("IMPLICATION_IDX_DUPLICATE_WEIGHT");
 	Knowledge::RegionManager::modelGenerationType	= Knowledge::ModelGenerationMode::ConvertType(GetString("DISEASE_DEPENDENT_LEVEL").c_str());
 	Knowledge::BinaryArchive								= GetBoolean("BINARY_MODEL_ARCHIVE");
-	Task::Task::detailedReport								= GetBoolean("DETAILED_REPORTS");
+	Knowledge::SnpDataset::detailedReport = Task::Task::detailedReport = GetBoolean("DETAILED_REPORTS");
 	Knowledge::GeneGeneModelArchive::minImplicationIndex		= GetInteger("MINIMUM_IMPLICATION_INDEX");
 	Knowledge::GeneGeneModelArchive::maxModelCount	= GetInteger("MAX_SNP_MODEL_COUNT");
 
