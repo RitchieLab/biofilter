@@ -10,6 +10,14 @@
 #include "utility/locus.h"
 #include "utility/strings.h"
 
+#include <boost/algorithm/string.hpp>
+#include <boost/lexical_cast.hpp>
+#include <vector>
+#include <string>
+
+using std::vector;
+using std::string;
+
 namespace Knowledge {
 
 uint GroupManagerDB::LoadFromDB(soci::session& sociDB, RegionManager& regions) {
@@ -19,9 +27,9 @@ uint GroupManagerDB::LoadFromDB(soci::session& sociDB, RegionManager& regions) {
 
 
 uint GroupManagerDB::LoadFromDB(soci::session& sociDB,
-	const Utility::IdCollection& pids,
-	RegionManager& regions,
-	Utility::StringArray& groupNames) {
+		const Utility::IdCollection& pids,
+		RegionManager& regions,
+		Utility::StringArray& groupNames) {
 
 	Utility::IdCollection ids(pids);		
 	std::string groupConstraint = "";
@@ -106,12 +114,21 @@ uint GroupManagerDB::LoadFromDB(soci::session& sociDB, const Utility::IdCollecti
 	}
 	std::string idList = Utility::Join(totalGroupsLoaded, ",");
 	//At this point, we should have the IDs associated with all of the groups, so we can query for the gene associations all at once
-	soci::rowset<soci::row> rs = (sociDB.prepare<<"SELECT group_id, gene_id FROM group_associations WHERE group_id IN ("<<idList<<")");
+	soci::rowset<soci::row> rs = (sociDB.prepare<<"SELECT group_id, gene_list FROM "<<
+			"(SELECT count(*) as n, group_id, group_concat(gene_id) as gene_list FROM "<<
+			"group_associations WHERE group_id IN ("<<idList<<") group by group_id)" <<
+			"WHERE n <= " << maxGeneCount << ";");
 	for (soci::rowset<soci::row>::const_iterator itr = rs.begin(); itr != rs.end(); itr++) {
 		soci::row const& row = *itr;
 		uint groupID	= row.get<int>(0);
-		uint geneID		= row.get<int>(1);
-		AddGeneAssociation(groupID, regions(geneID), regions);
+		string geneList = row.get<string>(1);
+		for (boost::split_iterator<string::iterator> gene_itr = boost::make_split_iterator(geneList, boost::first_finder(","));
+				gene_itr != boost::split_iterator<string::iterator>();
+				++gene_itr){
+			uint geneID = boost::lexical_cast<uint>(*gene_itr);
+			AddGeneAssociation(groupID, regions(geneID), regions);
+		}
+
 	}
 
 	return ids.size()==0 ? totalGroupsLoaded.size() - 1 : totalGroupsLoaded.size();		// We don't want to count the Metagroup ID, so subtract one

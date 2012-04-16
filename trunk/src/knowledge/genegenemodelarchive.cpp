@@ -34,7 +34,7 @@ void GeneGeneModelArchive::GenerateModels(SnpSnpModel::Collection& snpBasedModel
 	std::set<GeneGeneModel>::iterator itr = models.begin();
 	std::set<GeneGeneModel>::iterator end = models.end();
 
-	while (itr != end && snpBasedModels.size() < maxModelCount) 
+	while (itr != end && snpBasedModels.size() < maxModelCount)
 		itr++->GenerateModels(snpBasedModels, regions);
 	
 }
@@ -130,7 +130,9 @@ void GeneGeneModelArchive::AddRegions(Utility::IdCollection& ids, RegionManager&
 						//Check with the region to validate the model's validity based on configuration
 						if (regions.ValidGeneGene(lIndex, rIndex)) {
 							float ii = regions[lIndex].ImplicationIndex(regions[rIndex]);
-							models.insert(GeneGeneModel(lIndex, rIndex, ii));
+							if (ii >= minImplicationIndex){
+								models.insert(GeneGeneModel(lIndex, rIndex, ii));
+							}
 						}
 					}
 					rItr++;

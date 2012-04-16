@@ -187,8 +187,9 @@ void Configuration::ExecuteConfiguration(Application* app) {
 	Knowledge::RegionManager::modelGenerationType	= Knowledge::ModelGenerationMode::ConvertType(GetString("DISEASE_DEPENDENT_LEVEL").c_str());
 	Knowledge::BinaryArchive								= GetBoolean("BINARY_MODEL_ARCHIVE");
 	Knowledge::SnpDataset::detailedReport = Task::Task::detailedReport = GetBoolean("DETAILED_REPORTS");
-	Knowledge::GeneGeneModelArchive::minImplicationIndex		= GetInteger("MINIMUM_IMPLICATION_INDEX");
+	Knowledge::GeneGeneModelArchive::minImplicationIndex		= GetDouble("MINIMUM_IMPLICATION_INDEX");
 	Knowledge::GeneGeneModelArchive::maxModelCount	= GetInteger("MAX_SNP_MODEL_COUNT");
+	Knowledge::GroupManager::maxGeneCount = GetInteger("MAX_GENE_COUNT");
 
 
 	//Knowledge::KbGroup::CollapseAssociationReport = GetBoolean("COLLAPSE_ASSOCIATION_REPORT");
