@@ -142,6 +142,10 @@ public:
 		}
 	}
 
+	bool diseaseDependent() const{
+		return groupType != MetaGroup::DiseaseIndependent;
+	}
+
 	static uint maxGeneCount;													///< Max gene count in order to determine whether models are to be generated or not
 
 	uint id;																			///< DB ID associated with the group type

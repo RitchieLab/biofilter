@@ -17,9 +17,17 @@
 #include "utility/strings.h"
 #include "snpsnpmodel.h"
 #include "snpdataset.h"
+
+#include <set>
+
+using std::map;
+using std::set;
+using std::string;
 //#include "genegenemodel.h"
 
 namespace Knowledge {
+
+class GroupManager;
 
 class Region {
 public:
@@ -50,17 +58,14 @@ public:
 	/**
 	 * Adds one or more meta type IDs to the meta type collection
 	 */
-	void AddMetaIDs(MetaGroup::Type metaType, const Utility::IdCollection& ids);
-	void AddMetaID(MetaGroup::Type metaType, uint id);
+	void AddMetaIDs(const GroupManager* gm, const Utility::IdCollection& ids);
+	void AddMetaID(const GroupManager* gm, uint id);
 
 	uint GenerateModels(SnpSnpModel::Collection& models, Region& other, float ii = 0.0);
 	uint GenerateModels(SnpSnpModel::Collection& models, Utility::IdCollection& otherSnps, float ii);
 
 	void WriteToArchive(std::ostream& os, const char *sep);
 	void WriteToArchiveBinary(std::ostream& os);
-
-	bool LoadFromArchive(std::istream& s, const char *sep);
-	bool LoadFromArchiveBinary(std::istream& s);
 
 	void GenerateRandomModels(uint count, SnpSnpModel::Collection& models, Region& other, float ii=0.0);
 	void GenerateRandomModels(uint count, SnpSnpModel::Collection& models, Utility::IdCollection& otherSnps, float ii);
@@ -92,10 +97,12 @@ public:
 	static float DuplicateDD_Weight;
 
 	Utility::StringArray aliases;
-	std::map<MetaGroup::Type, Utility::IdCollection > groups;
+
 	Utility::IdCollection snps;				///< SNPs contained within the gene
 private:
 
+	// mapping of type->src->groups
+	std::map<const GroupManager*, set<uint> > groups;
 
 };
 
@@ -108,7 +115,7 @@ inline
 Region::Region(const char *name, uint id) : name(name), id(id), effStart(0), effEnd(0), trueStart(0), trueEnd(0) { }
 
 inline
-Region::Region(const Region& orig) : name(orig.name), chrom(orig.chrom), id(orig.id), effStart(orig.effStart), effEnd(orig.effEnd), trueStart(orig.trueStart), trueEnd(orig.trueEnd), aliases(orig.aliases), groups(orig.groups), snps(orig.snps) { }
+Region::Region(const Region& orig) : name(orig.name), chrom(orig.chrom), id(orig.id), effStart(orig.effStart), effEnd(orig.effEnd), trueStart(orig.trueStart), trueEnd(orig.trueEnd), aliases(orig.aliases), snps(orig.snps), groups(orig.groups) { }
 
 inline
 Region::Region(const char *name, uint id, uint start, uint stop) : name(name), id(id), effStart(start), effEnd(stop), trueStart(start), trueEnd(stop) { }
@@ -121,10 +128,6 @@ bool Region::IsPresent(uint snp) {
 	return snps.find(snp) != snps.end();
 }
 
-inline
-uint Region::CountDDCapable() {
-	return groups[MetaGroup::DiseaseDependent].size() + groups[MetaGroup::SnpCollection].size() + groups[MetaGroup::GeneCollection].size();
-}
 inline
 void Region::AddSNPs(const Utility::IdCollection& snps) {
 	this->snps.insert(snps.begin(), snps.end());
@@ -141,13 +144,13 @@ uint Region::SnpCount() const {
 }
 
 inline
-void Region::AddMetaIDs(MetaGroup::Type metaType, const Utility::IdCollection& ids) {
-	groups[metaType].insert(ids.begin(), ids.end());
+void Region::AddMetaIDs(const GroupManager* gm, const Utility::IdCollection& ids) {
+	groups[gm].insert(ids.begin(), ids.end());
 }
 
 inline
-void Region::AddMetaID(MetaGroup::Type metaType, uint id) {
-	groups[metaType].insert(id);
+void Region::AddMetaID(const GroupManager* gm, uint id) {
+	groups[gm].insert(id);
 }
 
 inline

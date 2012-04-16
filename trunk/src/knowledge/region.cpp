@@ -7,25 +7,35 @@
 #include <iostream>
 #include <fstream>
 #include "region.h"
+#include "groupmanager.h"
 
 namespace Knowledge {
 
 float Region::DuplicateDD_Weight = 0.0;
 
 float Region::ImplicationIndex(Region& other)  {
-	std::set<MetaGroup::Type> common;			///< These will be applied to the duplicate weight
-	std::set<MetaGroup::Type> total;			///< singular representation
 
-	for (MetaGroup::Type i=MetaGroup::DiseaseIndependent; i<MetaGroup::MetaGroupCount; ++i) {
-		total.insert(groups[i].begin(), groups[i].end());
-		total.insert(other.groups[i].begin(), other.groups[i].end());
-		set_intersection(groups[i].begin(), groups[i].end(), other.groups[i].begin(), other.groups[i].end(), inserter(common, common.begin()));
+	float ii = 0;
 
-		//std::cerr<<"  L: "<<Utility::Join(groups[i], " ")<<" | R: "<<Utility::Join(other.groups[i], " ");
+	map<const GroupManager*, set<uint> >::const_iterator itr = groups.begin();
+	map<const GroupManager*, set<uint> >::const_iterator end = groups.end();
 
+	set<uint> common;
+
+	while(itr != end){
+		map<const GroupManager*, set<uint> >::const_iterator o_itr = other.groups.find((*itr).first);
+		if(o_itr != other.groups.end()){
+			common.clear();
+			set_intersection((*itr).second.begin(), (*itr).second.end(),
+					(*o_itr).second.begin(), (*o_itr).second.end(),
+					inserter(common, common.begin()));
+
+			ii += (common.size() > 0) + (common.size() > 0)*((*itr).first->diseaseDependent() ? 1 : DuplicateDD_Weight)*(common.size() - 1);
+		}
+		++itr;
 	}
-	//std::cerr<<" | C: "<<Utility::Join(common, " ")<<"  "<<(float)common.size() + DuplicateDD_Weight * ((float)total.size() - (float)common.size())<<"\n";
-	return (float)common.size() + DuplicateDD_Weight * ((float)total.size() - (float)common.size());
+
+	return ii;
 }
 
 uint Region::GenerateModels(SnpSnpModel::Collection& models, Region& other, float ii) {
@@ -121,16 +131,16 @@ void Region::WriteToArchiveBinary(std::ostream& os) {
 	os.write((char*)&trueEnd, 4);
 	os.write((char*)&effStart, 4);
 	os.write((char*)&effEnd, 4);
-	for (MetaGroup::Type i=MetaGroup::DiseaseIndependent; i<MetaGroup::MetaGroupCount; i++) {
-		uint count = groups[i].size();
-		os.write((char*)&count, 4);
-		Utility::IdCollection::iterator itr = groups[i].begin();
-		Utility::IdCollection::iterator end = groups[i].end();
-
-		while (itr != end) {
-			os.write((char*)&(*itr++), 4);
-		}
-	}
+//	for (MetaGroup::Type i=MetaGroup::DiseaseIndependent; i<MetaGroup::MetaGroupCount; i++) {
+//		uint count = groups[i].size();
+//		os.write((char*)&count, 4);
+//		Utility::IdCollection::iterator itr = groups[i].begin();
+//		Utility::IdCollection::iterator end = groups[i].end();
+//
+//		while (itr != end) {
+//			os.write((char*)&(*itr++), 4);
+//		}
+//	}
 	os<<Utility::Join(aliases, "|")<<"\n";
 	uint count = snps.size();
 	os.write((char*)&count, 4);
@@ -142,90 +152,42 @@ void Region::WriteToArchiveBinary(std::ostream& os) {
 	}
 }
 
-bool Region::LoadFromArchiveBinary(std::istream& file) {
-	bool success = false;
-	static char line[65536];		///< This just skips the instantiation process
-	memset(line, '\0', 65536);
-
-	file.getline(line, 32);
-
-	if (strlen(line) > 1) {
-		name = line;
-		file.read((char*)&trueStart, 4);
-		file.read((char*)&trueEnd, 4);
-		file.read((char*)&effStart, 4);
-		file.read((char*)&effEnd, 4);
-
-		for (MetaGroup::Type i=MetaGroup::DiseaseIndependent; i<MetaGroup::MetaGroupCount; i++) {
-			groups[i].clear();
-			uint count = 0;
-			file.read((char*)&count, 4);
-			for (uint p=0; p<count; p++) {
-				uint n;
-				file.read((char*)&n, 4);
-				groups[i].insert(n);
-			}
-		}
-		file.getline(line, 65535);
-		aliases = Utility::Split(line, "|");
-		uint count = 0;
-		file.read((char*)&count, 4);
-		uint snp;
-		for (uint i=0; i<count; i++) {
-			file.read((char*)&snp, 4);
-			snps.insert(snp);
-		}
-		success = true;
-	}
-	return success;
-}
 
 void Region::WriteToArchive(std::ostream& os, const char *sep) {
 	Utility::StringArray ids;
-	for (MetaGroup::Type i=MetaGroup::DiseaseIndependent; i<MetaGroup::MetaGroupCount; i++) {
-		std::string s = Utility::Join(groups[i], "!");
-		ids.push_back(Utility::Join(groups[i], "!"));
-	}
-
 
 	os	<<name<<sep
 		<<trueStart<<sep
 		<<trueEnd<<sep
 		<<effStart<<sep
-		<<effEnd<<sep
-		<<Utility::Join(ids, "|")<<sep
-		<<Utility::Join(aliases, "|")<<sep
-		<<Utility::Join<std::set<uint> >(snps, "|")<<"\n";
-	Utility::StringArray::iterator itr = aliases.begin();
-	Utility::StringArray::iterator end = aliases.end();
+		<<effEnd<<sep;
 
-}
+	// output the groups
 
-bool Region::LoadFromArchive(std::istream& os, const char *sep) {
-	bool success = false;
-	static char line[65536];				///< This just skips the instantiation process
-	memset(line, '\0', 65536);
+	map<const GroupManager*, set<uint> >::const_iterator itr = groups.begin();
+	map<const GroupManager*, set<uint> >::const_iterator end = groups.end();
 
-	os.getline(line, 65535);
-	if (strlen(line) > 1) {
-		Utility::StringArray pieces = Utility::Split(line, sep, true);
-		name			= pieces[0];
-		trueStart	= atoi(pieces[1].c_str());
-		trueEnd		= atoi(pieces[2].c_str());
-		effStart		= atoi(pieces[3].c_str());
-		effEnd		= atoi(pieces[4].c_str());
-		aliases		= Utility::Split(pieces[6].c_str(), "|");
-		snps			= Utility::ToSet<uint>(pieces[7].c_str(), "|");
+	while(itr != end){
 
-		// We have to start at 1, since we are using a DB key, which starts at 1
-		Utility::StringArray groupLists = Utility::Split(pieces[5].c_str(), "|", true);
-		for (uint i=0; i<groupLists.size(); i++) {
-			groups[i+1] = Utility::ToSet<uint>(groupLists[i].c_str(), "!");
+		set<uint>::const_iterator g_itr = (*itr).second.begin();
+		set<uint>::const_iterator g_end = (*itr).second.end();
+		while(g_itr != g_end){
+			os << ((*itr).first->diseaseDependent() ? "~" : "!") << *g_itr;
+			++g_itr;
 		}
-		success = true;
+
+		++itr;
+		if(itr != end){
+			os << "|";
+		}
+
 	}
-	return success;
+
+	os 	<<sep<<Utility::Join(aliases, "|")<<sep
+		<<Utility::Join<std::set<uint> >(snps, "|")<<"\n";
+
 }
+
 
 void Region::ListGroupAssociations(std::ostream& os, uint tabCount, SnpDataset& snps) {
 	os<<std::string(tabCount, '\t')<<name<<" (";
@@ -236,6 +198,18 @@ void Region::ListGroupAssociations(std::ostream& os, uint tabCount, SnpDataset& 
 		os<<snps[*itr++].RSID()<<" ";
 	}
 	os<<")\n";
+}
+
+uint Region::CountDDCapable() {
+	uint num_dd = 0;
+
+	map<const GroupManager*, set<uint> >::const_iterator itr = groups.begin();
+	map<const GroupManager*, set<uint> >::const_iterator end = groups.end();
+	while (itr != end){
+		num_dd += (*itr).first->diseaseDependent();
+	}
+
+	return num_dd;
 }
 
 }

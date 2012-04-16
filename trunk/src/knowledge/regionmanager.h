@@ -24,6 +24,8 @@
 
 namespace Knowledge {
 
+class GroupManager;
+
 class RegionManager {
 public:
 	typedef std::vector<Region> RegionCollection;
@@ -40,12 +42,6 @@ public:
 	void WriteArchive(const char *filename, const char *sep = "\t");
 
 	/**
-	 * Loads regions from archive (will switch to binary, based on BinaryArchive)
-    * @param filename
-    */
-	void LoadArchive(const char *filename, const char *sep = "\t");
-
-	/**
 	 * Adds region and returns
     * @param name		the primary name
     * @param id		the gene_id from the database
@@ -56,8 +52,8 @@ public:
     */
 	Region& AddRegion(const char *, uint id, uint start, uint stop, const char *aliases = "");
 
-	void AddMetaID(uint id, MetaGroup::Type groupType, Utility::IdCollection& regionIDs);
-	void AddMetaID(uint id, MetaGroup::Type groupType, uint regionId);
+	void AddMetaID(uint id, const GroupManager* gm, Utility::IdCollection& regionIDs);
+	void AddMetaID(uint id, const GroupManager* gm, uint regionId);
 	
 	/**
 	 * Adds region and returns it's index
@@ -138,7 +134,6 @@ public:
 	static ModelGenerationMode::Type modelGenerationType;
 protected:
 	void WriteArchiveBinary(const char *filename);
-	void LoadArchiveBinary(const char *filename);
 	std::map<uint, uint> idToIndex;						///< id=>index lookup
 	std::map<std::string, uint> aliasToIndex;			///< alias=>index lookup
 	RegionCollection regions;
@@ -252,20 +247,7 @@ uint RegionManager::operator()(const std::string& alias)  {
 	return (uint)-1;
 }
 
-inline
-void RegionManager::AddMetaID(uint id, MetaGroup::Type groupType, Utility::IdCollection& ids) {
-	Utility::IdCollection::iterator itr = ids.begin();
-	Utility::IdCollection::iterator end = ids.end();
 
-	while (itr != end) {
-		regions[*itr++].AddMetaID(groupType, id);
-	}
-}
-
-inline
-void RegionManager::AddMetaID(uint id, MetaGroup::Type groupType, uint regionId) {
-	regions[regionId].AddMetaID(groupType, id);
-}
 
 inline
 void RegionManager::WriteArchive(std::ostream& file, const char *sep) {
@@ -280,12 +262,12 @@ void RegionManager::WriteArchive(std::ostream& file, const char *sep) {
 }
 inline
 void RegionManager::WriteArchive(const char* filename, const char *sep) {
-	if (BinaryArchive)
-		WriteArchiveBinary(filename);
-	else {
+	//if (BinaryArchive)
+	//	WriteArchiveBinary(filename);
+	//else {
 		std::ofstream file(filename);
 		WriteArchive(file, sep);
-	}
+	//}
 }
 
 inline
@@ -336,37 +318,6 @@ void RegionManager::WriteArchiveBinary(const char *filename) {
 
 	for (RegionCollection::iterator itr=regions.begin(); itr<regions.end(); itr++) {
 		itr->WriteToArchiveBinary(file);
-	}
-}
-
-inline
-void RegionManager::LoadArchive(const char *filename, const char *sep) {
-	if (BinaryArchive)
-		LoadArchiveBinary(filename);
-	else {
-		std::ifstream file(filename);
-		char line[4096];
-		file.getline(line, 4096);
-
-		Region reg;
-		while (file.good() && !file.eof()) {
-			if (reg.LoadFromArchive(file, sep))
-				regions.push_back(reg);
-		}
-	}
-}
-
-inline
-void RegionManager::LoadArchiveBinary(const char *filename) {
-	std::ifstream file(filename, std::ios::binary);
-
-	uint count = 0;
-	file.read((char*)&count, 4);
-
-	Region reg;
-	for (uint i=0; i<count; i++) {
-		reg.LoadFromArchiveBinary(file);
-		regions.push_back(reg);
 	}
 }
 

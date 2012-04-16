@@ -118,7 +118,7 @@ void GroupManager::AddGeneAssociation(uint groupID, uint regionIndex, RegionMana
 	// Make sure that the group isn't one that we've decided to drop for some reason
 	if (regionIndex < (uint)-1 && group != groupLookup.end() && group->second >= 0) {
 		groups[group->second].regions.insert(regionIndex);
-		regions.AddMetaID(id, groupType, regionIndex);
+		regions.AddMetaID(group->second, this, regionIndex);
 	} /* This is for debugging-I think it's related to purging pre-existing DB and am looking into it-EST july 2011
 	else {
 		std::cerr<<"The following id was said to be associated with a gene, but we couldn't find it:  "<<groupID<<"\n";
@@ -229,7 +229,7 @@ std::map<std::string, uint> GroupManager::LoadArchive(const char *filename,
 						uint id = regions(words[j]);
 						if (id < (uint)-1) {
 							group.regions.insert(id);
-							regions.AddMetaID(group.id, groupType, id);
+							regions.AddMetaID(group.id, this, id);
 						}
 						else
 							unmatchedAliases.push_back(words[j]);

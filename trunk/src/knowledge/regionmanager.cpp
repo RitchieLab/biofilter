@@ -6,9 +6,26 @@
  */
 
 #include "regionmanager.h"
+#include "groupmanager.h"
 
 
 Knowledge::ModelGenerationMode::Type Knowledge::RegionManager::modelGenerationType = Knowledge::ModelGenerationMode::ALL_MODELS;
+namespace Knowledge{
+
+void RegionManager::AddMetaID(uint id, const GroupManager* gm, Utility::IdCollection& ids) {
+	Utility::IdCollection::iterator itr = ids.begin();
+	Utility::IdCollection::iterator end = ids.end();
+
+	while (itr != end) {
+		regions[*itr++].AddMetaID(gm, id);
+	}
+}
+
+void RegionManager::AddMetaID(uint id, const GroupManager* gm, uint regionId) {
+	regions[regionId].AddMetaID(gm, id);
+}
+
+}
 
 #ifdef TEST_APP
 

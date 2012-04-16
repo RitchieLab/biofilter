@@ -79,11 +79,12 @@ void LdSpline::RunReport(const char *chrom, int position, float value, const cha
 			sitr++;
 		}
 
-		if (spline.size() == 0)
+		if (spline.size() == 0){
 			if (loci[chrom].GetPosToRS(position) > 0)
 				os<<chrom<<"\trs"<<loci[chrom].GetPosToRS(position)<<"\t"<<position<<"\t \t \n";
 			else
 				os<<chrom<<"\t  ??  \t"<<position<<"\t \t \n";
+		}
 	}
 	else {
 		os<<chrom<<"\t ?? \t"<<position<<"\t"<<"??"<<"\t"<<" "<<"\n";
