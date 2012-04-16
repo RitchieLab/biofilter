@@ -39,7 +39,7 @@ SnpReport::~SnpReport() { }
 inline
 void SnpReport::ExecuteTask() {
 	std::ofstream file(filename.c_str());
-	file<<"Chrom,RSID,Gene Name,(Other Gene Name...)\n";
+	file<<"Chrom,RSID,Gene Name\n";
 	uint count = snps->Size();
 	for (uint i=0; i<count; i++) {
 		std::multimap<uint, uint>::iterator itr = geneLookup->lower_bound(i);

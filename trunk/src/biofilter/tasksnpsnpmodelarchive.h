@@ -57,7 +57,8 @@ void SnpSnpModelArchive::ExecuteTask() {
 		file << "SNP 1\tSNP 2\tImplication Index\n";
 	}
 
-	while (itr != end) {
+	uint n_models = 0;
+	while (itr != end && ++n_models <= Knowledge::GeneGeneModelArchive::maxModelCount) {
 		scores[itr->ImplicationIndex()]++;
 		itr++->Write(file);
 	}

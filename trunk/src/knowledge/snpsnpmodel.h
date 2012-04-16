@@ -127,7 +127,7 @@ std::string SnpSnpModel::ToFLString() const {
 		ss<<*itr++<<"\t";
 		//ss<<std::setw(MAX_RS_LENGTH)<<std::right<<*itr++;
 	//ss<<std::setw(MAX_II_LENGTH)<<std::right<<std::setprecision(1)<<ImplicationIndex();
-	ss<<std::setprecision(1)<<ImplicationIndex();
+	ss<<std::setprecision(4)<<ImplicationIndex();
 	return ss.str();
 }
 

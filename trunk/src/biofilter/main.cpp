@@ -321,18 +321,6 @@ int Main::ParseCmd(int curr, int argc, char **argv) {
 		cfg.SetValue("DETAILED_REPORTS", "ON");
 		return nextCmd;
 	}
-	if (strcmp(argv[curr], "--map-snps-to-gene")==0) {
-		cfg.SetValue("SNP_GENE_MAP", "ON");
-		if (nextCmd < argc) {
-			cfg.SetValue("GENE_COVERAGE", argv[nextCmd++]);
-		}
-		else {
-			action = BiofilterAction::ParseError;
-			std::cerr<<"--map-snps-to-gene must be followed by a filename containing a list of genes.\n";
-			return -1;
-		}
-		return nextCmd;
-	}
 	if (strcmp(argv[curr], "--report-gene-coverage")==0) {
 		action = BiofilterAction::RunGeneCoverage;
 		return nextCmd;

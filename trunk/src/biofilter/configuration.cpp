@@ -77,7 +77,7 @@ void Configuration::Init() {
 	InitKey("DETAILED_REPORTS",		"OFF",				"Activates extra data in the reports. See manual for details.");
 	InitKey("MARKER_INFO_REPORT",		"OFF",				"Produces a marker-info report once the SNP data is loaded.");
 	InitKey("SNP_REPORT",				"OFF",				"Produces comma separated list of genes each SNP is found in.");
-	InitKey("SNP_GENE_MAP",				"OFF",				"Produces report indicating SNP/gene relationship including relational details (Interior/etc)");
+	InitKey("SNP_GENE_REPORT",				"OFF",				"Produces report indicating SNP/gene relationship including relational details (Interior/etc)");
 	InitKey("GENE_COVERAGE",			"",					"Filename (or ALL) containing list of gene aliases of to be used in various gene reports.");
 	InitKey("GENE_REPORT",				"OFF",				"Details the contents of the regions in use.");
 	InitKey("COVERAGE_RS",				"",					"Platforms for coverage reports using RS IDs instead of MAP files");
@@ -205,7 +205,7 @@ void Configuration::ExecuteConfiguration(Application* app) {
 	//Build out the task list
 	AddTask("GENE_REPORT", new Task::GeneReport());
 	AddTask("MARKER_INFO_REPORT", new Task::MarkerInfo());
-	AddTask("SNP_GENE_MAP", new Task::SnpReport());
+	AddTask("SNP_GENE_REPORT", new Task::SnpReport());
 	AddTask("SNP_REPORT", new Task::SnpGeneMap());
 	AddTask("EXPORT_GENE_MODELS", new Task::GeneGeneModelReport());
 	AddTask("EXPORT_SNP_MODELS", new Task::SnpSnpModelArchive());

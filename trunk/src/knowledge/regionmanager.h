@@ -153,15 +153,19 @@ inline
 bool RegionManager::DoGenerateModels(Utility::IdCollection& groupContents) {
 	if (modelGenerationType == ModelGenerationMode::ALL_MODELS)
 		return true;
+
 	Utility::IdCollection::iterator itr = groupContents.begin();
 	Utility::IdCollection::iterator end = groupContents.end();
 
-	uint ddCapable = 0;
-	//Build up the group collection data
-	while (itr != end) 
-		ddCapable += regions[*itr++].CountDDCapable();
+	// If ANY region in the group is in a disease-dependent group, start
+	// generating models
+	while (itr != end){
+		if(regions[*itr++].CountDDCapable()){
+			return true;
+		}
+	}
 
-	return ddCapable > 0;
+	return false;
 }
 
 /**
