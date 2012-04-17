@@ -41,4 +41,5 @@ biofilter_SOURCES = \
 
 EXTRA_DIST=\
 	$(top_srcdir)/doc/manual.odt \
+	$(top_srcdir)/doc/manual.pdf \
 	$(top_srcdir)/examples
