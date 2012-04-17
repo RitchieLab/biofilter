@@ -195,65 +195,89 @@ void Main::PrintHelp() {
 #ifdef USE_MPI
 	std::cerr<<"usage: biofilter <configuration file> [ [command] ...] [ [parameter] ...]\n";
 #else
-	std::cerr<<"usage: biofilter <configuration file> \n";
+	std::cerr<<"usage: biofilter <configuration file> [OPTIONS]\n";
 #endif
 	std::cerr<<"\nbiofilter is a standalone application for use in investigating possible SNP associations\n"
 	           "\tin a set of data which, through biological knowledge, might be worth investigating\n";
 	std::cerr<<"Optional Commands Include:\n";
 	std::cerr<<"\t-S [--sample-config]                       -- Print sample configuration to std-out\n";
-	std::cerr<<"\t--report-gene-coverage gene-list-filename  -- Reports the snp count for the genes in genelist \n"
-	         <<"\t                                              for the snps in snp-source\n";
-/*	std::cerr<<"\t--filter-by-genes gene-list-filename       -- Lists gene name and rsid for each SNP inside each gene.\n"
-	         <<"\t                                              gene names and rsids can both appear multiple times.\n";
-	std::cerr<<"\t--inject-gene-information analysis-results chrom-col rs-col gene-list  \n"
-	         <<"\t                                              Injects gene(s) at the end of the CSV file and writes the\n"
-	         <<"\t                                              combined data to a new file.\n";
-*/	std::cerr<<"\t-W [--write-models] min-impl max-models    -- Writes model list to files limitted to those with min-impl\n"
-	         <<"\t                                              or greater with a target snp-snp model count of max-models\n";
+	std::cerr<<"\t--report-gene-coverage                     -- Reports the number of markers in each gene in the \n"
+	         <<"\t                                              given gene list\n";
+	std::cerr<<"\t-G [--groups] <label|ALL>                  -- Prints the groups from the LOKI database matching the given \n"
+			 <<"\t                                              comma-separated criteria.\n";
+	std::cerr<<"\t--genes <label|ALL> <label|ALL>            -- Prints the genes from the LOKI database mathing the given \n"
+			 <<"\t                                              comma-separated criteria and type.\n";
+	std::cerr<<"\t-P [--list-populations]                    -- Lists all available Population based LD boundary options\n";
+
+	//LD-SPLINE import here!
+
+	std::cerr<<"\nOptional Parameters Include:\n";
+	std::cerr<<"\t--DB <filename>                            -- Uses the given file as the LOKI database\n";
+	std::cerr<<"\t--list-genes                               -- Lists all genes that are covered by at least one SNP\n";
 	std::cerr<<"\t--marker-info                              -- Reports each SNP and it's position/chromosome\n"
-	         <<"\t                                              in a format acceptable by haploview\n";
-	std::cerr<<"\t-g [--gene-file] gene-filename (ALL)       -- File containing one or more gene alias (or ALL) to be used\n"
-	         <<"\t                                              in conjunction with gene centric reports (such as those listed below)\n";
+		     <<"\t                                              in a format acceptable by haploview\n";
+	std::cerr<<"\t-b [--binary] <yes/no>                     -- Overrides binary setting in configuration file\n";
+	std::cerr<<"\t-D [--detailed]                            -- Adds extra details to output reports\n";
+	std::cerr<<"\t--cov-rs  <filename>                       -- Add a platform to coverage report list (Using RSIDs)\n";
+	std::cerr<<"\t--cov-map <filename>                       -- Add a platform to coverage report list (Using BP Locations)\n";
+	std::cerr<<"\t-d [--add-group] <filename>                -- Adds a meta group containing data from the given file\n";
+	std::cerr<<"\t-g [--gene-file] <filename|ALL>            -- File containing one or more gene alias (or ALL) to be used\n"
+	         <<"\t                                              in conjunction with gene reports\n";
 	std::cerr<<"\t--snp-report                               -- Reports all genes each SNP is found in (from genes listed \n"
-	         <<"\t                                              in file or all known to biofilter\n";
+	         <<"\t                                              in file or all known to biofilter)\n";
 	std::cerr<<"\t--map-snps-to-gene                         -- Reports all genes each SNP is found along with information\n"
 	         <<"\t                                              describing the SNPs relationship to that gene (INTERIOR, etc)\n";
-	std::cerr<<"\t--list-genes                               -- Lists all genes that are covered by at least one SNP\n";
-	std::cerr<<"\t--genes alias_list alias_type              -- Lists all genes present in the database that match one of the comma \n"
-	         <<"\t                                              separated. Either or both can also be ALL, which will show them all. \n";
-/*	std::cerr<<"\t--model-report  model-list-filename        -- Generates a report containing the Genes and groups\n"
-	         <<"\t                                              associated with each two snp model listed in the file\n";
-*/	std::cerr<<"\nOptional Parameters Include:\n";
-	std::cerr<<"\t-s [--snps] <snps filename>                -- Override the snp source file on the commandline\n";
-	std::cerr<<"\t-v [--variants] <mapfile>                  -- Override the map source file (this takes precedence over --snps\n";
-	std::cerr<<"\t--cov-rs  <rs filename>                    -- Add a platform to coverage report list\n";
-	std::cerr<<"\t--cov-map <map_filename>                   -- Add a platform to coverage report list\n";
-	std::cerr<<"\t-B [--build] <build version>               -- Define the build associated with map files (35, 36, 37)\n";
-	std::cerr<<"\t-D [--detailed-coverage]                   -- (used with -C) adds extra details to coverage report\n";
-	std::cerr<<"\t-X (--export-snp-models) min-impl max-models\n"
-	         <<"\t                                           -- Writes Snp-Snp Models to file. This assumes a pre-existing \n"
+	std::cerr<<"\t-B [--build] <label>                       -- Define the build associated with map files (35, 36, 37)\n";
+	std::cerr<<"--PREFIX <label>                             -- Set the report prefix.\n";
+	std::cerr<<"\t-s [--snps] <filename>                     -- Override the snp source file on the commandline\n";
+	std::cerr<<"\t-p [--set-population] <label>              -- Override the configurations population setting (NO-LD, CEUDP1.0, etc)\n";
+	std::cerr<<"\t--gene-boundary <integer>                  -- Extends a gene by the given number of base pairs (NO-LD population only)\n";
+	std::cerr<<"\t-v [--variants] <filename>                 -- Override the map source file (this takes precedence over --snps\n";
+	std::cerr<<"\t-W [--write-models] <float> <integer>      -- Writes gene/gene model list to files limitted to those with given minimum\n"
+	         <<"\t                                              implication or greater with a given maximum number of snp-snp models\n";
+	std::cerr<<"\t-X [--export-snp-models] <float> <integer> -- Writes SNP/SNP Models to file. This assumes a pre-existing \n"
 	         <<"\t                                              gene-gene model file \n";
-/*	std::cerr<<"\t-m [--show-models]                         -- Writes contents of model file to screen in human\n"
-	         <<"\t                                              readable form\n";
-	std::cerr<<"\t-l [--load-ld] <ld filename>               -- Loads LD information from the file, filename, and\n"
-	         <<"\t                                              adjusts the gene boundaries accordingly\n";
-*/
-	std::cerr<<"\t-d [--add-group] <filename>                -- Adds a meta group containing data from the file, filename\n";
-/*	std::cerr<<"\t-G [--list-groups] [criteria]              -- Adds group search criteria and produces a list of\n"
-	         <<"\t                                               group IDs that match the criteria\n";
-	std::cerr<<"\t-h [--html-reports] yes/no                 -- Turns HTML Reporting on/off\n";
-	std::cerr<<"\t-q [--quiet]                               -- Silences general output during processing. Reports and errors are still produced\n";
-*/
-	std::cerr<<"\t-b [--binary] yes/no                       -- Overrides binary setting in configuration file\n";
-	std::cerr<<"\t-P [--list-populations]                    -- Lists all available Population based LD boundary options\n";
-	std::cerr<<"\t-p [--set-population] pop                  -- Override the configurations population setting (NO-LD, CEUDP1.0, etc)\n";
-	std::cerr<<"\t--optimize                                 -- Updates internal structures to allow faster access. This\n"
-	         <<"\t                                              is usually done prior to release\n";
-	std::cerr<<"\t--strip-optimization                       -- Strips the optimization out (this is helpful to allow data\n"
-	         <<"\t                                              imports to run more quickly) \n";
-	std::cerr<<"\t--ldspline ldconfig                        -- Imports LD-Spline variations using ldconfig as a guide\n";
-	std::cerr<<"\t--fix-variations var-filename-path         -- Sets the path (and filename) to the appropriate variation file.\n";
-	std::cerr<<"\t                                              This should only be done if the file needs to be moved to a new location.\n";
+
+
+
+
+// The options below are either old or unknown
+//
+//	std::cerr<<"\t--filter-by-genes gene-list-filename       -- Lists gene name and rsid for each SNP inside each gene.\n"
+//	         <<"\t                                              gene names and rsids can both appear multiple times.\n";
+//	std::cerr<<"\t--inject-gene-information analysis-results chrom-col rs-col gene-list  \n"
+//	         <<"\t                                              Injects gene(s) at the end of the CSV file and writes the\n"
+//	         <<"\t                                              combined data to a new file.\n";
+//
+//	std::cerr<<"\t--genes alias_list alias_type              -- Lists all genes present in the database that match one of the comma \n"
+//	         <<"\t                                              separated. Either or both can also be ALL, which will show them all. \n";
+//	std::cerr<<"\t--model-report  model-list-filename        -- Generates a report containing the Genes and groups\n"
+//	         <<"\t                                              associated with each two snp model listed in the file\n";
+//
+//
+//
+//
+//
+//	std::cerr<<"\t-m [--show-models]                         -- Writes contents of model file to screen in human\n"
+//	         <<"\t                                              readable form\n";
+//	std::cerr<<"\t-l [--load-ld] <ld filename>               -- Loads LD information from the file, filename, and\n"
+//	         <<"\t                                              adjusts the gene boundaries accordingly\n";
+//
+//
+//	std::cerr<<"\t-G [--list-groups] [criteria]              -- Adds group search criteria and produces a list of\n"
+//	         <<"\t                                               group IDs that match the criteria\n";
+//	std::cerr<<"\t-h [--html-reports] yes/no                 -- Turns HTML Reporting on/off\n";
+//	std::cerr<<"\t-q [--quiet]                               -- Silences general output during processing. Reports and errors are still produced\n";
+//
+//
+//
+//	std::cerr<<"\t--optimize                                 -- Updates internal structures to allow faster access. This\n"
+//	         <<"\t                                              is usually done prior to release\n";
+//	std::cerr<<"\t--strip-optimization                       -- Strips the optimization out (this is helpful to allow data\n"
+//	         <<"\t                                              imports to run more quickly) \n";
+//	std::cerr<<"\t--ldspline ldconfig                        -- Imports LD-Spline variations using ldconfig as a guide\n";
+//	std::cerr<<"\t--fix-variations var-filename-path         -- Sets the path (and filename) to the appropriate variation file.\n";
+//	std::cerr<<"\t                                              This should only be done if the file needs to be moved to a new location.\n";
 }
 
 void Main::LoadSNPs() {
@@ -301,6 +325,11 @@ int Main::SetConfigValue(int nextCmd, int argc, const char *var, const char *val
 
 int Main::ParseCmd(int curr, int argc, char **argv) {
 	int nextCmd = curr+1;
+	if (strcmp(argv[curr], "-h")==0 || strcmp(argv[curr], "--help")==0){
+		PrintHelp();
+		action = BiofilterAction::ParseError;
+		return -1;
+	}
 	if (strcmp(argv[curr], "-S")==0 || strcmp(argv[curr], "--sample-config")==0) {
 		action = BiofilterAction::PrintSampleConfig;
 		return nextCmd;
@@ -451,7 +480,7 @@ int Main::ParseCmd(int curr, int argc, char **argv) {
 		
 	}
 	if (strcmp(argv[curr], "-W")==0 || strcmp(argv[curr], "--write-models")==0) {
-		action = BiofilterAction::ProduceModels;
+		//action = BiofilterAction::ProduceModels;
 		if (nextCmd < argc-1 && argv[nextCmd][0] != '-') {
 			cfg.SetValue("EXPORT_GENE_MODELS", "YES");
 			cfg.SetValue("MINIMUM_IMPLICATION_INDEX", argv[nextCmd++]);
@@ -464,7 +493,7 @@ int Main::ParseCmd(int curr, int argc, char **argv) {
 		}
 	}
 	if (strcmp(argv[curr], "-X")==0 || strcmp(argv[curr], "--export-snp-models")==0) {
-		action = BiofilterAction::ProduceModels;
+		//action = BiofilterAction::ProduceModels;
 		if (nextCmd < argc-1 && argv[nextCmd][0] != '-') {
 			cfg.SetValue("EXPORT_SNP_MODELS", "YES");
 			cfg.SetValue("MINIMUM_IMPLICATION_INDEX", argv[nextCmd++]);
