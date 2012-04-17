@@ -42,4 +42,7 @@ biofilter_SOURCES = \
 EXTRA_DIST=\
 	$(top_srcdir)/doc/manual.odt \
 	$(top_srcdir)/doc/manual.pdf \
-	$(top_srcdir)/examples
+	$(top_srcdir)/examples/affy50-na28.txt \
+	$(top_srcdir)/examples/affy-dmet.txt \
+	$(top_srcdir)/examples/Illumina-1MDuo.txt \
+	$(top_srcdir)/examples/Illumina-660Quad.txt
