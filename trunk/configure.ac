@@ -32,10 +32,12 @@ AC_CONFIG_FILES([
 		Makefile
 		src/utility/Makefile
 		src/knowledge/Makefile
-		src/ldspline/Makefile
 		src/liftover/Makefile
 		src/biofilter/Makefile
 		BioUpdater/Makefile
+		ldspline/Makefile
+		ldspline/src/ldspline/Makefile
+		ldspline/src/utility/Makefile
 ])
 
 AC_OUTPUT

@@ -1,7 +1,7 @@
 SUBDIRS = \
+	ldspline \
 	src/utility \
 	src/knowledge \
-	src/ldspline \
 	src/liftover \
 	src/biofilter \
 	BioUpdater

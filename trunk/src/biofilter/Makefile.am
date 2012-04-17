@@ -3,13 +3,13 @@ bin_PROGRAMS = biofilter
 biofilter_LDADD = \
 	../utility/libutility.la \
 	../knowledge/libknowledge.la \
-	../ldspline/libldspline.la \
+	../../ldspline/src/ldspline/libldspline.la \
 	../liftover/libliftover.la \
 	$(BOOST_LIB) $(BOOST_FILESYSTEM_LIB) $(BOOST_SYSTEM_LIB) $(BOOST_REGEX_LIB) \
 	$(SOCI_LIB) $(SOCI_SQLITE_LIB)
 
 AM_CPPFLAGS = \
-	-I$(top_srcdir)/src \
+	-I$(top_srcdir)/src -I$(top_srcdir)/ldspline/src\
 	$(BOOST_CPPFLAGS) $(BOOST_FILESYSTEM_CPPFLAGS) $(BOOST_SYSTEM_CPPFLAGS) $(BOOST_REGEX_CPPFLAGS) \
 	$(SOCI_CPPFLAGS) $(SOCI_SQLITE_CPPFLAGS) -DDATA_DIR='"$(datadir)"'
 
