@@ -26,7 +26,7 @@ public:
 	Application();
 	virtual ~Application();
 
-	void InitBiofilter(const char *dbFilename, bool reportVersions);
+	void InitBiofilter(const char *dbFilename, bool reportVersions, bool setWriteable=false);
 
 	std::string GetReportLog();
 
@@ -173,10 +173,11 @@ public:
 	LiftOver::ConverterDB buildConverter;					///< Converter structure for map files (using liftover chains)
 private:
 	static std::string knowledgeDir;
+	bool _write_db;
 };
 
 inline
-Application::Application() : dbFilename(""), varVersion(0), geneExtensionLength(0), htmlReports(false), reportPrefix("report") {}
+Application::Application() : dbFilename(""), varVersion(0), geneExtensionLength(0), htmlReports(false), reportPrefix("report"), _write_db(false) {}
 
 inline
 Knowledge::RegionManager *Application::GetRegions() {
@@ -219,11 +220,6 @@ void Application::UseHtmlReports(bool doUse) {
 	htmlReports = doUse;
 }
 
-inline
-Application::~Application()  {
-	if (!errorExit)
-		std::cerr<<GetReportLog()<<"\n";
-}
 
 inline
 std::vector<uint> Application::ManagerIDs() {

@@ -10,6 +10,7 @@
 
 #include <algorithm>
 
+#include <boost/filesystem.hpp>
 
 namespace Biofilter {
 
@@ -45,7 +46,7 @@ void Main::InitGroupData() {
 }
 
 void Main::RunCommands() {
-	app.InitBiofilter(cfg.GetLine("SETTINGS_DB").c_str(), !silentRun);
+	app.InitBiofilter(cfg.GetLine("SETTINGS_DB").c_str(), !silentRun, _write_db);
 	std::string genomicBuild = cfg.GetString("GENOMIC_BUILD");
 	if (genomicBuild != "") {
 		app.LoadBuildConverter(genomicBuild.c_str());
@@ -470,6 +471,7 @@ int Main::ParseCmd(int curr, int argc, char **argv) {
 	if (strcmp(argv[curr], "--ldspline")==0) {
 		action = BiofilterAction::ImportLdSplines;
 		if (argc > nextCmd) {
+			_write_db = true;
 			cfg.SetValue("LD_CONFIGURATION", argv[nextCmd++]);
 			return nextCmd;
 		} else {

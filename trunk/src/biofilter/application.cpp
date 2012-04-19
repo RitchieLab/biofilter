@@ -17,10 +17,26 @@
 // Use the boost filesystem library to work with OS-independent paths
 #include <boost/filesystem.hpp>
 
+// Non-portable means of changing permissions
+#include <sys/stat.h>
+
 namespace Biofilter {
 
 bool Application::errorExit = false;
 std::string Application::knowledgeDir = "";
+
+Application::~Application()  {
+	if (!errorExit)
+		std::cerr<<GetReportLog()<<"\n";
+
+	// If we set the write bit, it's now time to unset it
+	if(_write_db){
+		struct stat results;
+		if(!stat(dbFilename.c_str(), &results)){
+			chmod(dbFilename.c_str(), results.st_mode & (~S_IWUSR));
+		}
+	}
+}
 
 std::string Application::GetReportLog() {
 	return reportLog.str();
@@ -286,7 +302,7 @@ uint Application::LoadGroupDataByName(Utility::StringArray& userDefinedGroups,
 
 
 
-void Application::InitBiofilter(const char *filename, bool reportVersion) {
+void Application::InitBiofilter(const char *filename, bool reportVersion, bool setWriteable) {
 	dbFilename = filename;
 	boost::filesystem::path dbPath = boost::filesystem::path(dbFilename);
 	bool fileFound = false;
@@ -298,9 +314,38 @@ void Application::InitBiofilter(const char *filename, bool reportVersion) {
 				dbPath = (boost::filesystem::path(std::string(DATA_DIR))/=(dbPath));
 				if (boost::filesystem::is_regular_file(dbPath)){
 					fileFound=true;
+					dbFilename=dbPath.string();
 				}
 			}
 		#endif
+	}
+
+	// At this point, try to get write permissions, if needed
+
+	if (setWriteable) {
+		// BEGIN Non-portable code!!!
+		struct stat results;
+		bool throw_err = false;
+
+		// If we do not currently have write access
+		if (stat(dbPath.c_str(), &results)) {
+			throw_err = true;
+		} else if (!(results.st_mode & S_IWUSR)) {
+			//set the write access
+			if (!chmod(dbPath.c_str(), results.st_mode | S_IWUSR)) {
+				//Whoo-hoo, it's writeable!
+				_write_db = true;
+			} else {
+				throw_err = true;
+				//Uh-oh, can't set the write bit.  Time to throw an error!
+			}
+		} // Hidden else means that we found that write bit was already set; noop
+
+		// END Non-portable code
+		if (throw_err) {
+			throw Utility::Exception::FileIO(filename,
+					"Cannot write to Database");
+		}
 	}
 
 	if (!fileFound){

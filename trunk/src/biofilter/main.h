@@ -61,10 +61,14 @@ protected:
 	bool silentRun;						///< Used to silence the banner banter
 	BiofilterAction::Action action;	///< Actual task to be performed
 
+private:
+	//flag for if db write access is needed
+	bool _write_db;
+
 
 };
 inline
-Main::Main() : silentRun(false), action(BiofilterAction::NoAction) { }
+Main::Main() : silentRun(false), action(BiofilterAction::NoAction), _write_db(false) { }
 
 inline
 Main::~Main() { }
