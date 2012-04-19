@@ -523,6 +523,7 @@ int main(int argc, char *argv[]) {
 
 	Biofilter::Main *app = new Biofilter::Main();					///<The application object
 
+	int retval = 0;
 
 	if (!app->ParseCmdLine(argc, argv)) {
 		delete app;
@@ -535,9 +536,11 @@ int main(int argc, char *argv[]) {
 	catch (Utility::Exception::General& e) {
 		Biofilter::Application::errorExit = true;
 		std::cerr<<"\nError: \t"<<e.GetErrorMessage()<<" Unable to continue.\n";
+		retval = 1;
 	}
 
 	delete app;
 
-  	return 0;
+	return retval;
+
 }
