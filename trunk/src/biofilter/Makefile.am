@@ -1,5 +1,7 @@
 bin_PROGRAMS = biofilter
 
+bin_SCRIPTS = $(top_srcdir)/util/buildPopulations.py
+
 biofilter_LDADD = \
 	../utility/libutility.la \
 	../knowledge/libknowledge.la \
