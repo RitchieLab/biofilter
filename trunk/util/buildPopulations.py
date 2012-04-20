@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+import subprocess
 import os
 import sys
 import itertools
@@ -14,13 +15,41 @@ def downloadFile(ftp_obj, fn):
 	"""
 	Downloads and checks the file, retrying as necessary
 	"""
-	
 	print "Downloading", fn
 	# TODO: retry on errors
-	f = file(fn, 'wb')
-	ftp_obj.retrbinary("RETR " + fn, lambda x: f.write(x))
-	f.close()
-	# perform check here
+	n_tries = 0
+	max_tries = 10
+	
+	wd = ftp_obj.pwd()	
+	
+	fs_re = re.compile(r"(?:\S*\s*){4,4}(\d*)")
+	retry = True
+	
+	while retry and n_tries < max_tries:
+		n_tries = n_tries + 1
+		ls_result = []
+		try:
+			f = file(fn, 'wb')
+			ftp_obj.retrbinary("RETR " + fn, lambda x: f.write(x))
+			f.close()
+			ftp_obj.dir(fn, lambda x: ls_result.append(x))
+			# check to make sure we got the whole file
+			ftp_sz = int(fs_re.match(ls_result[0]).groups()[0])
+			f_inf = os.stat(fn)
+			# If the file sizes match, then we probably got it right.
+			# I'm not going to worry about solar flares flipping a bit!
+			if ftp_sz == f_inf.st_size:
+				retry = False
+			
+		except ftplib.all_errors, e:
+			f.close()
+			ftp_obj.connect(ftp_obj.host)
+			ftp_obj.login()
+			ftp_obj.cwd(wd)
+	
+	if n_tries == max_tries:
+		raise Exception("Could not download " + fn)
+
 
 def downloadFiles(population):
 	"""
@@ -28,7 +57,7 @@ def downloadFiles(population):
 	(population must be a 3-letter code used by HapMap)
 	"""
 	f_srv = FTP("ftp.ncbi.nlm.nih.gov")
-	f_srv.login("anonymous")
+	f_srv.login()
 	f_srv.cwd("hapmap/ld_data/latest")
 	
 	# TODO: make this a little more restrictive, please
@@ -152,7 +181,7 @@ if __name__ == "__main__":
 	parser.add_option("-l", "--liftover", dest="liftover", action="store",
 		help="Location of the liftOver executable (default is in path)",
 		default="liftOver")
-	parser.add_option("-s", "--ldspline", dest="ldplsine", action="store",
+	parser.add_option("-s", "--ldspline", dest="ldspline", action="store",
 		help="Location of the ldspline executable (default is in path)",
 		default="ldspline")
 	parser.add_option("-f", "--biofilter", dest="biofilter", action="store",
@@ -182,12 +211,31 @@ if __name__ == "__main__":
 	
 	pops = [s.upper() for s in itertools.chain(*(a.split(",") for a in opts.pops))]
 	
+	# Try to find all of the child programs needed now
+	exe_error = False
+	try:
+		subprocess.call(opts.ldspline)
+	except OSError, e:
+		print "Error: could not find ldspline executable"
+		exe_error = True
+	try:
+		subprocess.call(opts.biofilter)
+	except OSError, e:
+		print "Error: could not find biofilter executable"
+		exe_error = True
+	try:
+		subprocess.call(opts.liftover)
+	except OSError, e:
+		print "Error: could not find liftOver executable"
+		exe_error = True
+	if exe_error:
+		sys.exit(6)
+		
+	
 	if not pops:
 		print "Error: You must supply at least one population"
 		sys.exit(5)
 	
-	# Check for validity of other arguments here
-
 	try:
 		genPops(pops, dprime, rsq, opts)
 	except KeyError, e:
