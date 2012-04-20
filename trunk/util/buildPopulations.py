@@ -14,6 +14,8 @@ def downloadFile(ftp_obj, fn):
 	"""
 	Downloads and checks the file, retrying as necessary
 	"""
+	
+	print "Downloading", fn
 	# TODO: retry on errors
 	f = file(fn, 'wb')
 	ftp_obj.retrbinary("RETR " + fn, lambda x: f.write(x))
@@ -30,7 +32,7 @@ def downloadFiles(population):
 	f_srv.cwd("hapmap/ld_data/latest")
 	
 	# TODO: make this a little more restrictive, please
-	file_list = f_srv.nlist("*" + population + "*")
+	file_list = f_srv.nlst("*" + population + "*")
 	for fn in file_list:
 		downloadFile(f_srv, fn)
 	
@@ -39,6 +41,7 @@ def downloadFiles(population):
 	fn_list = []
 	# OK, now we have all the files, unzip them
 	for fn in file_list:
+		print "Extracting", fn
 		fz = gzip.open(fn)
 		f = file(os.path.splitext(fn)[0],'w')
 		for l in fz:
@@ -48,6 +51,7 @@ def downloadFiles(population):
 		
 		f.close()
 		fz.close()
+		os.remove(fz.name)
 
 	# And return a list of all the files that we've downloaded
 	return fn_list		
@@ -88,7 +92,7 @@ def genPops(popList, dprimes, rsquared, opts):
 
 	
 	# Now, write the configuration
-	cfg_f = file(pop_ext + "-ldspline.cfg", "w")
+	cfg_f = file("ldspline.cfg", "w")
 	print >> cfg_f, "rs", " ".join((str(v) for v in rsquared))
 	print >> cfg_f, "dp", " ".join((str(v) for v in dprimes))
 	
@@ -110,9 +114,11 @@ def genPops(popList, dprimes, rsquared, opts):
 		idx_file.close()			
 	
 		# Now, get the splines
+		print "Building LD Splines"
 		os.system(opts.ldspline + " load " + idx_file.name)
 	
 		# Export the splines
+		print "Lifting splines to build 37"
 		os.system(opts.ldspline + " export-lomap " + pop_ext)
 	
 		# Lift over the splines (36->37)
@@ -127,6 +133,7 @@ def genPops(popList, dprimes, rsquared, opts):
 	cfg_f.close()
 	
 	# OK, we're done w/ all the populations, time to give it to biofilter!
+	print "Creating populations in biofilter"
 	os.system(opt.biofilter + " --DB " + opts.db + " --ldspline " + cfg_f.name)
 	
 	#.... and we're done, so clean up after yourself, please!
@@ -161,18 +168,32 @@ if __name__ == "__main__":
 		rsq = [float(f) for f in itertools.chain(*(a.split(",") for a in opts.rsq))]
 	except ValueError, e:
 		print "Error: Invalid R-Squared value"
+		sys.exit(1)
 		
 	try:
 		dprime = [float(f) for f in itertools.chain(*(a.split(",") for a in opts.dprime))]
 	except ValueError, e:
 		print "Error: Invalid R-Squared value"	
+		sys.exit(2)
+				
+	if not rsq and not dprime:
+		print "Error: You must provide R-squared or D-prime cutoffs"
+		sys.exit(3)
 	
 	pops = [s.upper() for s in itertools.chain(*(a.split(",") for a in opts.pops))]
+	
+	if not pops:
+		print "Error: You must supply at least one population"
+		sys.exit(5)
+	
+	# Check for validity of other arguments here
 
 	try:
-		genPops(pops, dprime, rsq)
+		genPops(pops, dprime, rsq, opts)
 	except KeyError, e:
 		print "Error: Invalid population"
+		sys.exit(4)
 	except Exception, e:
 		print e
+		raise
 
