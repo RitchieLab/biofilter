@@ -47,4 +47,5 @@ EXTRA_DIST=\
 	$(top_srcdir)/examples/affy50-na28.txt \
 	$(top_srcdir)/examples/affy-dmet.txt \
 	$(top_srcdir)/examples/Illumina-1MDuo.txt \
-	$(top_srcdir)/examples/Illumina-660Quad.txt
+	$(top_srcdir)/examples/Illumina-660Quad.txt \
+	$(top_srcdir)/util/buildPopulations.py
