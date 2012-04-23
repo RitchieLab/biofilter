@@ -35,9 +35,10 @@ AC_CONFIG_FILES([
 		src/liftover/Makefile
 		src/biofilter/Makefile
 		BioUpdater/Makefile
-		ldspline/Makefile
-		ldspline/src/ldspline/Makefile
-		ldspline/src/utility/Makefile
+		BioUpdater/loadPops/Makefile
+		BioUpdater/loadPops/ldspline/Makefile
+		BioUpdater/loadPops/ldspline/src/ldspline/Makefile
+		BioUpdater/loadPops/ldspline/src/utility/Makefile
 ])
 
 AC_OUTPUT
