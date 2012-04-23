@@ -157,7 +157,7 @@ def genPops(popList, dprimes, rsquared, opts):
 		os.system(opts.ldspline + " import-lomap " + pop_ext + " 37")
 		
 		# print this population's LDspline location 
-		print >> cfg_f, pop_ext + os.path.join(os.getcwd(), pop_ext+"-b37.ldspline " + pop_ext + " population from HapMap")
+		print >> cfg_f, pop_ext, os.path.join(os.getcwd(), pop_ext+"-b37.ldspline"), pop_ext + " population from HapMap")
 
 	cfg_f.close()
 	
