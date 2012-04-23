@@ -77,7 +77,7 @@ public:
 
 	uint GetPopulationID(const char *pop);
 
-	void LoadLdSpline(const char *cfg);
+	//void LoadLdSpline(const char *cfg);
 
 	Knowledge::RegionManager *GetRegions();
 	Knowledge::SnpDataset *GetDataset();

@@ -11,7 +11,7 @@
 #include "utility/filetools.h"
 #include "taskgenecoverage.h"
 #include <iomanip>
-#include "ldsplineimporter.h"
+//#include "ldsplineimporter.h"
 #include "liftover/converterdb.h"
 
 // Use the boost filesystem library to work with OS-independent paths
@@ -225,11 +225,13 @@ uint Application::GetPopulationID(const char *pop) {
 	return popID;
 }
 
+/* This is no longer in biofilter.
 void Application::LoadLdSpline(const char *cfg) {
 	LdSplineImporter splineMgr;
 	splineMgr.LoadConfiguration(cfg);
 	splineMgr.Process(sociDB);
 }
+*/
 
 uint Application::LoadRegionData(const char *pop, Utility::StringArray& aliasesNotFound, Utility::StringArray& aliasList) {
 	std::map<std::string, uint> idLookup;

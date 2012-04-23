@@ -93,9 +93,11 @@ void Main::RunCommands() {
 			return;
 		}
 		case BiofilterAction::ImportLdSplines: {
+			/* taken out of biofilter
 			std::string s = cfg.GetLine("LD_CONFIGURATION");
 			app.LoadLdSpline(s.c_str());
 			return;
+			*/
 		}
 		case BiofilterAction::ListMetaGroups:
 			{

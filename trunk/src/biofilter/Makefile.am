@@ -19,7 +19,6 @@ AM_LDFLAGS = \
 biofilter_SOURCES = \
 	application.h \
 	configuration.h \
-	ldsplineimporter.h \
 	main.h \
 	task.h \
 	taskgenecoverage.h \
@@ -33,7 +32,6 @@ biofilter_SOURCES = \
 	tasksnpreport.h \
 	application.cpp \
 	configuration.cpp \
-	ldsplineimporter.cpp \
 	main.cpp \
 	task.cpp \
 	taskgenecoverage.cpp
