@@ -1,5 +1,4 @@
 SUBDIRS = \
-	ldspline \
 	src/utility \
 	src/knowledge \
 	src/liftover \
