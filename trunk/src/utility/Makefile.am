@@ -1,5 +1,15 @@
 noinst_LTLIBRARIES = libutility.la
 
+libknowledge_la_LIBADD = \
+	../utility/libutility.la \
+	$(BOOST_REGEX_LIB)
+
+AM_CPPFLAGS = \
+	$(BOOST_CPPFLAGS)
+	
+AM_LDFLAGS = \
+	$(BOOST_LDFLAGS)
+
 libutility_la_SOURCES = \
 	filetools.h \
 	lineparser.h \

@@ -1,10 +1,15 @@
 noinst_LTLIBRARIES = libliftover.la
 
-libliftover_la_LIBADD = \
-	../utility/libutility.la
+libknowledge_la_LIBADD = \
+	../utility/libutility.la \
+	$(SOCI_LIB) $(SOCI_SQLITE_LIB)
 
 AM_CPPFLAGS = \
-	-I$(top_srcdir)/src
+	-I$(top_srcdir)/src \
+	$(BOOST_CPPFLAGS) $(SOCI_CPPFLAGS) $(SOCI_SQLITE_CPPFLAGS)
+	
+AM_LDFLAGS = \
+	$(BOOST_LDFLAGS) $(SOCI_LDFLAGS) $(SOCI_SQLITE_LDFLAGS)
 
 libliftover_la_SOURCES = \
 	chain.h \
