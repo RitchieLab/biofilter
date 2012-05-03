@@ -92,19 +92,10 @@ void Main::RunCommands() {
 			app.ListGenes(std::cout, aliasList, aliasTypeList);
 			return;
 		}
-		case BiofilterAction::ImportLdSplines: {
-			/* taken out of biofilter
-			std::string s = cfg.GetLine("LD_CONFIGURATION");
-			app.LoadLdSpline(s.c_str());
+		case BiofilterAction::ListMetaGroups: {
+			app.ListMetaGroups(std::cout);
 			return;
-			*/
 		}
-		case BiofilterAction::ListMetaGroups:
-			{
-/*				InitGroupData();
-				app.ListMetaGroups(cout);
-*/			}
-			return;
 		default: {}
 	}
 	
@@ -211,6 +202,7 @@ void Main::PrintHelp() {
 	std::cerr<<"\t--genes <label|ALL> <label|ALL>            -- Prints the genes from the LOKI database mathing the given \n"
 			 <<"\t                                              comma-separated criteria and type.\n";
 	std::cerr<<"\t-P [--list-populations]                    -- Lists all available Population based LD boundary options\n";
+	std::cerr<<"\t-M [--list-sources]                        -- Lists all available Sources (Meta-groups) available in the LOKI database";
 
 	//LD-SPLINE import here!
 
@@ -418,7 +410,7 @@ int Main::ParseCmd(int curr, int argc, char **argv) {
 			cfg.SetValue("LIST_GROUPS_FROM_DB", "ON");
 			cfg.SetValue("GROUP_SEARCH_CRITERIA", argv[nextCmd++]);
 			action = BiofilterAction::ListGroups;
-			return -1;
+			return nextCmd;
 		}
 		else {
 			action = BiofilterAction::ParseError;
@@ -509,6 +501,10 @@ int Main::ParseCmd(int curr, int argc, char **argv) {
 			return -1;
 		}
 
+	}
+	if (strcmp(argv[curr], "-M") == 0 || strcmp(argv[curr], "--list-sources")==0){
+		action = BiofilterAction::ListMetaGroups;
+		return nextCmd;
 	}
 	action = BiofilterAction::ParseError;
 	std::cerr<<"Unrecognized parameter: "<<argv[curr]<<"\n";

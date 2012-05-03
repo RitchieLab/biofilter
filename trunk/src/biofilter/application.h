@@ -99,6 +99,10 @@ public:
 	 */
 	void ListGroupIDs(std::ostream& os, Utility::StringArray& searchList);
 
+	/**
+	 * Lists the sources contained within biofilter
+	 */
+	void ListMetaGroups(std::ostream& os);
 
 	/**
 	 * Generate simple alias type ID report

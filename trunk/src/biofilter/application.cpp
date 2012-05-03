@@ -91,6 +91,17 @@ void Application::ListGroupIDs(std::ostream& os, Utility::StringArray& searchLis
 
 }
 
+void Application::ListMetaGroups(std::ostream& os){
+	os<<"ID\tName\tDescription\n";
+	soci::rowset<soci::row> rs = (sociDB.prepare <<"select group_id, group_name, group_desc from group_relationships a left join group_relationships b on a.parent_id=b.child_id inner join groups on a.parent_id = groups.group_id where b.parent_id is NULL group by a.parent_id;");
+	for (soci::rowset<soci::row>::const_iterator itr = rs.begin(); itr != rs.end(); ++itr) {
+		soci::row const& row = *itr;
+		os<<row.get<int>(0)<<"\t"
+			 <<row.get<std::string>(1)<<"\t"
+			 <<row.get<std::string>(2)<<"\n";
+	}
+}
+
 void Application::ListPopulationIDs(std::ostream& os) {
 	soci::rowset<soci::row> rs = (sociDB.prepare << "SELECT population_label, pop_description FROM populations");
 	os<<"Label\tDescription\n";
