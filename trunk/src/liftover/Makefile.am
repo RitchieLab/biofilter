@@ -1,6 +1,6 @@
 noinst_LTLIBRARIES = libliftover.la
 
-libknowledge_la_LIBADD = \
+libliftover_la_LIBADD = \
 	../utility/libutility.la \
 	$(SOCI_LIB) $(SOCI_SQLITE_LIB)
 

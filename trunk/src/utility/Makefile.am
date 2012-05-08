@@ -1,7 +1,6 @@
 noinst_LTLIBRARIES = libutility.la
 
-libknowledge_la_LIBADD = \
-	../utility/libutility.la \
+libutility_la_LIBADD = \
 	$(BOOST_REGEX_LIB)
 
 AM_CPPFLAGS = \
