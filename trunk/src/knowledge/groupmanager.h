@@ -70,6 +70,8 @@ public:
     * @return 
     */
 	Group& operator[](uint idx);
+
+	const Group& operator[](uint idx) const {return groups[idx];}
 	
 	/**
 	 * Lookup via ID
