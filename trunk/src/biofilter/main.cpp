@@ -34,12 +34,12 @@ void Main::InitGroupData() {
 	cfg.GetLines("ADD_GROUP", udGroups);
 
 	//Any specialized searches are defined here
-	Utility::IdCollection ids = Utility::ToSet<uint>(cfg.GetLine("INCLUDE_GROUPS").c_str(), ", \t");
+	Utility::IdCollection ids = Utility::ToSet<uint>(cfg.GetString("INCLUDE_GROUPS").c_str(), ", \t");
 
 	cfg.LoadFileContents("INCLUDE_GROUP_FILE", ids);
 
 	//Now, let's do the same for names
-	Utility::StringArray groups = Utility::Split(cfg.GetLine("INCLUDE_GROUP_NAMES").c_str(), ", \t");
+	Utility::StringArray groups = Utility::Split(cfg.GetString("INCLUDE_GROUP_NAMES").c_str(), ", \t");
 	cfg.LoadFileContents("INCLUDE_GROUP_NAME_FILE", groups);
 	app.LoadGroupDataByName(udGroups, groups, ids);
 
