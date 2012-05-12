@@ -83,7 +83,7 @@ void Configuration::Init() {
 	InitKey("COVERAGE_RS",				"",					"Platforms for coverage reports using RS IDs instead of MAP files");
 	InitKey("COVERAGE_MAP",				"",					"Platforms for coverage reports using MAP files instead of RS IDs");
 
-	InitKey("MINIMUM_IMPLICATION_INDEX", "-1",			"The minimum implication index to show in gene/gene or SNP/SNP models");
+	InitKey("MINIMUM_IMPLICATION_INDEX", "1",			"The minimum implication index to show in gene/gene or SNP/SNP models");
 	InitKey("MAX_SNP_MODEL_COUNT",			"-1",					"The max number of SNP/SNP models to be generated");
 	InitKey("EXPORT_SNP_MODELS",		"NO",					"Exports snp-snp models immediately after gene-gene model production");
 	InitKey("EXPORT_GENE_MODELS",		"NO",					"Generate gene-gene models");
