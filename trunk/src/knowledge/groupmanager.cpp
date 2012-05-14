@@ -47,11 +47,13 @@ void GroupManager::GenerateGeneGeneModels(GeneGeneModelArchive& geneArchive, Reg
 		std::map<uint, Utility::IdCollection > regionLookup;
 		BuildRegionCollections(regionLookup);
 
-		Utility::IdCollection::iterator itr = root.begin();
-		Utility::IdCollection::iterator end = root.end();
 		Utility::IdCollection visited;
-		while (itr != end)
-			GenerateGeneGeneModels(geneArchive, regionLookup, regions, *itr++, os, visited);
+
+
+		for(uint i=0; i<groups.size(); i++){
+			GenerateGeneGeneModels(geneArchive,regionLookup,regions,i,os,visited);
+		}
+
 	}
 }
 
