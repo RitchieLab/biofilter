@@ -17,26 +17,13 @@ namespace Knowledge {
 uint GroupManager::maxGeneCount = 30;
 
 void GroupManager::GenerateGeneGeneModels(GeneGeneModelArchive& geneArchive, 
-	 std::map<uint, Utility::IdCollection>& regionLookup,
+	 Group& grp,
 	 RegionManager& regions,
-	 uint idx,
-	 std::ostream& os,
-	 Utility::IdCollection& visited) {
+	 std::ostream& os) {
 
-	Group &group = groups[idx];
-	if (visited.find(idx) == visited.end()) {
-		visited.insert(idx);
-		if (regionLookup[idx].size() > maxGeneCount) {
-			Utility::IdCollection::iterator itr = group.groups.begin();
-			Utility::IdCollection::iterator end = group.groups.end();
-
-			while (itr != end) {
-				GenerateGeneGeneModels(geneArchive, regionLookup, regions, *itr++, os, visited);
-			}
-		} else {
-			// Let's start creating gene gene models
-			geneArchive.AddRegions(regionLookup[idx], regions);
-		}
+	if (diseaseDependent() || grp.regions.size() <= maxGeneCount) {
+		// Let's start creating gene gene models
+		geneArchive.AddRegions(grp.regions, regions);
 	}
 }
 
@@ -44,14 +31,11 @@ void GroupManager::GenerateGeneGeneModels(GeneGeneModelArchive& geneArchive, Reg
 
 	//If group Type is one of the dataset types, we don't want to generate models 
 	if (groupType == MetaGroup::DiseaseIndependent || groupType == MetaGroup::DiseaseDependent) {
-		std::map<uint, Utility::IdCollection > regionLookup;
-		BuildRegionCollections(regionLookup);
-
-		Utility::IdCollection visited;
-
+		//std::map<uint, Utility::IdCollection > regionLookup;
+		//BuildRegionCollections(regionLookup);
 
 		for(uint i=0; i<groups.size(); i++){
-			GenerateGeneGeneModels(geneArchive,regionLookup,regions,i,os,visited);
+			GenerateGeneGeneModels(geneArchive,groups[i],regions,os);
 		}
 
 	}

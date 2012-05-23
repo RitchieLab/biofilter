@@ -48,7 +48,7 @@ public:
 	void WriteToArchive(const char *filename, bool useBinary);
 	void WriteToArchive(const char *filename, const RegionManager& regions, std::map<float, uint>& scores, bool useBinary);
 	void GenerateModels(SnpSnpModel::Collection& snpBasedModels, RegionManager& regions);
-	static uint minImplicationIndex;				///< Used for writing only the "best" models to archives
+	static float minImplicationIndex;				///< Used for writing only the "best" models to archives
 	static uint maxModelCount;						///< Also used to restrict the size of the SNP/SNP archive
 private:
 	

@@ -11,7 +11,7 @@
 
 namespace Knowledge {
 	
-uint GeneGeneModelArchive::minImplicationIndex = 1.0;		///< Default to all
+float GeneGeneModelArchive::minImplicationIndex = 1.0;		///< Default to all
 uint GeneGeneModelArchive::maxModelCount = 10000000;		///< Default to 10 million
 
 void GeneGeneModelArchive::LoadFromArchive(const char *filename, bool useBinary) {

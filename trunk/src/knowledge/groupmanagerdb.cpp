@@ -116,8 +116,7 @@ uint GroupManagerDB::LoadFromDB(soci::session& sociDB, const Utility::IdCollecti
 	//At this point, we should have the IDs associated with all of the groups, so we can query for the gene associations all at once
 	soci::rowset<soci::row> rs = (sociDB.prepare<<"SELECT group_id, gene_list FROM "<<
 			"(SELECT count(*) as n, group_id, group_concat(gene_id) as gene_list FROM "<<
-			"group_associations WHERE group_id IN ("<<idList<<") group by group_id)" <<
-			"WHERE n <= " << maxGeneCount << ";");
+			"group_associations WHERE group_id IN ("<<idList<<") group by group_id);");
 	for (soci::rowset<soci::row>::const_iterator itr = rs.begin(); itr != rs.end(); itr++) {
 		soci::row const& row = *itr;
 		uint groupID	= row.get<int>(0);

@@ -39,11 +39,9 @@ public:
 	void GenerateGeneGeneModels(GeneGeneModelArchive& geneArchive,
 		RegionManager& regions, std::ostream& os);
 	void GenerateGeneGeneModels(GeneGeneModelArchive& geneArchive, 
-		std::map<uint, Utility::IdCollection>& regionLookup,
-		RegionManager& regions,
-		uint idx, 
-		std::ostream& os,
-		Utility::IdCollection& visited);
+		 Group& grp,
+		 RegionManager& regions,
+		 std::ostream& os);
 
 	void AddGroup(uint id, const char *name, const char *desc = "");
 	
