@@ -4,7 +4,7 @@ import sys
 import os
 import argparse
 
-import loki
+import loki_db
 
 
 class Biofilter:
@@ -14,7 +14,7 @@ class Biofilter:
 	# public class data
 	
 	
-	ver_maj,ver_min,ver_rev,ver_date = 0,0,4,'2012-03-15'
+	ver_maj,ver_min,ver_rev,ver_date = 0,0,529,'2012-05-29'
 	
 	
 	# ##################################################
@@ -22,165 +22,31 @@ class Biofilter:
 	
 	
 	_schema = {
-		
 		'main': {
-			
-			# ########## main.group ##########
-			'group': {
-				'table': """
-(
-  rowid INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-  label VARCHAR(64),
-  group_id INTEGER,
-  type_id TINYINT
-)
-""",
-				'index': {
-					'group__label': '(label)',
-					'group__group_id': '(group_id)',
-				}
-			}, #.main.group
 			
 			# ########## main.locus ##########
 			'locus': {
 				'table': """
 (
-  rowid INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-  label VARCHAR(64),
-  rs INTEGER,
-  chr TINYINT,
-  pos BIGINT
+  label VARCHAR(32),
+  chr TINYINT NOT NULL,
+  pos BIGINT NOT NULL
 )
 """,
-				'index': {
-					'locus__label': '(label)',
-					'locus__rs': '(rs)',
-					'locus__pos': '(chr,pos)',
-				}
+				'index': {}
 			}, #.main.locus
 			
-			# ########## main.region ##########
-			'region': {
-				'table': """
-(
-  rowid INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-  label VARCHAR(64),
-  region_id INTEGER,
-  type_id TINYINT,
-  chr TINYINT,
-  posMin BIGINT,
-  posMax BIGINT
-)
-""",
-				'index': {
-					'region__label': '(label)',
-					'region__region_id': '(region_id)',
-					'region__posmin': '(chr,posMin)',
-					'region__posmax': '(chr,posMax)',
-				}
-			}, #.main.region
-			
-			# ########## main.region_zone ##########
-			'region_zone': {
-				'table': """
-(
-  rowid INTEGER NOT NULL,
-  chr TINYINT NOT NULL,
-  zone INTEGER NOT NULL,
-  PRIMARY KEY (rowid,chr,zone)
-)
-""",
-				'index': {
-					'region_zone__zone': '(chr,zone)',
-				}
-			}, #.main.region_zone
-			
-		}, #.main
-		
-		
-		'temp': {
-			
-			# ########## temp.group ##########
-			'group': {
-				'table': """
-(
-  rowid INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-  label VARCHAR(64),
-  group_id INTEGER,
-  type_id TINYINT
-)
-""",
-				'index': {
-					'group__label': '(label)',
-					'group__group_id': '(group_id)',
-				}
-			}, #.temp.group
-			
-			# ########## temp.locus ##########
-			'locus': {
-				'table': """
-(
-  rowid INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-  label VARCHAR(64),
-  rs INTEGER,
-  chr TINYINT,
-  pos BIGINT
-)
-""",
-				'index': {
-					'locus__label': '(label)',
-					'locus__rs': '(rs)',
-					'locus__pos': '(chr,pos)'
-				}
-			}, #.temp.locus
-			
-			# ########## temp.region ##########
-			'region': {
-				'table': """
-(
-  rowid INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-  label VARCHAR(64),
-  region_id INTEGER,
-  type_id TINYINT,
-  chr TINYINT,
-  posMin BIGINT,
-  posMax BIGINT
-)
-""",
-				'index': {
-					'region__label': '(label)',
-					'region__region_id': '(region_id)',
-					'region__posmin': '(chr,posMin)',
-					'region__posmax': '(chr,posMax)',
-				}
-			}, #.temp.region
-			
-			# ########## temp.region_zone ##########
-			'region_zone': {
-				'table': """
-(
-  rowid INTEGER NOT NULL,
-  chr TINYINT NOT NULL,
-  zone INTEGER NOT NULL,
-  PRIMARY KEY (rowid,chr,zone)
-)
-""",
-				'index': {
-					'region_zone__zone': '(chr,zone)'
-				}
-			}, #.temp.region_zone
-			
-			# ########## temp.rs ##########
-			'rs': {
+			# ########## main.snp ##########
+			'snp': {
 				'table': """
 (
   rs INTEGER PRIMARY KEY NOT NULL
 )
 """,
 				'index': {}
-			}, #.temp.rs
+			}, #.main.snp
 			
-		}, #.temp
+		}, #.main
 	} #_schema{}
 	
 	
@@ -191,31 +57,34 @@ class Biofilter:
 	def __init__(self):
 		# initialize instance properties
 		self._iwd = os.getcwd()
-		self._expand = 0
-		self._population = 'n/a'
+		self._expansion = 0
+		self._population_id = 0
 		
 		# initialize instance database
-		self._loki = loki.Database()
-		self._loki.createDatabaseObjects(self._schema['main'], 'main')
+		self._loki = loki_db.Database()
 		self._loki.setVerbose(True)
+		self._loki.createDatabaseTables(self._schema, 'main', '*', True)
 	#__init__()
 	
 	
 	# ##################################################
-	# instance management
-	
-	
-	def changeDirectory(self, path):
-		try:
-			os.chdir(self._iwd if path == "-" else path)
-		except OSError as e:
-			sys.exit("ERROR: %s" % e)
-		sys.stderr.write("OK: %s\n" % os.getcwd())
-	#changeDirectory()
-	
-	
-	# ##################################################
 	# input data parsers
+	
+	
+	def generateRSesFromRSFiles(self, rsfiles):
+		for path in rsfiles:
+			with open(path, 'rU') as rsfile:
+				for line in rsfile:
+					if line[0:1] == '#':
+						pass
+					elif line[0:2].upper() == 'RS':
+						yield long(line[2:].rstrip())
+					else:
+						yield long(line.rstrip())
+				#foreach line in rsfile
+			#with rsfile
+		#foreach rsfile
+	#generateRSesFromRSFiles()
 	
 	
 	def generateLociiFromMarkers(self, markers, separator=':'):
@@ -228,7 +97,7 @@ class Biofilter:
 			
 			# parse line
 			if len(cols) < 2:
-				sys.exit("ERROR: malformed marker '%s', expected 'chr:pos' or 'chr:label:pos'" % marker)
+				raise Exception("malformed marker '%s': expected 'chr:pos' or 'chr:label:pos'" % marker)
 			elif len(cols) == 2:
 				chm = cols[0].upper()
 				pos = cols[1].upper()
@@ -245,7 +114,7 @@ class Biofilter:
 			if chm[:3] == 'CHR':
 				chm = chm[3:]
 			if chm not in self._loki.chr_num:
-				sys.exit("ERROR: malformed marker '%s', unknown chromosome" % marker)
+				raise Exception("malformed marker '%s': unknown chromosome '%s'" % (marker,chm))
 			chm = self._loki.chr_num[chm]
 			
 			# parse and convert marker label
@@ -265,101 +134,18 @@ class Biofilter:
 	#generateLociiFromMarkers()
 	
 	
-	def getLociiFromMarkers(self, markers, separator=':'):
-		return [ self.generateLociiFromMarkers(markers, separator) ]
-	#getLociiFromMarkers()
-	
-	
-	def generateLociiFromMapFiles(self, files):
-		for filePtr in files:
-			sys.stderr.write("processing '%s' ..." % filePtr.name)
-			sys.stderr.flush()
-			for locus in self.generateLociiFromMarkers(
-					((line.rstrip() if (len(line) > 0 and line[0] != '#') else None) for line in filePtr),
-					"\t"
-			):
-				yield locus
-			sys.stderr.write(" OK: %d variants\n" % len(lines))
-		#foreach file
+	def generateLociiFromMapFiles(self, mapfiles):
+		for path in mapfiles:
+			with open(path, 'rU') as mapfile:
+				for locus in self.generateLociiFromMarkers(
+						(line.rstrip() for line in mapfile if line[0:1] != '#'),
+						"\t"
+				):
+					yield locus
+				#foreach generated locus
+			#with mapfile
+		#foreach mapfile
 	#generateLociiFromMapFiles()
-	
-	
-	def getLociiFromMapFiles(self, files):
-		return [ self.generateLociiFromMapFiles(files) ]
-	#getLociiFromMapFiles()
-	
-	
-	def generateSNPsFromRSFiles(self, files):
-		for filePtr in files:
-			sys.stderr.write("processing '%s' ...\n" % filePtr.name)
-			n = 0
-			for line in filePtr:
-				if len(line) > 0 and line[0] != '#':
-					n += 1
-					yield long(line)
-			#foreach line in file
-			sys.stderr.write("... OK: %d SNPs\n" % n)
-		#foreach file
-	#generateSNPsFromRSFiles()
-	
-	
-	def getSNPsFromRSFiles(self, files):
-		return [ self.generateSNPsFromRSFiles(files) ]
-	#getSNPsFromRSFiles()
-	
-	
-	# ##################################################
-	# working set management
-	
-	
-	def addLocii(self, itrLocus):
-		# itrLocus.next() => (label,rs,chr,pos)
-		with self._loki:
-			# load locii into temp table
-			self._loki.createDatabaseTables(self._schema['temp'], 'temp', 'locus')
-			self._loki._dbc.executemany("INSERT INTO temp.locus (label,rs,chr,pos) VALUES (?,?,?,?)", itrLocus)
-			
-			sys.stderr.write("adding locii to working set ...\n")
-			
-			# update merged rs#s
-			lstUpdate = []
-			for row in self._loki._dbc.execute("SELECT sm.rsCur, l.rowid FROM temp.locus AS l JOIN db.snp_merge AS sm ON sm.rsOld = l.rs"):
-				lstUpdate.append( (row[0],row[1]) )
-			self._loki._dbc.executemany("UPDATE temp.locus SET rs=? WHERE rowid=?", lstUpdate)
-			numUpdate = len(lstUpdate)
-			
-			# load locii into the working set, using rs# to fill in missing chr/pos
-			self._loki.dropDatabaseIndexes(self._schema['main'], 'main', 'locus')
-			self._loki._dbc.execute("""
-INSERT INTO main.locus (label,rs,chr,pos)
-SELECT
-  COALESCE(
-    l.label,
-    'rs' || l.rs,
-    'chr' || COALESCE(l.chr,s.chr) || ':' || COALESCE(l.pos,s.pos)
-  ) AS label,
-  l.rs,
-  COALESCE(l.chr,s.chr) AS chr,
-  COALESCE(l.pos,s.pos) AS pos
-FROM temp.locus AS l
-LEFT JOIN db.snp AS s
-  ON s.rs = l.rs
-  AND (l.chr IS NULL OR s.chr = l.chr)
-  AND (l.pos IS NULL OR s.pos = l.pos)
-""")
-			numAdd = self._loki._db.changes()
-			self._loki.createDatabaseIndexes(self._schema['main'], 'main', 'locus')
-			self._loki.dropDatabaseTables(self._schema['temp'], 'temp', 'locus')
-			
-			# print stats
-			sys.stderr.write("... OK: %d locii added (%d rs#s updated)\n" % (numAdd,numUpdate))
-			sys.stderr.write("verifying ...\n")
-			sys.stderr.flush()
-			for row in self._loki._dbc.execute("SELECT COUNT(1) FROM main.locus"):
-				ttl = row[0]
-			sys.stderr.write("... OK: %d variants in working set\n" % ttl)
-		#with db transaction
-	#addLocii()
 	
 	
 	# ##################################################
@@ -781,133 +567,115 @@ class Biofilter_ArgParse_Output(Biofilter_ArgParse):
 			namespace.biofilter.outputRegionModels()
 
 
-class Biofilter_ArgParse_Version(Biofilter_ArgParse):
-	def __call__(self, parser, namespace, values, option_string=None):
-		Biofilter_ArgParse.__call__(self, parser, namespace, values, option_string)
-		sys.stderr.write(
-"""Biofilter version %d.%d.%d (%s)
-     LOKI version %d.%d.%d (%s)
-%9s version %s
-%9s version %s
-""" % (
-			Biofilter.ver_maj, Biofilter.ver_min, Biofilter.ver_rev, Biofilter.ver_date,
-			loki.Database.ver_maj, loki.Database.ver_min, loki.Database.ver_rev, loki.Database.ver_date,
-			loki.Database.getDatabaseDriverName(), loki.Database.getDatabaseDriverVersion(),
-			loki.Database.getDatabaseInterfaceName(), loki.Database.getDatabaseInterfaceVersion()
-		))
-
-
-class Biofilter_ArgParse_NotImplemented(Biofilter_ArgParse):
-	def __call__(self, parser, namespace, values, option_string=None):
-		Biofilter_ArgParse.__call__(self, parser, namespace, values, option_string)
-		sys.stderr.write("> %s %s\n" % (self.dest, values))
-		sys.stderr.write("NOT YET IMPLEMENTED\n")
 
 
 if __name__ == "__main__":
+	version = "Biofilter version %d.%d.%d (%s)" % (
+			Biofilter.ver_maj,
+			Biofilter.ver_min,
+			Biofilter.ver_rev,
+			Biofilter.ver_date
+	)
+	
+	# define arguments
 	parser = argparse.ArgumentParser()
 	
-	parser.add_argument('-d', '--database',
-			type=str, metavar='filename', action=Biofilter_ArgParse_Database,
-			help="specify the database file to use"
+	parser.add_argument('--version', action='version',
+			version=version+"""
+%9s version %d.%d.%d (%s)
+%9s version %s
+%9s version %s
+""" % (
+				"LOKI",
+				loki_db.Database.ver_maj,
+				loki_db.Database.ver_min,
+				loki_db.Database.ver_rev,
+				loki_db.Database.ver_date,
+				loki_db.Database.getDatabaseDriverName(),
+				loki_db.Database.getDatabaseDriverVersion(),
+				loki_db.Database.getDatabaseInterfaceName(),
+				loki_db.Database.getDatabaseInterfaceVersion()
+			)
 	)
 	
-	parser.add_argument('--cd', '--chdir',
-			type=str, metavar='pathname', action=Biofilter_ArgParse_ChDir,
-			help="change the current working directory, from which relative paths to input and output files are resolved; "
-			+"the special path '-' returns to the initial directory when the program was started"
+	parser.add_argument('-k', '--knowledge', type=str, metavar='file',
+			help="the knowledge database file to use"
 	)
 	
-	parser.add_argument('-u', '--update',
-			type=str, metavar='data', nargs='+', action=Biofilter_ArgParse_Update,
-			help="update the database file by downloading and processing new source data of the specified type; "
-			+"files will be downloaded into a 'loki_cache' subdirectory of the current working directory and left in place "
-			+"afterwards, so that future updates can avoid re-downloading source data which has not changed"
+	parser.add_argument('-s', '--snp', type=str, metavar='rs#', nargs='+', action='append',
+			help="a filtering set of SNPs, specified as RS#s"
 	)
 	
-	parser.add_argument('-m', '--marker',
-			type=str, metavar='marker', nargs='+', action=Biofilter_ArgParse_Marker,
-			help="load variants into the working set by marker ('chr:pos' or 'chr:label:pos')"
-	)
-	parser.add_argument('-M', '--mapfile',
-			type=argparse.FileType('r'), metavar='filename', nargs='+', action=Biofilter_ArgParse_MapFile,
-			help="load variants into the working set by reading markers from one or more .map files"
+	parser.add_argument('-S', '--snpfile', type=str, metavar='file', nargs='+', action='append',
+			help="RS# file(s) from which to load a filtering set of SNPs"
 	)
 	
-	parser.add_argument('-s', '--snp',
-			type=str, metavar='rs#', nargs='+', action=Biofilter_ArgParse_SNP,
-			help="load variants into the working set by rs#"
-	)
-	parser.add_argument('-S', '--snpfile',
-			type=argparse.FileType('r'), metavar='filename', nargs='+', action=Biofilter_ArgParse_SNPFile,
-			help="load variants into the working set by reading rs#s from one or more files"
+	parser.add_argument('-m', '--marker', type=str, metavar='marker', nargs='+', action='append',
+			help="a filtering set of markers, specified as 'chr:pos' or 'chr:label:pos'"
 	)
 	
-	#parser.add_argument('-r', '--region',
-			#type=str, metavar='chr:pos-pos', nargs='+', action=Biofilter_ArgParse_NotImplemented,
-			#help="load regions into the working set by locus range (chr:pos-pos)"
-	#)
-	#parser.add_argument('-R', '--regionfile',
-			#type=argparse.FileType('r'), metavar='filename', nargs='+', action=Biofilter_ArgParse_NotImplemented,
-			#help="load regions into the working set by reading locus ranges from one or more files"
-	#)
-	
-	#parser.add_argument('-g', '--gene',
-			#type=str, metavar='alias/tag', nargs='+', action=Biofilter_ArgParse_Gene,
-			#help="load regions into the working set by gene alias or special tag: "
-			#+"':d' loads all known gene regions from the database; "
-			#+"':v' loads gene regions from the database using the working set of variants; "
-			#+"':c' clears all regions from the current working set"
-	#)
-	#parser.add_argument('-G', '--genefile',
-			#type=argparse.FileType('r'), metavar='filename', nargs='+', action=Biofilter_ArgParse_NotImplemented,
-			#help="load regions into the working set by reading gene aliases from one or more files"
-	#)
-	
-	parser.add_argument('-x', '--expand',
-			type=str, metavar='num', action=Biofilter_ArgParse_Expand,
-			help="when matching region boundaries to locii, expand the boundaries by this amount; "
-			+"the suffix 'k' multiplies the amount by 1000"
-	)
-	parser.add_argument('-p', '--population',
-			type=str, metavar='label', action=Biofilter_ArgParse_NotImplemented,
-			help="when matching region boundaries to locii, expand the boundaries according to the linkage disequilibrium calculations stored in the database"
+	parser.add_argument('-M', '--mapfile', type=str, metavar='file', nargs='+', action='append',
+			help=".map file(s) from which to load a filtering set of markers"
 	)
 	
-	parser.add_argument('-o', '--output',
-			type=str, metavar='data', action=Biofilter_ArgParse_Output,
-			help="outputs data from the working sets according to the requested type: "
-			+"'v' lists all variants; "
-			+"'v:dg' annotates variants against known genes"
+	parser.add_argument('-x', '--expand', type=str, metavar='num',
+			help="amount by which to expand region boundaries when matching them to locii"
 	)
 	
-	parser.add_argument('--version', nargs=0, action=Biofilter_ArgParse_Version)
+	parser.add_argument('-p', '--population', type=str, metavar='label',
+			help="LD profile with which to expand region boundaries when matching them to locii"
+	)
 	
-	ns = argparse.Namespace()
-	ns.biofilter = Biofilter()
-	args = parser.parse_args(namespace=ns)
+	parser.add_argument('-o', '--output', type=str, metavar='data', choices={'s','g'},
+			help="output type"
+	)
 	
-	if not hasattr(args, 'action'):
-		print "Biofilter version %d.%d.%d (%s)" % (Biofilter.ver_maj, Biofilter.ver_min, Biofilter.ver_rev, Biofilter.ver_date)
-		print "     LOKI version %d.%d.%d (%s)" % (loki.Database.ver_maj, loki.Database.ver_min, loki.Database.ver_rev, loki.Database.ver_date)
+	# if no arguments, print usage and exit
+	if len(sys.argv) < 2:
+		print version
 		print
 		parser.print_usage()
 		print
 		print "Use -h for details."
+		sys.exit(2)
+	
+	# parse arguments
+	args = parser.parse_args()
+	obj = Biofilter()
+	
+	# collect SNP filters
+	snpFilters = []
+	if args.snp:
+		for snpList in args.snp:
+			snpFilters.append( (long(snp[2:]) if snp[0:2].upper() == 'RS' else long(snp) for snp in snpList) )
+	if args.snpfile:
+		for snpFileList in args.snpfile:
+			snpFilters.append( obj.generateRSesFromRSFiles(snpFileList) )
+	
+	# collect locus filters
+	locusFilters = []
+	if args.marker:
+		for markerList in args.marker:
+			locusFilters.append( obj.generateLociiFromMarkers(markerList) )
+	if args.mapfile:
+		for mapFileList in args.mapfile
+			locusFilters.append( obj.generateLociiFromMapFiles(mapFileList) )
+	
+	
 #__main__
 
 
 """
 h	help
-d	database
-u	update
+k	knowledge
 
-s	variants - rs#
-m	variants - map
-g	regions - genes
-r	regions - map
-t	groups - pathways
-	groups - genesets
+s	SNPs (rs#)
+m	markers (map)
+g	genes (symbol)
+r	regions (map)
+?	groups (name)
+?	networks (symbols)
+c	sources (name)
 
 p	population
 x	expansion
