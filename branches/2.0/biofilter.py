@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 
-import sys
-import os
 import argparse
+import os
+import sys
 
 import loki_db
 
@@ -14,7 +14,7 @@ class Biofilter:
 	# public class data
 	
 	
-	ver_maj,ver_min,ver_rev,ver_date = 0,0,529,'2012-05-29'
+	ver_maj,ver_min,ver_rev,ver_date = 2,-1,601,'2012-06-01'
 	
 	
 	# ##################################################
@@ -28,19 +28,24 @@ class Biofilter:
 			'locus': {
 				'table': """
 (
-  label VARCHAR(32),
+  label VARCHAR(32) NOT NULL,
   chr TINYINT NOT NULL,
-  pos BIGINT NOT NULL
+  pos BIGINT NOT NULL,
+  flag TINYINT NOT NULL DEFAULT 0,
+  PRIMARY KEY (label,chr,pos)
 )
 """,
-				'index': {}
+				'index': {
+					'locus__pos': '(chr,pos)',
+				}
 			}, #.main.locus
 			
 			# ########## main.snp ##########
 			'snp': {
 				'table': """
 (
-  rs INTEGER PRIMARY KEY NOT NULL
+  rs INTEGER PRIMARY KEY NOT NULL,
+  flag TINYINT NOT NULL DEFAULT 0
 )
 """,
 				'index': {}
@@ -57,14 +62,88 @@ class Biofilter:
 	def __init__(self):
 		# initialize instance properties
 		self._iwd = os.getcwd()
+		self._verbose = False
+		self._logFile = sys.stderr
+		self._logIndent = 0
+		self._logHanging = False
 		self._expansion = 0
-		self._population_id = 0
+		self._population = 'n/a'
+		self._snpFilters = 0
+		self._locusFilters = 0
 		
 		# initialize instance database
 		self._loki = loki_db.Database()
-		self._loki.setVerbose(True)
-		self._loki.createDatabaseTables(self._schema, 'main', '*', True)
+		self._loki.setLogger(self)
+		self._loki.createDatabaseTables(self._schema['main'], 'main', '*', True)
 	#__init__()
+	
+	
+	# ##################################################
+	# logging
+	
+	
+	def getVerbose(self):
+		return self._verbose
+	#getVerbose()
+	
+	
+	def setVerbose(self, verbose=True):
+		self._verbose = verbose
+	#setVerbose()
+	
+	
+	def log(self, message=""):
+		if self._verbose:
+			if (self._logIndent > 0) and (not self._logHanging):
+				self._logFile.write(self._logIndent * "  ")
+				self._logHanging = True
+			self._logFile.write(message)
+			if (message == "") or (message[-1] != "\n"):
+				self._logHanging = True
+				self._logFile.flush()
+			else:
+				self._logHanging = False
+		#if _verbose
+	#log()
+	
+	
+	def logPush(self, message=None):
+		if message:
+			self.log(message)
+		if self._logHanging:
+			self.log("\n")
+		self._logIndent += 1
+	#logPush()
+	
+	
+	def logPop(self, message=None):
+		if self._logHanging:
+			self.log("\n")
+		self._logIndent = max(0, self._logIndent - 1)
+		if message:
+			self.log(message)
+	#logPop()
+	
+	
+	# ##################################################
+	# configuration
+	
+	
+	def attachDatabaseFile(self, dbFile):
+		return self._loki.attachDatabaseFile(dbFile)
+	#attachDatabaseFile()
+	
+	
+	def setExpansion(self, expansion=0):
+		self._expansion = int(expansion)
+		self.log("region boundary expansion: %d\n" % self._expansion)
+	#setExpansion()
+	
+	
+	def setPopulation(self, population='n/a'):
+		self._population = population.strip()
+		self.log("population LD profile for region boundary expansion: %s\n" % self._population)
+	#setPopulation()
 	
 	
 	# ##################################################
@@ -92,7 +171,7 @@ class Biofilter:
 			if marker == None:
 				continue
 			
-			label = rs = chm = pos = None
+			label = chm = pos = None
 			cols = marker.split(separator)
 			
 			# parse line
@@ -120,8 +199,8 @@ class Biofilter:
 			# parse and convert marker label
 			if not label:
 				label = 'chr%s:%s' % (self.loki.chr_name[chm], pos)
-			elif label[:2].upper() == 'RS' and label[2:].isdigit():
-				rs = long(label[2:])
+			#elif label[:2].upper() == 'RS' and label[2:].isdigit():
+			#	rs = long(label[2:])
 			
 			# parse and convert position
 			if pos == '-' or pos == 'NA':
@@ -129,7 +208,7 @@ class Biofilter:
 			else:
 				pos = long(pos)
 			
-			yield (label,rs,chm,pos)
+			yield (label,chm,pos)
 		#foreach marker
 	#generateLociiFromMarkers()
 	
@@ -149,30 +228,114 @@ class Biofilter:
 	
 	
 	# ##################################################
+	# filter management
+	
+	
+	def intersectSNPs(self, snps):
+		dbc = self._loki._db.cursor()
+		
+		if self._snpFilters:
+			dbc.execute("UPDATE `main`.`snp` SET flag = 0")
+			dbc.executemany("UPDATE `main`.`snp` SET flag = 1 WHERE rs = ?", snps)
+			dbc.execute("DELETE FROM `main`.`snp` WHERE flag = 0")
+		else:
+			self.log("adding SNP filter ...")
+			rs = None
+			total = found = 0
+			for row in dbc.executemany("INSERT OR REPLACE INTO `main`.`snp` (rs) SELECT rs FROM `db`.`snp` WHERE rs = ?; SELECT LAST_INSERT_ROWID()", snps):
+				total += 1
+				if rs != row[0]:
+					found += 1
+					rs = row[0]
+			self.log(" OK: added %d of %d RS#s (%d unrecognized)\n" % (found,total,total-found))
+		
+		self._snpFilters += 1
+	#intersectSNPs()
+	
+	
+	def intersectLocii(self, locii):
+		dbc = self._loki._db.cursor()
+		
+		self.log("adding locus filter ...")
+		if self._locusFilters:
+			dbc.execute("UPDATE `main`.`locus` SET flag = 0")
+			dbc.executemany("UPDATE `main`.`locus` SET flag = 1 WHERE (1 OR ?) AND chr = ? AND pos = ?", locii)
+			dbc.execute("DELETE FROM `main`.`locus` WHERE flag = 0")
+		else:
+			dbc.executemany("INSERT OR IGNORE INTO `main`.`locus` (label,chr,pos) VALUES (?,?,?)", locii)
+		self.log(" OK\n")
+		
+		self._locusFilters += 1
+	#intersectLocii()
+	
+	
+	# ##################################################
 	# annotation
 	
 	
-	def outputLocii(self, target=sys.stdout):
-		target.write("#chr\tlabel\tpos\n")
-		# sqlite3's string concat operator is ||
-		for row in self._loki._dbc.execute("""
-SELECT
-  COALESCE(chr, 'NA') AS chr,
-  COALESCE(
-    label,
-    'rs' || rs,
-    'chr' || chr || ':' || pos,
-    '!#' || rowid
-  ) AS label,
-  COALESCE(pos, 'NA') AS pos
-FROM main.locus
+	def generateLocii(self):
+		if self._snpFilters and self._locusFilters:
+			sql = """
+SELECT 'rs'||d_s.rs AS label, d_s.chr, d_s.pos
+FROM `main`.`snp` AS m_s
+JOIN `db`.`snp` AS d_s USING (rs)
+UNION
+SELECT label, chr, pos
+FROM `main`.`locus` AS m_l
 """
-		):
-			target.write("%s\t%s\t%s\n" % row)
-	#outputLocii()
+		elif self._snpFilters:
+			sql = """
+SELECT 'rs'||d_s.rs AS label, d_s.chr, d_s.pos
+FROM `main`.`snp` AS m_s
+JOIN `db`.`snp` AS d_s USING (rs)
+"""
+		elif self._locusFilters:
+			sql = """
+SELECT label, chr, pos
+FROM `main`.`locus` AS m_l
+"""
+		else:
+			sql = """
+SELECT 'rs'||d_s.rs AS label, d_s.chr, d_s.pos
+FROM `db`.`snp` AS d_s
+"""
+		#if _snpFilters and/or _locusFilters
+		
+		for row in self._loki._db.cursor().execute(sql):
+			yield row
+	#generateLocii()
 	
 	
-	def outputLociiRegions(self, rtype='gene', target=sys.stdout):
+	def generateLociiRegions(self, locii, rtype='gene'):
+		expansion = self._expansion
+		populationID = self._loki.getPopulationID(self._population)
+		typeID = self._loki.getTypeID(rtype)
+		zonesize = int(self._loki.getDatabaseSetting('region_zone_size'))
+		
+		sql = """
+SELECT DISTINCT i_l.label, i_l.chr, i_l.pos, d_r.region_id, d_r.label, d_rb.posMin, d_rb.posMax
+FROM (SELECT ? AS label, ? AS chr, ? AS pos) AS i_l
+JOIN `db`.`region_zone` AS d_rz
+  ON d_rz.population_id = %d
+  AND d_rz.chr = i_l.chr
+  AND d_rz.zone >= (i_l.pos - %d) / %d
+  AND d_rz.zone <= (i_l.pos + %d) / %d
+JOIN `db`.`region_bound` AS d_rb
+  ON d_rb.region_id = d_rz.region_id
+  AND d_rb.population_id = d_rz.population_id
+  AND d_rb.chr = d_rz.chr
+  AND d_rb.posMin <= (i_l.pos + %d)
+  AND d_rb.posMax >= (i_l.pos - %d)
+JOIN `db`.`region` AS d_r
+  ON d_r.region_id = d_rb.region_id
+  AND d_r.type_id = %d
+""" % (populationID,expansion,zonesize,expansion,zonesize,expansion,expansion,typeID)
+		for row in self._loki._db.cursor().executemany(sql, locii):
+			yield row
+	#generateLociiRegions()
+	
+	
+	def outputLociiRegions(self, rtype='gene', target=sys.stdout): #TODO
 		typeID = self._loki.getTypeID(rtype)
 		if not typeID:
 			sys.stderr.write("ERROR: unknown region type '%s'\n" % rtype)
@@ -269,7 +432,7 @@ LEFT JOIN db.region AS rD
 """, { 'expand':self._expand, 'population_id':populationID, 'type_id':typeID }
 		):
 			target.write("%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n" % row)
-	#outputLociiRegions()
+	#outputLociiRegions() #TODO
 	
 	
 	# ##################################################
@@ -369,10 +532,10 @@ JOIN main.locus AS lB
 					modelRoutes[model], len(modelLinks[model]), len(modelSources[model])
 				)
 			)
-	#outputLociiModels()
+	#outputLociiModels() #TODO
 	
 	
-	def outputRegionModels(self, rtype='gene', target=sys.stdout):
+	def outputRegionModels(self, rtype='gene', target=sys.stdout): #TODO
 		typeID = self._loki.getTypeID(rtype)
 		if not typeID:
 			sys.stderr.write("ERROR: unknown region type '%s'\n" % rtype)
@@ -479,94 +642,10 @@ ORDER BY groups DESC, sourcesA DESC, sourcesB DESC
 		sys.stderr.write(" OK: %d models\n" % n)
 		self._loki.dropDatabaseTables(self._schema['temp'], 'temp', 'region')
 		self._loki.dropDatabaseTables(self._schema['temp'], 'temp', 'group')
-	#outputRegionModels()
+	#outputRegionModels() #TODO
 	
 	
 #Biofilter
-
-
-class Biofilter_ArgParse(argparse.Action):
-	def __call__(self, parser, namespace, values, option_string=None):
-		setattr(namespace, 'action', True)
-
-
-class Biofilter_ArgParse_Database(Biofilter_ArgParse):
-	def __call__(self, parser, namespace, values, option_string=None):
-		Biofilter_ArgParse.__call__(self, parser, namespace, values, option_string)
-		sys.stderr.write("> database %s\n" % values)
-		warnings = namespace.biofilter._loki.attachDatabaseFile(values)
-		if warnings != True:
-			for msg in warnings:
-				sys.stderr.write("WARNING: %s\n" % msg)
-
-
-class Biofilter_ArgParse_ChDir(Biofilter_ArgParse):
-	def __call__(self, parser, namespace, values, option_string=None):
-		Biofilter_ArgParse.__call__(self, parser, namespace, values, option_string)
-		sys.stderr.write("> chdir %s\n" % values)
-		namespace.biofilter.changeDirectory(values)
-
-
-class Biofilter_ArgParse_Update(Biofilter_ArgParse):
-	def __call__(self, parser, namespace, values, option_string=None):
-		Biofilter_ArgParse.__call__(self, parser, namespace, values, option_string)
-		sys.stderr.write("> update %s\n" % values)
-		namespace.biofilter._loki.updateDatabase(values)
-
-
-class Biofilter_ArgParse_Marker(Biofilter_ArgParse):
-	def __call__(self, parser, namespace, values, option_string=None):
-		Biofilter_ArgParse.__call__(self, parser, namespace, values, option_string)
-		sys.stderr.write("> marker %s\n" % values)
-		namespace.biofilter.addLocii(namespace.biofilter.generateLociiFromMarkers(values))
-
-
-class Biofilter_ArgParse_MapFile(Biofilter_ArgParse):
-	def __call__(self, parser, namespace, values, option_string=None):
-		Biofilter_ArgParse.__call__(self, parser, namespace, values, option_string)
-		sys.stderr.write("> mapfile %s\n" % [k.name for k in values])
-		namespace.biofilter.addLocii( namespace.biofilter.generateLociiFromMapFiles(values) )
-
-
-class Biofilter_ArgParse_SNP(Biofilter_ArgParse):
-	def __call__(self, parser, namespace, values, option_string=None):
-		Biofilter_ArgParse.__call__(self, parser, namespace, values, option_string)
-		sys.stderr.write("> snp %s\n" % values)
-		namespace.biofilter.addLocii( (None,snp,None,None) for snp in values )
-
-
-class Biofilter_ArgParse_SNPFile(Biofilter_ArgParse):
-	def __call__(self, parser, namespace, values, option_string=None):
-		Biofilter_ArgParse.__call__(self, parser, namespace, values, option_string)
-		sys.stderr.write("> snpfile %s\n" % [k.name for k in values])
-		namespace.biofilter.addLocii( (None,snp,None,None) for snp in namespace.biofilter.generateSNPsFromRSFiles(values) )
-
-
-class Biofilter_ArgParse_Expand(Biofilter_ArgParse):
-	def __call__(self, parser, namespace, values, option_string=None):
-		Biofilter_ArgParse.__call__(self, parser, namespace, values, option_string)
-		sys.stderr.write("> expand %s\n" % values)
-		if values[-1:].upper() == 'K':
-			namespace.biofilter._expand = int(float(values[:-1]) * 1000)
-		else:
-			namespace.biofilter._expand = int(values)
-		sys.stderr.write("OK: region boundary expansion set to %d\n" % namespace.biofilter._expand)
-
-
-class Biofilter_ArgParse_Output(Biofilter_ArgParse):
-	def __call__(self, parser, namespace, values, option_string=None):
-		Biofilter_ArgParse.__call__(self, parser, namespace, values, option_string)
-		sys.stderr.write("> output %s\n" % values)
-		if values == 'l':
-			namespace.biofilter.outputLocii()
-		elif values == 'l:r':
-			namespace.biofilter.outputLociiRegions()
-		elif values == 'l:l':
-			namespace.biofilter.outputLociiModels()
-		elif values == 'r:r':
-			namespace.biofilter.outputRegionModels()
-
-
 
 
 if __name__ == "__main__":
@@ -578,7 +657,10 @@ if __name__ == "__main__":
 	)
 	
 	# define arguments
-	parser = argparse.ArgumentParser()
+	parser = argparse.ArgumentParser(
+		formatter_class=argparse.RawDescriptionHelpFormatter,
+		description=version,
+	)
 	
 	parser.add_argument('--version', action='version',
 			version=version+"""
@@ -618,7 +700,7 @@ if __name__ == "__main__":
 			help=".map file(s) from which to load a filtering set of markers"
 	)
 	
-	parser.add_argument('-x', '--expand', type=str, metavar='num',
+	parser.add_argument('-x', '--expansion', type=str, metavar='num',
 			help="amount by which to expand region boundaries when matching them to locii"
 	)
 	
@@ -626,8 +708,12 @@ if __name__ == "__main__":
 			help="LD profile with which to expand region boundaries when matching them to locii"
 	)
 	
-	parser.add_argument('-o', '--output', type=str, metavar='data', choices={'s','g'},
+	parser.add_argument('-o', '--output', type=str, metavar='format',
 			help="output type"
+	)
+	
+	parser.add_argument('-v', '--verbose', action='store_true',
+			help="print warnings and log messages"
 	)
 	
 	# if no arguments, print usage and exit
@@ -641,26 +727,53 @@ if __name__ == "__main__":
 	
 	# parse arguments
 	args = parser.parse_args()
-	obj = Biofilter()
+	bio = Biofilter()
+	bio.setVerbose(args.verbose)
+	if args.knowledge:
+		bio.attachDatabaseFile(args.knowledge)
+	if args.expansion:
+		e = args.expansion.strip().upper()
+		if e[-1:] == 'B':
+			e = e[:-1]
+		if e[-1] == 'K':
+			e = long(e[:-1]) * 1000
+		elif e[-1] == 'M':
+			e = long(e[:-1]) * 1000 * 1000
+		elif e[-1] == 'G':
+			e = long(e[:-1]) * 1000 * 1000 * 1000
+		else:
+			e = long(e)
+		bio.setExpansion(e)
+	if args.population:
+		bio.setPopulation(args.population)
 	
-	# collect SNP filters
-	snpFilters = []
+	# apply SNP filters
 	if args.snp:
 		for snpList in args.snp:
-			snpFilters.append( (long(snp[2:]) if snp[0:2].upper() == 'RS' else long(snp) for snp in snpList) )
+			bio.intersectSNPs( (long(snp[2:]),) if snp[0:2].upper() == 'RS' else (long(snp),) for snp in snpList )
 	if args.snpfile:
 		for snpFileList in args.snpfile:
-			snpFilters.append( obj.generateRSesFromRSFiles(snpFileList) )
+			bio.intersectSNPs( (rs,) for rs in bio.generateRSesFromRSFiles(snpFileList) )
 	
-	# collect locus filters
-	locusFilters = []
+	# apply locus filters
 	if args.marker:
 		for markerList in args.marker:
-			locusFilters.append( obj.generateLociiFromMarkers(markerList) )
+			bio.intersectLocii( bio.generateLociiFromMarkers(markerList) )
 	if args.mapfile:
-		for mapFileList in args.mapfile
-			locusFilters.append( obj.generateLociiFromMapFiles(mapFileList) )
+		for mapFileList in args.mapfile:
+			bio.intersectLocii( bio.generateLociiFromMapFiles(mapFileList) )
 	
+	# output
+	if args.output:
+		o = args.output.strip().upper()
+		if o == 'L':
+			sys.stdout.write("#label\tchr\tpos\n")
+			for line in bio.generateLocii():
+				sys.stdout.write("%s\t%s\t%s\n" % line)
+		elif o == 'L:R':
+			sys.stdout.write("#label\tchr\tpos\tid\tgene\tstart\tstop\n")
+			for line in bio.generateLociiRegions( (bio.generateLocii()) ):
+				sys.stdout.write("%s\t%s\t%s\t%s\t%s\t%s\t%s\n" % line)
 	
 #__main__
 
