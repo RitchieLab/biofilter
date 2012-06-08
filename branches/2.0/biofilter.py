@@ -14,7 +14,7 @@ class Biofilter:
 	# public class data
 	
 	
-	ver_maj,ver_min,ver_rev,ver_date = 2,-1,601,'2012-06-01'
+	ver_maj,ver_min,ver_rev,ver_date = 2,-1,605,'2012-06-05'
 	
 	
 	# ##################################################
@@ -24,6 +24,20 @@ class Biofilter:
 	_schema = {
 		'main': {
 			
+			# ########## main.snp ##########
+			'snp': {
+				'table': """
+(
+  label VARCHAR(32) NOT NULL,
+  rs INTEGER NOT NULL,
+  flag TINYINT NOT NULL DEFAULT 0
+)
+""",
+				'index': {
+					'snp__rs': '(rs)',
+				}
+			}, #.main.snp
+			
 			# ########## main.locus ##########
 			'locus': {
 				'table': """
@@ -31,8 +45,7 @@ class Biofilter:
   label VARCHAR(32) NOT NULL,
   chr TINYINT NOT NULL,
   pos BIGINT NOT NULL,
-  flag TINYINT NOT NULL DEFAULT 0,
-  PRIMARY KEY (label,chr,pos)
+  flag TINYINT NOT NULL DEFAULT 0
 )
 """,
 				'index': {
@@ -40,16 +53,51 @@ class Biofilter:
 				}
 			}, #.main.locus
 			
-			# ########## main.snp ##########
-			'snp': {
+			# ########## main.region ##########
+			'region': {
 				'table': """
 (
-  rs INTEGER PRIMARY KEY NOT NULL,
+  label VARCHAR(32) NOT NULL,
+  region_id INTEGER NOT NULL,
   flag TINYINT NOT NULL DEFAULT 0
 )
 """,
-				'index': {}
-			}, #.main.snp
+				'index': {
+					'region__region_id': '(region_id)',
+				}
+			}, #.main.region
+			
+			# ########## main.bound ##########
+			'bound': {
+				'table': """
+(
+  label VARCHAR(32) NOT NULL,
+  chr TINYINT NOT NULL,
+  posMin BIGINT NOT NULL,
+  posMax BIGINT NOT NULL,
+  flag TINYINT NOT NULL DEFAULT 0
+)
+""",
+				'index': {
+					'bound__posmin': '(chr,posMin,posMax)',
+					'bound__posmax': '(chr,posMax,posMin)',
+				}
+			}, #.main.bound
+			
+			# ########## main.bound_zone ##########
+			'bound_zone': {
+				'table': """
+(
+  bound_rowid INTEGER NOT NULL,
+  chr TINYINT NOT NULL,
+  zone INTEGER NOT NULL,
+  PRIMARY KEY (chr,zone,bound_rowid)
+)
+""",
+				'index': {
+					'bound_zone__bound': '(bound_rowid)',
+				}
+			}, #.main.bound_zone
 			
 		}, #.main
 	} #_schema{}
@@ -68,8 +116,13 @@ class Biofilter:
 		self._logHanging = False
 		self._expansion = 0
 		self._population = 'n/a'
+		self._geneNamespace = 'symbol'
+		
+		self._tablesDeindexed = set()
 		self._snpFilters = 0
 		self._locusFilters = 0
+		self._regionFilters = 0
+		self._boundFilters = 0
 		
 		# initialize instance database
 		self._loki = loki_db.Database()
@@ -129,11 +182,6 @@ class Biofilter:
 	# configuration
 	
 	
-	def attachDatabaseFile(self, dbFile):
-		return self._loki.attachDatabaseFile(dbFile)
-	#attachDatabaseFile()
-	
-	
 	def setExpansion(self, expansion=0):
 		self._expansion = int(expansion)
 		self.log("region boundary expansion: %d\n" % self._expansion)
@@ -146,13 +194,83 @@ class Biofilter:
 	#setPopulation()
 	
 	
+	def setGeneNamespace(self, namespace='symbol'):
+		self._geneNamespace = namespace.strip()
+		self.log("gene region name type: %s\n" % self._geneNamespace)
+	#setGeneNamespace()
+	
+	
+	# ##################################################
+	# database management
+	
+	
+	def attachDatabaseFile(self, dbFile):
+		return self._loki.attachDatabaseFile(dbFile)
+	#attachDatabaseFile()
+	
+	
+	def prepareTableForUpdate(self, table):
+		if table not in self._tablesDeindexed:
+			self._tablesDeindexed.add(table)
+			self._loki.dropDatabaseIndexes(self._schema['main'], 'main', table)
+	#prepareTableForUpdate()
+	
+	
+	def prepareTableForQuery(self, table):
+		if table in self._tablesDeindexed:
+			self._tablesDeindexed.remove(table)
+			self._loki.createDatabaseIndexes(self._schema['main'], 'main', table)
+			if table == "bound":
+				self.updateBoundZones()
+	#prepareTableForQuery()
+	
+	
+	def updateBoundZones(self):
+		self.log("calculating region zones ...")
+		
+		zoneSize = self._loki.getDatabaseSetting('region_zone_size')
+		if not zoneSize:
+			raise Exception("ERROR: could not determine database setting 'region_zone_size'")
+		zoneSize = int(zoneSize)
+		dbc = self._db.cursor()
+		
+		# make sure all regions are correctly oriented
+		dbc.execute("UPDATE `main`.`bound` SET posMin = posMax, posMax = posMin WHERE posMin > posMax")
+		
+		# define zone generator
+		def _zones(zoneSize, bounds):
+			# bounds=[ (rowid,chr,posMin,posMax),... ]
+			# yields:[ (rowid,chr,zone),... ]
+			for b in bounds:
+				for z in xrange(int(b[2])/zoneSize,(int(b[3])/zoneSize)+1):
+					yield (b[0],b[1],z)
+		#_zones()
+		
+		# feed all bounds through the zone generator
+		self.prepareTableForUpdate('bound_zone')
+		self.prepareTableForQuery('bound')
+		dbc.execute("DELETE FROM `main`.`bound_zone`")
+		dbc.executemany(
+			"INSERT OR IGNORE INTO `main`.`bound_zone` (bound_rowid,chr,zone) VALUES (?,?,?)",
+			_zones(
+				zoneSize,
+				self._db.cursor().execute("SELECT _ROWID_,chr,posMin,posMax FROM `main`.`bound`")
+			)
+		)
+		
+		# clean up
+		self.prepareTableForQuery('bound_zone')
+		self.log(" OK\n")
+	#updateBoundZones()
+	
+	
 	# ##################################################
 	# input data parsers
 	
 	
 	def generateRSesFromRSFiles(self, rsfiles):
 		for path in rsfiles:
-			with open(path, 'rU') as rsfile:
+			with (sys.stdin if (path == '-' or not path) else open(path, 'rU')) as rsfile:
 				for line in rsfile:
 					if line[0:1] == '#':
 						pass
@@ -215,7 +333,7 @@ class Biofilter:
 	
 	def generateLociiFromMapFiles(self, mapfiles):
 		for path in mapfiles:
-			with open(path, 'rU') as mapfile:
+			with (sys.stdin if (path == '-' or not path) else open(path, 'rU')) as mapfile:
 				for locus in self.generateLociiFromMarkers(
 						(line.rstrip() for line in mapfile if line[0:1] != '#'),
 						"\t"
@@ -227,212 +345,486 @@ class Biofilter:
 	#generateLociiFromMapFiles()
 	
 	
+	def generateNamesFromNameFiles(self, namefiles):
+		for path in namefiles:
+			with (sys.stdin if (path == '-' or not path) else open(path, 'rU')) as namefile:
+				for line in namefile:
+					if line[0:1] == '#':
+						pass
+					else:
+						yield line.rstrip()
+				#foreach line in namefile
+			#with namefile
+		#foreach namefile
+	#generateNamesFromNameFiles()
+	
+	
 	# ##################################################
-	# filter management
+	# snp/locus input
+	
+	
+	def unionSNPs(self, snps):
+		# snps=[ rs, ... ]
+		self.log("adding SNP filter ...")
+		self.prepareTableForUpdate('snp')
+		dbc = self._loki._db.cursor()
+		sql = "INSERT INTO `main`.`snp` (label,rs) VALUES ('rs'||?,?); SELECT 1"
+		tally = dict()
+		numAdd = 0
+		for row in dbc.executemany(sql, self._loki.generateCurrentRSesByRS(snps, tally=tally)):
+			numAdd += 1
+		self.log(" OK: added %d RS#s (%d matched, %d updated, %d ambiguous, %d unrecognized)\n" % (
+				numAdd,tally['match'],tally['merge'],tally['ambig'],tally['null']
+		))
+		self._snpFilters += 1
+	#unionSNPs()
 	
 	
 	def intersectSNPs(self, snps):
+		# snps=[ rs, ... ]
+		if not self._snpFilters:
+			return self.unionSNPs(snps)
+		self.log("intersecting SNP filter ...")
+		self.prepareTableForQuery('snp')
 		dbc = self._loki._db.cursor()
-		
-		if self._snpFilters:
-			dbc.execute("UPDATE `main`.`snp` SET flag = 0")
-			dbc.executemany("UPDATE `main`.`snp` SET flag = 1 WHERE rs = ?", snps)
-			dbc.execute("DELETE FROM `main`.`snp` WHERE flag = 0")
-		else:
-			self.log("adding SNP filter ...")
-			rs = None
-			total = found = 0
-			for row in dbc.executemany("INSERT OR REPLACE INTO `main`.`snp` (rs) SELECT rs FROM `db`.`snp` WHERE rs = ?; SELECT LAST_INSERT_ROWID()", snps):
-				total += 1
-				if rs != row[0]:
-					found += 1
-					rs = row[0]
-			self.log(" OK: added %d of %d RS#s (%d unrecognized)\n" % (found,total,total-found))
-		
+		dbc.execute("UPDATE `main`.`snp` SET flag = 0")
+		numBefore = self._loki._db.changes()
+		tally = dict()
+		sql = "UPDATE `main`.`snp` SET flag = 1 WHERE (1 OR ?) AND rs = ?"
+		dbc.executemany(sql, self._loki.generateCurrentRSesByRS(snps, tally=tally))
+		dbc.execute("DELETE FROM `main`.`snp` WHERE flag = 0")
+		numDrop = self._loki._db.changes()
+		self.log(" OK: kept %d RS#s (%d dropped, %d ambiguous, %d unrecognized)\n" % (
+				numBefore-numDrop,numDrop,tally['ambig'],tally['null']
+		))
 		self._snpFilters += 1
 	#intersectSNPs()
 	
 	
-	def intersectLocii(self, locii):
-		dbc = self._loki._db.cursor()
-		
+	def unionLocii(self, locii):
+		# locii=[ (label,chr,pos), ... ]
 		self.log("adding locus filter ...")
-		if self._locusFilters:
-			dbc.execute("UPDATE `main`.`locus` SET flag = 0")
-			dbc.executemany("UPDATE `main`.`locus` SET flag = 1 WHERE (1 OR ?) AND chr = ? AND pos = ?", locii)
-			dbc.execute("DELETE FROM `main`.`locus` WHERE flag = 0")
-		else:
-			dbc.executemany("INSERT OR IGNORE INTO `main`.`locus` (label,chr,pos) VALUES (?,?,?)", locii)
-		self.log(" OK\n")
-		
+		self.prepareTableForUpdate('locus')
+		dbc = self._loki._db.cursor()
+		sql = "INSERT OR IGNORE INTO `main`.`locus` (label,chr,pos) VALUES (?,?,?); SELECT LAST_INSERT_ROWID()"
+		lastID = None
+		numAdd = numNull = 0
+		for row in dbc.executemany(sql, locii):
+			if lastID != row[0]:
+				numAdd += 1
+				lastID = row[0]
+			else:
+				numNull += 1
+		self.log(" OK: added %d locii (%d incomplete)\n" % (numAdd,numNull))
+		self._locusFilters += 1
+	#unionLocii()
+	
+	
+	def intersectLocii(self, locii):
+		# locii=[ (label,chr,pos), ... ]
+		if not self._locusFilters:
+			return self.unionLocii(locii)
+		self.log("intersecting locus filter ...")
+		self.prepareTableForQuery('locus')
+		dbc = self._loki._db.cursor()
+		dbc.execute("UPDATE `main`.`locus` SET flag = 0")
+		numBefore = self._loki._db.changes()
+		dbc.executemany("UPDATE `main`.`locus` SET flag = 1 WHERE (1 OR ?) AND chr = ? AND pos = ?", locii)
+		dbc.execute("DELETE FROM `main`.`locus` WHERE flag = 0")
+		numDrop = self._loki._db.changes()
+		self.log(" OK: kept %d locii (%d dropped)\n" % (numBefore-numDrop,numDrop))
 		self._locusFilters += 1
 	#intersectLocii()
+	
+	
+	# ##################################################
+	# region/bound input
+	
+	
+	def unionRegions(self, names, ntype=None, rtype='gene'):
+		# names=[ rs, ... ]
+		
+		self.log("adding %s filter ..." % rtype)
+		ntype = ntype or self._geneNamespace
+		namespaceID = ntype and self._loki.getNamespaceID(ntype)
+		if ntype and not namespaceID:
+			raise Exception("ERROR: unknown name type '%s'" % ntype)
+		typeID = self._loki.getTypeID(rtype)
+		if not typeID:
+			raise Exception("ERROR: unknown region type '%s'" % rtype)
+		self.prepareTableForUpdate('region')
+		dbc = self._loki._db.cursor()
+		
+		sql = "INSERT INTO `main`.`region` (label,region_id) VALUES (?,?); SELECT 1"
+		tally = dict()
+		numAdd = 0
+		for row in dbc.executemany(sql, self._loki.generateRegionIDsByName(names, namespaceID=namespaceID, typeID=typeID, tally=tally)):
+			numAdd += 1
+		self.log(" OK: added %d %s regions (%d matched, %d ambiguous, %d unrecognized)\n" % (
+				numAdd,rtype,tally['match'],tally['ambig'],tally['null']
+		))
+		self._regionFilters += 1
+	#unionRegions()
+	
+	
+	def intersectRegions(self, names, ntype=None, rtype='gene'):
+		# names=[ rs, ... ]
+		if not self._regionFilters:
+			return self.unionRegions(names, ntype, rtype)
+		
+		self.log("intersecting %s filter ..." % rtype)
+		ntype = ntype or self._geneNamespace
+		namespaceID = ntype and self._loki.getNamespaceID(ntype)
+		if ntype and not namespaceID:
+			raise Exception("ERROR: unknown name type '%s'" % ntype)
+		typeID = self._loki.getTypeID(rtype)
+		if not typeID:
+			raise Exception("ERROR: unknown region type '%s'" % rtype)
+		self.prepareTableForQuery('region')
+		dbc = self._loki._db.cursor()
+		
+		dbc.execute("UPDATE `main`.`region` SET flag = 0")
+		numBefore = self._loki._db.changes()
+		tally = dict()
+		sql = "UPDATE `main`.`region` SET flag = 1 WHERE (1 OR ?) AND region_id = ?"
+		dbc.executemany(sql, self._loki.generateRegionIDsByName(names, namespaceID=namespaceID, typeID=typeID, tally=tally))
+		dbc.execute("DELETE FROM `main`.`region` WHERE flag = 0")
+		numDrop = self._loki._db.changes()
+		self.log(" OK: kept %d %s regions (%d dropped, %d ambiguous, %d unrecognized)\n" % (
+				numBefore-numDrop,rtype,numDrop,tally['ambig'],tally['null']
+		))
+		self._regionFilters += 1
+	#intersectRegions()
+	
+	
+	def unionBounds(self, bounds):
+		raise Exception("not implemented")
+	#unionBounds()
+	
+	
+	def intersectBounds(self, bounds):
+		raise Exception("not implemented")
+	#intersectBounds()
+	
+	
+	# ##################################################
+	# filtering
+	
+	
+	def generateFilteredData(self, snps=None, regions=None):
+		# gather settings
+		expansion = self._expansion
+		populationID = self._loki.getPopulationID(self._population)
+		if not populationID:
+			raise Exception("ERROR: unknown population '%s'" % self._population)
+		zoneSize = self._loki.getDatabaseSetting('region_zone_size')
+		if not zoneSize:
+			raise Exception("ERROR: could not determine database setting 'region_zone_size'")
+		zoneSize = int(zoneSize)
+		
+		# define unique aliases for all tables we might need
+		aliasTable = {
+			"ms":  "`main`.`snp`",
+			"ml":  "`main`.`locus`",
+			"mr":  "`main`.`region`",
+			"mb":  "`main`.`bound`",
+			"mbz": "`main`.`bound_zone`",
+			"ds":  "`db`.`snp`",
+			"dr":  "`db`.`region`",
+			"drb": "`db`.`region_bound`",
+			"drz": "`db`.`region_zone`",
+			"dg":  "`db`.`group`",
+			"dgg": "`db`.`group_group`",
+			"dgr": "`db`.`group_region`",
+		}
+		
+		# define general constraints for each table
+		aliasWhere = {
+			"drb": {"drb.population_id = {populationID}"},
+			"drz": {"drz.population_id = {populationID}"},
+		}
+		
+		# define join constraints for each pair of tables
+		joinWhere = {
+			("ms","ds"): {
+				"ms.rs = ds.rs"
+			},
+			("ml","mb"): {
+				"ml.chr = mb.chr",
+				"ml.pos >= (mb.posMin - {expansion})",
+				"ml.pos <= (mb.posMax + {expansion})",
+				"(ml.pos + {expansion}) >= mb.posMin",
+				"(ml.pos - {expansion}) <= mb.posMax",
+			},
+			("ml","mbz"): {
+				"ml.chr = mbz.chr",
+				"ml.pos >= ((mbz.zone * {zoneSize}) - {expansion})",
+				"ml.pos < (((mbz.zone + 1) * {zoneSize}) + {expansion})",
+				"((ml.pos + {expansion}) / {zoneSize}) >= mbz.zone",
+				"((ml.pos - {expansion}) / {zoneSize}) <= mbz.zone",
+			},
+			("ml","ds"): {
+				"ml.chr = ds.chr",
+				"ml.pos = ds.pos",
+			},
+			("ml","drb"): {
+				"ml.chr = drb.chr",
+				"ml.pos >= (drb.posMin - {expansion})",
+				"ml.pos <= (drb.posMax + {expansion})",
+				"(ml.pos + {expansion}) >= drb.posMin",
+				"(ml.pos - {expansion}) <= drb.posMax",
+			},
+			("ml","drz"): {
+				"ml.chr = drz.chr",
+				"ml.pos >= ((drz.zone * {zoneSize}) - {expansion})",
+				"ml.pos < (((drz.zone + 1) * {zoneSize}) + {expansion})",
+				"((ml.pos + {expansion}) / {zoneSize}) >= drz.zone",
+				"((ml.pos - {expansion}) / {zoneSize}) <= drz.zone",
+			},
+			("mr","dr"): {
+				"mr.region_id = dr.region_id",
+			},
+			("mr","drb"): {
+				"mr.region_id = drb.region_id",
+			},
+			("mb","mbz"): {
+				"mb._ROWID_ = mbz.bound_rowid",
+				# these should all be guaranteed by self.updateBoundZones()
+				"mb.chr = mbz.chr",
+				"mb.posMin < ((mbz.zone + 1) * {zoneSize})",
+				"mb.posMax >= (mbz.zone * {zoneSize})",
+				"(mb.posMin / {zoneSize}) <= mbz.zone",
+				"(mb.posMax / {zoneSize}) >= mbz.zone",
+			},
+			("mb","ds"): {
+				"mb.chr = ds.chr",
+				"(mb.posMin - {expansion}) <= ds.pos",
+				"(mb.posMax + {expansion}) >= ds.pos",
+				"mb.posMin <= (ds.pos + {expansion})",
+				"mb.posMax >= (ds.pos - {expansion})",
+			},
+			("mb","drb"): {
+				#TODO: match by overlap? more complited, but maybe more useful
+				"mb.chr = drb.chr",
+				"mb.posMin = drb.posMin",
+				"mb.posMax = drb.posMax",
+			},
+			("mbz","ds"): {
+				"mbz.chr = ds.chr",
+				"((mbz.zone * {zoneSize}) - {expansion}) <= ds.pos",
+				"(((mbz.zone + 1) * {zoneSize}) + {expansion}) > ds.pos",
+				"mbz.zone <= ((ds.pos + {expansion}) / {zoneSize})",
+				"mbz.zone >= ((ds.pos - {expansion}) / {zoneSize})",
+			},
+			("mbz","drb"): {
+				#TODO
+			},
+			("mbz","drz"): {
+				"mbz.chr = drz.chr",
+				"mbz.zone = drz.zone",
+			},
+			("ds","drb"): {
+				"ds.chr = drb.chr",
+				"ds.pos >= (drb.posMin - {expansion})",
+				"ds.pos <= (drb.posMax + {expansion})",
+				"(ds.pos + {expansion}) >= drb.posMin",
+				"(ds.pos - {expansion}) <= drb.posMax",
+			},
+			("ds","drz"): {
+				"ds.chr = drz.chr",
+				"ds.pos >= ((drz.zone * {zoneSize}) - {expansion})",
+				"ds.pos < (((drz.zone + 1) * {zoneSize}) + {expansion})",
+				"((ds.pos + {expansion}) / {zoneSize}) >= drz.zone",
+				"((ds.pos - {expansion}) / {zoneSize}) <= drz.zone",
+			},
+			("dr","drb"): {
+				"dr.region_id = drb.region_id",
+			},
+			("dr","drz"): {
+				"dr.region_id = drz.region_id",
+			},
+			("drb","drz"): {
+				"drb.region_id = drz.region_id",
+				"drb.population_id = drz.population_id",
+				"drb.chr = drz.chr",
+				# these should all be guaranteed by loki.updateRegionZones()
+				"drb.posMin < ((drz.zone + 1) * {zoneSize})",
+				"drb.posMax >= (drz.zone * {zoneSize})",
+				"(drb.posMin / {zoneSize}) <= drz.zone",
+				"(drb.posMax / {zoneSize}) >= drz.zone",
+			},
+		} #joinWhere{}
+		
+		# initialize query fragments
+		sqlSelect = list() # [a,b,...] => SELECT a, b, ...
+		sqlFrom = set() # {a,b,...} => FROM aliasTable[a] AS a, aliasTable[b] AS b, ...
+		sqlWhere = set() # {a,b,...} => WHERE a AND b AND ...
+		sqlGroup = list() # [a,b,...] => GROUP BY a, b, ...
+		
+		# decide which tables need to be included
+		if self._snpFilters:
+			sqlFrom.add("ms")
+			sqlFrom.add("ds")
+		
+		if self._locusFilters:
+			sqlFrom.add("ml")
+		
+		if snps and not (self._snpFilters or self._locusFilters):
+			sqlFrom.add("ds")
+		
+		if self._regionFilters:
+			sqlFrom.add("mr")
+			sqlFrom.add("dr")
+			sqlFrom.add("drb")
+		
+		if self._boundFilters:
+			sqlFrom.add("mb")
+		
+		if regions and not (self._regionFilters or self._boundFilters):
+			sqlFrom.add("dr")
+			sqlFrom.add("drb")
+		
+		if "mb" in sqlFrom and ("ml" in sqlFrom or "ds" in sqlFrom):
+			sqlFrom.add("mbz")
+		
+		if "drb" in sqlFrom and ("ml" in sqlFrom or "ds" in sqlFrom):
+			sqlFrom.add("drz")
+		
+		# decide which constraints need to be included
+		for alias in aliasWhere:
+			if alias in sqlFrom:
+				sqlWhere.update(aliasWhere[alias])
+		for join in joinWhere:
+			if join[0] in sqlFrom and join[1] in sqlFrom:
+				sqlWhere.update(joinWhere[join])
+		
+		# decide which columns to select for output
+		if snps:
+			if "ml" in sqlFrom:
+				sqlSelect.append("ml.label")
+				sqlSelect.append("ml.chr")
+				sqlSelect.append("ml.pos")
+				sqlGroup.append("ml._ROWID_")
+			elif "ds" in sqlFrom:
+				sqlSelect.append("'rs'||ds.rs AS label")
+				sqlSelect.append("ds.chr")
+				sqlSelect.append("ds.pos")
+				sqlGroup.append("ds._ROWID_")
+			else:
+				raise Exception("ERROR: constructed query includes no snp tables")
+		
+		if regions:
+			if "mb" in sqlFrom:
+				sqlSelect.append("mb.label")
+				sqlSelect.append("mb.chr")
+				sqlSelect.append("mb.posMin")
+				sqlSelect.append("mb.posMax")
+				sqlGroup.append("mb._ROWID_")
+			elif "dr" in sqlFrom and "drb" in sqlFrom:
+				sqlSelect.append("dr.label")
+				sqlSelect.append("drb.chr")
+				sqlSelect.append("drb.posMin")
+				sqlSelect.append("drb.posMax")
+				sqlGroup.append("drb._ROWID_")
+			else:
+				raise Exception("ERROR: constructed query includes no region tables")
+		
+		# assemble the pieces
+		sql = "SELECT\n  "+(",\n  ".join(sqlSelect) if sqlSelect else "1")
+		sql += "\nFROM "+(",\n  ".join(aliasTable[t]+" AS "+t for t in sqlFrom) if sqlFrom else "(SELECT 1)")
+		sql += "\nWHERE "+("\n  AND ".join(sqlWhere) if sqlWhere else "1")
+		if sqlGroup:
+			sql += "\nGROUP BY "+(",".join(sqlGroup))
+		sql = sql.format(expansion=expansion, populationID=populationID, zoneSize=zoneSize)
+		
+		# make sure any filter tables are indexed
+		if "ms" in sqlFrom:
+			self.prepareTableForQuery("snp")
+		if "ml" in sqlFrom:
+			self.prepareTableForQuery("locus")
+		if "mr" in sqlFrom:
+			self.prepareTableForQuery("region")
+		if "mb" in sqlFrom:
+			self.prepareTableForQuery("bound")
+		if "mbz" in sqlFrom:
+			self.prepareTableForQuery("bound_zone")
+		
+		# run and return
+		self.log(sql+"\n")
+		for row in self._loki._db.cursor().execute("EXPLAIN QUERY PLAN "+sql):
+			self.log(str(row)+"\n")
+		for row in self._loki._db.cursor().execute(sql):
+			yield row
+	#generateFilteredData()
+	
+	
+	def generateFilteredLocii(self):
+		#TODO
+		return self.generateVariants()
+	#generateFilteredLocii()
+	
+	
+	def generateFilteredRegions(self):
+		#TODO
+		return self.generateRegions()
+	#generateFilteredRegions()
 	
 	
 	# ##################################################
 	# annotation
 	
 	
-	def generateLocii(self):
-		if self._snpFilters and self._locusFilters:
-			sql = """
-SELECT 'rs'||d_s.rs AS label, d_s.chr, d_s.pos
-FROM `main`.`snp` AS m_s
-JOIN `db`.`snp` AS d_s USING (rs)
-UNION
-SELECT label, chr, pos
-FROM `main`.`locus` AS m_l
-"""
-		elif self._snpFilters:
-			sql = """
-SELECT 'rs'||d_s.rs AS label, d_s.chr, d_s.pos
-FROM `main`.`snp` AS m_s
-JOIN `db`.`snp` AS d_s USING (rs)
-"""
-		elif self._locusFilters:
-			sql = """
-SELECT label, chr, pos
-FROM `main`.`locus` AS m_l
-"""
-		else:
-			sql = """
-SELECT 'rs'||d_s.rs AS label, d_s.chr, d_s.pos
-FROM `db`.`snp` AS d_s
-"""
-		#if _snpFilters and/or _locusFilters
-		
-		for row in self._loki._db.cursor().execute(sql):
-			yield row
-	#generateLocii()
-	
-	
-	def generateLociiRegions(self, locii, rtype='gene'):
+	def generateAnnotatedLociiRegions(self, locii, rtype='gene'):
 		expansion = self._expansion
 		populationID = self._loki.getPopulationID(self._population)
+		if not populationID:
+			raise Exception("ERROR: unknown population '%s'" % self._population)
 		typeID = self._loki.getTypeID(rtype)
+		if not typeID:
+			raise Exception("ERROR: unknown region type '%s'" % rtype)
 		zonesize = int(self._loki.getDatabaseSetting('region_zone_size'))
+		if not zonesize:
+			raise Exception("ERROR: missing 'region_zone_size' setting in knowledge database")
 		
+		# an expansion value might cause a locus near a zone boundary to map to
+		# both neighboring zones, and therefore map to the same region twice;
+		# to suppress this effect we use DISTINCT, but only when expansion > 0
+		# since otherwise it isn't needed and adds a performance overhead
 		sql = """
-SELECT DISTINCT i_l.label, i_l.chr, i_l.pos, d_r.region_id, d_r.label, d_rb.posMin, d_rb.posMax
-FROM (SELECT ? AS label, ? AS chr, ? AS pos) AS i_l
+SELECT {distinct}
+  i_l.label,
+  i_l.rs,
+  i_l.chr,
+  i_l.pos,
+  d_r.label,
+  d_r.region_id,
+  d_rb.posMin,
+  d_rb.posMax
+FROM (SELECT ? AS label, ? AS rs, ? AS chr, ? AS pos) AS i_l
 JOIN `db`.`region_zone` AS d_rz
-  ON d_rz.population_id = %d
+  ON d_rz.population_id = {populationID}
   AND d_rz.chr = i_l.chr
-  AND d_rz.zone >= (i_l.pos - %d) / %d
-  AND d_rz.zone <= (i_l.pos + %d) / %d
+  AND d_rz.zone >= (i_l.pos - {expansion}) / {zonesize}
+  AND d_rz.zone <= (i_l.pos + {expansion}) / {zonesize}
 JOIN `db`.`region_bound` AS d_rb
   ON d_rb.region_id = d_rz.region_id
   AND d_rb.population_id = d_rz.population_id
   AND d_rb.chr = d_rz.chr
-  AND d_rb.posMin <= (i_l.pos + %d)
-  AND d_rb.posMax >= (i_l.pos - %d)
+  AND d_rb.posMin <= (i_l.pos + {expansion})
+  AND d_rb.posMax >= (i_l.pos - {expansion})
 JOIN `db`.`region` AS d_r
   ON d_r.region_id = d_rb.region_id
-  AND d_r.type_id = %d
-""" % (populationID,expansion,zonesize,expansion,zonesize,expansion,expansion,typeID)
+  AND d_r.type_id = {typeID}
+""".format(
+				distinct=("DISTINCT" if expansion else ""),
+				expansion=expansion,
+				populationID=populationID,
+				typeID=typeID,
+				zonesize=zonesize
+		)
 		for row in self._loki._db.cursor().executemany(sql, locii):
 			yield row
-	#generateLociiRegions()
-	
-	
-	def outputLociiRegions(self, rtype='gene', target=sys.stdout): #TODO
-		typeID = self._loki.getTypeID(rtype)
-		if not typeID:
-			sys.stderr.write("ERROR: unknown region type '%s'\n" % rtype)
-			sys.exit(1)
-		populationID = self._loki.getPopulationID(self._population)
-		if not populationID:
-			sys.stderr.write("ERROR: unknown population '%s'\n" % self._population)
-			sys.exit(1)
-		
-		target.write(
-				("#chr\tlabel\tpos"
-				+"\t%s_name.match\t%s_start.match\t%s_end.match"
-				+"\t%s_name.upstream\t%s_start.upstream\t%s_end.upstream"
-				+"\t%s_name.downstream\t%s_start.downstream\t%s_end.downstream"
-				+"\n")
-				% (rtype,rtype,rtype,rtype,rtype,rtype,rtype,rtype,rtype)
-		)
-		for row in self._loki._dbc.execute("""
-SELECT
-  COALESCE(lM.chr, 'NA') AS chr,
-  COALESCE(
-    lM.label,
-    'rs' || lM.rs,
-    'chr' || lM.chr || ':' || lM.pos,
-    '!#' || lM.rowid
-  ) AS label,
-  COALESCE(lM.pos, 'NA') AS pos,
-  lM.labelM,
-  lM.posMinM,
-  lM.posMaxM,
-  COALESCE(rU.label, '') AS labelU,
-  COALESCE(rbU.posMin, '') AS posMinU,
-  COALESCE(rbU.posMax, '') AS posMaxU,
-  COALESCE(rD.label, '') AS labelD,
-  COALESCE(rbD.posMin, '') AS posMinD,
-  COALESCE(rbD.posMax, '') AS posMaxD
-FROM (
-  SELECT
-    l.rowid,
-    l.label,
-    l.rs,
-    l.chr,
-    l.pos,
-    (CASE WHEN rM.region_id IS NULL THEN '' ELSE GROUP_CONCAT(DISTINCT rM.label) END) AS labelM,
-    (CASE WHEN rM.region_id IS NULL THEN '' ELSE MIN(rbM.posMin) END) AS posMinM,
-    (CASE WHEN rM.region_id IS NULL THEN '' ELSE MAX(rbM.posMax) END) AS posMaxM,
-    (
-      SELECT rbU._rowid_
-      FROM db.region_bound AS rbU
-      JOIN db.region AS rU USING (region_id)
-      WHERE rbU.population_id = :population_id
-        AND rbU.chr = l.chr
-        AND rbU.posMax < l.pos - :expand
-        AND rU.type_id = :type_id
-      ORDER BY rbU.posMax DESC
-      LIMIT 1
-    ) AS rbU_rowid,
-    (
-      SELECT rbD._rowid_
-      FROM db.region_bound AS rbD
-      JOIN db.region AS rD USING (region_id)
-      WHERE rbD.population_id = :population_id
-        AND rbD.chr = l.chr
-        AND rbD.posMin > l.pos + :expand
-        AND rD.type_id = :type_id
-      ORDER BY rbD.posMin ASC
-      LIMIT 1
-    ) AS rbD_rowid
-  FROM main.locus AS l
-  LEFT JOIN db.region_zone AS rzM
-    ON rzM.population_id = :population_id
-    AND rzM.chr = l.chr
-    AND rzM.zone >= (l.pos - :expand) / 100000
-    AND rzM.zone <= (l.pos + :expand) / 100000
-  LEFT JOIN db.region_bound AS rbM
-    ON rbM.region_id = rzM.region_id
-    AND rbM.population_id = :population_id
-    AND rbM.chr = l.chr
-    AND rbM.posMin <= l.pos + :expand
-    AND rbM.posMax >= l.pos - :expand
-  LEFT JOIN db.region AS rM
-    ON rM.region_id = rbM.region_id
-    AND rM.type_id = :type_id
-  GROUP BY l.rowid
-) AS lM
-LEFT JOIN db.region_bound AS rbU
-  ON rbU._rowid_ = lM.rbU_rowid
-LEFT JOIN db.region AS rU
-  ON rU.region_id = rbU.region_id
-LEFT JOIN db.region_bound AS rbD
-  ON rbD._rowid_ = lM.rbD_rowid
-LEFT JOIN db.region AS rD
-  ON rD.region_id = rbD.region_id
-""", { 'expand':self._expand, 'population_id':populationID, 'type_id':typeID }
-		):
-			target.write("%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n" % row)
-	#outputLociiRegions() #TODO
+	#generateAnnotatedLociiRegions()
 	
 	
 	# ##################################################
@@ -684,22 +1076,6 @@ if __name__ == "__main__":
 			help="the knowledge database file to use"
 	)
 	
-	parser.add_argument('-s', '--snp', type=str, metavar='rs#', nargs='+', action='append',
-			help="a filtering set of SNPs, specified as RS#s"
-	)
-	
-	parser.add_argument('-S', '--snpfile', type=str, metavar='file', nargs='+', action='append',
-			help="RS# file(s) from which to load a filtering set of SNPs"
-	)
-	
-	parser.add_argument('-m', '--marker', type=str, metavar='marker', nargs='+', action='append',
-			help="a filtering set of markers, specified as 'chr:pos' or 'chr:label:pos'"
-	)
-	
-	parser.add_argument('-M', '--mapfile', type=str, metavar='file', nargs='+', action='append',
-			help=".map file(s) from which to load a filtering set of markers"
-	)
-	
 	parser.add_argument('-x', '--expansion', type=str, metavar='num',
 			help="amount by which to expand region boundaries when matching them to locii"
 	)
@@ -708,8 +1084,51 @@ if __name__ == "__main__":
 			help="LD profile with which to expand region boundaries when matching them to locii"
 	)
 	
-	parser.add_argument('-o', '--output', type=str, metavar='format',
-			help="output type"
+	
+	parser.add_argument('-s', '--snp', type=str, metavar=('rs#'), nargs='+', action='append',
+			help="a filtering set of SNPs, specified by RS#"
+	)
+	
+	parser.add_argument('-S', '--snp-file', type=str, metavar=('file'), nargs='+', action='append',
+			help="RS# file(s) from which to load a filtering set of SNPs"
+	)
+	
+	parser.add_argument('-m', '--marker', type=str, metavar=('marker'), nargs='+', action='append',
+			help="a filtering set of markers, specified by 'chr:pos' or 'chr:label:pos'"
+	)
+	
+	parser.add_argument('-M', '--map-file', type=str, metavar=('file'), nargs='+', action='append',
+			help=".map file(s) from which to load a filtering set of markers"
+	)
+	
+	
+	parser.add_argument('-g', '--gene', type=str, metavar=('name'), nargs='+', action='append',
+			help="a filtering set of genes, specified by name"
+	)
+	
+	parser.add_argument('-G', '--gene-file', type=str, metavar=('file'), nargs='+', action='append',
+			help="name file(s) from which to load a filtering set of genes"
+	)
+	
+	parser.add_argument('--gene-names', type=str, metavar='type',
+			help="the type of the gene name(s) provided via --gene or --gene-file"
+	)
+	
+	parser.add_argument('-r', '--region', type=str, metavar=('region'), nargs='+', action='append',
+			help="a filtering set of regions, specified by 'chr:start:stop' or 'chr:label:start:stop'"
+	)
+	
+	parser.add_argument('-R', '--region-file', type=str, metavar=('file'), nargs='+', action='append',
+			help="region file(s) from which to load a filtering set of regions"
+	)
+	
+	
+	parser.add_argument('-o', '--output', type=str, metavar=('type'), nargs=1, action='append', choices=['snps','genes'],
+			help="filtered data type to output, among 'snps' and 'genes'"
+	)
+	
+	parser.add_argument('-a', '--annotate', type=str, metavar=('type','type'), nargs=2, action='append', choices=['snps','genes'],
+			help="pair of data types to cross-reference and annotate, among 'snps' and 'genes'"
 	)
 	
 	parser.add_argument('-v', '--verbose', action='store_true',
@@ -746,34 +1165,60 @@ if __name__ == "__main__":
 		bio.setExpansion(e)
 	if args.population:
 		bio.setPopulation(args.population)
+	if args.gene_names:
+		bio.setGeneNamespace(args.gene_names)
 	
 	# apply SNP filters
 	if args.snp:
 		for snpList in args.snp:
-			bio.intersectSNPs( (long(snp[2:]),) if snp[0:2].upper() == 'RS' else (long(snp),) for snp in snpList )
-	if args.snpfile:
-		for snpFileList in args.snpfile:
-			bio.intersectSNPs( (rs,) for rs in bio.generateRSesFromRSFiles(snpFileList) )
+			bio.intersectSNPs( (long(snp[2:]) if snp[0:2].upper() == 'RS' else long(snp)) for snp in snpList )
+	if args.snp_file:
+		for snpFileList in args.snp_file:
+			bio.intersectSNPs( bio.generateRSesFromRSFiles(snpFileList) )
 	
 	# apply locus filters
 	if args.marker:
 		for markerList in args.marker:
 			bio.intersectLocii( bio.generateLociiFromMarkers(markerList) )
-	if args.mapfile:
-		for mapFileList in args.mapfile:
+	if args.map_file:
+		for mapFileList in args.map_file:
 			bio.intersectLocii( bio.generateLociiFromMapFiles(mapFileList) )
+	
+	# apply gene filters
+	if args.gene:
+		for geneList in args.gene:
+			bio.intersectRegions( geneList )
+	if args.gene_file:
+		for geneFileList in args.gene_file:
+			bio.intersectRegions( bio.generateNamesFromNameFiles(geneFileList) )
 	
 	# output
 	if args.output:
-		o = args.output.strip().upper()
-		if o == 'L':
-			sys.stdout.write("#label\tchr\tpos\n")
-			for line in bio.generateLocii():
-				sys.stdout.write("%s\t%s\t%s\n" % line)
-		elif o == 'L:R':
-			sys.stdout.write("#label\tchr\tpos\tid\tgene\tstart\tstop\n")
-			for line in bio.generateLociiRegions( (bio.generateLocii()) ):
-				sys.stdout.write("%s\t%s\t%s\t%s\t%s\t%s\t%s\n" % line)
+		for o in args.output:
+			if o[0] == 'snps':
+				print "\t".join(("snp","chr","pos"))
+				for data in bio.generateFilteredData(snps=True):
+					print "\t".join(str(col) for col in data)
+			elif o[0] == 'genes':
+				print "\t".join(("gene","chr","posMin","posMax"))
+				for data in bio.generateFilteredData(regions=True):
+					print "\t".join(str(col) for col in data)
+			else:
+				print "%s output not implemented" % o
+		#foreach output
+	#if output
+	
+	# annotate
+	if args.annotate:
+		for a in args.annotate:
+			if a[0] == 'snps' and a[1] == 'genes':
+				print "\t".join(("snp","chr","pos","gene","chr","posMin","posMax"))
+				for data in bio.generateFilteredData(snps=True, regions=True):
+					print "\t".join(str(col) for col in data)
+			else:
+				print "%s annotation not implemented" % a
+		#foreach annotate
+	#if annotate
 	
 #__main__
 
