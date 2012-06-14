@@ -283,20 +283,8 @@ uint Application::LoadGroupDataByName(Utility::StringArray& userDefinedGroups,
 	}
 
 	Utility::StringArray unmatchedAliases;
-	Utility::StringArray::iterator udItr = userDefinedGroups.begin();
-	Utility::StringArray::iterator udEnd = userDefinedGroups.end();
 
 	uint totalGroupsLoaded = 0;
-	while (udItr != udEnd) {
-		//Give some bogus groupType, since it will be found in the file
-		Knowledge::GroupManagerDB udGroup(++maxGroupID, 1, udItr->c_str());
-		std::map<std::string, uint> nameToId = udGroup.LoadArchive(udItr->c_str(), regions, maxGroupID + 1, unmatchedAliases);
-		groups[udGroup.id] = udGroup;
-		totalGroupsLoaded += nameToId.size();
-		maxGroupID += nameToId.size();
-		udItr++;
-	}
-
 	std::map<uint, Knowledge::GroupManagerDB>::iterator itr = groups.begin();
 	std::map<uint, Knowledge::GroupManagerDB>::iterator end = groups.end();
 
@@ -308,6 +296,20 @@ uint Application::LoadGroupDataByName(Utility::StringArray& userDefinedGroups,
 		} else
 			groups.erase(itr++);
 	}
+
+	Utility::StringArray::iterator udItr = userDefinedGroups.begin();
+	Utility::StringArray::iterator udEnd = userDefinedGroups.end();
+
+	while (udItr != udEnd) {
+		//Give some bogus groupType, since it will be found in the file
+		Knowledge::GroupManagerDB udGroup(++maxGroupID, 1, udItr->c_str());
+		std::map<std::string, uint> nameToId = udGroup.LoadArchive(udItr->c_str(), regions, maxGroupID + 1, unmatchedAliases);
+		groups[udGroup.id] = udGroup;
+		totalGroupsLoaded += nameToId.size();
+		maxGroupID += nameToId.size();
+		udItr++;
+	}
+
 
 	return totalGroupsLoaded;
 
