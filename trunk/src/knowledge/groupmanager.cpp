@@ -213,7 +213,7 @@ std::map<std::string, uint> GroupManager::LoadArchive(const char *filename,
 				else{
 					for (uint j = 0; j < words.size(); j++){
 						uint r_id = regions(words[j]);
-						if (id < (uint)-1) {
+						if (r_id < (uint)-1) {
 							group.regions.insert(r_id);
 							regions.AddMetaID(group.id, this, r_id);
 						}
