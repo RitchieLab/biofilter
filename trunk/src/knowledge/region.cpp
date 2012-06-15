@@ -172,7 +172,7 @@ void Region::WriteToArchive(std::ostream& os, const char *sep) {
 		set<uint>::const_iterator g_itr = (*itr).second.begin();
 		set<uint>::const_iterator g_end = (*itr).second.end();
 		while(g_itr != g_end){
-			os << ((*itr).first->diseaseDependent() ? "~" : "!") << (*(*itr).first)[*g_itr].id;
+			os << ((*itr).first->diseaseDependent() ? "~" : "!") << *g_itr;
 			++g_itr;
 		}
 
