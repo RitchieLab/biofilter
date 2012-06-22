@@ -16,7 +16,7 @@ class Biofilter:
 	# public class data
 	
 	
-	ver_maj,ver_min,ver_rev,ver_date = 2,-1,620,'2012-06-20'
+	ver_maj,ver_min,ver_rev,ver_date = 2,-1,621,'2012-06-21'
 	
 	
 	##################################################
