@@ -1,8 +1,10 @@
 #!/usr/bin/env python
 
 import argparse
+import itertools
 import os
 import sys
+import time
 
 import loki_db
 
@@ -10,24 +12,24 @@ import loki_db
 class Biofilter:
 	
 	
-	# ##################################################
+	##################################################
 	# public class data
 	
 	
-	ver_maj,ver_min,ver_rev,ver_date = 2,-1,605,'2012-06-05'
+	ver_maj,ver_min,ver_rev,ver_date = 2,-1,620,'2012-06-20'
 	
 	
-	# ##################################################
+	##################################################
 	# private class data
 	
 	
 	_schema = {
 		'main': {
 			
-			# ########## main.snp ##########
 			'snp': {
 				'table': """
 (
+  rowid INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
   label VARCHAR(32) NOT NULL,
   rs INTEGER NOT NULL,
   flag TINYINT NOT NULL DEFAULT 0
@@ -38,10 +40,11 @@ class Biofilter:
 				}
 			}, #.main.snp
 			
-			# ########## main.locus ##########
+			
 			'locus': {
 				'table': """
 (
+  rowid INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
   label VARCHAR(32) NOT NULL,
   chr TINYINT NOT NULL,
   pos BIGINT NOT NULL,
@@ -53,24 +56,26 @@ class Biofilter:
 				}
 			}, #.main.locus
 			
-			# ########## main.region ##########
-			'region': {
+			
+			'gene': {
 				'table': """
 (
+  rowid INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
   label VARCHAR(32) NOT NULL,
-  region_id INTEGER NOT NULL,
+  biopolymer_id INTEGER NOT NULL,
   flag TINYINT NOT NULL DEFAULT 0
 )
 """,
 				'index': {
-					'region__region_id': '(region_id)',
+					'gene__biopolymer': '(biopolymer_id)',
 				}
-			}, #.main.region
+			}, #.main.gene
 			
-			# ########## main.bound ##########
-			'bound': {
+			
+			'region': {
 				'table': """
 (
+  rowid INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
   label VARCHAR(32) NOT NULL,
   chr TINYINT NOT NULL,
   posMin BIGINT NOT NULL,
@@ -79,31 +84,46 @@ class Biofilter:
 )
 """,
 				'index': {
-					'bound__posmin': '(chr,posMin,posMax)',
-					'bound__posmax': '(chr,posMax,posMin)',
+					'region__chr_min': '(chr,posMin)',
+					'region__chr_max': '(chr,posMax)',
 				}
-			}, #.main.bound
+			}, #.main.region
 			
-			# ########## main.bound_zone ##########
-			'bound_zone': {
+			
+			'region_zone': {
 				'table': """
 (
-  bound_rowid INTEGER NOT NULL,
+  region_rowid INTEGER NOT NULL,
   chr TINYINT NOT NULL,
   zone INTEGER NOT NULL,
-  PRIMARY KEY (chr,zone,bound_rowid)
+  PRIMARY KEY (chr,zone,region_rowid)
 )
 """,
 				'index': {
-					'bound_zone__bound': '(bound_rowid)',
+					'region_zone__region': '(region_rowid)',
 				}
-			}, #.main.bound_zone
+			}, #.main.region_zone
+			
+			
+			'group': {
+				'table': """
+(
+  rowid INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+  label VARCHAR(32) NOT NULL,
+  group_id INTEGER NOT NULL,
+  flag TINYINT NOT NULL DEFAULT 0
+)
+""",
+				'index': {
+					'group__group_id': '(group_id)',
+				}
+			}, #.main.group
 			
 		}, #.main
 	} #_schema{}
 	
 	
-	# ##################################################
+	##################################################
 	# constructor
 	
 	
@@ -114,24 +134,27 @@ class Biofilter:
 		self._logFile = sys.stderr
 		self._logIndent = 0
 		self._logHanging = False
+		self._debug = False
 		self._expansion = 0
-		self._population = 'n/a'
+		self._ldprofile = 'n/a'
 		self._geneNamespace = 'symbol'
 		
 		self._tablesDeindexed = set()
 		self._snpFilters = 0
 		self._locusFilters = 0
+		self._geneFilters = 0
 		self._regionFilters = 0
-		self._boundFilters = 0
+		self._groupFilters = 0
+		self._sourceFilters = 0
 		
 		# initialize instance database
 		self._loki = loki_db.Database()
 		self._loki.setLogger(self)
-		self._loki.createDatabaseTables(self._schema['main'], 'main', '*', True)
+		self._loki.createDatabaseTables(self._schema['main'], 'main', None, True)
 	#__init__()
 	
 	
-	# ##################################################
+	##################################################
 	# logging
 	
 	
@@ -178,8 +201,14 @@ class Biofilter:
 	#logPop()
 	
 	
-	# ##################################################
+	##################################################
 	# configuration
+	
+	
+	def setDebug(self, debug=False):
+		self._debug = debug
+		self.log("debugging mode: %s\n" % ("ON" if debug else "OFF"))
+	#setDebug()
 	
 	
 	def setExpansion(self, expansion=0):
@@ -188,10 +217,10 @@ class Biofilter:
 	#setExpansion()
 	
 	
-	def setPopulation(self, population='n/a'):
-		self._population = population.strip()
-		self.log("population LD profile for region boundary expansion: %s\n" % self._population)
-	#setPopulation()
+	def setLDProfile(self, ldprofile='n/a'):
+		self._ldprofile = ldprofile.strip()
+		self.log("LD profile for region boundary expansion: %s\n" % self._ldprofile)
+	#setLDProfile()
 	
 	
 	def setGeneNamespace(self, namespace='symbol'):
@@ -200,101 +229,115 @@ class Biofilter:
 	#setGeneNamespace()
 	
 	
-	# ##################################################
+	##################################################
 	# database management
 	
 	
 	def attachDatabaseFile(self, dbFile):
-		return self._loki.attachDatabaseFile(dbFile)
+		return self._loki.attachDatabaseFile(dbFile, readOnly=True)
 	#attachDatabaseFile()
 	
 	
 	def prepareTableForUpdate(self, table):
 		if table not in self._tablesDeindexed:
 			self._tablesDeindexed.add(table)
-			self._loki.dropDatabaseIndexes(self._schema['main'], 'main', table)
+			self._loki.dropDatabaseIndecies(self._schema['main'], 'main', table)
 	#prepareTableForUpdate()
 	
 	
 	def prepareTableForQuery(self, table):
 		if table in self._tablesDeindexed:
 			self._tablesDeindexed.remove(table)
-			self._loki.createDatabaseIndexes(self._schema['main'], 'main', table)
-			if table == "bound":
-				self.updateBoundZones()
+			self._loki.createDatabaseIndecies(self._schema['main'], 'main', table)
+			if table == "region":
+				self.updateRegionZones()
 	#prepareTableForQuery()
 	
 	
-	def updateBoundZones(self):
-		self.log("calculating region zones ...")
+	def updateRegionZones(self):
+		self.log("calculating region zone coverage ...")
 		
-		zoneSize = self._loki.getDatabaseSetting('region_zone_size')
-		if not zoneSize:
-			raise Exception("ERROR: could not determine database setting 'region_zone_size'")
-		zoneSize = int(zoneSize)
-		dbc = self._db.cursor()
+		size = self._loki.getDatabaseSetting('zone_size')
+		if not size:
+			raise Exception("ERROR: could not determine database setting 'zone_size'")
+		size = int(size)
+		dbc = self._loki._db.cursor()
 		
 		# make sure all regions are correctly oriented
-		dbc.execute("UPDATE `main`.`bound` SET posMin = posMax, posMax = posMin WHERE posMin > posMax")
+		dbc.execute("UPDATE `main`.`region` SET posMin = posMax, posMax = posMin WHERE posMin > posMax")
 		
 		# define zone generator
-		def _zones(zoneSize, bounds):
-			# bounds=[ (rowid,chr,posMin,posMax),... ]
-			# yields:[ (rowid,chr,zone),... ]
-			for b in bounds:
-				for z in xrange(int(b[2])/zoneSize,(int(b[3])/zoneSize)+1):
-					yield (b[0],b[1],z)
+		def _zones(size, regions):
+			# regions=[ (id,chr,posMin,posMax),... ]
+			# yields:[ (id,chr,zone),... ]
+			for r in regions:
+				for z in xrange(int(r[2]/size),int(r[3]/size)+1):
+					yield (r[0],r[1],z)
 		#_zones()
 		
-		# feed all bounds through the zone generator
-		self.prepareTableForUpdate('bound_zone')
-		self.prepareTableForQuery('bound')
-		dbc.execute("DELETE FROM `main`.`bound_zone`")
+		# feed all regions through the zone generator
+		# (use a separate cursor to iterate both results simultaneously)
+		self.prepareTableForQuery('region')
+		self.prepareTableForUpdate('region_zone')
+		dbc.execute("DELETE FROM `main`.`region_zone`")
 		dbc.executemany(
-			"INSERT OR IGNORE INTO `main`.`bound_zone` (bound_rowid,chr,zone) VALUES (?,?,?)",
+			"INSERT OR IGNORE INTO `main`.`region_zone` (region_rowid,chr,zone) VALUES (?,?,?)",
 			_zones(
-				zoneSize,
-				self._db.cursor().execute("SELECT _ROWID_,chr,posMin,posMax FROM `main`.`bound`")
+				size,
+				self._loki._db.cursor().execute("SELECT _ROWID_,chr,posMin,posMax FROM `main`.`region`")
 			)
 		)
 		
 		# clean up
-		self.prepareTableForQuery('bound_zone')
+		self.prepareTableForQuery('region_zone')
 		self.log(" OK\n")
-	#updateBoundZones()
+	#updateRegionZones()
 	
 	
-	# ##################################################
+	##################################################
 	# input data parsers
 	
 	
-	def generateRSesFromRSFiles(self, rsfiles):
-		for path in rsfiles:
-			with (sys.stdin if (path == '-' or not path) else open(path, 'rU')) as rsfile:
-				for line in rsfile:
-					if line[0:1] == '#':
-						pass
-					elif line[0:2].upper() == 'RS':
-						yield long(line[2:].rstrip())
-					else:
-						yield long(line.rstrip())
-				#foreach line in rsfile
-			#with rsfile
-		#foreach rsfile
+	def generateRSesFromText(self, text, errorCallback=None):
+		for line in text:
+			if not line:
+				continue
+			try:
+				yield long(line)
+			except ValueError:
+				if line[0:2].upper() == 'RS':
+					try:
+						yield long(line[2:])
+					except ValueError:
+						if errorCallback:
+							errorCallback(line)
+		#foreach line
+	#generateRSesFromText()
+	
+		
+	def generateRSesFromRSFiles(self, paths, errorCallback=None):
+		for path in paths:
+			with (sys.stdin if (path == '-' or not path) else open(path, 'rU')) as file:
+				for rs in self.generateRSesFromText((line for line in file if line[0:1] != '#'), errorCallback):
+					yield rs
+			#with file
+		#foreach path
 	#generateRSesFromRSFiles()
 	
 	
-	def generateLociiFromMarkers(self, markers, separator=':'):
-		for marker in markers:
-			if marker == None:
+	def generateLociFromText(self, text, separator=':', errorCallback=None):
+		for line in text:
+			if not line:
 				continue
 			
 			label = chm = pos = None
-			cols = marker.split(separator)
+			cols = line.split(separator)
 			
 			# parse line
 			if len(cols) < 2:
-				raise Exception("malformed marker '%s': expected 'chr:pos' or 'chr:label:pos'" % marker)
+				if errorCallback:
+					errorCallback(line)
+				continue
 			elif len(cols) == 2:
 				chm = cols[0].upper()
 				pos = cols[1].upper()
@@ -311,14 +354,14 @@ class Biofilter:
 			if chm[:3] == 'CHR':
 				chm = chm[3:]
 			if chm not in self._loki.chr_num:
-				raise Exception("malformed marker '%s': unknown chromosome '%s'" % (marker,chm))
+				if errorCallback:
+					errorCallback(line)
+				continue
 			chm = self._loki.chr_num[chm]
 			
-			# parse and convert marker label
+			# parse and convert locus label
 			if not label:
 				label = 'chr%s:%s' % (self.loki.chr_name[chm], pos)
-			#elif label[:2].upper() == 'RS' and label[2:].isdigit():
-			#	rs = long(label[2:])
 			
 			# parse and convert position
 			if pos == '-' or pos == 'NA':
@@ -327,39 +370,94 @@ class Biofilter:
 				pos = long(pos)
 			
 			yield (label,chm,pos)
-		#foreach marker
-	#generateLociiFromMarkers()
+		#foreach line
+	#generateLociFromText()
 	
 	
-	def generateLociiFromMapFiles(self, mapfiles):
-		for path in mapfiles:
-			with (sys.stdin if (path == '-' or not path) else open(path, 'rU')) as mapfile:
-				for locus in self.generateLociiFromMarkers(
-						(line.rstrip() for line in mapfile if line[0:1] != '#'),
-						"\t"
-				):
+	def generateLociFromMapFiles(self, paths, errorCallback=None):
+		for path in paths:
+			with (sys.stdin if (path == '-' or not path) else open(path, 'rU')) as file:
+				for locus in self.generateLociFromText((line for line in file if line[0:1] != '#'), "\t", errorCallback):
 					yield locus
-				#foreach generated locus
-			#with mapfile
-		#foreach mapfile
-	#generateLociiFromMapFiles()
+			#with file
+		#foreach path
+	#generateLociFromMapFiles()
 	
 	
-	def generateNamesFromNameFiles(self, namefiles):
-		for path in namefiles:
-			with (sys.stdin if (path == '-' or not path) else open(path, 'rU')) as namefile:
-				for line in namefile:
-					if line[0:1] == '#':
-						pass
-					else:
+	def generateNamesFromNameFiles(self, paths):
+		for path in paths:
+			with (sys.stdin if (path == '-' or not path) else open(path, 'rU')) as file:
+				for line in file:
+					if line[0:1] != '#':
 						yield line.rstrip()
-				#foreach line in namefile
-			#with namefile
-		#foreach namefile
+				#foreach line in file
+			#with file
+		#foreach path
 	#generateNamesFromNameFiles()
 	
 	
-	# ##################################################
+	def generateRegionsFromText(self, text, separator=':', errorCallback=None):
+		for line in text:
+			if not line:
+				continue
+			
+			label = chm = posMin = posMax = None
+			cols = line.split(separator)
+			
+			# parse line
+			if len(cols) < 3:
+				if errorCallback:
+					errorCallback(line)
+				continue
+			elif len(cols) == 3:
+				chm = cols[0].upper()
+				posMin = cols[1].upper()
+				posMax = cols[2].upper()
+			elif len(cols) >= 4:
+				chm = cols[0].upper()
+				label = cols[1]
+				posMin = cols[2].upper()
+				posMax = cols[3].upper()
+			
+			# parse, validate and convert chromosome
+			if chm[:3] == 'CHR':
+				chm = chm[3:]
+			if chm not in self._loki.chr_num:
+				if errorCallback:
+					errorCallback(line)
+				continue
+			chm = self._loki.chr_num[chm]
+			
+			# parse and convert region label
+			if not label:
+				label = 'chr%s:%s-%s' % (self.loki.chr_name[chm], posMin, posMax)
+			
+			# parse and convert positions
+			if posMin == '-' or posMin == 'NA':
+				posMin = None
+			else:
+				posMin = long(posMin)
+			if posMax == '-' or posMax == 'NA':
+				posMax = None
+			else:
+				posMax = long(posMax)
+			
+			yield (label,chm,posMin,posMax)
+		#foreach line
+	#generateRegionsFromText()
+	
+	
+	def generateRegionsFromFiles(self, paths, errorCallback=None):
+		for path in paths:
+			with (sys.stdin if (path == '-' or not path) else open(path, 'rU')) as file:
+				for region in self.generateRegionsFromText((line for line in file if line[0:1] != '#'), "\t", errorCallback):
+					yield region
+			#with file
+		#foreach path
+	#generateRegionsFromFiles()
+	
+	
+	##################################################
 	# snp/locus input
 	
 	
@@ -368,14 +466,25 @@ class Biofilter:
 		self.log("adding SNP filter ...")
 		self.prepareTableForUpdate('snp')
 		dbc = self._loki._db.cursor()
-		sql = "INSERT INTO `main`.`snp` (label,rs) VALUES ('rs'||?,?); SELECT 1"
-		tally = dict()
-		numAdd = 0
-		for row in dbc.executemany(sql, self._loki.generateCurrentRSesByRS(snps, tally=tally)):
-			numAdd += 1
-		self.log(" OK: added %d RS#s (%d matched, %d updated, %d ambiguous, %d unrecognized)\n" % (
-				numAdd,tally['match'],tally['merge'],tally['ambig'],tally['null']
-		))
+		
+		# for some reason this process (create temp table, insert to temp table,
+		# left join merge table while insert-selecting from temp to main table)
+		# is ~30% faster than the equivalent one-query solution (left join merge
+		# table while insert-selecting from literal "SELECT ? AS rs" subquery)
+		dbc.execute("CREATE TEMP TABLE `temp`.`rs` (rs INTEGER PRIMARY KEY)")
+		dbc.executemany("INSERT OR IGNORE INTO `temp`.`rs` (rs) VALUES (?)", itertools.izip(snps))
+		sql = """
+INSERT INTO `main`.`snp` (label,rs)
+SELECT 'rs'||t_r.rs, COALESCE(d_sm.rsCurrent, t_r.rs)
+FROM `temp`.`rs` AS t_r
+LEFT JOIN `db`.`snp_merge` AS d_sm
+  ON d_sm.rsMerged = t_r.rs
+"""
+		dbc.execute(sql)
+		numAdd = self._loki._db.changes()
+		dbc.execute("DROP TABLE `temp`.`rs`")
+		self.log(" OK: added %d RS#s\n" % (numAdd,))
+		
 		self._snpFilters += 1
 	#unionSNPs()
 	
@@ -385,310 +494,587 @@ class Biofilter:
 		if not self._snpFilters:
 			return self.unionSNPs(snps)
 		self.log("intersecting SNP filter ...")
-		self.prepareTableForQuery('snp')
 		dbc = self._loki._db.cursor()
-		dbc.execute("UPDATE `main`.`snp` SET flag = 0")
-		numBefore = self._loki._db.changes()
-		tally = dict()
-		sql = "UPDATE `main`.`snp` SET flag = 1 WHERE (1 OR ?) AND rs = ?"
-		dbc.executemany(sql, self._loki.generateCurrentRSesByRS(snps, tally=tally))
-		dbc.execute("DELETE FROM `main`.`snp` WHERE flag = 0")
+		
+		self.prepareTableForQuery('snp')
+		numBefore = max(row[0] for row in dbc.execute("SELECT COUNT() FROM `main`.`snp`"))
+		dbc.execute("CREATE TEMP TABLE `temp`.`rs` (rs INTEGER PRIMARY KEY)")
+		dbc.executemany("INSERT INTO `temp`.`rs` (rs) VALUES (?)", itertools.izip(snps))
+		sql = """
+DELETE FROM `main`.`snp` WHERE rs NOT IN (
+  SELECT m_s.rs
+  FROM `temp`.`rs` AS t_r
+  LEFT JOIN `db`.`snp_merge` AS d_sm
+    ON d_sm.rsMerged = t_r.rs
+  JOIN `main`.`snp` AS m_s
+    ON m_s.rs = COALESCE(d_sm.rsCurrent, t_r.rs)
+)
+"""
+		dbc.execute(sql)
 		numDrop = self._loki._db.changes()
-		self.log(" OK: kept %d RS#s (%d dropped, %d ambiguous, %d unrecognized)\n" % (
-				numBefore-numDrop,numDrop,tally['ambig'],tally['null']
-		))
+		dbc.execute("DROP TABLE `temp`.`rs`")
+		self.log(" OK: kept %d RS#s (%d dropped)\n" % (numBefore-numDrop,numDrop))
+		
 		self._snpFilters += 1
 	#intersectSNPs()
 	
 	
-	def unionLocii(self, locii):
-		# locii=[ (label,chr,pos), ... ]
+	def unionLoci(self, loci):
+		# loci=[ (label,chr,pos), ... ]
 		self.log("adding locus filter ...")
 		self.prepareTableForUpdate('locus')
 		dbc = self._loki._db.cursor()
 		sql = "INSERT OR IGNORE INTO `main`.`locus` (label,chr,pos) VALUES (?,?,?); SELECT LAST_INSERT_ROWID()"
 		lastID = None
 		numAdd = numNull = 0
-		for row in dbc.executemany(sql, locii):
+		for row in dbc.executemany(sql, loci):
 			if lastID != row[0]:
 				numAdd += 1
 				lastID = row[0]
 			else:
 				numNull += 1
-		self.log(" OK: added %d locii (%d incomplete)\n" % (numAdd,numNull))
+		self.log(" OK: added %d loci (%d incomplete)\n" % (numAdd,numNull))
 		self._locusFilters += 1
-	#unionLocii()
+	#unionLoci()
 	
 	
-	def intersectLocii(self, locii):
-		# locii=[ (label,chr,pos), ... ]
+	def intersectLoci(self, loci):
+		# loci=[ (label,chr,pos), ... ]
 		if not self._locusFilters:
-			return self.unionLocii(locii)
+			return self.unionLoci(loci)
 		self.log("intersecting locus filter ...")
 		self.prepareTableForQuery('locus')
 		dbc = self._loki._db.cursor()
 		dbc.execute("UPDATE `main`.`locus` SET flag = 0")
 		numBefore = self._loki._db.changes()
-		dbc.executemany("UPDATE `main`.`locus` SET flag = 1 WHERE (1 OR ?) AND chr = ? AND pos = ?", locii)
+		dbc.executemany("UPDATE `main`.`locus` SET flag = 1 WHERE (1 OR ?) AND chr = ? AND pos = ?", loci)
 		dbc.execute("DELETE FROM `main`.`locus` WHERE flag = 0")
 		numDrop = self._loki._db.changes()
-		self.log(" OK: kept %d locii (%d dropped)\n" % (numBefore-numDrop,numDrop))
+		self.log(" OK: kept %d loci (%d dropped)\n" % (numBefore-numDrop,numDrop))
 		self._locusFilters += 1
-	#intersectLocii()
+	#intersectLoci()
 	
 	
-	# ##################################################
-	# region/bound input
+	##################################################
+	# region/boundary input
 	
 	
-	def unionRegions(self, names, ntype=None, rtype='gene'):
-		# names=[ rs, ... ]
+	def unionGenes(self, names, namespace=None):
+		# names=[ name, ... ]
 		
-		self.log("adding %s filter ..." % rtype)
-		ntype = ntype or self._geneNamespace
-		namespaceID = ntype and self._loki.getNamespaceID(ntype)
-		if ntype and not namespaceID:
-			raise Exception("ERROR: unknown name type '%s'" % ntype)
-		typeID = self._loki.getTypeID(rtype)
+		self.log("adding gene filter ...")
+		typeID = self._loki.getTypeID('gene')
 		if not typeID:
-			raise Exception("ERROR: unknown region type '%s'" % rtype)
-		self.prepareTableForUpdate('region')
+			raise Exception("ERROR: knowledge file contains no gene data")
+		namespace = namespace or self._geneNamespace
+		namespaceID = namespace and self._loki.getNamespaceID(namespace)
+		if namespace and not namespaceID:
+			raise Exception("ERROR: unknown gene name type '%s'" % (namespace,))
+		self.prepareTableForUpdate('gene')
 		dbc = self._loki._db.cursor()
 		
-		sql = "INSERT INTO `main`.`region` (label,region_id) VALUES (?,?); SELECT 1"
+		sql = "INSERT INTO `main`.`gene` (label,biopolymer_id) VALUES (?,?); SELECT 1"
 		tally = dict()
 		numAdd = 0
-		for row in dbc.executemany(sql, self._loki.generateRegionIDsByName(names, namespaceID=namespaceID, typeID=typeID, tally=tally)):
+		for row in dbc.executemany(sql, self._loki.generateBiopolymerIDsByName(names, tally=tally, namespaceID=namespaceID, typeID=typeID)):
 			numAdd += 1
-		self.log(" OK: added %d %s regions (%d matched, %d ambiguous, %d unrecognized)\n" % (
-				numAdd,rtype,tally['match'],tally['ambig'],tally['null']
-		))
+		self.log(" OK: added %d genes (%d matched, %d ambiguous, %d unrecognized)\n" % (numAdd,tally['match'],tally['ambig'],tally['null']))
+		self._geneFilters += 1
+	#unionGenes()
+	
+	
+	def intersectGenes(self, names, namespace=None):
+		# names=[ name, ... ]
+		if not self._geneFilters:
+			return self.unionGenes(names, namespace)
+		
+		self.log("intersecting gene filter ...")
+		typeID = self._loki.getTypeID('gene')
+		if not typeID:
+			raise Exception("ERROR: knowledge file contains no gene data")
+		namespace = namespace or self._geneNamespace
+		namespaceID = namespace and self._loki.getNamespaceID(namespace)
+		if namespace and not namespaceID:
+			raise Exception("ERROR: unknown gene name type '%s'" % (namespace,))
+		self.prepareTableForQuery('gene')
+		dbc = self._loki._db.cursor()
+		
+		dbc.execute("UPDATE `main`.`gene` SET flag = 0")
+		numBefore = self._loki._db.changes()
+		tally = dict()
+		sql = "UPDATE `main`.`gene` SET flag = 1 WHERE (1 OR ?) AND biopolymer_id = ?"
+		dbc.executemany(sql, self._loki.generateBiopolymerIDsByName(names, tally=tally, namespaceID=namespaceID, typeID=typeID))
+		dbc.execute("DELETE FROM `main`.`gene` WHERE flag = 0")
+		numDrop = self._loki._db.changes()
+		self.log(" OK: kept %d genes (%d dropped, %d ambiguous, %d unrecognized)\n" % (numBefore-numDrop,numDrop,tally['ambig'],tally['null']))
+		self._geneFilters += 1
+	#intersectGenes()
+	
+	
+	def unionRegions(self, regions):
+		# regions=[ (label,chr,posMin,posMax), ... ]
+		self.log("adding region filter ...")
+		self.prepareTableForUpdate('region')
+		dbc = self._loki._db.cursor()
+		sql = "INSERT OR IGNORE INTO `main`.`region` (label,chr,posMin,posMax) VALUES (?,?,?,?); SELECT LAST_INSERT_ROWID()"
+		lastID = None
+		numAdd = numNull = 0
+		for row in dbc.executemany(sql, regions):
+			if lastID != row[0]:
+				numAdd += 1
+				lastID = row[0]
+			else:
+				numNull += 1
+		self.log(" OK: added %d regions (%d incomplete)\n" % (numAdd,numNull))
 		self._regionFilters += 1
 	#unionRegions()
 	
 	
-	def intersectRegions(self, names, ntype=None, rtype='gene'):
-		# names=[ rs, ... ]
+	def intersectRegions(self, regions):
+		# regions=[ (label,chr,posMin,posMax), ... ]
 		if not self._regionFilters:
-			return self.unionRegions(names, ntype, rtype)
-		
-		self.log("intersecting %s filter ..." % rtype)
-		ntype = ntype or self._geneNamespace
-		namespaceID = ntype and self._loki.getNamespaceID(ntype)
-		if ntype and not namespaceID:
-			raise Exception("ERROR: unknown name type '%s'" % ntype)
-		typeID = self._loki.getTypeID(rtype)
-		if not typeID:
-			raise Exception("ERROR: unknown region type '%s'" % rtype)
+			return self.unionRegions(regions)
+		self.log("intersecting region filter ...")
 		self.prepareTableForQuery('region')
 		dbc = self._loki._db.cursor()
-		
 		dbc.execute("UPDATE `main`.`region` SET flag = 0")
 		numBefore = self._loki._db.changes()
-		tally = dict()
-		sql = "UPDATE `main`.`region` SET flag = 1 WHERE (1 OR ?) AND region_id = ?"
-		dbc.executemany(sql, self._loki.generateRegionIDsByName(names, namespaceID=namespaceID, typeID=typeID, tally=tally))
+		dbc.executemany("UPDATE `main`.`region` SET flag = 1 WHERE (1 OR ?) AND chr = ? AND posMin = ? AND posMax = ?", regions)
 		dbc.execute("DELETE FROM `main`.`region` WHERE flag = 0")
 		numDrop = self._loki._db.changes()
-		self.log(" OK: kept %d %s regions (%d dropped, %d ambiguous, %d unrecognized)\n" % (
-				numBefore-numDrop,rtype,numDrop,tally['ambig'],tally['null']
-		))
+		self.log(" OK: kept %d regions (%d dropped)\n" % (numBefore-numDrop,numDrop))
 		self._regionFilters += 1
 	#intersectRegions()
 	
 	
-	def unionBounds(self, bounds):
-		raise Exception("not implemented")
-	#unionBounds()
+	##################################################
+	# group input
 	
 	
-	def intersectBounds(self, bounds):
-		raise Exception("not implemented")
-	#intersectBounds()
+	def unionGroups(self, names, namespace=None, gtype=None):
+		# names=[ name, ... ]
+		
+		self.log("adding %s filter ..." % (gtype or "group"))
+		typeID = gtype and self._loki.getTypeID(gtype)
+		if gtype and not typeID:
+			raise Exception("ERROR: unknown group type '%s'" % gtype)
+		namespaceID = namespace and self._loki.getNamespaceID(namespace)
+		if namespace and not namespaceID:
+			raise Exception("ERROR: unknown group name type '%s'" % namespace)
+		self.prepareTableForUpdate('group')
+		dbc = self._loki._db.cursor()
+		
+		sql = "INSERT INTO `main`.`group` (label,group_id) VALUES (?,?); SELECT 1"
+		tally = dict()
+		numAdd = 0
+		for row in dbc.executemany(sql, self._loki.generateGroupIDsByName(names, namespaceID=namespaceID, typeID=typeID, tally=tally)):
+			numAdd += 1
+		self.log(" OK: added %d groups (%d matched, %d ambiguous, %d unrecognized)\n" % (
+				numAdd,tally['match'],tally['ambig'],tally['null']
+		))
+		self._groupFilters += 1
+	#unionGroups()
 	
 	
-	# ##################################################
-	# filtering
+	def intersectGroups(self, names, namespace=None, gtype=None):
+		# names=[ name, ... ]
+		if not self._groupFilters:
+			return self.unionGroups(names, namespace, gtype)
+		
+		self.log("intersecting %s filter ..." % (gtype or "group"))
+		typeID = gtype and self._loki.getTypeID(gtype)
+		if gtype and not typeID:
+			raise Exception("ERROR: unknown group type '%s'" % gtype)
+		namespaceID = namespace and self._loki.getNamespaceID(namespace)
+		if namespace and not namespaceID:
+			raise Exception("ERROR: unknown group name type '%s'" % namespace)
+		self.prepareTableForQuery('group')
+		dbc = self._loki._db.cursor()
+		
+		dbc.execute("UPDATE `main`.`group` SET flag = 0")
+		numBefore = self._loki._db.changes()
+		tally = dict()
+		sql = "UPDATE `main`.`group` SET flag = 1 WHERE (1 OR ?) AND group_id = ?"
+		dbc.executemany(sql, self._loki.generateGroupIDsByName(names, namespaceID=namespaceID, typeID=typeID, tally=tally))
+		dbc.execute("DELETE FROM `main`.`group` WHERE flag = 0")
+		numDrop = self._loki._db.changes()
+		self.log(" OK: kept %d groups (%d dropped, %d ambiguous, %d unrecognized)\n" % (
+				numBefore-numDrop,numDrop,tally['ambig'],tally['null']
+		))
+		self._groupFilters += 1
+	#intersectGroups()
 	
 	
-	def generateFilteredData(self, snps=None, regions=None):
+	##################################################
+	# filtering & annotation
+	
+	
+	def generateFilteredData(self, snps=None, loci=None, genes=None, regions=None, groups=None):
 		# gather settings
 		expansion = self._expansion
-		populationID = self._loki.getPopulationID(self._population)
-		if not populationID:
-			raise Exception("ERROR: unknown population '%s'" % self._population)
-		zoneSize = self._loki.getDatabaseSetting('region_zone_size')
-		if not zoneSize:
-			raise Exception("ERROR: could not determine database setting 'region_zone_size'")
-		zoneSize = int(zoneSize)
+		zoneSize = self._loki.getDatabaseSetting('zone_size')
+		zoneSize = int(zoneSize) if zoneSize else None
+		ldprofileID = self._loki.getLDProfileID(self._ldprofile)
 		
 		# define unique aliases for all tables we might need
 		aliasTable = {
-			"ms":  "`main`.`snp`",
-			"ml":  "`main`.`locus`",
-			"mr":  "`main`.`region`",
-			"mb":  "`main`.`bound`",
-			"mbz": "`main`.`bound_zone`",
-			"ds":  "`db`.`snp`",
-			"dr":  "`db`.`region`",
-			"drb": "`db`.`region_bound`",
-			"drz": "`db`.`region_zone`",
-			"dg":  "`db`.`group`",
-			"dgg": "`db`.`group_group`",
-			"dgr": "`db`.`group_region`",
+			"m_s":  "`main`.`snp`",              # (label,rs)
+			"m_l":  "`main`.`locus`",            # (label,chr,pos)
+			"m_bg": "`main`.`gene`",             # (label,biopolymer_id)
+			"m_r":  "`main`.`region`",           # (label,chr,posMin,posMax)
+			"m_rz": "`main`.`region_zone`",      # (region_rowid,chr,zone)
+			"m_g":  "`main`.`group`",            # (label,group_id)
+			"d_sl": "`db`.`snp_locus`",          # (rs,chr,pos)
+			"d_b":  "`db`.`biopolymer`",         # (biopolymer_id,type_id,label)
+			"d_br": "`db`.`biopolymer_region`",  # (biopolymer_id,ldprofile_id,chr,posMin,posMax)
+			"d_bz": "`db`.`biopolymer_zone`",    # (biopolymer_id,chr,zone)
+			"d_g":  "`db`.`group`",              # (group_id,type_id,label)
+			"d_gb": "`db`.`group_biopolymer`",   # (group_id,biopolymer_id,specificity,implication,quality)
+		}
+		
+		# define intermediate tables necessary to join other pairs of tables
+		joinTable = {
+			("m_s" ,"m_l" ): {"d_sl"},
+			("m_s" ,"m_bg"): {"d_sl","d_bz","d_br"},
+			("m_s" ,"m_r" ): {"d_sl","m_rz"},
+		#	("m_s" ,"m_rz"): {"d_sl"},
+			("m_s" ,"m_g" ): {"d_sl","d_bz","d_br","d_gb"},
+		#	("m_s" ,"d_sl"): {},
+			("m_s" ,"d_b" ): {"d_sl","d_bz","d_br"},
+			("m_s" ,"d_br"): {"d_sl","d_bz"},
+		#	("m_s" ,"d_bz"): {"d_sl"},
+			("m_s" ,"d_g" ): {"d_sl","d_bz","d_br","d_gb"},
+		#	("m_s" ,"d_gb"): {"d_sl","d_bz","d_br"},
+			
+			("m_l" ,"m_bg"): {"d_bz","d_br"},
+			("m_l" ,"m_r" ): {"m_rz"},
+		#	("m_l" ,"m_rz"): {},
+			("m_l" ,"m_g" ): {"d_bz","d_br","d_gb"},
+		#	("m_l" ,"d_sl"): {},
+			("m_l" ,"d_b" ): {"d_bz","d_br"},
+			("m_l" ,"d_br"): {"d_bz"},
+		#	("m_l" ,"d_bz"): {},
+			("m_l" ,"d_g" ): {"d_bz","d_br","d_gb"},
+		#	("m_l" ,"d_gb"): {"d_bz","d_br"},
+			
+			("m_bg","m_r" ): {"d_br"},
+		#	("m_bg","m_rz"): {"d_bz"},
+			("m_bg","m_g" ): {"d_gb"},
+			("m_bg","d_sl"): {"d_bz","d_br"},
+		#	("m_bg","d_b" ): {},
+		#	("m_bg","d_br"): {},
+		#	("m_bg","d_bz"): {},
+			("m_bg","d_g" ): {"d_gb"},
+		#	("m_bg","d_gb"): {},
+			
+		#	("m_r" ,"m_rz"): {},
+			("m_r" ,"m_g" ): {"d_br","d_gb"},
+			("m_r" ,"d_sl"): {"m_rz"},
+			("m_r" ,"d_b" ): {"d_br"},
+		#	("m_r" ,"d_br"): {},
+		#	("m_r" ,"d_bz"): {},
+			("m_r" ,"d_g" ): {"d_br","d_gb"},
+		#	("m_r" ,"d_gb"): {"d_br"},
+			
+		#	("m_rz","m_g" ): {"m_r","d_br","d_gb"},
+		#	("m_rz","d_sl"): {},
+		#	("m_rz","d_b" ): {"d_bz"},
+		#	("m_rz","d_br"): {"d_bz"},
+		#	("m_rz","d_bz"): {},
+		#	("m_rz","d_g" ): {"d_bz","d_gr"},
+		#	("m_rz","d_gb"): {"d_bz"},
+			
+			("m_g" ,"d_sl"): {"d_gb","d_br","d_bz"},
+			("m_g" ,"d_b" ): {"d_gb"},
+			("m_g" ,"d_br"): {"d_gb"},
+		#	("m_g" ,"d_bz"): {"d_gb"},
+		#	("m_g" ,"d_g" ): {},
+		#	("m_g" ,"d_gb"): {},
+			
+			("d_sl","d_b" ): {"d_bz","d_br"},
+			("d_sl","d_br"): {"d_bz"},
+		#	("d_sl","d_bz"): {},
+			("d_sl","d_g" ): {"d_bz","d_br","d_gb"},
+		#	("d_sl","d_gb"): {"d_bz","d_br"},
+			
+		#	("d_b" ,"d_br"): {},
+		#	("d_b" ,"d_bz"): {},
+			("d_b" ,"d_g" ): {"d_gb"},
+		#	("d_b" ,"d_gb"): {},
+			
+		#	("d_br","d_bz"): {},
+			("d_br","d_g" ): {"d_gb"},
+		#	("d_br","d_gb"): {},
+			
+			("d_bz","d_g" ): {"d_gb"},
+		#	("d_bz","d_gb"): {},
+			
+		#	("d_g", "d_gb"): {},
 		}
 		
 		# define general constraints for each table
 		aliasWhere = {
-			"drb": {"drb.population_id = {populationID}"},
-			"drz": {"drz.population_id = {populationID}"},
+			"d_br": {"d_br.ldprofile_id = {ldprofileID}"},
 		}
 		
-		# define join constraints for each pair of tables
+		# define join constraints for each pair of tables;
+		# Note that the SQLite optimizer will not use an index on a column
+		# which is modified by an expression, even if the condition could
+		# be rewritten otherwise (i.e. "colA = colB + 10" will not use an
+		# index on colB).  To account for this, all conditions which include
+		# expressions should be repeated once for each operand column to appear
+		# unmodified (i.e. "colA = colB + 10" and also "colA - 10 = colB").
 		joinWhere = {
-			("ms","ds"): {
-				"ms.rs = ds.rs"
+			("m_s","d_sl"): {
+				"m_s.rs = d_sl.rs"
 			},
-			("ml","mb"): {
-				"ml.chr = mb.chr",
-				"ml.pos >= (mb.posMin - {expansion})",
-				"ml.pos <= (mb.posMax + {expansion})",
-				"(ml.pos + {expansion}) >= mb.posMin",
-				"(ml.pos - {expansion}) <= mb.posMax",
+			("m_l","m_r"): {
+				"m_l.chr = m_r.chr",
+				"m_l.pos >= (m_r.posMin - {expansion})",
+				"m_l.pos <= (m_r.posMax + {expansion})",
+				"(m_l.pos + {expansion}) >= m_r.posMin",
+				"(m_l.pos - {expansion}) <= m_r.posMax",
 			},
-			("ml","mbz"): {
-				"ml.chr = mbz.chr",
-				"ml.pos >= ((mbz.zone * {zoneSize}) - {expansion})",
-				"ml.pos < (((mbz.zone + 1) * {zoneSize}) + {expansion})",
-				"((ml.pos + {expansion}) / {zoneSize}) >= mbz.zone",
-				"((ml.pos - {expansion}) / {zoneSize}) <= mbz.zone",
+			("m_l","m_rz"): {
+				"m_l.chr = m_rz.chr",
+				"m_l.pos >= ((m_rz.zone * {zoneSize}) - {expansion})",
+				"m_l.pos < (((m_rz.zone + 1) * {zoneSize}) + {expansion})",
+				"((m_l.pos + {expansion}) / {zoneSize}) >= m_rz.zone",
+				"((m_l.pos - {expansion}) / {zoneSize}) <= m_rz.zone",
 			},
-			("ml","ds"): {
-				"ml.chr = ds.chr",
-				"ml.pos = ds.pos",
+			("m_l","d_sl"): {
+				"m_l.chr = d_sl.chr",
+				"m_l.pos = d_sl.pos",
 			},
-			("ml","drb"): {
-				"ml.chr = drb.chr",
-				"ml.pos >= (drb.posMin - {expansion})",
-				"ml.pos <= (drb.posMax + {expansion})",
-				"(ml.pos + {expansion}) >= drb.posMin",
-				"(ml.pos - {expansion}) <= drb.posMax",
+			("m_l","d_br"): {
+				"m_l.chr = d_br.chr",
+				"m_l.pos >= (d_br.posMin - {expansion})",
+				"m_l.pos <= (d_br.posMax + {expansion})",
+				"(m_l.pos + {expansion}) >= d_br.posMin",
+				"(m_l.pos - {expansion}) <= d_br.posMax",
 			},
-			("ml","drz"): {
-				"ml.chr = drz.chr",
-				"ml.pos >= ((drz.zone * {zoneSize}) - {expansion})",
-				"ml.pos < (((drz.zone + 1) * {zoneSize}) + {expansion})",
-				"((ml.pos + {expansion}) / {zoneSize}) >= drz.zone",
-				"((ml.pos - {expansion}) / {zoneSize}) <= drz.zone",
+			("m_l","d_bz"): {
+				"m_l.chr = d_bz.chr",
+				"m_l.pos >= ((d_bz.zone * {zoneSize}) - {expansion})",
+				"m_l.pos < (((d_bz.zone + 1) * {zoneSize}) + {expansion})",
+				"((m_l.pos + {expansion}) / {zoneSize}) >= d_bz.zone",
+				"((m_l.pos - {expansion}) / {zoneSize}) <= d_bz.zone",
 			},
-			("mr","dr"): {
-				"mr.region_id = dr.region_id",
+			("m_bg","d_b"): {
+				"m_bg.biopolymer_id = d_b.biopolymer_id",
 			},
-			("mr","drb"): {
-				"mr.region_id = drb.region_id",
+			("m_bg","d_br"): {
+				"m_bg.biopolymer_id = d_br.biopolymer_id",
 			},
-			("mb","mbz"): {
-				"mb._ROWID_ = mbz.bound_rowid",
-				# these should all be guaranteed by self.updateBoundZones()
-				"mb.chr = mbz.chr",
-				"mb.posMin < ((mbz.zone + 1) * {zoneSize})",
-				"mb.posMax >= (mbz.zone * {zoneSize})",
-				"(mb.posMin / {zoneSize}) <= mbz.zone",
-				"(mb.posMax / {zoneSize}) >= mbz.zone",
+			("m_bg","d_bz"): {
+				"m_bg.biopolymer_id = d_bz.biopolymer_id",
 			},
-			("mb","ds"): {
-				"mb.chr = ds.chr",
-				"(mb.posMin - {expansion}) <= ds.pos",
-				"(mb.posMax + {expansion}) >= ds.pos",
-				"mb.posMin <= (ds.pos + {expansion})",
-				"mb.posMax >= (ds.pos - {expansion})",
+			("m_bg","d_gb"): {
+				"m_bg.biopolymer_id = d_gb.biopolymer_id",
 			},
-			("mb","drb"): {
+			("m_r","m_rz"): {
+				"m_r._ROWID_ = m_rz.region_rowid",
+				# these should all be guaranteed by self.updateRegionZones()
+				"m_r.chr = m_rz.chr",
+				"m_r.posMin < ((m_rz.zone + 1) * {zoneSize})",
+				"m_r.posMax >= (m_rz.zone * {zoneSize})",
+				"(m_r.posMin / {zoneSize}) <= m_rz.zone",
+				"(m_r.posMax / {zoneSize}) >= m_rz.zone",
+			},
+			("m_r","d_sl"): {
+				"m_r.chr = d_sl.chr",
+				"(m_r.posMin - {expansion}) <= d_sl.pos",
+				"(m_r.posMax + {expansion}) >= d_sl.pos",
+				"m_r.posMin <= (d_sl.pos + {expansion})",
+				"m_r.posMax >= (d_sl.pos - {expansion})",
+			},
+			("m_r","d_br"): {
 				#TODO: match by overlap? more complited, but maybe more useful
-				"mb.chr = drb.chr",
-				"mb.posMin = drb.posMin",
-				"mb.posMax = drb.posMax",
+				"m_r.chr = d_br.chr",
+				"m_r.posMin = d_br.posMin",
+				"m_r.posMax = d_br.posMax",
 			},
-			("mbz","ds"): {
-				"mbz.chr = ds.chr",
-				"((mbz.zone * {zoneSize}) - {expansion}) <= ds.pos",
-				"(((mbz.zone + 1) * {zoneSize}) + {expansion}) > ds.pos",
-				"mbz.zone <= ((ds.pos + {expansion}) / {zoneSize})",
-				"mbz.zone >= ((ds.pos - {expansion}) / {zoneSize})",
+			("m_r","d_bz"): {
+				"m_r.chr = d_bz.chr",
+				"m_r.posMin < ((d_bz.zone + 1) * {zoneSize})",
+				"m_r.posMax >= (d_bz.zone * {zoneSize})",
+				"(m_r.posMin / {zoneSize}) <= d_bz.zone",
+				"(m_r.posMax / {zoneSize}) >= d_bz.zone",
 			},
-			("mbz","drb"): {
-				#TODO
+			("m_rz","d_sl"): {
+				"m_rz.chr = d_sl.chr",
+				"((m_rz.zone * {zoneSize}) - {expansion}) <= d_sl.pos",
+				"(((m_rz.zone + 1) * {zoneSize}) + {expansion}) > d_sl.pos",
+				"m_rz.zone <= ((d_sl.pos + {expansion}) / {zoneSize})",
+				"m_rz.zone >= ((d_sl.pos - {expansion}) / {zoneSize})",
 			},
-			("mbz","drz"): {
-				"mbz.chr = drz.chr",
-				"mbz.zone = drz.zone",
+			("m_rz","d_br"): {
+				"m_rz.chr = d_br.chr",
+				"m_rz.zone >= (d_br.posMin / {zoneSize})",
+				"m_rz.zone <= (d_br.posMax / {zoneSize})",
+				"((m_rz.zone + 1) * {zoneSize}) > d_br.posMin",
+				"(m_rz.zone * {zoneSize}) <= d_br.posMax",
 			},
-			("ds","drb"): {
-				"ds.chr = drb.chr",
-				"ds.pos >= (drb.posMin - {expansion})",
-				"ds.pos <= (drb.posMax + {expansion})",
-				"(ds.pos + {expansion}) >= drb.posMin",
-				"(ds.pos - {expansion}) <= drb.posMax",
+			("m_rz","d_bz"): {
+				"m_rz.chr = d_bz.chr",
+				"m_rz.zone = d_bz.zone",
 			},
-			("ds","drz"): {
-				"ds.chr = drz.chr",
-				"ds.pos >= ((drz.zone * {zoneSize}) - {expansion})",
-				"ds.pos < (((drz.zone + 1) * {zoneSize}) + {expansion})",
-				"((ds.pos + {expansion}) / {zoneSize}) >= drz.zone",
-				"((ds.pos - {expansion}) / {zoneSize}) <= drz.zone",
+			("m_g","d_g"): {
+				"m_g.group_id = d_g.group_id",
 			},
-			("dr","drb"): {
-				"dr.region_id = drb.region_id",
+			("m_g","d_gb"): {
+				"m_g.group_id = d_gb.group_id",
 			},
-			("dr","drz"): {
-				"dr.region_id = drz.region_id",
+			("d_sl","d_br"): {
+				"d_sl.chr = d_br.chr",
+				"d_sl.pos >= (d_br.posMin - {expansion})",
+				"d_sl.pos <= (d_br.posMax + {expansion})",
+				"(d_sl.pos + {expansion}) >= d_br.posMin",
+				"(d_sl.pos - {expansion}) <= d_br.posMax",
 			},
-			("drb","drz"): {
-				"drb.region_id = drz.region_id",
-				"drb.population_id = drz.population_id",
-				"drb.chr = drz.chr",
+			("d_sl","d_bz"): {
+				"d_sl.chr = d_bz.chr",
+				"d_sl.pos >= ((d_bz.zone * {zoneSize}) - {expansion})",
+				"d_sl.pos < (((d_bz.zone + 1) * {zoneSize}) + {expansion})",
+				"((d_sl.pos + {expansion}) / {zoneSize}) >= d_bz.zone",
+				"((d_sl.pos - {expansion}) / {zoneSize}) <= d_bz.zone",
+			},
+			("d_b","d_br"): {
+				"d_b.biopolymer_id = d_br.biopolymer_id",
+			},
+			("d_b","d_bz"): {
+				"d_b.biopolymer_id = d_bz.biopolymer_id",
+			},
+			("d_b","d_gb"): {
+				"d_b.biopolymer_id = d_gb.biopolymer_id",
+			},
+			("d_br","d_bz"): {
+				"d_br.biopolymer_id = d_bz.biopolymer_id",
+				"d_br.chr = d_bz.chr",
 				# these should all be guaranteed by loki.updateRegionZones()
-				"drb.posMin < ((drz.zone + 1) * {zoneSize})",
-				"drb.posMax >= (drz.zone * {zoneSize})",
-				"(drb.posMin / {zoneSize}) <= drz.zone",
-				"(drb.posMax / {zoneSize}) >= drz.zone",
+				"d_br.posMin < ((d_bz.zone + 1) * {zoneSize})",
+				"d_br.posMax >= (d_bz.zone * {zoneSize})",
+				"(d_br.posMin / {zoneSize}) <= d_bz.zone",
+				"(d_br.posMax / {zoneSize}) >= d_bz.zone",
+			},
+			("d_br","d_gb"): {
+				"d_br.biopolymer_id = d_gb.biopolymer_id",
+			},
+			("d_bz","d_gb"): {
+				"d_bz.biopolymer_id = d_gb.biopolymer_id",
+			},
+			("d_g","d_gb"): {
+				"d_g.group_id = d_gb.group_id",
 			},
 		} #joinWhere{}
 		
 		# initialize query fragments
-		sqlSelect = list() # [a,b,...] => SELECT a, b, ...
+		columns = [
+				'rowid',
+				'locus_label','locus_chr','locus_pos',
+				'region_label','region_chr','region_posMin','region_posMax',
+				'group_label'
+		]
+		sqlSelect = { col:"NULL" for col in columns } # {A:a,B:a,...} => SELECT a AS A, b AS B, ...
+		sqlSelect['rowid'] = "''"
 		sqlFrom = set() # {a,b,...} => FROM aliasTable[a] AS a, aliasTable[b] AS b, ...
 		sqlWhere = set() # {a,b,...} => WHERE a AND b AND ...
 		sqlGroup = list() # [a,b,...] => GROUP BY a, b, ...
 		
-		# decide which tables need to be included
+		# include all tables needed to satisfy input filters
 		if self._snpFilters:
-			sqlFrom.add("ms")
-			sqlFrom.add("ds")
+			sqlFrom.add("m_s")
 		
 		if self._locusFilters:
-			sqlFrom.add("ml")
+			sqlFrom.add("m_l")
 		
-		if snps and not (self._snpFilters or self._locusFilters):
-			sqlFrom.add("ds")
+		if self._geneFilters:
+			sqlFrom.add("m_bg")
 		
 		if self._regionFilters:
-			sqlFrom.add("mr")
-			sqlFrom.add("dr")
-			sqlFrom.add("drb")
+			sqlFrom.add("m_r")
 		
-		if self._boundFilters:
-			sqlFrom.add("mb")
+		if self._groupFilters:
+			sqlFrom.add("m_g")
 		
-		if regions and not (self._regionFilters or self._boundFilters):
-			sqlFrom.add("dr")
-			sqlFrom.add("drb")
+		# include all tables and columns needed to satisfy output column requests
+		if loci:
+			if "m_l" in sqlFrom:
+				sqlSelect['rowid'] += "||m_l._ROWID_||'_'"
+				sqlSelect['locus_label'] = "m_l.label"
+				sqlSelect['locus_chr'] = "m_l.chr"
+				sqlSelect['locus_pos'] = "m_l.pos"
+			elif "m_s" in sqlFrom:
+				sqlFrom.add("d_sl")
+				sqlSelect['rowid'] += "||d_sl._ROWID_||'_'"
+				sqlSelect['locus_label'] = "m_s.label"
+				sqlSelect['locus_chr'] = "d_sl.chr"
+				sqlSelect['locus_pos'] = "d_sl.pos"
+			else:
+				sqlFrom.add("d_sl")
+				sqlSelect['rowid'] += "||d_sl._ROWID_||'_'"
+				sqlSelect['locus_label'] = "'rs'||d_sl.rs"
+				sqlSelect['locus_chr'] = "d_sl.chr"
+				sqlSelect['locus_pos'] = "d_sl.pos"
+		elif snps:
+			if "m_s" in sqlFrom:
+				sqlSelect['rowid'] += "||m_s._ROWID_||'_'"
+				sqlSelect['locus_label'] = "m_s.label"
+			else:
+				sqlFrom.add("d_sl")
+				sqlSelect['rowid'] += "||d_sl.rs||'_'"
+				sqlSelect['locus_label'] = "'rs'||d_sl.rs"
 		
-		if "mb" in sqlFrom and ("ml" in sqlFrom or "ds" in sqlFrom):
-			sqlFrom.add("mbz")
+		if regions:
+			if "m_r" in sqlFrom:
+				sqlSelect['rowid'] += "||m_r._ROWID_||'_'"
+				sqlSelect['region_label'] = "m_r.label"
+				sqlSelect['region_chr'] = "m_r.chr"
+				sqlSelect['region_posMin'] = "m_r.posMin"
+				sqlSelect['region_posMax'] = "m_r.posMax"
+			elif "m_bg" in sqlFrom:
+				sqlFrom.add("d_br")
+				sqlSelect['rowid'] += "||d_br._ROWID_||'_'"
+				sqlSelect['region_label'] = "m_bg.label"
+				sqlSelect['region_chr'] = "d_br.chr"
+				sqlSelect['region_posMin'] = "d_br.posMin"
+				sqlSelect['region_posMax'] = "d_br.posMax"
+			else:
+				sqlFrom.add("d_b")
+				sqlFrom.add("d_br")
+				sqlSelect['rowid'] += "||d_br._ROWID_||'_'"
+				sqlSelect['region_label'] = "d_b.label"
+				sqlSelect['region_chr'] = "d_br.chr"
+				sqlSelect['region_posMin'] = "d_br.posMin"
+				sqlSelect['region_posMax'] = "d_br.posMax"
+		elif genes:
+			if "m_bg" in sqlFrom:
+				sqlSelect['rowid'] += "||m_bg._ROWID_||'_'"
+				sqlSelect['region_label'] = "m_bg.label"
+			else:
+				sqlFrom.add("d_b")
+				sqlSelect['rowid'] += "||d_b.biopolymer_id||'_'"
+				sqlSelect['region_label'] = "d_b.label"
 		
-		if "drb" in sqlFrom and ("ml" in sqlFrom or "ds" in sqlFrom):
-			sqlFrom.add("drz")
+		if groups:
+			if "m_g" in sqlFrom:
+				sqlSelect['rowid'] += "||m_g._ROWID_||'_'"
+				sqlSelect['group_label'] = "m_g.label"
+			else:
+				sqlFrom.add("d_g")
+				sqlSelect['rowid'] += "||d_g.group_id||'_'"
+				sqlSelect['group_label'] = "d_g.label"
+		
+		# include all tables needed to bridge other included tables
+		# (since rules can be interdependent, iterate until nothing changes)
+		sizeFrom = None
+		while sizeFrom != len(sqlFrom):
+			sizeFrom = len(sqlFrom)
+			
+			for join in joinTable:
+				if join[0] in sqlFrom and join[1] in sqlFrom:
+					sqlFrom.update(joinTable[join])
+		#while
 		
 		# decide which constraints need to be included
 		for alias in aliasWhere:
@@ -698,140 +1084,59 @@ class Biofilter:
 			if join[0] in sqlFrom and join[1] in sqlFrom:
 				sqlWhere.update(joinWhere[join])
 		
-		# decide which columns to select for output
-		if snps:
-			if "ml" in sqlFrom:
-				sqlSelect.append("ml.label")
-				sqlSelect.append("ml.chr")
-				sqlSelect.append("ml.pos")
-				sqlGroup.append("ml._ROWID_")
-			elif "ds" in sqlFrom:
-				sqlSelect.append("'rs'||ds.rs AS label")
-				sqlSelect.append("ds.chr")
-				sqlSelect.append("ds.pos")
-				sqlGroup.append("ds._ROWID_")
-			else:
-				raise Exception("ERROR: constructed query includes no snp tables")
-		
-		if regions:
-			if "mb" in sqlFrom:
-				sqlSelect.append("mb.label")
-				sqlSelect.append("mb.chr")
-				sqlSelect.append("mb.posMin")
-				sqlSelect.append("mb.posMax")
-				sqlGroup.append("mb._ROWID_")
-			elif "dr" in sqlFrom and "drb" in sqlFrom:
-				sqlSelect.append("dr.label")
-				sqlSelect.append("drb.chr")
-				sqlSelect.append("drb.posMin")
-				sqlSelect.append("drb.posMax")
-				sqlGroup.append("drb._ROWID_")
-			else:
-				raise Exception("ERROR: constructed query includes no region tables")
-		
 		# assemble the pieces
-		sql = "SELECT\n  "+(",\n  ".join(sqlSelect) if sqlSelect else "1")
+		sqlSelect['rowid'] = "("+sqlSelect['rowid']+")"
+		sql = "SELECT "+(",\n  ".join(("%s AS %s" % (sqlSelect[col],col)) for col in columns))
 		sql += "\nFROM "+(",\n  ".join(aliasTable[t]+" AS "+t for t in sqlFrom) if sqlFrom else "(SELECT 1)")
 		sql += "\nWHERE "+("\n  AND ".join(sqlWhere) if sqlWhere else "1")
 		if sqlGroup:
 			sql += "\nGROUP BY "+(",".join(sqlGroup))
-		sql = sql.format(expansion=expansion, populationID=populationID, zoneSize=zoneSize)
+		if "{zoneSize}" in sql and not zoneSize:
+			raise Exception("ERROR: knowledge database is missing 'zone_size' setting")
+		if "{ldprofileID}" in sql and not ldprofileID:
+			raise Exception("ERROR: unknown LD profile '%s'" % self._ldprofile)
+		sql = sql.format(expansion=expansion, ldprofileID=ldprofileID, zoneSize=zoneSize)
 		
 		# make sure any filter tables are indexed
-		if "ms" in sqlFrom:
+		if "m_s" in sqlFrom:
 			self.prepareTableForQuery("snp")
-		if "ml" in sqlFrom:
+		if "m_l" in sqlFrom:
 			self.prepareTableForQuery("locus")
-		if "mr" in sqlFrom:
+		if "m_bg" in sqlFrom:
+			self.prepareTableForQuery("gene")
+		if "m_r" in sqlFrom:
 			self.prepareTableForQuery("region")
-		if "mb" in sqlFrom:
-			self.prepareTableForQuery("bound")
-		if "mbz" in sqlFrom:
-			self.prepareTableForQuery("bound_zone")
+		if "m_rz" in sqlFrom:
+			self.prepareTableForQuery("region_zone")
+		if "m_g" in sqlFrom:
+			self.prepareTableForQuery("group")
 		
-		# run and return
-		self.log(sql+"\n")
-		for row in self._loki._db.cursor().execute("EXPLAIN QUERY PLAN "+sql):
-			self.log(str(row)+"\n")
+		if self._debug:
+			self.log(sql+"\n")
+			for row in self._loki._db.cursor().execute("EXPLAIN QUERY PLAN "+sql):
+				self.log(str(row)+"\n")
+		
+		# run, filter and return
+		# The unique-row filtering could be done in SQL using GROUP BY, but that
+		# often forces the optimizer to join the tables in the order of grouping
+		# which might not be ideal.  It could also be done with DISTINCT, but
+		# there's no way to specify that only a few columns really have to be
+		# checked for distinctness because all the rest depend on those few.
+		# So it ends up being fastest to do the duplicate filtering here, by
+		# checking only the composite ROWID against a set of previous values.
+		rowIDs = set()
 		for row in self._loki._db.cursor().execute(sql):
-			yield row
+			if row[0] not in rowIDs:
+				rowIDs.add(row[0])
+				yield row
 	#generateFilteredData()
 	
 	
-	def generateFilteredLocii(self):
-		#TODO
-		return self.generateVariants()
-	#generateFilteredLocii()
-	
-	
-	def generateFilteredRegions(self):
-		#TODO
-		return self.generateRegions()
-	#generateFilteredRegions()
-	
-	
-	# ##################################################
-	# annotation
-	
-	
-	def generateAnnotatedLociiRegions(self, locii, rtype='gene'):
-		expansion = self._expansion
-		populationID = self._loki.getPopulationID(self._population)
-		if not populationID:
-			raise Exception("ERROR: unknown population '%s'" % self._population)
-		typeID = self._loki.getTypeID(rtype)
-		if not typeID:
-			raise Exception("ERROR: unknown region type '%s'" % rtype)
-		zonesize = int(self._loki.getDatabaseSetting('region_zone_size'))
-		if not zonesize:
-			raise Exception("ERROR: missing 'region_zone_size' setting in knowledge database")
-		
-		# an expansion value might cause a locus near a zone boundary to map to
-		# both neighboring zones, and therefore map to the same region twice;
-		# to suppress this effect we use DISTINCT, but only when expansion > 0
-		# since otherwise it isn't needed and adds a performance overhead
-		sql = """
-SELECT {distinct}
-  i_l.label,
-  i_l.rs,
-  i_l.chr,
-  i_l.pos,
-  d_r.label,
-  d_r.region_id,
-  d_rb.posMin,
-  d_rb.posMax
-FROM (SELECT ? AS label, ? AS rs, ? AS chr, ? AS pos) AS i_l
-JOIN `db`.`region_zone` AS d_rz
-  ON d_rz.population_id = {populationID}
-  AND d_rz.chr = i_l.chr
-  AND d_rz.zone >= (i_l.pos - {expansion}) / {zonesize}
-  AND d_rz.zone <= (i_l.pos + {expansion}) / {zonesize}
-JOIN `db`.`region_bound` AS d_rb
-  ON d_rb.region_id = d_rz.region_id
-  AND d_rb.population_id = d_rz.population_id
-  AND d_rb.chr = d_rz.chr
-  AND d_rb.posMin <= (i_l.pos + {expansion})
-  AND d_rb.posMax >= (i_l.pos - {expansion})
-JOIN `db`.`region` AS d_r
-  ON d_r.region_id = d_rb.region_id
-  AND d_r.type_id = {typeID}
-""".format(
-				distinct=("DISTINCT" if expansion else ""),
-				expansion=expansion,
-				populationID=populationID,
-				typeID=typeID,
-				zonesize=zonesize
-		)
-		for row in self._loki._db.cursor().executemany(sql, locii):
-			yield row
-	#generateAnnotatedLociiRegions()
-	
-	
-	# ##################################################
+	##################################################
 	# model generation
 	
 	
-	def outputLociiModels(self, etype='gene', target=sys.stdout): #TODO
+	def outputLociModels(self, etype='gene', target=sys.stdout): #TODO
 		typeID = self._loki.getTypeID(etype)
 		if not typeID:
 			sys.stderr.write("ERROR: unknown entity type '%s'\n" % etype)
@@ -924,7 +1229,7 @@ JOIN main.locus AS lB
 					modelRoutes[model], len(modelLinks[model]), len(modelSources[model])
 				)
 			)
-	#outputLociiModels() #TODO
+	#outputLociModels() #TODO
 	
 	
 	def outputRegionModels(self, rtype='gene', target=sys.stdout): #TODO
@@ -937,7 +1242,7 @@ JOIN main.locus AS lB
 			sys.stderr.write("ERROR: unknown population '%s'\n" % self._population)
 			sys.exit(1)
 		
-		# map locii to known regions
+		# map loci to known regions
 		sys.stderr.write("identifying candidate %s regions ..." % rtype)
 		sys.stderr.flush()
 		self._loki.createDatabaseTables(self._schema['temp'], 'temp', 'region')
@@ -955,7 +1260,7 @@ JOIN main.`locus` AS l
 WHERE r.type_id = :type_id
 GROUP BY rb._rowid_
 """, { 'expand':self._expand, 'population_id':populationID, 'type_id':typeID })
-		self._loki.createDatabaseIndexes(self._schema['temp'], 'temp', 'region')
+		self._loki.createDatabaseIndecies(self._schema['temp'], 'temp', 'region')
 		for row in self._loki._dbc.execute("SELECT COUNT(1) FROM temp.region"):
 			ttl = row[0]
 		sys.stderr.write(" OK: %d regions\n" % ttl)
@@ -976,7 +1281,7 @@ JOIN db.`region` AS r
 GROUP BY g.group_id
 HAVING COUNT(DISTINCT r.region_id) <= 30
 """, { 'type_id':typeID })
-		self._loki.createDatabaseIndexes(self._schema['temp'], 'temp', 'group')
+		self._loki.createDatabaseIndecies(self._schema['temp'], 'temp', 'group')
 		for row in self._loki._dbc.execute("SELECT COUNT(1) FROM temp.`group`"):
 			ttl = row[0]
 		sys.stderr.write(" OK: %d groups\n" % ttl)
@@ -1040,6 +1345,10 @@ ORDER BY groups DESC, sourcesA DESC, sourcesB DESC
 #Biofilter
 
 
+##################################################
+# command line interface
+
+
 if __name__ == "__main__":
 	version = "Biofilter version %d.%d.%d (%s)" % (
 			Biofilter.ver_maj,
@@ -1076,12 +1385,33 @@ if __name__ == "__main__":
 			help="the knowledge database file to use"
 	)
 	
-	parser.add_argument('-x', '--expansion', type=str, metavar='num',
-			help="amount by which to expand region boundaries when matching them to locii"
+	parser.add_argument('--prime', type=int, metavar='num', nargs='?', default=False,
+			help="attempt to 'prime' the knowledge database file by reading it one or more times,"
+			+" hopefully causing the filesystem to cache it into main memory"
 	)
 	
-	parser.add_argument('-p', '--population', type=str, metavar='label',
-			help="LD profile with which to expand region boundaries when matching them to locii"
+	parser.add_argument('-x', '--expansion', type=str, metavar='num',
+			help="amount by which to expand region boundaries when matching them to loci"
+	)
+	
+	parser.add_argument('-l', '--ldprofile', type=str, metavar='profile',
+			help="LD profile with which to expand region boundaries when matching them to loci"
+	)
+	
+	parser.add_argument('-p', '--prefix', type=str, metavar='prefix', default='biofilter',
+			help="prefix to use for all output filenames; may contain path components (default: 'biofilter')"
+	)
+	
+	parser.add_argument('--stdout', action='store_true',
+			help="return output directly on stdout rather than writing to any files"
+	)
+	
+	parser.add_argument('--overwrite', action='store_true',
+			help="overwrite any existing output files",
+	)
+	
+	parser.add_argument('--debug', action='store_true',
+			help="print extra debugging information"
 	)
 	
 	
@@ -1123,12 +1453,17 @@ if __name__ == "__main__":
 	)
 	
 	
-	parser.add_argument('-o', '--output', type=str, metavar=('type'), nargs=1, action='append', choices=['snps','genes'],
-			help="filtered data type to output, among 'snps' and 'genes'"
+	parser.add_argument('-u', '--group', type=str, metavar=('name'), nargs='+', action='append',
+			help="a filtering set of groups, specified by name"
 	)
 	
-	parser.add_argument('-a', '--annotate', type=str, metavar=('type','type'), nargs=2, action='append', choices=['snps','genes'],
-			help="pair of data types to cross-reference and annotate, among 'snps' and 'genes'"
+	parser.add_argument('-U', '--group-file', type=str, metavar=('file'), nargs='+', action='append',
+			help="name file(s) from which to load a filtering set of groups"
+	)
+	
+	
+	parser.add_argument('-o', '--output', type=str, metavar=('type'), nargs='+', action='append', choices=['snps','loci','genes','regions','groups'],
+			help="data type(s) to filter and annotate, from 'snps', 'loci', 'genes', 'regions' and 'groups'"
 	)
 	
 	parser.add_argument('-v', '--verbose', action='store_true',
@@ -1144,11 +1479,26 @@ if __name__ == "__main__":
 		print "Use -h for details."
 		sys.exit(2)
 	
-	# parse arguments
+	# parse arguments and apply basic settings
 	args = parser.parse_args()
 	bio = Biofilter()
-	bio.setVerbose(args.verbose)
+	if args.verbose:
+		bio.setVerbose(True)
+	if args.debug:
+		bio.setDebug(True)
 	if args.knowledge:
+		if args.prime == None:
+			args.prime = 2
+		if args.prime:
+			readSize = 8*1024*1024
+			for p in xrange(args.prime):
+				bio.log("priming knowledge database file ...")
+				t0 = time.time()
+				with open(args.knowledge, 'rb') as kFile:
+					while len(kFile.read(readSize)) >= readSize:
+						pass
+				bio.log(" OK: %1.1f seconds\n" % (time.time()-t0))
+		#if prime
 		bio.attachDatabaseFile(args.knowledge)
 	if args.expansion:
 		e = args.expansion.strip().upper()
@@ -1163,15 +1513,15 @@ if __name__ == "__main__":
 		else:
 			e = long(e)
 		bio.setExpansion(e)
-	if args.population:
-		bio.setPopulation(args.population)
+	if args.ldprofile:
+		bio.setLDProfile(args.ldprofile)
 	if args.gene_names:
 		bio.setGeneNamespace(args.gene_names)
 	
 	# apply SNP filters
 	if args.snp:
 		for snpList in args.snp:
-			bio.intersectSNPs( (long(snp[2:]) if snp[0:2].upper() == 'RS' else long(snp)) for snp in snpList )
+			bio.intersectSNPs( bio.generateRSesFromText(snpList) )
 	if args.snp_file:
 		for snpFileList in args.snp_file:
 			bio.intersectSNPs( bio.generateRSesFromRSFiles(snpFileList) )
@@ -1179,63 +1529,77 @@ if __name__ == "__main__":
 	# apply locus filters
 	if args.marker:
 		for markerList in args.marker:
-			bio.intersectLocii( bio.generateLociiFromMarkers(markerList) )
+			bio.intersectLoci( bio.generateLociFromText(markerList) )
 	if args.map_file:
 		for mapFileList in args.map_file:
-			bio.intersectLocii( bio.generateLociiFromMapFiles(mapFileList) )
+			bio.intersectLoci( bio.generateLociFromMapFiles(mapFileList) )
 	
 	# apply gene filters
 	if args.gene:
 		for geneList in args.gene:
-			bio.intersectRegions( geneList )
+			bio.intersectGenes( geneList )
 	if args.gene_file:
 		for geneFileList in args.gene_file:
-			bio.intersectRegions( bio.generateNamesFromNameFiles(geneFileList) )
+			bio.intersectGenes( bio.generateNamesFromNameFiles(geneFileList) )
+	
+	# apply region filters
+	if args.region:
+		for regionList in args.region:
+			bio.intersectRegions( bio.generateRegionsFromText(regionList) )
+	if args.region_file:
+		for regionFileList in args.region_file:
+			bio.intersectRegions( bio.generateRegionsFromFiles(regionFileList) )
+	
+	# apply group filters
+	if args.group:
+		for groupList in args.group:
+			bio.intersectGroups( groupList )
+	if args.group_file:
+		for groupFileList in args.group_file:
+			bio.intersectGroups( bio.generateNamesFromNameFiles(groupFileList) )
 	
 	# output
-	if args.output:
-		for o in args.output:
-			if o[0] == 'snps':
-				print "\t".join(("snp","chr","pos"))
-				for data in bio.generateFilteredData(snps=True):
-					print "\t".join(str(col) for col in data)
-			elif o[0] == 'genes':
-				print "\t".join(("gene","chr","posMin","posMax"))
-				for data in bio.generateFilteredData(regions=True):
-					print "\t".join(str(col) for col in data)
-			else:
-				print "%s output not implemented" % o
-		#foreach output
-	#if output
-	
-	# annotate
-	if args.annotate:
-		for a in args.annotate:
-			if a[0] == 'snps' and a[1] == 'genes':
-				print "\t".join(("snp","chr","pos","gene","chr","posMin","posMax"))
-				for data in bio.generateFilteredData(snps=True, regions=True):
-					print "\t".join(str(col) for col in data)
-			else:
-				print "%s annotation not implemented" % a
-		#foreach annotate
-	#if annotate
+	for output in (args.output or []):
+		outPath = args.prefix + '.' + '-'.join(output)
+		bio.log("writing %s to %s ..." % ('-'.join(output),("<stdout>" if args.stdout else outPath)))
+		if (not args.stdout) and (not args.overwrite) and os.path.exists(outPath):
+			bio.log("ERROR: output file '%s' already exists\n" % outPath)
+		else:
+			# generateFilteredData() yields (rowid, locus_label,chr,pos, region_label,chr,posMin,posMax, group_label)
+			headerList = list()
+			formatList = list()
+			outS = outL = outBG = outR = outG = False
+			for outType in output:
+				if outType == 'snps':
+					outS = True
+					headerList.extend(["snp"])
+					formatList.extend(["{d[1]}"])
+				elif outType == 'loci':
+					outL = True
+					headerList.extend(["chr","locus","pos"])
+					formatList.extend(["{d[2]}","{d[1]}","{d[3]}"])
+				elif outType == 'genes':
+					outBG = True
+					headerList.extend(["gene"])
+					formatList.extend(["{d[4]}"])
+				elif outType == 'regions':
+					outR = True
+					headerList.extend(["chr","region","posMin","posMax"])
+					formatList.extend(["{d[5]}","{d[4]}","{d[6]}","{d[7]}"])
+				elif outType == 'groups':
+					outG = True
+					headerList.extend(["group"])
+					formatList.extend(["{d[8]}"])
+			#foreach outType
+			headerStr = "#" + "\t".join(headerList) + "\n"
+			formatStr = "\t".join(formatList) + "\n"
+			with (sys.stdout if args.stdout else open(outPath, 'w')) as outFile:
+				outFile.write(headerStr)
+				for data in bio.generateFilteredData(snps=outS, loci=outL, genes=outBG, regions=outR, groups=outG):
+					outFile.write(formatStr.format(d=data))
+			#with outFile
+			bio.log(" OK\n")
+		#if output ok
+	#foreach output
 	
 #__main__
-
-
-"""
-h	help
-k	knowledge
-
-s	SNPs (rs#)
-m	markers (map)
-g	genes (symbol)
-r	regions (map)
-?	groups (name)
-?	networks (symbols)
-c	sources (name)
-
-p	population
-x	expansion
-o	output
-"""
