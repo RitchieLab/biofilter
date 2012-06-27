@@ -16,7 +16,7 @@ class Biofilter:
 	# public class data
 	
 	
-	ver_maj,ver_min,ver_rev,ver_date = 2,-1,621,'2012-06-21'
+	ver_maj,ver_min,ver_rev,ver_dev,ver_date = 2,0,0,'a2','2012-06-27'
 	
 	
 	##################################################
@@ -139,19 +139,58 @@ class Biofilter:
 	
 	
 	##################################################
+	# class interrogation
+	
+	
+	@classmethod
+	def getVersionString(cls):
+		return "%d.%d.%d%s%s (%s)" % (cls.ver_maj, cls.ver_min, cls.ver_rev, ("-" if cls.ver_dev else ""), (cls.ver_dev or ""), cls.ver_date)
+	#getVersionString()
+	
+	
+	@classmethod
+	def checkMinimumVersion(cls, major=None, minor=None, revision=None, development=None):
+		if (major == None) or (cls.ver_maj > major):
+			return True
+		if cls.ver_maj < major:
+			return False
+		
+		if (minor == None) or (cls.ver_min > minor):
+			return True
+		if cls.ver_min < minor:
+			return False
+		
+		if (revision == None) or (cls.ver_rev > revision):
+			return True
+		if cls.ver_rev < revision:
+			return False
+		
+		if (development == None) or (not cls.ver_dev) or (cls.ver_dev > development):
+			return True
+		if cls.ver_dev < development:
+			return False
+		
+		return True
+	#checkMinimumVersion()
+	
+	
+	##################################################
 	# constructor
 	
 	
 	def __init__(self):
 		# initialize instance properties
 		self._iwd = os.getcwd()
+		
 		self._verbose = False
 		self._logFile = sys.stderr
 		self._logIndent = 0
 		self._logHanging = False
+		
 		self._debug = False
-		self._expansion = 0
-		self._ldprofile = 'n/a'
+		self._snpsValid = None
+		self._regionLocusTolerance = 0
+		self._ldprofile = ''
 		self._geneNamespace = None
 		self._groupNamespace = None
 		
@@ -162,6 +201,10 @@ class Biofilter:
 		self._regionFilters = 0
 		self._groupFilters = 0
 		self._sourceFilters = 0
+		
+		# require loki_db 2.0.0-a2 or later (for the snp_locus.validated column)
+		if not loki_db.Database.checkMinimumVersion(2,0,0,'a2'):
+			exit("ERROR: LOKI version 2.0.0-a2 or later required; found %s" % (loki_db.Database.getVersionString(),))
 		
 		# initialize instance database
 		self._loki = loki_db.Database()
@@ -227,26 +270,32 @@ class Biofilter:
 	#setDebug()
 	
 	
-	def setExpansion(self, expansion=0):
-		self._expansion = int(expansion)
-		self.log("region boundary expansion: %d\n" % self._expansion)
-	#setExpansion()
+	def setSNPsValid(self, valid=None):
+		self._snpsValid = None if (valid == None) else (1 if valid else 0)
+		self.log("use known SNP loci: %s\n" % ("all" if (self._snpsValid == None) else ("validated only" if self._snpsValid else "unvalidated only")))
+	#setSNPsValid()
 	
 	
-	def setLDProfile(self, ldprofile='n/a'):
-		self._ldprofile = ldprofile.strip()
-		self.log("LD profile for region boundary expansion: %s\n" % self._ldprofile)
+	def setRegionLocusTolerance(self, regionLocusTolerance=0):
+		self._regionLocusTolerance = int(regionLocusTolerance)
+		self.log("region-locus match tolerance: %d\n" % self._regionLocusTolerance)
+	#setRegionLocusTolerance()
+	
+	
+	def setLDProfile(self, ldprofile=''):
+		self._ldprofile = str(ldprofile).strip()
+		self.log("LD profile for region-locus matching: %s\n" % self._ldprofile)
 	#setLDProfile()
 	
 	
 	def setGeneNamespace(self, namespace=None):
-		self._geneNamespace = namespace
+		self._geneNamespace = str(namespace).strip()
 		self.log("gene name type: %s\n" % ("<label>" if namespace == None else (namespace or "<any>")))
 	#setGeneNamespace()
 	
 	
 	def setGroupNamespace(self, namespace=None):
-		self._groupNamespace = namespace
+		self._groupNamespace = str(namespace).strip()
 		self.log("group name type: %s\n" % ("<label>" if namespace == None else (namespace or "<any>")))
 	#setGroupNamespace()
 	
@@ -801,7 +850,8 @@ DELETE FROM `main`.`snp` WHERE rs NOT IN (
 	
 	def generateFilteredData(self, snps=None, loci=None, genes=None, regions=None, groups=None, sources=None):
 		# gather settings
-		expansion = self._expansion
+		snpsValid = self._snpsValid
+		rlTolerance = self._regionLocusTolerance
 		zoneSize = self._loki.getDatabaseSetting('zone_size')
 		zoneSize = int(zoneSize) if zoneSize else None
 		ldprofileID = self._loki.getLDProfileID(self._ldprofile)
@@ -933,6 +983,7 @@ DELETE FROM `main`.`snp` WHERE rs NOT IN (
 		
 		# define general constraints for each table
 		aliasWhere = {
+			"d_sl": {"d_sl.validated = {snpsValid}"} if (self._snpsValid != None) else {},
 			"d_br": {"d_br.ldprofile_id = {ldprofileID}"},
 		}
 		
@@ -949,17 +1000,17 @@ DELETE FROM `main`.`snp` WHERE rs NOT IN (
 			},
 			("m_l","m_r"): {
 				"m_l.chr = m_r.chr",
-				"m_l.pos >= (m_r.posMin - {expansion})",
-				"m_l.pos <= (m_r.posMax + {expansion})",
-				"(m_l.pos + {expansion}) >= m_r.posMin",
-				"(m_l.pos - {expansion}) <= m_r.posMax",
+				"m_l.pos >= (m_r.posMin - {rlTolerance})",
+				"m_l.pos <= (m_r.posMax + {rlTolerance})",
+				"(m_l.pos + {rlTolerance}) >= m_r.posMin",
+				"(m_l.pos - {rlTolerance}) <= m_r.posMax",
 			},
 			("m_l","m_rz"): {
 				"m_l.chr = m_rz.chr",
-				"m_l.pos >= ((m_rz.zone * {zoneSize}) - {expansion})",
-				"m_l.pos < (((m_rz.zone + 1) * {zoneSize}) + {expansion})",
-				"((m_l.pos + {expansion}) / {zoneSize}) >= m_rz.zone",
-				"((m_l.pos - {expansion}) / {zoneSize}) <= m_rz.zone",
+				"m_l.pos >= ((m_rz.zone * {zoneSize}) - {rlTolerance})",
+				"m_l.pos < (((m_rz.zone + 1) * {zoneSize}) + {rlTolerance})",
+				"((m_l.pos + {rlTolerance}) / {zoneSize}) >= m_rz.zone",
+				"((m_l.pos - {rlTolerance}) / {zoneSize}) <= m_rz.zone",
 			},
 			("m_l","d_sl"): {
 				"m_l.chr = d_sl.chr",
@@ -967,17 +1018,17 @@ DELETE FROM `main`.`snp` WHERE rs NOT IN (
 			},
 			("m_l","d_br"): {
 				"m_l.chr = d_br.chr",
-				"m_l.pos >= (d_br.posMin - {expansion})",
-				"m_l.pos <= (d_br.posMax + {expansion})",
-				"(m_l.pos + {expansion}) >= d_br.posMin",
-				"(m_l.pos - {expansion}) <= d_br.posMax",
+				"m_l.pos >= (d_br.posMin - {rlTolerance})",
+				"m_l.pos <= (d_br.posMax + {rlTolerance})",
+				"(m_l.pos + {rlTolerance}) >= d_br.posMin",
+				"(m_l.pos - {rlTolerance}) <= d_br.posMax",
 			},
 			("m_l","d_bz"): {
 				"m_l.chr = d_bz.chr",
-				"m_l.pos >= ((d_bz.zone * {zoneSize}) - {expansion})",
-				"m_l.pos < (((d_bz.zone + 1) * {zoneSize}) + {expansion})",
-				"((m_l.pos + {expansion}) / {zoneSize}) >= d_bz.zone",
-				"((m_l.pos - {expansion}) / {zoneSize}) <= d_bz.zone",
+				"m_l.pos >= ((d_bz.zone * {zoneSize}) - {rlTolerance})",
+				"m_l.pos < (((d_bz.zone + 1) * {zoneSize}) + {rlTolerance})",
+				"((m_l.pos + {rlTolerance}) / {zoneSize}) >= d_bz.zone",
+				"((m_l.pos - {rlTolerance}) / {zoneSize}) <= d_bz.zone",
 			},
 			("m_bg","d_b"): {
 				"m_bg.biopolymer_id = d_b.biopolymer_id",
@@ -1002,10 +1053,10 @@ DELETE FROM `main`.`snp` WHERE rs NOT IN (
 			},
 			("m_r","d_sl"): {
 				"m_r.chr = d_sl.chr",
-				"(m_r.posMin - {expansion}) <= d_sl.pos",
-				"(m_r.posMax + {expansion}) >= d_sl.pos",
-				"m_r.posMin <= (d_sl.pos + {expansion})",
-				"m_r.posMax >= (d_sl.pos - {expansion})",
+				"(m_r.posMin - {rlTolerance}) <= d_sl.pos",
+				"(m_r.posMax + {rlTolerance}) >= d_sl.pos",
+				"m_r.posMin <= (d_sl.pos + {rlTolerance})",
+				"m_r.posMax >= (d_sl.pos - {rlTolerance})",
 			},
 			("m_r","d_br"): {
 				#TODO: match by overlap? more complited, but maybe more useful
@@ -1022,10 +1073,10 @@ DELETE FROM `main`.`snp` WHERE rs NOT IN (
 			},
 			("m_rz","d_sl"): {
 				"m_rz.chr = d_sl.chr",
-				"((m_rz.zone * {zoneSize}) - {expansion}) <= d_sl.pos",
-				"(((m_rz.zone + 1) * {zoneSize}) + {expansion}) > d_sl.pos",
-				"m_rz.zone <= ((d_sl.pos + {expansion}) / {zoneSize})",
-				"m_rz.zone >= ((d_sl.pos - {expansion}) / {zoneSize})",
+				"((m_rz.zone * {zoneSize}) - {rlTolerance}) <= d_sl.pos",
+				"(((m_rz.zone + 1) * {zoneSize}) + {rlTolerance}) > d_sl.pos",
+				"m_rz.zone <= ((d_sl.pos + {rlTolerance}) / {zoneSize})",
+				"m_rz.zone >= ((d_sl.pos - {rlTolerance}) / {zoneSize})",
 			},
 			("m_rz","d_br"): {
 				"m_rz.chr = d_br.chr",
@@ -1052,17 +1103,17 @@ DELETE FROM `main`.`snp` WHERE rs NOT IN (
 			},
 			("d_sl","d_br"): {
 				"d_sl.chr = d_br.chr",
-				"d_sl.pos >= (d_br.posMin - {expansion})",
-				"d_sl.pos <= (d_br.posMax + {expansion})",
-				"(d_sl.pos + {expansion}) >= d_br.posMin",
-				"(d_sl.pos - {expansion}) <= d_br.posMax",
+				"d_sl.pos >= (d_br.posMin - {rlTolerance})",
+				"d_sl.pos <= (d_br.posMax + {rlTolerance})",
+				"(d_sl.pos + {rlTolerance}) >= d_br.posMin",
+				"(d_sl.pos - {rlTolerance}) <= d_br.posMax",
 			},
 			("d_sl","d_bz"): {
 				"d_sl.chr = d_bz.chr",
-				"d_sl.pos >= ((d_bz.zone * {zoneSize}) - {expansion})",
-				"d_sl.pos < (((d_bz.zone + 1) * {zoneSize}) + {expansion})",
-				"((d_sl.pos + {expansion}) / {zoneSize}) >= d_bz.zone",
-				"((d_sl.pos - {expansion}) / {zoneSize}) <= d_bz.zone",
+				"d_sl.pos >= ((d_bz.zone * {zoneSize}) - {rlTolerance})",
+				"d_sl.pos < (((d_bz.zone + 1) * {zoneSize}) + {rlTolerance})",
+				"((d_sl.pos + {rlTolerance}) / {zoneSize}) >= d_bz.zone",
+				"((d_sl.pos - {rlTolerance}) / {zoneSize}) <= d_bz.zone",
 			},
 			("d_b","d_br"): {
 				"d_b.biopolymer_id = d_br.biopolymer_id",
@@ -1236,7 +1287,7 @@ DELETE FROM `main`.`snp` WHERE rs NOT IN (
 			raise Exception("ERROR: knowledge database is missing 'zone_size' setting")
 		if "{ldprofileID}" in sql and not ldprofileID:
 			raise Exception("ERROR: unknown LD profile '%s'" % self._ldprofile)
-		sql = sql.format(expansion=expansion, ldprofileID=ldprofileID, zoneSize=zoneSize)
+		sql = sql.format(snpsValid=snpsValid, rlTolerance=rlTolerance, ldprofileID=ldprofileID, zoneSize=zoneSize)
 		
 		# make sure any filter tables are indexed
 		if "m_s" in sqlFrom:
@@ -1493,12 +1544,7 @@ ORDER BY groups DESC, sourcesA DESC, sourcesB DESC
 
 
 if __name__ == "__main__":
-	version = "Biofilter version %d.%d.%d (%s)" % (
-			Biofilter.ver_maj,
-			Biofilter.ver_min,
-			Biofilter.ver_rev,
-			Biofilter.ver_date
-	)
+	version = "Biofilter version %s" % (Biofilter.getVersionString())
 	
 	# define arguments
 	parser = argparse.ArgumentParser(
@@ -1508,15 +1554,12 @@ if __name__ == "__main__":
 	
 	parser.add_argument('--version', action='version',
 			version=version+"""
-%9s version %d.%d.%d (%s)
+%9s version %s
 %9s version %s
 %9s version %s
 """ % (
 				"LOKI",
-				loki_db.Database.ver_maj,
-				loki_db.Database.ver_min,
-				loki_db.Database.ver_rev,
-				loki_db.Database.ver_date,
+				loki_db.Database.getVersionString(),
 				loki_db.Database.getDatabaseDriverName(),
 				loki_db.Database.getDatabaseDriverVersion(),
 				loki_db.Database.getDatabaseInterfaceName(),
@@ -1529,58 +1572,49 @@ if __name__ == "__main__":
 	)
 	
 	parser.add_argument('--prime', type=int, metavar='num', nargs='?', default=False,
-			help="attempt to 'prime' the knowledge database file by reading it one or more times,"
-			+" hopefully causing the filesystem to cache it into main memory"
+			help="number of times to 'prime' the knowledge database file into filesystem cache memory"
 	)
 	
-	parser.add_argument('-x', '--expansion', type=str, metavar='num',
-			help="amount by which to expand region boundaries when matching them to loci"
+	parser.add_argument('--all-snp-loci', action='store_true',
+			help="use all known SNP loci, validated or not"
 	)
 	
-	parser.add_argument('-l', '--ldprofile', type=str, metavar='profile',
-			help="LD profile with which to expand region boundaries when matching them to loci"
+	parser.add_argument('--valid-snp-loci', action='store_true',
+			help="use only validated SNP loci"
 	)
 	
-	parser.add_argument('-p', '--prefix', type=str, metavar='prefix', default='biofilter',
-			help="prefix to use for all output filenames; may contain path components (default: 'biofilter')"
+	parser.add_argument('--region-locus-tolerance', type=str, metavar='bases',
+			help="distance beyond the bounds of known regions where SNPs and loci should still be matched (default: 0)"
 	)
 	
-	parser.add_argument('--stdout', action='store_true',
-			help="return output directly on stdout rather than writing to any files"
-	)
-	
-	parser.add_argument('--overwrite', action='store_true',
-			help="overwrite any existing output files",
-	)
-	
-	parser.add_argument('--debug', action='store_true',
-			help="print extra debugging information"
+	parser.add_argument('--ld-profile', type=str, metavar='profile',
+			help="LD profile with which to match known regions to SNPs and loci (default: none)"
 	)
 	
 	
 	parser.add_argument('-s', '--snp', type=str, metavar=('rs#'), nargs='+', action='append',
-			help="a filtering set of SNPs, specified by RS#"
+			help="input SNPs, specified by RS#"
 	)
 	
 	parser.add_argument('-S', '--snp-file', type=str, metavar=('file'), nargs='+', action='append',
-			help="RS# file(s) from which to load a filtering set of SNPs"
+			help="file(s) from which to load input SNPs"
 	)
 	
-	parser.add_argument('-m', '--marker', type=str, metavar=('marker'), nargs='+', action='append',
-			help="a filtering set of markers, specified by 'chr:pos' or 'chr:label:pos'"
+	parser.add_argument('-l', '--locus', type=str, metavar=('locus'), nargs='+', action='append',
+			help="input loci, specified by chromosome and position"
 	)
 	
-	parser.add_argument('-M', '--map-file', type=str, metavar=('file'), nargs='+', action='append',
-			help=".map file(s) from which to load a filtering set of markers"
+	parser.add_argument('-L', '--locus-file', type=str, metavar=('file'), nargs='+', action='append',
+			help="file(s) from which to load input loci"
 	)
 	
 	
 	parser.add_argument('-g', '--gene', type=str, metavar=('name'), nargs='+', action='append',
-			help="a filtering set of genes, specified by name"
+			help="input genes, specified by name"
 	)
 	
 	parser.add_argument('-G', '--gene-file', type=str, metavar=('file'), nargs='+', action='append',
-			help="name file(s) from which to load a filtering set of genes"
+			help="file(s) from which to load input genes"
 	)
 	
 	parser.add_argument('--gene-names', type=str, metavar='type',
@@ -1588,20 +1622,20 @@ if __name__ == "__main__":
 	)
 	
 	parser.add_argument('-r', '--region', type=str, metavar=('region'), nargs='+', action='append',
-			help="a filtering set of regions, specified by 'chr:start:stop' or 'chr:label:start:stop'"
+			help="input regions, specified by chromosome, start and stop positions"
 	)
 	
 	parser.add_argument('-R', '--region-file', type=str, metavar=('file'), nargs='+', action='append',
-			help="region file(s) from which to load a filtering set of regions"
+			help="file(s) from which to load input regions"
 	)
 	
 	
 	parser.add_argument('-u', '--group', type=str, metavar=('name'), nargs='+', action='append',
-			help="a filtering set of groups, specified by name"
+			help="input groups, specified by name"
 	)
 	
 	parser.add_argument('-U', '--group-file', type=str, metavar=('file'), nargs='+', action='append',
-			help="name file(s) from which to load a filtering set of groups"
+			help="file(s) from which to load input groups"
 	)
 	
 	parser.add_argument('--group-names', type=str, metavar='type',
@@ -1610,11 +1644,24 @@ if __name__ == "__main__":
 	
 	
 	parser.add_argument('-c', '--source', type=str, metavar=('name'), nargs='+', action='append',
-			help="a filtering set of knowledge sources, specified by name"
+			help="input sources, specified by name"
 	)
 	
 	parser.add_argument('-C', '--source-file', type=str, metavar=('file'), nargs='+', action='append',
-			help="name file(s) from which to load a filtering set of knowledge sources"
+			help="file(s) from which to load input sources"
+	)
+	
+	
+	parser.add_argument('-p', '--prefix', type=str, metavar='prefix', default='biofilter',
+			help="prefix to use for all output filenames; may contain path components (default: 'biofilter')"
+	)
+	
+	parser.add_argument('--overwrite', action='store_true',
+			help="overwrite any existing output files",
+	)
+	
+	parser.add_argument('--stdout', action='store_true',
+			help="display all output directly on <stdout> rather than writing to any files"
 	)
 	
 	
@@ -1622,8 +1669,13 @@ if __name__ == "__main__":
 			help="data type(s) to filter and annotate, from 'snps', 'loci', 'genes', 'regions', 'groups' and 'sources'"
 	)
 	
+	
 	parser.add_argument('-v', '--verbose', action='store_true',
 			help="print warnings and log messages"
+	)
+	
+	parser.add_argument('--debug', action='store_true',
+			help="print extra debugging information"
 	)
 	
 	# if no arguments, print usage and exit
@@ -1656,21 +1708,25 @@ if __name__ == "__main__":
 				bio.log(" OK: %1.1f seconds\n" % (time.time()-t0))
 		#if prime
 		bio.attachDatabaseFile(args.knowledge)
-	if args.expansion:
-		e = args.expansion.strip().upper()
-		if e[-1:] == 'B':
-			e = e[:-1]
-		if e[-1] == 'K':
-			e = long(e[:-1]) * 1000
-		elif e[-1] == 'M':
-			e = long(e[:-1]) * 1000 * 1000
-		elif e[-1] == 'G':
-			e = long(e[:-1]) * 1000 * 1000 * 1000
+	if args.all_snp_loci:
+		bio.setSNPsValid(None)
+	elif args.valid_snp_loci:
+		bio.setSNPsValid(True)
+	if args.region_locus_tolerance:
+		t = args.region_locus_tolerance.strip().upper()
+		if t[-1:] == 'B':
+			t = t[:-1]
+		if t[-1] == 'K':
+			t = long(t[:-1]) * 1000
+		elif t[-1] == 'M':
+			t = long(t[:-1]) * 1000 * 1000
+		elif t[-1] == 'G':
+			t = long(t[:-1]) * 1000 * 1000 * 1000
 		else:
-			e = long(e)
-		bio.setExpansion(e)
-	if args.ldprofile:
-		bio.setLDProfile(args.ldprofile)
+			t = long(t)
+		bio.setRegionLocusTolerance(t)
+	if args.ld_profile:
+		bio.setLDProfile(args.ld_profile)
 	if args.gene_names:
 		bio.setGeneNamespace(args.gene_names or '')
 	if args.group_names:
@@ -1685,12 +1741,12 @@ if __name__ == "__main__":
 			bio.intersectSNPs( bio.generateRSesFromRSFiles(snpFileList) )
 	
 	# apply locus filters
-	if args.marker:
-		for markerList in args.marker:
-			bio.intersectLoci( bio.generateLociFromText(markerList) )
-	if args.map_file:
-		for mapFileList in args.map_file:
-			bio.intersectLoci( bio.generateLociFromMapFiles(mapFileList) )
+	if args.locus:
+		for locusList in args.locus:
+			bio.intersectLoci( bio.generateLociFromText(locusList) )
+	if args.locus_file:
+		for locusFileList in args.locus_file:
+			bio.intersectLoci( bio.generateLociFromMapFiles(locusFileList) )
 	
 	# apply gene filters
 	if args.gene:
