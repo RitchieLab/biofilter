@@ -16,7 +16,7 @@ class Biofilter:
 	# public class data
 	
 	
-	ver_maj,ver_min,ver_rev,ver_dev,ver_date = 2,0,0,'a2','2012-06-27'
+	ver_maj,ver_min,ver_rev,ver_dev,ver_date = 2,0,0,'a3','2012-06-29'
 	
 	
 	##################################################
@@ -188,11 +188,15 @@ class Biofilter:
 		self._logHanging = False
 		
 		self._debug = False
-		self._snpsValid = None
+		self._snpLociValidated = False
+		self._geneStrict = True
+		self._groupStrict = True
+		self._knowledgeStrict = True
+		self._knowledgeScoring = 'basic'
 		self._regionLocusTolerance = 0
-		self._ldprofile = ''
 		self._geneNamespace = None
 		self._groupNamespace = None
+		self._ldprofile = ''
 		
 		self._tablesDeindexed = set()
 		self._snpFilters = 0
@@ -202,9 +206,9 @@ class Biofilter:
 		self._groupFilters = 0
 		self._sourceFilters = 0
 		
-		# require loki_db 2.0.0-a2 or later (for the snp_locus.validated column)
-		if not loki_db.Database.checkMinimumVersion(2,0,0,'a2'):
-			exit("ERROR: LOKI version 2.0.0-a2 or later required; found %s" % (loki_db.Database.getVersionString(),))
+		# verify loki_db version (generate<X>NameStats() in 2.0.0-a4)
+		if not loki_db.Database.checkMinimumVersion(2,0,0,'a4'):
+			exit("ERROR: LOKI version 2.0.0-a4 or later required; found %s" % (loki_db.Database.getVersionString(),))
 		
 		# initialize instance database
 		self._loki = loki_db.Database()
@@ -270,14 +274,44 @@ class Biofilter:
 	#setDebug()
 	
 	
-	def setSNPsValid(self, valid=None):
-		self._snpsValid = None if (valid == None) else (1 if valid else 0)
-		self.log("use known SNP loci: %s\n" % ("all" if (self._snpsValid == None) else ("validated only" if self._snpsValid else "unvalidated only")))
-	#setSNPsValid()
+	def setValidatedSNPLoci(self, validated=True):
+		self._snpLociValidated = bool(validated)
+		self.log("allow unvalidated SNP loci: %s\n" % ("no" if self._snpLociValidated else "yes"))
+	#setValidatedSNPLoci()
 	
 	
-	def setRegionLocusTolerance(self, regionLocusTolerance=0):
-		self._regionLocusTolerance = int(regionLocusTolerance)
+	def setStrictGenes(self, strict=True):
+		self._geneStrict = bool(strict)
+		self.log("allow ambiguous input gene names: %s\n" % ("no" if self._geneStrict else "yes"))
+	#setStrictGenes()
+	
+	
+	def setStrictGroups(self, strict=True):
+		self._groupStrict = bool(strict)
+		self.log("allow ambiguous input group names: %s\n" % ("no" if self._groupStrict else "yes"))
+	#setStrictGroups()
+	
+	
+	def setStrictKnowledge(self, strict=True):
+		self._knowledgeStrict = bool(strict)
+		self.log("allow ambiguous knowledge base associations: %s\n" % ("no" if self._knowledgeStrict else "yes"))
+	#setStrictKnowledge()
+	
+	
+	def setKnowledgeScoring(self, method='basic'):
+		method = method.lower().strip()
+		if 'quality'.startswith(method):
+			self._knowledgeScoring = 'quality'
+		elif 'implication'.startswith(method):
+			self._knowledgeScoring = 'implication'
+		else:
+			self._knowledgeScoring = 'basic'
+		self.log("knowledge base association ambiguity scoring mode: %s\n" % self._knowledgeScoring)
+	#setKnowledgeScoring()
+	
+	
+	def setRegionLocusTolerance(self, tolerance=0):
+		self._regionLocusTolerance = int(tolerance)
 		self.log("region-locus match tolerance: %d\n" % self._regionLocusTolerance)
 	#setRegionLocusTolerance()
 	
@@ -289,14 +323,14 @@ class Biofilter:
 	
 	
 	def setGeneNamespace(self, namespace=None):
-		self._geneNamespace = str(namespace).strip()
-		self.log("gene name type: %s\n" % ("<label>" if namespace == None else (namespace or "<any>")))
+		self._geneNamespace = None if (namespace == None) else str(namespace).strip()
+		self.log("gene name type: %s\n" % ("<label>" if self._geneNamespace == None else (self._geneNamespace or "<any>")))
 	#setGeneNamespace()
 	
 	
 	def setGroupNamespace(self, namespace=None):
-		self._groupNamespace = str(namespace).strip()
-		self.log("group name type: %s\n" % ("<label>" if namespace == None else (namespace or "<any>")))
+		self._groupNamespace = None if (namespace == None) else str(namespace).strip()
+		self.log("group name type: %s\n" % ("<label>" if self._groupNamespace == None else (self._groupNamespace or "<any>")))
 	#setGroupNamespace()
 	
 	
@@ -650,9 +684,10 @@ DELETE FROM `main`.`snp` WHERE rs NOT IN (
 		self.prepareTableForUpdate('gene')
 		dbc = self._loki._db.cursor()
 		sql = "INSERT INTO `main`.`gene` (label,biopolymer_id) VALUES (?,?); SELECT 1"
+		maxMatch = (1 if self._geneStrict else None)
 		tally = dict()
 		numAdd = 0
-		for row in dbc.executemany(sql, self._loki.generateBiopolymerIDsByName(names, tally=tally, namespaceID=namespaceID, typeID=typeID)):
+		for row in dbc.executemany(sql, self._loki.generateBiopolymerIDsByName(names, maxMatch=maxMatch, tally=tally, namespaceID=namespaceID, typeID=typeID)):
 			numAdd += 1
 		self.log(" OK: added %d genes (%d matched, %d ambiguous, %d unrecognized)\n" % (numAdd,tally['match'],tally['ambig'],tally['null']))
 		self._geneFilters += 1
@@ -684,7 +719,8 @@ DELETE FROM `main`.`snp` WHERE rs NOT IN (
 		numBefore = self._loki._db.changes()
 		tally = dict()
 		sql = "UPDATE `main`.`gene` SET flag = 1 WHERE (1 OR ?) AND biopolymer_id = ?"
-		dbc.executemany(sql, self._loki.generateBiopolymerIDsByName(names, tally=tally, namespaceID=namespaceID, typeID=typeID))
+		maxMatch = (1 if self._geneStrict else None)
+		dbc.executemany(sql, self._loki.generateBiopolymerIDsByName(names, maxMatch=maxMatch, tally=tally, namespaceID=namespaceID, typeID=typeID))
 		dbc.execute("DELETE FROM `main`.`gene` WHERE flag = 0")
 		numDrop = self._loki._db.changes()
 		self.log(" OK: kept %d genes (%d dropped, %d ambiguous, %d unrecognized)\n" % (numBefore-numDrop,numDrop,tally['ambig'],tally['null']))
@@ -755,9 +791,10 @@ DELETE FROM `main`.`snp` WHERE rs NOT IN (
 		self.prepareTableForUpdate('group')
 		dbc = self._loki._db.cursor()
 		sql = "INSERT INTO `main`.`group` (label,group_id) VALUES (?,?); SELECT 1"
+		maxMatch = (1 if self._groupStrict else None)
 		tally = dict()
 		numAdd = 0
-		for row in dbc.executemany(sql, self._loki.generateGroupIDsByName(names, tally=tally, namespaceID=namespaceID, typeID=typeID)):
+		for row in dbc.executemany(sql, self._loki.generateGroupIDsByName(names, maxMatch=maxMatch, tally=tally, namespaceID=namespaceID, typeID=typeID)):
 			numAdd += 1
 		self.log(" OK: added %d groups (%d matched, %d ambiguous, %d unrecognized)\n" % (
 				numAdd,tally['match'],tally['ambig'],tally['null']
@@ -789,9 +826,10 @@ DELETE FROM `main`.`snp` WHERE rs NOT IN (
 		dbc = self._loki._db.cursor()
 		dbc.execute("UPDATE `main`.`group` SET flag = 0")
 		numBefore = self._loki._db.changes()
+		maxMatch = (1 if self._groupStrict else None)
 		tally = dict()
 		sql = "UPDATE `main`.`group` SET flag = 1 WHERE (1 OR ?) AND group_id = ?"
-		dbc.executemany(sql, self._loki.generateGroupIDsByName(names, tally=tally, namespaceID=namespaceID, typeID=typeID))
+		dbc.executemany(sql, self._loki.generateGroupIDsByName(names, maxMatch=maxMatch, tally=tally, namespaceID=namespaceID, typeID=typeID))
 		dbc.execute("DELETE FROM `main`.`group` WHERE flag = 0")
 		numDrop = self._loki._db.changes()
 		self.log(" OK: kept %d groups (%d dropped, %d ambiguous, %d unrecognized)\n" % (
@@ -845,17 +883,30 @@ DELETE FROM `main`.`snp` WHERE rs NOT IN (
 	
 	
 	##################################################
+	# knowledge database metadata
+	
+	
+	def generateGeneNameStats(self):
+		typeID = self._loki.getTypeID('gene')
+		if not typeID:
+			raise Exception("ERROR: knowledge file contains no gene data")
+		return self._loki.generateBiopolymerNameStats(typeID=typeID)
+	#generateGeneNameStats()
+	
+	
+	def generateGroupNameStats(self, gtype=None):
+		typeID = gtype and self._loki.getTypeID(gtype)
+		if gtype and not typeID:
+			raise Exception("ERROR: unknown group type '%s'" % gtype)
+		return self._loki.generateGroupNameStats(typeID=typeID)
+	#generateGroupNameStats()
+	
+	
+	##################################################
 	# filtering & annotation
 	
 	
 	def generateFilteredData(self, snps=None, loci=None, genes=None, regions=None, groups=None, sources=None):
-		# gather settings
-		snpsValid = self._snpsValid
-		rlTolerance = self._regionLocusTolerance
-		zoneSize = self._loki.getDatabaseSetting('zone_size')
-		zoneSize = int(zoneSize) if zoneSize else None
-		ldprofileID = self._loki.getLDProfileID(self._ldprofile)
-		
 		# define unique aliases for all tables we might need
 		aliasTable = {
 			"m_s":  "`main`.`snp`",              # (label,rs)
@@ -983,9 +1034,18 @@ DELETE FROM `main`.`snp` WHERE rs NOT IN (
 		
 		# define general constraints for each table
 		aliasWhere = {
-			"d_sl": {"d_sl.validated = {snpsValid}"} if (self._snpsValid != None) else {},
+			"d_sl": {},
 			"d_br": {"d_br.ldprofile_id = {ldprofileID}"},
+			"d_gb": {"d_gb.biopolymer_id > 0"},
 		}
+		if self._snpLociValidated:
+			aliasWhere["d_sl"].add("d_sl.validated = 1")
+		if self._knowledgeScoring == 'quality':
+			aliasWhere["d_gb"].add("d_gb.quality %s" % (">= 100" if self._knowledgeStrict else "> 0"))
+		elif self._knowledgeScoring == 'implication':
+			aliasWhere["d_gb"].add("d_gb.implication %s" % (">= 100" if self._knowledgeStrict else "> 0"))
+		else:
+			aliasWhere["d_gb"].add("d_gb.specificity %s" % (">= 100" if self._knowledgeStrict else "> 0"))
 		
 		# define join constraints for each pair of tables;
 		# Note that the SQLite optimizer will not use an index on a column
@@ -1283,11 +1343,22 @@ DELETE FROM `main`.`snp` WHERE rs NOT IN (
 		sql += "\nWHERE "+("\n  AND ".join(sqlWhere) if sqlWhere else "1")
 		if sqlGroup:
 			sql += "\nGROUP BY "+(",".join(sqlGroup))
+		
+		# fetch and verify required settings
+		zoneSize = self._loki.getDatabaseSetting('zone_size')
 		if "{zoneSize}" in sql and not zoneSize:
 			raise Exception("ERROR: knowledge database is missing 'zone_size' setting")
+		zoneSize = int(zoneSize)
+		ldprofileID = self._loki.getLDProfileID(self._ldprofile)
 		if "{ldprofileID}" in sql and not ldprofileID:
 			raise Exception("ERROR: unknown LD profile '%s'" % self._ldprofile)
-		sql = sql.format(snpsValid=snpsValid, rlTolerance=rlTolerance, ldprofileID=ldprofileID, zoneSize=zoneSize)
+		
+		# add settings to SQL
+		sql = sql.format(
+				rlTolerance=self._regionLocusTolerance,
+				ldprofileID=ldprofileID,
+				zoneSize=zoneSize
+		)
 		
 		# make sure any filter tables are indexed
 		if "m_s" in sqlFrom:
@@ -1575,12 +1646,47 @@ if __name__ == "__main__":
 			help="number of times to 'prime' the knowledge database file into filesystem cache memory"
 	)
 	
-	parser.add_argument('--all-snp-loci', action='store_true',
-			help="use all known SNP loci, validated or not"
+	choiceSnpLoci = parser.add_mutually_exclusive_group()
+	choiceSnpLoci.add_argument('--validated-snp-loci', '--vsl', action='store_true',
+			help="only use validated SNP loci"
+	)
+	choiceSnpLoci.add_argument('--all-snp-loci', '--asl', action='store_true',
+			help="use all SNP loci, validated or not (default)"
 	)
 	
-	parser.add_argument('--valid-snp-loci', action='store_true',
-			help="use only validated SNP loci"
+	choiceAmbigGenes = parser.add_mutually_exclusive_group()
+	choiceAmbigGenes.add_argument('--strict-gene-names', '--sgn', action='store_true',
+			help="ignore ambiguous input gene names (default)"
+	)
+	choiceAmbigGenes.add_argument('--all-gene-names', '--agn', action='store_true',
+			help="allow ambiguous input gene names by including all possibilities"
+	)
+	
+	choiceAmbigGroups = parser.add_mutually_exclusive_group()
+	choiceAmbigGroups.add_argument('--strict-group-names', '--sun', action='store_true',
+			help="ignore ambiguous input group names (default)"
+	)
+	choiceAmbigGroups.add_argument('--all-group-names', '--aun', action='store_true',
+			help="allow ambiguous input group names by including all possibilities"
+	)
+	
+	choiceAmbigKnowledge = parser.add_mutually_exclusive_group()
+	choiceAmbigKnowledge.add_argument('--strict-knowledge', '--sk', action='store_true',
+			help="ignore ambiguous associations in the knowledge database (default)"
+	)
+	choiceAmbigKnowledge.add_argument('--all-knowledge', '--ak', action='store_true',
+			help="allow ambiguous associations in the knowledge base by including all possibilities"
+	)
+	
+	choiceScoreKnowledge = parser.add_mutually_exclusive_group()
+	choiceScoreKnowledge.add_argument('--basic-knowledge-scoring', '--bks', action='store_true',
+			help="use basic (all or nothing) scoring for ambiguous associations in the knowledge base (default)"
+	)
+	choiceScoreKnowledge.add_argument('--implication-knowledge-scoring', '--iks', action='store_true',
+			help="use implication scoring for ambiguous associations in the knowledge base"
+	)
+	choiceScoreKnowledge.add_argument('--quality-knowledge-scoring', '--qks', action='store_true',
+			help="use quality scoring for ambiguous associations in the knowledge base"
 	)
 	
 	parser.add_argument('--region-locus-tolerance', type=str, metavar='bases',
@@ -1617,7 +1723,7 @@ if __name__ == "__main__":
 			help="file(s) from which to load input genes"
 	)
 	
-	parser.add_argument('--gene-names', type=str, metavar='type',
+	parser.add_argument('--gene-names', type=str, metavar='type', nargs='?', default=False,
 			help="the type of the gene name(s) provided via --gene or --gene-file (default: primary labels)"
 	)
 	
@@ -1638,7 +1744,7 @@ if __name__ == "__main__":
 			help="file(s) from which to load input groups"
 	)
 	
-	parser.add_argument('--group-names', type=str, metavar='type',
+	parser.add_argument('--group-names', type=str, metavar='type', nargs='?', default=False,
 			help="the type of the group name(s) provided via --group or --group-file (default: primary labels)"
 	)
 	
@@ -1664,6 +1770,14 @@ if __name__ == "__main__":
 			help="display all output directly on <stdout> rather than writing to any files"
 	)
 	
+	
+	parser.add_argument('--gene-name-stats', action='store_true',
+			help="output gene name statistics"
+	)
+	
+	parser.add_argument('--group-name-stats', action='store_true',
+			help="output group name statistics"
+	)
 	
 	parser.add_argument('-o', '--output', type=str, metavar=('type'), nargs='+', action='append', choices=['snps','loci','genes','regions','groups','sources'],
 			help="data type(s) to filter and annotate, from 'snps', 'loci', 'genes', 'regions', 'groups' and 'sources'"
@@ -1694,6 +1808,7 @@ if __name__ == "__main__":
 		bio.setVerbose(True)
 	if args.debug:
 		bio.setDebug(True)
+	
 	if args.knowledge:
 		if args.prime == None:
 			args.prime = 2
@@ -1708,10 +1823,34 @@ if __name__ == "__main__":
 				bio.log(" OK: %1.1f seconds\n" % (time.time()-t0))
 		#if prime
 		bio.attachDatabaseFile(args.knowledge)
-	if args.all_snp_loci:
-		bio.setSNPsValid(None)
-	elif args.valid_snp_loci:
-		bio.setSNPsValid(True)
+	
+	if args.validated_snp_loci:
+		bio.setValidatedSNPLoci(True)
+	elif args.all_snp_loci:
+		bio.setValidatedSNPLoci(False)
+	
+	if args.strict_gene_names:
+		bio.setStrictGenes(True)
+	elif args.all_gene_names:
+		bio.setStrictGenes(False)
+	
+	if args.strict_group_names:
+		bio.setStrictGroups(True)
+	elif args.all_group_names:
+		bio.setStrictGroups(False)
+	
+	if args.strict_knowledge:
+		bio.setStrictKnowledge(True)
+	elif args.all_knowledge:
+		bio.setStrictKnowledge(False)
+	
+	if args.basic_knowledge_scoring:
+		bio.setKnowledgeScoring('basic')
+	elif args.implication_knowledge_scoring:
+		bio.setKnowledgeScoring('implication')
+	elif args.quality_knowledge_scoring:
+		bio.setKnowledgeScoring('quality')
+	
 	if args.region_locus_tolerance:
 		t = args.region_locus_tolerance.strip().upper()
 		if t[-1:] == 'B':
@@ -1725,11 +1864,14 @@ if __name__ == "__main__":
 		else:
 			t = long(t)
 		bio.setRegionLocusTolerance(t)
+	
 	if args.ld_profile:
 		bio.setLDProfile(args.ld_profile)
-	if args.gene_names:
+	
+	if args.gene_names != False:
 		bio.setGeneNamespace(args.gene_names or '')
-	if args.group_names:
+	
+	if args.group_names != False:
 		bio.setGroupNamespace(args.group_names or '')
 	
 	# apply SNP filters
@@ -1779,6 +1921,34 @@ if __name__ == "__main__":
 	if args.source_file:
 		for sourceFileList in args.source_file:
 			bio.intersectSources( bio.generateNamesFromNameFiles(sourceFileList) )
+	
+	# gene name stats
+	if args.gene_name_stats:
+		outPath = args.prefix + '.gene-names'
+		bio.log("writing gene name statistics to %s ..." % ("<stdout>" if args.stdout else outPath))
+		if (not args.stdout) and (not args.overwrite) and os.path.exists(outPath):
+			bio.log("ERROR: output file '%s' already exists\n" % outPath)
+		else:
+			with (sys.stdout if args.stdout else open(outPath, 'w')) as outFile:
+				outFile.write("#type\tnames\tunique\tambiguous\n")
+				for row in bio.generateGeneNameStats():
+					outFile.write("%s\t%s\t%s\t%s\n" % row)
+			bio.log(" OK\n")
+	#if gene-name-stats
+	
+	# group name stats
+	if args.group_name_stats:
+		outPath = args.prefix + '.group-names'
+		bio.log("writing group name statistics to %s ..." % ("<stdout>" if args.stdout else outPath))
+		if (not args.stdout) and (not args.overwrite) and os.path.exists(outPath):
+			bio.log("ERROR: output file '%s' already exists\n" % outPath)
+		else:
+			with (sys.stdout if args.stdout else open(outPath, 'w')) as outFile:
+				outFile.write("#type\tnames\tunique\tambiguous\n")
+				for row in bio.generateGroupNameStats():
+					outFile.write("%s\t%s\t%s\t%s\n" % row)
+			bio.log(" OK\n")
+	#if group-name-stats
 	
 	# output
 	for output in (args.output or []):
