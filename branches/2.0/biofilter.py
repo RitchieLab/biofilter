@@ -16,7 +16,7 @@ class Biofilter:
 	# public class data
 	
 	
-	ver_maj,ver_min,ver_rev,ver_dev,ver_date = 2,0,0,'a3','2012-06-29'
+	ver_maj,ver_min,ver_rev,ver_dev,ver_date = 2,0,0,'a4','2012-06-29'
 	
 	
 	##################################################
@@ -1810,6 +1810,14 @@ if __name__ == "__main__":
 		bio.setDebug(True)
 	
 	if args.knowledge:
+		dbPath = args.knowledge
+		if not os.path.exists(dbPath):
+			if not os.path.samefile(os.getcwd(), os.path.dirname(__file__)):
+				dbPath = os.path.join(os.path.dirname(__file__), args.knowledge)
+				if not os.path.exists(dbPath):
+					exit("ERROR: knowledge database file '%s' not found in '%s' or '%s'" % (args.knowledge, os.getcwd(), os.path.dirname(__file__)))
+			else:
+				exit("ERROR: knowledge database file '%s' not found" % (args.knowledge))
 		if args.prime == None:
 			args.prime = 2
 		if args.prime:
