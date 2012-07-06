@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import argparse
+import collections
 import itertools
 import os
 import sys
@@ -903,483 +904,541 @@ DELETE FROM `main`.`snp` WHERE rs NOT IN (
 	
 	
 	##################################################
+	# query construction
+	
+	
+	# define table aliases and assign them to actual tables: {alias:(db,table)}
+	_queryAliasTables = {
+		'mf_s'  : ('main','snp'),              # (label,rs)
+		'mm_s'  : ('main','snp'),
+		'ma_s'  : ('main','snp_alt'),
+		'mf_l'  : ('main','locus'),            # (label,chr,pos)
+		'mm_l'  : ('main','locus'),
+		'ma_l'  : ('main','locus_alt'),
+		'mf_rz' : ('main','region_zone'),      # (region_rowid,chr,zone)
+		'mm_rz' : ('main','region_zone'),
+		'ma_rz' : ('main','region_zone_alt'),
+		'mf_r'  : ('main','region'),           # (label,chr,posMin,posMax)
+		'mm_r'  : ('main','region'),
+		'ma_r'  : ('main','region_alt'),
+		'mf_bg' : ('main','gene'),             # (label,biopolymer_id)
+		'mm_bg' : ('main','gene'),
+		'ma_bg' : ('main','gene_alt'),
+		'mf_g'  : ('main','group'),            # (label,group_id)
+		'mm_g'  : ('main','group'),
+		'ma_g'  : ('main','group_alt'),
+		'mf_c'  : ('main','source'),           # (label,source_id)
+		'mm_c'  : ('main','source'),
+		'ma_c'  : ('main','source_alt'),
+		'df_sl' : ('db','snp_locus'),          # (rs,chr,pos)
+		'dm_sl' : ('db','snp_locus'),
+		'df_bz' : ('db','biopolymer_zone'),    # (biopolymer_id,chr,zone)
+		'dm_bz' : ('db','biopolymer_zone'),
+		'df_br' : ('db','biopolymer_region'),  # (biopolymer_id,ldprofile_id,chr,posMin,posMax)
+		'dm_br' : ('db','biopolymer_region'),
+		'df_b'  : ('db','biopolymer'),         # (biopolymer_id,type_id,label)
+		'dm_b'  : ('db','biopolymer'),
+		'df_gb' : ('db','group_biopolymer'),   # (group_id,biopolymer_id,specificity,implication,quality)
+		'dm_gb' : ('db','group_biopolymer'),
+		'df_g'  : ('db','group'),              # (group_id,type_id,label,source_id)
+		'dm_g'  : ('db','group'),
+		'df_c'  : ('db','source'),             # (source_id,source)
+		'dm_c'  : ('db','source'),
+	}#class._queryAliasTables{}
+	
+	
+	# define aliases which can be joined along a primary path: {alias:{join1,join2}}
+	_queryAliasJoinPathEdges = {
+		'mf_s'  : {'df_sl'},
+		'mm_s'  : {'dm_sl'}
+		        | {'ma_s' },
+		'ma_s'  : {'dm_sl'}
+		        | {'mm_s' },
+		'mf_l'  : {'mf_rz','df_sl','df_bz'},
+		'mm_l'  : {'mm_rz','dm_sl','dm_bz'}
+		        | {'ma_rz','ma_l' },
+		'ma_l'  : {'ma_rz','dm_sl','dm_bz'}
+		        | {'mm_rz','mm_l' },
+		'mf_rz' : {'mf_l' ,'mf_r' ,'df_sl','df_bz'},
+		'mm_rz' : {'mm_l' ,'mm_r' ,'dm_sl','dm_bz'}
+		        | {'ma_l' ,'ma_rz'},
+		'ma_rz' : {'ma_l' ,'ma_r' ,'dm_sl','dm_bz'}
+		        | {'mm_l' ,'mm_rz'},
+		'mf_r'  : {'mf_rz'},
+		'mm_r'  : {'mm_rz'},
+		'ma_r'  : {'ma_rz'},
+		'mf_bg' : {'df_br','df_b' ,'df_gb'},
+		'mm_bg' : {'dm_br','dm_b' ,'dm_gb'}
+		        | {'ma_bg'},
+		'ma_bg' : {'dm_br','dm_b' ,'dm_gb'}
+		        | {'mm_bg'},
+		'mf_g'  : {'df_gb','df_g' },
+		'mm_g'  : {'dm_gb','dm_g' }
+		        | {'ma_g'},
+		'ma_g'  : {'dm_gb','dm_g' }
+		        | {'mm_g'},
+		'mf_c'  : {'df_g' ,'df_c' },
+		'mm_c'  : {'dm_g' ,'dm_c' }
+		        | {'ma_c'},
+		'ma_c'  : {'dm_g' ,'dm_c' }
+		        | {'mm_c'},
+		'df_sl' : {'mf_s' ,'mf_l' ,'mf_rz','df_bz'},
+		'dm_sl' : {'mm_s' ,'mm_l' ,'mm_rz','dm_bz'}
+		        | {'ma_s' ,'ma_l' ,'ma_rz'},
+		'df_bz' : {'mf_l' ,'mf_rz','df_sl','df_br'},
+		'dm_bz' : {'mm_l' ,'mm_rz','dm_sl','dm_br'}
+		        | {'ma_l' ,'ma_rz'},
+		'df_br' : {'mf_bg','df_bz','df_b' ,'df_gb'},
+		'dm_br' : {'mm_bg','dm_bz','dm_b' ,'dm_gb'}
+		        | {'ma_bg'},
+		'df_b'  : {'mf_bg','df_br','df_gb'},
+		'dm_b'  : {'mm_bg','dm_br','dm_gb'}
+		        | {'ma_bg'},
+		'df_gb' : {'mf_bg','mf_g' ,'df_br','df_b' ,'df_g'},
+		'dm_gb' : {'mm_bg','mm_g' ,'dm_br','dm_b' ,'dm_g'}
+		        | {'ma_bg','ma_g' },
+		'df_g'  : {'mf_g' ,'mf_c' ,'df_gb','df_c' },
+		'dm_g'  : {'mm_g' ,'mm_c' ,'dm_gb','dm_c' }
+		        | {'ma_g' ,'ma_c' },
+		'df_c'  : {'mf_c' ,'df_g' },
+		'dm_c'  : {'mm_c' ,'dm_g' }
+		        | {'ma_c' },
+	}#class._queryAliasJoinPathEdges{}
+	
+	
+	# define aliases which can be joined, but are not a primary path: {alias:{join1,join2}}
+
+	_queryAliasJoinConditionEdges = {
+		'mf_l'  : {'mf_r' ,'df_br'},
+		'mm_l'  : {'mm_r' ,'ma_r' ,'dm_br'},
+		'ma_l'  : {'mm_r' ,'ma_r' ,'dm_br'},
+		'mf_r'  : {'mf_l' ,'df_sl','df_br'},
+		'mm_r'  : {'mm_l' ,'ma_l' ,'ma_r' ,'dm_sl','dm_br'},
+		'ma_r'  : {'mm_l' ,'ma_l' ,'mm_r' ,'dm_sl','dm_br'},
+		'df_sl' : {'mf_r' ,'df_br'},
+		'dm_sl' : {'mm_r' ,'ma_r' ,'dm_br'},
+		'df_br' : {'mf_l' ,'mf_r' ,'df_sl'},
+		'dm_br' : {'mm_l' ,'ma_l' ,'mm_r' ,'ma_r' ,'dm_sl'},
+	}#class._queryAliasJoinConditionEdges{}
+	
+	
+	# make sure all join path edges are symmetric and non-reflexive
+	for a1 in _queryAliasJoinPathEdges:
+		if a1 not in _queryAliasTables:
+			raise Exception("internal struct error: table alias '%s' has join path edges but no table assignment" % (a1))
+		for a2 in _queryAliasJoinPathEdges[a1]:
+			if a1 == a2:
+				raise Exception("internal struct error: table alias '%s' has a join path edge to itself" % (a1))
+			elif a1 not in _queryAliasJoinPathEdges[a2]:
+				raise Exception("internal struct error: table alias '%s' join path edge to '%s' is not symmetric" % (a1,a2))
+	
+	
+	# make sure all join condition edges are symmetric, non-reflexive and non-redundant
+	for a1 in _queryAliasJoinConditionEdges:
+		if a1 not in _queryAliasTables:
+			raise Exception("internal struct error: table alias '%s' has join condition edges but no table assignment" % (a1))
+		for a2 in _queryAliasJoinConditionEdges[a1]:
+			if a1 == a2:
+				raise Exception("internal struct error: table alias '%s' has a join condition edge to itself" % (a1))
+			elif a1 not in _queryAliasJoinConditionEdges[a2]:
+				raise Exception("internal struct error: table alias '%s' join condition edge to '%s' is not symmetric" % (a1,a2))
+			elif a1 in _queryAliasJoinPathEdges and a2 in _queryAliasJoinPathEdges[a1]:
+				raise Exception("internal struct error: table alias '%s' join condition edge to '%s' duplicates join path edge" % (a1,a2))
+	
+	
+	# define join constraints for each pair of tables which can be joined: {(db,table):{(db,table):{cond1,cond2}}}
+	# Note that the SQLite optimizer will not use an index on a column
+	# which is modified by an expression, even if the condition could
+	# be rewritten otherwise (i.e. "colA = colB + 10" will not use an
+	# index on colB).  To account for this, all conditions which include
+	# expressions must be duplicated so that each operand column appears
+	# unmodified (i.e. "colA = colB + 10" and also "colA - 10 = colB").
+	_queryTableJoinConditions = {
+		('main','snp'): {
+			('main','snp'): {
+				"{L}.rs = {R}.rs",
+			},
+			('db','snp_locus'): {
+				"{L}.rs = {R}.rs",
+			},
+		},
+		
+		('main','locus'): {
+			('main','locus'): {
+				"{L}.chr = {R}.chr",
+				"{L}.pos = {R}.pos",
+			},
+			('main','region_zone'): {
+				"{L}.chr = {R}.chr",
+				"{L}.pos >= (({R}.zone * {zoneSize}) - {rlTolerance})",
+				"{L}.pos < ((({R}.zone + 1) * {zoneSize}) + {rlTolerance})",
+				"(({L}.pos + {rlTolerance}) / {zoneSize}) >= {R}.zone",
+				"(({L}.pos - {rlTolerance}) / {zoneSize}) <= {R}.zone",
+			},
+			('main','region'): {
+				"{L}.chr = {R}.chr",
+				"{L}.pos >= ({R}.posMin - {rlTolerance})",
+				"{L}.pos <= ({R}.posMax + {rlTolerance})",
+				"({L}.pos + {rlTolerance}) >= {R}.posMin",
+				"({L}.pos - {rlTolerance}) <= {R}.posMax",
+			},
+			('db','snp_locus'): {
+				"{L}.chr = {R}.chr",
+				"{L}.pos = {R}.pos",
+			},
+			('db','biopolymer_zone'): {
+				"{L}.chr = {R}.chr",
+				"{L}.pos >= (({R}.zone * {zoneSize}) - {rlTolerance})",
+				"{L}.pos < ((({R}.zone + 1) * {zoneSize}) + {rlTolerance})",
+				"(({L}.pos + {rlTolerance}) / {zoneSize}) >= {R}.zone",
+				"(({L}.pos - {rlTolerance}) / {zoneSize}) <= {R}.zone",
+			},
+			('db','biopolymer_region'): {
+				"{L}.chr = {R}.chr",
+				"{L}.pos >= ({R}.posMin - {rlTolerance})",
+				"{L}.pos <= ({R}.posMax + {rlTolerance})",
+				"({L}.pos + {rlTolerance}) >= {R}.posMin",
+				"({L}.pos - {rlTolerance}) <= {R}.posMax",
+			},
+		},
+		
+		
+		('main','region_zone'): {
+			('main','region_zone'): {
+				"{L}.chr = {R}.chr",
+				"{L}.zone = {R}.zone",
+			},
+			('main','region'): {
+				"{L}.region_rowid = {R}.rowid",
+				# with the rowid match, these should all be guaranteed by self.updateRegionZones()
+				"{L}.chr = {R}.chr",
+				"(({L}.zone + 1) * {zoneSize}) > {R}.posMin",
+				"({L}.zone * {zoneSize}) <= {R}.posMax",
+				"{L}.zone >= ({R}.posMin / {zoneSize})",
+				"{L}.zone <= ({R}.posMax / {zoneSize})",
+			},
+			('db','snp_locus'): {
+				"{L}.chr = {R}.chr",
+				"(({L}.zone * {zoneSize}) - {rlTolerance}) <= {R}.pos",
+				"((({L}.zone + 1) * {zoneSize}) + {rlTolerance}) > {R}.pos",
+				"{L}.zone <= (({R}.pos + {rlTolerance}) / {zoneSize})",
+				"{L}.zone >= (({R}.pos - {rlTolerance}) / {zoneSize})",
+			},
+			('db','biopolymer_zone'): {
+				"{L}.chr = {R}.chr",
+				"{L}.zone = {R}.zone",
+			},
+		},
+		
+		('main','region'): {
+			('main','region'): { #TODO: partial overlap
+				"{L}.chr = {R}.chr",
+				"{L}.posMin = {R}.posMin",
+				"{L}.posMax = {R}.posMax",
+			},
+			('db','snp_locus'): {
+				"{L}.chr = {R}.chr",
+				"({L}.posMin - {rlTolerance}) <= {R}.pos",
+				"({L}.posMax + {rlTolerance}) >= {R}.pos",
+				"{L}.posMin <= ({R}.pos + {rlTolerance})",
+				"{L}.posMax >= ({R}.pos - {rlTolerance})",
+			},
+			('db','biopolymer_region'): { #TODO: partial overlap
+				"{L}.chr = {R}.chr",
+				"{L}.posMin = {R}.posMin",
+				"{L}.posMax = {R}.posMax",
+			},
+		},
+		
+		('main','gene'): {
+			('main','gene'): {
+				"{L}.biopolymer_id = {R}.biopolymer_id",
+			},
+			('db','biopolymer_region'): {
+				"{L}.biopolymer_id = {R}.biopolymer_id",
+			},
+			('db','biopolymer'): {
+				"{L}.biopolymer_id = {R}.biopolymer_id",
+			},
+			('db','group_biopolymer'): {
+				"{L}.biopolymer_id = {R}.biopolymer_id",
+			},
+		},
+		
+		('main','group'): {
+			('main','group'): {
+				"{L}.group_id = {R}.group_id",
+			},
+			('db','group_biopolymer'): {
+				"{L}.group_id = {R}.group_id",
+			},
+			('db','group'): {
+				"{L}.group_id = {R}.group_id",
+			},
+		},
+		
+		('main','source'): {
+			('main','source'): {
+				"{L}.source_id = {R}.source_id",
+			},
+			('db','group'): {
+				"{L}.source_id = {R}.source_id",
+			},
+			('db','source'): {
+				"{L}.source_id = {R}.source_id",
+			},
+		},
+		
+		('db','snp_locus'): {
+			('db','biopolymer_zone'): {
+				"{L}.chr = {R}.chr",
+				"{L}.pos >= (({R}.zone * {zoneSize}) - {rlTolerance})",
+				"{L}.pos < ((({R}.zone + 1) * {zoneSize}) + {rlTolerance})",
+				"(({L}.pos + {rlTolerance}) / {zoneSize}) >= {R}.zone",
+				"(({L}.pos - {rlTolerance}) / {zoneSize}) <= {R}.zone",
+			},
+			('db','biopolymer_region'): {
+				"{L}.chr = {R}.chr",
+				"{L}.pos >= ({R}.posMin - {rlTolerance})",
+				"{L}.pos <= ({R}.posMax + {rlTolerance})",
+				"({L}.pos + {rlTolerance}) >= {R}.posMin",
+				"({L}.pos - {rlTolerance}) <= {R}.posMax",
+			},
+		},
+		
+		('db','biopolymer_zone'): {
+			('db','biopolymer_region'): {
+				"{L}.biopolymer_id = {R}.biopolymer_id",
+				"{L}.chr = {R}.chr",
+				# verify the zone/region coverage match in case there are two regions on the same chromosome
+				"(({L}.zone + 1) * {zoneSize}) > {R}.posMin",
+				"({L}.zone * {zoneSize}) <= {R}.posMax",
+				"{L}.zone >= ({R}.posMin / {zoneSize})",
+				"{L}.zone <= ({R}.posMax / {zoneSize})",
+			},
+		},
+		
+		('db','biopolymer_region'): {
+			('db','biopolymer'): {
+				"{L}.biopolymer_id = {R}.biopolymer_id",
+			},
+			('db','group_biopolymer'): {
+				"{L}.biopolymer_id = {R}.biopolymer_id",
+			},
+		},
+		
+		('db','biopolymer'): {
+			('db','group_biopolymer'): {
+				"{L}.biopolymer_id = {R}.biopolymer_id",
+			},
+		},
+		
+		('db','group_biopolymer'): {
+			('db','group'): {
+				"{L}.group_id = {R}.group_id",
+			},
+		},
+		
+		('db','group'): {
+			('db','source'): {
+				"{L}.source_id = {R}.source_id",
+			},
+		},
+	}#class._queryTableJoinConditions{}
+	
+	
+	
+	def getQueryAliasJoins(self, aliasTables):
+		pass
+	#getQueryAliasJoins()
+	
+	
+	##################################################
 	# filtering & annotation
 	
 	
-	def generateFilteredData(self, snps=None, loci=None, genes=None, regions=None, groups=None, sources=None):
-		# define unique aliases for all tables we might need
-		aliasTable = {
-			"m_s":  "`main`.`snp`",              # (label,rs)
-			"m_l":  "`main`.`locus`",            # (label,chr,pos)
-			"m_bg": "`main`.`gene`",             # (label,biopolymer_id)
-			"m_r":  "`main`.`region`",           # (label,chr,posMin,posMax)
-			"m_rz": "`main`.`region_zone`",      # (region_rowid,chr,zone)
-			"m_g":  "`main`.`group`",            # (label,group_id)
-			"m_c":  "`main`.`source`",           # (label,source_id)
-			"d_sl": "`db`.`snp_locus`",          # (rs,chr,pos)
-			"d_b":  "`db`.`biopolymer`",         # (biopolymer_id,type_id,label)
-			"d_br": "`db`.`biopolymer_region`",  # (biopolymer_id,ldprofile_id,chr,posMin,posMax)
-			"d_bz": "`db`.`biopolymer_zone`",    # (biopolymer_id,chr,zone)
-			"d_g":  "`db`.`group`",              # (group_id,type_id,label,source_id)
-			"d_gb": "`db`.`group_biopolymer`",   # (group_id,biopolymer_id,specificity,implication,quality)
-			"d_c":  "`db`.`source`",             # (source_id,source)
-		}
-		
-		# define intermediate tables necessary to join other pairs of tables
-		joinTable = {
-			("m_s" ,"m_l" ): {"d_sl"},
-			("m_s" ,"m_bg"): {"d_sl","d_bz","d_br"},
-			("m_s" ,"m_r" ): {"d_sl","m_rz"},
-		#	("m_s" ,"m_rz"): {"d_sl"},
-			("m_s" ,"m_g" ): {"d_sl","d_bz","d_br","d_gb"},
-			("m_s" ,"m_c" ): {"d_sl","d_bz","d_br","d_gb","d_g"},
-		#	("m_s" ,"d_sl"): {},
-			("m_s" ,"d_b" ): {"d_sl","d_bz","d_br"},
-			("m_s" ,"d_br"): {"d_sl","d_bz"},
-		#	("m_s" ,"d_bz"): {"d_sl"},
-			("m_s" ,"d_g" ): {"d_sl","d_bz","d_br","d_gb"},
-		#	("m_s" ,"d_gb"): {"d_sl","d_bz","d_br"},
-			("m_s" ,"d_c" ): {"d_sl","d_bz","d_br","d_gb","d_g"},
-			
-			("m_l" ,"m_bg"): {"d_bz","d_br"},
-			("m_l" ,"m_r" ): {"m_rz"},
-		#	("m_l" ,"m_rz"): {},
-			("m_l" ,"m_g" ): {"d_bz","d_br","d_gb"},
-			("m_l" ,"m_c" ): {"d_bz","d_br","d_gb","d_g"},
-		#	("m_l" ,"d_sl"): {},
-			("m_l" ,"d_b" ): {"d_bz","d_br"},
-			("m_l" ,"d_br"): {"d_bz"},
-		#	("m_l" ,"d_bz"): {},
-			("m_l" ,"d_g" ): {"d_bz","d_br","d_gb"},
-		#	("m_l" ,"d_gb"): {"d_bz","d_br"},
-			("m_l" ,"d_c" ): {"d_bz","d_br","d_gb","d_g"},
-			
-			("m_bg","m_r" ): {"d_br"},
-		#	("m_bg","m_rz"): {"d_bz"},
-			("m_bg","m_g" ): {"d_gb"},
-			("m_bg","m_c" ): {"d_gb","d_g"},
-			("m_bg","d_sl"): {"d_bz","d_br"},
-		#	("m_bg","d_b" ): {},
-		#	("m_bg","d_br"): {},
-		#	("m_bg","d_bz"): {},
-			("m_bg","d_g" ): {"d_gb"},
-		#	("m_bg","d_gb"): {},
-			("m_bg","d_c" ): {"d_gb","d_g"},
-			
-		#	("m_r" ,"m_rz"): {},
-			("m_r" ,"m_g" ): {"d_br","d_gb"},
-			("m_r" ,"m_c" ): {"d_br","d_gb","d_g"},
-			("m_r" ,"d_sl"): {"m_rz"},
-			("m_r" ,"d_b" ): {"d_br"},
-		#	("m_r" ,"d_br"): {},
-		#	("m_r" ,"d_bz"): {},
-			("m_r" ,"d_g" ): {"d_br","d_gb"},
-		#	("m_r" ,"d_gb"): {"d_br"},
-			("m_r" ,"d_c" ): {"d_br","d_gb","d_g"},
-			
-		#	("m_rz","m_g" ): {"m_r","d_br","d_gb"},
-		#	("m_rz","m_c" ): {"m_r","d_br","d_gb","d_g"},
-		#	("m_rz","d_sl"): {},
-		#	("m_rz","d_b" ): {"d_bz"},
-		#	("m_rz","d_br"): {"d_bz"},
-		#	("m_rz","d_bz"): {},
-		#	("m_rz","d_g" ): {"d_bz","d_gr"},
-		#	("m_rz","d_gb"): {"d_bz"},
-		#	("m_rz","d_c" ): {"d_bz","d_gr","d_g"},
-			
-			("m_g" ,"m_c" ): {"d_g"},
-			("m_g" ,"d_sl"): {"d_gb","d_br","d_bz"},
-			("m_g" ,"d_b" ): {"d_gb"},
-			("m_g" ,"d_br"): {"d_gb"},
-		#	("m_g" ,"d_bz"): {"d_gb"},
-		#	("m_g" ,"d_g" ): {},
-		#	("m_g" ,"d_gb"): {},
-			("m_g" ,"d_c" ): {"d_g"},
-			
-			("m_c" ,"d_sl"): {"d_g","d_gb","d_br","d_bz"},
-			("m_c" ,"d_b" ): {"d_g","d_gb"},
-			("m_c" ,"d_br"): {"d_g","d_gb"},
-		#	("m_c" ,"d_bz"): {"d_g","d_gb"},
-		#	("m_c" ,"d_g" ): {},
-		#	("m_c" ,"d_gb"): {"d_g"},
-		#	("m_c" ,"d_c" ): {},
-			
-			("d_sl","d_b" ): {"d_bz","d_br"},
-			("d_sl","d_br"): {"d_bz"},
-		#	("d_sl","d_bz"): {},
-			("d_sl","d_g" ): {"d_bz","d_br","d_gb"},
-		#	("d_sl","d_gb"): {"d_bz","d_br"},
-			("d_sl","d_c" ): {"d_bz","d_br","d_gb","d_g"},
-			
-		#	("d_b" ,"d_br"): {},
-		#	("d_b" ,"d_bz"): {},
-			("d_b" ,"d_g" ): {"d_gb"},
-		#	("d_b" ,"d_gb"): {},
-			("d_b" ,"d_c" ): {"d_gb","d_g"},
-			
-		#	("d_br","d_bz"): {},
-			("d_br","d_g" ): {"d_gb"},
-		#	("d_br","d_gb"): {},
-			("d_br","d_c" ): {"d_gb","d_c"},
-			
-			("d_bz","d_g" ): {"d_gb"},
-		#	("d_bz","d_gb"): {},
-			("d_bz","d_c" ): {"d_gb","d_c"},
-			
-		#	("d_g", "d_gb"): {},
-		#	("d_g", "d_c" ): {},
-			
-		#	("d_gb", "d_c" ): {},
-		}
-		
-		# define general constraints for each table
-		aliasWhere = {
-			"d_sl": {},
-			"d_br": {"d_br.ldprofile_id = {ldprofileID}"},
-			"d_gb": {"d_gb.biopolymer_id > 0"},
-		}
-		if self._snpLociValidated:
-			aliasWhere["d_sl"].add("d_sl.validated = 1")
-		if self._knowledgeScoring == 'quality':
-			aliasWhere["d_gb"].add("d_gb.quality %s" % (">= 100" if self._knowledgeStrict else "> 0"))
-		elif self._knowledgeScoring == 'implication':
-			aliasWhere["d_gb"].add("d_gb.implication %s" % (">= 100" if self._knowledgeStrict else "> 0"))
-		else:
-			aliasWhere["d_gb"].add("d_gb.specificity %s" % (">= 100" if self._knowledgeStrict else "> 0"))
-		
-		# define join constraints for each pair of tables;
-		# Note that the SQLite optimizer will not use an index on a column
-		# which is modified by an expression, even if the condition could
-		# be rewritten otherwise (i.e. "colA = colB + 10" will not use an
-		# index on colB).  To account for this, all conditions which include
-		# expressions should be repeated once for each operand column to appear
-		# unmodified (i.e. "colA = colB + 10" and also "colA - 10 = colB").
-		joinWhere = {
-			("m_s","d_sl"): {
-				"m_s.rs = d_sl.rs"
-			},
-			("m_l","m_r"): {
-				"m_l.chr = m_r.chr",
-				"m_l.pos >= (m_r.posMin - {rlTolerance})",
-				"m_l.pos <= (m_r.posMax + {rlTolerance})",
-				"(m_l.pos + {rlTolerance}) >= m_r.posMin",
-				"(m_l.pos - {rlTolerance}) <= m_r.posMax",
-			},
-			("m_l","m_rz"): {
-				"m_l.chr = m_rz.chr",
-				"m_l.pos >= ((m_rz.zone * {zoneSize}) - {rlTolerance})",
-				"m_l.pos < (((m_rz.zone + 1) * {zoneSize}) + {rlTolerance})",
-				"((m_l.pos + {rlTolerance}) / {zoneSize}) >= m_rz.zone",
-				"((m_l.pos - {rlTolerance}) / {zoneSize}) <= m_rz.zone",
-			},
-			("m_l","d_sl"): {
-				"m_l.chr = d_sl.chr",
-				"m_l.pos = d_sl.pos",
-			},
-			("m_l","d_br"): {
-				"m_l.chr = d_br.chr",
-				"m_l.pos >= (d_br.posMin - {rlTolerance})",
-				"m_l.pos <= (d_br.posMax + {rlTolerance})",
-				"(m_l.pos + {rlTolerance}) >= d_br.posMin",
-				"(m_l.pos - {rlTolerance}) <= d_br.posMax",
-			},
-			("m_l","d_bz"): {
-				"m_l.chr = d_bz.chr",
-				"m_l.pos >= ((d_bz.zone * {zoneSize}) - {rlTolerance})",
-				"m_l.pos < (((d_bz.zone + 1) * {zoneSize}) + {rlTolerance})",
-				"((m_l.pos + {rlTolerance}) / {zoneSize}) >= d_bz.zone",
-				"((m_l.pos - {rlTolerance}) / {zoneSize}) <= d_bz.zone",
-			},
-			("m_bg","d_b"): {
-				"m_bg.biopolymer_id = d_b.biopolymer_id",
-			},
-			("m_bg","d_br"): {
-				"m_bg.biopolymer_id = d_br.biopolymer_id",
-			},
-			("m_bg","d_bz"): {
-				"m_bg.biopolymer_id = d_bz.biopolymer_id",
-			},
-			("m_bg","d_gb"): {
-				"m_bg.biopolymer_id = d_gb.biopolymer_id",
-			},
-			("m_r","m_rz"): {
-				"m_r.rowid = m_rz.region_rowid",
-				# these should all be guaranteed by self.updateRegionZones()
-				"m_r.chr = m_rz.chr",
-				"m_r.posMin < ((m_rz.zone + 1) * {zoneSize})",
-				"m_r.posMax >= (m_rz.zone * {zoneSize})",
-				"(m_r.posMin / {zoneSize}) <= m_rz.zone",
-				"(m_r.posMax / {zoneSize}) >= m_rz.zone",
-			},
-			("m_r","d_sl"): {
-				"m_r.chr = d_sl.chr",
-				"(m_r.posMin - {rlTolerance}) <= d_sl.pos",
-				"(m_r.posMax + {rlTolerance}) >= d_sl.pos",
-				"m_r.posMin <= (d_sl.pos + {rlTolerance})",
-				"m_r.posMax >= (d_sl.pos - {rlTolerance})",
-			},
-			("m_r","d_br"): {
-				#TODO: match by overlap? more complited, but maybe more useful
-				"m_r.chr = d_br.chr",
-				"m_r.posMin = d_br.posMin",
-				"m_r.posMax = d_br.posMax",
-			},
-			("m_r","d_bz"): {
-				"m_r.chr = d_bz.chr",
-				"m_r.posMin < ((d_bz.zone + 1) * {zoneSize})",
-				"m_r.posMax >= (d_bz.zone * {zoneSize})",
-				"(m_r.posMin / {zoneSize}) <= d_bz.zone",
-				"(m_r.posMax / {zoneSize}) >= d_bz.zone",
-			},
-			("m_rz","d_sl"): {
-				"m_rz.chr = d_sl.chr",
-				"((m_rz.zone * {zoneSize}) - {rlTolerance}) <= d_sl.pos",
-				"(((m_rz.zone + 1) * {zoneSize}) + {rlTolerance}) > d_sl.pos",
-				"m_rz.zone <= ((d_sl.pos + {rlTolerance}) / {zoneSize})",
-				"m_rz.zone >= ((d_sl.pos - {rlTolerance}) / {zoneSize})",
-			},
-			("m_rz","d_br"): {
-				"m_rz.chr = d_br.chr",
-				"m_rz.zone >= (d_br.posMin / {zoneSize})",
-				"m_rz.zone <= (d_br.posMax / {zoneSize})",
-				"((m_rz.zone + 1) * {zoneSize}) > d_br.posMin",
-				"(m_rz.zone * {zoneSize}) <= d_br.posMax",
-			},
-			("m_rz","d_bz"): {
-				"m_rz.chr = d_bz.chr",
-				"m_rz.zone = d_bz.zone",
-			},
-			("m_g","d_g"): {
-				"m_g.group_id = d_g.group_id",
-			},
-			("m_g","d_gb"): {
-				"m_g.group_id = d_gb.group_id",
-			},
-			("m_c","d_g"): {
-				"m_c.source_id = d_g.source_id",
-			},
-			("m_c","d_c"): {
-				"m_c.source_id = d_c.source_id",
-			},
-			("d_sl","d_br"): {
-				"d_sl.chr = d_br.chr",
-				"d_sl.pos >= (d_br.posMin - {rlTolerance})",
-				"d_sl.pos <= (d_br.posMax + {rlTolerance})",
-				"(d_sl.pos + {rlTolerance}) >= d_br.posMin",
-				"(d_sl.pos - {rlTolerance}) <= d_br.posMax",
-			},
-			("d_sl","d_bz"): {
-				"d_sl.chr = d_bz.chr",
-				"d_sl.pos >= ((d_bz.zone * {zoneSize}) - {rlTolerance})",
-				"d_sl.pos < (((d_bz.zone + 1) * {zoneSize}) + {rlTolerance})",
-				"((d_sl.pos + {rlTolerance}) / {zoneSize}) >= d_bz.zone",
-				"((d_sl.pos - {rlTolerance}) / {zoneSize}) <= d_bz.zone",
-			},
-			("d_b","d_br"): {
-				"d_b.biopolymer_id = d_br.biopolymer_id",
-			},
-			("d_b","d_bz"): {
-				"d_b.biopolymer_id = d_bz.biopolymer_id",
-			},
-			("d_b","d_gb"): {
-				"d_b.biopolymer_id = d_gb.biopolymer_id",
-			},
-			("d_br","d_bz"): {
-				"d_br.biopolymer_id = d_bz.biopolymer_id",
-				"d_br.chr = d_bz.chr",
-				# these should all be guaranteed by loki.updateRegionZones()
-				"d_br.posMin < ((d_bz.zone + 1) * {zoneSize})",
-				"d_br.posMax >= (d_bz.zone * {zoneSize})",
-				"(d_br.posMin / {zoneSize}) <= d_bz.zone",
-				"(d_br.posMax / {zoneSize}) >= d_bz.zone",
-			},
-			("d_br","d_gb"): {
-				"d_br.biopolymer_id = d_gb.biopolymer_id",
-			},
-			("d_bz","d_gb"): {
-				"d_bz.biopolymer_id = d_gb.biopolymer_id",
-			},
-			("d_g","d_gb"): {
-				"d_g.group_id = d_gb.group_id",
-			},
-			("d_g","d_c"): {
-				"d_g.source_id = d_c.source_id",
-			},
-		} #joinWhere{}
-		
+	def generateFilteredData(self, types):
 		# initialize query fragments
-		columns = [
-				'rowid',
-				'locus_label','locus_chr','locus_pos',
-				'region_label','region_chr','region_posMin','region_posMax',
-				'group_label',
-				'source_label'
+		sqlSelect = [
+			'rowid',
+			'snp_label',
+			'locus_label', 'locus_chr', 'locus_pos',
+			'gene_label',
+			'region_label', 'region_chr', 'region_posMin', 'region_posMax',
+			'group_label',
+			'source_label'
 		]
-		sqlSelect = { col:"NULL" for col in columns } # {A:a,B:a,...} => SELECT a AS A, b AS B, ...
-		sqlSelect['rowid'] = "''"
-		sqlFrom = set() # {a,b,...} => FROM aliasTable[a] AS a, aliasTable[b] AS b, ...
-		sqlWhere = set() # {a,b,...} => WHERE a AND b AND ...
-		sqlGroup = list() # [a,b,...] => GROUP BY a, b, ...
+		sqlRowID = set() # {expA,expB,...} => SELECT expA||'_'||expB... AS rowid, ...
+		sqlColumn = { # {colA:expA,colB:expB,...} => SELECT ... expA AS colA, expB AS colB, ...
+			'snp_label'     : "NULL",
+			'locus_label'   : "NULL",
+			'locus_chr'     : "NULL",
+			'locus_pos'     : "NULL",
+			'gene_label'    : "NULL",
+			'region_label'  : "NULL",
+			'region_chr'    : "NULL",
+			'region_posMin' : "NULL",
+			'region_posMax' : "NULL",
+			'group_label'   : "NULL",
+			'source_label'  : "NULL",
+		}
+		sqlFrom = set() # {tblA,tblB,...} => FROM aliasTable[tblA] AS tblA, aliasTable[tblB] AS tblB, ...
+		sqlWhere = set() # {expA,expB,...} => WHERE expA AND expB AND ...
+		sqlGroup = list() # [expA,expB,...] => GROUP BY expA, expB, ...
 		
-		# include all tables needed to satisfy input filters
+		# include all table aliases needed to satisfy input filters
 		if self._snpFilters:
-			sqlFrom.add("m_s")
-		
+			sqlFrom.add('mf_s')
 		if self._locusFilters:
-			sqlFrom.add("m_l")
-		
+			sqlFrom.add('mf_l')
 		if self._geneFilters:
-			sqlFrom.add("m_bg")
-		
+			sqlFrom.add('mf_bg')
 		if self._regionFilters:
-			sqlFrom.add("m_r")
-		
+			sqlFrom.add('mf_r')
 		if self._groupFilters:
-			sqlFrom.add("m_g")
-		
+			sqlFrom.add('mf_g')
 		if self._sourceFilters:
-			sqlFrom.add("m_c")
+			sqlFrom.add('mf_c')
 		
-		# include all tables and columns needed to satisfy output column requests
-		if loci:
-			if "m_l" in sqlFrom:
-				sqlSelect['rowid'] += "||m_l.rowid||'_'"
-				sqlSelect['locus_label'] = "m_l.label"
-				sqlSelect['locus_chr'] = "m_l.chr"
-				sqlSelect['locus_pos'] = "m_l.pos"
-			elif "m_s" in sqlFrom:
-				sqlFrom.add("d_sl")
-				sqlSelect['rowid'] += "||d_sl._ROWID_||'_'"
-				sqlSelect['locus_label'] = "m_s.label"
-				sqlSelect['locus_chr'] = "d_sl.chr"
-				sqlSelect['locus_pos'] = "d_sl.pos"
+		# include all table aliases and columns needed to satisfy output requests
+		if 'snps' in types:
+			if 'mf_s' in sqlFrom:
+				sqlRowID.add("mf_s.rowid")
+				sqlColumn['snp_label'] = "mf_s.label"
 			else:
-				sqlFrom.add("d_sl")
-				sqlSelect['rowid'] += "||d_sl._ROWID_||'_'"
-				sqlSelect['locus_label'] = "'rs'||d_sl.rs"
-				sqlSelect['locus_chr'] = "d_sl.chr"
-				sqlSelect['locus_pos'] = "d_sl.pos"
-		elif snps:
-			if "m_s" in sqlFrom:
-				sqlSelect['rowid'] += "||m_s.rowid||'_'"
-				sqlSelect['locus_label'] = "m_s.label"
-			else:
-				sqlFrom.add("d_sl")
-				sqlSelect['rowid'] += "||d_sl.rs||'_'"
-				sqlSelect['locus_label'] = "'rs'||d_sl.rs"
+				sqlFrom.add('df_sl')
+				sqlRowID.add("df_sl.rs")
+				sqlColumn['snp_label'] = "'rs'||df_sl.rs"
 		
-		if regions:
-			if "m_r" in sqlFrom:
-				sqlSelect['rowid'] += "||m_r.rowid||'_'"
-				sqlSelect['region_label'] = "m_r.label"
-				sqlSelect['region_chr'] = "m_r.chr"
-				sqlSelect['region_posMin'] = "m_r.posMin"
-				sqlSelect['region_posMax'] = "m_r.posMax"
-			elif "m_bg" in sqlFrom:
-				sqlFrom.add("d_br")
-				sqlSelect['rowid'] += "||d_br._ROWID_||'_'"
-				sqlSelect['region_label'] = "m_bg.label"
-				sqlSelect['region_chr'] = "d_br.chr"
-				sqlSelect['region_posMin'] = "d_br.posMin"
-				sqlSelect['region_posMax'] = "d_br.posMax"
+		if 'loci' in types:
+			if 'mf_l' in sqlFrom:
+				sqlRowID.add("mf_l.rowid")
+				sqlColumn['locus_label'] = "mf_l.label"
+				sqlColumn['locus_chr'] = "mf_l.chr"
+				sqlColumn['locus_pos'] = "mf_l.pos"
 			else:
-				sqlFrom.add("d_b")
-				sqlFrom.add("d_br")
-				sqlSelect['rowid'] += "||d_br._ROWID_||'_'"
-				sqlSelect['region_label'] = "d_b.label"
-				sqlSelect['region_chr'] = "d_br.chr"
-				sqlSelect['region_posMin'] = "d_br.posMin"
-				sqlSelect['region_posMax'] = "d_br.posMax"
-		elif genes:
-			if "m_bg" in sqlFrom:
-				sqlSelect['rowid'] += "||m_bg._ROWID_||'_'"
-				sqlSelect['region_label'] = "m_bg.label"
-			else:
-				sqlFrom.add("d_b")
-				sqlSelect['rowid'] += "||d_b.biopolymer_id||'_'"
-				sqlSelect['region_label'] = "d_b.label"
+				sqlFrom.add('df_sl')
+				sqlRowID.add("df_sl._ROWID_")
+				sqlColumn['locus_label'] = "'rs'||df_sl.rs"
+				sqlColumn['locus_chr'] = "df_sl.chr"
+				sqlColumn['locus_pos'] = "df_sl.pos"
 		
-		if groups:
-			if "m_g" in sqlFrom:
-				sqlSelect['rowid'] += "||m_g.rowid||'_'"
-				sqlSelect['group_label'] = "m_g.label"
+		if 'genes' in types:
+			if 'mf_bg' in sqlFrom:
+				sqlRowID.add("mf_bg._ROWID")
+				sqlColumn['gene_label'] = "mf_bg.label"
 			else:
-				sqlFrom.add("d_g")
-				sqlSelect['rowid'] += "||d_g.group_id||'_'"
-				sqlSelect['group_label'] = "d_g.label"
+				sqlFrom.add('df_b')
+				sqlRowID.add("df_b.biopolymer_id")
+				sqlColumn['gene_label'] = "df_b.label"
 		
-		if sources:
-			if "m_c" in sqlFrom:
-				sqlSelect['rowid'] += "||m_c.rowid||'_'"
-				sqlSelect['source_label'] = "m_c.label"
+		if 'regions' in types:
+			if 'mf_r' in sqlFrom:
+				sqlRowID.add("mf_r.rowid")
+				sqlColumn['region_label'] = "mf_r.label"
+				sqlColumn['region_chr'] = "mf_r.chr"
+				sqlColumn['region_posMin'] = "mf_r.posMin"
+				sqlColumn['region_posMax'] = "mf_r.posMax"
 			else:
-				sqlFrom.add("d_c")
-				sqlSelect['rowid'] += "||d_c.source_id||'_'"
-				sqlSelect['source_label'] = "d_c.source"
+				sqlFrom.add('df_b')
+				sqlFrom.add('df_br')
+				sqlRowID.add("df_br._ROWID_")
+				sqlColumn['region_label'] = "df_b.label"
+				sqlColumn['region_chr'] = "df_br.chr"
+				sqlColumn['region_posMin'] = "df_br.posMin"
+				sqlColumn['region_posMax'] = "df_br.posMax"
+		
+		if 'groups' in types:
+			if 'mf_g' in sqlFrom:
+				sqlRowID.add("mf_g.rowid")
+				sqlColumn['group_label'] = "mf_g.label"
+			else:
+				sqlFrom.add('df_g')
+				sqlRowID.add("df_g.group_id")
+				sqlColumn['group_label'] = "df_g.label"
+		
+		if 'sources' in types:
+			if 'mf_c' in sqlFrom:
+				sqlRowID.add("mf_c.rowid")
+				sqlColumn['source_label'] = "mf_c.label"
+			else:
+				sqlFrom.add('df_c')
+				sqlRowID.add("df_c.source_id")
+				sqlColumn['source_label'] = "df_c.source"
+		
+		# generate all-pairs-shortest-paths
+		paths = { a:{} for a in self._queryAliasJoinPathEdges }
+		queue = collections.deque()
+		for a0 in self._queryAliasJoinPathEdges:
+			visited = { a0 }
+			for a1 in self._queryAliasJoinPathEdges[a0]:
+				queue.append( [a0,a1] )
+				visited.add(a1)
+			while queue:
+				path = queue.popleft()
+				if path[-1] not in paths[path[0]]:
+					paths[path[0]][path[-1]] = set(path[1:-1])
+				for a1 in self._queryAliasJoinPathEdges[path[-1]]:
+					if a1 not in visited:
+						visited.add(a1)
+						queue.append( path+[a1] )
 		
 		# include all tables needed to bridge other included tables
-		# (since rules can be interdependent, iterate until nothing changes)
-		sizeFrom = None
-		while sizeFrom != len(sqlFrom):
-			sizeFrom = len(sqlFrom)
-			
-			for join in joinTable:
-				if join[0] in sqlFrom and join[1] in sqlFrom:
-					sqlFrom.update(joinTable[join])
-		#while
+		for a0 in paths:
+			for a1 in paths[a0]:
+				if (a0 in sqlFrom) and (a1 in sqlFrom):
+					sqlFrom.update(paths[a0][a1])
 		
-		# decide which constraints need to be included
-		for alias in aliasWhere:
-			if alias in sqlFrom:
-				sqlWhere.update(aliasWhere[alias])
-		for join in joinWhere:
-			if join[0] in sqlFrom and join[1] in sqlFrom:
-				sqlWhere.update(joinWhere[join])
+		# make sure any included filter tables are indexed
+		for a in sqlFrom:
+			if self._queryAliasTables[a][0] == 'main':
+				self.prepareTableForQuery(self._queryAliasTables[a][1])
+		
+		# fetch values to insert into conditions
+		rlTolerance = self._regionLocusTolerance
+		zoneSize = self._loki.getDatabaseSetting('zone_size')
+		zoneSize = int(zoneSize) if zoneSize else None
+		ldprofileID = self._loki.getLDProfileID(self._ldprofile)
+		
+		# add some general constraints for included tables
+		if ('df_sl' in sqlFrom) and self._snpLociValidated:
+			sqlWhere.add("df_sl.validated = 1")
+		if ('df_br' in sqlFrom):
+			sqlWhere.add("df_br.ldprofile_id = {ldprofileID}".format(ldprofileID=ldprofileID))
+		if ('df_gb' in sqlFrom):
+			sqlWhere.add("df_gb.biopolymer_id > 0")
+			if self._knowledgeScoring == 'quality':
+				sqlWhere.add("df_gb.quality {0}".format(">= 100" if self._knowledgeStrict else "> 0"))
+			elif self._knowledgeScoring == 'implication':
+				sqlWhere.add("df.implication {0}".format(">= 100" if self._knowledgeStrict else "> 0"))
+			else:
+				sqlWhere.add("df_gb.specificity {0}".format(">= 100" if self._knowledgeStrict else "> 0"))
+		
+		# add join constraints for included table pairs
+		for a0 in self._queryAliasJoinPathEdges:
+			if a0 in sqlFrom:
+				for a1 in self._queryAliasJoinPathEdges[a0]:
+					if a1 in sqlFrom:
+						t0 = self._queryAliasTables[a0]
+						t1 = self._queryAliasTables[a1]
+						if (t0 in self._queryTableJoinConditions) and (t1 in self._queryTableJoinConditions[t0]):
+							sqlWhere.update(c.format(
+									L=a0, R=a1, rlTolerance=rlTolerance, zoneSize=zoneSize, ldprofileID=ldprofileID
+							) for c in self._queryTableJoinConditions[t0][t1])
 		
 		# assemble the pieces
-		sqlSelect['rowid'] = "("+sqlSelect['rowid']+")"
-		sql = "SELECT "+(",\n  ".join(("%s AS %s" % (sqlSelect[col],col)) for col in columns))
-		sql += "\nFROM "+(",\n  ".join(aliasTable[t]+" AS "+t for t in sqlFrom) if sqlFrom else "(SELECT 1)")
-		sql += "\nWHERE "+("\n  AND ".join(sqlWhere) if sqlWhere else "1")
+		sqlColumn['rowid'] = "(" + ("||'_'||".join(sqlRowID)) + ")"
+		sql = "SELECT " + (",\n  ".join("{0} AS {1}".format(sqlColumn[c],c) for c in sqlSelect))
+		sql += "\nFROM " + ((",\n  ".join("`{0[0]}`.`{0[1]}` AS {1}".format(self._queryAliasTables[a],a) for a in sqlFrom)) if sqlFrom else "(SELECT 1)")
+		sql += "\nWHERE " + (("\n  AND ".join(sqlWhere)) if sqlWhere else "1")
 		if sqlGroup:
-			sql += "\nGROUP BY "+(",".join(sqlGroup))
-		
-		# fetch and verify required settings
-		zoneSize = self._loki.getDatabaseSetting('zone_size')
-		if "{zoneSize}" in sql and not zoneSize:
-			raise Exception("ERROR: knowledge database is missing 'zone_size' setting")
-		zoneSize = int(zoneSize)
-		ldprofileID = self._loki.getLDProfileID(self._ldprofile)
-		if "{ldprofileID}" in sql and not ldprofileID:
-			raise Exception("ERROR: unknown LD profile '%s'" % self._ldprofile)
-		
-		# add settings to SQL
-		sql = sql.format(
-				rlTolerance=self._regionLocusTolerance,
-				ldprofileID=ldprofileID,
-				zoneSize=zoneSize
-		)
-		
-		# make sure any filter tables are indexed
-		if "m_s" in sqlFrom:
-			self.prepareTableForQuery("snp")
-		if "m_l" in sqlFrom:
-			self.prepareTableForQuery("locus")
-		if "m_bg" in sqlFrom:
-			self.prepareTableForQuery("gene")
-		if "m_r" in sqlFrom:
-			self.prepareTableForQuery("region")
-		if "m_rz" in sqlFrom:
-			self.prepareTableForQuery("region_zone")
-		if "m_g" in sqlFrom:
-			self.prepareTableForQuery("group")
-		if "m_c" in sqlFrom:
-			self.prepareTableForQuery("source")
+			sql += "\nGROUP BY " + (", ".join(sqlGroup))
 		
 		if self._debug:
 			self.log(sql+"\n")
 			for row in self._loki._db.cursor().execute("EXPLAIN QUERY PLAN "+sql):
 				self.log(str(row)+"\n")
+			return
 		
 		# run, filter and return
 		# The unique-row filtering could be done in SQL using GROUP BY, but that
@@ -1965,41 +2024,34 @@ if __name__ == "__main__":
 		if (not args.stdout) and (not args.overwrite) and os.path.exists(outPath):
 			bio.log("ERROR: output file '%s' already exists\n" % outPath)
 		else:
-			# generateFilteredData() yields (rowid, locus_label,chr,pos, region_label,chr,posMin,posMax, group_label, source_label)
+			# generateFilteredData() yields (rowid, snp_label, locus_label,chr,pos, gene_label, region_label,chr,posMin,posMax, group_label, source_label)
 			headerList = list()
 			formatList = list()
-			outS = outL = outBG = outR = outG = outC = False
 			for outType in output:
 				if outType == 'snps':
-					outS = True
 					headerList.extend(["snp"])
 					formatList.extend(["{d[1]}"])
 				elif outType == 'loci':
-					outL = True
 					headerList.extend(["chr","locus","pos"])
-					formatList.extend(["{d[2]}","{d[1]}","{d[3]}"])
+					formatList.extend(["{d[3]}","{d[2]}","{d[4]}"])
 				elif outType == 'genes':
-					outBG = True
 					headerList.extend(["gene"])
-					formatList.extend(["{d[4]}"])
+					formatList.extend(["{d[5]}"])
 				elif outType == 'regions':
-					outR = True
 					headerList.extend(["chr","region","posMin","posMax"])
-					formatList.extend(["{d[5]}","{d[4]}","{d[6]}","{d[7]}"])
+					formatList.extend(["{d[7]}","{d[6]}","{d[8]}","{d[9]}"])
 				elif outType == 'groups':
-					outG = True
 					headerList.extend(["group"])
-					formatList.extend(["{d[8]}"])
+					formatList.extend(["{d[10]}"])
 				elif outType == 'sources':
-					outC = True
 					headerList.extend(["source"])
-					formatList.extend(["{d[9]}"])
+					formatList.extend(["{d[11]}"])
 			#foreach outType
 			headerStr = "#" + "\t".join(headerList) + "\n"
 			formatStr = "\t".join(formatList) + "\n"
 			with (sys.stdout if args.stdout else open(outPath, 'w')) as outFile:
 				outFile.write(headerStr)
-				for data in bio.generateFilteredData(snps=outS, loci=outL, genes=outBG, regions=outR, groups=outG, sources=outC):
+				for data in bio.generateFilteredData(set(output)):
 					outFile.write(formatStr.format(d=data))
 			#with outFile
 			bio.log(" OK\n")
