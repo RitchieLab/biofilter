@@ -17,7 +17,7 @@ class Biofilter:
 	# public class data
 	
 	
-	ver_maj,ver_min,ver_rev,ver_dev,ver_date = 2,0,0,'a4','2012-06-29'
+	ver_maj,ver_min,ver_rev,ver_dev,ver_date = 2,0,0,'a5','2012-07-13'
 	
 	
 	##################################################
@@ -42,6 +42,21 @@ class Biofilter:
 			}, #.main.snp
 			
 			
+			'snp_alt': {
+				'table': """
+(
+  rowid INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+  label VARCHAR(32) NOT NULL,
+  rs INTEGER NOT NULL,
+  flag TINYINT NOT NULL DEFAULT 0
+)
+""",
+				'index': {
+					'snp_alt__rs': '(rs)',
+				}
+			}, #.main.snp_alt
+			
+			
 			'locus': {
 				'table': """
 (
@@ -58,6 +73,22 @@ class Biofilter:
 			}, #.main.locus
 			
 			
+			'locus_alt': {
+				'table': """
+(
+  rowid INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+  label VARCHAR(32) NOT NULL,
+  chr TINYINT NOT NULL,
+  pos BIGINT NOT NULL,
+  flag TINYINT NOT NULL DEFAULT 0
+)
+""",
+				'index': {
+					'locus_alt__pos': '(chr,pos)',
+				}
+			}, #.main.locus_alt
+			
+			
 			'gene': {
 				'table': """
 (
@@ -71,6 +102,21 @@ class Biofilter:
 					'gene__biopolymer': '(biopolymer_id)',
 				}
 			}, #.main.gene
+			
+			
+			'gene_alt': {
+				'table': """
+(
+  rowid INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+  label VARCHAR(32) NOT NULL,
+  biopolymer_id INTEGER NOT NULL,
+  flag TINYINT NOT NULL DEFAULT 0
+)
+""",
+				'index': {
+					'gene_alt__biopolymer': '(biopolymer_id)',
+				}
+			}, #.main.gene_alt
 			
 			
 			'region': {
@@ -91,6 +137,24 @@ class Biofilter:
 			}, #.main.region
 			
 			
+			'region_alt': {
+				'table': """
+(
+  rowid INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+  label VARCHAR(32) NOT NULL,
+  chr TINYINT NOT NULL,
+  posMin BIGINT NOT NULL,
+  posMax BIGINT NOT NULL,
+  flag TINYINT NOT NULL DEFAULT 0
+)
+""",
+				'index': {
+					'region_alt__chr_min': '(chr,posMin)',
+					'region_alt__chr_max': '(chr,posMax)',
+				}
+			}, #.main.region_alt
+			
+			
 			'region_zone': {
 				'table': """
 (
@@ -104,6 +168,21 @@ class Biofilter:
 					'region_zone__region': '(region_rowid)',
 				}
 			}, #.main.region_zone
+			
+			
+			'region_zone_alt': {
+				'table': """
+(
+  region_rowid INTEGER NOT NULL,
+  chr TINYINT NOT NULL,
+  zone INTEGER NOT NULL,
+  PRIMARY KEY (chr,zone,region_rowid)
+)
+""",
+				'index': {
+					'region_zone_alt__region': '(region_rowid)',
+				}
+			}, #.main.region_zone_alt
 			
 			
 			'group': {
@@ -121,6 +200,21 @@ class Biofilter:
 			}, #.main.group
 			
 			
+			'group_alt': {
+				'table': """
+(
+  rowid INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+  label VARCHAR(32) NOT NULL,
+  group_id INTEGER NOT NULL,
+  flag TINYINT NOT NULL DEFAULT 0
+)
+""",
+				'index': {
+					'group_alt__group_id': '(group_id)',
+				}
+			}, #.main.group_alt
+			
+			
 			'source': {
 				'table': """
 (
@@ -134,6 +228,21 @@ class Biofilter:
 					'source__source_id': '(source_id)',
 				}
 			}, #.main.source
+			
+			
+			'source_alt': {
+				'table': """
+(
+  rowid INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+  label VARCHAR(32) NOT NULL,
+  source_id INTEGER NOT NULL,
+  flag TINYINT NOT NULL DEFAULT 0
+)
+""",
+				'index': {
+					'source_alt__source_id': '(source_id)',
+				}
+			}, #.main.source_alt
 			
 		}, #.main
 	} #_schema{}
@@ -198,14 +307,19 @@ class Biofilter:
 		self._geneNamespace = None
 		self._groupNamespace = None
 		self._ldprofile = ''
+		self._altModelFilter = False
+		self._supportedModels = True
+		self._monogenicModels = False
+		self._minModelScore = 1
+		self._numModels = 100
 		
 		self._tablesDeindexed = set()
-		self._snpFilters = 0
-		self._locusFilters = 0
-		self._geneFilters = 0
-		self._regionFilters = 0
-		self._groupFilters = 0
-		self._sourceFilters = 0
+		self._snpFilters = [0,0]
+		self._locusFilters = [0,0]
+		self._geneFilters = [0,0]
+		self._regionFilters = [0,0]
+		self._groupFilters = [0,0]
+		self._sourceFilters = [0,0]
 		
 		# verify loki_db version (generate<X>NameStats() in 2.0.0-a4)
 		if not loki_db.Database.checkMinimumVersion(2,0,0,'a4'):
@@ -319,7 +433,7 @@ class Biofilter:
 	
 	def setLDProfile(self, ldprofile=''):
 		self._ldprofile = str(ldprofile).strip()
-		self.log("LD profile for region-locus matching: %s\n" % self._ldprofile)
+		self.log("LD profile for region-locus matching: %s\n" % (self._ldprofile or "<none>"))
 	#setLDProfile()
 	
 	
@@ -333,6 +447,36 @@ class Biofilter:
 		self._groupNamespace = None if (namespace == None) else str(namespace).strip()
 		self.log("group name type: %s\n" % ("<label>" if self._groupNamespace == None else (self._groupNamespace or "<any>")))
 	#setGroupNamespace()
+	
+	
+	def setAlternateModelFiltering(self, alternate=False):
+		self._altModelFilter = True if alternate else False
+		self.log("alternate model filtering: %s\n" % ("yes" if self._altModelFilter else "no"))
+	#setAlternateModelFiltering()
+	
+	
+	def setSupportedModels(self, supported=True):
+		self._supportedModels = True if supported else False
+		self.log("generate only knowledge-supported models: %s\n" % ("yes" if self._supportedModels else "no"))
+	#setSupportedModels()
+	
+	
+	def setMonogenicModels(self, monogenic=False):
+		self._monogenicModels = True if monogenic else False
+		self.log("allow SNP-SNP models within the same gene: %s\n" % ("yes" if self._monogenicModels else "no"))
+	#setMonogenicModels()
+	
+	
+	def setMinimumModelScore(self, score=1):
+		self._minModelScore = int(score)
+		self.log("minimum model score: %s\n" % self._minModelScore)
+	#setMinimumModelScore()
+	
+	
+	def setNumModels(self, num=None):
+		self._numModels = int(num) if num else None
+		self.log("number of models to generate: %s\n" % (self._numModels or "<unlimited>"))
+	#setNumModels()
 	
 	
 	##################################################
@@ -356,12 +500,14 @@ class Biofilter:
 			self._tablesDeindexed.remove(table)
 			self._loki.createDatabaseIndecies(self._schema['main'], 'main', table)
 			if table == "region":
-				self.updateRegionZones()
+				self.updateRegionZones(False)
+			elif table == "region_alt":
+				self.updateRegionZones(True)
 	#prepareTableForQuery()
 	
 	
-	def updateRegionZones(self):
-		self.log("calculating region zone coverage ...")
+	def updateRegionZones(self, alt=False):
+		self.log("calculating %sregion zone coverage ..." % ("alternate " if alt else ""))
 		
 		size = self._loki.getDatabaseSetting('zone_size')
 		if not size:
@@ -370,7 +516,7 @@ class Biofilter:
 		dbc = self._loki._db.cursor()
 		
 		# make sure all regions are correctly oriented
-		dbc.execute("UPDATE `main`.`region` SET posMin = posMax, posMax = posMin WHERE posMin > posMax")
+		dbc.execute("UPDATE `main`.`region%s` SET posMin = posMax, posMax = posMin WHERE posMin > posMax" % ("_alt" if alt else ""))
 		
 		# define zone generator
 		def _zones(size, regions):
@@ -383,19 +529,19 @@ class Biofilter:
 		
 		# feed all regions through the zone generator
 		# (use a separate cursor to iterate both results simultaneously)
-		self.prepareTableForQuery('region')
-		self.prepareTableForUpdate('region_zone')
-		dbc.execute("DELETE FROM `main`.`region_zone`")
+		self.prepareTableForQuery('region%s' % ("_alt" if alt else ""))
+		self.prepareTableForUpdate('region_zone%s' % ("_alt" if alt else ""))
+		dbc.execute("DELETE FROM `main`.`region_zone%s`" % ("_alt" if alt else ""))
 		dbc.executemany(
-			"INSERT OR IGNORE INTO `main`.`region_zone` (region_rowid,chr,zone) VALUES (?,?,?)",
+			"INSERT OR IGNORE INTO `main`.`region_zone%s` (region_rowid,chr,zone) VALUES (?,?,?)" % ("_alt" if alt else ""),
 			_zones(
 				size,
-				self._loki._db.cursor().execute("SELECT rowid,chr,posMin,posMax FROM `main`.`region`")
+				self._loki._db.cursor().execute("SELECT rowid,chr,posMin,posMax FROM `main`.`region%s`" % ("_alt" if alt else ""))
 			)
 		)
 		
 		# clean up
-		self.prepareTableForQuery('region_zone')
+		self.prepareTableForQuery('region_zone%s' % ("_alt" if alt else ""))
 		self.log(" OK\n")
 	#updateRegionZones()
 	
@@ -567,10 +713,10 @@ class Biofilter:
 	# snp/locus input
 	
 	
-	def unionSNPs(self, snps):
+	def unionSNPs(self, snps, alt=False):
 		# snps=[ rs, ... ]
-		self.log("adding SNP filter ...")
-		self.prepareTableForUpdate('snp')
+		self.log("adding %sSNP filter ..." % ("alternate " if alt else ""))
+		self.prepareTableForUpdate('snp%s' % ("_alt" if alt else ""))
 		dbc = self._loki._db.cursor()
 		
 		# for some reason this process (create temp table, insert to temp table,
@@ -580,57 +726,57 @@ class Biofilter:
 		dbc.execute("CREATE TEMP TABLE `temp`.`rs` (rs INTEGER PRIMARY KEY)")
 		dbc.executemany("INSERT OR IGNORE INTO `temp`.`rs` (rs) VALUES (?)", itertools.izip(snps))
 		sql = """
-INSERT INTO `main`.`snp` (label,rs)
+INSERT INTO `main`.`snp%s` (label,rs)
 SELECT 'rs'||t_r.rs, COALESCE(d_sm.rsCurrent, t_r.rs)
 FROM `temp`.`rs` AS t_r
 LEFT JOIN `db`.`snp_merge` AS d_sm
   ON d_sm.rsMerged = t_r.rs
-"""
+""" % ("_alt" if alt else "")
 		dbc.execute(sql)
 		numAdd = self._loki._db.changes()
 		dbc.execute("DROP TABLE `temp`.`rs`")
 		self.log(" OK: added %d RS#s\n" % (numAdd,))
 		
-		self._snpFilters += 1
+		self._snpFilters[1 if alt else 0] += 1
 	#unionSNPs()
 	
 	
-	def intersectSNPs(self, snps):
+	def intersectSNPs(self, snps, alt=False):
 		# snps=[ rs, ... ]
-		if not self._snpFilters:
-			return self.unionSNPs(snps)
-		self.log("intersecting SNP filter ...")
+		if not self._snpFilters[1 if alt else 0]:
+			return self.unionSNPs(snps, alt)
+		self.log("intersecting %sSNP filter ..." % ("alternate " if alt else ""))
 		dbc = self._loki._db.cursor()
 		
-		self.prepareTableForQuery('snp')
-		numBefore = max(row[0] for row in dbc.execute("SELECT COUNT() FROM `main`.`snp`"))
+		self.prepareTableForQuery('snp%s' % ("_alt" if alt else ""))
+		numBefore = max(row[0] for row in dbc.execute("SELECT COUNT() FROM `main`.`snp%s`" % ("_alt" if alt else "")))
 		dbc.execute("CREATE TEMP TABLE `temp`.`rs` (rs INTEGER PRIMARY KEY)")
 		dbc.executemany("INSERT INTO `temp`.`rs` (rs) VALUES (?)", itertools.izip(snps))
 		sql = """
-DELETE FROM `main`.`snp` WHERE rs NOT IN (
+DELETE FROM `main`.`snp%s` WHERE rs NOT IN (
   SELECT m_s.rs
   FROM `temp`.`rs` AS t_r
   LEFT JOIN `db`.`snp_merge` AS d_sm
     ON d_sm.rsMerged = t_r.rs
-  JOIN `main`.`snp` AS m_s
+  JOIN `main`.`snp%s` AS m_s
     ON m_s.rs = COALESCE(d_sm.rsCurrent, t_r.rs)
 )
-"""
+""" % (("_alt" if alt else ""),("_alt" if alt else ""))
 		dbc.execute(sql)
 		numDrop = self._loki._db.changes()
 		dbc.execute("DROP TABLE `temp`.`rs`")
 		self.log(" OK: kept %d RS#s (%d dropped)\n" % (numBefore-numDrop,numDrop))
 		
-		self._snpFilters += 1
+		self._snpFilters[1 if alt else 0] += 1
 	#intersectSNPs()
 	
 	
-	def unionLoci(self, loci):
+	def unionLoci(self, loci, alt=False):
 		# loci=[ (label,chr,pos), ... ]
-		self.log("adding locus filter ...")
-		self.prepareTableForUpdate('locus')
+		self.log("adding %slocus filter ..." % ("alternate " if alt else ""))
+		self.prepareTableForUpdate('locus%s' % ("_alt" if alt else ""))
 		dbc = self._loki._db.cursor()
-		sql = "INSERT OR IGNORE INTO `main`.`locus` (label,chr,pos) VALUES (?,?,?); SELECT LAST_INSERT_ROWID()"
+		sql = "INSERT OR IGNORE INTO `main`.`locus%s` (label,chr,pos) VALUES (?,?,?); SELECT LAST_INSERT_ROWID()" % ("_alt" if alt else "")
 		lastID = None
 		numAdd = numNull = 0
 		for row in dbc.executemany(sql, loci):
@@ -640,24 +786,24 @@ DELETE FROM `main`.`snp` WHERE rs NOT IN (
 			else:
 				numNull += 1
 		self.log(" OK: added %d loci (%d incomplete)\n" % (numAdd,numNull))
-		self._locusFilters += 1
+		self._locusFilters[1 if alt else 0] += 1
 	#unionLoci()
 	
 	
-	def intersectLoci(self, loci):
+	def intersectLoci(self, loci, alt=False):
 		# loci=[ (label,chr,pos), ... ]
-		if not self._locusFilters:
-			return self.unionLoci(loci)
-		self.log("intersecting locus filter ...")
-		self.prepareTableForQuery('locus')
+		if not self._locusFilters[1 if alt else 0]:
+			return self.unionLoci(loci, alt)
+		self.log("intersecting %slocus filter ..." % ("alternate " if alt else ""))
+		self.prepareTableForQuery('locus%s' % ("_alt" if alt else ""))
 		dbc = self._loki._db.cursor()
-		dbc.execute("UPDATE `main`.`locus` SET flag = 0")
+		dbc.execute("UPDATE `main`.`locus%s` SET flag = 0" % ("_alt" if alt else ""))
 		numBefore = self._loki._db.changes()
-		dbc.executemany("UPDATE `main`.`locus` SET flag = 1 WHERE (1 OR ?) AND chr = ? AND pos = ?", loci)
-		dbc.execute("DELETE FROM `main`.`locus` WHERE flag = 0")
+		dbc.executemany("UPDATE `main`.`locus%s` SET flag = 1 WHERE (1 OR ?) AND chr = ? AND pos = ?" % ("_alt" if alt else ""), loci)
+		dbc.execute("DELETE FROM `main`.`locus%s` WHERE flag = 0" % ("_alt" if alt else ""))
 		numDrop = self._loki._db.changes()
 		self.log(" OK: kept %d loci (%d dropped)\n" % (numBefore-numDrop,numDrop))
-		self._locusFilters += 1
+		self._locusFilters[1 if alt else 0] += 1
 	#intersectLoci()
 	
 	
@@ -665,9 +811,9 @@ DELETE FROM `main`.`snp` WHERE rs NOT IN (
 	# region/boundary input
 	
 	
-	def unionGenes(self, names):
+	def unionGenes(self, names, alt=False):
 		# names=[ name, ... ]
-		self.log("adding gene filter ...")
+		self.log("adding %sgene filter ..." % ("alternate " if alt else ""))
 		
 		typeID = self._loki.getTypeID('gene')
 		if not typeID:
@@ -682,24 +828,24 @@ DELETE FROM `main`.`snp` WHERE rs NOT IN (
 			if not namespaceID:
 				raise Exception("ERROR: unknown gene name type '%s'" % (self._geneNamespace,))
 		
-		self.prepareTableForUpdate('gene')
+		self.prepareTableForUpdate('gene%s' % ("_alt" if alt else ""))
 		dbc = self._loki._db.cursor()
-		sql = "INSERT INTO `main`.`gene` (label,biopolymer_id) VALUES (?,?); SELECT 1"
+		sql = "INSERT INTO `main`.`gene%s` (label,biopolymer_id) VALUES (?,?); SELECT 1" % ("_alt" if alt else "")
 		maxMatch = (1 if self._geneStrict else None)
 		tally = dict()
 		numAdd = 0
 		for row in dbc.executemany(sql, self._loki.generateBiopolymerIDsByName(names, maxMatch=maxMatch, tally=tally, namespaceID=namespaceID, typeID=typeID)):
 			numAdd += 1
 		self.log(" OK: added %d genes (%d matched, %d ambiguous, %d unrecognized)\n" % (numAdd,tally['match'],tally['ambig'],tally['null']))
-		self._geneFilters += 1
+		self._geneFilters[1 if alt else 0] += 1
 	#unionGenes()
 	
 	
-	def intersectGenes(self, names):
+	def intersectGenes(self, names, alt=False):
 		# names=[ name, ... ]
-		if not self._geneFilters:
-			return self.unionGenes(names)
-		self.log("intersecting gene filter ...")
+		if not self._geneFilters[1 if alt else 0]:
+			return self.unionGenes(names, alt)
+		self.log("intersecting %sgene filter ..." % ("alternate " if alt else ""))
 		
 		typeID = self._loki.getTypeID('gene')
 		if not typeID:
@@ -714,29 +860,29 @@ DELETE FROM `main`.`snp` WHERE rs NOT IN (
 			if not namespaceID:
 				raise Exception("ERROR: unknown gene name type '%s'" % (self._geneNamespace,))
 		
-		self.prepareTableForQuery('gene')
+		self.prepareTableForQuery('gene%s' % ("_alt" if alt else ""))
 		dbc = self._loki._db.cursor()
-		dbc.execute("UPDATE `main`.`gene` SET flag = 0")
+		dbc.execute("UPDATE `main`.`gene%s` SET flag = 0" % ("_alt" if alt else ""))
 		numBefore = self._loki._db.changes()
 		tally = dict()
-		sql = "UPDATE `main`.`gene` SET flag = 1 WHERE (1 OR ?) AND biopolymer_id = ?"
+		sql = "UPDATE `main`.`gene%s` SET flag = 1 WHERE (1 OR ?) AND biopolymer_id = ?" % ("_alt" if alt else "")
 		maxMatch = (1 if self._geneStrict else None)
 		dbc.executemany(sql, self._loki.generateBiopolymerIDsByName(names, maxMatch=maxMatch, tally=tally, namespaceID=namespaceID, typeID=typeID))
-		dbc.execute("DELETE FROM `main`.`gene` WHERE flag = 0")
+		dbc.execute("DELETE FROM `main`.`gene%s` WHERE flag = 0" % ("_alt" if alt else ""))
 		numDrop = self._loki._db.changes()
 		self.log(" OK: kept %d genes (%d dropped, %d ambiguous, %d unrecognized)\n" % (numBefore-numDrop,numDrop,tally['ambig'],tally['null']))
-		self._geneFilters += 1
+		self._geneFilters[1 if alt else 0] += 1
 	#intersectGenes()
 	
 	
-	def unionRegions(self, regions):
+	def unionRegions(self, regions, alt=False):
 		# regions=[ (label,chr,posMin,posMax), ... ]
-		self.log("adding region filter ...")
+		self.log("adding %sregion filter ..." % ("alternate " if alt else ""))
 		
-		self.prepareTableForUpdate('region')
+		self.prepareTableForUpdate('region%s' % ("_alt" if alt else ""))
 		dbc = self._loki._db.cursor()
 		
-		sql = "INSERT OR IGNORE INTO `main`.`region` (label,chr,posMin,posMax) VALUES (?,?,?,?); SELECT LAST_INSERT_ROWID()"
+		sql = "INSERT OR IGNORE INTO `main`.`region%s` (label,chr,posMin,posMax) VALUES (?,?,?,?); SELECT LAST_INSERT_ROWID()" % ("_alt" if alt else "")
 		lastID = None
 		numAdd = numNull = 0
 		for row in dbc.executemany(sql, regions):
@@ -746,25 +892,25 @@ DELETE FROM `main`.`snp` WHERE rs NOT IN (
 			else:
 				numNull += 1
 		self.log(" OK: added %d regions (%d incomplete)\n" % (numAdd,numNull))
-		self._regionFilters += 1
+		self._regionFilters[1 if alt else 0] += 1
 	#unionRegions()
 	
 	
-	def intersectRegions(self, regions):
+	def intersectRegions(self, regions, alt=False):
 		# regions=[ (label,chr,posMin,posMax), ... ]
-		if not self._regionFilters:
-			return self.unionRegions(regions)
+		if not self._regionFilters[1 if alt else 0]:
+			return self.unionRegions(regions, alt)
 		
-		self.log("intersecting region filter ...")
-		self.prepareTableForQuery('region')
+		self.log("intersecting %sregion filter ..." % ("alternate " if alt else ""))
+		self.prepareTableForQuery('region%s' % ("_alt" if alt else ""))
 		dbc = self._loki._db.cursor()
-		dbc.execute("UPDATE `main`.`region` SET flag = 0")
+		dbc.execute("UPDATE `main`.`region%s` SET flag = 0" % ("_alt" if alt else ""))
 		numBefore = self._loki._db.changes()
-		dbc.executemany("UPDATE `main`.`region` SET flag = 1 WHERE (1 OR ?) AND chr = ? AND posMin = ? AND posMax = ?", regions)
-		dbc.execute("DELETE FROM `main`.`region` WHERE flag = 0")
+		dbc.executemany("UPDATE `main`.`region%s` SET flag = 1 WHERE (1 OR ?) AND chr = ? AND posMin = ? AND posMax = ?" % ("_alt" if alt else ""), regions)
+		dbc.execute("DELETE FROM `main`.`region%s` WHERE flag = 0" % ("_alt" if alt else ""))
 		numDrop = self._loki._db.changes()
 		self.log(" OK: kept %d regions (%d dropped)\n" % (numBefore-numDrop,numDrop))
-		self._regionFilters += 1
+		self._regionFilters[1 if alt else 0] += 1
 	#intersectRegions()
 	
 	
@@ -772,9 +918,9 @@ DELETE FROM `main`.`snp` WHERE rs NOT IN (
 	# group input
 	
 	
-	def unionGroups(self, names, gtype=None):
+	def unionGroups(self, names, gtype=None, alt=False):
 		# names=[ name, ... ]
-		self.log("adding %s filter ..." % (gtype or "group"))
+		self.log("adding %s%s filter ..." % (("alternate" if alt else ""),(gtype or "group")))
 		
 		typeID = gtype and self._loki.getTypeID(gtype)
 		if gtype and not typeID:
@@ -789,9 +935,9 @@ DELETE FROM `main`.`snp` WHERE rs NOT IN (
 			if not namespaceID:
 				raise Exception("ERROR: unknown %s name type '%s'" % (gtype or "group",self._groupNamespace))
 		
-		self.prepareTableForUpdate('group')
+		self.prepareTableForUpdate('group%s' % ("_alt" if alt else ""))
 		dbc = self._loki._db.cursor()
-		sql = "INSERT INTO `main`.`group` (label,group_id) VALUES (?,?); SELECT 1"
+		sql = "INSERT INTO `main`.`group%s` (label,group_id) VALUES (?,?); SELECT 1" % ("_alt" if alt else "")
 		maxMatch = (1 if self._groupStrict else None)
 		tally = dict()
 		numAdd = 0
@@ -800,15 +946,15 @@ DELETE FROM `main`.`snp` WHERE rs NOT IN (
 		self.log(" OK: added %d groups (%d matched, %d ambiguous, %d unrecognized)\n" % (
 				numAdd,tally['match'],tally['ambig'],tally['null']
 		))
-		self._groupFilters += 1
+		self._groupFilters[1 if alt else 0] += 1
 	#unionGroups()
 	
 	
-	def intersectGroups(self, names, gtype=None):
+	def intersectGroups(self, names, gtype=None, alt=False):
 		# names=[ name, ... ]
-		if not self._groupFilters:
-			return self.unionGroups(names, gtype)
-		self.log("intersecting %s filter ..." % (gtype or "group"))
+		if not self._groupFilters[1 if alt else 0]:
+			return self.unionGroups(names, gtype, alt)
+		self.log("intersecting %s%s filter ..." % (("alternate" if alt else ""),(gtype or "group")))
 		
 		typeID = gtype and self._loki.getTypeID(gtype)
 		if gtype and not typeID:
@@ -823,20 +969,20 @@ DELETE FROM `main`.`snp` WHERE rs NOT IN (
 			if not namespaceID:
 				raise Exception("ERROR: unknown %s name type '%s'" % (gtype or "group",self._groupNamespace))
 		
-		self.prepareTableForQuery('group')
+		self.prepareTableForQuery('group%s' % ("_alt" if alt else ""))
 		dbc = self._loki._db.cursor()
-		dbc.execute("UPDATE `main`.`group` SET flag = 0")
+		dbc.execute("UPDATE `main`.`group%s` SET flag = 0" % ("_alt" if alt else ""))
 		numBefore = self._loki._db.changes()
 		maxMatch = (1 if self._groupStrict else None)
 		tally = dict()
-		sql = "UPDATE `main`.`group` SET flag = 1 WHERE (1 OR ?) AND group_id = ?"
+		sql = "UPDATE `main`.`group%s` SET flag = 1 WHERE (1 OR ?) AND group_id = ?" % ("_alt" if alt else "")
 		dbc.executemany(sql, self._loki.generateGroupIDsByName(names, maxMatch=maxMatch, tally=tally, namespaceID=namespaceID, typeID=typeID))
-		dbc.execute("DELETE FROM `main`.`group` WHERE flag = 0")
+		dbc.execute("DELETE FROM `main`.`group%s` WHERE flag = 0" % ("_alt" if alt else ""))
 		numDrop = self._loki._db.changes()
 		self.log(" OK: kept %d groups (%d dropped, %d ambiguous, %d unrecognized)\n" % (
 				numBefore-numDrop,numDrop,tally['ambig'],tally['null']
 		))
-		self._groupFilters += 1
+		self._groupFilters[1 if alt else 0] += 1
 	#intersectGroups()
 	
 	
@@ -844,13 +990,13 @@ DELETE FROM `main`.`snp` WHERE rs NOT IN (
 	# source input
 	
 	
-	def unionSources(self, names):
+	def unionSources(self, names, alt=False):
 		# names=[ name, ... ]
-		self.log("adding source filter ...")
+		self.log("adding %ssource filter ..." % ("alternate " if alt else ""))
 		
-		self.prepareTableForUpdate('source')
+		self.prepareTableForUpdate('source%s' % ("_alt" if alt else ""))
 		dbc = self._loki._db.cursor()
-		sql = "INSERT OR IGNORE INTO `main`.`source` (label,source_id) VALUES (?,?); SELECT LAST_INSERT_ROWID()"
+		sql = "INSERT OR IGNORE INTO `main`.`source%s` (label,source_id) VALUES (?,?); SELECT LAST_INSERT_ROWID()" % ("_alt" if alt else "")
 		lastID = None
 		numAdd = numNull = 0
 		for row in dbc.executemany(sql, self._loki.getSourceIDs(names).iteritems()):
@@ -860,26 +1006,26 @@ DELETE FROM `main`.`snp` WHERE rs NOT IN (
 			else:
 				numNull += 1
 		self.log(" OK: added %d sources (%d unrecognized)\n" % (numAdd,numNull))
-		self._sourceFilters += 1
+		self._sourceFilters[1 if alt else 0] += 1
 	#unionSources()
 	
 	
-	def intersectSources(self, names):
+	def intersectSources(self, names, alt=False):
 		# names=[ name, ... ]
-		if not self._sourceFilters:
-			return self.unionSources(names)
-		self.log("intersecting source filter ...")
+		if not self._sourceFilters[1 if alt else 0]:
+			return self.unionSources(names, alt)
+		self.log("intersecting %ssource filter ..." % ("alternate " if alt else ""))
 		
-		self.prepareTableForQuery('source')
+		self.prepareTableForQuery('source%s' % ("_alt" if alt else ""))
 		dbc = self._loki._db.cursor()
-		dbc.execute("UPDATE `main`.`source` SET flag = 0")
+		dbc.execute("UPDATE `main`.`source%s` SET flag = 0" % ("_alt" if alt else ""))
 		numBefore = self._loki._db.changes()
-		sql = "UPDATE `main`.`source` SET flag = 1 WHERE (1 OR ?) AND source_id = ?"
+		sql = "UPDATE `main`.`source%s` SET flag = 1 WHERE (1 OR ?) AND source_id = ?" % ("_alt" if alt else "")
 		dbc.executemany(sql, self._loki.getSourceIDs(names).iteritems())
-		dbc.execute("DELETE FROM `main`.`source` WHERE flag = 0")
+		dbc.execute("DELETE FROM `main`.`source%s` WHERE flag = 0" % ("_alt" if alt else ""))
 		numDrop = self._loki._db.changes()
 		self.log(" OK: kept %d sources (%d dropped)\n" % (numBefore-numDrop,numDrop))
-		self._sourceFilters += 1
+		self._sourceFilters[1 if alt else 0] += 1
 	#intersectSources()
 	
 	
@@ -1007,7 +1153,6 @@ DELETE FROM `main`.`snp` WHERE rs NOT IN (
 	
 	
 	# define aliases which can be joined, but are not a primary path: {alias:{join1,join2}}
-
 	_queryAliasJoinConditionEdges = {
 		'mf_l'  : {'mf_r' ,'df_br'},
 		'mm_l'  : {'mm_r' ,'ma_r' ,'dm_br'},
@@ -1055,7 +1200,7 @@ DELETE FROM `main`.`snp` WHERE rs NOT IN (
 	# unmodified (i.e. "colA = colB + 10" and also "colA - 10 = colB").
 	_queryTableJoinConditions = {
 		('main','snp'): {
-			('main','snp'): {
+			('main','snp_alt'): {
 				"{L}.rs = {R}.rs",
 			},
 			('db','snp_locus'): {
@@ -1063,8 +1208,14 @@ DELETE FROM `main`.`snp` WHERE rs NOT IN (
 			},
 		},
 		
+		('main','snp_alt'): {
+			('db','snp_locus'): {
+				"{L}.rs = {R}.rs",
+			},
+		},
+		
 		('main','locus'): {
-			('main','locus'): {
+			('main','locus_alt'): {
 				"{L}.chr = {R}.chr",
 				"{L}.pos = {R}.pos",
 			},
@@ -1075,7 +1226,21 @@ DELETE FROM `main`.`snp` WHERE rs NOT IN (
 				"(({L}.pos + {rlTolerance}) / {zoneSize}) >= {R}.zone",
 				"(({L}.pos - {rlTolerance}) / {zoneSize}) <= {R}.zone",
 			},
+			('main','region_zone_alt'): {
+				"{L}.chr = {R}.chr",
+				"{L}.pos >= (({R}.zone * {zoneSize}) - {rlTolerance})",
+				"{L}.pos < ((({R}.zone + 1) * {zoneSize}) + {rlTolerance})",
+				"(({L}.pos + {rlTolerance}) / {zoneSize}) >= {R}.zone",
+				"(({L}.pos - {rlTolerance}) / {zoneSize}) <= {R}.zone",
+			},
 			('main','region'): {
+				"{L}.chr = {R}.chr",
+				"{L}.pos >= ({R}.posMin - {rlTolerance})",
+				"{L}.pos <= ({R}.posMax + {rlTolerance})",
+				"({L}.pos + {rlTolerance}) >= {R}.posMin",
+				"({L}.pos - {rlTolerance}) <= {R}.posMax",
+			},
+			('main','region_alt'): {
 				"{L}.chr = {R}.chr",
 				"{L}.pos >= ({R}.posMin - {rlTolerance})",
 				"{L}.pos <= ({R}.posMax + {rlTolerance})",
@@ -1102,9 +1267,57 @@ DELETE FROM `main`.`snp` WHERE rs NOT IN (
 			},
 		},
 		
+		('main','locus_alt'): {
+			('main','region_zone'): {
+				"{L}.chr = {R}.chr",
+				"{L}.pos >= (({R}.zone * {zoneSize}) - {rlTolerance})",
+				"{L}.pos < ((({R}.zone + 1) * {zoneSize}) + {rlTolerance})",
+				"(({L}.pos + {rlTolerance}) / {zoneSize}) >= {R}.zone",
+				"(({L}.pos - {rlTolerance}) / {zoneSize}) <= {R}.zone",
+			},
+			('main','region_zone_alt'): {
+				"{L}.chr = {R}.chr",
+				"{L}.pos >= (({R}.zone * {zoneSize}) - {rlTolerance})",
+				"{L}.pos < ((({R}.zone + 1) * {zoneSize}) + {rlTolerance})",
+				"(({L}.pos + {rlTolerance}) / {zoneSize}) >= {R}.zone",
+				"(({L}.pos - {rlTolerance}) / {zoneSize}) <= {R}.zone",
+			},
+			('main','region'): {
+				"{L}.chr = {R}.chr",
+				"{L}.pos >= ({R}.posMin - {rlTolerance})",
+				"{L}.pos <= ({R}.posMax + {rlTolerance})",
+				"({L}.pos + {rlTolerance}) >= {R}.posMin",
+				"({L}.pos - {rlTolerance}) <= {R}.posMax",
+			},
+			('main','region_alt'): {
+				"{L}.chr = {R}.chr",
+				"{L}.pos >= ({R}.posMin - {rlTolerance})",
+				"{L}.pos <= ({R}.posMax + {rlTolerance})",
+				"({L}.pos + {rlTolerance}) >= {R}.posMin",
+				"({L}.pos - {rlTolerance}) <= {R}.posMax",
+			},
+			('db','snp_locus'): {
+				"{L}.chr = {R}.chr",
+				"{L}.pos = {R}.pos",
+			},
+			('db','biopolymer_zone'): {
+				"{L}.chr = {R}.chr",
+				"{L}.pos >= (({R}.zone * {zoneSize}) - {rlTolerance})",
+				"{L}.pos < ((({R}.zone + 1) * {zoneSize}) + {rlTolerance})",
+				"(({L}.pos + {rlTolerance}) / {zoneSize}) >= {R}.zone",
+				"(({L}.pos - {rlTolerance}) / {zoneSize}) <= {R}.zone",
+			},
+			('db','biopolymer_region'): {
+				"{L}.chr = {R}.chr",
+				"{L}.pos >= ({R}.posMin - {rlTolerance})",
+				"{L}.pos <= ({R}.posMax + {rlTolerance})",
+				"({L}.pos + {rlTolerance}) >= {R}.posMin",
+				"({L}.pos - {rlTolerance}) <= {R}.posMax",
+			},
+		},
 		
 		('main','region_zone'): {
-			('main','region_zone'): {
+			('main','region_zone_alt'): {
 				"{L}.chr = {R}.chr",
 				"{L}.zone = {R}.zone",
 			},
@@ -1130,8 +1343,31 @@ DELETE FROM `main`.`snp` WHERE rs NOT IN (
 			},
 		},
 		
+		('main','region_zone_alt'): {
+			('main','region_alt'): {
+				"{L}.region_rowid = {R}.rowid",
+				# with the rowid match, these should all be guaranteed by self.updateRegionZones()
+				"{L}.chr = {R}.chr",
+				"(({L}.zone + 1) * {zoneSize}) > {R}.posMin",
+				"({L}.zone * {zoneSize}) <= {R}.posMax",
+				"{L}.zone >= ({R}.posMin / {zoneSize})",
+				"{L}.zone <= ({R}.posMax / {zoneSize})",
+			},
+			('db','snp_locus'): {
+				"{L}.chr = {R}.chr",
+				"(({L}.zone * {zoneSize}) - {rlTolerance}) <= {R}.pos",
+				"((({L}.zone + 1) * {zoneSize}) + {rlTolerance}) > {R}.pos",
+				"{L}.zone <= (({R}.pos + {rlTolerance}) / {zoneSize})",
+				"{L}.zone >= (({R}.pos - {rlTolerance}) / {zoneSize})",
+			},
+			('db','biopolymer_zone'): {
+				"{L}.chr = {R}.chr",
+				"{L}.zone = {R}.zone",
+			},
+		},
+		
 		('main','region'): {
-			('main','region'): { #TODO: partial overlap
+			('main','region_alt'): { #TODO: partial overlap
 				"{L}.chr = {R}.chr",
 				"{L}.posMin = {R}.posMin",
 				"{L}.posMax = {R}.posMax",
@@ -1150,8 +1386,23 @@ DELETE FROM `main`.`snp` WHERE rs NOT IN (
 			},
 		},
 		
+		('main','region_alt'): {
+			('db','snp_locus'): {
+				"{L}.chr = {R}.chr",
+				"({L}.posMin - {rlTolerance}) <= {R}.pos",
+				"({L}.posMax + {rlTolerance}) >= {R}.pos",
+				"{L}.posMin <= ({R}.pos + {rlTolerance})",
+				"{L}.posMax >= ({R}.pos - {rlTolerance})",
+			},
+			('db','biopolymer_region'): { #TODO: partial overlap
+				"{L}.chr = {R}.chr",
+				"{L}.posMin = {R}.posMin",
+				"{L}.posMax = {R}.posMax",
+			},
+		},
+		
 		('main','gene'): {
-			('main','gene'): {
+			('main','gene_alt'): {
 				"{L}.biopolymer_id = {R}.biopolymer_id",
 			},
 			('db','biopolymer_region'): {
@@ -1165,8 +1416,20 @@ DELETE FROM `main`.`snp` WHERE rs NOT IN (
 			},
 		},
 		
+		('main','gene_alt'): {
+			('db','biopolymer_region'): {
+				"{L}.biopolymer_id = {R}.biopolymer_id",
+			},
+			('db','biopolymer'): {
+				"{L}.biopolymer_id = {R}.biopolymer_id",
+			},
+			('db','group_biopolymer'): {
+				"{L}.biopolymer_id = {R}.biopolymer_id",
+			},
+		},
+		
 		('main','group'): {
-			('main','group'): {
+			('main','group_alt'): {
 				"{L}.group_id = {R}.group_id",
 			},
 			('db','group_biopolymer'): {
@@ -1177,10 +1440,28 @@ DELETE FROM `main`.`snp` WHERE rs NOT IN (
 			},
 		},
 		
+		('main','group_alt'): {
+			('db','group_biopolymer'): {
+				"{L}.group_id = {R}.group_id",
+			},
+			('db','group'): {
+				"{L}.group_id = {R}.group_id",
+			},
+		},
+		
 		('main','source'): {
-			('main','source'): {
+			('main','source_alt'): {
 				"{L}.source_id = {R}.source_id",
 			},
+			('db','group'): {
+				"{L}.source_id = {R}.source_id",
+			},
+			('db','source'): {
+				"{L}.source_id = {R}.source_id",
+			},
+		},
+		
+		('main','source_alt'): {
 			('db','group'): {
 				"{L}.source_id = {R}.source_id",
 			},
@@ -1234,6 +1515,9 @@ DELETE FROM `main`.`snp` WHERE rs NOT IN (
 		},
 		
 		('db','group_biopolymer'): {
+			('db','group_biopolymer'): {
+				"{L}.group_id = {R}.group_id",
+			},
 			('db','group'): {
 				"{L}.group_id = {R}.group_id",
 			},
@@ -1248,123 +1532,264 @@ DELETE FROM `main`.`snp` WHERE rs NOT IN (
 	
 	
 	
-	def getQueryAliasJoins(self, aliasTables):
-		pass
-	#getQueryAliasJoins()
-	
-	
 	##################################################
-	# filtering & annotation
+	# filtering, annotation & modeling
 	
 	
-	def generateFilteredData(self, types):
-		# initialize query fragments
-		sqlSelect = [
-			'rowid',
-			'snp_label',
-			'locus_label', 'locus_chr', 'locus_pos',
-			'gene_label',
-			'region_label', 'region_chr', 'region_posMin', 'region_posMax',
-			'group_label',
-			'source_label'
+	def generateResults(self, filterTypes, modelTypes=None):
+		filterTypes = set(filterTypes)
+		modelTypes = set(modelTypes or [])
+		columns = [
+			'f_rowid',
+			'f_snp_label',
+			'f_locus_label', 'f_locus_chr', 'f_locus_pos',
+			'f_gene_label',
+			'f_region_label', 'f_region_chr', 'f_region_posMin', 'f_region_posMax',
+			'f_group_label',
+			'f_source_label',
+			'm_rowid',
+			'm_snp_label',
+			'm_locus_label', 'm_locus_chr', 'm_locus_pos',
+			'm_gene_label',
+			'm_region_label', 'm_region_chr', 'm_region_posMin', 'm_region_posMax',
+			'm_group_label',
+			'm_source_label',
+			'sources',
+			'groups'
 		]
-		sqlRowID = set() # {expA,expB,...} => SELECT expA||'_'||expB... AS rowid, ...
-		sqlColumn = { # {colA:expA,colB:expB,...} => SELECT ... expA AS colA, expB AS colB, ...
-			'snp_label'     : "NULL",
-			'locus_label'   : "NULL",
-			'locus_chr'     : "NULL",
-			'locus_pos'     : "NULL",
-			'gene_label'    : "NULL",
-			'region_label'  : "NULL",
-			'region_chr'    : "NULL",
-			'region_posMin' : "NULL",
-			'region_posMax' : "NULL",
-			'group_label'   : "NULL",
-			'source_label'  : "NULL",
-		}
+		
+		# initialize query fragments
+		sqlFRowID = set() # {expA,expB,...} => SELECT expA||'_'||expB... AS f_rowid, ...
+		sqlMRowID = set() # {expA,expB,...} => SELECT expA||'_'||expB... AS m_rowid, ...
+		sqlSelect = { c:"NULL" for c in columns } # {colA:expA,colB:expB,...} => SELECT ... expA AS colA, expB AS colB, ...
 		sqlFrom = set() # {tblA,tblB,...} => FROM aliasTable[tblA] AS tblA, aliasTable[tblB] AS tblB, ...
 		sqlWhere = set() # {expA,expB,...} => WHERE expA AND expB AND ...
 		sqlGroup = list() # [expA,expB,...] => GROUP BY expA, expB, ...
+		sqlHaving = set() # {expA,expB,...} => HAVING expA AND expB AND ...
+		sqlOrder = list() # [expA,expB,...] => ORDER BY expA, expB, ...
+		sqlLimit = None # l => LIMIT int(l)
 		
-		# include all table aliases needed to satisfy input filters
-		if self._snpFilters:
+		# include all filtering aliases needed to satisfy inputs
+		if self._snpFilters[0]:
 			sqlFrom.add('mf_s')
-		if self._locusFilters:
+		if self._locusFilters[0]:
 			sqlFrom.add('mf_l')
-		if self._geneFilters:
+		if self._geneFilters[0]:
 			sqlFrom.add('mf_bg')
-		if self._regionFilters:
+		if self._regionFilters[0]:
 			sqlFrom.add('mf_r')
-		if self._groupFilters:
+		if self._groupFilters[0]:
 			sqlFrom.add('mf_g')
-		if self._sourceFilters:
+		if self._sourceFilters[0]:
 			sqlFrom.add('mf_c')
 		
-		# include all table aliases and columns needed to satisfy output requests
-		if 'snps' in types:
+		# include all modeling aliases needed to satisfy inputs
+		if modelTypes:
+			if self._snpFilters[1]:
+				sqlFrom.add('ma_s')
+			if self._locusFilters[1]:
+				sqlFrom.add('ma_l')
+			if self._geneFilters[1]:
+				sqlFrom.add('ma_bg')
+			if self._regionFilters[1]:
+				sqlFrom.add('ma_r')
+			if self._groupFilters[1]:
+				sqlFrom.add('ma_g')
+			if self._sourceFilters[1]:
+				sqlFrom.add('ma_c')
+			
+			if not self._altModelFilter:
+				if self._snpFilters[0]:
+					sqlFrom.add('mm_s')
+				if self._locusFilters[0]:
+					sqlFrom.add('mm_l')
+				if self._geneFilters[0]:
+					sqlFrom.add('mm_bg')
+				if self._regionFilters[0]:
+					sqlFrom.add('mm_r')
+				if self._groupFilters[0]:
+					sqlFrom.add('mm_g')
+				if self._sourceFilters[0]:
+					sqlFrom.add('mm_c')
+		#if modelTypes
+		
+		# include all filtering aliases and columns needed to satisfy output
+		if 'snps' in filterTypes:
 			if 'mf_s' in sqlFrom:
-				sqlRowID.add("mf_s.rowid")
-				sqlColumn['snp_label'] = "mf_s.label"
+				sqlFRowID.add("mf_s.rs")
+				sqlSelect['f_snp_label'] = "mf_s.label"
 			else:
 				sqlFrom.add('df_sl')
-				sqlRowID.add("df_sl.rs")
-				sqlColumn['snp_label'] = "'rs'||df_sl.rs"
+				sqlFRowID.add("df_sl.rs")
+				sqlSelect['f_snp_label'] = "'rs'||df_sl.rs"
 		
-		if 'loci' in types:
+		if 'loci' in filterTypes:
 			if 'mf_l' in sqlFrom:
-				sqlRowID.add("mf_l.rowid")
-				sqlColumn['locus_label'] = "mf_l.label"
-				sqlColumn['locus_chr'] = "mf_l.chr"
-				sqlColumn['locus_pos'] = "mf_l.pos"
+				sqlFRowID.add("mf_l.rowid")
+				sqlSelect['f_locus_label'] = "mf_l.label"
+				sqlSelect['f_locus_chr'] = "mf_l.chr"
+				sqlSelect['f_locus_pos'] = "mf_l.pos"
 			else:
 				sqlFrom.add('df_sl')
-				sqlRowID.add("df_sl._ROWID_")
-				sqlColumn['locus_label'] = "'rs'||df_sl.rs"
-				sqlColumn['locus_chr'] = "df_sl.chr"
-				sqlColumn['locus_pos'] = "df_sl.pos"
+				sqlFRowID.add("df_sl._ROWID_")
+				sqlSelect['f_locus_label'] = "'rs'||df_sl.rs"
+				sqlSelect['f_locus_chr'] = "df_sl.chr"
+				sqlSelect['f_locus_pos'] = "df_sl.pos"
 		
-		if 'genes' in types:
+		if 'genes' in filterTypes:
 			if 'mf_bg' in sqlFrom:
-				sqlRowID.add("mf_bg._ROWID")
-				sqlColumn['gene_label'] = "mf_bg.label"
+				sqlFRowID.add("mf_bg.biopolymer_id")
+				sqlSelect['f_gene_label'] = "mf_bg.label"
 			else:
 				sqlFrom.add('df_b')
-				sqlRowID.add("df_b.biopolymer_id")
-				sqlColumn['gene_label'] = "df_b.label"
+				sqlFRowID.add("df_b.biopolymer_id")
+				sqlSelect['f_gene_label'] = "df_b.label"
 		
-		if 'regions' in types:
+		if 'regions' in filterTypes:
 			if 'mf_r' in sqlFrom:
-				sqlRowID.add("mf_r.rowid")
-				sqlColumn['region_label'] = "mf_r.label"
-				sqlColumn['region_chr'] = "mf_r.chr"
-				sqlColumn['region_posMin'] = "mf_r.posMin"
-				sqlColumn['region_posMax'] = "mf_r.posMax"
+				sqlFRowID.add("mf_r.rowid")
+				sqlSelect['f_region_label'] = "mf_r.label"
+				sqlSelect['f_region_chr'] = "mf_r.chr"
+				sqlSelect['f_region_posMin'] = "mf_r.posMin"
+				sqlSelect['f_region_posMax'] = "mf_r.posMax"
 			else:
 				sqlFrom.add('df_b')
 				sqlFrom.add('df_br')
-				sqlRowID.add("df_br._ROWID_")
-				sqlColumn['region_label'] = "df_b.label"
-				sqlColumn['region_chr'] = "df_br.chr"
-				sqlColumn['region_posMin'] = "df_br.posMin"
-				sqlColumn['region_posMax'] = "df_br.posMax"
+				sqlFRowID.add("df_br._ROWID_")
+				sqlSelect['f_region_label'] = "df_b.label"
+				sqlSelect['f_region_chr'] = "df_br.chr"
+				sqlSelect['f_region_posMin'] = "df_br.posMin"
+				sqlSelect['f_region_posMax'] = "df_br.posMax"
 		
-		if 'groups' in types:
+		if 'groups' in filterTypes:
 			if 'mf_g' in sqlFrom:
-				sqlRowID.add("mf_g.rowid")
-				sqlColumn['group_label'] = "mf_g.label"
+				sqlFRowID.add("mf_g.group_id")
+				sqlSelect['f_group_label'] = "mf_g.label"
 			else:
 				sqlFrom.add('df_g')
-				sqlRowID.add("df_g.group_id")
-				sqlColumn['group_label'] = "df_g.label"
+				sqlFRowID.add("df_g.group_id")
+				sqlSelect['f_group_label'] = "df_g.label"
 		
-		if 'sources' in types:
+		if 'sources' in filterTypes:
 			if 'mf_c' in sqlFrom:
-				sqlRowID.add("mf_c.rowid")
-				sqlColumn['source_label'] = "mf_c.label"
+				sqlFRowID.add("mf_c.source_id")
+				sqlSelect['f_source_label'] = "mf_c.label"
 			else:
 				sqlFrom.add('df_c')
-				sqlRowID.add("df_c.source_id")
-				sqlColumn['source_label'] = "df_c.source"
+				sqlFRowID.add("df_c.source_id")
+				sqlSelect['f_source_label'] = "df_c.source"
+		
+		# include all modeling aliases and columns needed to satisfy output
+		if 'snps' in modelTypes:
+			if 'ma_s' in sqlFrom:
+				sqlMRowID.add("ma_s.rs")
+				sqlSelect['m_snp_label'] = "ma_s.label"
+			elif ('mm_s' in sqlFrom) and not self._altModelFilter:
+				sqlMRowID.add("mm_s.rs")
+				sqlSelect['m_snp_label'] = "mm_s.label"
+			else:
+				sqlFrom.add('dm_sl')
+				sqlMRowID.add("dm_sl.rs")
+				sqlSelect['m_snp_label'] = "'rs'||dm_sl.rs"
+		
+		if 'loci' in modelTypes:
+			if 'ma_l' in sqlFrom:
+				sqlMRowID.add("ma_l.rowid")
+				sqlSelect['m_locus_label'] = "ma_l.label"
+				sqlSelect['m_locus_chr'] = "ma_l.chr"
+				sqlSelect['m_locus_pos'] = "ma_l.pos"
+			elif ('mm_l' in sqlFrom) and not self._altModelFilter:
+				sqlMRowID.add("mm_l.rowid")
+				sqlSelect['m_locus_label'] = "mm_l.label"
+				sqlSelect['m_locus_chr'] = "mm_l.chr"
+				sqlSelect['m_locus_pos'] = "mm_l.pos"
+			else:
+				sqlFrom.add('dm_sl')
+				sqlMRowID.add("dm_sl._ROWID_")
+				sqlSelect['m_locus_label'] = "'rs'||dm_sl.rs"
+				sqlSelect['m_locus_chr'] = "dm_sl.chr"
+				sqlSelect['m_locus_pos'] = "dm_sl.pos"
+		
+		if 'genes' in modelTypes:
+			if 'ma_bg' in sqlFrom:
+				sqlMRowID.add("ma_bg.biopolymer_id")
+				sqlSelect['m_gene_label'] = "ma_bg.label"
+			elif ('mm_bg' in sqlFrom) and not self._altModelFilter:
+				sqlMRowID.add("mm_bg.biopolymer_id")
+				sqlSelect['m_gene_label'] = "mm_bg.label"
+			else:
+				sqlFrom.add('dm_b')
+				sqlMRowID.add("dm_b.biopolymer_id")
+				sqlSelect['m_gene_label'] = "dm_b.label"
+		
+		if 'regions' in modelTypes:
+			if 'ma_r' in sqlFrom:
+				sqlMRowID.add("ma_r.rowid")
+				sqlSelect['m_region_label'] = "ma_r.label"
+				sqlSelect['m_region_chr'] = "ma_r.chr"
+				sqlSelect['m_region_posMin'] = "ma_r.posMin"
+				sqlSelect['m_region_posMax'] = "ma_r.posMax"
+			elif ('mm_r' in sqlFrom) and not self._altModelFilter:
+				sqlMRowID.add("mm_r.rowid")
+				sqlSelect['m_region_label'] = "mm_r.label"
+				sqlSelect['m_region_chr'] = "mm_r.chr"
+				sqlSelect['m_region_posMin'] = "mm_r.posMin"
+				sqlSelect['m_region_posMax'] = "mm_r.posMax"
+			else:
+				sqlFrom.add('dm_b')
+				sqlFrom.add('dm_br')
+				sqlMRowID.add("dm_br._ROWID_")
+				sqlSelect['m_region_label'] = "dm_b.label"
+				sqlSelect['m_region_chr'] = "dm_br.chr"
+				sqlSelect['m_region_posMin'] = "dm_br.posMin"
+				sqlSelect['m_region_posMax'] = "dm_br.posMax"
+		
+		if 'groups' in modelTypes:
+			if 'ma_g' in sqlFrom:
+				sqlMRowID.add("ma_g.group_id")
+				sqlSelect['m_group_label'] = "ma_g.label"
+			elif ('mm_g' in sqlFrom) and not self._altModelFilter:
+				sqlMRowID.add("mm_g.group_id")
+				sqlSelect['m_group_label'] = "mm_g.label"
+			else:
+				sqlFrom.add('dm_g')
+				sqlMRowID.add("dm_g.group_id")
+				sqlSelect['m_group_label'] = "dm_g.label"
+		
+		if 'sources' in modelTypes:
+			if 'ma_c' in sqlFrom:
+				sqlMRowID.add("ma_c.source_id")
+				sqlSelect['m_source_label'] = "ma_c.label"
+			elif ('mm_c' in sqlFrom) and not self._altModelFilter:
+				sqlMRowID.add("mm_c.source_id")
+				sqlSelect['m_source_label'] = "mm_c.label"
+			else:
+				sqlFrom.add('dm_c')
+				sqlMRowID.add("dm_c.source_id")
+				sqlSelect['m_source_label'] = "dm_c.source"
+		
+		# add scores and group/having/order for knowledge-supported models
+		if modelTypes and self._supportedModels:
+			sqlFrom.add('df_g')
+			sqlSelect['sources'] = "COUNT(DISTINCT df_g.source_id)"
+			sqlSelect['groups'] = "COUNT(DISTINCT df_g.group_id)"
+			
+			sqlFrom.add('df_gb')
+			sqlFrom.add('dm_gb')
+			sqlWhere.add("df_gb.group_id = dm_gb.group_id")
+			if not self._monogenicModels:
+				sqlWhere.add("df_gb.biopolymer_id != dm_gb.biopolymer_id")
+			
+			sqlGroup.extend(['f_rowid','m_rowid'])
+			sqlHaving.add("sources >= %d" % self._minModelScore)
+			if filterTypes == modelTypes:
+				sqlHaving.add("f_rowid != m_rowid")
+			sqlOrder.extend(['sources DESC','groups DESC'])
+		#if supportedModels
+		
+		# add model limit
+		if modelTypes and self._numModels:
+			sqlLimit = int(self._numModels)
 		
 		# generate all-pairs-shortest-paths
 		paths = { a:{} for a in self._queryAliasJoinPathEdges }
@@ -1389,11 +1814,6 @@ DELETE FROM `main`.`snp` WHERE rs NOT IN (
 				if (a0 in sqlFrom) and (a1 in sqlFrom):
 					sqlFrom.update(paths[a0][a1])
 		
-		# make sure any included filter tables are indexed
-		for a in sqlFrom:
-			if self._queryAliasTables[a][0] == 'main':
-				self.prepareTableForQuery(self._queryAliasTables[a][1])
-		
 		# fetch values to insert into conditions
 		rlTolerance = self._regionLocusTolerance
 		zoneSize = self._loki.getDatabaseSetting('zone_size')
@@ -1403,36 +1823,73 @@ DELETE FROM `main`.`snp` WHERE rs NOT IN (
 		# add some general constraints for included tables
 		if ('df_sl' in sqlFrom) and self._snpLociValidated:
 			sqlWhere.add("df_sl.validated = 1")
+		if ('dm_sl' in sqlFrom) and self._snpLociValidated:
+			sqlWhere.add("dm_sl.validated = 1")
 		if ('df_br' in sqlFrom):
 			sqlWhere.add("df_br.ldprofile_id = {ldprofileID}".format(ldprofileID=ldprofileID))
+		if ('dm_br' in sqlFrom):
+			sqlWhere.add("dm_br.ldprofile_id = {ldprofileID}".format(ldprofileID=ldprofileID))
 		if ('df_gb' in sqlFrom):
 			sqlWhere.add("df_gb.biopolymer_id > 0")
 			if self._knowledgeScoring == 'quality':
 				sqlWhere.add("df_gb.quality {0}".format(">= 100" if self._knowledgeStrict else "> 0"))
 			elif self._knowledgeScoring == 'implication':
-				sqlWhere.add("df.implication {0}".format(">= 100" if self._knowledgeStrict else "> 0"))
+				sqlWhere.add("df_gb.implication {0}".format(">= 100" if self._knowledgeStrict else "> 0"))
 			else:
 				sqlWhere.add("df_gb.specificity {0}".format(">= 100" if self._knowledgeStrict else "> 0"))
+		if ('dm_gb' in sqlFrom):
+			sqlWhere.add("dm_gb.biopolymer_id > 0")
+			if self._knowledgeScoring == 'quality':
+				sqlWhere.add("dm_gb.quality {0}".format(">= 100" if self._knowledgeStrict else "> 0"))
+			elif self._knowledgeScoring == 'implication':
+				sqlWhere.add("dm_gb.implication {0}".format(">= 100" if self._knowledgeStrict else "> 0"))
+			else:
+				sqlWhere.add("dm_gb.specificity {0}".format(">= 100" if self._knowledgeStrict else "> 0"))
 		
 		# add join constraints for included table pairs
 		for a0 in self._queryAliasJoinPathEdges:
-			if a0 in sqlFrom:
-				for a1 in self._queryAliasJoinPathEdges[a0]:
-					if a1 in sqlFrom:
-						t0 = self._queryAliasTables[a0]
-						t1 = self._queryAliasTables[a1]
-						if (t0 in self._queryTableJoinConditions) and (t1 in self._queryTableJoinConditions[t0]):
-							sqlWhere.update(c.format(
-									L=a0, R=a1, rlTolerance=rlTolerance, zoneSize=zoneSize, ldprofileID=ldprofileID
-							) for c in self._queryTableJoinConditions[t0][t1])
+			for a1 in self._queryAliasJoinPathEdges[a0]:
+				if (a0 in sqlFrom) and (a1 in sqlFrom):
+					t0 = self._queryAliasTables[a0]
+					t1 = self._queryAliasTables[a1]
+					if (t0 in self._queryTableJoinConditions) and (t1 in self._queryTableJoinConditions[t0]):
+						sqlWhere.update(c.format(
+								L=a0, R=a1, rlTolerance=rlTolerance, zoneSize=zoneSize, ldprofileID=ldprofileID
+						) for c in self._queryTableJoinConditions[t0][t1])
+		for a0 in self._queryAliasJoinConditionEdges:
+			for a1 in self._queryAliasJoinConditionEdges[a0]:
+				if (a0 in sqlFrom) and (a1 in sqlFrom):
+					t0 = self._queryAliasTables[a0]
+					t1 = self._queryAliasTables[a1]
+					if (t0 in self._queryTableJoinConditions) and (t1 in self._queryTableJoinConditions[t0]):
+						sqlWhere.update(c.format(
+								L=a0, R=a1, rlTolerance=rlTolerance, zoneSize=zoneSize, ldprofileID=ldprofileID
+						) for c in self._queryTableJoinConditions[t0][t1])
+		
+		# make sure any included filter tables are indexed
+		for a0 in sqlFrom:
+			if self._queryAliasTables[a0][0] == 'main':
+				self.prepareTableForQuery(self._queryAliasTables[a0][1])
 		
 		# assemble the pieces
-		sqlColumn['rowid'] = "(" + ("||'_'||".join(sqlRowID)) + ")"
-		sql = "SELECT " + (",\n  ".join("{0} AS {1}".format(sqlColumn[c],c) for c in sqlSelect))
-		sql += "\nFROM " + ((",\n  ".join("`{0[0]}`.`{0[1]}` AS {1}".format(self._queryAliasTables[a],a) for a in sqlFrom)) if sqlFrom else "(SELECT 1)")
-		sql += "\nWHERE " + (("\n  AND ".join(sqlWhere)) if sqlWhere else "1")
+		sql = "SELECT "
+		sqlSelect['f_rowid'] = ("(" + ("||'_'||".join(sqlFRowID)) + ")") if sqlFRowID else "0"
+		sqlSelect['m_rowid'] = ("(" + ("||'_'||".join(sqlMRowID)) + ")") if sqlMRowID else "0"
+		sql += ",\n  ".join("{0} AS {1}".format(sqlSelect[c],c) for c in columns)
+		sql += "\nFROM "
+		sql += (",\n  ".join("`{0[0]}`.`{0[1]}` AS {1}".format(self._queryAliasTables[a],a) for a in sorted(sqlFrom))) if sqlFrom else "(SELECT 1)"
+		if sqlWhere:
+			sql += "\nWHERE "
+			sql += "\n  AND ".join(sorted(sqlWhere))
 		if sqlGroup:
 			sql += "\nGROUP BY " + (", ".join(sqlGroup))
+		if sqlHaving:
+			sql += "\nHAVING "
+			sql += "\n  AND ".join(sorted(sqlHaving))
+		if sqlOrder:
+			sql += "\nORDER BY " + (", ".join(sqlOrder))
+		if sqlLimit:
+			sql += "\nLIMIT %d" % sqlLimit
 		
 		if self._debug:
 			self.log(sql+"\n")
@@ -1448,222 +1905,19 @@ DELETE FROM `main`.`snp` WHERE rs NOT IN (
 		# checked for distinctness because all the rest depend on those few.
 		# So it ends up being fastest to do the duplicate filtering here, by
 		# checking only the composite ROWID against a set of previous values.
-		rowIDs = set()
+		columnIndex = { columns[i]:i for i in xrange(len(columns)) }
+		fidIndex = columnIndex['f_rowid']
+		midIndex = columnIndex['m_rowid']
+		resultIDs = set()
 		for row in self._loki._db.cursor().execute(sql):
-			if row[0] not in rowIDs:
-				rowIDs.add(row[0])
+			if filterTypes == modelTypes:
+				rid = (min(row[fidIndex],row[midIndex]),max(row[fidIndex],row[midIndex]))
+			else:
+				rid = (row[fidIndex],row[midIndex])
+			if rid not in resultIDs:
+				resultIDs.add(rid)
 				yield row
-	#generateFilteredData()
-	
-	
-	##################################################
-	# model generation
-	
-	
-	def outputLociModels(self, etype='gene', target=sys.stdout): #TODO
-		typeID = self._loki.getTypeID(etype)
-		if not typeID:
-			sys.stderr.write("ERROR: unknown entity type '%s'\n" % etype)
-			sys.exit(1)
-		populationID = self._loki.getPopulationID(self._population)
-		if not populationID:
-			sys.stderr.write("ERROR: unknown population '%s'\n" % self._population)
-			sys.exit(1)
-		
-		target.write(
-				("#label1\tchr1\tpos1"
-				+"\tlabel2\tchr2\tpos2"
-				+"\troutes\tlinks\tsources"
-				+"\n")
-		)
-		locus = {}
-		modelRoutes = {}
-		modelLinks = {}
-		modelSources = {}
-		sql = """
-SELECT
-  lA.locus_id AS locus1,
-  COALESCE(lA.label, 'rs'||lA.rs, 'chr'||lA.chr||':'||lA.pos, '!#'||lA.locus_id) AS label1,
-  COALESCE(lA.chr, 'NA') AS chr1,
-  COALESCE(lA.pos, 'NA') AS pos1,
-  lB.locus_id AS locus2,
-  COALESCE(lB.label, 'rs'||lB.rs, 'chr'||lB.chr||':'||lB.pos, '!#'||lB.locus_id) AS label2,
-  COALESCE(lB.chr, 'NA') AS chr2,
-  COALESCE(lB.pos, 'NA') AS pos2,
-  eX.entity_id AS link,
-  elA.source_id AS source1,
-  elB.source_id AS source2
-FROM main.locus AS lA
-JOIN db.entity_zone AS ezA
-  ON ezA.population_id = :population_id
-  AND ezA.chr = lA.chr
-  AND ezA.zone >= (lA.pos - :expand) / 100000
-  AND ezA.zone <= (lA.pos + :expand) / 100000
-JOIN db.entity_region AS erA
-  ON erA.entity_id = ezA.entity_id
-  AND erA.population_id = :population_id
-  AND erA.chr = lA.chr
-  AND erA.posMin <= lA.pos + :expand
-  AND erA.posMax >= lA.pos - :expand
-JOIN db.entity AS eA
-  ON eA.entity_id = erA.entity_id
-  AND eA.type_id = :type_id
-JOIN db.entity_link AS elA
-  ON elA.entity_id = eA.entity_id
-JOIN db.entity AS eX
-  ON eX.entity_id = elA.related_entity_id
-JOIN db.entity_link AS elB
-  ON elB.entity_id = elA.related_entity_id
-  AND elB.related_entity_id != elA.entity_id
-JOIN db.entity AS eB
-  ON eB.entity_id = elB.related_entity_id
-  AND eB.type_id = :type_id
-JOIN db.entity_region AS erB
-  ON erB.entity_id = eB.entity_id
-  AND erB.population_id = :population_id
-JOIN main.locus AS lB
-  ON lB.chr = erB.chr
-  AND lB.pos >= erB.posMin - :expand
-  AND lB.pos <= erB.posMax + :expand
-"""
-		for row in self._loki._dbc.execute(sql, { 'expand':self._expand, 'population_id':populationID, 'type_id':typeID }):
-			if row[0] not in locus:
-				locus[row[0]] = (row[0],row[1],row[2],row[3])
-			if row[4] not in locus:
-				locus[row[4]] = (row[4],row[5],row[6],row[7])
-			model = (row[0],row[4])
-			if model not in modelRoutes:
-				modelRoutes[model] = 0
-				modelLinks[model] = set()
-				modelSources[model] = set()
-			modelRoutes[model] += 1
-			modelLinks[model].add(row[8])
-			modelSources[model].add(row[9])
-			modelSources[model].add(row[10])
-		print "outputting ..."
-		for model in modelRoutes:
-			target.write(
-				(
-					"%s\t%d:%d\t"
-					+"%s\t%d:%d\t"
-					+"%d\t%d\t%d\n"
-				) % (
-					locus[model[0]][1],locus[model[0]][2],locus[model[0]][3],
-					locus[model[1]][1],locus[model[1]][2],locus[model[1]][3],
-					modelRoutes[model], len(modelLinks[model]), len(modelSources[model])
-				)
-			)
-	#outputLociModels() #TODO
-	
-	
-	def outputRegionModels(self, rtype='gene', target=sys.stdout): #TODO
-		typeID = self._loki.getTypeID(rtype)
-		if not typeID:
-			sys.stderr.write("ERROR: unknown region type '%s'\n" % rtype)
-			sys.exit(1)
-		populationID = self._loki.getPopulationID(self._population)
-		if not populationID:
-			sys.stderr.write("ERROR: unknown population '%s'\n" % self._population)
-			sys.exit(1)
-		
-		# map loci to known regions
-		sys.stderr.write("identifying candidate %s regions ..." % rtype)
-		sys.stderr.flush()
-		self._loki.createDatabaseTables(self._schema['temp'], 'temp', 'region')
-		self._loki._dbc.execute("""
-INSERT INTO temp.`region` (label, region_id, type_id, chr, posMin, posMax)
-SELECT r.label, r.region_id, r.type_id, rb.chr, rb.posMin, rb.posMax
-FROM db.`region` AS r
-JOIN db.`region_bound` AS rb
-  ON rb.region_id = r.region_id
-  AND rb.population_id = :population_id
-JOIN main.`locus` AS l
-  ON l.chr = rb.chr
-  AND l.pos >= rb.posMin - :expand
-  AND l.pos <= rb.posMax + :expand
-WHERE r.type_id = :type_id
-GROUP BY rb._rowid_
-""", { 'expand':self._expand, 'population_id':populationID, 'type_id':typeID })
-		self._loki.createDatabaseIndecies(self._schema['temp'], 'temp', 'region')
-		for row in self._loki._dbc.execute("SELECT COUNT(1) FROM temp.region"):
-			ttl = row[0]
-		sys.stderr.write(" OK: %d regions\n" % ttl)
-		
-		# identify suitable groups # TODO: configurable max group size
-		sys.stderr.write("identifying candidate %s groups ..." % rtype)
-		sys.stderr.flush()
-		self._loki.createDatabaseTables(self._schema['temp'], 'temp', 'group')
-		self._loki._dbc.execute("""
-INSERT OR IGNORE INTO temp.`group` (label, group_id, type_id)
-SELECT g.label, g.group_id, g.type_id
-FROM db.`group` AS g
-JOIN db.`group_region` AS gr
-  ON gr.group_id = g.group_id
-JOIN db.`region` AS r
-  ON r.region_id = gr.region_id
-  AND r.type_id = :type_id
-GROUP BY g.group_id
-HAVING COUNT(DISTINCT r.region_id) <= 30
-""", { 'type_id':typeID })
-		self._loki.createDatabaseIndecies(self._schema['temp'], 'temp', 'group')
-		for row in self._loki._dbc.execute("SELECT COUNT(1) FROM temp.`group`"):
-			ttl = row[0]
-		sys.stderr.write(" OK: %d groups\n" % ttl)
-		
-		# generate region models
-		sys.stderr.write("generating %s-%s models ..." % (rtype,rtype))
-		sys.stderr.flush()
-		target.write(
-			(
-				"#%s1\tregion1\t"
-				+"%s2\tregion2\t"
-				+"routes\tgroups\tsources\n"
-			) % (rtype,rtype)
-		)
-		sql = """
-SELECT
-  rA.label AS labelA,
-  GROUP_CONCAT(DISTINCT trA.chr || ':' || trA.posMin || '-' || trA.posMax) AS regionA,
-  rB.label AS labelB,
-  GROUP_CONCAT(DISTINCT trB.chr || ':' || trB.posMin || '-' || trB.posMax) AS regionB,
-  COUNT(1) AS routes,
-  COUNT(DISTINCT tg.group_id) AS groups,
-  COUNT(DISTINCT grA.source_id) AS sourcesA,
-  COUNT(DISTINCT grB.source_id) AS sourcesB
-FROM temp.`region` AS trA
-JOIN db.`region` AS rA
-  ON rA.region_id = trA.region_id
-  AND rA.type_id = :type_id
-JOIN db.`group_region` AS grA
-  ON grA.region_id = rA.region_id
-JOIN temp.`group` AS tg
-  ON tg.group_id = grA.group_id
-JOIN db.`group_region` AS grB
-  ON grB.group_id = grA.group_id
-  AND grB.region_id != grA.region_id
-JOIN db.`region` AS rB
-  ON rB.region_id = grB.region_id
-  AND rB.type_id = :type_id
-JOIN temp.`region` AS trB
-  ON trB.region_id = rB.region_id
-GROUP BY rA.region_id, rB.region_id
-HAVING groups > 1 OR sourcesA > 1 OR sourcesB > 1
-ORDER BY groups DESC, sourcesA DESC, sourcesB DESC
-"""
-		n = 0
-		for row in self._loki._dbc.execute(sql, { 'expand':self._expand, 'population_id':populationID, 'type_id':typeID }):
-			n += 1
-			target.write(
-				(
-					"%s\t%s\t"
-					+"%s\t%s\t"
-					+"%d\t%d\t%d\t%d\n"
-				) % row
-			)
-		sys.stderr.write(" OK: %d models\n" % n)
-		self._loki.dropDatabaseTables(self._schema['temp'], 'temp', 'region')
-		self._loki.dropDatabaseTables(self._schema['temp'], 'temp', 'group')
-	#outputRegionModels() #TODO
+	#generateResults()
 	
 	
 #Biofilter
@@ -1697,7 +1951,7 @@ if __name__ == "__main__":
 			)
 	)
 	
-	parser.add_argument('-k', '--knowledge', type=str, metavar='file',
+	parser.add_argument('--knowledge', '-k', type=str, metavar='file',
 			help="the knowledge database file to use"
 	)
 	
@@ -1752,55 +2006,129 @@ if __name__ == "__main__":
 			help="distance beyond the bounds of known regions where SNPs and loci should still be matched (default: 0)"
 	)
 	
-	parser.add_argument('--ld-profile', type=str, metavar='profile',
+	parser.add_argument('--ld-profile', type=str, metavar='profile', nargs='?', default=False,
 			help="LD profile with which to match known regions to SNPs and loci (default: none)"
 	)
 	
+	choiceModelFiltering = parser.add_mutually_exclusive_group()
+	choiceModelFiltering.add_argument('--uniform-model-filtering', '--umf', action='store_true',
+			help="apply primary input filters to both sides of generated models (default)"
+	)
+	choiceModelFiltering.add_argument('--alternate-model-filtering', '--amf', action='store_true',
+			help="apply primary input filters to only one side of generated models"
+	)
 	
-	parser.add_argument('-s', '--snp', type=str, metavar=('rs#'), nargs='+', action='append',
+	choiceSupportedModels = parser.add_mutually_exclusive_group()
+	choiceSupportedModels.add_argument('--supported-models', '--sm', action='store_true',
+			help="generate only models supported by the knowledge database (default)"
+	)
+	choiceSupportedModels.add_argument('--all-models', '--am', action='store_true',
+			help="generate all pair-wise models"
+	)
+	
+	choiceMonogenicModels = parser.add_mutually_exclusive_group()
+	choiceMonogenicModels.add_argument('--polygenic-models', '--pgm', action='store_true',
+			help="exclude knowledge-supported SNP-SNP models within the same gene (default)"
+	)
+	choiceMonogenicModels.add_argument('--monogenic-models', '--mgm', action='store_true',
+			help="generate knowledge-supported SNP-SNP models within the same gene"
+	)
+	
+	parser.add_argument('--minimum-model-score', '--mms', type=int, metavar='score',
+			help="minimum implication score for knowledge-supported models (default: 1)"
+	)
+	
+	parser.add_argument('--num-models', '--nm', type=int, metavar='score',
+			help="maximum number of models to generate, 0 for unlimited (default: 100)"
+	)
+	
+	
+	parser.add_argument('--snp', '-s', type=str, metavar=('rs#'), nargs='+', action='append',
 			help="input SNPs, specified by RS#"
 	)
 	
-	parser.add_argument('-S', '--snp-file', type=str, metavar=('file'), nargs='+', action='append',
+	parser.add_argument('--alt-snp', '--as', type=str, metavar=('rs#'), nargs='+', action='append',
+			help="alternate input SNPs, specified by RS#"
+	)
+	
+	parser.add_argument('--snp-file', '-S', type=str, metavar=('file'), nargs='+', action='append',
 			help="file(s) from which to load input SNPs"
 	)
 	
-	parser.add_argument('-l', '--locus', type=str, metavar=('locus'), nargs='+', action='append',
+	parser.add_argument('--alt-snp-file', '--AS', type=str, metavar=('file'), nargs='+', action='append',
+			help="file(s) from which to load alternate input SNPs"
+	)
+	
+	
+	parser.add_argument('--locus', '-l', type=str, metavar=('locus'), nargs='+', action='append',
 			help="input loci, specified by chromosome and position"
 	)
 	
-	parser.add_argument('-L', '--locus-file', type=str, metavar=('file'), nargs='+', action='append',
+	parser.add_argument('--alt-locus', '--al', type=str, metavar=('locus'), nargs='+', action='append',
+			help="alternate input loci, specified by chromosome and position"
+	)
+	
+	parser.add_argument('--locus-file', '-L', type=str, metavar=('file'), nargs='+', action='append',
 			help="file(s) from which to load input loci"
 	)
 	
+	parser.add_argument('--alt-locus-file', '--AL', type=str, metavar=('file'), nargs='+', action='append',
+			help="file(s) from which to load alternate input loci"
+	)
 	
-	parser.add_argument('-g', '--gene', type=str, metavar=('name'), nargs='+', action='append',
+	
+	parser.add_argument('--gene', '-g', type=str, metavar=('name'), nargs='+', action='append',
 			help="input genes, specified by name"
 	)
 	
-	parser.add_argument('-G', '--gene-file', type=str, metavar=('file'), nargs='+', action='append',
+	parser.add_argument('--alt-gene', '--ag', type=str, metavar=('name'), nargs='+', action='append',
+			help="alternate input genes, specified by name"
+	)
+	
+	parser.add_argument('--gene-file', '-G', type=str, metavar=('file'), nargs='+', action='append',
 			help="file(s) from which to load input genes"
+	)
+	
+	parser.add_argument('--alt-gene-file', '--AG', type=str, metavar=('file'), nargs='+', action='append',
+			help="file(s) from which to load alternate input genes"
 	)
 	
 	parser.add_argument('--gene-names', type=str, metavar='type', nargs='?', default=False,
 			help="the type of the gene name(s) provided via --gene or --gene-file (default: primary labels)"
 	)
 	
-	parser.add_argument('-r', '--region', type=str, metavar=('region'), nargs='+', action='append',
+	
+	parser.add_argument('--region', '-r', type=str, metavar=('region'), nargs='+', action='append',
 			help="input regions, specified by chromosome, start and stop positions"
 	)
 	
-	parser.add_argument('-R', '--region-file', type=str, metavar=('file'), nargs='+', action='append',
+	parser.add_argument('--alt-region', '--ar', type=str, metavar=('region'), nargs='+', action='append',
+			help="alternate input regions, specified by chromosome, start and stop positions"
+	)
+	
+	parser.add_argument('--region-file', '-R', type=str, metavar=('file'), nargs='+', action='append',
 			help="file(s) from which to load input regions"
 	)
 	
+	parser.add_argument('--alt-region-file', '--AR', type=str, metavar=('file'), nargs='+', action='append',
+			help="file(s) from which to load alternate input regions"
+	)
 	
-	parser.add_argument('-u', '--group', type=str, metavar=('name'), nargs='+', action='append',
+	
+	parser.add_argument('--group', '-u', type=str, metavar=('name'), nargs='+', action='append',
 			help="input groups, specified by name"
 	)
 	
-	parser.add_argument('-U', '--group-file', type=str, metavar=('file'), nargs='+', action='append',
+	parser.add_argument('--alt-group', '--au', type=str, metavar=('name'), nargs='+', action='append',
+			help="alternate input groups, specified by name"
+	)
+	
+	parser.add_argument('--group-file', '-U', type=str, metavar=('file'), nargs='+', action='append',
 			help="file(s) from which to load input groups"
+	)
+	
+	parser.add_argument('--alt-group-file', '--AU', type=str, metavar=('file'), nargs='+', action='append',
+			help="file(s) from which to load alternate input groups"
 	)
 	
 	parser.add_argument('--group-names', type=str, metavar='type', nargs='?', default=False,
@@ -1808,16 +2136,24 @@ if __name__ == "__main__":
 	)
 	
 	
-	parser.add_argument('-c', '--source', type=str, metavar=('name'), nargs='+', action='append',
+	parser.add_argument('--source', '-c', type=str, metavar=('name'), nargs='+', action='append',
 			help="input sources, specified by name"
 	)
 	
-	parser.add_argument('-C', '--source-file', type=str, metavar=('file'), nargs='+', action='append',
+	parser.add_argument('--alt-source', '--ac', type=str, metavar=('name'), nargs='+', action='append',
+			help="alternate input sources, specified by name"
+	)
+	
+	parser.add_argument('--source-file', '-C', type=str, metavar=('file'), nargs='+', action='append',
 			help="file(s) from which to load input sources"
 	)
 	
+	parser.add_argument('--alt-source-file', '--AC', type=str, metavar=('file'), nargs='+', action='append',
+			help="file(s) from which to load alternate input sources"
+	)
 	
-	parser.add_argument('-p', '--prefix', type=str, metavar='prefix', default='biofilter',
+	
+	parser.add_argument('--prefix', '-p', type=str, metavar='prefix', default='biofilter',
 			help="prefix to use for all output filenames; may contain path components (default: 'biofilter')"
 	)
 	
@@ -1838,12 +2174,16 @@ if __name__ == "__main__":
 			help="output group name statistics"
 	)
 	
-	parser.add_argument('-o', '--output', type=str, metavar=('type'), nargs='+', action='append', choices=['snps','loci','genes','regions','groups','sources'],
+	parser.add_argument('--output', '-o', type=str, metavar=('type'), nargs='+', action='append', choices=['snps','loci','genes','regions','groups','sources'],
 			help="data type(s) to filter and annotate, from 'snps', 'loci', 'genes', 'regions', 'groups' and 'sources'"
 	)
 	
+	parser.add_argument('--model', '-m', type=str, metavar=('type'), nargs=2, action='append', choices=['snps','loci','genes','regions','groups','sources'],
+			help="data types to model, from 'snps', 'loci', 'genes', 'regions', 'groups' and 'sources'"
+	)
 	
-	parser.add_argument('-v', '--verbose', action='store_true',
+	
+	parser.add_argument('--verbose', '-v', action='store_true',
 			help="print warnings and log messages"
 	)
 	
@@ -1871,10 +2211,12 @@ if __name__ == "__main__":
 	if args.knowledge:
 		dbPath = args.knowledge
 		if not os.path.exists(dbPath):
-			if not os.path.samefile(os.getcwd(), os.path.dirname(__file__)):
-				dbPath = os.path.join(os.path.dirname(__file__), args.knowledge)
+			cwdDir = os.path.dirname(os.path.realpath(os.path.abspath(os.getcwd())))
+			myDir = os.path.dirname(os.path.realpath(os.path.abspath(__file__)))
+			if not os.path.samefile(cwdDir, myDir):
+				dbPath = os.path.join(myDir, args.knowledge)
 				if not os.path.exists(dbPath):
-					exit("ERROR: knowledge database file '%s' not found in '%s' or '%s'" % (args.knowledge, os.getcwd(), os.path.dirname(__file__)))
+					exit("ERROR: knowledge database file '%s' not found in '%s' or '%s'" % (args.knowledge, cwdDir, myDir))
 			else:
 				exit("ERROR: knowledge database file '%s' not found" % (args.knowledge))
 		if args.prime == None:
@@ -1889,7 +2231,7 @@ if __name__ == "__main__":
 						pass
 				bio.log(" OK: %1.1f seconds\n" % (time.time()-t0))
 		#if prime
-		bio.attachDatabaseFile(args.knowledge)
+		bio.attachDatabaseFile(dbPath)
 	
 	if args.validated_snp_loci:
 		bio.setValidatedSNPLoci(True)
@@ -1918,7 +2260,7 @@ if __name__ == "__main__":
 	elif args.quality_knowledge_scoring:
 		bio.setKnowledgeScoring('quality')
 	
-	if args.region_locus_tolerance:
+	if args.region_locus_tolerance != None:
 		t = args.region_locus_tolerance.strip().upper()
 		if t[-1:] == 'B':
 			t = t[:-1]
@@ -1932,14 +2274,36 @@ if __name__ == "__main__":
 			t = long(t)
 		bio.setRegionLocusTolerance(t)
 	
-	if args.ld_profile:
-		bio.setLDProfile(args.ld_profile)
+	if args.ld_profile != False:
+		bio.setLDProfile(args.ld_profile or '')
+	
+	if args.uniform_model_filtering:
+		bio.setAlternateModelFiltering(False)
+	elif args.alternate_model_filtering:
+		bio.setAlternateModelFiltering(True)
+	
+	if args.supported_models:
+		bio.setSupportedModels(True)
+	elif args.all_models:
+		bio.setSupportedModels(False)
+	
+	if args.polygenic_models:
+		bio.setMonogenicModels(False)
+	elif args.monogenic_models:
+		bio.setMonogenicModels(True)
+	
+	if args.minimum_model_score != None:
+		bio.setMinimumModelScore(args.minimum_model_score)
+	
+	if args.num_models != None:
+		bio.setNumModels(args.num_models)
 	
 	if args.gene_names != False:
 		bio.setGeneNamespace(args.gene_names or '')
 	
 	if args.group_names != False:
 		bio.setGroupNamespace(args.group_names or '')
+	
 	
 	# apply SNP filters
 	if args.snp:
@@ -1948,6 +2312,12 @@ if __name__ == "__main__":
 	if args.snp_file:
 		for snpFileList in args.snp_file:
 			bio.intersectSNPs( bio.generateRSesFromRSFiles(snpFileList) )
+	if args.alt_snp:
+		for snpList in args.alt_snp:
+			bio.intersectSNPs( bio.generateRSesFromText(snpList), True )
+	if args.alt_snp_file:
+		for snpFileList in args.alt_snp_file:
+			bio.intersectSNPs( bio.generateRSesFromRSFiles(snpFileList), True )
 	
 	# apply locus filters
 	if args.locus:
@@ -1956,6 +2326,12 @@ if __name__ == "__main__":
 	if args.locus_file:
 		for locusFileList in args.locus_file:
 			bio.intersectLoci( bio.generateLociFromMapFiles(locusFileList) )
+	if args.alt_locus:
+		for locusList in args.alt_locus:
+			bio.intersectLoci( bio.generateLociFromText(locusList), True )
+	if args.alt_locus_file:
+		for locusFileList in args.alt_locus_file:
+			bio.intersectLoci( bio.generateLociFromMapFiles(locusFileList), True )
 	
 	# apply gene filters
 	if args.gene:
@@ -1964,6 +2340,12 @@ if __name__ == "__main__":
 	if args.gene_file:
 		for geneFileList in args.gene_file:
 			bio.intersectGenes( bio.generateNamesFromNameFiles(geneFileList) )
+	if args.alt_gene:
+		for geneList in args.alt_gene:
+			bio.intersectGenes( geneList, True )
+	if args.alt_gene_file:
+		for geneFileList in args.alt_gene_file:
+			bio.intersectGenes( bio.generateNamesFromNameFiles(geneFileList), True )
 	
 	# apply region filters
 	if args.region:
@@ -1972,6 +2354,12 @@ if __name__ == "__main__":
 	if args.region_file:
 		for regionFileList in args.region_file:
 			bio.intersectRegions( bio.generateRegionsFromFiles(regionFileList) )
+	if args.alt_region:
+		for regionList in args.alt_region:
+			bio.intersectRegions( bio.generateRegionsFromText(regionList), True )
+	if args.alt_region_file:
+		for regionFileList in args.alt_region_file:
+			bio.intersectRegions( bio.generateRegionsFromFiles(regionFileList), True )
 	
 	# apply group filters
 	if args.group:
@@ -1980,6 +2368,12 @@ if __name__ == "__main__":
 	if args.group_file:
 		for groupFileList in args.group_file:
 			bio.intersectGroups( bio.generateNamesFromNameFiles(groupFileList) )
+	if args.alt_group:
+		for groupList in args.alt_group:
+			bio.intersectGroups( groupList, True )
+	if args.alt_group_file:
+		for groupFileList in args.alt_group_file:
+			bio.intersectGroups( bio.generateNamesFromNameFiles(groupFileList), True )
 	
 	# apply source filters
 	if args.source:
@@ -1988,6 +2382,12 @@ if __name__ == "__main__":
 	if args.source_file:
 		for sourceFileList in args.source_file:
 			bio.intersectSources( bio.generateNamesFromNameFiles(sourceFileList) )
+	if args.alt_source:
+		for sourceList in args.alt_source:
+			bio.intersectSources( sourceList, True )
+	if args.alt_source_file:
+		for sourceFileList in args.alt_source_file:
+			bio.intersectSources( bio.generateNamesFromNameFiles(sourceFileList), True )
 	
 	# gene name stats
 	if args.gene_name_stats:
@@ -2017,16 +2417,17 @@ if __name__ == "__main__":
 			bio.log(" OK\n")
 	#if group-name-stats
 	
-	# output
+	# filtering/annotation output
 	for output in (args.output or []):
 		outPath = args.prefix + '.' + '-'.join(output)
 		bio.log("writing %s to %s ..." % ('-'.join(output),("<stdout>" if args.stdout else outPath)))
 		if (not args.stdout) and (not args.overwrite) and os.path.exists(outPath):
 			bio.log("ERROR: output file '%s' already exists\n" % outPath)
 		else:
-			# generateFilteredData() yields (rowid, snp_label, locus_label,chr,pos, gene_label, region_label,chr,posMin,posMax, group_label, source_label)
 			headerList = list()
 			formatList = list()
+			
+			# => (rowid, snp_label, locus_label,chr,pos, gene_label, region_label,chr,posMin,posMax, group_label, source_label)
 			for outType in output:
 				if outType == 'snps':
 					headerList.extend(["snp"])
@@ -2047,15 +2448,81 @@ if __name__ == "__main__":
 					headerList.extend(["source"])
 					formatList.extend(["{d[11]}"])
 			#foreach outType
+			
 			headerStr = "#" + "\t".join(headerList) + "\n"
 			formatStr = "\t".join(formatList) + "\n"
 			with (sys.stdout if args.stdout else open(outPath, 'w')) as outFile:
 				outFile.write(headerStr)
-				for data in bio.generateFilteredData(set(output)):
+				for data in bio.generateResults(output):
 					outFile.write(formatStr.format(d=data))
 			#with outFile
 			bio.log(" OK\n")
 		#if output ok
 	#foreach output
+	
+	# modeling output
+	for model in (args.model or []):
+		outPath = args.prefix + '.' + '-'.join(model) + '.models'
+		bio.log("writing %s models to %s ..." % ('-'.join(model),("<stdout>" if args.stdout else outPath)))
+		if (not args.stdout) and (not args.overwrite) and os.path.exists(outPath):
+			bio.log("ERROR: output file '%s' already exists\n" % outPath)
+		else:
+			headerList = list()
+			formatList = list()
+			
+			# [0:11] => (f_rowid, f_snp_label, f_locus_label,chr,pos, f_gene_label, f_region_label,chr,posMin,posMax, f_group_label, f_source_label)
+			if model[0] == 'snps':
+				headerList.extend(["snp"])
+				formatList.extend(["{d[1]}"])
+			elif model[0] == 'loci':
+				headerList.extend(["chr","locus","pos"])
+				formatList.extend(["{d[3]}","{d[2]}","{d[4]}"])
+			elif model[0] == 'genes':
+				headerList.extend(["gene"])
+				formatList.extend(["{d[5]}"])
+			elif model[0] == 'regions':
+				headerList.extend(["chr","region","posMin","posMax"])
+				formatList.extend(["{d[7]}","{d[6]}","{d[8]}","{d[9]}"])
+			elif model[0] == 'groups':
+				headerList.extend(["group"])
+				formatList.extend(["{d[10]}"])
+			elif model[0] == 'sources':
+				headerList.extend(["source"])
+				formatList.extend(["{d[11]}"])
+			
+			# [0:11] => (m_rowid, m_snp_label, m_locus_label,chr,pos, m_gene_label, m_region_label,chr,posMin,posMax, m_group_label, m_source_label)
+			if model[1] == 'snps':
+				headerList.extend(["snp"])
+				formatList.extend(["{d[13]}"])
+			elif model[1] == 'loci':
+				headerList.extend(["chr","locus","pos"])
+				formatList.extend(["{d[15]}","{d[14]}","{d[16]}"])
+			elif model[1] == 'genes':
+				headerList.extend(["gene"])
+				formatList.extend(["{d[17]}"])
+			elif model[1] == 'regions':
+				headerList.extend(["chr","region","posMin","posMax"])
+				formatList.extend(["{d[19]}","{d[18]}","{d[20]}","{d[21]}"])
+			elif model[1] == 'groups':
+				headerList.extend(["group"])
+				formatList.extend(["{d[22]}"])
+			elif model[1] == 'sources':
+				headerList.extend(["source"])
+				formatList.extend(["{d[23]}"])
+			
+			if bio._supportedModels:
+				headerList.extend(["score"])
+				formatList.extend(["{d[24]}.{d[25]}"])
+			
+			headerStr = "#" + "\t".join(headerList) + "\n"
+			formatStr = "\t".join(formatList) + "\n"
+			with (sys.stdout if args.stdout else open(outPath, 'w')) as outFile:
+				outFile.write(headerStr)
+				for data in bio.generateResults(model[0:1], model[1:2]):
+					outFile.write(formatStr.format(d=data))
+			#with outFile
+			bio.log(" OK\n")
+		#if model ok
+	#foreach model
 	
 #__main__
