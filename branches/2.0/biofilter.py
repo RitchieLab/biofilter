@@ -17,7 +17,7 @@ class Biofilter:
 	# public class data
 	
 	
-	ver_maj,ver_min,ver_rev,ver_dev,ver_date = 2,0,0,'a5','2012-07-13'
+	ver_maj,ver_min,ver_rev,ver_dev,ver_date = 2,0,0,'a6','2012-07-31'
 	
 	
 	##################################################
@@ -304,6 +304,8 @@ class Biofilter:
 		self._knowledgeStrict = True
 		self._knowledgeScoring = 'basic'
 		self._regionLocusTolerance = 0
+		self._regionMatchPercent = 100
+		self._regionMatchBases = 0
 		self._geneNamespace = None
 		self._groupNamespace = None
 		self._ldprofile = ''
@@ -312,6 +314,7 @@ class Biofilter:
 		self._monogenicModels = False
 		self._minModelScore = 1
 		self._numModels = 100
+		self._modelOrder = True
 		
 		self._tablesDeindexed = set()
 		self._snpFilters = [0,0]
@@ -425,10 +428,22 @@ class Biofilter:
 	#setKnowledgeScoring()
 	
 	
-	def setRegionLocusTolerance(self, tolerance=0):
-		self._regionLocusTolerance = int(tolerance)
+	def setRegionLocusTolerance(self, bases=0):
+		self._regionLocusTolerance = int(bases)
 		self.log("region-locus match tolerance: %d\n" % self._regionLocusTolerance)
 	#setRegionLocusTolerance()
+	
+	
+	def setRegionMatchPercent(self, percent=None):
+		self._regionMatchPercent = max(0, min(100, int(percent)))
+		self.log("minimum region match percent: %s%%\n" % (self._regionMatchPercent))
+	#setRegionMatchPercent()
+	
+	
+	def setRegionMatchBases(self, bases=None):
+		self._regionMatchBases = int(bases)
+		self.log("minimum region match bases: %d\n" % (self._regionMatchBases,))
+	#setRegionMatchBases()
 	
 	
 	def setLDProfile(self, ldprofile=''):
@@ -474,9 +489,15 @@ class Biofilter:
 	
 	
 	def setNumModels(self, num=None):
-		self._numModels = int(num) if num else None
+		self._numModels = int(num) or None
 		self.log("number of models to generate: %s\n" % (self._numModels or "<unlimited>"))
 	#setNumModels()
+	
+	
+	def setModelOrder(self, score=True):
+		self._modelOrder = True if score else False
+		self.log("model sort order: %s\n" % ("descending score" if self._modelOrder else "none/random"))
+	#setModelOrder()
 	
 	
 	##################################################
@@ -1324,11 +1345,11 @@ DELETE FROM `main`.`snp%s` WHERE rs NOT IN (
 			('main','region'): {
 				"{L}.region_rowid = {R}.rowid",
 				# with the rowid match, these should all be guaranteed by self.updateRegionZones()
-				"{L}.chr = {R}.chr",
-				"(({L}.zone + 1) * {zoneSize}) > {R}.posMin",
-				"({L}.zone * {zoneSize}) <= {R}.posMax",
-				"{L}.zone >= ({R}.posMin / {zoneSize})",
-				"{L}.zone <= ({R}.posMax / {zoneSize})",
+				#"{L}.chr = {R}.chr",
+				#"(({L}.zone + 1) * {zoneSize}) > {R}.posMin",
+				#"({L}.zone * {zoneSize}) <= {R}.posMax",
+				#"{L}.zone >= ({R}.posMin / {zoneSize})",
+				#"{L}.zone <= ({R}.posMax / {zoneSize})",
 			},
 			('db','snp_locus'): {
 				"{L}.chr = {R}.chr",
@@ -1347,11 +1368,11 @@ DELETE FROM `main`.`snp%s` WHERE rs NOT IN (
 			('main','region_alt'): {
 				"{L}.region_rowid = {R}.rowid",
 				# with the rowid match, these should all be guaranteed by self.updateRegionZones()
-				"{L}.chr = {R}.chr",
-				"(({L}.zone + 1) * {zoneSize}) > {R}.posMin",
-				"({L}.zone * {zoneSize}) <= {R}.posMax",
-				"{L}.zone >= ({R}.posMin / {zoneSize})",
-				"{L}.zone <= ({R}.posMax / {zoneSize})",
+				#"{L}.chr = {R}.chr",
+				#"(({L}.zone + 1) * {zoneSize}) > {R}.posMin",
+				#"({L}.zone * {zoneSize}) <= {R}.posMax",
+				#"{L}.zone >= ({R}.posMin / {zoneSize})",
+				#"{L}.zone <= ({R}.posMax / {zoneSize})",
 			},
 			('db','snp_locus'): {
 				"{L}.chr = {R}.chr",
@@ -1367,10 +1388,17 @@ DELETE FROM `main`.`snp%s` WHERE rs NOT IN (
 		},
 		
 		('main','region'): {
-			('main','region_alt'): { #TODO: partial overlap
+			('main','region_alt'): {
 				"{L}.chr = {R}.chr",
-				"{L}.posMin = {R}.posMin",
-				"{L}.posMax = {R}.posMax",
+				"({L}.posMax - {L}.posMin) >= {rmBases}",
+				"({R}.posMax - {R}.posMin) >= {rmBases}",
+				"((" +
+					"{L}.posMin >= {R}.posMin AND " +
+					"{L}.posMin <= {R}.posMax - MAX({rmBases}, MIN({L}.posMax - {L}.posMin, {R}.posMax - {R}.posMin) * {rmPercent} / 100)" +
+				") OR (" +
+					"{R}.posMin >= {L}.posMin AND " +
+					"{R}.posMin <= {L}.posMax - MAX({rmBases}, MIN({L}.posMax - {L}.posMin, {R}.posMax - {R}.posMin) * {rmPercent} / 100)" +
+				"))",
 			},
 			('db','snp_locus'): {
 				"{L}.chr = {R}.chr",
@@ -1379,10 +1407,17 @@ DELETE FROM `main`.`snp%s` WHERE rs NOT IN (
 				"{L}.posMin <= ({R}.pos + {rlTolerance})",
 				"{L}.posMax >= ({R}.pos - {rlTolerance})",
 			},
-			('db','biopolymer_region'): { #TODO: partial overlap
+			('db','biopolymer_region'): {
 				"{L}.chr = {R}.chr",
-				"{L}.posMin = {R}.posMin",
-				"{L}.posMax = {R}.posMax",
+				"({L}.posMax - {L}.posMin) >= {rmBases}",
+				"({R}.posMax - {R}.posMin) >= {rmBases}",
+				"((" +
+					"{L}.posMin >= {R}.posMin AND " +
+					"{L}.posMin <= {R}.posMax - MAX({rmBases}, MIN({L}.posMax - {L}.posMin, {R}.posMax - {R}.posMin) * {rmPercent} / 100)" +
+				") OR (" +
+					"{R}.posMin >= {L}.posMin AND " +
+					"{R}.posMin <= {L}.posMax - MAX({rmBases}, MIN({L}.posMax - {L}.posMin, {R}.posMax - {R}.posMin) * {rmPercent} / 100)" +
+				"))",
 			},
 		},
 		
@@ -1394,10 +1429,17 @@ DELETE FROM `main`.`snp%s` WHERE rs NOT IN (
 				"{L}.posMin <= ({R}.pos + {rlTolerance})",
 				"{L}.posMax >= ({R}.pos - {rlTolerance})",
 			},
-			('db','biopolymer_region'): { #TODO: partial overlap
+			('db','biopolymer_region'): {
 				"{L}.chr = {R}.chr",
-				"{L}.posMin = {R}.posMin",
-				"{L}.posMax = {R}.posMax",
+				"({L}.posMax - {L}.posMin) >= {rmBases}",
+				"({R}.posMax - {R}.posMin) >= {rmBases}",
+				"((" +
+					"{L}.posMin >= {R}.posMin AND " +
+					"{L}.posMin <= {R}.posMax - MAX({rmBases}, MIN({L}.posMax - {L}.posMin, {R}.posMax - {R}.posMin) * {rmPercent} / 100)" +
+				") OR (" +
+					"{R}.posMin >= {L}.posMin AND " +
+					"{R}.posMin <= {L}.posMax - MAX({rmBases}, MIN({L}.posMax - {L}.posMin, {R}.posMax - {R}.posMin) * {rmPercent} / 100)" +
+				"))",
 			},
 		},
 		
@@ -1780,11 +1822,13 @@ DELETE FROM `main`.`snp%s` WHERE rs NOT IN (
 			if not self._monogenicModels:
 				sqlWhere.add("df_gb.biopolymer_id != dm_gb.biopolymer_id")
 			
-			sqlGroup.extend(['f_rowid','m_rowid'])
+			sqlGroup.extend(sqlFRowID)
+			sqlGroup.extend(sqlMRowID)
 			sqlHaving.add("sources >= %d" % self._minModelScore)
 			if filterTypes == modelTypes:
 				sqlHaving.add("f_rowid != m_rowid")
-			sqlOrder.extend(['sources DESC','groups DESC'])
+			if self._modelOrder:
+				sqlOrder.extend(['sources DESC','groups DESC'])
 		#if supportedModels
 		
 		# add model limit
@@ -1816,6 +1860,8 @@ DELETE FROM `main`.`snp%s` WHERE rs NOT IN (
 		
 		# fetch values to insert into conditions
 		rlTolerance = self._regionLocusTolerance
+		rmPercent = self._regionMatchPercent
+		rmBases = self._regionMatchBases
 		zoneSize = self._loki.getDatabaseSetting('zone_size')
 		zoneSize = int(zoneSize) if zoneSize else None
 		ldprofileID = self._loki.getLDProfileID(self._ldprofile)
@@ -1854,7 +1900,7 @@ DELETE FROM `main`.`snp%s` WHERE rs NOT IN (
 					t1 = self._queryAliasTables[a1]
 					if (t0 in self._queryTableJoinConditions) and (t1 in self._queryTableJoinConditions[t0]):
 						sqlWhere.update(c.format(
-								L=a0, R=a1, rlTolerance=rlTolerance, zoneSize=zoneSize, ldprofileID=ldprofileID
+								L=a0, R=a1, rlTolerance=rlTolerance, rmPercent=rmPercent, rmBases=rmBases, zoneSize=zoneSize, ldprofileID=ldprofileID
 						) for c in self._queryTableJoinConditions[t0][t1])
 		for a0 in self._queryAliasJoinConditionEdges:
 			for a1 in self._queryAliasJoinConditionEdges[a0]:
@@ -1863,7 +1909,7 @@ DELETE FROM `main`.`snp%s` WHERE rs NOT IN (
 					t1 = self._queryAliasTables[a1]
 					if (t0 in self._queryTableJoinConditions) and (t1 in self._queryTableJoinConditions[t0]):
 						sqlWhere.update(c.format(
-								L=a0, R=a1, rlTolerance=rlTolerance, zoneSize=zoneSize, ldprofileID=ldprofileID
+								L=a0, R=a1, rlTolerance=rlTolerance, rmPercent=rmPercent, rmBases=rmBases, zoneSize=zoneSize, ldprofileID=ldprofileID
 						) for c in self._queryTableJoinConditions[t0][t1])
 		
 		# make sure any included filter tables are indexed
@@ -1909,14 +1955,18 @@ DELETE FROM `main`.`snp%s` WHERE rs NOT IN (
 		fidIndex = columnIndex['f_rowid']
 		midIndex = columnIndex['m_rowid']
 		resultIDs = set()
-		for row in self._loki._db.cursor().execute(sql):
-			if filterTypes == modelTypes:
+		if filterTypes == modelTypes:
+			for row in self._loki._db.cursor().execute(sql):
 				rid = (min(row[fidIndex],row[midIndex]),max(row[fidIndex],row[midIndex]))
-			else:
+				if rid not in resultIDs:
+					resultIDs.add(rid)
+					yield row
+		else:
+			for row in self._loki._db.cursor().execute(sql):
 				rid = (row[fidIndex],row[midIndex])
-			if rid not in resultIDs:
-				resultIDs.add(rid)
-				yield row
+				if rid not in resultIDs:
+					resultIDs.add(rid)
+					yield row
 	#generateResults()
 	
 	
@@ -2002,8 +2052,16 @@ if __name__ == "__main__":
 			help="use quality scoring for ambiguous associations in the knowledge base"
 	)
 	
-	parser.add_argument('--region-locus-tolerance', type=str, metavar='bases',
-			help="distance beyond the bounds of known regions where SNPs and loci should still be matched (default: 0)"
+	parser.add_argument('--region-locus-tolerance', '--rlt', type=str, metavar='bases',
+			help="number of bases beyond the bounds of known regions where SNPs and loci should still be matched (default: 0)"
+	)
+	
+	parser.add_argument('--region-match-percent', '--rmp', type=int, metavar='percentage',
+			help="minimum percentage overlap of two regions to consider them a match (default: 100)"
+	)
+	
+	parser.add_argument('--region-match-bases', '--rmb', type=str, metavar='bases',
+			help="minimum overlapping bases of two regions to consider them a match (default: not used)"
 	)
 	
 	parser.add_argument('--ld-profile', type=str, metavar='profile', nargs='?', default=False,
@@ -2038,8 +2096,16 @@ if __name__ == "__main__":
 			help="minimum implication score for knowledge-supported models (default: 1)"
 	)
 	
-	parser.add_argument('--num-models', '--nm', type=int, metavar='score',
+	parser.add_argument('--num-models', '--nm', type=int, metavar='num',
 			help="maximum number of models to generate, 0 for unlimited (default: 100)"
+	)
+	
+	choiceModelOrder = parser.add_mutually_exclusive_group()
+	choiceModelOrder.add_argument('--model-order-score', '--mos', action='store_true',
+			help="output models in order of descending score (default)",
+	)
+	choiceModelOrder.add_argument('--model-order-none', '--mon', action='store_true',
+			help="output models in no particular order",
 	)
 	
 	
@@ -2261,18 +2327,35 @@ if __name__ == "__main__":
 		bio.setKnowledgeScoring('quality')
 	
 	if args.region_locus_tolerance != None:
-		t = args.region_locus_tolerance.strip().upper()
-		if t[-1:] == 'B':
-			t = t[:-1]
-		if t[-1] == 'K':
-			t = long(t[:-1]) * 1000
-		elif t[-1] == 'M':
-			t = long(t[:-1]) * 1000 * 1000
-		elif t[-1] == 'G':
-			t = long(t[:-1]) * 1000 * 1000 * 1000
+		n = args.region_locus_tolerance.strip().upper()
+		if n[-1:] == 'B':
+			n = n[:-1]
+		if n[-1] == 'K':
+			n = long(n[:-1]) * 1000
+		elif n[-1] == 'M':
+			n = long(n[:-1]) * 1000 * 1000
+		elif n[-1] == 'G':
+			n = long(n[:-1]) * 1000 * 1000 * 1000
 		else:
-			t = long(t)
-		bio.setRegionLocusTolerance(t)
+			n = long(n)
+		bio.setRegionLocusTolerance(n)
+	
+	if args.region_match_percent != None:
+		bio.setRegionMatchPercent(args.region_match_percent)
+	
+	if args.region_match_bases != None:
+		n = args.region_match_bases.strip().upper()
+		if n[-1:] == 'B':
+			n = n[:-1]
+		if n[-1] == 'K':
+			n = long(n[:-1]) * 1000
+		elif n[-1] == 'M':
+			n = long(n[:-1]) * 1000 * 1000
+		elif n[-1] == 'G':
+			n = long(n[:-1]) * 1000 * 1000 * 1000
+		else:
+			n = long(n)
+		bio.setRegionMatchBases(n)
 	
 	if args.ld_profile != False:
 		bio.setLDProfile(args.ld_profile or '')
@@ -2297,6 +2380,11 @@ if __name__ == "__main__":
 	
 	if args.num_models != None:
 		bio.setNumModels(args.num_models)
+	
+	if args.model_order_score:
+		bio.setModelOrder(True)
+	elif args.model_order_none:
+		bio.setModelOrder(False)
 	
 	if args.gene_names != False:
 		bio.setGeneNamespace(args.gene_names or '')
