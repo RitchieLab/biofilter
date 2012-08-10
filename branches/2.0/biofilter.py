@@ -17,7 +17,7 @@ class Biofilter:
 	# public class data
 	
 	
-	ver_maj,ver_min,ver_rev,ver_dev,ver_date = 2,0,0,'a6','2012-07-31'
+	ver_maj,ver_min,ver_rev,ver_dev,ver_date = 2,0,0,'a7','2012-08-13'
 	
 	
 	##################################################
@@ -297,7 +297,8 @@ class Biofilter:
 		self._logIndent = 0
 		self._logHanging = False
 		
-		self._debug = False
+		self._debugQuery = False
+		self._debugProfile = False
 		self._snpLociValidated = False
 		self._geneStrict = True
 		self._groupStrict = True
@@ -312,8 +313,8 @@ class Biofilter:
 		self._altModelFilter = False
 		self._supportedModels = True
 		self._monogenicModels = False
-		self._minModelScore = 1
-		self._numModels = 100
+		self._minModelScore = 2
+		self._numModels = None
 		self._modelOrder = True
 		
 		self._tablesDeindexed = set()
@@ -386,9 +387,13 @@ class Biofilter:
 	# configuration
 	
 	
-	def setDebug(self, debug=False):
-		self._debug = debug
-		self.log("debugging mode: %s\n" % ("ON" if debug else "OFF"))
+	def setDebug(self, query=None, profile=None):
+		if query != None:
+			self._debugQuery = query
+			self.log("debug queries: %s\n" % ("ON" if query else "OFF"))
+		if profile != None:
+			self._debugProfile = profile
+			self.log("debug profiling: %s\n" % ("ON" if profile else "OFF"))
 	#setDebug()
 	
 	
@@ -1212,6 +1217,25 @@ DELETE FROM `main`.`snp%s` WHERE rs NOT IN (
 				raise Exception("internal struct error: table alias '%s' join condition edge to '%s' duplicates join path edge" % (a1,a2))
 	
 	
+	# generate all-pairs-shortest-paths
+	_queryAliasJoinPaths = { a:{} for a in _queryAliasJoinPathEdges }
+	queue = collections.deque()
+	for a0 in _queryAliasJoinPathEdges:
+		visited = { a0 }
+		for a1 in _queryAliasJoinPathEdges[a0]:
+			queue.append( [a0,a1] )
+			visited.add(a1)
+		while queue:
+			path = queue.popleft()
+			if path[-1] not in _queryAliasJoinPaths[path[0]]:
+				_queryAliasJoinPaths[path[0]][path[-1]] = set(path[1:-1])
+			for a1 in _queryAliasJoinPathEdges[path[-1]]:
+				if a1 not in visited:
+					visited.add(a1)
+					queue.append( path+[a1] )
+	del a0, a1, queue, visited, path
+	
+	
 	# define join constraints for each pair of tables which can be joined: {(db,table):{(db,table):{cond1,cond2}}}
 	# Note that the SQLite optimizer will not use an index on a column
 	# which is modified by an expression, even if the condition could
@@ -1578,9 +1602,7 @@ DELETE FROM `main`.`snp%s` WHERE rs NOT IN (
 	# filtering, annotation & modeling
 	
 	
-	def generateResults(self, filterTypes, modelTypes=None):
-		filterTypes = set(filterTypes)
-		modelTypes = set(modelTypes or [])
+	def getQueryTemplate(self):
 		columns = [
 			'f_rowid',
 			'f_snp_label',
@@ -1596,267 +1618,254 @@ DELETE FROM `main`.`snp%s` WHERE rs NOT IN (
 			'm_region_label', 'm_region_chr', 'm_region_posMin', 'm_region_posMax',
 			'm_group_label',
 			'm_source_label',
-			'sources',
-			'groups'
+			'source_id',
+			'group_id'
 		]
-		
-		# initialize query fragments
-		sqlFRowID = set() # {expA,expB,...} => SELECT expA||'_'||expB... AS f_rowid, ...
-		sqlMRowID = set() # {expA,expB,...} => SELECT expA||'_'||expB... AS m_rowid, ...
-		sqlSelect = { c:"NULL" for c in columns } # {colA:expA,colB:expB,...} => SELECT ... expA AS colA, expB AS colB, ...
-		sqlFrom = set() # {tblA,tblB,...} => FROM aliasTable[tblA] AS tblA, aliasTable[tblB] AS tblB, ...
-		sqlWhere = set() # {expA,expB,...} => WHERE expA AND expB AND ...
-		sqlGroup = list() # [expA,expB,...] => GROUP BY expA, expB, ...
-		sqlHaving = set() # {expA,expB,...} => HAVING expA AND expB AND ...
-		sqlOrder = list() # [expA,expB,...] => ORDER BY expA, expB, ...
-		sqlLimit = None # l => LIMIT int(l)
-		
-		# include all filtering aliases needed to satisfy inputs
+		return {
+			'colname'  : columns,
+			'colindex' : { columns[i]:i for i in xrange(len(columns)) },
+			'SELECT'   : { c:("''" if c in ('f_rowid','m_rowid') else "NULL") for c in columns },
+			                     # { colA:expA, colB:expB, ... } => SELECT expA AS colA, expB AS colB, ...
+			'FROM'     : set(),  # { tblA, tblB, ... }           => FROM aliasTable[tblA] AS tblA, aliasTable[tblB] AS tblB, ...
+			'WHERE'    : set(),  # { expA, expB, ... }           => WHERE expA AND expB AND ...
+			'GROUP BY' : list(), # [ expA, expB, ... ]           => GROUP BY expA, expB, ...
+			'HAVING'   : set(),  # { expA, expB, ... }           => HAVING expA AND expB AND ...
+			'ORDER BY' : list(), # [ expA, expB, ... ]           => ORDER BY expA, expB, ...
+			'LIMIT'    : None    # num                           => LIMIT INT(num)
+		}
+	#getQueryTemplate()
+	
+	
+	def addQueryFilterInputs(self, query, types):
 		if self._snpFilters[0]:
-			sqlFrom.add('mf_s')
+			query['FROM'].add('mf_s')
 		if self._locusFilters[0]:
-			sqlFrom.add('mf_l')
+			query['FROM'].add('mf_l')
 		if self._geneFilters[0]:
-			sqlFrom.add('mf_bg')
+			query['FROM'].add('mf_bg')
 		if self._regionFilters[0]:
-			sqlFrom.add('mf_r')
+			query['FROM'].add('mf_r')
 		if self._groupFilters[0]:
-			sqlFrom.add('mf_g')
+			query['FROM'].add('mf_g')
 		if self._sourceFilters[0]:
-			sqlFrom.add('mf_c')
+			query['FROM'].add('mf_c')
+	#addQueryFilterInputs()
+	
+	
+	def addQueryModelInputs(self, query, types):
+		if not self._altModelFilter:
+			if self._snpFilters[0]:
+				query['FROM'].add('mm_s')
+			if self._locusFilters[0]:
+				query['FROM'].add('mm_l')
+			if self._geneFilters[0]:
+				query['FROM'].add('mm_bg')
+			if self._regionFilters[0]:
+				query['FROM'].add('mm_r')
+			if self._groupFilters[0]:
+				query['FROM'].add('mm_g')
+			if self._sourceFilters[0]:
+				query['FROM'].add('mm_c')
+		#if not altModelFilter
 		
-		# include all modeling aliases needed to satisfy inputs
-		if modelTypes:
-			if self._snpFilters[1]:
-				sqlFrom.add('ma_s')
-			if self._locusFilters[1]:
-				sqlFrom.add('ma_l')
-			if self._geneFilters[1]:
-				sqlFrom.add('ma_bg')
-			if self._regionFilters[1]:
-				sqlFrom.add('ma_r')
-			if self._groupFilters[1]:
-				sqlFrom.add('ma_g')
-			if self._sourceFilters[1]:
-				sqlFrom.add('ma_c')
-			
-			if not self._altModelFilter:
-				if self._snpFilters[0]:
-					sqlFrom.add('mm_s')
-				if self._locusFilters[0]:
-					sqlFrom.add('mm_l')
-				if self._geneFilters[0]:
-					sqlFrom.add('mm_bg')
-				if self._regionFilters[0]:
-					sqlFrom.add('mm_r')
-				if self._groupFilters[0]:
-					sqlFrom.add('mm_g')
-				if self._sourceFilters[0]:
-					sqlFrom.add('mm_c')
-		#if modelTypes
-		
-		# include all filtering aliases and columns needed to satisfy output
-		if 'snps' in filterTypes:
-			if 'mf_s' in sqlFrom:
-				sqlFRowID.add("mf_s.rs")
-				sqlSelect['f_snp_label'] = "mf_s.label"
+		if self._snpFilters[1]:
+			query['FROM'].add('ma_s')
+		if self._locusFilters[1]:
+			query['FROM'].add('ma_l')
+		if self._geneFilters[1]:
+			query['FROM'].add('ma_bg')
+		if self._regionFilters[1]:
+			query['FROM'].add('ma_r')
+		if self._groupFilters[1]:
+			query['FROM'].add('ma_g')
+		if self._sourceFilters[1]:
+			query['FROM'].add('ma_c')
+	#addQueryModelInputs()
+	
+	
+	def addQueryFilterOutputs(self, query, types):
+		if 'snps' in types:
+			if 'mf_s' in query['FROM']:
+				query['SELECT']['f_rowid'] += "||mf_s.rs||'_'"
+				query['SELECT']['f_snp_label'] = "mf_s.label"
 			else:
-				sqlFrom.add('df_sl')
-				sqlFRowID.add("df_sl.rs")
-				sqlSelect['f_snp_label'] = "'rs'||df_sl.rs"
+				query['FROM'].add('df_sl')
+				query['SELECT']['f_rowid'] += "||df_sl.rs||'_'"
+				query['SELECT']['f_snp_label'] = "'rs'||df_sl.rs"
 		
-		if 'loci' in filterTypes:
-			if 'mf_l' in sqlFrom:
-				sqlFRowID.add("mf_l.rowid")
-				sqlSelect['f_locus_label'] = "mf_l.label"
-				sqlSelect['f_locus_chr'] = "mf_l.chr"
-				sqlSelect['f_locus_pos'] = "mf_l.pos"
+		if 'loci' in types:
+			if 'mf_l' in query['FROM']:
+				query['SELECT']['f_rowid'] += "||mf_l.rowid||'_'"
+				query['SELECT']['f_locus_label'] = "mf_l.label"
+				query['SELECT']['f_locus_chr'] = "mf_l.chr"
+				query['SELECT']['f_locus_pos'] = "mf_l.pos"
 			else:
-				sqlFrom.add('df_sl')
-				sqlFRowID.add("df_sl._ROWID_")
-				sqlSelect['f_locus_label'] = "'rs'||df_sl.rs"
-				sqlSelect['f_locus_chr'] = "df_sl.chr"
-				sqlSelect['f_locus_pos'] = "df_sl.pos"
+				query['FROM'].add('df_sl')
+				query['SELECT']['f_rowid'] += "||df_sl._ROWID_||'_'"
+				query['SELECT']['f_locus_label'] = "'rs'||df_sl.rs"
+				query['SELECT']['f_locus_chr'] = "df_sl.chr"
+				query['SELECT']['f_locus_pos'] = "df_sl.pos"
 		
-		if 'genes' in filterTypes:
-			if 'mf_bg' in sqlFrom:
-				sqlFRowID.add("mf_bg.biopolymer_id")
-				sqlSelect['f_gene_label'] = "mf_bg.label"
+		if 'genes' in types:
+			if 'mf_bg' in query['FROM']:
+				query['SELECT']['f_rowid'] += "||mf_bg.biopolymer_id||'_'"
+				query['SELECT']['f_gene_label'] = "mf_bg.label"
 			else:
-				sqlFrom.add('df_b')
-				sqlFRowID.add("df_b.biopolymer_id")
-				sqlSelect['f_gene_label'] = "df_b.label"
+				query['FROM'].add('df_b')
+				query['SELECT']['f_rowid'] += "||df_b.biopolymer_id||'_'"
+				query['SELECT']['f_gene_label'] = "df_b.label"
 		
-		if 'regions' in filterTypes:
-			if 'mf_r' in sqlFrom:
-				sqlFRowID.add("mf_r.rowid")
-				sqlSelect['f_region_label'] = "mf_r.label"
-				sqlSelect['f_region_chr'] = "mf_r.chr"
-				sqlSelect['f_region_posMin'] = "mf_r.posMin"
-				sqlSelect['f_region_posMax'] = "mf_r.posMax"
+		if 'regions' in types:
+			if 'mf_r' in query['FROM']:
+				query['SELECT']['f_rowid'] += "||mf_r.rowid||'_'"
+				query['SELECT']['f_region_label'] = "mf_r.label"
+				query['SELECT']['f_region_chr'] = "mf_r.chr"
+				query['SELECT']['f_region_posMin'] = "mf_r.posMin"
+				query['SELECT']['f_region_posMax'] = "mf_r.posMax"
 			else:
-				sqlFrom.add('df_b')
-				sqlFrom.add('df_br')
-				sqlFRowID.add("df_br._ROWID_")
-				sqlSelect['f_region_label'] = "df_b.label"
-				sqlSelect['f_region_chr'] = "df_br.chr"
-				sqlSelect['f_region_posMin'] = "df_br.posMin"
-				sqlSelect['f_region_posMax'] = "df_br.posMax"
+				query['FROM'].add('df_b')
+				query['FROM'].add('df_br')
+				query['SELECT']['f_rowid'] += "||df_br._ROWID_||'_'"
+				query['SELECT']['f_region_label'] = "df_b.label"
+				query['SELECT']['f_region_chr'] = "df_br.chr"
+				query['SELECT']['f_region_posMin'] = "df_br.posMin"
+				query['SELECT']['f_region_posMax'] = "df_br.posMax"
 		
-		if 'groups' in filterTypes:
-			if 'mf_g' in sqlFrom:
-				sqlFRowID.add("mf_g.group_id")
-				sqlSelect['f_group_label'] = "mf_g.label"
+		if 'groups' in types:
+			if 'mf_g' in query['FROM']:
+				query['SELECT']['f_rowid'] += "||mf_g.group_id||'_'"
+				query['SELECT']['f_group_label'] = "mf_g.label"
 			else:
-				sqlFrom.add('df_g')
-				sqlFRowID.add("df_g.group_id")
-				sqlSelect['f_group_label'] = "df_g.label"
+				query['FROM'].add('df_g')
+				query['SELECT']['f_rowid'] += "||df_g.group_id||'_'"
+				query['SELECT']['f_group_label'] = "df_g.label"
 		
-		if 'sources' in filterTypes:
-			if 'mf_c' in sqlFrom:
-				sqlFRowID.add("mf_c.source_id")
-				sqlSelect['f_source_label'] = "mf_c.label"
+		if 'sources' in types:
+			if 'mf_c' in query['FROM']:
+				query['SELECT']['f_rowid'] += "||mf_c.source_id||'_'"
+				query['SELECT']['f_source_label'] = "mf_c.label"
 			else:
-				sqlFrom.add('df_c')
-				sqlFRowID.add("df_c.source_id")
-				sqlSelect['f_source_label'] = "df_c.source"
-		
-		# include all modeling aliases and columns needed to satisfy output
-		if 'snps' in modelTypes:
-			if 'ma_s' in sqlFrom:
-				sqlMRowID.add("ma_s.rs")
-				sqlSelect['m_snp_label'] = "ma_s.label"
-			elif ('mm_s' in sqlFrom) and not self._altModelFilter:
-				sqlMRowID.add("mm_s.rs")
-				sqlSelect['m_snp_label'] = "mm_s.label"
+				query['FROM'].add('df_c')
+				query['SELECT']['f_rowid'] += "||df_c.source_id||'_'"
+				query['SELECT']['f_source_label'] = "df_c.source"
+	#addQueryFilterOutputs()
+	
+	
+	def addQueryModelOutputs(self, query, types):
+		if 'snps' in types:
+			if 'ma_s' in query['FROM']:
+				query['SELECT']['m_rowid'] += "||ma_s.rs||'_'"
+				query['SELECT']['m_snp_label'] = "ma_s.label"
+			elif ('mm_s' in query['FROM']) and not self._altModelFilter:
+				query['SELECT']['m_rowid'] += "||mm_s.rs||'_'"
+				query['SELECT']['m_snp_label'] = "mm_s.label"
 			else:
-				sqlFrom.add('dm_sl')
-				sqlMRowID.add("dm_sl.rs")
-				sqlSelect['m_snp_label'] = "'rs'||dm_sl.rs"
+				query['FROM'].add('dm_sl')
+				query['SELECT']['m_rowid'] += "||dm_sl.rs||'_'"
+				query['SELECT']['m_snp_label'] = "'rs'||dm_sl.rs"
 		
-		if 'loci' in modelTypes:
-			if 'ma_l' in sqlFrom:
-				sqlMRowID.add("ma_l.rowid")
-				sqlSelect['m_locus_label'] = "ma_l.label"
-				sqlSelect['m_locus_chr'] = "ma_l.chr"
-				sqlSelect['m_locus_pos'] = "ma_l.pos"
-			elif ('mm_l' in sqlFrom) and not self._altModelFilter:
-				sqlMRowID.add("mm_l.rowid")
-				sqlSelect['m_locus_label'] = "mm_l.label"
-				sqlSelect['m_locus_chr'] = "mm_l.chr"
-				sqlSelect['m_locus_pos'] = "mm_l.pos"
+		if 'loci' in types:
+			if 'ma_l' in query['FROM']:
+				query['SELECT']['m_rowid'] += "||ma_l.rowid||'_'"
+				query['SELECT']['m_locus_label'] = "ma_l.label"
+				query['SELECT']['m_locus_chr'] = "ma_l.chr"
+				query['SELECT']['m_locus_pos'] = "ma_l.pos"
+			elif ('mm_l' in query['FROM']) and not self._altModelFilter:
+				query['SELECT']['m_rowid'] += "||mm_l.rowid||'_'"
+				query['SELECT']['m_locus_label'] = "mm_l.label"
+				query['SELECT']['m_locus_chr'] = "mm_l.chr"
+				query['SELECT']['m_locus_pos'] = "mm_l.pos"
 			else:
-				sqlFrom.add('dm_sl')
-				sqlMRowID.add("dm_sl._ROWID_")
-				sqlSelect['m_locus_label'] = "'rs'||dm_sl.rs"
-				sqlSelect['m_locus_chr'] = "dm_sl.chr"
-				sqlSelect['m_locus_pos'] = "dm_sl.pos"
+				query['FROM'].add('dm_sl')
+				query['SELECT']['m_rowid'] += "||dm_sl._ROWID_||'_'"
+				query['SELECT']['m_locus_label'] = "'rs'||dm_sl.rs"
+				query['SELECT']['m_locus_chr'] = "dm_sl.chr"
+				query['SELECT']['m_locus_pos'] = "dm_sl.pos"
 		
-		if 'genes' in modelTypes:
-			if 'ma_bg' in sqlFrom:
-				sqlMRowID.add("ma_bg.biopolymer_id")
-				sqlSelect['m_gene_label'] = "ma_bg.label"
-			elif ('mm_bg' in sqlFrom) and not self._altModelFilter:
-				sqlMRowID.add("mm_bg.biopolymer_id")
-				sqlSelect['m_gene_label'] = "mm_bg.label"
+		if 'genes' in types:
+			if 'ma_bg' in query['FROM']:
+				query['SELECT']['m_rowid'] += "||ma_bg.biopolymer_id||'_'"
+				query['SELECT']['m_gene_label'] = "ma_bg.label"
+			elif ('mm_bg' in query['FROM']) and not self._altModelFilter:
+				query['SELECT']['m_rowid'] += "||mm_bg.biopolymer_id||'_'"
+				query['SELECT']['m_gene_label'] = "mm_bg.label"
 			else:
-				sqlFrom.add('dm_b')
-				sqlMRowID.add("dm_b.biopolymer_id")
-				sqlSelect['m_gene_label'] = "dm_b.label"
+				query['FROM'].add('dm_b')
+				query['SELECT']['m_rowid'] += "||dm_b.biopolymer_id||'_'"
+				query['SELECT']['m_gene_label'] = "dm_b.label"
 		
-		if 'regions' in modelTypes:
-			if 'ma_r' in sqlFrom:
-				sqlMRowID.add("ma_r.rowid")
-				sqlSelect['m_region_label'] = "ma_r.label"
-				sqlSelect['m_region_chr'] = "ma_r.chr"
-				sqlSelect['m_region_posMin'] = "ma_r.posMin"
-				sqlSelect['m_region_posMax'] = "ma_r.posMax"
-			elif ('mm_r' in sqlFrom) and not self._altModelFilter:
-				sqlMRowID.add("mm_r.rowid")
-				sqlSelect['m_region_label'] = "mm_r.label"
-				sqlSelect['m_region_chr'] = "mm_r.chr"
-				sqlSelect['m_region_posMin'] = "mm_r.posMin"
-				sqlSelect['m_region_posMax'] = "mm_r.posMax"
+		if 'regions' in types:
+			if 'ma_r' in query['FROM']:
+				query['SELECT']['m_rowid'] += "||ma_r.rowid||'_'"
+				query['SELECT']['m_region_label'] = "ma_r.label"
+				query['SELECT']['m_region_chr'] = "ma_r.chr"
+				query['SELECT']['m_region_posMin'] = "ma_r.posMin"
+				query['SELECT']['m_region_posMax'] = "ma_r.posMax"
+			elif ('mm_r' in query['FROM']) and not self._altModelFilter:
+				query['SELECT']['m_rowid'] += "||mm_r.rowid||'_'"
+				query['SELECT']['m_region_label'] = "mm_r.label"
+				query['SELECT']['m_region_chr'] = "mm_r.chr"
+				query['SELECT']['m_region_posMin'] = "mm_r.posMin"
+				query['SELECT']['m_region_posMax'] = "mm_r.posMax"
 			else:
-				sqlFrom.add('dm_b')
-				sqlFrom.add('dm_br')
-				sqlMRowID.add("dm_br._ROWID_")
-				sqlSelect['m_region_label'] = "dm_b.label"
-				sqlSelect['m_region_chr'] = "dm_br.chr"
-				sqlSelect['m_region_posMin'] = "dm_br.posMin"
-				sqlSelect['m_region_posMax'] = "dm_br.posMax"
+				query['FROM'].add('dm_b')
+				query['FROM'].add('dm_br')
+				query['SELECT']['m_rowid'] += "||dm_br._ROWID_||'_'"
+				query['SELECT']['m_region_label'] = "dm_b.label"
+				query['SELECT']['m_region_chr'] = "dm_br.chr"
+				query['SELECT']['m_region_posMin'] = "dm_br.posMin"
+				query['SELECT']['m_region_posMax'] = "dm_br.posMax"
 		
-		if 'groups' in modelTypes:
-			if 'ma_g' in sqlFrom:
-				sqlMRowID.add("ma_g.group_id")
-				sqlSelect['m_group_label'] = "ma_g.label"
-			elif ('mm_g' in sqlFrom) and not self._altModelFilter:
-				sqlMRowID.add("mm_g.group_id")
-				sqlSelect['m_group_label'] = "mm_g.label"
+		if 'groups' in types:
+			if 'ma_g' in query['FROM']:
+				query['SELECT']['m_rowid'] += "||ma_g.group_id||'_'"
+				query['SELECT']['m_group_label'] = "ma_g.label"
+			elif ('mm_g' in query['FROM']) and not self._altModelFilter:
+				query['SELECT']['m_rowid'] += "||mm_g.group_id||'_'"
+				query['SELECT']['m_group_label'] = "mm_g.label"
 			else:
-				sqlFrom.add('dm_g')
-				sqlMRowID.add("dm_g.group_id")
-				sqlSelect['m_group_label'] = "dm_g.label"
+				query['FROM'].add('dm_g')
+				query['SELECT']['m_rowid'] += "||dm_g.group_id||'_'"
+				query['SELECT']['m_group_label'] = "dm_g.label"
 		
-		if 'sources' in modelTypes:
-			if 'ma_c' in sqlFrom:
-				sqlMRowID.add("ma_c.source_id")
-				sqlSelect['m_source_label'] = "ma_c.label"
-			elif ('mm_c' in sqlFrom) and not self._altModelFilter:
-				sqlMRowID.add("mm_c.source_id")
-				sqlSelect['m_source_label'] = "mm_c.label"
+		if 'sources' in types:
+			if 'ma_c' in query['FROM']:
+				query['SELECT']['m_rowid'] += "||ma_c.source_id||'_'"
+				query['SELECT']['m_source_label'] = "ma_c.label"
+			elif ('mm_c' in query['FROM']) and not self._altModelFilter:
+				query['SELECT']['m_rowid'] += "||mm_c.source_id||'_'"
+				query['SELECT']['m_source_label'] = "mm_c.label"
 			else:
-				sqlFrom.add('dm_c')
-				sqlMRowID.add("dm_c.source_id")
-				sqlSelect['m_source_label'] = "dm_c.source"
-		
-		# add scores and group/having/order for knowledge-supported models
-		if modelTypes and self._supportedModels:
-			sqlFrom.add('df_g')
-			sqlSelect['sources'] = "COUNT(DISTINCT df_g.source_id)"
-			sqlSelect['groups'] = "COUNT(DISTINCT df_g.group_id)"
-			
-			sqlFrom.add('df_gb')
-			sqlFrom.add('dm_gb')
-			sqlWhere.add("df_gb.group_id = dm_gb.group_id")
-			if not self._monogenicModels:
-				sqlWhere.add("df_gb.biopolymer_id != dm_gb.biopolymer_id")
-			
-			sqlGroup.extend(sqlFRowID)
-			sqlGroup.extend(sqlMRowID)
-			sqlHaving.add("sources >= %d" % self._minModelScore)
-			if filterTypes == modelTypes:
-				sqlHaving.add("f_rowid != m_rowid")
-			if self._modelOrder:
-				sqlOrder.extend(['sources DESC','groups DESC'])
-		#if supportedModels
-		
-		# add model limit
-		if modelTypes and self._numModels:
-			sqlLimit = int(self._numModels)
-		
-		# generate all-pairs-shortest-paths
-		paths = { a:{} for a in self._queryAliasJoinPathEdges }
-		queue = collections.deque()
-		for a0 in self._queryAliasJoinPathEdges:
-			visited = { a0 }
-			for a1 in self._queryAliasJoinPathEdges[a0]:
-				queue.append( [a0,a1] )
-				visited.add(a1)
-			while queue:
-				path = queue.popleft()
-				if path[-1] not in paths[path[0]]:
-					paths[path[0]][path[-1]] = set(path[1:-1])
-				for a1 in self._queryAliasJoinPathEdges[path[-1]]:
-					if a1 not in visited:
-						visited.add(a1)
-						queue.append( path+[a1] )
-		
+				query['FROM'].add('dm_c')
+				query['SELECT']['m_rowid'] += "||dm_c.source_id||'_'"
+				query['SELECT']['m_source_label'] = "dm_c.source"
+	#addQueryModelOutputs()
+	
+	
+	def getQueryText(self, query):
+		sql = "SELECT " + (",\n  ".join("{0} AS {1}".format(query['SELECT'][c] or "NULL",c) for c in query['colname'])) + "\n"
+		if query['FROM']:
+			sql += "FROM " + (",\n  ".join("`{0[0]}`.`{0[1]}` AS {1}".format(self._queryAliasTables[a],a) for a in sorted(query['FROM']))) + "\n"
+		if query['WHERE']:
+			sql += "WHERE " + ("\n  AND ".join(sorted(query['WHERE']))) + "\n"
+		if query['GROUP BY']:
+			sql += "GROUP BY " + (", ".join(query['GROUP BY'])) + "\n"
+		if query['HAVING']:
+			sql += "HAVING " + ("\n  AND ".join(sorted(query['HAVING']))) + "\n"
+		if query['ORDER BY']:
+			sql += "ORDER BY " + (", ".join(query['ORDER BY'])) + "\n"
+		if query['LIMIT']:
+			sql += "LIMIT " + str(int(query['LIMIT'])) + "\n"
+		return sql
+	#getQueryText()
+	
+	
+	def generateQueryResults(self, query):
 		# include all tables needed to bridge other included tables
-		for a0 in paths:
-			for a1 in paths[a0]:
-				if (a0 in sqlFrom) and (a1 in sqlFrom):
-					sqlFrom.update(paths[a0][a1])
+		for a0 in self._queryAliasJoinPaths:
+			for a1 in self._queryAliasJoinPaths[a0]:
+				if (a0 in query['FROM']) and (a1 in query['FROM']):
+					query['FROM'].update(self._queryAliasJoinPaths[a0][a1])
 		
 		# fetch values to insert into conditions
 		rlTolerance = self._regionLocusTolerance
@@ -1867,107 +1876,146 @@ DELETE FROM `main`.`snp%s` WHERE rs NOT IN (
 		ldprofileID = self._loki.getLDProfileID(self._ldprofile)
 		
 		# add some general constraints for included tables
-		if ('df_sl' in sqlFrom) and self._snpLociValidated:
-			sqlWhere.add("df_sl.validated = 1")
-		if ('dm_sl' in sqlFrom) and self._snpLociValidated:
-			sqlWhere.add("dm_sl.validated = 1")
-		if ('df_br' in sqlFrom):
-			sqlWhere.add("df_br.ldprofile_id = {ldprofileID}".format(ldprofileID=ldprofileID))
-		if ('dm_br' in sqlFrom):
-			sqlWhere.add("dm_br.ldprofile_id = {ldprofileID}".format(ldprofileID=ldprofileID))
-		if ('df_gb' in sqlFrom):
-			sqlWhere.add("df_gb.biopolymer_id > 0")
+		if ('df_sl' in query['FROM']) and self._snpLociValidated:
+			query['WHERE'].add("df_sl.validated = 1")
+		if ('dm_sl' in query['FROM']) and self._snpLociValidated:
+			query['WHERE'].add("dm_sl.validated = 1")
+		if ('df_br' in query['FROM']):
+			query['WHERE'].add("df_br.ldprofile_id = {ldprofileID}".format(ldprofileID=ldprofileID))
+		if ('dm_br' in query['FROM']):
+			query['WHERE'].add("dm_br.ldprofile_id = {ldprofileID}".format(ldprofileID=ldprofileID))
+		if ('df_gb' in query['FROM']):
+			query['WHERE'].add("df_gb.biopolymer_id > 0")
 			if self._knowledgeScoring == 'quality':
-				sqlWhere.add("df_gb.quality {0}".format(">= 100" if self._knowledgeStrict else "> 0"))
+				query['WHERE'].add("df_gb.quality {0}".format(">= 100" if self._knowledgeStrict else "> 0"))
 			elif self._knowledgeScoring == 'implication':
-				sqlWhere.add("df_gb.implication {0}".format(">= 100" if self._knowledgeStrict else "> 0"))
+				query['WHERE'].add("df_gb.implication {0}".format(">= 100" if self._knowledgeStrict else "> 0"))
 			else:
-				sqlWhere.add("df_gb.specificity {0}".format(">= 100" if self._knowledgeStrict else "> 0"))
-		if ('dm_gb' in sqlFrom):
-			sqlWhere.add("dm_gb.biopolymer_id > 0")
+				query['WHERE'].add("df_gb.specificity {0}".format(">= 100" if self._knowledgeStrict else "> 0"))
+		if ('dm_gb' in query['FROM']):
+			query['WHERE'].add("dm_gb.biopolymer_id > 0")
 			if self._knowledgeScoring == 'quality':
-				sqlWhere.add("dm_gb.quality {0}".format(">= 100" if self._knowledgeStrict else "> 0"))
+				query['WHERE'].add("dm_gb.quality {0}".format(">= 100" if self._knowledgeStrict else "> 0"))
 			elif self._knowledgeScoring == 'implication':
-				sqlWhere.add("dm_gb.implication {0}".format(">= 100" if self._knowledgeStrict else "> 0"))
+				query['WHERE'].add("dm_gb.implication {0}".format(">= 100" if self._knowledgeStrict else "> 0"))
 			else:
-				sqlWhere.add("dm_gb.specificity {0}".format(">= 100" if self._knowledgeStrict else "> 0"))
+				query['WHERE'].add("dm_gb.specificity {0}".format(">= 100" if self._knowledgeStrict else "> 0"))
 		
 		# add join constraints for included table pairs
 		for a0 in self._queryAliasJoinPathEdges:
 			for a1 in self._queryAliasJoinPathEdges[a0]:
-				if (a0 in sqlFrom) and (a1 in sqlFrom):
+				if (a0 in query['FROM']) and (a1 in query['FROM']):
 					t0 = self._queryAliasTables[a0]
 					t1 = self._queryAliasTables[a1]
 					if (t0 in self._queryTableJoinConditions) and (t1 in self._queryTableJoinConditions[t0]):
-						sqlWhere.update(c.format(
+						query['WHERE'].update(c.format(
 								L=a0, R=a1, rlTolerance=rlTolerance, rmPercent=rmPercent, rmBases=rmBases, zoneSize=zoneSize, ldprofileID=ldprofileID
 						) for c in self._queryTableJoinConditions[t0][t1])
 		for a0 in self._queryAliasJoinConditionEdges:
 			for a1 in self._queryAliasJoinConditionEdges[a0]:
-				if (a0 in sqlFrom) and (a1 in sqlFrom):
+				if (a0 in query['FROM']) and (a1 in query['FROM']):
 					t0 = self._queryAliasTables[a0]
 					t1 = self._queryAliasTables[a1]
 					if (t0 in self._queryTableJoinConditions) and (t1 in self._queryTableJoinConditions[t0]):
-						sqlWhere.update(c.format(
+						query['WHERE'].update(c.format(
 								L=a0, R=a1, rlTolerance=rlTolerance, rmPercent=rmPercent, rmBases=rmBases, zoneSize=zoneSize, ldprofileID=ldprofileID
 						) for c in self._queryTableJoinConditions[t0][t1])
 		
 		# make sure any included filter tables are indexed
-		for a0 in sqlFrom:
+		for a0 in query['FROM']:
 			if self._queryAliasTables[a0][0] == 'main':
 				self.prepareTableForQuery(self._queryAliasTables[a0][1])
 		
-		# assemble the pieces
-		sql = "SELECT "
-		sqlSelect['f_rowid'] = ("(" + ("||'_'||".join(sqlFRowID)) + ")") if sqlFRowID else "0"
-		sqlSelect['m_rowid'] = ("(" + ("||'_'||".join(sqlMRowID)) + ")") if sqlMRowID else "0"
-		sql += ",\n  ".join("{0} AS {1}".format(sqlSelect[c],c) for c in columns)
-		sql += "\nFROM "
-		sql += (",\n  ".join("`{0[0]}`.`{0[1]}` AS {1}".format(self._queryAliasTables[a],a) for a in sorted(sqlFrom))) if sqlFrom else "(SELECT 1)"
-		if sqlWhere:
-			sql += "\nWHERE "
-			sql += "\n  AND ".join(sorted(sqlWhere))
-		if sqlGroup:
-			sql += "\nGROUP BY " + (", ".join(sqlGroup))
-		if sqlHaving:
-			sql += "\nHAVING "
-			sql += "\n  AND ".join(sorted(sqlHaving))
-		if sqlOrder:
-			sql += "\nORDER BY " + (", ".join(sqlOrder))
-		if sqlLimit:
-			sql += "\nLIMIT %d" % sqlLimit
-		
-		if self._debug:
+		# execute the query and yield the results
+		dbc = self._loki._db.cursor()
+		sql = self.getQueryText(query)
+		if self._debugQuery:
 			self.log(sql+"\n")
-			for row in self._loki._db.cursor().execute("EXPLAIN QUERY PLAN "+sql):
+			for row in dbc.execute("EXPLAIN QUERY PLAN "+sql):
 				self.log(str(row)+"\n")
-			return
-		
-		# run, filter and return
-		# The unique-row filtering could be done in SQL using GROUP BY, but that
-		# often forces the optimizer to join the tables in the order of grouping
-		# which might not be ideal.  It could also be done with DISTINCT, but
-		# there's no way to specify that only a few columns really have to be
-		# checked for distinctness because all the rest depend on those few.
-		# So it ends up being fastest to do the duplicate filtering here, by
-		# checking only the composite ROWID against a set of previous values.
-		columnIndex = { columns[i]:i for i in xrange(len(columns)) }
-		fidIndex = columnIndex['f_rowid']
-		midIndex = columnIndex['m_rowid']
-		resultIDs = set()
-		if filterTypes == modelTypes:
-			for row in self._loki._db.cursor().execute(sql):
-				rid = (min(row[fidIndex],row[midIndex]),max(row[fidIndex],row[midIndex]))
-				if rid not in resultIDs:
-					resultIDs.add(rid)
-					yield row
+			return list()
 		else:
-			for row in self._loki._db.cursor().execute(sql):
-				rid = (row[fidIndex],row[midIndex])
-				if rid not in resultIDs:
-					resultIDs.add(rid)
-					yield row
-	#generateResults()
+			return dbc.execute(sql)
+	#generateQueryResults()
+	
+	
+	def generateFilterResults(self, types):
+		types = set(types)
+		query = self.getQueryTemplate()
+		self.addQueryFilterInputs(query, types)
+		self.addQueryFilterOutputs(query, types)
+		
+		resultIDs = set()
+		for row in self.generateQueryResults(query):
+			if row[0] not in resultIDs:
+				resultIDs.add(row[0])
+				yield row
+	#generateFilterResults()
+	
+	
+	def generateModelResults(self, typesL, typesR):
+		typesL = set(typesL)
+		typesR = set(typesR)
+		
+		# flag all candidate genes and groups
+		query = self.getQueryTemplate()
+		self.addQueryFilterInputs(query, typesL)
+		
+		
+		
+		self.addQueryModelInputs(query, typesR)
+		self.addQueryFilterOutputs(query, typesL)
+		self.addQueryModelOutputs(query, typesR)
+		
+		if typesL == typesR:
+			query['WHERE'].add("f_rowid != m_rowid")
+		
+		if self._supportedModels:
+			query['FROM'].add('df_g')
+			query['SELECT']['source_id'] = "df_g.source_id"
+			query['SELECT']['group_id'] = "df_g.group_id"
+			
+			query['FROM'].add('df_gb')
+			query['FROM'].add('dm_gb')
+			query['WHERE'].add("df_gb.group_id = dm_gb.group_id")
+			if not self._monogenicModels:
+				query['WHERE'].add("df_gb.biopolymer_id != dm_gb.biopolymer_id")
+		#if supportedModels
+		
+		# collect and score all models
+		models = collections.defaultdict(
+			lambda: collections.defaultdict(
+				lambda: [None,set(),set()]
+			)
+		)
+		if typesL == typesR:
+			for row in self.generateQueryResults(query):
+				model = models[min(row[0],row[12])][max(row[0],row[12])]
+				model[1].add(row[24])
+				model[2].add(row[25])
+				model[0] = row if (len(model[1]) >= self._minModelScore) else None
+		else:
+			for row in self.generateQueryResults(query):
+				model = models[row[0]][row[12]]
+				model[1].add(row[24])
+				model[2].add(row[25])
+				model[0] = row if (len(model[1]) >= self._minModelScore) else None
+		
+		# drop models with insufficient score
+		drop = list()
+		for mL in models:
+			for mR in models[mL]:
+				if len(models[mL][mR][1]) < self._minModelScore:
+					drop.append(mR)
+			while drop:
+				del models[mL][drop.pop()]
+		
+		#TODO: implement order and limit
+		
+		for mL,modelsL in models.iteritems():
+			for mR,model in modelsL.iteritems():
+				yield model[0][:-2] + (len(model[1]),len(model[2]))
+	#generateModelResults()
 	
 	
 #Biofilter
@@ -2008,6 +2056,7 @@ if __name__ == "__main__":
 	parser.add_argument('--prime', type=int, metavar='num', nargs='?', default=False,
 			help="number of times to 'prime' the knowledge database file into filesystem cache memory"
 	)
+	
 	
 	choiceSnpLoci = parser.add_mutually_exclusive_group()
 	choiceSnpLoci.add_argument('--validated-snp-loci', '--vsl', action='store_true',
@@ -2093,11 +2142,11 @@ if __name__ == "__main__":
 	)
 	
 	parser.add_argument('--minimum-model-score', '--mms', type=int, metavar='score',
-			help="minimum implication score for knowledge-supported models (default: 1)"
+			help="minimum implication score for knowledge-supported models (default: 2)"
 	)
 	
 	parser.add_argument('--num-models', '--nm', type=int, metavar='num',
-			help="maximum number of models to generate, 0 for unlimited (default: 100)"
+			help="maximum number of models to generate, 0 for unlimited (default: unlimited)"
 	)
 	
 	choiceModelOrder = parser.add_mutually_exclusive_group()
@@ -2253,8 +2302,12 @@ if __name__ == "__main__":
 			help="print warnings and log messages"
 	)
 	
-	parser.add_argument('--debug', action='store_true',
-			help="print extra debugging information"
+	parser.add_argument('--debug-query', action='store_true',
+			help="print debugging information about the internal database queries to be used"
+	)
+	
+	parser.add_argument('--debug-profile', action='store_true',
+			help="print debugging information about performance profiling"
 	)
 	
 	# if no arguments, print usage and exit
@@ -2271,8 +2324,10 @@ if __name__ == "__main__":
 	bio = Biofilter()
 	if args.verbose:
 		bio.setVerbose(True)
-	if args.debug:
-		bio.setDebug(True)
+	if args.debug_query:
+		bio.setDebug(query=True)
+	if args.debug_profile:
+		bio.setDebug(profile=True)
 	
 	if args.knowledge:
 		dbPath = args.knowledge
@@ -2541,7 +2596,7 @@ if __name__ == "__main__":
 			formatStr = "\t".join(formatList) + "\n"
 			with (sys.stdout if args.stdout else open(outPath, 'w')) as outFile:
 				outFile.write(headerStr)
-				for data in bio.generateResults(output):
+				for data in bio.generateFilterResults(output):
 					outFile.write(formatStr.format(d=data))
 			#with outFile
 			bio.log(" OK\n")
@@ -2606,7 +2661,7 @@ if __name__ == "__main__":
 			formatStr = "\t".join(formatList) + "\n"
 			with (sys.stdout if args.stdout else open(outPath, 'w')) as outFile:
 				outFile.write(headerStr)
-				for data in bio.generateResults(model[0:1], model[1:2]):
+				for data in bio.generateModelResults(model[0:1], model[1:2]):
 					outFile.write(formatStr.format(d=data))
 			#with outFile
 			bio.log(" OK\n")
