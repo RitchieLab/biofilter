@@ -1870,7 +1870,7 @@ class Biofilter:
 			if altGeneFilter:
 				sqlFrom.add("`temp`.`alt_biopolymer` AS t_ab_R")
 				sqlWhere.add("d_gb_R.biopolymer_id = t_ab_R.biopolymer_id")
-			elif not self._altModelFilter:
+			elif mainGeneFilter and not self._altModelFilter:
 				sqlFrom.add("`temp`.`main_biopolymer` AS t_mb_R")
 				sqlWhere.add("d_gb_R.biopolymer_id = t_mb_R.biopolymer_id")
 			
