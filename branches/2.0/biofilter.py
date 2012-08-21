@@ -25,7 +25,12 @@ class Biofilter:
 	
 	
 	_schema = {
+		
+		##################################################
+		# main input filter tables
+		
 		'main' : {
+			
 			
 			'snp' : {
 				'table' : """
@@ -135,9 +140,52 @@ class Biofilter:
 				}
 			}, #main.source
 			
-		} #main
+		}, #main
+		
+		
+		##################################################
+		# candidate model component tables
+		
+		'cand' : {
+			
+			'main_biopolymer' : {
+				'table' : """
+(
+  biopolymer_id INTEGER PRIMARY KEY NOT NULL,
+  flag TINYINT NOT NULL DEFAULT 0
+)
+""",
+				'index' : {}
+			}, #cand.main_biopolymer
+			
+			
+			'alt_biopolymer' : {
+				'table' : """
+(
+  biopolymer_id INTEGER PRIMARY KEY NOT NULL,
+  flag TINYINT NOT NULL DEFAULT 0
+)
+""",
+				'index' : {}
+			}, #cand.alt_biopolymer
+			
+			
+			'group' : {
+				'table' : """
+(
+  group_id INTEGER PRIMARY KEY NOT NULL,
+  flag TINYINT NOT NULL DEFAULT 0
+)
+""",
+				'index' : {}
+			}, #cand.group
+			
+		}, #cand
+		
+		
 	} #_schema{}
 	
+	# alternate input filter tables mirror main
 	_schema['alt'] = _schema['main']
 	
 	
@@ -431,7 +479,7 @@ class Biofilter:
 	
 	
 	def updateRegionZones(self, db):
-		assert(db in self._schema)
+		assert((db in self._schema) and 'region' in self._schema[db] and 'region_zone' in self._schema[db])
 		self.log("calculating %s region zone coverage ..." % db)
 		cursor = self._loki._db.cursor()
 		
@@ -464,8 +512,6 @@ class Biofilter:
 				self._loki._db.cursor().execute("SELECT rowid,chr,posMin,posMax FROM `%s`.`region`" % db)
 			)
 		)
-		
-		# clean up
 		self.prepareTableForQuery(db, 'region_zone')
 		self.log(" OK\n")
 	#updateRegionZones()
@@ -1656,7 +1702,7 @@ class Biofilter:
 					self._addQueryColumn(query, col, 'd_g', "d_g.group_id", "d_g.group_id")
 			elif col == 'group_label':
 				if main and ('m_g' in query['FROM']):
-					self._addQueryColumn(query, col, '_mg', "m_g.label", "m_g.group_id")
+					self._addQueryColumn(query, col, 'm_g', "m_g.label", "m_g.group_id")
 				elif alt and ('a_g' in query['FROM']):
 					self._addQueryColumn(query, col, 'a_g', "a_g.label", "a_g.group_id")
 				else:
