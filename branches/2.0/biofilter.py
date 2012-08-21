@@ -2000,7 +2000,7 @@ class Biofilter:
 		headerL = list(("%s1" % h) for h in headerL)
 		if not columnsL:
 			return
-		if self._supportedModels:
+		if self._supportedModels or not self._monogenicModels:
 			columnsL.append('gene_id')
 		queryL = self.getQueryTemplate()
 		self.addQueryInputs(queryL, main=True, alt=False)
@@ -2019,7 +2019,7 @@ class Biofilter:
 		headerR = list(("%s2" % h) for h in headerR)
 		if not columnsR:
 			return
-		if self._supportedModels:
+		if self._supportedModels or not self._monogenicModels:
 			columnsR.append('gene_id')
 		queryR = self.getQueryTemplate()
 		self.addQueryInputs(queryR, main=(not self._altModelFilter), alt=True)
@@ -2084,17 +2084,24 @@ class Biofilter:
 			for row in cursor.execute(sqlR):
 				if row[-1] not in rowIDs:
 					rowIDs.add(row[-1])
-					listR.append(row[:-1])
+					listR.append(row)
 			del rowIDs
 			
 			# now query the left-hand side results and pair each with the stored right-hand sides
 			rowIDs = set()
+			sameCols = (columnsL == columnsR)
+			rowCut = -1 if self._monogenicModels else -2
 			for row in cursor.execute(sqlL):
 				if row[-1] not in rowIDs:
 					rowIDs.add(row[-1])
 					for modelR in listR:
-						n += 1
-						yield row[:-1] + modelR
+						if sameCols and row[-1] == modelR[-1]:
+							pass
+						elif (not self._monogenicModels) and row[-2] == modelR[-2]:
+							pass
+						else:
+							n += 1
+							yield row[:rowCut] + modelR[:rowCut]
 			del rowIDs
 			
 			self.log(" OK: %d models\n" % n)
