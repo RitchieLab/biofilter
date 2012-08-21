@@ -984,6 +984,7 @@ class Biofilter:
 		'a_bg' : ('alt','gene'),              # (label,biopolymer_id)
 		'a_g'  : ('alt','group'),             # (label,group_id)
 		'a_c'  : ('alt','source'),            # (label,source_id)
+		't_mb' : ('temp','main_biopolymer'),  #TODO
 		'd_sl' : ('db','snp_locus'),          # (rs,chr,pos)
 		'd_bz' : ('db','biopolymer_zone'),    # (biopolymer_id,chr,zone)
 		'd_br' : ('db','biopolymer_region'),  # (biopolymer_id,ldprofile_id,chr,posMin,posMax)
@@ -1000,21 +1001,22 @@ class Biofilter:
 		'm_l'  : {'m_rz','a_l','a_rz','d_sl','d_bz'},
 		'm_rz' : {'m_l','m_r','a_l','a_rz','d_sl','d_bz'},
 		'm_r'  : {'m_rz'},
-		'm_bg' : {'a_bg','d_br','d_b','d_gb'},
+		'm_bg' : {'a_bg','t_mb','d_br','d_b','d_gb'},#TODO
 		'm_g'  : {'a_g','d_gb','d_g'},
 		'm_c'  : {'a_c','d_g','d_c'},
 		'a_s'  : {'m_s','d_sl'},
 		'a_l'  : {'a_rz','m_l','m_rz','d_sl','d_bz'},
 		'a_rz' : {'a_l','a_r','m_l','m_rz','d_sl','d_bz'},
 		'a_r'  : {'a_rz'},
-		'a_bg' : {'m_bg','d_br','d_b','d_gb'},
+		'a_bg' : {'m_bg','t_mb','d_br','d_b','d_gb'},#TODO
 		'a_g'  : {'m_g','d_gb','d_g'},
 		'a_c'  : {'m_c','d_g','d_c'},
+		't_mb' : {'m_bg','a_bg','d_br','d_b','d_gb'},#TODO
 		'd_sl' : {'d_bz','m_s','m_l','m_rz','a_s','a_l','a_rz'},
 		'd_bz' : {'d_sl','d_br','m_l','m_rz','a_l','a_rz'},
-		'd_br' : {'d_bz','d_b','d_gb','m_bg','a_bg'},
-		'd_b'  : {'d_br','d_gb','m_bg','a_bg'},
-		'd_gb' : {'d_br','d_b','d_g','m_bg','m_g','a_bg','a_g'},
+		'd_br' : {'d_bz','d_b','d_gb','m_bg','a_bg','t_mb'},#TODO
+		'd_b'  : {'d_br','d_gb','m_bg','a_bg','t_mb'},#TODO
+		'd_gb' : {'d_br','d_b','d_g','m_bg','m_g','a_bg','a_g','t_mb'},#TODO
 		'd_g'  : {'d_gb','d_c','m_g','m_c','a_g','a_c'},
 		'd_c'  : {'d_g','m_c','a_c'},
 	} #class._queryAliasJoinPathEdges{}
@@ -1436,6 +1438,24 @@ class Biofilter:
 				"{L}.source_id = {R}.source_id",
 			},
 		},
+		
+		('temp','main_biopolymer'): { #TODO
+			('main','gene'): {
+				"{L}.biopolymer_id = {R}.biopolymer_id",
+			},
+			('alt','gene'): {
+				"{L}.biopolymer_id = {R}.biopolymer_id",
+			},
+			('db','biopolymer_region'): {
+				"{L}.biopolymer_id = {R}.biopolymer_id",
+			},
+			('db','biopolymer'): {
+				"{L}.biopolymer_id = {R}.biopolymer_id",
+			},
+			('db','group_biopolymer'): {
+				"{L}.biopolymer_id = {R}.biopolymer_id",
+			},
+		},
 	} #class._queryTableJoinConditions{}
 	
 	
@@ -1826,16 +1846,19 @@ class Biofilter:
 			self.addQueryConditions(query)
 			self.addQueryIndecies(query)
 			cursor.executemany(sql, self.generateQueryResults(query, allowDupes=True))
-			if max(num for tbl,num in self._inputFilters['main'].iteritems()):
+			if mainGeneFilter:
+				#TODO
 				sql = "UPDATE `temp`.`group` SET flag = 1 WHERE group_id = ?1"
 				query = self.getQueryTemplate()
 				self.addQueryInputs(query, main=True, alt=False)
+				query['FROM'] -= {'m_s','m_l','m_r'}
+				query['FROM'] |= {'t_mb'}
 				self.addQueryOutputs(query, ['group_id'], main=True, alt=False)
 				self.addQueryConditions(query)
 				self.addQueryIndecies(query)
 				cursor.executemany(sql, self.generateQueryResults(query, allowDupes=True))
 				cursor.execute("DELETE FROM `temp`.`group` WHERE flag = 0")
-			#if any main filters
+			#if mainGeneFilter
 			
 			numGroups = max(row[0] for row in cursor.execute("SELECT COUNT() FROM `temp`.`group`"))
 			self.log(" OK: %d groups\n" % numGroups)
