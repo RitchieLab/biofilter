@@ -1411,7 +1411,9 @@ class Biofilter:
 			# the last-resort source for a random output column
 			if not inside:
 				col = remaining.pop()
-				inside.add( [source[0] for source in self._queryColumnSources[col]][-1] )
+				alias = self._queryColumnSources[col][-1][0]
+				remaining -= aliasColumns[alias]
+				inside.add(alias)
 				outside -= inside
 			queue = collections.deque()
 			queue.append( (inside, outside, remaining) )
@@ -1730,10 +1732,11 @@ class Biofilter:
 			yield row
 		self.log(" OK: %d results\n" % n)
 		
-		for row in self._loki._db.cursor().execute("select * from main.sqlite_stat1 where tbl in ('snp')"):
-			self.log(str(row)+"\n")
-		for row in self._loki._db.cursor().execute("select * from db.sqlite_stat1 where tbl in ('biopolymer_region','biopolymer_zone','snp_locus')"):
-			self.log(str(row)+"\n")
+		#debugging
+		#for row in self._loki._db.cursor().execute("select * from main.sqlite_stat1 where tbl in ('snp')"):
+		#	self.log(str(row)+"\n")
+		#for row in self._loki._db.cursor().execute("select * from db.sqlite_stat1 where tbl in ('biopolymer_region','biopolymer_zone','snp_locus')"):
+		#	self.log(str(row)+"\n")
 	#generateFilterOutput()
 	
 	
@@ -1754,6 +1757,8 @@ class Biofilter:
 		conditionsL = {}
 		if self._supportedModels or not self._monogenicModels:
 			conditionsL['gene_id' if self._onlyGeneModels else 'biopolymer_id'] = "= (CASE WHEN 1 THEN ?1 ELSE 0*?2*?3*?4 END)"
+		if (not self._supportedModels) and (not self._monogenicModels):
+			columnsL.append('biopolymer_id')
 		queryL = self.buildQuery(columnsL, conditionsL, focus='main')
 		sqlL = self.getQueryText(queryL)
 		
@@ -1767,6 +1772,8 @@ class Biofilter:
 		conditionsR = {}
 		if self._supportedModels or not self._monogenicModels:
 			conditionsR['gene_id' if self._onlyGeneModels else 'biopolymer_id'] = "= (CASE WHEN 1 THEN ?2 ELSE 0*?1*?3*?4 END)"
+		if (not self._supportedModels) and (not self._monogenicModels):
+			columnsR.append('biopolymer_id')
 		queryR = self.buildQuery(columnsR, conditionsR, focus='alt')
 		sqlR = self.getQueryText(queryR)
 		
@@ -1797,7 +1804,7 @@ class Biofilter:
 				for row in cursor.execute(sqlR, model):
 					if row[-1] not in rowIDs:
 						rowIDs.add(row[-1])
-						listR.append(row[:-2] + ('-'.join(str(s) for s in model[2:]),))
+						listR.append(row[:-1] + ('-'.join(str(s) for s in model[2:]),))
 				del rowIDs
 				
 				# now expand the left-hand side and pair each result with the stored right-hand sides
@@ -1807,8 +1814,14 @@ class Biofilter:
 						rowIDs.add(row[-1])
 						for modelR in listR:
 							n += 1
-							yield row[:-2] + modelR
+							yield row[:-1] + modelR
+							if n >= self._numModels:
+								break
+					if n >= self._numModels:
+						break
 				del rowIDs
+				if n >= self._numModels:
+					break
 			#foreach model
 			self.log(" OK: %d models\n" % n)
 		else:
@@ -1841,6 +1854,10 @@ class Biofilter:
 						else:
 							n += 1
 							yield row[:rowCut] + modelR[:rowCut]
+							if n >= self._numModels:
+								break
+					if n >= self._numModels:
+						break
 			del rowIDs
 			
 			self.log(" OK: %d models\n" % n)
@@ -2244,6 +2261,8 @@ if __name__ == "__main__":
 			n = long(n[:-1]) * 1000 * 1000 * 1000
 		else:
 			n = long(n)
+		if args.region_match_percent == None:
+			bio.setRegionMatchPercent(0)
 		bio.setRegionMatchBases(n)
 	
 	if args.ld_profile != False:
