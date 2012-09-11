@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#! python
 
 import argparse
 import codecs
@@ -10,7 +10,7 @@ import string
 import sys
 import time
 
-import loki_db
+from loki import loki_db
 
 
 class Biofilter:
