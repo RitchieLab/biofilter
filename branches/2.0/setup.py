@@ -35,6 +35,6 @@ class my_install(autodist.auto_install):
 setup(name='biofilter',version='2.0.0',
 	author='Ritchie Lab',author_email='software@ritchielab.psu.edu',
 	url='http://ritchielab.psu.edu',
-	scripts=['loki/loki.py','biofilter.py','loki/loadPops/buildPopulations.py'],
-	packages=['loki','loki.loaders','loki.util'],
+	scripts=['loki/loki-build.py','biofilter.py','loki/loadPops/buildPopulations.py'],
+	packages=['loki','loki.loaders','loki.loaders/test','loki.util'],
 	cmdclass={'install':my_install, 'sdist':autodist.auto_sdist})
