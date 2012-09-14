@@ -20,7 +20,7 @@ class Biofilter:
 	# public class data
 	
 	
-	ver_maj,ver_min,ver_rev,ver_dev,ver_date = 2,0,0,'a9','2012-09-11'
+	ver_maj,ver_min,ver_rev,ver_dev,ver_date = 2,0,0,'a9','2012-09-14'
 	
 	
 	##################################################
@@ -1366,8 +1366,9 @@ class Biofilter:
 			for source in self._queryColumnSources[col]: # source=(alias,expression,rowid,conditions)
 				if source[0] in query['FROM']:
 					query['WHERE'].update("({0} {1})".format(source[1], c) for c in conds)
-					if (len(source) > 2) and source[2]:
-						query['_rowid'].add(source[2])
+					# adding conditions to the rowid causes duplicate expanded SNP models due to biopolymer_id, i.e. test dataset rs11-rs15
+					#if (len(source) > 2) and source[2]:
+					#	query['_rowid'].add(source[2])
 					if (len(source) > 3) and source[3]:
 						query['WHERE'].update(formatter.vformat(c, args=None, kwargs=options) for c in source[3])
 					break
@@ -1646,12 +1647,11 @@ class Biofilter:
 		headerL = list(("%s1" % h) for h in headerL)
 		headerL[0] = "#" + headerL[0]
 		headerR = list(("%s2" % h) for h in headerR)
-		conditionsL = dict()
-		conditionsR = dict()
+		conditionsL = conditionsR = None
 		# for knowledge-supported models, add the conditions for expanding from base models
 		if self._options.all_pairwise_models != 'yes':
-			conditionsL['gene_id' if self._onlyGeneModels else 'biopolymer_id'] = "= (CASE WHEN 1 THEN ?1 ELSE 0*?2*?3*?4 END)"
-			conditionsR['gene_id' if self._onlyGeneModels else 'biopolymer_id'] = "= (CASE WHEN 1 THEN ?2 ELSE 0*?1*?3*?4 END)"
+			conditionsL = {('gene_id' if self._onlyGeneModels else 'biopolymer_id') : "= (CASE WHEN 1 THEN ?1 ELSE 0*?2*?3*?4 END)"}
+			conditionsR = {('gene_id' if self._onlyGeneModels else 'biopolymer_id') : "= (CASE WHEN 1 THEN ?2 ELSE 0*?1*?3*?4 END)"}
 		sqlL = self.getQueryText(self.buildQuery(columnsL, conditionsL, focus='main'))
 		sqlR = self.getQueryText(self.buildQuery(columnsR, conditionsR, focus='alt'))
 		
@@ -1672,28 +1672,21 @@ class Biofilter:
 			# expand each gene-gene model
 			headerR.append('score')
 			yield tuple(headerL + headerR)
-			n = 0
+			modelIDs = set()
 			for model in self.getGeneModels():
-				# first expand the right-hand side and store it
-				listR = list()
-				rowIDs = set()
-				for row in cursor.execute(sqlR, model):
-					if row[-1] not in rowIDs:
-						rowIDs.add(row[-1])
-						listR.append(row[:-1] + ('-'.join(str(s) for s in model[2:]),))
-				del rowIDs
-				
-				# now expand the left-hand side and pair each result with the stored right-hand sides
-				rowIDs = set()
+				score = ('-'.join(str(s) for s in model[2:]),)
+				# store the expanded right-hand side, then pair them all with the expanded left-hand side
+				listR = list(cursor.execute(sqlR, model))
 				for row in cursor.execute(sqlL, model):
-					if row[-1] not in rowIDs:
-						rowIDs.add(row[-1])
-						for modelR in listR:
-							n += 1
-							yield row[:-1] + modelR
-							if limit and n >= limit:
+					for modelR in listR:
+						modelID = (row[-1],modelR[-1])
+						if modelID not in modelIDs:
+							modelIDs.add(modelID)
+							yield row[:-1] + modelR[:-1] + score
+							if limit and len(modelIDs) >= limit:
 								return
-				del rowIDs
+					#foreach right-hand
+				#foreach left-hand
 			#foreach model
 		else:
 			yield tuple(headerL + headerR)
@@ -1965,10 +1958,10 @@ if __name__ == "__main__":
 	group.add_argument('--stdout', type=yesno, metavar='yes/no', nargs='?', const='yes', default='no',
 			help="display all output data directly on <stdout> rather than writing to any files (default: no)"
 	)
-	group.add_argument('--gene-name-stats', type=yesno, nargs='?', const='yes', #default=argparse.SUPPRESS,
+	group.add_argument('--gene-name-stats', type=yesno, metavar='yes/no', nargs='?', const='yes', default='no',
 			help="display statistics on available gene identifier types (default: no)"
 	)
-	group.add_argument('--group-name-stats', type=yesno, nargs='?', const='yes', #default=argparse.SUPPRESS,
+	group.add_argument('--group-name-stats', type=yesno, metavar='yes/no', nargs='?', const='yes', default='no',
 			help="display statistics on available group identifier types (default: no)"
 	)
 	group.add_argument('--annotate', '-a', type=str, metavar='type', nargs='+', action='append', #default=argparse.SUPPRESS,
