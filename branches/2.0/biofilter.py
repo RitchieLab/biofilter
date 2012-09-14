@@ -20,7 +20,7 @@ class Biofilter:
 	# public class data
 	
 	
-	ver_maj,ver_min,ver_rev,ver_dev,ver_date = 2,0,0,'a9','2012-09-14'
+	ver_maj,ver_min,ver_rev,ver_dev,ver_date = 2,0,0,'a10','2012-09-14'
 	
 	
 	##################################################
@@ -1106,8 +1106,8 @@ class Biofilter:
 		],
 		
 		'biopolymer_id' : [
-			('m_bg', "m_bg.biopolymer_id", "m_bg.biopolymer_id"),
 			('a_bg', "a_bg.biopolymer_id", "a_bg.biopolymer_id"),
+			('m_bg', "m_bg.biopolymer_id", "m_bg.biopolymer_id"),
 			('c_mb_L', "c_mb_L.biopolymer_id", "c_mb_L.biopolymer_id"),
 			('c_mb_R', "c_mb_R.biopolymer_id", "c_mb_R.biopolymer_id"),
 			('c_ab_R', "c_ab_R.biopolymer_id", "c_ab_R.biopolymer_id"),
@@ -1138,6 +1138,16 @@ class Biofilter:
 			('a_bg', "a_bg.label", "a_bg.biopolymer_id"),
 			('m_bg', "m_bg.label", "m_bg.biopolymer_id"),
 			('d_b', "d_b.label", "d_b.biopolymer_id", {"d_b.type_id+0 = {typeID_gene}"}),
+		],
+		'gene_identifiers' : [
+			('a_bg', "(SELECT GROUP_CONCAT(namespace||':'||name) FROM `db`.`biopolymer_name` AS d_bn JOIN `db`.`namespace` AS d_n USING (namespace_id) WHERE d_bn.biopolymer_id = a_bg.biopolymer_id)", "a_bg.biopolymer_id"),
+			('m_bg', "(SELECT GROUP_CONCAT(namespace||':'||name) FROM `db`.`biopolymer_name` AS d_bn JOIN `db`.`namespace` AS d_n USING (namespace_id) WHERE d_bn.biopolymer_id = m_bg.biopolymer_id)", "m_bg.biopolymer_id"),
+			('d_b',  "(SELECT GROUP_CONCAT(namespace||':'||name) FROM `db`.`biopolymer_name` AS d_bn JOIN `db`.`namespace` AS d_n USING (namespace_id) WHERE d_bn.biopolymer_id = d_b.biopolymer_id)", "d_b.biopolymer_id", {"d_b.type_id+0 = {typeID_gene}"}),
+		],
+		'gene_symbols' : [
+			('a_bg', "(SELECT GROUP_CONCAT(name) FROM `db`.`biopolymer_name` AS d_bn WHERE d_bn.biopolymer_id = a_bg.biopolymer_id AND d_bn.namespace_id = {namespaceID_symbol})", "a_bg.biopolymer_id"),
+			('m_bg', "(SELECT GROUP_CONCAT(name) FROM `db`.`biopolymer_name` AS d_bn WHERE d_bn.biopolymer_id = m_bg.biopolymer_id AND d_bn.namespace_id = {namespaceID_symbol})", "m_bg.biopolymer_id"),
+			('d_b',  "(SELECT GROUP_CONCAT(name) FROM `db`.`biopolymer_name` AS d_bn WHERE d_bn.biopolymer_id = d_b.biopolymer_id  AND d_bn.namespace_id = {namespaceID_symbol})", "d_b.biopolymer_id", {"d_b.type_id+0 = {typeID_gene}"}),
 		],
 		
 		'region_id' : [
@@ -1179,6 +1189,11 @@ class Biofilter:
 			('a_g', "a_g.label", "a_g.group_id"),
 			('m_g', "m_g.label", "m_g.group_id"),
 			('d_g', "d_g.label", "d_g.group_id"),
+		],
+		'group_identifiers' : [
+			('a_g', "(SELECT GROUP_CONCAT(namespace||':'||name) FROM `db`.`group_name` AS d_gn JOIN `db`.`namespace` AS d_n USING (namespace_id) WHERE d_gn.group_id = a_g.group_id)", "a_g.group_id"),
+			('m_g', "(SELECT GROUP_CONCAT(namespace||':'||name) FROM `db`.`group_name` AS d_gn JOIN `db`.`namespace` AS d_n USING (namespace_id) WHERE d_gn.group_id = m_g.group_id)", "m_g.group_id"),
+			('d_g', "(SELECT GROUP_CONCAT(namespace||':'||name) FROM `db`.`group_name` AS d_gn JOIN `db`.`namespace` AS d_n USING (namespace_id) WHERE d_gn.group_id = d_g.group_id)", "d_g.group_id"),
 		],
 		
 		'source_id' : [
@@ -1333,6 +1348,7 @@ class Biofilter:
 			'L'           : None,
 			'R'           : None,
 			'typeID_gene' : self.getOptionTypeID('gene'),
+			'namespaceID_symbol' : self.getOptionNamespaceID('symbol'),
 			'allowUSP'    : (1 if self._options.allow_unvalidated_snp_positions == 'yes' else 0),
 			'rpMargin'    : self._options.region_position_margin,
 			'rmPercent'   : self._options.region_match_percent,
@@ -1350,7 +1366,7 @@ class Biofilter:
 		for col in outputs:
 			for source in self._queryColumnSources[col]: # source=(alias,expression,rowid,conditions)
 				if source[0] in query['FROM']:
-					query['SELECT'][col] = source[1]
+					query['SELECT'][col] = formatter.vformat(source[1], args=None, kwargs=options)
 					if (len(source) > 2) and source[2]:
 						query['_rowid'].add(source[2])
 					if (len(source) > 3) and source[3]:
@@ -1365,7 +1381,7 @@ class Biofilter:
 			conds = conds if isinstance(conds, set) else {conds}
 			for source in self._queryColumnSources[col]: # source=(alias,expression,rowid,conditions)
 				if source[0] in query['FROM']:
-					query['WHERE'].update("({0} {1})".format(source[1], c) for c in conds)
+					query['WHERE'].update("({0} {1})".format(formatter.vformat(source[1], args=None, kwargs=options), c) for c in conds)
 					# adding conditions to the rowid causes duplicate expanded SNP models due to biopolymer_id, i.e. test dataset rs11-rs15
 					#if (len(source) > 2) and source[2]:
 					#	query['_rowid'].add(source[2])
@@ -1609,6 +1625,9 @@ class Biofilter:
 			elif t == 'source':
 				header.extend(['source'])
 				columns.extend(['source_label'])
+			elif t in self._queryColumnSources:
+				header.append(t)
+				columns.append(t)
 			else:
 				raise Exception("ERROR: unsupported output type '%s'" % t)
 		#foreach types
@@ -1964,13 +1983,11 @@ if __name__ == "__main__":
 	group.add_argument('--group-name-stats', type=yesno, metavar='yes/no', nargs='?', const='yes', default='no',
 			help="display statistics on available group identifier types (default: no)"
 	)
-	group.add_argument('--annotate', '-a', type=str, metavar='type', nargs='+', action='append', #default=argparse.SUPPRESS,
-			choices=['snp','position','gene','region','group','source'],
-			help="data type(s) to filter and annotate, from 'snp', 'position', 'gene', 'region', 'group' and 'source'"
+	group.add_argument('--annotate', '-a', type=str, metavar='type', nargs='+', action='append',
+			help="data types or columns to include in the filtered and annotated output"
 	)
-	group.add_argument('--model', '-m', type=str, metavar='type', nargs='+', action='append', #default=argparse.SUPPRESS,
-			choices=['snp','position','gene','region','group','source',':'],
-			help="data type(s) to model, from 'snp', 'position', 'gene', 'region', 'group' and 'source'"
+	group.add_argument('--model', '-m', type=str, metavar='type', nargs='+', action='append',
+			help="data types or columns to include in the output models"
 	)
 	
 	# add hidden options
