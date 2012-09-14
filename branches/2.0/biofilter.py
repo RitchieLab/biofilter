@@ -1,4 +1,4 @@
-#! python
+#!/usr/bin/env python
 
 import argparse
 import codecs
@@ -1652,10 +1652,6 @@ class Biofilter:
 		if self._options.all_pairwise_models != 'yes':
 			conditionsL['gene_id' if self._onlyGeneModels else 'biopolymer_id'] = "= (CASE WHEN 1 THEN ?1 ELSE 0*?2*?3*?4 END)"
 			conditionsR['gene_id' if self._onlyGeneModels else 'biopolymer_id'] = "= (CASE WHEN 1 THEN ?2 ELSE 0*?1*?3*?4 END)"
-		# for all-pairwise models, add the id columns to filter out monogenic results later
-		if self._options.all_pairwise_models == 'yes' and self._options.allow_monogenic_pairwise_models != 'yes':
-			columnsL.append('biopolymer_id')
-			columnsR.append('biopolymer_id')
 		sqlL = self.getQueryText(self.buildQuery(columnsL, conditionsL, focus='main'))
 		sqlR = self.getQueryText(self.buildQuery(columnsR, conditionsR, focus='alt'))
 		
@@ -1714,19 +1710,14 @@ class Biofilter:
 			
 			# now query the left-hand side results and pair each with the stored right-hand sides
 			rowIDs = set()
-			sameCols = (columnsL == columnsR)
-			rowCut = -1 if self._options.allow_monogenic_pairwise_models == 'yes' else -2
+			diffCols = (columnsL != columnsR)
 			for row in cursor.execute(sqlL):
 				if row[-1] not in rowIDs:
 					rowIDs.add(row[-1])
 					for modelR in listR:
-						if sameCols and row[-1] == modelR[-1]:
-							pass
-						elif self._options.allow_monogenic_pairwise_models != 'yes' and row[-2] == modelR[-2]:
-							pass
-						else:
+						if diffCols or row[-1] != modelR[-1]:
 							n += 1
-							yield row[:rowCut] + modelR[:rowCut]
+							yield row[:-1] + modelR[:-1]
 							if limit and n >= limit:
 								return
 			del rowIDs
@@ -1811,9 +1802,9 @@ if __name__ == "__main__":
 	group.add_argument('--report-configuration', '--rc', type=yesno, metavar='yes/no', nargs='?', const='yes', default='no',
 			help="output a report of all effective options, including any defaults, in a configuration file format which can be re-input (default: no)"
 	)
-	group.add_argument('--report-knowledge-fingerprint', '--rkf', type=yesno, metavar='yes/no', nargs='?', const='yes', default='no',
-			help="include the knowledge database file's fingerprint values in the configuration report, to ensure the same data is used in replication (default: no)"
-	)
+	#group.add_argument('--report-knowledge-fingerprint', '--rkf', type=yesno, metavar='yes/no', nargs='?', const='yes', default='no',
+	#		help="include the knowledge database file's fingerprint values in the configuration report, to ensure the same data is used in replication (default: no)"
+	#)
 	
 	# add knowledge database section
 	group = parser.add_argument_group("Prior Knowledge Options")
@@ -1946,9 +1937,6 @@ if __name__ == "__main__":
 	)
 	group.add_argument('--all-pairwise-models', '--apm', type=yesno, metavar='yes/no', nargs='?', const='yes', default='no',
 			help="generate all comprehensive pairwise models without regard to any prior knowledge (default: no)"
-	)
-	group.add_argument('--allow-monogenic-pairwise-models', '--impm', type=yesno, metavar='yes/no', nargs='?', const='yes', default='no',
-			help="generate comprehensive pairwise SNP or position models even when both sides map to the same gene (default: no)"
 	)
 	group.add_argument('--maximum-model-group-size', '--mmgs', type=int, metavar='size', default=30,
 			help="maximum size of a group to use for knowledge-supported models, or < 1 for unlimited (default: 30)"
@@ -2129,9 +2117,8 @@ if __name__ == "__main__":
 			outFile.write(encodeLine("#   Biofilter version %s" % Biofilter.getVersionString()))
 			outFile.write(encodeLine("#   LOKI version %s" % loki_db.Database.getVersionString()))
 			outFile.write(encodeLine(""))
-			if options.report_knowledge_fingerprint == 'yes':
-				#TODO
-				pass
+			#if options.report_knowledge_fingerprint == 'yes':
+			#	#TODO
 			for opt in options:
 				if (opt in ('configuration','end_of_line','debug_query','debug_profile')) or not hasattr(options, opt):
 					continue
