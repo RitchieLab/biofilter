@@ -17,10 +17,26 @@ class Biofilter:
 	
 	
 	##################################################
-	# public class data
+	# class interrogation
 	
 	
-	ver_maj,ver_min,ver_rev,ver_dev,ver_date = 2,0,0,'a10','2012-09-14'
+	@classmethod
+	def getVersionTuple(cls):
+		# tuple = (major,minor,revision,dev,build,date)
+		# dev must be in ('a','b','rc','release') for lexicographic comparison
+		return (2,0,0,'a',11,'2012-09-24')
+	#getVersionTuple()
+	
+	
+	@classmethod
+	def getVersionString(cls):
+		v = list(cls.getVersionTuple())
+		# tuple = (major,minor,revision,dev,build,date)
+		# dev must be in > 'rc' for releases for lexicographic comparison,
+		# but we don't need to actually print 'release' in the version string
+		v[3] = '' if v[3] > 'rc' else v[3]
+		return "%d.%d.%d%s%s (%s)" % tuple(v)
+	#getVersionString()
 	
 	
 	##################################################
@@ -65,21 +81,6 @@ class Biofilter:
 			}, #main.locus
 			
 			
-			'gene' : {
-				'table' : """
-(
-  rowid INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-  label VARCHAR(32) NOT NULL,
-  biopolymer_id INTEGER NOT NULL,
-  flag TINYINT NOT NULL DEFAULT 0
-)
-""",
-				'index' : {
-					'gene__biopolymer' : '(biopolymer_id)',
-				}
-			}, #main.gene
-			
-			
 			'region' : {
 				'table' : """
 (
@@ -111,6 +112,21 @@ class Biofilter:
 					'region_zone__region' : '(region_rowid)',
 				}
 			}, #main.region_zone
+			
+			
+			'gene' : {
+				'table' : """
+(
+  rowid INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+  label VARCHAR(32) NOT NULL,
+  biopolymer_id INTEGER NOT NULL,
+  flag TINYINT NOT NULL DEFAULT 0
+)
+""",
+				'index' : {
+					'gene__biopolymer' : '(biopolymer_id)',
+				}
+			}, #main.gene
 			
 			
 			'group' : {
@@ -194,42 +210,6 @@ class Biofilter:
 	
 	
 	##################################################
-	# class interrogation
-	
-	
-	@classmethod
-	def getVersionString(cls):
-		return "%d.%d.%d%s%s (%s)" % (cls.ver_maj, cls.ver_min, cls.ver_rev, ("-" if cls.ver_dev else ""), (cls.ver_dev or ""), cls.ver_date)
-	#getVersionString()
-	
-	
-	@classmethod
-	def checkMinimumVersion(cls, major=None, minor=None, revision=None, development=None):
-		if (major == None) or (cls.ver_maj > major):
-			return True
-		if cls.ver_maj < major:
-			return False
-		
-		if (minor == None) or (cls.ver_min > minor):
-			return True
-		if cls.ver_min < minor:
-			return False
-		
-		if (revision == None) or (cls.ver_rev > revision):
-			return True
-		if cls.ver_rev < revision:
-			return False
-		
-		if (development == None) or (not cls.ver_dev) or (cls.ver_dev > development):
-			return True
-		if cls.ver_dev < development:
-			return False
-		
-		return True
-	#checkMinimumVersion()
-	
-	
-	##################################################
 	# constructor
 	
 	
@@ -257,9 +237,9 @@ class Biofilter:
 		self._geneModels = None
 		self._onlyGeneModels = True #TODO
 		
-		# verify loki_db version (attachTempDatabase() in 2.0.0-a6)
-		if not loki_db.Database.checkMinimumVersion(2,0,0,'a6'):
-			exit("ERROR: LOKI version 2.0.0-a6 or later required; found %s" % (loki_db.Database.getVersionString(),))
+		# verify loki_db version (generateBiopolymerIDsBySearch() in 2.0.0a10)
+		if loki_db.Database.getVersionTuple() < (2,0,0,'a',10):
+			exit("ERROR: LOKI version 2.0.0a10 or later required; found %s" % (loki_db.Database.getVersionString(),))
 		
 		# initialize instance database
 		self._loki = loki_db.Database()
@@ -596,21 +576,21 @@ class Biofilter:
 	#generateRegionsFromFiles()
 	
 	
-	def getOptionTypeID(self, value):
+	def getOptionTypeID(self, value, optional=False):
 		typeID = self._loki.getTypeID(value)
-		if not typeID:
-			self.warn("ERROR: database contains no %s data" % (value,))
+		if not (typeID or optional):
+			self.warn("ERROR: database contains no %s data\n" % (value,))
 			sys.exit(1)
 		return typeID
 	#getOptionTypeID()
 	
 	
-	def getOptionNamespaceID(self, value):
+	def getOptionNamespaceID(self, value, optional=False):
 		if value == '-': # primary labels
 			return None
 		namespaceID = self._loki.getNamespaceID(value)
-		if not namespaceID:
-			self.warn("ERROR: unknown identifier type '%s'" % (value,))
+		if not (namespaceID or optional):
+			self.warn("ERROR: unknown identifier type '%s'\n" % (value,))
 			sys.exit(1)
 		return namespaceID
 	#getOptionNamespaceID()
@@ -626,7 +606,7 @@ class Biofilter:
 		cursor = self._loki._db.cursor()
 		
 		self.prepareTableForUpdate(db, 'snp')
-		sql = "INSERT INTO `%s`.`snp` (label,rs) VALUES ('rs'||?,?)" % db
+		sql = "INSERT INTO `%s`.`snp` (label,rs) VALUES ('rs'||?1,?2)" % db
 		tally = dict()
 		cursor.executemany(sql, self._loki.generateCurrentRSesByRS(snps, tally))
 		self.logPop("... OK: added %d SNPs (%d RS#s merged)\n" % (tally['match']+tally['merge'],tally['merge']))
@@ -645,7 +625,7 @@ class Biofilter:
 		self.prepareTableForQuery(db, 'snp')
 		cursor.execute("UPDATE `%s`.`snp` SET flag = 0" % db)
 		numBefore = cursor.getconnection().changes()
-		sql = "UPDATE `%s`.`snp` SET flag = 1 WHERE (1 OR ?) AND rs = ?" % db
+		sql = "UPDATE `%s`.`snp` SET flag = 1 WHERE (1 OR ?1) AND rs = ?2" % db
 		tally = dict()
 		cursor.executemany(sql, self._loki.generateCurrentRSesByRS(snps, tally))
 		cursor.execute("DELETE FROM `%s`.`snp` WHERE flag = 0" % db)
@@ -663,7 +643,7 @@ class Biofilter:
 		
 		# use OR IGNORE to continue on data error, i.e. missing chr or pos
 		self.prepareTableForUpdate(db, 'locus')
-		sql = "INSERT OR IGNORE INTO `%s`.`locus` (label,chr,pos) VALUES (?,?,?); SELECT LAST_INSERT_ROWID()" % db
+		sql = "INSERT OR IGNORE INTO `%s`.`locus` (label,chr,pos) VALUES (?1,?2,?3); SELECT LAST_INSERT_ROWID()" % db
 		lastID = numAdd = numNull = 0
 		for row in cursor.executemany(sql, loci):
 			if lastID != row[0]:
@@ -689,7 +669,7 @@ class Biofilter:
 		self.prepareTableForQuery(db, 'locus')
 		cursor.execute("UPDATE `%s`.`locus` SET flag = 0" % db)
 		numBefore = cursor.getconnection().changes()
-		sql = "UPDATE `%s`.`locus` SET flag = 1 WHERE chr = :1 AND pos = :2" % db
+		sql = "UPDATE `%s`.`locus` SET flag = 1 WHERE chr = ?1 AND pos = ?2" % db
 		cursor.executemany(sql, loci)
 		cursor.execute("DELETE FROM `%s`.`locus` WHERE flag = 0" % db)
 		numDrop = self._loki._db.changes()
@@ -712,7 +692,7 @@ class Biofilter:
 		namespaceID = self.getOptionNamespaceID(self._options.gene_identifier_type)
 		
 		self.prepareTableForUpdate(db, 'gene')
-		sql = "INSERT INTO `%s`.`gene` (label,biopolymer_id) VALUES (?,?); SELECT 1" % db
+		sql = "INSERT INTO `%s`.`gene` (label,biopolymer_id) VALUES (?1,?2); SELECT 1" % db
 		maxMatch = (None if self._options.allow_ambiguous_genes == 'yes' else 1)
 		tally = dict()
 		numAdd = 0
@@ -722,7 +702,7 @@ class Biofilter:
 			self.warn("WARNING: ignored %d unrecognized gene identifier(s)\n" % tally['null'])
 		if tally['ambig']:
 			if self._options.allow_ambiguous_genes == 'yes':
-				self.warn("WARNING: included multiple results for %d ambiguous gene identifier(s)\n" % tally['ambig'])
+				self.warn("WARNING: added multiple results for %d ambiguous gene identifier(s)\n" % tally['ambig'])
 			else:
 				self.warn("WARNING: ignored %d ambiguous gene identifier(s)\n" % tally['ambig'])
 		self.logPop("... OK: added %d genes\n" % numAdd)
@@ -745,7 +725,7 @@ class Biofilter:
 		cursor.execute("UPDATE `%s`.`gene` SET flag = 0" % db)
 		numBefore = cursor.getconnection().changes()
 		tally = dict()
-		sql = "UPDATE `%s`.`gene` SET flag = 1 WHERE (1 OR ?) AND biopolymer_id = ?" % db
+		sql = "UPDATE `%s`.`gene` SET flag = 1 WHERE (1 OR ?1) AND biopolymer_id = ?2" % db
 		maxMatch = (None if self._options.allow_ambiguous_genes == 'yes' else 1)
 		cursor.executemany(sql, self._loki.generateBiopolymerIDsByName(names, maxMatch=maxMatch, tally=tally, namespaceID=namespaceID, typeID=typeID))
 		cursor.execute("DELETE FROM `%s`.`gene` WHERE flag = 0" % db)
@@ -754,13 +734,53 @@ class Biofilter:
 			self.warn("WARNING: ignored %d unrecognized gene identifier(s)\n" % tally['null'])
 		if tally['ambig']:
 			if self._options.allow_ambiguous_genes == 'yes':
-				self.warn("WARNING: dropped multiple results for %d ambiguous gene identifier(s)\n" % tally['ambig'])
+				self.warn("WARNING: kept multiple results for %d ambiguous gene identifier(s)\n" % tally['ambig'])
 			else:
 				self.warn("WARNING: ignored %d ambiguous gene identifier(s)\n" % tally['ambig'])
 		self.logPop("... OK: kept %d genes (%d dropped)\n" % (numBefore-numDrop,numDrop))
 		
 		self._inputFilters[db]['gene'] += 1
 	#intersectInputGenes()
+	
+	
+	def unionInputGeneSearch(self, db, texts):
+		# texts=[ text, ... ]
+		self.logPush("adding to %s gene filter by text search ...\n" % db)
+		cursor = self._loki._db.cursor()
+		
+		typeID = self.getOptionTypeID('gene')
+		
+		self.prepareTableForUpdate(db, 'gene')
+		sql = "INSERT INTO `%s`.`gene` (biopolymer_id,label) VALUES (?1,?2); SELECT 1" % db
+		numAdd = 0
+		for row in cursor.executemany(sql, self._loki.generateBiopolymerIDsBySearch(texts, typeID=typeID)):
+			numAdd += 1
+		self.logPop("... OK: added %d genes\n" % numAdd)
+		
+		self._inputFilters[db]['gene'] += 1
+	#unionInputGeneSearch()
+	
+	
+	def intersectInputGeneSearch(self, db, texts):
+		# texts=[ texts, ... ]
+		if not self._inputFilters[db]['gene']:
+			return self.unionInputGeneSearch(db, texts)
+		self.logPush("reducing %s gene filter by text search ...\n" % db)
+		cursor = self._loki._db.cursor()
+		
+		typeID = self.getOptionTypeID('gene')
+		
+		self.prepareTableForQuery(db, 'gene')
+		cursor.execute("UPDATE `%s`.`gene` SET flag = 0" % db)
+		numBefore = cursor.getconnection().changes()
+		sql = "UPDATE `%s`.`gene` SET flag = 1 WHERE biopolymer_id = ?1 AND (1 OR ?2)" % db
+		cursor.executemany(sql, self._loki.generateBiopolymerIDsBySearch(texts, typeID=typeID))
+		cursor.execute("DELETE FROM `%s`.`gene` WHERE flag = 0" % db)
+		numDrop = cursor.getconnection().changes()
+		self.logPop("... OK: kept %d genes (%d dropped)\n" % (numBefore-numDrop,numDrop))
+		
+		self._inputFilters[db]['gene'] += 1
+	#intersectInputGeneSearch()
 	
 	
 	def unionInputRegions(self, db, regions):
@@ -770,7 +790,7 @@ class Biofilter:
 		
 		# use OR IGNORE to continue on data error, i.e. missing chr or pos
 		self.prepareTableForUpdate(db, 'region')
-		sql = "INSERT OR IGNORE INTO `%s`.`region` (label,chr,posMin,posMax) VALUES (?,?,?,?); SELECT LAST_INSERT_ROWID()" % db
+		sql = "INSERT OR IGNORE INTO `%s`.`region` (label,chr,posMin,posMax) VALUES (?1,?2,?3,?4); SELECT LAST_INSERT_ROWID()" % db
 		lastID = numAdd = numNull = 0
 		for row in cursor.executemany(sql, regions):
 			if lastID != row[0]:
@@ -796,7 +816,7 @@ class Biofilter:
 		self.prepareTableForQuery(db, 'region')
 		cursor.execute("UPDATE `%s`.`region` SET flag = 0" % db)
 		numBefore = cursor.getconnection().changes()
-		sql = "UPDATE `%s`.`region` SET flag = 1 WHERE chr = :1 AND posMin = :2 AND posMax = :3" % db
+		sql = "UPDATE `%s`.`region` SET flag = 1 WHERE (1 OR ?1) AND chr = ?2 AND posMin = ?3 AND posMax = ?4" % db
 		cursor.executemany(sql, regions)
 		cursor.execute("DELETE FROM `%s`.`region` WHERE flag = 0" % db)
 		numDrop = cursor.getconnection().changes()
@@ -819,7 +839,7 @@ class Biofilter:
 		namespaceID = self.getOptionNamespaceID(self._options.group_identifier_type)
 		
 		self.prepareTableForUpdate(db, 'group')
-		sql = "INSERT INTO `%s`.`group` (label,group_id) VALUES (?,?); SELECT 1" % db
+		sql = "INSERT INTO `%s`.`group` (label,group_id) VALUES (?1,?2); SELECT 1" % db
 		maxMatch = (None if self._options.allow_ambiguous_groups == 'yes' else 1)
 		tally = dict()
 		numAdd = 0
@@ -829,7 +849,7 @@ class Biofilter:
 			self.warn("WARNING: ignored %d unrecognized group identifier(s)\n" % tally['null'])
 		if tally['ambig']:
 			if self._options.allow_ambiguous_groups == 'yes':
-				self.warn("WARNING: included multiple results for %d ambiguous group identifier(s)\n" % tally['ambig'])
+				self.warn("WARNING: added multiple results for %d ambiguous group identifier(s)\n" % tally['ambig'])
 			else:
 				self.warn("WARNING: ignored %d ambiguous group identifier(s)\n" % tally['ambig'])
 		self.logPop("... OK: added %d groups\n" % numAdd)
@@ -853,7 +873,7 @@ class Biofilter:
 		numBefore = cursor.getconnection().changes()
 		maxMatch = (None if self._options.allow_ambiguous_groups == 'yes' else 1)
 		tally = dict()
-		sql = "UPDATE `%s`.`group` SET flag = 1 WHERE group_id = :1" % db
+		sql = "UPDATE `%s`.`group` SET flag = 1 WHERE (1 OR ?1) AND group_id = ?2" % db
 		cursor.executemany(sql, self._loki.generateGroupIDsByName(names, maxMatch=maxMatch, tally=tally, namespaceID=namespaceID, typeID=typeID))
 		cursor.execute("DELETE FROM `%s`.`group` WHERE flag = 0" % db)
 		numDrop = cursor.getconnection().changes()
@@ -861,13 +881,53 @@ class Biofilter:
 			self.warn("WARNING: ignored %d unrecognized group identifier(s)\n" % tally['null'])
 		if tally['ambig']:
 			if self._options.allow_ambiguous_groups == 'yes':
-				self.warn("WARNING: dropped multiple results for %d ambiguous group identifier(s)\n" % tally['ambig'])
+				self.warn("WARNING: kept multiple results for %d ambiguous group identifier(s)\n" % tally['ambig'])
 			else:
 				self.warn("WARNING: ignored %d ambiguous group identifier(s)\n" % tally['ambig'])
 		self.logPop("... OK: kept %d groups (%d dropped)\n" % (numBefore-numDrop,numDrop))
 		
 		self._inputFilters[db]['group'] += 1
 	#intersectGroups()
+	
+	
+	def unionInputGroupSearch(self, db, texts, gtype=None):
+		# texts=[ text, ... ]
+		self.logPush("adding to %s %s filter by text search ...\n" % (db,(gtype or "group")))
+		cursor = self._loki._db.cursor()
+		
+		typeID = self.getOptionTypeID(gtype) if gtype else None
+		
+		self.prepareTableForUpdate(db, 'group')
+		sql = "INSERT INTO `%s`.`group` (label,group_id) VALUES (?2,?1); SELECT 1" % db
+		numAdd = 0
+		for row in cursor.executemany(sql, self._loki.generateGroupIDsBySearch(texts, typeID=typeID)):
+			numAdd += 1
+		self.logPop("... OK: added %d groups\n" % numAdd)
+		
+		self._inputFilters[db]['group'] += 1
+	#unionInputGroupSearch()
+	
+	
+	def intersectInputGroupSearch(self, db, texts, gtype=None):
+		# texts=[ texts, ... ]
+		if not self._inputFilters[db]['group']:
+			return self.unionInputGroupSearch(db, texts, gtype)
+		self.logPush("reducing %s %s filter by text search ...\n" % (db,(gtype or "group")))
+		cursor = self._loki._db.cursor()
+		
+		typeID = self.getOptionTypeID(gtype) if gtype else None
+		
+		self.prepareTableForQuery(db, 'group')
+		cursor.execute("UPDATE `%s`.`group` SET flag = 0" % db)
+		numBefore = cursor.getconnection().changes()
+		sql = "UPDATE `%s`.`group` SET flag = 1 WHERE group_id = ?1 AND (1 OR ?2)" % db
+		cursor.executemany(sql, self._loki.generateGroupIDsBySearch(texts, typeID=typeID))
+		cursor.execute("DELETE FROM `%s`.`group` WHERE flag = 0" % db)
+		numDrop = cursor.getconnection().changes()
+		self.logPop("... OK: kept %d groups (%d dropped)\n" % (numBefore-numDrop,numDrop))
+		
+		self._inputFilters[db]['group'] += 1
+	#intersectInputGroupSearch()
 	
 	
 	##################################################
@@ -880,7 +940,7 @@ class Biofilter:
 		cursor = self._loki._db.cursor()
 		
 		self.prepareTableForUpdate(db, 'source')
-		sql = "INSERT OR IGNORE INTO `%s`.`source` (label,source_id) VALUES (?,?); SELECT LAST_INSERT_ROWID()" % db
+		sql = "INSERT OR IGNORE INTO `%s`.`source` (label,source_id) VALUES (?1,?2); SELECT LAST_INSERT_ROWID()" % db
 		lastID = numAdd = numNull = 0
 		for row in cursor.executemany(sql, self._loki.getSourceIDs(names).iteritems()):
 			if lastID != row[0]:
@@ -906,7 +966,7 @@ class Biofilter:
 		self.prepareTableForQuery(db, 'source')
 		cursor.execute("UPDATE `%s`.`source` SET flag = 0" % db)
 		numBefore = cursor.getconnection().changes()
-		sql = "UPDATE `%s`.`source` SET flag = 1 WHERE source_id = :1" % db
+		sql = "UPDATE `%s`.`source` SET flag = 1 WHERE source_id = ?1" % db
 		cursor.executemany(sql, self._loki.getSourceIDs(names).iteritems())
 		cursor.execute("DELETE FROM `%s`.`source` WHERE flag = 0" % db)
 		numDrop = cursor.getconnection().changes()
@@ -1021,7 +1081,10 @@ class Biofilter:
 			"{L}.chr = {R}.chr",
 			"{L}.zone = {R}.zone",
 		}),
-		(frozenset({'m_bg','a_bg','d_br','d_b','d_gb'}),) : frozenset({
+		(frozenset({'m_bg','a_bg','d_br','d_b'}),) : frozenset({
+			"{L}.biopolymer_id = {R}.biopolymer_id",
+		}),
+		(frozenset({'m_bg','a_bg','d_b'}),frozenset({'d_gb'})) : frozenset({
 			"{L}.biopolymer_id = {R}.biopolymer_id",
 		}),
 		(frozenset({'d_gb_L','d_gb_R'}),) : frozenset({
@@ -1046,7 +1109,8 @@ class Biofilter:
 	} #class._queryAliasJoinConditions{}
 	
 	
-	# define constraints on pairs of table aliases which may not be directly joined
+	# define constraints on pairs of table aliases which may not necessarily be directly joined;
+	# these conditions are added to either the WHERE or the LEFT JOIN...ON clause depending on where the aliases appear
 	_queryAliasPairConditions = {
 		(frozenset({'m_l','a_l','d_sl'}),frozenset({'m_r','a_r','d_br'})) : frozenset({
 			"{L}.chr = {R}.chr",
@@ -1071,153 +1135,165 @@ class Biofilter:
 	
 	
 	# define available data columns and the table aliases that can provide them,
-	# in order of preference:  dict{ col : list[ tuple(alias,expression,?rowid,?condition),... ], ... }
+	# in order of preference:
+	# dict{ col : list[ tuple(alias,rowid,expression,?conditions),... ], ... }
+	#   alias = source alias string
+	#   rowid = source table column which identifies unique results
+	#     "{alias}.{rowid}" must be a valid expression
+	#   expression = full SQL expression for the column (should reference only the appropriate alias)
+	#   conditions = optional set of additional conditions
 	_queryColumnSources = {
 		'snp_id' : [
-			('a_s', "a_s.rs", "a_s.rs"),
-			('m_s', "m_s.rs", "m_s.rs"),
-			('d_sl', "d_sl.rs", "d_sl.rs"),
+			('a_s',  'rs', "a_s.rs"),
+			('m_s',  'rs', "m_s.rs"),
+			('d_sl', 'rs', "d_sl.rs"),
 		],
 		'snp_label' : [
-			('a_s', "a_s.label", "a_s.rs"),
-			('m_s', "m_s.label", "m_s.rs"),
-			('d_sl', "'rs'||d_sl.rs", "d_sl.rs"),
+			('a_s',  'rs', "a_s.label"),
+			('m_s',  'rs', "m_s.label"),
+			('d_sl', 'rs', "'rs'||d_sl.rs"),
 		],
 		
-		'locus_id' : [
-			('a_l', "a_l.rowid", "a_l.rowid"),
-			('m_l', "m_l.rowid", "m_l.rowid"),
-			('d_sl', "d_sl._ROWID_", "d_sl._ROWID_"),
+		'position_id' : [
+			('a_l',  'rowid',   "a_l.rowid"),
+			('m_l',  'rowid',   "m_l.rowid"),
+			('d_sl', '_ROWID_', "d_sl._ROWID_"),
 		],
-		'locus_label' : [
-			('a_l', "a_l.label", "a_l.rowid"),
-			('m_l', "m_l.label", "m_l.rowid"),
-			('d_sl', "'rs'||d_sl.rs", "d_sl._ROWID_"),
+		'position_label' : [
+			('a_l',  'rowid',   "a_l.label"),
+			('m_l',  'rowid',   "m_l.label"),
+			('d_sl', '_ROWID_', "'rs'||d_sl.rs"),
 		],
-		'locus_chr' : [
-			('a_l', "a_l.chr", "a_l.rowid"),
-			('m_l', "m_l.chr", "m_l.rowid"),
-			('d_sl', "d_sl.chr", "d_sl._ROWID_"),
+		'position_chr' : [
+			('a_l',  'rowid',   "a_l.chr"),
+			('m_l',  'rowid',   "m_l.chr"),
+			('d_sl', '_ROWID_', "d_sl.chr"),
 		],
-		'locus_pos' : [
-			('a_l', "a_l.pos", "a_l.rowid"),
-			('m_l', "m_l.pos", "m_l.rowid"),
-			('d_sl', "d_sl.pos", "d_sl._ROWID_"),
-		],
-		
-		'biopolymer_id' : [
-			('a_bg', "a_bg.biopolymer_id", "a_bg.biopolymer_id"),
-			('m_bg', "m_bg.biopolymer_id", "m_bg.biopolymer_id"),
-			('c_mb_L', "c_mb_L.biopolymer_id", "c_mb_L.biopolymer_id"),
-			('c_mb_R', "c_mb_R.biopolymer_id", "c_mb_R.biopolymer_id"),
-			('c_ab_R', "c_ab_R.biopolymer_id", "c_ab_R.biopolymer_id"),
-			('d_br', "d_br.biopolymer_id", "d_br.biopolymer_id"),
-			('d_gb', "d_gb.biopolymer_id", "d_gb.biopolymer_id"),
-			('d_gb_L', "d_gb_L.biopolymer_id", "d_gb_L.biopolymer_id"),
-			('d_gb_R', "d_gb_R.biopolymer_id", "d_gb_R.biopolymer_id"),
-			('d_b', "d_b.biopolymer_id", "d_b.biopolymer_id"),
-		],
-		'biopolymer_id_L' : [
-			('c_mb_L', "c_mb_L.biopolymer_id", "c_mb_L.biopolymer_id"),
-			('d_gb_L', "d_gb_L.biopolymer_id", "d_gb_L.biopolymer_id"),
-			('d_b', "d_b.biopolymer_id", "d_b.biopolymer_id"),
-		],
-		'biopolymer_id_R' : [
-			('c_mb_R', "c_mb_R.biopolymer_id", "c_mb_R.biopolymer_id"),
-			('c_ab_R', "c_ab_R.biopolymer_id", "c_ab_R.biopolymer_id"),
-			('d_gb_R', "d_gb_R.biopolymer_id", "d_gb_R.biopolymer_id"),
-			('d_b', "d_b.biopolymer_id", "d_b.biopolymer_id"),
-		],
-		
-		'gene_id' : [
-			('a_bg', "a_bg.biopolymer_id", "a_bg.biopolymer_id"),
-			('m_bg', "m_bg.biopolymer_id", "m_bg.biopolymer_id"),
-			('d_b', "d_b.biopolymer_id", "d_b.biopolymer_id", {"d_b.type_id+0 = {typeID_gene}"}),
-		],
-		'gene_label' : [
-			('a_bg', "a_bg.label", "a_bg.biopolymer_id"),
-			('m_bg', "m_bg.label", "m_bg.biopolymer_id"),
-			('d_b', "d_b.label", "d_b.biopolymer_id", {"d_b.type_id+0 = {typeID_gene}"}),
-		],
-		'gene_identifiers' : [
-			('a_bg', "(SELECT GROUP_CONCAT(namespace||':'||name) FROM `db`.`biopolymer_name` AS d_bn JOIN `db`.`namespace` AS d_n USING (namespace_id) WHERE d_bn.biopolymer_id = a_bg.biopolymer_id)", "a_bg.biopolymer_id"),
-			('m_bg', "(SELECT GROUP_CONCAT(namespace||':'||name) FROM `db`.`biopolymer_name` AS d_bn JOIN `db`.`namespace` AS d_n USING (namespace_id) WHERE d_bn.biopolymer_id = m_bg.biopolymer_id)", "m_bg.biopolymer_id"),
-			('d_b',  "(SELECT GROUP_CONCAT(namespace||':'||name) FROM `db`.`biopolymer_name` AS d_bn JOIN `db`.`namespace` AS d_n USING (namespace_id) WHERE d_bn.biopolymer_id = d_b.biopolymer_id)", "d_b.biopolymer_id", {"d_b.type_id+0 = {typeID_gene}"}),
-		],
-		'gene_symbols' : [
-			('a_bg', "(SELECT GROUP_CONCAT(name) FROM `db`.`biopolymer_name` AS d_bn WHERE d_bn.biopolymer_id = a_bg.biopolymer_id AND d_bn.namespace_id = {namespaceID_symbol})", "a_bg.biopolymer_id"),
-			('m_bg', "(SELECT GROUP_CONCAT(name) FROM `db`.`biopolymer_name` AS d_bn WHERE d_bn.biopolymer_id = m_bg.biopolymer_id AND d_bn.namespace_id = {namespaceID_symbol})", "m_bg.biopolymer_id"),
-			('d_b',  "(SELECT GROUP_CONCAT(name) FROM `db`.`biopolymer_name` AS d_bn WHERE d_bn.biopolymer_id = d_b.biopolymer_id  AND d_bn.namespace_id = {namespaceID_symbol})", "d_b.biopolymer_id", {"d_b.type_id+0 = {typeID_gene}"}),
+		'position_pos' : [
+			('a_l',  'rowid',   "a_l.pos"),
+			('m_l',  'rowid',   "m_l.pos"),
+			('d_sl', '_ROWID_', "d_sl.pos"),
 		],
 		
 		'region_id' : [
-			('a_r', "a_r.rowid", "a_r.rowid"),
-			('m_r', "m_r.rowid", "m_r.rowid"),
-			('d_br', "d_br._ROWID_", "d_br._ROWID_"),
+			('a_r',  'rowid',   "a_r.rowid"),
+			('m_r',  'rowid',   "m_r.rowid"),
+			('d_br', '_ROWID_', "d_br._ROWID_"),
 		],
 		'region_label' : [
-			('a_r', "a_r.label", "a_r.rowid"),
-			('m_r', "m_r.label", "m_r.rowid"),
-			('d_b', "d_b.label", "d_b.biopolymer_id"),
+			('a_r',  'rowid',         "a_r.label"),
+			('m_r',  'rowid',         "m_r.label"),
+			('d_b',  'biopolymer_id', "d_b.label"),
 		],
 		'region_chr' : [
-			('a_r', "a_r.chr", "a_r.rowid"),
-			('m_r', "m_r.chr", "m_r.rowid"),
-			('d_br', "d_br.chr", "d_br._ROWID_"),
+			('a_r',  'rowid',   "a_r.chr"),
+			('m_r',  'rowid',   "m_r.chr"),
+			('d_br', '_ROWID_', "d_br.chr"),
+		],
+		'region_zone' : [
+			('a_rz', 'zone', "a_rz.zone"),
+			('m_rz', 'zone', "m_rz.zone"),
+			('d_bz', 'zone', "d_bz.zone"),
 		],
 		'region_posMin' : [
-			('a_r', "a_r.posMin", "a_r.rowid"),
-			('m_r', "m_r.posMin", "m_r.rowid"),
-			('d_br', "d_br.posMin", "d_br._ROWID_"),
+			('a_r',  'rowid',   "a_r.posMin"),
+			('m_r',  'rowid',   "m_r.posMin"),
+			('d_br', '_ROWID_', "d_br.posMin"),
 		],
 		'region_posMax' : [
-			('a_r', "a_r.posMax", "a_r.rowid"),
-			('m_r', "m_r.posMax", "m_r.rowid"),
-			('d_br', "d_br.posMax", "d_br._ROWID_"),
+			('a_r',  'rowid',   "a_r.posMax"),
+			('m_r',  'rowid',   "m_r.posMax"),
+			('d_br', '_ROWID_', "d_br.posMax"),
+		],
+		
+		'biopolymer_id' : [
+			('a_bg',   'biopolymer_id', "a_bg.biopolymer_id"),
+			('m_bg',   'biopolymer_id', "m_bg.biopolymer_id"),
+			('c_mb_L', 'biopolymer_id', "c_mb_L.biopolymer_id"),
+			('c_mb_R', 'biopolymer_id', "c_mb_R.biopolymer_id"),
+			('c_ab_R', 'biopolymer_id', "c_ab_R.biopolymer_id"),
+			('d_br',   'biopolymer_id', "d_br.biopolymer_id"),
+			('d_gb',   'biopolymer_id', "d_gb.biopolymer_id"),
+			('d_gb_L', 'biopolymer_id', "d_gb_L.biopolymer_id"),
+			('d_gb_R', 'biopolymer_id', "d_gb_R.biopolymer_id"),
+			('d_b',    'biopolymer_id', "d_b.biopolymer_id"),
+		],
+		'biopolymer_id_L' : [
+			('c_mb_L', 'biopolymer_id', "c_mb_L.biopolymer_id"),
+			('d_gb_L', 'biopolymer_id', "d_gb_L.biopolymer_id"),
+			('d_b',    'biopolymer_id', "d_b.biopolymer_id"),
+		],
+		'biopolymer_id_R' : [
+			('c_mb_R', 'biopolymer_id', "c_mb_R.biopolymer_id"),
+			('c_ab_R', 'biopolymer_id', "c_ab_R.biopolymer_id"),
+			('d_gb_R', 'biopolymer_id', "d_gb_R.biopolymer_id"),
+			('d_b',    'biopolymer_id', "d_b.biopolymer_id"),
+		],
+		
+		'gene_id' : [
+			('a_bg', 'biopolymer_id', "a_bg.biopolymer_id"),
+			('m_bg', 'biopolymer_id', "m_bg.biopolymer_id"),
+			('d_b',  'biopolymer_id', "d_b.biopolymer_id", {"d_b.type_id+0 = {typeID_gene}"}),
+		],
+		'gene_label' : [
+			('a_bg', 'biopolymer_id', "a_bg.label"),
+			('m_bg', 'biopolymer_id', "m_bg.label"),
+			('d_b',  'biopolymer_id', "d_b.label", {"d_b.type_id+0 = {typeID_gene}"}),
+		],
+		'gene_identifiers' : [
+			('a_bg', 'biopolymer_id', "(SELECT GROUP_CONCAT(namespace||':'||name) FROM `db`.`biopolymer_name` AS d_bn JOIN `db`.`namespace` AS d_n USING (namespace_id) WHERE d_bn.biopolymer_id = a_bg.biopolymer_id)"),
+			('m_bg', 'biopolymer_id', "(SELECT GROUP_CONCAT(namespace||':'||name) FROM `db`.`biopolymer_name` AS d_bn JOIN `db`.`namespace` AS d_n USING (namespace_id) WHERE d_bn.biopolymer_id = m_bg.biopolymer_id)"),
+			('d_b',  'biopolymer_id', "(SELECT GROUP_CONCAT(namespace||':'||name) FROM `db`.`biopolymer_name` AS d_bn JOIN `db`.`namespace` AS d_n USING (namespace_id) WHERE d_bn.biopolymer_id = d_b.biopolymer_id)", {"d_b.type_id+0 = {typeID_gene}"}),
+		],
+		'gene_symbols' : [
+			('a_bg', 'biopolymer_id', "(SELECT GROUP_CONCAT(name) FROM `db`.`biopolymer_name` AS d_bn WHERE d_bn.biopolymer_id = a_bg.biopolymer_id AND d_bn.namespace_id = {namespaceID_symbol})", "a_bg.biopolymer_id"),
+			('m_bg', 'biopolymer_id', "(SELECT GROUP_CONCAT(name) FROM `db`.`biopolymer_name` AS d_bn WHERE d_bn.biopolymer_id = m_bg.biopolymer_id AND d_bn.namespace_id = {namespaceID_symbol})", "m_bg.biopolymer_id"),
+			('d_b',  'biopolymer_id', "(SELECT GROUP_CONCAT(name) FROM `db`.`biopolymer_name` AS d_bn WHERE d_bn.biopolymer_id = d_b.biopolymer_id  AND d_bn.namespace_id = {namespaceID_symbol})", "d_b.biopolymer_id", {"d_b.type_id+0 = {typeID_gene}"}),
 		],
 		
 		'group_id' : [
-			('a_g', "a_g.group_id", "a_g.group_id"),
-			('m_g', "m_g.group_id", "m_g.group_id"),
-			('c_g', "c_g.group_id", "c_g.group_id"),
-			('d_gb', "d_gb.group_id", "d_gb.group_id"),
-			('d_gb_L', "d_gb_L.group_id", "d_gb_L.group_id"),
-			('d_gb_R', "d_gb_R.group_id", "d_gb_R.group_id"),
-			('d_g', "d_g.group_id", "d_g.group_id"),
+			('a_g',    'group_id', "a_g.group_id"),
+			('m_g',    'group_id', "m_g.group_id"),
+			('c_g',    'group_id', "c_g.group_id"),
+			('d_gb',   'group_id', "d_gb.group_id"),
+			('d_gb_L', 'group_id', "d_gb_L.group_id"),
+			('d_gb_R', 'group_id', "d_gb_R.group_id"),
+			('d_g',    'group_id', "d_g.group_id"),
 		],
 		'group_label' : [
-			('a_g', "a_g.label", "a_g.group_id"),
-			('m_g', "m_g.label", "m_g.group_id"),
-			('d_g', "d_g.label", "d_g.group_id"),
+			('a_g', 'group_id', "a_g.label"),
+			('m_g', 'group_id', "m_g.label"),
+			('d_g', 'group_id', "d_g.label"),
 		],
 		'group_identifiers' : [
-			('a_g', "(SELECT GROUP_CONCAT(namespace||':'||name) FROM `db`.`group_name` AS d_gn JOIN `db`.`namespace` AS d_n USING (namespace_id) WHERE d_gn.group_id = a_g.group_id)", "a_g.group_id"),
-			('m_g', "(SELECT GROUP_CONCAT(namespace||':'||name) FROM `db`.`group_name` AS d_gn JOIN `db`.`namespace` AS d_n USING (namespace_id) WHERE d_gn.group_id = m_g.group_id)", "m_g.group_id"),
-			('d_g', "(SELECT GROUP_CONCAT(namespace||':'||name) FROM `db`.`group_name` AS d_gn JOIN `db`.`namespace` AS d_n USING (namespace_id) WHERE d_gn.group_id = d_g.group_id)", "d_g.group_id"),
+			('a_g', 'group_id', "(SELECT GROUP_CONCAT(namespace||':'||name) FROM `db`.`group_name` AS d_gn JOIN `db`.`namespace` AS d_n USING (namespace_id) WHERE d_gn.group_id = a_g.group_id)"),
+			('m_g', 'group_id', "(SELECT GROUP_CONCAT(namespace||':'||name) FROM `db`.`group_name` AS d_gn JOIN `db`.`namespace` AS d_n USING (namespace_id) WHERE d_gn.group_id = m_g.group_id)"),
+			('d_g', 'group_id', "(SELECT GROUP_CONCAT(namespace||':'||name) FROM `db`.`group_name` AS d_gn JOIN `db`.`namespace` AS d_n USING (namespace_id) WHERE d_gn.group_id = d_g.group_id)"),
 		],
 		
 		'source_id' : [
-			('a_c', "a_c.source_id", "a_c.source_id"),
-			('m_c', "m_c.source_id", "m_c.source_id"),
-			('d_g', "d_g.source_id", "d_g.source_id"),
-			('d_c', "d_c.source_id", "d_c.source_id"),
+			('a_c', 'source_id', "a_c.source_id"),
+			('m_c', 'source_id', "m_c.source_id"),
+			('d_g', 'source_id', "d_g.source_id"),
+			('d_c', 'source_id', "d_c.source_id"),
 		],
 		'source_label' : [
-			('a_c', "a_c.label", "a_c.source_id"),
-			('m_c', "m_c.label", "m_c.source_id"),
-			('d_c', "d_c.source", "d_c.source_id"),
+			('a_c', 'source_id', "a_c.label"),
+			('m_c', 'source_id', "m_c.label"),
+			('d_c', 'source_id', "d_c.source"),
 		],
 	} #class._queryColumnSources
 	
 	
 	def getQueryTemplate(self):
 		return {
-			'_colname'  : list(), # [ colA, colB, ... ]
-			'_colindex' : dict(), # { colA:idxA, colB:idxB, ... }
-			'_rowid'    : set(),  # { expA, expB, ... }
-		#	'INSERT'    : None,   # tbl                           => INSERT INTO aliasTable[tbl] (colA,colB,...) ...
-			'SELECT'    : dict(), # { colA:expA, colB:expB, ... } => SELECT expA AS colA, expB AS colB, ...
+			'SELECT'    : collections.OrderedDict(),
+			            # OD{ colA:expA, colB:expB, ... }         => SELECT expA AS colA, expB AS colB, ...
+			'_rowid'    : collections.OrderedDict(),
+			            # OD{ tblA:{colA1,colA2,...}, ... }       => SELECT ... (tblA.colA1||'_'||tblA.colA2...) AS rowid
 			'FROM'      : set(),  # { tblA, tblB, ... }           => FROM aliasTable[tblA] AS tblA, aliasTable[tblB] AS tblB, ...
+			'LEFT JOIN' : collections.OrderedDict(),
+			            # OD{ tblA:{expA1,expA2,...}, ... }       => LEFT JOIN aliasTable[tblA] ON expA1 AND expA2 ...
 			'WHERE'     : set(),  # { expA, expB, ... }           => WHERE expA AND expB AND ...
 			'GROUP BY'  : list(), # [ expA, expB, ... ]           => GROUP BY expA, expB, ...
 			'HAVING'    : set(),  # { expA, expB, ... }           => HAVING expA AND expB AND ...
@@ -1227,12 +1303,13 @@ class Biofilter:
 	#getQueryTemplate()
 	
 	
-	def buildQuery(self, outputs, conditions=None, insert=None, focus='main', modelGenes=False, modelGroups=False):
+	def buildQuery(self, outputs, conditions=None, focus='main', modelGenes=False, modelGroups=False, annotate=False):
+		if self._options.debug_logic:
+			self.warnPush("buildQuery(outputs=%s, conditions=%s, focus=%s, modelGenes=%s, modelGroups=%s, annotate=%s\n" % (
+					outputs,conditions,focus,modelGenes,modelGroups,annotate
+			))
 		conditions = conditions or dict()
 		query = self.getQueryTemplate()
-		#if insert and (insert not in self._queryAliasTable):
-		#	raise Exception("ERROR: invalid insert table alias '%s'" % insert)
-		#query['INSERT'] = insert
 		
 		# generate table alias join adjacency map
 		aliasAdjacent = collections.defaultdict(set)
@@ -1243,104 +1320,153 @@ class Biofilter:
 						aliasAdjacent[aliasLeft].add(aliasRight)
 						aliasAdjacent[aliasRight].add(aliasLeft)
 		
+		if self._options.debug_logic:
+			self.warn("aliasAdjacent = \n")
+			for alias in sorted(aliasAdjacent):
+				self.warn("  %s : %s\n" % (alias,sorted(aliasAdjacent[alias])))
+		
 		# generate column availability map
+		# _queryColumnSources[col] = list[ tuple(alias,rowid,expression,?conditions),... ]
 		columnAliases = collections.defaultdict(set)
 		aliasColumns = collections.defaultdict(set)
 		for col in outputs:
 			if col not in self._queryColumnSources:
-				raise Exception("ERROR: unsupported internal data column '{0}'".format(col))
+				raise Exception("internal query with unsupported output column '{0}'".format(col))
 			for source in self._queryColumnSources[col]:
 				columnAliases[col].add(source[0])
 				aliasColumns[source[0]].add(col)
-			if col not in query['_colindex']:
-				query['_colindex'][col] = len(query['_colname'])
-				query['_colname'].append(col)
-				query['SELECT'][col] = None
+			query['SELECT'][col] = None
 		for col in conditions:
 			if col not in self._queryColumnSources:
-				raise Exception("ERROR: unsupported internal data column '{0}'".format(col))
+				raise Exception("internal query with unsupported condition column '{0}'".format(col))
 			for source in self._queryColumnSources[col]:
 				columnAliases[col].add(source[0])
 				aliasColumns[source[0]].add(col)
+		if not (columnAliases and aliasColumns):
+			raise Exception("internal query with no outputs or conditions")
 		
-		# re-index all input filter tables
-		for db in self._schema:
-			for tbl in self._schema[db]:
-				self.prepareTableForQuery(db, tbl)
+		if self._options.debug_logic:
+			self.warn("columnAliases = %s\n" % columnAliases)
+			self.warn("aliasColumns = %s\n" % aliasColumns)
 		
-		# add applicable input filter table aliases
-		for alias,table in self._queryAliasTable.iteritems():
-			if table[0] == 'main' and self._inputFilters['main'][table[1]] and ((focus == 'main') or (focus == 'alt' and self._options.alternate_model_filtering != 'yes')):
-				if modelGenes and alias in ('m_g','m_c'):
-					pass
-				elif modelGroups and alias not in ('m_g','m_c'):
-					pass
-				else:
-					query['FROM'].add(alias)
-			elif table[0] == 'alt' and self._inputFilters['alt'][table[1]] and focus == 'alt':
-				if modelGenes and alias in ('a_g','a_c'):
-					pass
-				elif modelGroups and alias not in ('a_g','a_c'):
-					pass
-				else:
-					query['FROM'].add(alias)
-			elif table[0] == 'cand' and self._inputFilters['cand'][table[1]] and focus == 'cand':
-				if (self._options.alternate_model_filtering == 'yes' or self._inputFilters['cand']['alt_biopolymer']) and alias == 'c_mb_R':
-					pass
-				elif modelGenes and alias == 'c_g':
-					pass
-				elif modelGroups and alias != 'c_g':
-					pass
-				else:
-					query['FROM'].add(alias)
+		# start from the specified tables when annotating, otherwise from applicable input tables
+		if annotate:
+			query['FROM'].update(a[0] for a in annotate.keys())
+		else:
+			# re-index all input filter tables
+			for db in self._schema:
+				for tbl in self._schema[db]:
+					self.prepareTableForQuery(db, tbl)
+			
+			# add applicable input filter table aliases
+			for alias,table in self._queryAliasTable.iteritems():
+				if table[0] == 'main' and self._inputFilters['main'][table[1]] and ((focus == 'main') or (focus == 'alt' and self._options.alternate_model_filtering != 'yes')):
+					if modelGenes and alias in ('m_g','m_c'):
+						pass
+					elif modelGroups and alias not in ('m_g','m_c'):
+						pass
+					else:
+						query['FROM'].add(alias)
+				elif table[0] == 'alt' and self._inputFilters['alt'][table[1]] and focus == 'alt':
+					if modelGenes and alias in ('a_g','a_c'):
+						pass
+					elif modelGroups and alias not in ('a_g','a_c'):
+						pass
+					else:
+						query['FROM'].add(alias)
+				elif table[0] == 'cand' and self._inputFilters['cand'][table[1]] and focus == 'cand':
+					if (self._options.alternate_model_filtering == 'yes' or self._inputFilters['cand']['alt_biopolymer']) and alias == 'c_mb_R':
+						pass
+					elif modelGenes and alias == 'c_g':
+						pass
+					elif modelGroups and alias != 'c_g':
+						pass
+					else:
+						query['FROM'].add(alias)
+			
+			# if there are no input filter tables, start from the last-resort source for a random output or condition column
+			if not query['FROM']:
+				col = next(itertools.chain(outputs, conditions))
+				alias = self._queryColumnSources[col][-1][0]
+				query['FROM'].add(alias)
+		#if annotate
 		
-		# add any table aliases necessary to join the input filters to eachother
-		if len(aliasAdjacent) > len(query['FROM']) > 1:
+		if self._options.debug_logic:
+			self.warn("starting FROM = %s\n" % ', '.join(query['FROM']))
+		
+		# add any table aliases necessary to join the currently included tables
+		if len(query['FROM']) > 1:
 			remaining = query['FROM'].copy()
 			inside = {remaining.pop()}
 			outside = set(aliasAdjacent) - inside
 			queue = collections.deque()
-			queue.append( (inside, outside, remaining) )
+			queue.append( (inside,outside,remaining) )
 			while queue:
 				inside,outside,remaining = queue.popleft()
 				if not remaining:
 					break
-				for alias in outside:
-					if aliasAdjacent[alias] & inside:
-						queue.append( (inside|{alias}, outside-{alias}, remaining-{alias}) )
-			query['FROM'] = inside
+				queue.extend( (inside|{a},outside-{a},remaining-{a}) for a in outside if inside & aliasAdjacent[a] )
+			if remaining:
+				raise Exception("could not find a join path for starting tables: %s" % query['FROM'])
+			query['FROM'] |= inside
 		#if tables need joining
 		
-		# check off any columns that we already have sources for
-		# (iterate over .keys() so we can delete during traversal)
-		for col in columnAliases.keys():
-			if columnAliases[col] & query['FROM']:
-				del columnAliases[col]
+		if self._options.debug_logic:
+			self.warn("joined FROM = %s\n" % ', '.join(query['FROM']))
 		
 		# add 'db' table aliases to satisfy any remaining columns
-		if columnAliases:
-			remaining = set(columnAliases)
-			inside = query['FROM']
-			outside = set(a for a,t in self._queryAliasTable.iteritems() if t[0] == 'db') - inside
-			# if there are no input filter tables whatsoever, pick an arbitrary starting point:
-			# the last-resort source for a random output column
-			if not inside:
-				col = remaining.pop()
-				alias = self._queryColumnSources[col][-1][0]
-				remaining -= aliasColumns[alias]
-				inside.add(alias)
-				outside -= inside
-			queue = collections.deque()
-			queue.append( (inside, outside, remaining) )
-			while queue:
-				inside,outside,remaining = queue.popleft()
-				if not remaining:
-					break
-				for alias in outside:
-					if aliasAdjacent[alias] & inside:
-						queue.append( (inside|{alias}, outside-{alias}, remaining-aliasColumns[alias]) )
-			query['FROM'] = inside
-		#if columns need sources
+		columnsRemaining = set(col for col in columnAliases if not (columnAliases[col] & query['FROM']))
+		if annotate:
+			# when annotating, do BFS on each remaining column in order to guarantee a valid path of LEFT JOINs
+			while columnsRemaining:
+				target = next(col for col in itertools.chain(conditions,outputs) if col in columnsRemaining)
+				inside = query['FROM'].union(query['LEFT JOIN'])
+				outside = set(a for a,t in self._queryAliasTable.iteritems() if t[0] == 'db' and a not in inside)
+				path = list()
+				if self._options.debug_logic:
+					self.warn("current LEFT JOIN = %s\n" % ', '.join(query['LEFT JOIN']))
+					self.warn("target column = %s\n" % target)
+					self.warn("available aliases = %s\n" % ', '.join(outside))
+				queue = collections.deque()
+				queue.extend((inside,outside-{a},[a]) for a in outside if inside & aliasAdjacent[a])
+				while queue:
+					inside,outside,path = queue.popleft()
+					#if self._options.debug_logic:
+					#	self.warn("considering path = %s\n" % ', '.join(path))
+					if target in aliasColumns[path[-1]]:
+						break
+					queue.extend((inside,outside-{a},path+[a]) for a in outside if path[-1] in aliasAdjacent[a])
+				if (not path) or (target not in aliasColumns[path[-1]]):
+					raise Exception("could not find a source table for output column: %s" % target)
+				for alias in path:
+					columnsRemaining.difference_update(aliasColumns[alias])
+					query['LEFT JOIN'][alias] = set()
+			#while columns need sources
+		else:
+			# when filtering, build a minimum spanning tree to connect all remaining columns at once, in any order
+			if columnsRemaining:
+				remaining = columnsRemaining
+				inside = query['FROM']
+				outside = set(a for a,t in self._queryAliasTable.iteritems() if t[0] == 'db' and a not in inside and a not in query['LEFT JOIN'])
+				if self._options.debug_logic:
+					self.warn("remaining columns = %s\n" % ', '.join(columnsRemaining))
+					self.warn("available aliases = %s\n" % ', '.join(outside))
+				queue = collections.deque()
+				queue.append( (inside,outside,remaining) )
+				while queue:
+					inside,outside,remaining = queue.popleft()
+					if not remaining:
+						break
+					queue.extend((inside|{a},outside-{a},remaining-aliasColumns[a]) for a in outside if inside & aliasAdjacent[a])
+				if remaining:
+					raise Exception("could not find a source table for output columns: %s" % ', '.join(columnsRemaining))
+				query['FROM'] |= inside
+			#if columns need sources
+		#if annotate
+		
+		if self._options.debug_logic:
+			self.warn("final FROM = %s\n" % ', '.join(query['FROM']))
+			self.warn("final LEFT JOIN = %s\n" % ', '.join(query['LEFT JOIN']))
 		
 		# fetch option values to insert into condition strings
 		formatter = string.Formatter()
@@ -1348,7 +1474,7 @@ class Biofilter:
 			'L'           : None,
 			'R'           : None,
 			'typeID_gene' : self.getOptionTypeID('gene'),
-			'namespaceID_symbol' : self.getOptionNamespaceID('symbol'),
+			'namespaceID_symbol' : self.getOptionNamespaceID('symbol', optional=True),
 			'allowUSP'    : (1 if self._options.allow_unvalidated_snp_positions == 'yes' else 0),
 			'rpMargin'    : self._options.region_position_margin,
 			'rmPercent'   : self._options.region_match_percent,
@@ -1364,97 +1490,143 @@ class Biofilter:
 		
 		# assign output columns
 		for col in outputs:
-			for source in self._queryColumnSources[col]: # source=(alias,expression,rowid,conditions)
-				if source[0] in query['FROM']:
-					query['SELECT'][col] = formatter.vformat(source[1], args=None, kwargs=options)
-					if (len(source) > 2) and source[2]:
-						query['_rowid'].add(source[2])
+			# _queryColumnSources[col] = list[ tuple(alias,rowid,expression,?conditions),... ]
+			for source in self._queryColumnSources[col]:
+				if (source[0] in query['FROM']) or (source[0] in query['LEFT JOIN']):
+					if source[0] not in query['_rowid']:
+						query['_rowid'][source[0]] = set()
+					query['_rowid'][source[0]].add(source[1])
+					query['SELECT'][col] = formatter.vformat(source[2], args=None, kwargs=options)
 					if (len(source) > 3) and source[3]:
-						query['WHERE'].update(formatter.vformat(c, args=None, kwargs=options) for c in source[3])
+						if source[0] in query['FROM']:
+							query['WHERE'].update(formatter.vformat(c, args=None, kwargs=options) for c in source[3])
+						else:
+							query['LEFT JOIN'][source[0]].update(formatter.vformat(c, args=None, kwargs=options) for c in source[3])
 					break
 				#if alias is available
 			#foreach possible source
 		#foreach output column
 		
+		if self._options.debug_logic:
+			self.warn("SELECT = %s\n" % query['SELECT'])
+		
 		# assign column conditions
 		for col,conds in conditions.iteritems():
 			conds = conds if isinstance(conds, set) else {conds}
-			for source in self._queryColumnSources[col]: # source=(alias,expression,rowid,conditions)
+			# _queryColumnSources[col] = list[ tuple(alias,rowid,expression,?conditions),... ]
+			for source in self._queryColumnSources[col]:
 				if source[0] in query['FROM']:
-					query['WHERE'].update("({0} {1})".format(formatter.vformat(source[1], args=None, kwargs=options), c) for c in conds)
-					# adding conditions to the rowid causes duplicate expanded SNP models due to biopolymer_id, i.e. test dataset rs11-rs15
-					#if (len(source) > 2) and source[2]:
-					#	query['_rowid'].add(source[2])
+					query['WHERE'].update("({0} {1})".format(formatter.vformat(source[2], args=None, kwargs=options), c) for c in conds)
 					if (len(source) > 3) and source[3]:
 						query['WHERE'].update(formatter.vformat(c, args=None, kwargs=options) for c in source[3])
+					break
+				elif source[0] in query['LEFT JOIN']:
+					query['LEFT JOIN'][source[0]].update("({0} {1})".format(formatter.vformat(source[2], args=None, kwargs=options), c) for c in conds)
+					if (len(source) > 3) and source[3]:
+						query['LEFT JOIN'][source[0]].update(formatter.vformat(c, args=None, kwargs=options) for c in source[3])
 					break
 				#if alias is available
 			#foreach possible source
 		#foreach column condition
 		
+		# add annotation conditions
+		if annotate:
+			query['WHERE'].update("{0}.{1} {2}".format(tblcol[0], tblcol[1], formatter.vformat(exp, args=None, kwargs=options)) for tblcol,exp in annotate.iteritems())
+		
+		#if conditions and self._options.debug_logic:
+		#	self.warn("condition WHERE = %s\n" % query['WHERE'])
+		#	self.warn("condition LEFT JOIN = %s\n" % query['LEFT JOIN'])
+		
 		# add general constraints for included table aliases
 		for aliases,conds in self._queryAliasConditions.iteritems():
-			for alias in (aliases & query['FROM']):
+			for alias in aliases.intersection(query['FROM']):
 				options['L'] = alias
 				query['WHERE'].update(formatter.vformat(c, args=None, kwargs=options) for c in conds)
+			for alias in aliases.intersection(query['LEFT JOIN']):
+				options['L'] = alias
+				query['LEFT JOIN'][alias].update(formatter.vformat(c, args=None, kwargs=options) for c in conds)
 		
 		# add join and pair constraints for included table alias pairs
 		for aliasPairs,conds in itertools.chain(self._queryAliasJoinConditions.iteritems(), self._queryAliasPairConditions.iteritems()):
 			for aliasLeft in aliasPairs[0]:
 				for aliasRight in aliasPairs[-1]:
-					if (aliasLeft != aliasRight) and (aliasLeft in query['FROM']) and (aliasRight in query['FROM']):
-						options['L'] = aliasLeft
-						options['R'] = aliasRight
+					options['L'] = aliasLeft
+					options['R'] = aliasRight
+					if aliasLeft == aliasRight:
+						pass
+					elif (aliasLeft in query['FROM']) and (aliasRight in query['FROM']):
 						query['WHERE'].update(formatter.vformat(c, args=None, kwargs=options) for c in conds)
+					elif (aliasLeft in query['FROM']) and (aliasRight in query['LEFT JOIN']):
+						query['LEFT JOIN'][aliasRight].update(formatter.vformat(c, args=None, kwargs=options) for c in conds)
+					elif (aliasLeft in query['LEFT JOIN']) and (aliasRight in query['FROM']):
+						query['LEFT JOIN'][aliasLeft].update(formatter.vformat(c, args=None, kwargs=options) for c in conds)
+					elif (aliasLeft in query['LEFT JOIN']) and (aliasRight in query['LEFT JOIN']):
+						indexLeft = query['LEFT JOIN'].keys().index(aliasLeft)
+						indexRight = query['LEFT JOIN'].keys().index(aliasRight)
+						if indexLeft > indexRight:
+							query['LEFT JOIN'][aliasLeft].update(formatter.vformat(c, args=None, kwargs=options) for c in conds)
+						else:
+							query['LEFT JOIN'][aliasRight].update(formatter.vformat(c, args=None, kwargs=options) for c in conds)
+				#foreach right alias
+			#foreach left alias
+		#foreach pair constraint
 		
-		# add or remove relevant indecies
-		#if query['INSERT']:
-		#	table = self._queryAliasTable[query['INSERT']]
-		#	if table[0] in self._schema:
-		#		self.prepareTableForUpdate(table[0], table[1])
+		#if self._options.debug_logic:
+		#	self.warn("final WHERE = %s\n" % query['WHERE'])
+		#	self.warn("final LEFT JOIN = %s\n" % query['LEFT JOIN'])
 		
 		# all done
 		return query
 	#buildQuery()
 	
 	
-	def getQueryText(self, query, noRowIDs=False):
-		sql = ""
-		#if query['INSERT']:
-		#	sql += "INSERT OR IGNORE INTO `{0[0]}`.`{0[1]}`\n".format(self._queryAliasTable[query['INSERT']])
-		sql += "SELECT " + (",\n  ".join("{0} AS {1}".format(query['SELECT'][c] or "NULL",c) for c in query['_colname'])) + "\n"
-		if not noRowIDs: #(query['INSERT'] or noRowIDs):
-			sql += "  , (" + ("||'_'||".join(query['_rowid'])) + ") AS rowid\n"
+	def getQueryText(self, query, noRowIDs=False, sortRowIDs=False, splitRowIDs=False):
+		sql = "SELECT " + (",\n  ".join("{0} AS {1}".format(exp or "NULL",col) for col,exp in query['SELECT'].iteritems())) + "\n"
+		rowIDs = list()
+		orderBy = list(query['ORDER BY'])
+		for alias,cols in query['_rowid'].iteritems():
+			rowIDs.extend("COALESCE({0}.{1},'')".format(alias,col) for col in cols)
+			if sortRowIDs:
+				orderBy.extend("({0}.{1} IS NULL)".format(alias,col) for col in cols)
+		if splitRowIDs:
+			for n in xrange(len(rowIDs)):
+				sql += "  , {0} AS _rowid_{1}\n".format(rowIDs[n],n)
+		if not noRowIDs:
+			sql += "  , (" + ("||'_'||".join(rowIDs)) + ") AS _rowid\n"
 		if query['FROM']:
 			sql += "FROM " + (",\n  ".join("`{0[0]}`.`{0[1]}` AS {1}".format(self._queryAliasTable[a],a) for a in sorted(query['FROM']))) + "\n"
+		for alias,joinon in query['LEFT JOIN'].iteritems():
+			sql += "LEFT JOIN `{0[0]}`.`{0[1]}` AS {1}\n".format(self._queryAliasTable[alias],alias)
+			if joinon:
+				sql += "  ON " + ("\n  AND ".join(sorted(joinon))) + "\n"
 		if query['WHERE']:
 			sql += "WHERE " + ("\n  AND ".join(sorted(query['WHERE']))) + "\n"
 		if query['GROUP BY']:
 			sql += "GROUP BY " + (", ".join(query['GROUP BY'])) + "\n"
 		if query['HAVING']:
 			sql += "HAVING " + ("\n  AND ".join(sorted(query['HAVING']))) + "\n"
-		if query['ORDER BY']:
-			sql += "ORDER BY " + (", ".join(query['ORDER BY'])) + "\n"
+		if orderBy:
+			sql += "ORDER BY " + (", ".join(orderBy)) + "\n"
 		if query['LIMIT']:
 			sql += "LIMIT " + str(int(query['LIMIT'])) + "\n"
 		return sql
 	#getQueryText()
 	
 	
-	def generateQueryResults(self, query, allowDupes=False):
+	def generateQueryResults(self, query, allowDupes=False, bindings=None):
 		# execute the query and yield the results
 		cursor = self._loki._db.cursor()
 		sql = self.getQueryText(query, noRowIDs=allowDupes)
 		if self._options.debug_query:
 			self.log(sql+"\n")
-			for row in cursor.execute("EXPLAIN QUERY PLAN "+sql):
+			for row in cursor.execute("EXPLAIN QUERY PLAN "+sql, bindings):
 				self.log(str(row)+"\n")
 		elif allowDupes:
-			for row in cursor.execute(sql):
+			for row in cursor.execute(sql, bindings):
 				yield row
 		else:
 			rowIDs = set()
-			for row in cursor.execute(sql):
+			for row in cursor.execute(sql, bindings):
 				if row[-1] not in rowIDs:
 					rowIDs.add(row[-1])
 					yield row[:-1]
@@ -1464,6 +1636,117 @@ class Biofilter:
 	
 	##################################################
 	# filtering, annotation & modeling
+	
+	
+	def _populateColumnsFromTypes(self, types, columns=None, header=None, ids=None):
+		if columns == None:
+			columns = list()
+		if header == None:
+			header = list()
+		if ids == None:
+			ids = list()
+		for t in types:
+			if t == 'snp':
+				header.extend(['snp'])
+				columns.extend(['snp_label'])
+			elif t == 'position':
+				header.extend(['chr','position','pos'])
+				columns.extend(['position_chr','position_label','position_pos']) # oddball .map file format
+			elif t == 'gene':
+				header.extend(['gene'])
+				columns.extend(['gene_label'])
+			elif t == 'region':
+				header.extend(['chr','region','posMin','posMax'])
+				columns.extend(['region_chr','region_label','region_posMin','region_posMax']) # inspired by oddball .map file format
+			elif t == 'group':
+				header.extend(['group'])
+				columns.extend(['group_label'])
+			elif t == 'source':
+				header.extend(['source'])
+				columns.extend(['source_label'])
+			elif t in self._queryColumnSources:
+				header.append(t)
+				columns.append(t)
+			else:
+				raise Exception("ERROR: unsupported output type '%s'" % t)
+		#foreach types
+		return columns
+	#_populateColumnsFromTypes()
+	
+	
+	def generateFilterOutput(self, types):
+		header = list()
+		columns = list()
+		self._populateColumnsFromTypes(types, columns, header)
+		if not (header and columns):
+			raise Exception("filtering with empty column list")
+		header[0] = "#" + header[0]
+		return itertools.chain([tuple(header)], self.generateQueryResults(self.buildQuery(columns)))
+	#generateFilterOutput()
+	
+	
+	def generateAnnotationOutput(self, typesF, typesA):
+		# build a baseline filtering query
+		headerF = list()
+		columnsF = list()
+		self._populateColumnsFromTypes(typesF, columnsF, headerF)
+		if not (headerF and columnsF):
+			raise Exception("annotation with no starting columns")
+		queryF = self.buildQuery(columnsF)
+		lenF = len(queryF['SELECT'])
+		sqlF = self.getQueryText(queryF, splitRowIDs=True)
+		
+		# add each filter rowid column as a condition for annotation
+		n = lenF
+		conditionsA = dict()
+		for alias,cols in queryF['_rowid'].iteritems():
+			for col in cols:
+				n += 1
+				conditionsA[(alias,col)] = "= ?%d" % n
+		
+		# build the annotation query
+		headerA = list()
+		columnsA = list()
+		self._populateColumnsFromTypes(typesA, columnsA, headerA)
+		if not (headerA and columnsA):
+			raise Exception("annotation with no extra columns")
+		queryA = self.buildQuery(columnsA, annotate=conditionsA)
+		lenA = len(queryA['SELECT'])
+		sqlA = self.getQueryText(queryA, noRowIDs=True, sortRowIDs=True, splitRowIDs=True)
+		
+		# generate filtered results and annotate each of them
+		cursorF = self._loki._db.cursor()
+		cursorA = self._loki._db.cursor()
+		if self._options.debug_query:
+			self.warn("========== annotation : filter step ==========\n")
+			self.warn(sqlF+"\n")
+			for row in cursorF.execute("EXPLAIN QUERY PLAN "+sqlF):
+				self.warn(str(row)+"\n")
+			self.warn("========== annotation : annotate step ==========\n")
+			self.warn(sqlA+"\n")
+			emptyF = (0,) * (len(queryF['SELECT']) + len(queryF['_rowid']))
+			for row in cursorF.execute("EXPLAIN QUERY PLAN "+sqlA, emptyF):
+				self.warn(str(row)+"\n")
+		else:
+			headerF[0] = "#" + headerF[0]
+			yield tuple(headerF + headerA)
+			idsF = set()
+			emptyA = tuple(None for c in columnsA)
+			for rowF in cursorF.execute(sqlF):
+				if rowF[-1] not in idsF:
+					idsF.add(rowF[-1])
+					idsA = set()
+					for rowA in cursorA.execute(sqlA, rowF[:-1]):
+						rowidA = rowA[lenA:]
+						if rowidA not in idsA:
+							idsA.update(itertools.product(*( (v,) if v == '' else (v,'') for v in rowidA )))
+							yield rowF[:lenF] + rowA[:lenA]
+					#foreach annotation result
+					if not idsA:
+						yield rowF[:lenF] + emptyA
+				#if filter result is new
+			#foreach filter result
+	#generateAnnotationOutput()
 	
 	
 	def identifyCandidateModelBiopolymers(self):
@@ -1545,16 +1828,17 @@ class Biofilter:
 			sql = "UPDATE `cand`.`group` SET flag = 1 WHERE group_id = ?"
 		else:
 			sql = "INSERT OR IGNORE INTO `cand`.`group` (group_id, flag) VALUES (?,0)"
+		# _queryColumnSources[col] = list[ tuple(alias,rowid,expression,?conditions),... ]
 		for source in self._queryColumnSources['group_id']:
 			if source[0] in query['FROM']:
-				query['GROUP BY'].append(source[1])
+				query['GROUP BY'].append("{0}.{1}".format(source[0], source[1]))
 				break
 		for source in self._queryColumnSources['gene_id' if self._onlyGeneModels else 'biopolymer_id']:
 			if source[0] in query['FROM']:
 				if self._options.maximum_model_group_size > 0:
-					query['HAVING'].add("(COUNT(DISTINCT %s) BETWEEN 2 AND %d)" % (source[1],self._options.maximum_model_group_size))
+					query['HAVING'].add("(COUNT(DISTINCT %s) BETWEEN 2 AND %d)" % (source[2],self._options.maximum_model_group_size))
 				else:
-					query['HAVING'].add("COUNT(DISTINCT %s) >= 2" % (source[1],))
+					query['HAVING'].add("COUNT(DISTINCT %s) >= 2" % (source[2],))
 				break
 		cursor.executemany(sql, self.generateQueryResults(query, allowDupes=True))
 		if self._inputFilters['cand']['group']:
@@ -1601,51 +1885,6 @@ class Biofilter:
 	#getGeneModels()
 	
 	
-	def _populateColumnsFromTypes(self, types, columns=None, header=None):
-		if columns == None:
-			columns = list()
-		if header == None:
-			header = list()
-		for t in types:
-			if t == 'snp':
-				header.extend(['snp'])
-				columns.extend(['snp_label'])
-			elif t == 'position':
-				header.extend(['chr','position','pos'])
-				columns.extend(['locus_chr','locus_label','locus_pos']) # oddball .map file format
-			elif t == 'gene':
-				header.extend(['gene'])
-				columns.extend(['gene_label'])
-			elif t == 'region':
-				header.extend(['chr','region','posMin','posMax'])
-				columns.extend(['region_chr','region_label','region_posMin','region_posMax']) # inspired by oddball .map file format
-			elif t == 'group':
-				header.extend(['group'])
-				columns.extend(['group_label'])
-			elif t == 'source':
-				header.extend(['source'])
-				columns.extend(['source_label'])
-			elif t in self._queryColumnSources:
-				header.append(t)
-				columns.append(t)
-			else:
-				raise Exception("ERROR: unsupported output type '%s'" % t)
-		#foreach types
-		return columns
-	#_populateColumnsFromTypes()
-	
-	
-	def generateFilterOutput(self, types):
-		header = list()
-		columns = list()
-		self._populateColumnsFromTypes(types, columns, header)
-		if not (header and columns):
-			raise Exception("annotation with empty column list")
-		header[0] = "#" + header[0]
-		return itertools.chain([tuple(header)], self.generateQueryResults(self.buildQuery(columns)))
-	#generateFilterOutput()
-	
-	
 	def generateModelOutput(self, typesL, typesR):
 		cursor = self._loki._db.cursor()
 		limit = max(0, self._options.maximum_model_count)
@@ -1654,7 +1893,7 @@ class Biofilter:
 		if self._options.all_pairwise_models != 'yes':
 			self.getGeneModels()
 		
-		# build querys for left- and right-hand model annotation
+		# build queries for left- and right-hand model expansion
 		headerL = list()
 		columnsL = list()
 		self._populateColumnsFromTypes(typesL, columnsL, headerL)
@@ -1854,8 +2093,17 @@ if __name__ == "__main__":
 	group.add_argument('--gene', '-g', type=str, metavar='name', nargs='+', action='append', #default=argparse.SUPPRESS,
 			help="input genes, specified by name"
 	)
+	group.add_argument('--gene-search', '--gs', type=str, metavar='text', nargs='+', action='append',
+			help="find input genes by searching all available names and descriptions"
+	)
 	group.add_argument('--gene-file', '-G', type=str, metavar='file', nargs='+', action='append', #default=argparse.SUPPRESS,
 			help="file(s) from which to load input genes"
+	)
+	group.add_argument('--gene-identifier-type', '--git', type=str, metavar='type', nargs='?', const='-', default='-',
+			help="the type of the gene identifiers provided via --gene or --gene-file, or '-' for primary labels (default: primary labels)"
+	)
+	group.add_argument('--allow-ambiguous-genes', '--aag', type=yesno, metavar='yes/no', nargs='?', const='yes', default='no',
+			help="use ambiguous input gene identifiers by including all possibilities (default: no)"
 	)
 	group.add_argument('--region', '-r', type=str, metavar='region', nargs='+', action='append', #default=argparse.SUPPRESS,
 			help="input regions, specified by chromosome, start and stop positions"
@@ -1866,26 +2114,23 @@ if __name__ == "__main__":
 	group.add_argument('--group', '-u', type=str, metavar='name', nargs='+', action='append', #default=argparse.SUPPRESS,
 			help="input groups, specified by name"
 	)
+	group.add_argument('--group-search', '--us', type=str, metavar='text', nargs='+', action='append',
+			help="find input groups by searching all available names and descriptions"
+	)
 	group.add_argument('--group-file', '-U', type=str, metavar='file', nargs='+', action='append', #default=argparse.SUPPRESS,
 			help="file(s) from which to load input groups"
-	)
-	group.add_argument('--source', '-c', type=str, metavar='name', nargs='+', action='append', #default=argparse.SUPPRESS,
-			help="input sources, specified by name"
-	)
-	group.add_argument('--source-file', '-C', type=str, metavar='file', nargs='+', action='append', #default=argparse.SUPPRESS,
-			help="file(s) from which to load input sources"
-	)
-	group.add_argument('--gene-identifier-type', '--git', type=str, metavar='type', nargs='?', const='-', default='-',
-			help="the type of the gene identifiers provided via --gene or --gene-file, or '-' for primary labels (default: primary labels)"
-	)
-	group.add_argument('--allow-ambiguous-genes', '--aag', type=yesno, metavar='yes/no', nargs='?', const='yes', default='no',
-			help="use ambiguous input gene identifiers by including all possibilities (default: no)"
 	)
 	group.add_argument('--group-identifier-type', '--uit', type=str, metavar='type', nargs='?', const='-', default='-',
 			help="the type of the group identifiers provided via --group or --group-file, or '-' for primary labels (default: primary labels)"
 	)
 	group.add_argument('--allow-ambiguous-groups', '--aau', type=yesno, metavar='yes/no', nargs='?', const='yes', default='no',
 			help="use ambiguous input group identifiers by including all possibilities (default: no)"
+	)
+	group.add_argument('--source', '-c', type=str, metavar='name', nargs='+', action='append', #default=argparse.SUPPRESS,
+			help="input sources, specified by name"
+	)
+	group.add_argument('--source-file', '-C', type=str, metavar='file', nargs='+', action='append', #default=argparse.SUPPRESS,
+			help="file(s) from which to load input sources"
 	)
 	
 	# add alternate input section
@@ -1905,6 +2150,9 @@ if __name__ == "__main__":
 	group.add_argument('--alt-gene', '--ag', type=str, metavar='name', nargs='+', action='append', #default=argparse.SUPPRESS,
 			help="alternate input genes, specified by name"
 	)
+	group.add_argument('--alt-gene-search', '--ags', type=str, metavar='text', nargs='+', action='append',
+			help="find alternate input genes by searching all available names and descriptions"
+	)
 	group.add_argument('--alt-gene-file', '--AG', type=str, metavar='file', nargs='+', action='append', #default=argparse.SUPPRESS,
 			help="file(s) from which to load alternate input genes"
 	)
@@ -1916,6 +2164,9 @@ if __name__ == "__main__":
 	)
 	group.add_argument('--alt-group', '--au', type=str, metavar='name', nargs='+', action='append', #default=argparse.SUPPRESS,
 			help="alternate input groups, specified by name"
+	)
+	group.add_argument('--alt-group-search', '--aus', type=str, metavar='text', nargs='+', action='append',
+			help="find alternate input groups by searching all available names and descriptions"
 	)
 	group.add_argument('--alt-group-file', '--AU', type=str, metavar='file', nargs='+', action='append', #default=argparse.SUPPRESS,
 			help="file(s) from which to load alternate input groups"
@@ -1983,8 +2234,11 @@ if __name__ == "__main__":
 	group.add_argument('--group-name-stats', type=yesno, metavar='yes/no', nargs='?', const='yes', default='no',
 			help="display statistics on available group identifier types (default: no)"
 	)
+	group.add_argument('--filter', '-f', type=str, metavar='type', nargs='+', action='append',
+			help="data types or columns to include in the filtered output"
+	)
 	group.add_argument('--annotate', '-a', type=str, metavar='type', nargs='+', action='append',
-			help="data types or columns to include in the filtered and annotated output"
+			help="data types or columns to include in the annotated output"
 	)
 	group.add_argument('--model', '-m', type=str, metavar='type', nargs='+', action='append',
 			help="data types or columns to include in the output models"
@@ -1992,6 +2246,7 @@ if __name__ == "__main__":
 	
 	# add hidden options
 	parser.add_argument('--end-of-line', action='store_true', help=argparse.SUPPRESS)
+	parser.add_argument('--debug-logic', action='store_true', help=argparse.SUPPRESS)
 	parser.add_argument('--debug-query', action='store_true', help=argparse.SUPPRESS)
 	parser.add_argument('--debug-profile', action='store_true', help=argparse.SUPPRESS)
 	
@@ -2111,7 +2366,7 @@ if __name__ == "__main__":
 	def encodeLine(line, term="\n"):
 		return utf8("%s%s" % (line,term))[0]
 	def encodeRow(row, term="\n", delim="\t"):
-		return utf8("%s%s" % ((delim.join((col if isinstance(col,basestring) else str(col)) for col in row)),term))[0]
+		return utf8("%s%s" % ((delim.join((col if isinstance(col,basestring) else str('' if col == None else col)) for col in row)),term))[0]
 	
 	# configuration report
 	if options.report_configuration == 'yes':
@@ -2204,6 +2459,8 @@ if __name__ == "__main__":
 		bio.intersectInputLoci('main', bio.generateLociFromMapFiles(positionFileList))
 	for geneList in (options.gene or empty):
 		bio.intersectInputGenes('main', geneList)
+	for geneSearch in (options.gene_search or empty):
+		bio.intersectInputGeneSearch('main', geneSearch)
 	for geneFileList in (options.gene_file or empty):
 		bio.intersectInputGenes('main', bio.generateNamesFromNameFiles(geneFileList))
 	for regionList in (options.region or empty):
@@ -2212,6 +2469,8 @@ if __name__ == "__main__":
 		bio.intersectInputRegions('main', bio.generateRegionsFromFiles(regionFileList))
 	for groupList in (options.group or empty):
 		bio.intersectInputGroups('main', groupList)
+	for groupSearch in (options.group_search or empty):
+		bio.intersectInputGroupSearch('main', groupSearch)
 	for groupFileList in (options.group_file or empty):
 		bio.intersectInputGroups('main', bio.generateNamesFromNameFiles(groupFileList))
 	for sourceList in (options.source or empty):
@@ -2230,6 +2489,8 @@ if __name__ == "__main__":
 		bio.intersectInputLoci('alt', bio.generateLociFromMapFiles(positionFileList))
 	for geneList in (options.alt_gene or empty):
 		bio.intersectInputGenes('alt', geneList)
+	for geneSearch in (options.alt_gene_search or empty):
+		bio.intersectInputGeneSearch('alt', geneSearch)
 	for geneFileList in (options.alt_gene_file or empty):
 		bio.intersectInputGenes('alt', bio.generateNamesFromNameFiles(geneFileList))
 	for regionList in (options.alt_region or empty):
@@ -2238,6 +2499,8 @@ if __name__ == "__main__":
 		bio.intersectInputRegions('alt', bio.generateRegionsFromFiles(regionFileList))
 	for groupList in (options.alt_group or empty):
 		bio.intersectInputGroups('alt', groupList)
+	for groupSearch in (options.alt_group_search or empty):
+		bio.intersectInputGroupSearch('alt', groupSearch)
 	for groupFileList in (options.alt_group_file or empty):
 		bio.intersectInputGroups('alt', bio.generateNamesFromNameFiles(groupFileList))
 	for sourceList in (options.alt_source or empty):
@@ -2245,17 +2508,51 @@ if __name__ == "__main__":
 	for sourceFileList in (options.alt_source_file or empty):
 		bio.intersectInputSources('alt', bio.generateNamesFromNameFiles(sourceFileList))
 	
-	# annotation output
-	for anno in (options.annotate or empty):
-		outPath = ('<stdout>' if options.stdout == 'yes' else (options.prefix + '.' + '-'.join(anno)))
-		bio.logPush("writing '%s' annotations to %s ...\n" % (' '.join(anno),outPath))
+	# filtering
+	for filt in (options.filter or empty):
+		outPath = ('<stdout>' if options.stdout == 'yes' else (options.prefix + '.' + '-'.join(filt)))
+		bio.logPush("writing '%s' filtered results to %s ...\n" % (' '.join(filt),outPath))
 		if (options.stdout != 'yes') and (options.overwrite != 'yes') and os.path.exists(outPath):
-			bio.warn("ERROR: %s annotation output file '%s' already exists, must specify --overwrite or a different --prefix\n" % ('-'.join(anno),outPath))
+			bio.warn("ERROR: '%s' filter output file '%s' already exists, must specify --overwrite or a different --prefix\n" % (' '.join(filt),outPath))
 			bio.logPop()
 		else:
 			outFile = (sys.stdout if options.stdout == 'yes' else open(outPath, 'wb'))
 			n = -1 # don't count header
-			for row in bio.generateFilterOutput(anno):
+			for row in bio.generateFilterOutput(filt):
+				n += 1
+				outFile.write(encodeRow(row))
+			if outFile != sys.stdout:
+				outFile.close()
+			bio.logPop("... OK: %d results\n" % n)
+		#if outPath ok
+	#foreach filter
+	
+	# annotation
+	for anno in (options.annotate or empty):
+		n = anno.count(':')
+		if n > 1:
+			bio.warn("ERROR: cannot annotate '%s', only two sets of outputs are allowed\n" % (' '.join(anno),))
+			continue
+		elif n == 1:
+			i = anno.index(':')
+			typesF = anno[:i]
+			typesA = anno[i+1:]
+		else:
+			typesF = anno[0:1]
+			typesA = anno[1:]
+		
+		if not typesA:
+			bio.warn("ERROR: cannot annotate '%s' alone\n" % (' '.join(typesF),))
+			continue
+		outPath = ('<stdout>' if options.stdout == 'yes' else (options.prefix + '.' + '-'.join(typesF) + '.' + '-'.join(typesA)))
+		bio.logPush("writing '%s' annotations to %s ...\n" % (' '.join(anno),outPath))
+		if (options.stdout != 'yes') and (options.overwrite != 'yes') and os.path.exists(outPath):
+			bio.warn("ERROR: '%s' annotation output file '%s' already exists, must specify --overwrite or a different --prefix\n" % (' '.join(anno),outPath))
+			bio.logPop()
+		else:
+			outFile = (sys.stdout if options.stdout == 'yes' else open(outPath, 'wb'))
+			n = -1 # don't count header
+			for row in bio.generateAnnotationOutput(typesF, typesA):
 				n += 1
 				outFile.write(encodeRow(row))
 			if outFile != sys.stdout:
