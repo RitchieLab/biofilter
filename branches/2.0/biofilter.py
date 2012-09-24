@@ -1164,10 +1164,10 @@ class Biofilter:
 			('m_l',  'rowid',   "m_l.label"),
 			('d_sl', '_ROWID_', "'rs'||d_sl.rs"),
 		],
-		'position_chr' : [
-			('a_l',  'rowid',   "a_l.chr"),
-			('m_l',  'rowid',   "m_l.chr"),
-			('d_sl', '_ROWID_', "d_sl.chr"),
+		'position_chr' : [ #TODO: find a way to avoid repeating the conversions already in loki_db.chr_name
+			('a_l',  'rowid',   "(CASE a_l.chr WHEN 23 THEN 'X' WHEN 24 THEN 'Y' WHEN 25 THEN 'XY' WHEN 26 THEN 'MT' ELSE a_l.chr END)"),
+			('m_l',  'rowid',   "(CASE m_l.chr WHEN 23 THEN 'X' WHEN 24 THEN 'Y' WHEN 25 THEN 'XY' WHEN 26 THEN 'MT' ELSE m_l.chr END)"),
+			('d_sl', '_ROWID_', "(CASE d_sl.chr WHEN 23 THEN 'X' WHEN 24 THEN 'Y' WHEN 25 THEN 'XY' WHEN 26 THEN 'MT' ELSE d_sl.chr END)"),
 		],
 		'position_pos' : [
 			('a_l',  'rowid',   "a_l.pos"),
@@ -1185,10 +1185,10 @@ class Biofilter:
 			('m_r',  'rowid',         "m_r.label"),
 			('d_b',  'biopolymer_id', "d_b.label"),
 		],
-		'region_chr' : [
-			('a_r',  'rowid',   "a_r.chr"),
-			('m_r',  'rowid',   "m_r.chr"),
-			('d_br', '_ROWID_', "d_br.chr"),
+		'region_chr' : [ #TODO: find a way to avoid repeating the conversions already in loki_db.chr_name
+			('a_r',  'rowid',   "(CASE a_r.chr WHEN 23 THEN 'X' WHEN 24 THEN 'Y' WHEN 25 THEN 'XY' WHEN 26 THEN 'MT' ELSE a_r.chr END)"),
+			('m_r',  'rowid',   "(CASE m_r.chr WHEN 23 THEN 'X' WHEN 24 THEN 'Y' WHEN 25 THEN 'XY' WHEN 26 THEN 'MT' ELSE m_r.chr END)"),
+			('d_br', '_ROWID_', "(CASE d_br.chr WHEN 23 THEN 'X' WHEN 24 THEN 'Y' WHEN 25 THEN 'XY' WHEN 26 THEN 'MT' ELSE d_br.chr END)"),
 		],
 		'region_zone' : [
 			('a_rz', 'zone', "a_rz.zone"),
@@ -1228,6 +1228,28 @@ class Biofilter:
 			('c_ab_R', 'biopolymer_id', "c_ab_R.biopolymer_id"),
 			('d_gb_R', 'biopolymer_id', "d_gb_R.biopolymer_id"),
 			('d_b',    'biopolymer_id', "d_b.biopolymer_id"),
+		],
+		'biopolymer_label' : [
+			('a_bg', 'biopolymer_id', "a_bg.label"),
+			('m_bg', 'biopolymer_id', "m_bg.label"),
+			('d_b',  'biopolymer_id', "d_b.label"),
+		],
+		'biopolymer_identifiers' : [
+			('a_bg', 'biopolymer_id', "(SELECT GROUP_CONCAT(namespace||':'||name) FROM `db`.`biopolymer_name` AS d_bn JOIN `db`.`namespace` AS d_n USING (namespace_id) WHERE d_bn.biopolymer_id = a_bg.biopolymer_id)"),
+			('m_bg', 'biopolymer_id', "(SELECT GROUP_CONCAT(namespace||':'||name) FROM `db`.`biopolymer_name` AS d_bn JOIN `db`.`namespace` AS d_n USING (namespace_id) WHERE d_bn.biopolymer_id = m_bg.biopolymer_id)"),
+			('d_b',  'biopolymer_id', "(SELECT GROUP_CONCAT(namespace||':'||name) FROM `db`.`biopolymer_name` AS d_bn JOIN `db`.`namespace` AS d_n USING (namespace_id) WHERE d_bn.biopolymer_id = d_b.biopolymer_id)"),
+		],
+		'biopolymer_chr' : [ #TODO: find a way to avoid repeating the conversions already in loki_db.chr_name
+			('d_br', '_ROWID_', "(CASE d_br.chr WHEN 23 THEN 'X' WHEN 24 THEN 'Y' WHEN 25 THEN 'XY' WHEN 26 THEN 'MT' ELSE d_br.chr END)", {"d_b.type_id+0 = {typeID_gene}"}),
+		],
+		'biopolymer_zone' : [
+			('d_bz', 'zone', "d_bz.zone"),
+		],
+		'biopolymer_posMin' : [
+			('d_br', '_ROWID_', "d_br.posMin"),
+		],
+		'biopolymer_posMax' : [
+			('d_br', '_ROWID_', "d_br.posMax"),
 		],
 		
 		'gene_id' : [
@@ -1655,9 +1677,12 @@ class Biofilter:
 			elif t == 'gene':
 				header.extend(['gene'])
 				columns.extend(['gene_label'])
+			elif t == 'generegion':
+				header.extend(['chr','gene','posMin','posMax'])
+				columns.extend(['biopolymer_chr','gene_label','biopolymer_posMin','biopolymer_posMax'])
 			elif t == 'region':
 				header.extend(['chr','region','posMin','posMax'])
-				columns.extend(['region_chr','region_label','region_posMin','region_posMax']) # inspired by oddball .map file format
+				columns.extend(['region_chr','region_label','region_posMin','region_posMax'])
 			elif t == 'group':
 				header.extend(['group'])
 				columns.extend(['group_label'])
