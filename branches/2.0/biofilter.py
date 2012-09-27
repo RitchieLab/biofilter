@@ -24,7 +24,7 @@ class Biofilter:
 	def getVersionTuple(cls):
 		# tuple = (major,minor,revision,dev,build,date)
 		# dev must be in ('a','b','rc','release') for lexicographic comparison
-		return (2,0,0,'a',11,'2012-09-24')
+		return (2,0,0,'a',12,'2012-09-27')
 	#getVersionTuple()
 	
 	
@@ -237,9 +237,9 @@ class Biofilter:
 		self._geneModels = None
 		self._onlyGeneModels = True #TODO
 		
-		# verify loki_db version (generateBiopolymerIDsBySearch() in 2.0.0a10)
-		if loki_db.Database.getVersionTuple() < (2,0,0,'a',10):
-			exit("ERROR: LOKI version 2.0.0a10 or later required; found %s" % (loki_db.Database.getVersionString(),))
+		# verify loki_db version (getUCSChgByGRCh() in 2.0.0a11)
+		if loki_db.Database.getVersionTuple() < (2,0,0,'a',11):
+			exit("ERROR: LOKI version 2.0.0a11 or later required; found %s" % (loki_db.Database.getVersionString(),))
 		
 		# initialize instance database
 		self._loki = loki_db.Database()
@@ -394,7 +394,20 @@ class Biofilter:
 	
 	
 	##################################################
-	# knowledge database metadata
+	# LOKI metadata retrieval
+	
+	
+	def getSourceFingerprints(self):
+		ret = collections.OrderedDict()
+		sourceIDs = self._loki.getSourceIDs()
+		for source in sorted(sourceIDs):
+			ret[source] = (
+					self._loki.getSourceIDVersion(sourceIDs[source]),
+					self._loki.getSourceIDOptions(sourceIDs[source]),
+					self._loki.getSourceIDFiles(sourceIDs[source])
+			)
+		return ret
+	#getSourceFingerprints()
 	
 	
 	def generateGeneNameStats(self):
@@ -414,166 +427,18 @@ class Biofilter:
 	
 	
 	##################################################
-	# input data parsers and lookup helpers
+	# LOKI data retrieval
 	
 	
-	def generateRSesFromText(self, text, errorCallback=None):
-		for line in text:
-			if not line:
-				continue
-			try:
-				yield long(line)
-			except ValueError:
-				if line[0:2].upper() == 'RS':
-					try:
-						yield long(line[2:])
-					except ValueError:
-						if errorCallback:
-							errorCallback(line)
-		#foreach line
-	#generateRSesFromText()
-	
-		
-	def generateRSesFromRSFiles(self, paths, errorCallback=None):
-		for path in paths:
-			with (sys.stdin if (path == '-' or not path) else open(path, 'rU')) as file:
-				for rs in self.generateRSesFromText((line for line in file if line[0:1] != '#'), errorCallback):
-					yield rs
-			#with file
-		#foreach path
-	#generateRSesFromRSFiles()
-	
-	
-	def generateLociFromText(self, text, separator=':', errorCallback=None):
-		for line in text:
-			if not line:
-				continue
-			
-			label = chm = pos = None
-			cols = line.split(separator)
-			
-			# parse line
-			if len(cols) < 2:
-				if errorCallback:
-					errorCallback(line)
-				continue
-			elif len(cols) == 2:
-				chm = cols[0].upper()
-				pos = cols[1].upper()
-			elif len(cols) == 3:
-				chm = cols[0].upper()
-				label = cols[1]
-				pos = cols[2].upper()
-			elif len(cols) >= 4:
-				chm = cols[0].upper()
-				label = cols[1]
-				pos = cols[3].upper()
-			
-			# parse, validate and convert chromosome
-			if chm[:3] == 'CHR':
-				chm = chm[3:]
-			if chm not in self._loki.chr_num:
-				if errorCallback:
-					errorCallback(line)
-				continue
-			chm = self._loki.chr_num[chm]
-			
-			# parse and convert locus label
-			if not label:
-				label = 'chr%s:%s' % (self._loki.chr_name[chm], pos)
-			
-			# parse and convert position
-			if pos == '-' or pos == 'NA':
-				pos = None
-			else:
-				pos = long(pos)
-			
-			yield (label,chm,pos)
-		#foreach line
-	#generateLociFromText()
-	
-	
-	def generateLociFromMapFiles(self, paths, errorCallback=None):
-		for path in paths:
-			with (sys.stdin if (path == '-' or not path) else open(path, 'rU')) as file:
-				for locus in self.generateLociFromText((line for line in file if line[0:1] != '#'), None, errorCallback):
-					yield locus
-			#with file
-		#foreach path
-	#generateLociFromMapFiles()
-	
-	
-	def generateNamesFromNameFiles(self, paths):
-		for path in paths:
-			with (sys.stdin if (path == '-' or not path) else open(path, 'rU')) as file:
-				for line in file:
-					if line[0:1] != '#':
-						yield line.rstrip()
-				#foreach line in file
-			#with file
-		#foreach path
-	#generateNamesFromNameFiles()
-	
-	
-	def generateRegionsFromText(self, text, separator=':', errorCallback=None):
-		for line in text:
-			if not line:
-				continue
-			
-			label = chm = posMin = posMax = None
-			cols = line.split(separator)
-			
-			# parse line
-			if len(cols) < 3:
-				if errorCallback:
-					errorCallback(line)
-				continue
-			elif len(cols) == 3:
-				chm = cols[0].upper()
-				posMin = cols[1].upper()
-				posMax = cols[2].upper()
-			elif len(cols) >= 4:
-				chm = cols[0].upper()
-				label = cols[1]
-				posMin = cols[2].upper()
-				posMax = cols[3].upper()
-			
-			# parse, validate and convert chromosome
-			if chm[:3] == 'CHR':
-				chm = chm[3:]
-			if chm not in self._loki.chr_num:
-				if errorCallback:
-					errorCallback(line)
-				continue
-			chm = self._loki.chr_num[chm]
-			
-			# parse and convert region label
-			if not label:
-				label = 'chr%s:%s-%s' % (self._loki.chr_name[chm], posMin, posMax)
-			
-			# parse and convert positions
-			if posMin == '-' or posMin == 'NA':
-				posMin = None
-			else:
-				posMin = long(posMin)
-			if posMax == '-' or posMax == 'NA':
-				posMax = None
-			else:
-				posMax = long(posMax)
-			
-			yield (label,chm,posMin,posMax)
-		#foreach line
-	#generateRegionsFromText()
-	
-	
-	def generateRegionsFromFiles(self, paths, errorCallback=None):
-		for path in paths:
-			with (sys.stdin if (path == '-' or not path) else open(path, 'rU')) as file:
-				for region in self.generateRegionsFromText((line for line in file if line[0:1] != '#'), None, errorCallback):
-					yield region
-			#with file
-		#foreach path
-	#generateRegionsFromFiles()
+	def getDatabaseGenomeBuilds(self):
+		ucschg = self._loki.getDatabaseSetting('ucschg')
+		ucschg = int(ucschg) if ucschg != None else None
+		grch = None
+		if ucschg:
+			for build in self._loki.generateGRChByUCSChg(ucschg):
+				grch = max(grch, int(build))
+		return (grch,ucschg)
+	#getDatabaseGenomeBuilds()
 	
 	
 	def getOptionTypeID(self, value, optional=False):
@@ -597,10 +462,208 @@ class Biofilter:
 	
 	
 	##################################################
-	# snp/locus input
+	# input data parsers and lookup helpers
 	
 	
-	def unionInputSNPs(self, db, snps):
+	def generateRSesFromText(self, lines, errorCallback=None):
+		for line in lines:
+			try:
+				line = line.rstrip()
+				if not line:
+					continue
+				try:
+					yield long(line)
+				except ValueError:
+					if line[0:2].upper() == 'RS':
+						yield long(line[2:])
+					else:
+						raise
+			except:
+				if errorCallback:
+					errorCallback(line, str(sys.exc_info()[1]))
+		#foreach line
+	#generateRSesFromText()
+	
+		
+	def generateRSesFromRSFiles(self, paths, errorCallback=None):
+		for path in paths:
+			try:
+				with (sys.stdin if (path == '-' or not path) else open(path, 'rU')) as file:
+					for rs in self.generateRSesFromText((line for line in file if not line.startswith('#')), errorCallback):
+						yield rs
+				#with file
+			except:
+				self.warn("WARNING: error reading input file '%s': %s\n" % (path,str(sys.exc_info()[1])))
+				if errorCallback:
+					errorCallback("<file> %s" % path, str(sys.exc_info()[1]))
+		#foreach path
+	#generateRSesFromRSFiles()
+	
+	
+	def generateLociFromText(self, lines, separator=None, errorCallback=None):
+		for line in lines:
+			try:
+				line = line.rstrip()
+				if not line:
+					continue
+				
+				# parse line
+				label = chm = pos = None
+				cols = line.split(separator)
+				if len(cols) < 2:
+					if errorCallback:
+						errorCallback(line, "not enough columns")
+					continue
+				elif len(cols) == 2:
+					chm = cols[0].upper()
+					pos = cols[1].upper()
+				elif len(cols) == 3:
+					chm = cols[0].upper()
+					label = cols[1]
+					pos = cols[2].upper()
+				elif len(cols) >= 4:
+					chm = cols[0].upper()
+					label = cols[1]
+					pos = cols[3].upper()
+				
+				# parse, validate and convert chromosome
+				if chm.startswith('CHR'):
+					chm = chm[3:]
+				if chm not in self._loki.chr_num:
+					if errorCallback:
+						errorCallback(line, "invalid chromosome '%s'" % chm)
+					continue
+				chm = self._loki.chr_num[chm]
+				
+				# parse and convert locus label
+				if not label:
+					label = 'chr%s:%s' % (self._loki.chr_name[chm], pos)
+				
+				# parse and convert position
+				if pos == '-' or pos == 'NA':
+					pos = None
+				else:
+					pos = long(pos)
+				yield (label,chm,pos)
+			except:
+				if errorCallback:
+					errorCallback(line, str(sys.exc_info()[1]))
+		#foreach line
+	#generateLociFromText()
+	
+	
+	def generateLociFromMapFiles(self, paths, errorCallback=None):
+		for path in paths:
+			try:
+				with (sys.stdin if (path == '-' or not path) else open(path, 'rU')) as file:
+					for locus in self.generateLociFromText((line for line in file if not line.startswith('#')), errorCallback=errorCallback):
+						yield locus
+				#with file
+			except:
+				self.warn("WARNING: error reading input file '%s': %s\n" % (path,str(sys.exc_info()[1])))
+				if errorCallback:
+					errorCallback("<file> %s" % path, str(sys.exc_info()[1]))
+		#foreach path
+	#generateLociFromMapFiles()
+	
+	
+	def generateRegionsFromText(self, lines, separator=None, errorCallback=None):
+		for line in lines:
+			try:
+				line = line.rstrip()
+				if not line:
+					continue
+				
+				# parse line
+				label = chm = posMin = posMax = None
+				cols = line.split(separator)
+				if len(cols) < 3:
+					if errorCallback:
+						errorCallback(line, "not enough columns")
+					continue
+				elif len(cols) == 3:
+					chm = cols[0].upper()
+					posMin = cols[1].upper()
+					posMax = cols[2].upper()
+				elif len(cols) >= 4:
+					chm = cols[0].upper()
+					label = cols[1]
+					posMin = cols[2].upper()
+					posMax = cols[3].upper()
+				
+				# parse, validate and convert chromosome
+				if chm.startswith('CHR'):
+					chm = chm[3:]
+				if chm not in self._loki.chr_num:
+					if errorCallback:
+						errorCallback(line, "invalid chromosome '%s'" % chm)
+					continue
+				chm = self._loki.chr_num[chm]
+				
+				# parse and convert region label
+				if not label:
+					label = 'chr%s:%s-%s' % (self._loki.chr_name[chm], posMin, posMax)
+				
+				# parse and convert positions
+				if posMin == '-' or posMin == 'NA':
+					posMin = None
+				else:
+					posMin = long(posMin)
+				if posMax == '-' or posMax == 'NA':
+					posMax = None
+				else:
+					posMax = long(posMax)
+				
+				yield (label,chm,posMin,posMax)
+			except:
+				if errorCallback:
+					errorCallback(line, str(sys.exc_info()[1]))
+		#foreach line
+	#generateRegionsFromText()
+	
+	
+	def generateRegionsFromFiles(self, paths, errorCallback=None):
+		for path in paths:
+			try:
+				with (sys.stdin if (path == '-' or not path) else open(path, 'rU')) as file:
+					for region in self.generateRegionsFromText((line for line in file if not line.startswith('#')), errorCallback=errorCallback):
+						yield region
+				#with file
+			except:
+				self.warn("WARNING: error reading input file '%s': %s\n" % (path,str(sys.exc_info()[1])))
+				if errorCallback:
+					errorCallback("<file> %s" % path, str(sys.exc_info()[1]))
+		#foreach path
+	#generateRegionsFromFiles()
+	
+	
+	def generateNamesFromNameFiles(self, paths, errorCallback=None):
+		for path in paths:
+			try:
+				with (sys.stdin if (path == '-' or not path) else open(path, 'rU')) as file:
+					for line in file:
+						try:
+							line = line.rstrip()
+							if line and not line.startswith('#'):
+								yield line.rstrip()
+						except:
+							if errorCallback:
+								errorCallback(line, str(sys.exc_info()[1]))
+					#foreach line in file
+				#with file
+			except:
+				self.warn("WARNING: error reading input file '%s': %s\n" % (path,str(sys.exc_info()[1])))
+				if errorCallback:
+					errorCallback("<file> %s" % path, str(sys.exc_info()[1]))
+		#foreach path
+	#generateNamesFromNameFiles()
+	
+	
+	##################################################
+	# snp input
+	
+	
+	def unionInputSNPs(self, db, snps, errorCallback=None):
 		# snps=[ rs, ... ]
 		self.logPush("adding to %s SNP filter ...\n" % db)
 		cursor = self._loki._db.cursor()
@@ -615,7 +678,7 @@ class Biofilter:
 	#unionInputSNPs()
 	
 	
-	def intersectInputSNPs(self, db, snps):
+	def intersectInputSNPs(self, db, snps, errorCallback=None):
 		# snps=[ rs, ... ]
 		if not self._inputFilters[db]['snp']:
 			return self.unionInputSNPs(db, snps)
@@ -636,21 +699,27 @@ class Biofilter:
 	#intersectInputSNPs()
 	
 	
-	def unionInputLoci(self, db, loci):
+	##################################################
+	# locus/position input
+	
+	
+	def unionInputLoci(self, db, loci, errorCallback=None):
 		# loci=[ (label,chr,pos), ... ]
 		self.logPush("adding to %s position filter ...\n" % db)
 		cursor = self._loki._db.cursor()
 		
 		# use OR IGNORE to continue on data error, i.e. missing chr or pos
 		self.prepareTableForUpdate(db, 'locus')
-		sql = "INSERT OR IGNORE INTO `%s`.`locus` (label,chr,pos) VALUES (?1,?2,?3); SELECT LAST_INSERT_ROWID()" % db
+		sql = "INSERT OR IGNORE INTO `%s`.`locus` (label,chr,pos) VALUES (?1,?2,?3); SELECT LAST_INSERT_ROWID(),?1,?2,?3" % db
 		lastID = numAdd = numNull = 0
-		for row in cursor.executemany(sql, loci):
+		for row in cursor.executemany(sql, (2*locus for locus in loci)):
 			if lastID != row[0]:
 				numAdd += 1
 				lastID = row[0]
 			else:
 				numNull += 1
+				if errorCallback:
+					errorCallback("\t".join(row[1:]), "invalid data")
 		if numNull:
 			self.warn("WARNING: ignored %d invalid positions\n" % numNull)
 		self.logPop("... OK: added %d positions\n" % numAdd)
@@ -659,7 +728,7 @@ class Biofilter:
 	#unionInputLoci()
 	
 	
-	def intersectInputLoci(self, db, loci):
+	def intersectInputLoci(self, db, loci, errorCallback=None):
 		# loci=[ (label,chr,pos), ... ]
 		if not self._inputFilters[db]['locus']:
 			return self.unionInputLoci(db, loci)
@@ -680,10 +749,59 @@ class Biofilter:
 	
 	
 	##################################################
-	# region/boundary input
+	# region input
 	
 	
-	def unionInputGenes(self, db, names):
+	def unionInputRegions(self, db, regions, errorCallback=None):
+		# regions=[ (label,chr,posMin,posMax), ... ]
+		self.logPush("adding to %s region filter ...\n" % db)
+		cursor = self._loki._db.cursor()
+		
+		# use OR IGNORE to continue on data error, i.e. missing chr or pos
+		self.prepareTableForUpdate(db, 'region')
+		sql = "INSERT OR IGNORE INTO `%s`.`region` (label,chr,posMin,posMax) VALUES (?1,?2,?3,?4); SELECT LAST_INSERT_ROWID(),?1,?2,?3,?4" % db
+		lastID = numAdd = numNull = 0
+		for row in cursor.executemany(sql, (2*region for region in regions)):
+			if lastID != row[0]:
+				numAdd += 1
+				lastID = row[0]
+			else:
+				numNull += 1
+				if errorCallback:
+					errorCallback("\t".join(row[1:]), "invalid data")
+		if numNull:
+			self.warn("WARNING: ignored %d invalid regions\n" % numNull)
+		self.logPop("... OK: added %d regions\n" % numAdd)
+		
+		self._inputFilters[db]['region'] += 1
+	#unionInputRegions()
+	
+	
+	def intersectInputRegions(self, db, regions, errorCallback=None):
+		# regions=[ (label,chr,posMin,posMax), ... ]
+		if not self._inputFilters[db]['region']:
+			return self.unionInputRegions(db, regions)
+		self.logPush("reducing %s region filter ...\n" % db)
+		cursor = self._loki._db.cursor()
+		
+		self.prepareTableForQuery(db, 'region')
+		cursor.execute("UPDATE `%s`.`region` SET flag = 0" % db)
+		numBefore = cursor.getconnection().changes()
+		sql = "UPDATE `%s`.`region` SET flag = 1 WHERE (1 OR ?1) AND chr = ?2 AND posMin = ?3 AND posMax = ?4" % db
+		cursor.executemany(sql, regions)
+		cursor.execute("DELETE FROM `%s`.`region` WHERE flag = 0" % db)
+		numDrop = cursor.getconnection().changes()
+		self.logPop("... OK: kept %d regions (%d dropped)\n" % (numBefore-numDrop,numDrop))
+		
+		self._inputFilters[db]['region'] += 1
+	#intersectInputRegions()
+	
+	
+	##################################################
+	# gene input
+	
+	
+	def unionInputGenes(self, db, names, errorCallback=None):
 		# names=[ name, ... ]
 		self.logPush("adding to %s gene filter ...\n" % db)
 		cursor = self._loki._db.cursor()
@@ -696,22 +814,24 @@ class Biofilter:
 		maxMatch = (None if self._options.allow_ambiguous_genes == 'yes' else 1)
 		tally = dict()
 		numAdd = 0
-		for row in cursor.executemany(sql, self._loki.generateBiopolymerIDsByName(names, maxMatch=maxMatch, tally=tally, namespaceID=namespaceID, typeID=typeID)):
+		for row in cursor.executemany(sql, self._loki.generateBiopolymerIDsByName(
+				names, maxMatch=maxMatch, tally=tally, namespaceID=namespaceID, typeID=typeID, errorCallback=errorCallback
+		)):
 			numAdd += 1
-		if tally['null']:
-			self.warn("WARNING: ignored %d unrecognized gene identifier(s)\n" % tally['null'])
-		if tally['ambig']:
+		if tally['zero']:
+			self.warn("WARNING: ignored %d unrecognized gene identifier(s)\n" % tally['zero'])
+		if tally['many']:
 			if self._options.allow_ambiguous_genes == 'yes':
-				self.warn("WARNING: added multiple results for %d ambiguous gene identifier(s)\n" % tally['ambig'])
+				self.warn("WARNING: added multiple results for %d ambiguous gene identifier(s)\n" % tally['many'])
 			else:
-				self.warn("WARNING: ignored %d ambiguous gene identifier(s)\n" % tally['ambig'])
+				self.warn("WARNING: ignored %d ambiguous gene identifier(s)\n" % tally['many'])
 		self.logPop("... OK: added %d genes\n" % numAdd)
 		
 		self._inputFilters[db]['gene'] += 1
 	#unionInputGenes()
 	
 	
-	def intersectInputGenes(self, db, names):
+	def intersectInputGenes(self, db, names, errorCallback=None):
 		# names=[ name, ... ]
 		if not self._inputFilters[db]['gene']:
 			return self.unionInputGenes(db, names)
@@ -727,16 +847,18 @@ class Biofilter:
 		tally = dict()
 		sql = "UPDATE `%s`.`gene` SET flag = 1 WHERE (1 OR ?1) AND biopolymer_id = ?2" % db
 		maxMatch = (None if self._options.allow_ambiguous_genes == 'yes' else 1)
-		cursor.executemany(sql, self._loki.generateBiopolymerIDsByName(names, maxMatch=maxMatch, tally=tally, namespaceID=namespaceID, typeID=typeID))
+		cursor.executemany(sql, self._loki.generateBiopolymerIDsByName(
+				names, maxMatch=maxMatch, tally=tally, namespaceID=namespaceID, typeID=typeID, errorCallback=errorCallback
+		))
 		cursor.execute("DELETE FROM `%s`.`gene` WHERE flag = 0" % db)
 		numDrop = cursor.getconnection().changes()
-		if tally['null']:
-			self.warn("WARNING: ignored %d unrecognized gene identifier(s)\n" % tally['null'])
-		if tally['ambig']:
+		if tally['zero']:
+			self.warn("WARNING: ignored %d unrecognized gene identifier(s)\n" % tally['zero'])
+		if tally['many']:
 			if self._options.allow_ambiguous_genes == 'yes':
-				self.warn("WARNING: kept multiple results for %d ambiguous gene identifier(s)\n" % tally['ambig'])
+				self.warn("WARNING: kept multiple results for %d ambiguous gene identifier(s)\n" % tally['many'])
 			else:
-				self.warn("WARNING: ignored %d ambiguous gene identifier(s)\n" % tally['ambig'])
+				self.warn("WARNING: ignored %d ambiguous gene identifier(s)\n" % tally['many'])
 		self.logPop("... OK: kept %d genes (%d dropped)\n" % (numBefore-numDrop,numDrop))
 		
 		self._inputFilters[db]['gene'] += 1
@@ -783,54 +905,11 @@ class Biofilter:
 	#intersectInputGeneSearch()
 	
 	
-	def unionInputRegions(self, db, regions):
-		# regions=[ (label,chr,posMin,posMax), ... ]
-		self.logPush("adding to %s region filter ...\n" % db)
-		cursor = self._loki._db.cursor()
-		
-		# use OR IGNORE to continue on data error, i.e. missing chr or pos
-		self.prepareTableForUpdate(db, 'region')
-		sql = "INSERT OR IGNORE INTO `%s`.`region` (label,chr,posMin,posMax) VALUES (?1,?2,?3,?4); SELECT LAST_INSERT_ROWID()" % db
-		lastID = numAdd = numNull = 0
-		for row in cursor.executemany(sql, regions):
-			if lastID != row[0]:
-				numAdd += 1
-				lastID = row[0]
-			else:
-				numNull += 1
-		if numNull:
-			self.warn("WARNING: ignored %d invalid regions\n" % numNull)
-		self.logPop("... OK: added %d regions\n" % numAdd)
-		
-		self._inputFilters[db]['region'] += 1
-	#unionInputRegions()
-	
-	
-	def intersectInputRegions(self, db, regions):
-		# regions=[ (label,chr,posMin,posMax), ... ]
-		if not self._inputFilters[db]['region']:
-			return self.unionInputRegions(db, regions)
-		self.logPush("reducing %s region filter ...\n" % db)
-		cursor = self._loki._db.cursor()
-		
-		self.prepareTableForQuery(db, 'region')
-		cursor.execute("UPDATE `%s`.`region` SET flag = 0" % db)
-		numBefore = cursor.getconnection().changes()
-		sql = "UPDATE `%s`.`region` SET flag = 1 WHERE (1 OR ?1) AND chr = ?2 AND posMin = ?3 AND posMax = ?4" % db
-		cursor.executemany(sql, regions)
-		cursor.execute("DELETE FROM `%s`.`region` WHERE flag = 0" % db)
-		numDrop = cursor.getconnection().changes()
-		self.logPop("... OK: kept %d regions (%d dropped)\n" % (numBefore-numDrop,numDrop))
-		
-		self._inputFilters[db]['region'] += 1
-	#intersectInputRegions()
-	
-	
 	##################################################
 	# group input
 	
 	
-	def unionInputGroups(self, db, names, gtype=None):
+	def unionInputGroups(self, db, names, gtype=None, errorCallback=None):
 		# names=[ name, ... ]
 		self.logPush("adding to %s %s filter ...\n" % (db,(gtype or "group")))
 		cursor = self._loki._db.cursor()
@@ -843,22 +922,24 @@ class Biofilter:
 		maxMatch = (None if self._options.allow_ambiguous_groups == 'yes' else 1)
 		tally = dict()
 		numAdd = 0
-		for row in cursor.executemany(sql, self._loki.generateGroupIDsByName(names, maxMatch=maxMatch, tally=tally, namespaceID=namespaceID, typeID=typeID)):
+		for row in cursor.executemany(sql, self._loki.generateGroupIDsByName(
+				names, maxMatch=maxMatch, tally=tally, namespaceID=namespaceID, typeID=typeID, errorCallback=errorCallback
+		)):
 			numAdd += 1
-		if tally['null']:
-			self.warn("WARNING: ignored %d unrecognized group identifier(s)\n" % tally['null'])
-		if tally['ambig']:
+		if tally['zero']:
+			self.warn("WARNING: ignored %d unrecognized group identifier(s)\n" % tally['zero'])
+		if tally['many']:
 			if self._options.allow_ambiguous_groups == 'yes':
-				self.warn("WARNING: added multiple results for %d ambiguous group identifier(s)\n" % tally['ambig'])
+				self.warn("WARNING: added multiple results for %d ambiguous group identifier(s)\n" % tally['many'])
 			else:
-				self.warn("WARNING: ignored %d ambiguous group identifier(s)\n" % tally['ambig'])
+				self.warn("WARNING: ignored %d ambiguous group identifier(s)\n" % tally['many'])
 		self.logPop("... OK: added %d groups\n" % numAdd)
 		
 		self._inputFilters[db]['group'] += 1
 	#unionInputGroups()
 	
 	
-	def intersectInputGroups(self, db, names, gtype=None):
+	def intersectInputGroups(self, db, names, gtype=None, errorCallback=None):
 		# names=[ name, ... ]
 		if not self._inputFilters[db]['group']:
 			return self.unionInputGroups(db, names, gtype)
@@ -874,16 +955,18 @@ class Biofilter:
 		maxMatch = (None if self._options.allow_ambiguous_groups == 'yes' else 1)
 		tally = dict()
 		sql = "UPDATE `%s`.`group` SET flag = 1 WHERE (1 OR ?1) AND group_id = ?2" % db
-		cursor.executemany(sql, self._loki.generateGroupIDsByName(names, maxMatch=maxMatch, tally=tally, namespaceID=namespaceID, typeID=typeID))
+		cursor.executemany(sql, self._loki.generateGroupIDsByName(
+				names, maxMatch=maxMatch, tally=tally, namespaceID=namespaceID, typeID=typeID, errorCallback=errorCallback
+		))
 		cursor.execute("DELETE FROM `%s`.`group` WHERE flag = 0" % db)
 		numDrop = cursor.getconnection().changes()
-		if tally['null']:
-			self.warn("WARNING: ignored %d unrecognized group identifier(s)\n" % tally['null'])
-		if tally['ambig']:
+		if tally['zero']:
+			self.warn("WARNING: ignored %d unrecognized group identifier(s)\n" % tally['zero'])
+		if tally['many']:
 			if self._options.allow_ambiguous_groups == 'yes':
-				self.warn("WARNING: kept multiple results for %d ambiguous group identifier(s)\n" % tally['ambig'])
+				self.warn("WARNING: kept multiple results for %d ambiguous group identifier(s)\n" % tally['many'])
 			else:
-				self.warn("WARNING: ignored %d ambiguous group identifier(s)\n" % tally['ambig'])
+				self.warn("WARNING: ignored %d ambiguous group identifier(s)\n" % tally['many'])
 		self.logPop("... OK: kept %d groups (%d dropped)\n" % (numBefore-numDrop,numDrop))
 		
 		self._inputFilters[db]['group'] += 1
@@ -934,20 +1017,23 @@ class Biofilter:
 	# source input
 	
 	
-	def unionInputSources(self, db, names):
+	def unionInputSources(self, db, names, errorCallback=None):
 		# names=[ name, ... ]
 		self.logPush("adding to %s source filter ...\n" % db)
 		cursor = self._loki._db.cursor()
 		
 		self.prepareTableForUpdate(db, 'source')
-		sql = "INSERT OR IGNORE INTO `%s`.`source` (label,source_id) VALUES (?1,?2); SELECT LAST_INSERT_ROWID()" % db
-		lastID = numAdd = numNull = 0
-		for row in cursor.executemany(sql, self._loki.getSourceIDs(names).iteritems()):
-			if lastID != row[0]:
+		sql = "INSERT OR IGNORE INTO `%s`.`source` (label,source_id) VALUES (?1,?2)" % db
+		numAdd = numNull = 0
+		for source in names:
+			sourceID = self._loki.getSourceID(source)
+			if sourceID:
 				numAdd += 1
-				lastID = row[0]
+				cursor.execute(sql, (source,sourceID))
 			else:
 				numNull += 1
+				if errorCallback:
+					errorCallback(source, "invalid source")
 		if numNull:
 			self.warn("WARNING: ignored %d unrecognized source identifier(s)\n" % numNull)
 		self.logPop("... OK: added %d sources\n" % numAdd)
@@ -956,7 +1042,7 @@ class Biofilter:
 	#unionInputSources()
 	
 	
-	def intersectInputSources(self, db, names):
+	def intersectInputSources(self, db, names, errorCallback=None):
 		# names=[ name, ... ]
 		if not self._inputFilters[db]['source']:
 			return self.unionInputSources(db, names)
@@ -967,7 +1053,10 @@ class Biofilter:
 		cursor.execute("UPDATE `%s`.`source` SET flag = 0" % db)
 		numBefore = cursor.getconnection().changes()
 		sql = "UPDATE `%s`.`source` SET flag = 1 WHERE source_id = ?1" % db
-		cursor.executemany(sql, self._loki.getSourceIDs(names).iteritems())
+		for source in names:
+			sourceID = self._loki.getSourceID(source)
+			if sourceID:
+				cursor.execute(sql, (sourceID,))
 		cursor.execute("DELETE FROM `%s`.`source` WHERE flag = 0" % db)
 		numDrop = cursor.getconnection().changes()
 		self.logPop("... OK: kept %d sources (%d dropped)\n" % (numBefore-numDrop,numDrop))
@@ -984,15 +1073,15 @@ class Biofilter:
 	_queryAliasTable = {
 		'm_s'    : ('main','snp'),              # (label,rs)
 		'm_l'    : ('main','locus'),            # (label,chr,pos)
-		'm_rz'   : ('main','region_zone'),      # (region_rowid,chr,zone)
 		'm_r'    : ('main','region'),           # (label,chr,posMin,posMax)
+		'm_rz'   : ('main','region_zone'),      # (region_rowid,chr,zone)
 		'm_bg'   : ('main','gene'),             # (label,biopolymer_id)
 		'm_g'    : ('main','group'),            # (label,group_id)
 		'm_c'    : ('main','source'),           # (label,source_id)
 		'a_s'    : ('alt','snp'),               # (label,rs)
 		'a_l'    : ('alt','locus'),             # (label,chr,pos)
-		'a_rz'   : ('alt','region_zone'),       # (region_rowid,chr,zone)
 		'a_r'    : ('alt','region'),            # (label,chr,posMin,posMax)
+		'a_rz'   : ('alt','region_zone'),       # (region_rowid,chr,zone)
 		'a_bg'   : ('alt','gene'),              # (label,biopolymer_id)
 		'a_g'    : ('alt','group'),             # (label,group_id)
 		'a_c'    : ('alt','source'),            # (label,source_id)
@@ -1001,8 +1090,8 @@ class Biofilter:
 		'c_ab_R' : ('cand','alt_biopolymer'),   # (biopolymer_id)
 		'c_g'    : ('cand','group'),            # (group_id)
 		'd_sl'   : ('db','snp_locus'),          # (rs,chr,pos)
-		'd_bz'   : ('db','biopolymer_zone'),    # (biopolymer_id,chr,zone)
 		'd_br'   : ('db','biopolymer_region'),  # (biopolymer_id,ldprofile_id,chr,posMin,posMax)
+		'd_bz'   : ('db','biopolymer_zone'),    # (biopolymer_id,chr,zone)
 		'd_b'    : ('db','biopolymer'),         # (biopolymer_id,type_id,label)
 		'd_gb'   : ('db','group_biopolymer'),   # (group_id,biopolymer_id,specificity,implication,quality)
 		'd_gb_L' : ('db','group_biopolymer'),   # (group_id,biopolymer_id,specificity,implication,quality)
@@ -2025,7 +2114,7 @@ if __name__ == "__main__":
 			return 'yes'
 		if val in ('0','f','false','n','no','off'):
 			return 'no'
-		raise ValueError("invalid choice: '%s' must be yes/on/true/1 or no/off/false/0")
+		raise argparse.ArgumentTypeError("'%s' must be yes/on/true/1 or no/off/false/0" % val)
 	#yesno()
 	
 	# define custom percentage type handler
@@ -2035,7 +2124,7 @@ if __name__ == "__main__":
 			val = val[:-1]
 		val = float(val)
 		if val > 100:
-			raise ValueError("invalid percentage: '%s' must be <= 100" % val)
+			raise argparse.ArgumentTypeError("'%s' must be <= 100" % val)
 		return val
 	#percent()
 	
@@ -2078,14 +2167,23 @@ if __name__ == "__main__":
 	group.add_argument('--report-configuration', '--rc', type=yesno, metavar='yes/no', nargs='?', const='yes', default='no',
 			help="output a report of all effective options, including any defaults, in a configuration file format which can be re-input (default: no)"
 	)
-	#group.add_argument('--report-knowledge-fingerprint', '--rkf', type=yesno, metavar='yes/no', nargs='?', const='yes', default='no',
-	#		help="include the knowledge database file's fingerprint values in the configuration report, to ensure the same data is used in replication (default: no)"
-	#)
+	group.add_argument('--report-replication-fingerprint', '--rrf', type=yesno, metavar='yes/no', nargs='?', const='yes', default='no',
+			help="include software versions and the knowledge database file's fingerprint values in the configuration report, to ensure the same data is used in replication (default: no)"
+	)
 	
 	# add knowledge database section
 	group = parser.add_argument_group("Prior Knowledge Options")
 	group.add_argument('--knowledge', '-k', type=str, metavar='file', #default=argparse.SUPPRESS,
 			help="the prior knowledge database file to use"
+	)
+	group.add_argument('--report-genome-build', '--rgb', type=yesno, metavar='yes/no', nargs='?', const='yes', default='no',
+			help="report the genome build version number used by the knowledge database (default: no)"
+	)
+	group.add_argument('--report-gene-name-stats', '--rgns', type=yesno, metavar='yes/no', nargs='?', const='yes', default='no',
+			help="display statistics on available gene identifier types (default: no)"
+	)
+	group.add_argument('--report-group-name-stats', '--runs', type=yesno, metavar='yes/no', nargs='?', const='yes', default='no',
+			help="display statistics on available group identifier types (default: no)"
 	)
 	group.add_argument('--allow-unvalidated-snp-positions', '--ausp', type=yesno, metavar='yes/no', nargs='?', const='yes', default='yes',
 			help="use unvalidated SNP positions in the knowledge database (default: yes)"
@@ -2099,6 +2197,21 @@ if __name__ == "__main__":
 	)
 	group.add_argument('--ld-profile', '--lp', type=str, metavar='profile', nargs='?', const=None, default=None,
 			help="LD profile with which to adjust regions in the knowledge database (default: none)"
+	)
+	group.add_argument('--verify-biofilter-version', type=str, metavar='version', default=None,
+			help="require a specific Biofilter software version to replicate results"
+	)
+	group.add_argument('--verify-loki-version', type=str, metavar='version', default=None,
+			help="require a specific LOKI software version to replicate results"
+	)
+	group.add_argument('--verify-source-loader', type=str, metavar=('source','version'), nargs=2, action='append', default=None,
+			help="require that the knowledge database was built with a specific source loader version"
+	)
+	group.add_argument('--verify-source-option', type=str, metavar=('source','option','value'), nargs=3, action='append', default=None,
+			help="require that the knowledge database was built with a specific source loader option"
+	)
+	group.add_argument('--verify-source-file', type=str, metavar=('source','file','date','size','md5'), nargs=5, action='append', default=None,
+			help="require that the knowledge database was built with a specific source file fingerprint"
 	)
 	
 	# add primary input section
@@ -2253,11 +2366,8 @@ if __name__ == "__main__":
 	group.add_argument('--stdout', type=yesno, metavar='yes/no', nargs='?', const='yes', default='no',
 			help="display all output data directly on <stdout> rather than writing to any files (default: no)"
 	)
-	group.add_argument('--gene-name-stats', type=yesno, metavar='yes/no', nargs='?', const='yes', default='no',
-			help="display statistics on available gene identifier types (default: no)"
-	)
-	group.add_argument('--group-name-stats', type=yesno, metavar='yes/no', nargs='?', const='yes', default='no',
-			help="display statistics on available group identifier types (default: no)"
+	group.add_argument('--report-invalid-input', '--rii', type=yesno, metavar='yes/no', nargs='?', const='yes', default='no',
+			help="report invalid input data lines in a separate output file for each type (default: no)"
 	)
 	group.add_argument('--filter', '-f', type=str, metavar='type', nargs='+', action='append',
 			help="data types or columns to include in the filtered output"
@@ -2366,6 +2476,136 @@ if __name__ == "__main__":
 		parseCFile(cfName)
 	parser.parse_args(namespace=options)
 	bio = Biofilter(options)
+	empty = list()
+	
+	# identify all the reports we need to output
+	typeOutputPath = collections.OrderedDict()
+	typeOutputPath['report'] = collections.OrderedDict()
+	if options.report_configuration == 'yes':
+		typeOutputPath['report']['configuration'] = options.prefix + '.configuration'
+	if options.report_gene_name_stats == 'yes':
+		typeOutputPath['report']['gene name statistics'] = options.prefix + '.gene-names'
+	if options.report_group_name_stats == 'yes':
+		typeOutputPath['report']['group name statistics'] = options.prefix + '.group-names'
+	
+	# define invalid input handlers, if requested
+	typeOutputPath['invalid'] = collections.OrderedDict()
+	cb = collections.defaultdict(bool)
+	cbLog = collections.OrderedDict()
+	cbMake = lambda modtype: lambda line,err: cbLog[modtype].extend(["# %s" % (err or "(unknown error"), line.rstrip()])
+	if options.report_invalid_input == 'yes':
+		for type in ['SNP','position','region','gene','group','source']:
+			for mod in ['','alt-']:
+				typeOutputPath['invalid'][mod+type] = options.prefix + '.invalid.' + mod+type.lower()
+				cbLog[mod+type] = list()
+	#if report invalid input
+	
+	# identify all the filtering results we need to output
+	typeOutputPath['filter'] = collections.OrderedDict()
+	for types in (options.filter or empty):
+		if types:
+			typeOutputPath['filter'][tuple(types)] = options.prefix + '.' + '-'.join(types)
+		else:
+			# ignore empty filters
+			pass
+	#foreach requested filter
+	
+	# identify all the annotation results we need to output
+	typeOutputPath['annotation'] = collections.OrderedDict()
+	for types in (options.annotate or empty):
+		n = types.count(':')
+		if n > 1:
+			bio.warn("ERROR: cannot annotate '%s', only two sets of outputs are allowed\n" % (' '.join(types),))
+			continue
+		elif n:
+			i = types.index(':')
+			typesF = types[:i]
+			typesA = types[i+1:None]
+		else:
+			typesF = types[0:1]
+			typesA = types[1:None]
+		
+		if typesF and typesA:
+			typeOutputPath['annotation'][(tuple(typesF),tuple(typesA))] = options.prefix + '.' + '-'.join(typesF) + '.' + '-'.join(typesA)
+		elif typesF:
+			bio.warn("WARNING: annotating '%s' is equivalent to filtering '%s'\n" % (' '.join(types),' '.join(typesF)))
+			typeOutputPath['filter'][tuple(typesF)] = options.prefix + '.' + '-'.join(typesF)
+		elif typesA:
+			bio.warn("ERROR: cannot annotate '%s' with no starting point\n" % (' '.join(types),))
+		else:
+			# ignore empty annotations
+			pass
+	#foreach requested annotation
+	
+	# identify all the model results we need to output
+	typeOutputPath['models'] = collections.OrderedDict()
+	for types in (options.model or empty):
+		n = types.count(':')
+		if n > 1:
+			bio.warn("ERROR: cannot model '%s', only two sets of outputs are allowed\n" % (' '.join(types),))
+			continue
+		elif n:
+			i = types.index(':')
+			typesL = types[:i]
+			typesR = types[i+1:None]
+		else:
+			typesL = typesR = types
+		
+		if not (typesL or typesR):
+			# ignore empty models
+			pass
+		elif not (typesL and typesR):
+			bio.warn("ERROR: cannot model '%s', both sides require at least one output type\n" % ' '.join(types))
+		elif typesL == typesR:
+			typeOutputPath['models'][(tuple(typesL),tuple(typesR))] = options.prefix + '.' + '-'.join(typesL) + '.models'
+		else:
+			typeOutputPath['models'][(tuple(typesL),tuple(typesR))] = options.prefix + '.' + '-'.join(typesL) + '.' + '-'.join(typesR) + '.models'
+	#foreach requested model
+	
+	# verify that all output files are unique, writeable and nonexistant (unless overwriting)
+	typeOutputInfo = dict()
+	pathUsed = dict()
+	for outtype,outputPath in typeOutputPath.iteritems():
+		typeOutputInfo[outtype] = collections.OrderedDict()
+		for output,path in outputPath.iteritems():
+			if outtype == 'report':
+				label = "%s report" % (output,)
+			elif outtype == 'invalid':
+				label = "invalid %s input report" % (output,)
+			elif outtype == 'filter':
+				label = "'%s' filter" % (" ".join(output),)
+			elif outtype == 'annotation':
+				label = "'%s : %s' annotation" % (" ".join(output[0])," ".join(output[1]))
+			elif outtype == 'models':
+				if output[0] == output[1]:
+					label = "'%s' models" % (" ".join(output[0]),)
+				else:
+					label = "'%s : %s' models" % (" ".join(output[0])," ".join(output[1]))
+			else:
+				raise Exception("unexpected output type")
+			
+			if options.debug_logic == 'yes':
+				bio.warn("%s will be written to '%s'\n" % (label,('<stdout>' if options.stdout == 'yes' else path)))
+			
+			if options.stdout == 'yes':
+				path = '<stdout>'
+			elif path in pathUsed:
+				bio.warn("ERROR: cannot write %s to '%s', file is already reserved for %s\n" % (label,path,pathUsed[path]))
+				continue
+			elif os.path.exists(path):
+				if options.overwrite == 'yes':
+					bio.warn("WARNING: %s file '%s' already exists and will be overwritten\n" % (label,path))
+				else:
+					bio.warn("ERROR: %s file '%s' already exists, must specify --overwrite or a different --prefix\n" % (label,path))
+					continue
+			
+			pathUsed[path] = label
+			file = sys.stdout if options.stdout == 'yes' else (open(path,'wb') if outtype != 'invalid' else None)
+			typeOutputInfo[outtype][output] = (label,path,file)
+			if outtype == 'invalid':
+				cb[output] = cbMake(output)
+		#foreach output of type
+	#foreach output type
 	
 	# attach the knowledge file, if provided
 	if options.knowledge:
@@ -2384,6 +2624,67 @@ if __name__ == "__main__":
 		bio.attachDatabaseFile(dbPath)
 	#if knowledge
 	
+	# verify the replication fingerprint, if requested
+	sourceVerify = collections.defaultdict(lambda: [None,None,None])
+	for source,version in (options.verify_source_loader or empty):
+		sourceVerify[source][0] = version
+	for source,option,value in (options.verify_source_option or empty):
+		if not sourceVerify[source][1]:
+			sourceVerify[source][1] = dict()
+		sourceVerify[source][1][option] = value
+	for source,file,date,size,md5 in (options.verify_source_file or empty):
+		if not sourceVerify[source][2]:
+			sourceVerify[source][2] = dict()
+		sourceVerify[source][2][file] = (date,long(size),md5)
+	if sourceVerify or options.verify_biofilter_version or options.verify_loki_version:
+		bio.logPush("verifying replication fingerprint ...\n")
+		if options.verify_biofilter_version and (options.verify_biofilter_version != Biofilter.getVersionString()):
+			bio.warn("ERROR: configuration requires Biofilter version %s, but this is version %s\n" % (options.verify_biofilter_version, Biofilter.getVersionString()))
+			sys.exit(1)
+		if options.verify_loki_version and (options.verify_loki_version != loki_db.Database.getVersionString()):
+			bio.warn("ERROR: configuration requires LOKI version %s, but this is version %s\n" % (options.verify_loki_version, loki_db.Database.getVersionString()))
+			sys.exit(1)
+		for source in sorted(sourceVerify):
+			verify = sourceVerify[source]
+			sourceID = bio._loki.getSourceID(source)
+			if not sourceID:
+				bio.warn("ERROR: cannot verify %s fingerprint, knowledge database contains no such source\n" % (source,))
+				sys.exit(1)
+			version = bio._loki.getSourceIDVersion(sourceID)
+			if verify[0] and verify[0] != version:
+				bio.warn("ERROR: configuration requires %s loader version %s, but knowledge database reports version %s\n" % (source,verify[0],version))
+				sys.exit(1)
+			if verify[1]:
+				options = bio._loki.getSourceIDOptions(sourceID)
+				for opt,val in verify[1].iteritems():
+					if opt not in options or val != options[opt]:
+						bio.warn("ERROR: configuration requires %s loader option %s = %s, but knowledge database reports setting = %s\n" % (source,opt,val,options.get(opt)))
+						sys.exit(1)
+			if verify[2]:
+				files = bio._loki.getSourceIDFiles(sourceID)
+				for file,meta in verify[2].iteritems():
+					if file not in files:
+						bio.warn("ERROR: configuration requires a specific fingerprint for %s file '%s', but knowledge database reports no such file\n" % (source,file))
+						sys.exit(1)
+					elif meta[0] != files[file][0]:
+						bio.warn("ERROR: configuration requires %s file '%s' modification date '%s', but knowledge database reports '%s'\n" % (source,file,meta[0],files[file][0]))
+						sys.exit(1)
+					elif meta[1] != files[file][1]:
+						bio.warn("ERROR: configuration requires %s file '%s' size %s, but knowledge database reports %s\n" % (source,file,meta[1],files[file][1]))
+						sys.exit(1)
+					elif meta[2] != files[file][2]:
+						bio.warn("ERROR: configuration requires %s file '%s' hash '%s', but knowledge database reports '%s'\n" % (source,file,meta[2],files[file][2]))
+						sys.exit(1)
+		#foreach source
+		bio.logPop("... OK\n")
+	#if verify replication fingerprint
+	
+	# report the genome build, if requested
+	if options.report_genome_build == 'yes':
+		builds = bio.getDatabaseGenomeBuilds()
+		bio.warn("knowledge database genome build: GRCh %s / UCSChg %s\n" % (builds[0] or '?', builds[1] or '?'))
+	#if genome build
+	
 	# define output helper functions
 	utf8 = codecs.getencoder('utf8')
 	def encodeString(string):
@@ -2393,230 +2694,179 @@ if __name__ == "__main__":
 	def encodeRow(row, term="\n", delim="\t"):
 		return utf8("%s%s" % ((delim.join((col if isinstance(col,basestring) else str('' if col == None else col)) for col in row)),term))[0]
 	
-	# configuration report
-	if options.report_configuration == 'yes':
-		outPath = ('<stdout>' if options.stdout == 'yes' else (options.prefix + '.configuration'))
-		bio.logPush("writing configuration report to %s ...\n" % outPath)
-		if (options.stdout != 'yes') and (options.overwrite != 'yes') and os.path.exists(outPath):
-			bio.warn("ERROR: configuration report output file '%s' already exists, must specify --overwrite or a different --prefix\n")
-			bio.logPop()
-		else:
-			outFile = (sys.stdout if options.stdout == 'yes' else open(outPath, 'wb'))
-			outFile.write(encodeLine("# Biofilter configuration file"))
-			outFile.write(encodeLine("#   generated %s" % time.strftime('%a, %d %b %Y %H:%M:%S')))
-			outFile.write(encodeLine("#   Biofilter version %s" % Biofilter.getVersionString()))
-			outFile.write(encodeLine("#   LOKI version %s" % loki_db.Database.getVersionString()))
-			outFile.write(encodeLine(""))
-			#if options.report_knowledge_fingerprint == 'yes':
-			#	#TODO
+	# process reports
+	for report,info in typeOutputInfo['report'].iteritems():
+		label,path,outfile = info
+		bio.logPush("writing %s to '%s' ...\n" % (label,path))
+		if report == 'configuration':
+			outfile.write(encodeLine("# Biofilter configuration file"))
+			outfile.write(encodeLine("#   generated %s" % time.strftime('%a, %d %b %Y %H:%M:%S')))
+			outfile.write(encodeLine("#   Biofilter version %s" % Biofilter.getVersionString()))
+			outfile.write(encodeLine("#   LOKI version %s" % loki_db.Database.getVersionString()))
+			outfile.write(encodeLine(""))
+			if options.report_replication_fingerprint == 'yes':
+				outfile.write(encodeLine("%-35s \"%s\"" % ('VERIFY_BIOFILTER_VERSION', Biofilter.getVersionString(),)))
+				outfile.write(encodeLine("%-35s \"%s\"" % ('VERIFY_LOKI_VERSION', loki_db.Database.getVersionString(),)))
+				for source,fingerprint in bio.getSourceFingerprints().iteritems():
+					outfile.write(encodeLine("%-35s %s \"%s\"" % ('VERIFY_SOURCE_LOADER',source,fingerprint[0])))
+					for srcopt in sorted(fingerprint[1]):
+						outfile.write(encodeLine("%-35s %s %s " % ('VERIFY_SOURCE_OPTION',source,srcopt), term=""))
+						outfile.write(encodeRow(fingerprint[1][srcopt], delim=" "))
+					for srcfile in sorted(fingerprint[2]):
+						outfile.write(encodeLine("%-35s %s \"%s\" " % ('VERIFY_SOURCE_FILE',source,srcfile), term=""))
+						outfile.write(encodeRow((('"%s"' % col) for col in fingerprint[2][srcfile]), delim=" "))
+					outfile.write(encodeLine(""))
 			for opt in options:
-				if (opt in ('configuration','end_of_line','debug_query','debug_profile')) or not hasattr(options, opt):
+				if opt in ('configuration','verify_source_loader','verify_source_option','verify_source_file') or not hasattr(options, opt):
 					continue
 				val = getattr(options, opt)
+				if type(val) == bool: # --end-of-line, --debug-*
+					continue
 				opt = "%-35s" % opt.upper().replace('-','_')
 				# three possibilities: simple value, list of simple values, or list of lists of simple values
 				if isinstance(val,list) and len(val) and isinstance(val[0],list):
 					for subvals in val:
 						if len(subvals):
-							outFile.write(encodeRow(itertools.chain([opt],subvals), delim=" "))
+							outfile.write(encodeRow(itertools.chain([opt],subvals), delim=" "))
 						else:
-							outFile.write(encodeLine(opt))
+							outfile.write(encodeLine(opt))
 				elif isinstance(val,list):
 					if len(val):
-						outFile.write(encodeRow(itertools.chain([opt],val), delim=" "))
+						outfile.write(encodeRow(itertools.chain([opt],val), delim=" "))
 					else:
-						outFile.write(encodeLine(opt))
+						outfile.write(encodeLine(opt))
 				elif val != None:
-					outFile.write(encodeRow([opt,val], delim=" "))
+					outfile.write(encodeRow([opt,val], delim=" "))
 			#foreach option
-			if outFile != sys.stdout:
-				outFile.close()
-			bio.logPop("... OK\n")
-		#if outPath ok
-	#if configuration report
-	
-	# gene name stats
-	if options.gene_name_stats == 'yes':
-		outPath = ('<stdout>' if options.stdout == 'yes' else (options.prefix + '.gene-names'))
-		bio.logPush("writing gene name statistics to %s ...\n" % outPath)
-		if (options.stdout != 'yes') and (options.overwrite != 'yes') and os.path.exists(outPath):
-			bio.warn("ERROR: gene name statistics output file '%s' already exists, must specify --overwrite or a different --prefix\n" % outPath)
-			bio.logPop()
-		else:
-			outFile = (sys.stdout if options.stdout == 'yes' else open(outPath, 'wb'))
-			outFile.write(encodeRow(['#type','names','unique','ambiguous']))
+		elif report == 'gene name statistics':
+			outfile.write(encodeRow(['#type','names','unique','ambiguous']))
 			for row in bio.generateGeneNameStats():
-				outFile.write(encodeRow(row))
-			if outFile != sys.stdout:
-				outFile.close()
-			bio.logPop("... OK\n")
-		#if outPath ok
-	#if gene name stats
-	
-	# group name stats
-	if options.group_name_stats == 'yes':
-		outPath = ('<stdout>' if options.stdout == 'yes' else (options.prefix + '.group-names'))
-		bio.logPush("writing group name statistics to %s ...\n" % outPath)
-		if (options.stdout != 'yes') and (options.overwrite != 'yes') and os.path.exists(outPath):
-			bio.warn("ERROR: group name statistics output file '%s' already exists, must specify --overwrite or a different --prefix\n" % outPath)
-			bio.logPop()
-		else:
-			outFile = (sys.stdout if options.stdout == 'yes' else open(outPath, 'wb'))
-			outFile.write(encodeRow(['#type','names','unique','ambiguous']))
+				outfile.write(encodeRow(row))
+		elif report == 'group name statistics':
+			outfile.write(encodeRow(['#type','names','unique','ambiguous']))
 			for row in bio.generateGroupNameStats():
-				outFile.write(encodeRow(row))
-			if outFile != sys.stdout:
-				outFile.close()
-			bio.logPop("... OK\n")
-		#if outPath ok
-	#if group name stats
-	
-	empty = list()
+				outfile.write(encodeRow(row))
+		else:
+			raise Exception("unexpected report type")
+		#which report
+		if outfile != sys.stdout:
+			outfile.close()
+		bio.logPop("... OK\n")
+	#foreach report
 	
 	# apply primary filters
 	for snpList in (options.snp or empty):
-		bio.intersectInputSNPs('main', bio.generateRSesFromText(snpList))
+		bio.intersectInputSNPs('main', bio.generateRSesFromText(snpList, errorCallback=cb['SNP']), errorCallback=cb['SNP'])
 	for snpFileList in (options.snp_file or empty):
-		bio.intersectInputSNPs('main', bio.generateRSesFromRSFiles(snpFileList))
+		bio.intersectInputSNPs('main', bio.generateRSesFromRSFiles(snpFileList, errorCallback=cb['SNP']), errorCallback=cb['SNP'])
 	for positionList in (options.position or empty):
-		bio.intersectInputLoci('main', bio.generateLociFromText(positionList))
+		bio.intersectInputLoci('main', bio.generateLociFromText(positionList, separator=':', errorCallback=cb['position']), errorCallback=cb['position'])
 	for positionFileList in (options.position_file or empty):
-		bio.intersectInputLoci('main', bio.generateLociFromMapFiles(positionFileList))
+		bio.intersectInputLoci('main', bio.generateLociFromMapFiles(positionFileList, errorCallback=cb['position']), errorCallback=cb['position'])
 	for geneList in (options.gene or empty):
-		bio.intersectInputGenes('main', geneList)
+		bio.intersectInputGenes('main', geneList, errorCallback=cb['gene'])
 	for geneSearch in (options.gene_search or empty):
 		bio.intersectInputGeneSearch('main', geneSearch)
 	for geneFileList in (options.gene_file or empty):
-		bio.intersectInputGenes('main', bio.generateNamesFromNameFiles(geneFileList))
+		bio.intersectInputGenes('main', bio.generateNamesFromNameFiles(geneFileList, errorCallback=cb['gene']), errorCallback=cb['gene'])
 	for regionList in (options.region or empty):
-		bio.intersectInputRegions('main', bio.generateRegionsFromText(regionList))
+		bio.intersectInputRegions('main', bio.generateRegionsFromText(regionList, separator=':', errorCallback=cb['region']), errorCallback=cb['region'])
 	for regionFileList in (options.region_file or empty):
-		bio.intersectInputRegions('main', bio.generateRegionsFromFiles(regionFileList))
+		bio.intersectInputRegions('main', bio.generateRegionsFromFiles(regionFileList, errorCallback=cb['region']), errorCallback=cb['region'])
 	for groupList in (options.group or empty):
-		bio.intersectInputGroups('main', groupList)
+		bio.intersectInputGroups('main', groupList, errorCallback=cb['group'])
 	for groupSearch in (options.group_search or empty):
 		bio.intersectInputGroupSearch('main', groupSearch)
 	for groupFileList in (options.group_file or empty):
-		bio.intersectInputGroups('main', bio.generateNamesFromNameFiles(groupFileList))
+		bio.intersectInputGroups('main', bio.generateNamesFromNameFiles(groupFileList, errorCallback=cb['group']), errorCallback=cb['group'])
 	for sourceList in (options.source or empty):
-		bio.intersectInputSources('main', sourceList)
+		bio.intersectInputSources('main', sourceList, errorCallback=cb['source'])
 	for sourceFileList in (options.source_file or empty):
-		bio.intersectInputSources('main', bio.generateNamesFromNameFiles(sourceFileList))
+		bio.intersectInputSources('main', bio.generateNamesFromNameFiles(sourceFileList, errorCallback=cb['source']), errorCallback=cb['source'])
 	
 	# apply alternate filters
 	for snpList in (options.alt_snp or empty):
-		bio.intersectInputSNPs('alt', bio.generateRSesFromText(snpList))
+		bio.intersectInputSNPs('alt', bio.generateRSesFromText(snpList, errorCallback=cb['alt-SNP']), errorCallback=cb['alt-SNP'])
 	for snpFileList in (options.alt_snp_file or empty):
-		bio.intersectInputSNPs('alt', bio.generateRSesFromRSFiles(snpFileList))
+		bio.intersectInputSNPs('alt', bio.generateRSesFromRSFiles(snpFileList, errorCallback=cb['alt-SNP']), errorCallback=cb['alt-SNP'])
 	for positionList in (options.alt_position or empty):
-		bio.intersectInputLoci('alt', bio.generateLociFromText(positionList))
+		bio.intersectInputLoci('alt', bio.generateLociFromText(positionList, separator=':', errorCallback=cb['alt-position']), errorCallback=cb['alt-position'])
 	for positionFileList in (options.alt_position_file or empty):
-		bio.intersectInputLoci('alt', bio.generateLociFromMapFiles(positionFileList))
+		bio.intersectInputLoci('alt', bio.generateLociFromMapFiles(positionFileList, errorCallback=cb['alt-position']), errorCallback=cb['alt-position'])
 	for geneList in (options.alt_gene or empty):
-		bio.intersectInputGenes('alt', geneList)
+		bio.intersectInputGenes('alt', geneList, errorCallback=cb['alt-gene'])
 	for geneSearch in (options.alt_gene_search or empty):
 		bio.intersectInputGeneSearch('alt', geneSearch)
 	for geneFileList in (options.alt_gene_file or empty):
-		bio.intersectInputGenes('alt', bio.generateNamesFromNameFiles(geneFileList))
+		bio.intersectInputGenes('alt', bio.generateNamesFromNameFiles(geneFileList, errorCallback=cb['alt-gene']), errorCallback=cb['alt-gene'])
 	for regionList in (options.alt_region or empty):
-		bio.intersectInputRegions('alt', bio.generateRegionsFromText(regionList))
+		bio.intersectInputRegions('alt', bio.generateRegionsFromText(regionList, separator=':', errorCallback=cb['alt-region']), errorCallback=cb['alt-region'])
 	for regionFileList in (options.alt_region_file or empty):
-		bio.intersectInputRegions('alt', bio.generateRegionsFromFiles(regionFileList))
+		bio.intersectInputRegions('alt', bio.generateRegionsFromFiles(regionFileList, errorCallback=cb['alt-region']), errorCallback=cb['alt-region'])
 	for groupList in (options.alt_group or empty):
-		bio.intersectInputGroups('alt', groupList)
+		bio.intersectInputGroups('alt', groupList, errorCallback=cb['alt-group'])
 	for groupSearch in (options.alt_group_search or empty):
 		bio.intersectInputGroupSearch('alt', groupSearch)
 	for groupFileList in (options.alt_group_file or empty):
-		bio.intersectInputGroups('alt', bio.generateNamesFromNameFiles(groupFileList))
+		bio.intersectInputGroups('alt', bio.generateNamesFromNameFiles(groupFileList, errorCallback=cb['alt-group']), errorCallback=cb['alt-group'])
 	for sourceList in (options.alt_source or empty):
-		bio.intersectInputSources('alt', sourceList)
+		bio.intersectInputSources('alt', sourceList, errorCallback=cb['alt-source'])
 	for sourceFileList in (options.alt_source_file or empty):
-		bio.intersectInputSources('alt', bio.generateNamesFromNameFiles(sourceFileList))
+		bio.intersectInputSources('alt', bio.generateNamesFromNameFiles(sourceFileList, errorCallback=cb['alt-source']), errorCallback=cb['alt-source'])
 	
-	# filtering
-	for filt in (options.filter or empty):
-		outPath = ('<stdout>' if options.stdout == 'yes' else (options.prefix + '.' + '-'.join(filt)))
-		bio.logPush("writing '%s' filtered results to %s ...\n" % (' '.join(filt),outPath))
-		if (options.stdout != 'yes') and (options.overwrite != 'yes') and os.path.exists(outPath):
-			bio.warn("ERROR: '%s' filter output file '%s' already exists, must specify --overwrite or a different --prefix\n" % (' '.join(filt),outPath))
-			bio.logPop()
-		else:
-			outFile = (sys.stdout if options.stdout == 'yes' else open(outPath, 'wb'))
-			n = -1 # don't count header
-			for row in bio.generateFilterOutput(filt):
-				n += 1
-				outFile.write(encodeRow(row))
-			if outFile != sys.stdout:
-				outFile.close()
-			bio.logPop("... OK: %d results\n" % n)
-		#if outPath ok
+	# report invalid input, if requested
+	if options.report_invalid_input == 'yes':
+		for modtype,lines in cbLog.iteritems():
+			if lines:
+				path = ('<stdout>' if options.stdout == 'yes' else typeOutputInfo['invalid'][modtype][1])
+				bio.logPush("writing invalid %s input report to '%s' ...\n" % (modtype,path))
+				outfile = (sys.stdout if options.stdout == 'yes' else open(path, 'wb'))
+				outfile.write("\n".join(lines))
+				if outfile != sys.stdout:
+					outfile.close()
+				bio.logPop("... OK: %d invalid inputs\n" % (len(lines)/2))
+		#foreach modifier/type
+	#if report invalid input
+	
+	# process filters
+	for types,info in typeOutputInfo['filter'].iteritems():
+		label,path,outfile = info
+		bio.logPush("writing %s filter to '%s' ...\n" % (label,path))
+		n = -1 # don't count header
+		for row in bio.generateFilterOutput(types):
+			n += 1
+			outfile.write(encodeRow(row))
+		if outfile != sys.stdout:
+			outfile.close()
+		bio.logPop("... OK: %d results\n" % n)
 	#foreach filter
 	
-	# annotation
-	for anno in (options.annotate or empty):
-		n = anno.count(':')
-		if n > 1:
-			bio.warn("ERROR: cannot annotate '%s', only two sets of outputs are allowed\n" % (' '.join(anno),))
-			continue
-		elif n == 1:
-			i = anno.index(':')
-			typesF = anno[:i]
-			typesA = anno[i+1:]
-		else:
-			typesF = anno[0:1]
-			typesA = anno[1:]
-		
-		if not typesA:
-			bio.warn("ERROR: cannot annotate '%s' alone\n" % (' '.join(typesF),))
-			continue
-		outPath = ('<stdout>' if options.stdout == 'yes' else (options.prefix + '.' + '-'.join(typesF) + '.' + '-'.join(typesA)))
-		bio.logPush("writing '%s' annotations to %s ...\n" % (' '.join(anno),outPath))
-		if (options.stdout != 'yes') and (options.overwrite != 'yes') and os.path.exists(outPath):
-			bio.warn("ERROR: '%s' annotation output file '%s' already exists, must specify --overwrite or a different --prefix\n" % (' '.join(anno),outPath))
-			bio.logPop()
-		else:
-			outFile = (sys.stdout if options.stdout == 'yes' else open(outPath, 'wb'))
-			n = -1 # don't count header
-			for row in bio.generateAnnotationOutput(typesF, typesA):
-				n += 1
-				outFile.write(encodeRow(row))
-			if outFile != sys.stdout:
-				outFile.close()
-			bio.logPop("... OK: %d results\n" % n)
-		#if outPath ok
+	# process annotations
+	for types,info in typeOutputInfo['annotation'].iteritems():
+		typesF,typesA = types
+		label,path,outfile = info
+		bio.logPush("writing %s annotation to '%s' ...\n" % (label,path))
+		n = -1 # don't count header
+		for row in bio.generateAnnotationOutput(typesF, typesA):
+			n += 1
+			outfile.write(encodeRow(row))
+		if outfile != sys.stdout:
+			outfile.close()
+		bio.logPop("... OK: %d results\n" % n)
 	#foreach annotation
 	
-	# modeling output
-	for model in (options.model or empty):
-		n = model.count(':')
-		if n > 1:
-			bio.warn("ERROR: cannot model '%s', only two sets of model types are allowed\n" % (' '.join(model),))
-			continue
-		elif n == 1:
-			i = model.index(':')
-			typesL = model[:i]
-			typesR = model[i+1:]
-		else:
-			typesL = typesR = model
-		
-		if typesL == typesR:
-			outPath = ('<stdout>' if options.stdout == 'yes' else (options.prefix + '.' + '-'.join(typesL) + '.models'))
-		else:
-			outPath = ('<stdout>' if options.stdout == 'yes' else (options.prefix + '.' + '-'.join(typesL) + '.' + '-'.join(typesR) + '.models'))
-		bio.logPush("writing '%s' models to %s ...\n" % (' '.join(model),outPath))
-		if (options.stdout != 'yes') and (options.overwrite != 'yes') and os.path.exists(outPath):
-			bio.warn("ERROR: '%s' model output file '%s' already exists, must specify --overwrite or a different --prefix\n" % (' '.join(model),outPath))
-			bio.logPop()
-		else:
-			outFile = (sys.stdout if options.stdout == 'yes' else open(outPath, 'wb'))
-			n = -1 # don't count header
-			for row in bio.generateModelOutput(typesL, typesR):
-				n += 1
-				outFile.write(encodeRow(row))
-			if outFile != sys.stdout:
-				outFile.close()
-			bio.logPop("... OK: %d results\n" % n)
-		#if outPath ok
+	# process models
+	for types,info in typeOutputInfo['models'].iteritems():
+		typesL,typesR = types
+		label,path,outfile = info
+		bio.logPush("writing %s models to '%s' ...\n" % (label,path))
+		n = -1 # don't count header
+		for row in bio.generateModelOutput(typesL, typesR):
+			n += 1
+			outfile.write(encodeRow(row))
+		if outfile != sys.stdout:
+			outfile.close()
+		bio.logPop("... OK: %d results\n" % n)
 	#foreach model
 	
 #__main__
