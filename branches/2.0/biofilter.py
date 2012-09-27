@@ -239,7 +239,7 @@ class Biofilter:
 		
 		# verify loki_db version (getUCSChgByGRCh() in 2.0.0a11)
 		if loki_db.Database.getVersionTuple() < (2,0,0,'a',11):
-			exit("ERROR: LOKI version 2.0.0a11 or later required; found %s" % (loki_db.Database.getVersionString(),))
+			sys.exit("ERROR: LOKI version 2.0.0a11 or later required; found %s" % (loki_db.Database.getVersionString(),))
 		
 		# initialize instance database
 		self._loki = loki_db.Database()
@@ -359,7 +359,7 @@ class Biofilter:
 		
 		size = self._loki.getDatabaseSetting('zone_size')
 		if not size:
-			raise Exception("ERROR: could not determine database setting 'zone_size'")
+			sys.exit("ERROR: could not determine database setting 'zone_size'")
 		size = int(size)
 		
 		# make sure all regions are correctly oriented
@@ -413,7 +413,7 @@ class Biofilter:
 	def generateGeneNameStats(self):
 		typeID = self._loki.getTypeID('gene')
 		if not typeID:
-			raise Exception("ERROR: knowledge file contains no gene data")
+			sys.exit("ERROR: knowledge file contains no gene data")
 		return self._loki.generateBiopolymerNameStats(typeID=typeID)
 	#generateGeneNameStats()
 	
@@ -421,7 +421,7 @@ class Biofilter:
 	def generateGroupNameStats(self, gtype=None):
 		typeID = gtype and self._loki.getTypeID(gtype)
 		if gtype and not typeID:
-			raise Exception("ERROR: unknown group type '%s'" % gtype)
+			sys.exit("ERROR: unknown group type '%s'" % gtype)
 		return self._loki.generateGroupNameStats(typeID=typeID)
 	#generateGroupNameStats()
 	
@@ -444,8 +444,7 @@ class Biofilter:
 	def getOptionTypeID(self, value, optional=False):
 		typeID = self._loki.getTypeID(value)
 		if not (typeID or optional):
-			self.warn("ERROR: database contains no %s data\n" % (value,))
-			sys.exit(1)
+			sys.exit("ERROR: database contains no %s data\n" % (value,))
 		return typeID
 	#getOptionTypeID()
 	
@@ -455,8 +454,7 @@ class Biofilter:
 			return None
 		namespaceID = self._loki.getNamespaceID(value)
 		if not (namespaceID or optional):
-			self.warn("ERROR: unknown identifier type '%s'\n" % (value,))
-			sys.exit(1)
+			sys.exit("ERROR: unknown identifier type '%s'\n" % (value,))
 		return namespaceID
 	#getOptionNamespaceID()
 	
@@ -1596,8 +1594,7 @@ class Biofilter:
 		options['zoneSize'] = int(self._loki.getDatabaseSetting('zone_size') or 0)
 		options['ldprofileID'] = self._loki.getLDProfileID(self._options.ld_profile or '')
 		if not options['ldprofileID']:
-			self.warn("ERROR: knowledge database is missing the default LD profile record")
-			sys.exit(1)
+			sys.exit("ERROR: knowledge database is missing the default LD profile record")
 		
 		# assign output columns
 		for col in outputs:
@@ -2432,7 +2429,7 @@ if __name__ == "__main__":
 		# check for cycles
 		cfAbs = ('<stdin>' if cfName == '-' else os.path.abspath(cfName))
 		if cfAbs in cfStack:
-			raise Exception("ERROR: configuration files include eachother in a loop! %s" % (' -> '.join(cfStack + [cfAbs])))
+			sys.exit("ERROR: configuration files include eachother in a loop! %s" % (' -> '.join(cfStack + [cfAbs])))
 		cfStack.append(cfAbs)
 		
 		# set up iterators
@@ -2515,8 +2512,7 @@ if __name__ == "__main__":
 	for types in (options.annotate or empty):
 		n = types.count(':')
 		if n > 1:
-			bio.warn("ERROR: cannot annotate '%s', only two sets of outputs are allowed\n" % (' '.join(types),))
-			continue
+			sys.exit("ERROR: cannot annotate '%s', only two sets of outputs are allowed\n" % (' '.join(types),))
 		elif n:
 			i = types.index(':')
 			typesF = types[:i]
@@ -2531,7 +2527,7 @@ if __name__ == "__main__":
 			bio.warn("WARNING: annotating '%s' is equivalent to filtering '%s'\n" % (' '.join(types),' '.join(typesF)))
 			typeOutputPath['filter'][tuple(typesF)] = options.prefix + '.' + '-'.join(typesF)
 		elif typesA:
-			bio.warn("ERROR: cannot annotate '%s' with no starting point\n" % (' '.join(types),))
+			sys.exit("ERROR: cannot annotate '%s' with no starting point\n" % (' '.join(types),))
 		else:
 			# ignore empty annotations
 			pass
@@ -2542,8 +2538,7 @@ if __name__ == "__main__":
 	for types in (options.model or empty):
 		n = types.count(':')
 		if n > 1:
-			bio.warn("ERROR: cannot model '%s', only two sets of outputs are allowed\n" % (' '.join(types),))
-			continue
+			sys.exit("ERROR: cannot model '%s', only two sets of outputs are allowed\n" % (' '.join(types),))
 		elif n:
 			i = types.index(':')
 			typesL = types[:i]
@@ -2555,7 +2550,7 @@ if __name__ == "__main__":
 			# ignore empty models
 			pass
 		elif not (typesL and typesR):
-			bio.warn("ERROR: cannot model '%s', both sides require at least one output type\n" % ' '.join(types))
+			sys.exit("ERROR: cannot model '%s', both sides require at least one output type\n" % ' '.join(types))
 		elif typesL == typesR:
 			typeOutputPath['models'][(tuple(typesL),tuple(typesR))] = options.prefix + '.' + '-'.join(typesL) + '.models'
 		else:
@@ -2590,14 +2585,12 @@ if __name__ == "__main__":
 			if options.stdout == 'yes':
 				path = '<stdout>'
 			elif path in pathUsed:
-				bio.warn("ERROR: cannot write %s to '%s', file is already reserved for %s\n" % (label,path,pathUsed[path]))
-				continue
+				sys.exit("ERROR: cannot write %s to '%s', file is already reserved for %s\n" % (label,path,pathUsed[path]))
 			elif os.path.exists(path):
 				if options.overwrite == 'yes':
 					bio.warn("WARNING: %s file '%s' already exists and will be overwritten\n" % (label,path))
 				else:
-					bio.warn("ERROR: %s file '%s' already exists, must specify --overwrite or a different --prefix\n" % (label,path))
-					continue
+					sys.exit("ERROR: %s file '%s' already exists, must specify --overwrite or a different --prefix\n" % (label,path))
 			
 			pathUsed[path] = label
 			file = sys.stdout if options.stdout == 'yes' else (open(path,'wb') if outtype != 'invalid' else None)
@@ -2616,11 +2609,9 @@ if __name__ == "__main__":
 			if not os.path.samefile(cwdDir, myDir):
 				dbPath = os.path.join(myDir, options.knowledge)
 				if not os.path.exists(dbPath):
-					bio.warn("ERROR: knowledge database file '%s' not found in '%s' or '%s'" % (options.knowledge, cwdDir, myDir))
-					sys.exit(1)
+					sys.exit("ERROR: knowledge database file '%s' not found in '%s' or '%s'" % (options.knowledge, cwdDir, myDir))
 			else:
-				bio.warn("ERROR: knowledge database file '%s' not found" % (options.knowledge))
-				sys.exit(1)
+				sys.exit("ERROR: knowledge database file '%s' not found" % (options.knowledge))
 		bio.attachDatabaseFile(dbPath)
 	#if knowledge
 	
@@ -2639,42 +2630,33 @@ if __name__ == "__main__":
 	if sourceVerify or options.verify_biofilter_version or options.verify_loki_version:
 		bio.logPush("verifying replication fingerprint ...\n")
 		if options.verify_biofilter_version and (options.verify_biofilter_version != Biofilter.getVersionString()):
-			bio.warn("ERROR: configuration requires Biofilter version %s, but this is version %s\n" % (options.verify_biofilter_version, Biofilter.getVersionString()))
-			sys.exit(1)
+			sys.exit("ERROR: configuration requires Biofilter version %s, but this is version %s\n" % (options.verify_biofilter_version, Biofilter.getVersionString()))
 		if options.verify_loki_version and (options.verify_loki_version != loki_db.Database.getVersionString()):
-			bio.warn("ERROR: configuration requires LOKI version %s, but this is version %s\n" % (options.verify_loki_version, loki_db.Database.getVersionString()))
-			sys.exit(1)
+			sys.exit("ERROR: configuration requires LOKI version %s, but this is version %s\n" % (options.verify_loki_version, loki_db.Database.getVersionString()))
 		for source in sorted(sourceVerify):
 			verify = sourceVerify[source]
 			sourceID = bio._loki.getSourceID(source)
 			if not sourceID:
-				bio.warn("ERROR: cannot verify %s fingerprint, knowledge database contains no such source\n" % (source,))
-				sys.exit(1)
+				sys.exit("ERROR: cannot verify %s fingerprint, knowledge database contains no such source\n" % (source,))
 			version = bio._loki.getSourceIDVersion(sourceID)
 			if verify[0] and verify[0] != version:
-				bio.warn("ERROR: configuration requires %s loader version %s, but knowledge database reports version %s\n" % (source,verify[0],version))
-				sys.exit(1)
+				sys.exit("ERROR: configuration requires %s loader version %s, but knowledge database reports version %s\n" % (source,verify[0],version))
 			if verify[1]:
 				options = bio._loki.getSourceIDOptions(sourceID)
 				for opt,val in verify[1].iteritems():
 					if opt not in options or val != options[opt]:
-						bio.warn("ERROR: configuration requires %s loader option %s = %s, but knowledge database reports setting = %s\n" % (source,opt,val,options.get(opt)))
-						sys.exit(1)
+						sys.exit("ERROR: configuration requires %s loader option %s = %s, but knowledge database reports setting = %s\n" % (source,opt,val,options.get(opt)))
 			if verify[2]:
 				files = bio._loki.getSourceIDFiles(sourceID)
 				for file,meta in verify[2].iteritems():
 					if file not in files:
-						bio.warn("ERROR: configuration requires a specific fingerprint for %s file '%s', but knowledge database reports no such file\n" % (source,file))
-						sys.exit(1)
+						sys.exit("ERROR: configuration requires a specific fingerprint for %s file '%s', but knowledge database reports no such file\n" % (source,file))
 					elif meta[0] != files[file][0]:
-						bio.warn("ERROR: configuration requires %s file '%s' modification date '%s', but knowledge database reports '%s'\n" % (source,file,meta[0],files[file][0]))
-						sys.exit(1)
+						sys.exit("ERROR: configuration requires %s file '%s' modification date '%s', but knowledge database reports '%s'\n" % (source,file,meta[0],files[file][0]))
 					elif meta[1] != files[file][1]:
-						bio.warn("ERROR: configuration requires %s file '%s' size %s, but knowledge database reports %s\n" % (source,file,meta[1],files[file][1]))
-						sys.exit(1)
+						sys.exit("ERROR: configuration requires %s file '%s' size %s, but knowledge database reports %s\n" % (source,file,meta[1],files[file][1]))
 					elif meta[2] != files[file][2]:
-						bio.warn("ERROR: configuration requires %s file '%s' hash '%s', but knowledge database reports '%s'\n" % (source,file,meta[2],files[file][2]))
-						sys.exit(1)
+						sys.exit("ERROR: configuration requires %s file '%s' hash '%s', but knowledge database reports '%s'\n" % (source,file,meta[2],files[file][2]))
 		#foreach source
 		bio.logPop("... OK\n")
 	#if verify replication fingerprint
