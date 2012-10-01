@@ -24,7 +24,7 @@ class Biofilter:
 	def getVersionTuple(cls):
 		# tuple = (major,minor,revision,dev,build,date)
 		# dev must be in ('a','b','rc','release') for lexicographic comparison
-		return (2,0,0,'a',12,'2012-09-27')
+		return (2,0,0,'a',12,'2012-10-01')
 	#getVersionTuple()
 	
 	
@@ -1461,6 +1461,13 @@ class Biofilter:
 		# start from the specified tables when annotating, otherwise from applicable input tables
 		if annotate:
 			query['FROM'].update(a[0] for a in annotate.keys())
+			#TODO: when filtering '?_rz' comes along with '?_r' because _inputFilters is updated in updateRegionZones()
+			# but when annotating, '?_r' gets orphaned because it can't join directly to any db table;
+			# so, for any '?_r' in FROM, also add the corresponding '?_rz'
+			if 'm_r' in query['FROM']:
+				query['FROM'].add('m_rz')
+			if 'a_r' in query['FROM']:
+				query['FROM'].add('a_rz')
 		else:
 			# re-index all input filter tables
 			for db in self._schema:
