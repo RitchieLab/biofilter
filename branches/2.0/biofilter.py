@@ -13,6 +13,9 @@ import time
 from loki import loki_db
 
 
+#TODO fix bug when requesting the same output column twice
+
+
 class Biofilter:
 	
 	
@@ -24,7 +27,7 @@ class Biofilter:
 	def getVersionTuple(cls):
 		# tuple = (major,minor,revision,dev,build,date)
 		# dev must be in ('a','b','rc','release') for lexicographic comparison
-		return (2,0,0,'a',13,'2012-10-05')
+		return (2,0,0,'a',14,'2012-10-12')
 	#getVersionTuple()
 	
 	
@@ -237,9 +240,9 @@ class Biofilter:
 		self._geneModels = None
 		self._onlyGeneModels = True #TODO
 		
-		# verify loki_db version (generate*IDsByIdentifiers() in 2.0.0a12)
-		if loki_db.Database.getVersionTuple() < (2,0,0,'a',12):
-			sys.exit("ERROR: LOKI version 2.0.0a12 or later required; found %s" % (loki_db.Database.getVersionString(),))
+		# verify loki_db version (getLDProfileS() in 2.0.0a13)
+		if loki_db.Database.getVersionTuple() < (2,0,0,'a',13):
+			sys.exit("ERROR: LOKI version 2.0.0a13 or later required; found %s" % (loki_db.Database.getVersionString(),))
 		
 		# initialize instance database
 		self._loki = loki_db.Database()
@@ -426,6 +429,13 @@ class Biofilter:
 	def generateGroupNameStats(self):
 		return self._loki.generateGroupNameStats()
 	#generateGroupNameStats()
+	
+	
+	def generateLDProfiles(self):
+		ldprofiles = self._loki.getLDProfiles()
+		for l in sorted(ldprofiles):
+			yield (l,)+ldprofiles[l][1:]
+	#generateLDProfiles()
 	
 	
 	##################################################
@@ -1100,8 +1110,9 @@ class Biofilter:
 	
 	# define constraints on single table aliases: dict{ set(a1,a2,...) : set(cond1,cond2,...), ... }
 	_queryAliasConditions = {
+		# TODO: find a way to put this back here without the covering index problem; hardcoded in buildQuery() for now
 	#	frozenset({'d_sl'}) : frozenset({
-	#		"({allowUSP} OR ({L}.validated > 0))", #TODO: prevents use of covering index!
+	#		"({allowUSP} OR ({L}.validated > 0))",
 	#	}),
 		frozenset({'d_br'}) : frozenset({
 			"{L}.ldprofile_id = {ldprofileID}",
@@ -1211,10 +1222,10 @@ class Biofilter:
 			"({R}.posMax - {R}.posMin) >= {rmBases}",
 			"((" +
 				"{L}.posMin >= {R}.posMin AND " +
-				"{L}.posMin <= {R}.posMax - MAX({rmBases}, MIN({L}.posMax - {L}.posMin, {R}.posMax - {R}.posMin) * {rmPercent} / 100)" +
+				"{L}.posMin <= {R}.posMax - MAX({rmBases}, MIN({L}.posMax - {L}.posMin, {R}.posMax - {R}.posMin) * {rmPercent} / 100.0)" +
 			") OR (" +
 				"{R}.posMin >= {L}.posMin AND " +
-				"{R}.posMin <= {L}.posMax - MAX({rmBases}, MIN({L}.posMax - {L}.posMin, {R}.posMax - {R}.posMin) * {rmPercent} / 100)" +
+				"{R}.posMin <= {L}.posMax - MAX({rmBases}, MIN({L}.posMax - {L}.posMin, {R}.posMax - {R}.posMin) * {rmPercent} / 100.0)" +
 			"))",
 		}),
 	} #class._queryAliasPairConditions{}
@@ -1281,12 +1292,12 @@ class Biofilter:
 			('m_rz', 'zone', "m_rz.zone"),
 			('d_bz', 'zone', "d_bz.zone"),
 		],
-		'region_posMin' : [
+		'region_start' : [
 			('a_r',  'rowid',   "a_r.posMin"),
 			('m_r',  'rowid',   "m_r.posMin"),
 			('d_br', '_ROWID_', "d_br.posMin"),
 		],
-		'region_posMax' : [
+		'region_stop' : [
 			('a_r',  'rowid',   "a_r.posMax"),
 			('m_r',  'rowid',   "m_r.posMax"),
 			('d_br', '_ROWID_', "d_br.posMax"),
@@ -1334,10 +1345,10 @@ class Biofilter:
 		'biopolymer_zone' : [
 			('d_bz', 'zone', "d_bz.zone"),
 		],
-		'biopolymer_posMin' : [
+		'biopolymer_start' : [
 			('d_br', '_ROWID_', "d_br.posMin"),
 		],
-		'biopolymer_posMax' : [
+		'biopolymer_stop' : [
 			('d_br', '_ROWID_', "d_br.posMax"),
 		],
 		
@@ -1485,9 +1496,9 @@ class Biofilter:
 			if not ((db == focus) or (db == 'main' and focus == 'alt' and mode != 'annotate' and self._options.alternate_model_filtering != 'yes')):
 				continue
 			# only include tables on one end of the chain when finding candidates for modeling
-			if (mode == 'modelgene') and (table in ('gene','source')):
+			if (mode == 'modelgene') and (table in ('group','source')):
 				continue
-			if (mode == 'modelgroup') and (table not in ('gene','source')):
+			if (mode == 'modelgroup') and (table not in ('group','source')):
 				continue
 			# only re-use the main gene candidates on the right if necessary
 			if (alias == 'c_mb_R') and ((self._options.alternate_model_filtering == 'yes') or self._inputFilters['cand']['alt_biopolymer']):
@@ -1672,6 +1683,14 @@ class Biofilter:
 				options['L'] = alias
 				query['LEFT JOIN'][alias].update(formatter.vformat(c, args=None, kwargs=options) for c in conds)
 		
+		# TODO: find a way to move this back into _queryAliasConditions without the covering index problem
+		if self._options.allow_unvalidated_snp_positions != 'yes':
+			print "ausp no"
+			if 'd_sl' in query['FROM']:
+				query['WHERE'].add("d_sl.validated > 0")
+			if 'd_sl' in query['LEFT JOIN']:
+				query['LEFT JOIN']['d_sl'].add("d_sl.validated > 0")
+		
 		# debug
 		if self._options.debug_logic:
 			self.warn("table WHERE = %s\n" % query['WHERE'])
@@ -1782,11 +1801,11 @@ class Biofilter:
 				header.extend(['gene'])
 				columns.extend(['gene_label'])
 			elif t == 'generegion':
-				header.extend(['chr','gene','posMin','posMax'])
-				columns.extend(['biopolymer_chr','gene_label','biopolymer_posMin','biopolymer_posMax'])
+				header.extend(['chr','gene','start','stop'])
+				columns.extend(['biopolymer_chr','gene_label','biopolymer_start','biopolymer_stop'])
 			elif t == 'region':
-				header.extend(['chr','region','posMin','posMax'])
-				columns.extend(['region_chr','region_label','region_posMin','region_posMax'])
+				header.extend(['chr','region','start','stop'])
+				columns.extend(['region_chr','region_label','region_start','region_stop'])
 			elif t == 'group':
 				header.extend(['group'])
 				columns.extend(['group_label'])
@@ -2057,7 +2076,7 @@ class Biofilter:
 				self.log(str(row)+"\n")
 		elif self._options.all_pairwise_models != 'yes':
 			# expand each gene-gene model
-			headerR.append('score')
+			headerR.append('score(src-grp)')
 			yield tuple(headerL + headerR)
 			modelIDs = set()
 			for model in self.getGeneModels():
@@ -2210,6 +2229,9 @@ if __name__ == "__main__":
 			choices=['no','implication','quality','any'],
 			help="attempt to reduce ambiguity in the knowledge database using a heuristic strategy, from 'no', 'implication', 'quality' or 'any' (default: no)"
 	)
+	group.add_argument('--report-ld-profiles', '--rlp', type=yesno, metavar='yes/no', nargs='?', const='yes', default='no',
+			help="display the available LD profiles and their properties (default: no)"
+	)
 	group.add_argument('--ld-profile', '--lp', type=str, metavar='profile', nargs='?', const=None, default=None,
 			help="LD profile with which to adjust regions in the knowledge database (default: none)"
 	)
@@ -2246,9 +2268,6 @@ if __name__ == "__main__":
 	group.add_argument('--gene', '-g', type=str, metavar='name', nargs='+', action='append', #default=argparse.SUPPRESS,
 			help="input genes, specified by name"
 	)
-	group.add_argument('--gene-search', '--gs', type=str, metavar='text', nargs='+', action='append',
-			help="find input genes by searching all available names and descriptions"
-	)
 	group.add_argument('--gene-file', '-G', type=str, metavar='file', nargs='+', action='append', #default=argparse.SUPPRESS,
 			help="file(s) from which to load input genes"
 	)
@@ -2257,6 +2276,9 @@ if __name__ == "__main__":
 	)
 	group.add_argument('--allow-ambiguous-genes', '--aag', type=yesno, metavar='yes/no', nargs='?', const='yes', default='no',
 			help="use ambiguous input gene identifiers by including all possibilities (default: no)"
+	)
+	group.add_argument('--gene-search', '--gs', type=str, metavar='text', nargs='+', action='append',
+			help="find input genes by searching all available names and descriptions"
 	)
 	group.add_argument('--region', '-r', type=str, metavar='region', nargs='+', action='append', #default=argparse.SUPPRESS,
 			help="input regions, specified by chromosome, start and stop positions"
@@ -2267,9 +2289,6 @@ if __name__ == "__main__":
 	group.add_argument('--group', '-u', type=str, metavar='name', nargs='+', action='append', #default=argparse.SUPPRESS,
 			help="input groups, specified by name"
 	)
-	group.add_argument('--group-search', '--us', type=str, metavar='text', nargs='+', action='append',
-			help="find input groups by searching all available names and descriptions"
-	)
 	group.add_argument('--group-file', '-U', type=str, metavar='file', nargs='+', action='append', #default=argparse.SUPPRESS,
 			help="file(s) from which to load input groups"
 	)
@@ -2278,6 +2297,9 @@ if __name__ == "__main__":
 	)
 	group.add_argument('--allow-ambiguous-groups', '--aau', type=yesno, metavar='yes/no', nargs='?', const='yes', default='no',
 			help="use ambiguous input group identifiers by including all possibilities (default: no)"
+	)
+	group.add_argument('--group-search', '--us', type=str, metavar='text', nargs='+', action='append',
+			help="find input groups by searching all available names and descriptions"
 	)
 	group.add_argument('--source', '-c', type=str, metavar='name', nargs='+', action='append', #default=argparse.SUPPRESS,
 			help="input sources, specified by name"
@@ -2303,11 +2325,11 @@ if __name__ == "__main__":
 	group.add_argument('--alt-gene', '--ag', type=str, metavar='name', nargs='+', action='append', #default=argparse.SUPPRESS,
 			help="alternate input genes, specified by name"
 	)
-	group.add_argument('--alt-gene-search', '--ags', type=str, metavar='text', nargs='+', action='append',
-			help="find alternate input genes by searching all available names and descriptions"
-	)
 	group.add_argument('--alt-gene-file', '--AG', type=str, metavar='file', nargs='+', action='append', #default=argparse.SUPPRESS,
 			help="file(s) from which to load alternate input genes"
+	)
+	group.add_argument('--alt-gene-search', '--ags', type=str, metavar='text', nargs='+', action='append',
+			help="find alternate input genes by searching all available names and descriptions"
 	)
 	group.add_argument('--alt-region', '--ar', type=str, metavar='region', nargs='+', action='append', #default=argparse.SUPPRESS,
 			help="alternate input regions, specified by chromosome, start and stop positions"
@@ -2318,11 +2340,11 @@ if __name__ == "__main__":
 	group.add_argument('--alt-group', '--au', type=str, metavar='name', nargs='+', action='append', #default=argparse.SUPPRESS,
 			help="alternate input groups, specified by name"
 	)
-	group.add_argument('--alt-group-search', '--aus', type=str, metavar='text', nargs='+', action='append',
-			help="find alternate input groups by searching all available names and descriptions"
-	)
 	group.add_argument('--alt-group-file', '--AU', type=str, metavar='file', nargs='+', action='append', #default=argparse.SUPPRESS,
 			help="file(s) from which to load alternate input groups"
+	)
+	group.add_argument('--alt-group-search', '--aus', type=str, metavar='text', nargs='+', action='append',
+			help="find alternate input groups by searching all available names and descriptions"
 	)
 	group.add_argument('--alt-source', '--ac', type=str, metavar='name', nargs='+', action='append', #default=argparse.SUPPRESS,
 			help="alternate input sources, specified by name"
@@ -2336,10 +2358,10 @@ if __name__ == "__main__":
 	group.add_argument('--region-position-margin', '--rpm', type=basepairs, metavar='bases', default=0,
 			help="number of bases beyond the bounds of known regions where positions should still be matched (default: 0)"
 	)
-	group.add_argument('--region-match-percent', '--rmp', type=percent, metavar='percentage', default=100,
+	group.add_argument('--region-match-percent', '--rmp', type=percent, metavar='percentage', default=None, # default set later, with -bases
 			help="minimum percentage of overlap between two regions to consider them a match (default: 100)"
 	)
-	group.add_argument('--region-match-bases', '--rmb', type=basepairs, metavar='bases', default=0,
+	group.add_argument('--region-match-bases', '--rmb', type=basepairs, metavar='bases', default=None, # default set later, with -percent
 			help="minimum number of bases of overlap between two regions to consider them a match (default: 0)"
 	)
 	
@@ -2502,6 +2524,8 @@ if __name__ == "__main__":
 		typeOutputPath['report']['gene name statistics'] = options.prefix + '.gene-names'
 	if options.report_group_name_stats == 'yes':
 		typeOutputPath['report']['group name statistics'] = options.prefix + '.group-names'
+	if options.report_ld_profiles == 'yes':
+		typeOutputPath['report']['LD profiles'] = options.prefix + '.ld-profiles'
 	
 	# define invalid input handlers, if requested
 	typeOutputPath['invalid'] = collections.OrderedDict()
@@ -2679,6 +2703,16 @@ if __name__ == "__main__":
 		bio.logPop("... OK\n")
 	#if verify replication fingerprint
 	
+	# set default region_match_percent/bases
+	if (options.region_match_bases != None) and (options.region_match_percent == None):
+		bio.warn("WARNING: ignoring default region match percent (100) in favor of user-specified region match bases (%d)\n" % options.region_match_bases)
+		options.region_match_percent = 0.0
+	else:
+		if options.region_match_bases == None:
+			options.region_match_bases = 0
+		if options.region_match_percent == None:
+			options.region_match_percent = 100.0
+	
 	# report the genome build, if requested
 	if options.report_genome_build == 'yes':
 		builds = bio.getDatabaseGenomeBuilds()
@@ -2745,6 +2779,10 @@ if __name__ == "__main__":
 		elif report == 'group name statistics':
 			outfile.write(encodeRow(['#type','names','unique','ambiguous']))
 			for row in bio.generateGroupNameStats():
+				outfile.write(encodeRow(row))
+		elif report == 'LD profiles':
+			outfile.write(encodeRow(['#ldprofile','description','metric','value']))
+			for row in bio.generateLDProfiles():
 				outfile.write(encodeRow(row))
 		else:
 			raise Exception("unexpected report type")
