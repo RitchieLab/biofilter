@@ -13,9 +13,6 @@ import time
 from loki import loki_db
 
 
-#TODO fix bug when requesting the same output column twice
-
-
 class Biofilter:
 	
 	
@@ -27,7 +24,7 @@ class Biofilter:
 	def getVersionTuple(cls):
 		# tuple = (major,minor,revision,dev,build,date)
 		# dev must be in ('a','b','rc','release') for lexicographic comparison
-		return (2,0,0,'a',14,'2012-10-12')
+		return (2,0,0,'b',1,'2012-10-15')
 	#getVersionTuple()
 	
 	
@@ -240,9 +237,9 @@ class Biofilter:
 		self._geneModels = None
 		self._onlyGeneModels = True #TODO
 		
-		# verify loki_db version (getLDProfileS() in 2.0.0a13)
-		if loki_db.Database.getVersionTuple() < (2,0,0,'a',13):
-			sys.exit("ERROR: LOKI version 2.0.0a13 or later required; found %s" % (loki_db.Database.getVersionString(),))
+		# verify loki_db version (getLDProfiles() in 2.0.0a13/b1)
+		if loki_db.Database.getVersionTuple() < (2,0,0,'b',1):
+			sys.exit("ERROR: LOKI version 2.0.0b1 or later required; found %s" % (loki_db.Database.getVersionString(),))
 		
 		# initialize instance database
 		self._loki = loki_db.Database()
