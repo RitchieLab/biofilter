@@ -24,7 +24,7 @@ class Biofilter:
 	def getVersionTuple(cls):
 		# tuple = (major,minor,revision,dev,build,date)
 		# dev must be in ('a','b','rc','release') for lexicographic comparison
-		return (2,0,0,'b',1,'2012-10-15')
+		return (2,0,0,'b',2,'2012-10-29')
 	#getVersionTuple()
 	
 	
@@ -237,9 +237,9 @@ class Biofilter:
 		self._geneModels = None
 		self._onlyGeneModels = True #TODO
 		
-		# verify loki_db version (getLDProfiles() in 2.0.0a13/b1)
-		if loki_db.Database.getVersionTuple() < (2,0,0,'b',1):
-			sys.exit("ERROR: LOKI version 2.0.0b1 or later required; found %s" % (loki_db.Database.getVersionString(),))
+		# verify loki_db version (case-insensitive ldprofiles in 2.0.0b2)
+		if loki_db.Database.getVersionTuple() < (2,0,0,'b',2):
+			sys.exit("ERROR: LOKI version 2.0.0b2 or later required; found %s" % (loki_db.Database.getVersionString(),))
 		
 		# initialize instance database
 		self._loki = loki_db.Database()
@@ -1606,7 +1606,7 @@ class Biofilter:
 		options['zoneSize'] = int(self._loki.getDatabaseSetting('zone_size') or 0)
 		options['ldprofileID'] = self._loki.getLDProfileID(self._options.ld_profile or '')
 		if not options['ldprofileID']:
-			sys.exit("ERROR: knowledge database is missing the default LD profile record")
+			sys.exit("ERROR: %s LD profile record not found in the knowledge database" % (self._options.ld_profile or '<default>',))
 		
 		# debug
 		if self._options.debug_logic:
