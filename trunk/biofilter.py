@@ -24,7 +24,7 @@ class Biofilter:
 	def getVersionTuple(cls):
 		# tuple = (major,minor,revision,dev,build,date)
 		# dev must be in ('a','b','rc','release') for lexicographic comparison
-		return (2,0,0,'b',2,'2012-10-29')
+		return (2,0,0,'b',3,'2012-10-30')
 	#getVersionTuple()
 	
 	
@@ -1412,18 +1412,19 @@ class Biofilter:
 	
 	def getQueryTemplate(self):
 		return {
-			'SELECT'    : collections.OrderedDict(),
-			            # OD{ colA:expA, colB:expB, ... }         => SELECT expA AS colA, expB AS colB, ...
-			'_rowid'    : collections.OrderedDict(),
-			            # OD{ tblA:{colA1,colA2,...}, ... }       => SELECT ... (tblA.colA1||'_'||tblA.colA2...) AS rowid
-			'FROM'      : set(),  # { tblA, tblB, ... }           => FROM aliasTable[tblA] AS tblA, aliasTable[tblB] AS tblB, ...
-			'LEFT JOIN' : collections.OrderedDict(),
-			            # OD{ tblA:{expA1,expA2,...}, ... }       => LEFT JOIN aliasTable[tblA] ON expA1 AND expA2 ...
-			'WHERE'     : set(),  # { expA, expB, ... }           => WHERE expA AND expB AND ...
-			'GROUP BY'  : list(), # [ expA, expB, ... ]           => GROUP BY expA, expB, ...
-			'HAVING'    : set(),  # { expA, expB, ... }           => HAVING expA AND expB AND ...
-			'ORDER BY'  : list(), # [ expA, expB, ... ]           => ORDER BY expA, expB, ...
-			'LIMIT'     : None    # num                           => LIMIT INT(num)
+			'_columns'  : list(), # [ colA, colB, ... ]
+			'SELECT'    : collections.OrderedDict(), # { colA:expA, colB:expB, ... }
+			#                                              => SELECT expA AS colA, expB AS colB, ...
+			'_rowid'    : collections.OrderedDict(), # OD{ tblA:{colA1,colA2,...}, ... }
+			#                                              => SELECT ... (tblA.colA1||'_'||tblA.colA2...) AS rowid
+			'FROM'      : set(),  # { tblA, tblB, ... }    => FROM aliasTable[tblA] AS tblA, aliasTable[tblB] AS tblB, ...
+			'LEFT JOIN' : collections.OrderedDict(), # OD{ tblA:{expA1,expA2,...}, ... }
+			#                                              => LEFT JOIN aliasTable[tblA] ON expA1 AND expA2 ...
+			'WHERE'     : set(),  # { expA, expB, ... }    => WHERE expA AND expB AND ...
+			'GROUP BY'  : list(), # [ expA, expB, ... ]    => GROUP BY expA, expB, ...
+			'HAVING'    : set(),  # { expA, expB, ... }    => HAVING expA AND expB AND ...
+			'ORDER BY'  : list(), # [ expA, expB, ... ]    => ORDER BY expA, expB, ...
+			'LIMIT'     : None    # num                    => LIMIT INT(num)
 		}
 	#getQueryTemplate()
 	
@@ -1475,6 +1476,7 @@ class Biofilter:
 		
 		# establish select column order
 		for col in select:
+			query['_columns'].append(col)
 			query['SELECT'][col] = None
 		
 		# re-index all input filter tables
@@ -1614,6 +1616,8 @@ class Biofilter:
 		
 		# assign 'select' output columns
 		for col in select:
+			if query['SELECT'][col] != None:
+				continue
 			# _queryColumnSources[col] = list[ tuple(alias,rowid,expression,?conditions),... ]
 			for colsrc in self._queryColumnSources[col]:
 				if (colsrc[0] in query['FROM']) or (colsrc[0] in query['LEFT JOIN']):
@@ -1723,7 +1727,7 @@ class Biofilter:
 	
 	
 	def getQueryText(self, query, noRowIDs=False, sortRowIDs=False, splitRowIDs=False):
-		sql = "SELECT " + (",\n  ".join("{0} AS {1}".format(exp or "NULL",col) for col,exp in query['SELECT'].iteritems())) + "\n"
+		sql = "SELECT " + (",\n  ".join("{0} AS {1}".format(query['SELECT'][col] or "NULL",col) for col in query['_columns'])) + "\n"
 		rowIDs = list()
 		orderBy = list(query['ORDER BY'])
 		for alias,cols in query['_rowid'].iteritems():
@@ -1838,7 +1842,7 @@ class Biofilter:
 		if not (headerF and columnsF):
 			raise Exception("annotation with no starting columns")
 		queryF = self.buildQuery(mode='filter', focus='main', select=columnsF)
-		lenF = len(queryF['SELECT'])
+		lenF = len(queryF['_columns'])
 		sqlF = self.getQueryText(queryF, splitRowIDs=True)
 		
 		# add each filter rowid column as a condition for annotation
@@ -1856,7 +1860,7 @@ class Biofilter:
 		if not (headerA and columnsA):
 			raise Exception("annotation with no extra columns")
 		queryA = self.buildQuery(mode='annotate', focus='alt', select=columnsA, where=conditionsA)
-		lenA = len(queryA['SELECT'])
+		lenA = len(queryA['_columns'])
 		sqlA = self.getQueryText(queryA, noRowIDs=True, sortRowIDs=True, splitRowIDs=True)
 		
 		# generate filtered results and annotate each of them
@@ -1869,7 +1873,7 @@ class Biofilter:
 				self.warn(str(row)+"\n")
 			self.warn("========== annotation : annotate step ==========\n")
 			self.warn(sqlA+"\n")
-			emptyF = (0,) * (len(queryF['SELECT']) + len(queryF['_rowid']))
+			emptyF = (0,) * (len(queryF['_columns']) + len(queryF['_rowid']))
 			for row in cursorF.execute("EXPLAIN QUERY PLAN "+sqlA, emptyF):
 				self.warn(str(row)+"\n")
 		else:
