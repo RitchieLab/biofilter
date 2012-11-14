@@ -24,7 +24,7 @@ class Biofilter:
 	def getVersionTuple(cls):
 		# tuple = (major,minor,revision,dev,build,date)
 		# dev must be in ('a','b','rc','release') for lexicographic comparison
-		return (2,0,0,'b',3,'2012-10-30')
+		return (2,0,0,'b',4,'2012-11-14')
 	#getVersionTuple()
 	
 	
@@ -1762,14 +1762,17 @@ class Biofilter:
 	def generateQueryResults(self, query, allowDupes=False, bindings=None):
 		# execute the query and yield the results
 		cursor = self._loki._db.cursor()
-		sql = self.getQueryText(query, noRowIDs=allowDupes)
+		sql = self.getQueryText(query)
 		if self._options.debug_query:
 			self.log(sql+"\n")
 			for row in cursor.execute("EXPLAIN QUERY PLAN "+sql, bindings):
 				self.log(str(row)+"\n")
 		elif allowDupes:
+			lastID = None
 			for row in cursor.execute(sql, bindings):
-				yield row
+				if row[-1] != lastID:
+					lastID = row[-1]
+					yield row[:-1]
 		else:
 			rowIDs = set()
 			for row in cursor.execute(sql, bindings):
@@ -1830,7 +1833,8 @@ class Biofilter:
 		if not (header and columns):
 			raise Exception("filtering with empty column list")
 		header[0] = "#" + header[0]
-		return itertools.chain([tuple(header)], self.generateQueryResults(self.buildQuery(mode='filter', focus='main', select=columns)))
+		query = self.buildQuery(mode='filter', focus='main', select=columns)
+		return itertools.chain([tuple(header)], self.generateQueryResults(query, allowDupes=(self._options.allow_duplicate_output == 'yes')))
 	#generateFilterOutput()
 	
 	
@@ -1876,6 +1880,25 @@ class Biofilter:
 			emptyF = (0,) * (len(queryF['_columns']) + len(queryF['_rowid']))
 			for row in cursorF.execute("EXPLAIN QUERY PLAN "+sqlA, emptyF):
 				self.warn(str(row)+"\n")
+		elif self._options.allow_duplicate_output == 'yes':
+			headerF[0] = "#" + headerF[0]
+			yield tuple(headerF + headerA)
+			lastF = None
+			emptyA = tuple(None for c in columnsA)
+			for rowF in cursorF.execute(sqlF):
+				if lastF != rowF[-1]:
+					lastF = rowF[-1]
+					idsA = set()
+					for rowA in cursorA.execute(sqlA, rowF[:-1]):
+						rowidA = rowA[lenA:]
+						if rowidA not in idsA:
+							idsA.update(itertools.product(*( (v,) if v == '' else (v,'') for v in rowidA )))
+							yield rowF[:lenF] + rowA[:lenA]
+					#foreach annotation result
+					if not idsA:
+						yield rowF[:lenF] + emptyA
+				#if filter result is new
+			#foreach filter result
 		else:
 			headerF[0] = "#" + headerF[0]
 			yield tuple(headerF + headerA)
@@ -2026,7 +2049,7 @@ class Biofilter:
 			# execute query and store models
 			self._geneModels = list()
 			self.log("calculating baseline models ...")
-			self._geneModels = list(self.generateQueryResults(query, allowDupes=True))
+			self._geneModels = list(self.generateQueryResults(query, allowDupes=True)) # the GROUP BY already prevents duplicates
 			self.log(" OK: %d models\n" % len(self._geneModels))
 		#if no models yet
 		
@@ -2403,6 +2426,9 @@ if __name__ == "__main__":
 	)
 	group.add_argument('--stdout', type=yesno, metavar='yes/no', nargs='?', const='yes', default='no',
 			help="display all output data directly on <stdout> rather than writing to any files (default: no)"
+	)
+	group.add_argument('--allow-duplicate-output', '--ado', type=yesno, metavar='yes/no', nargs='?', const='yes', default='no',
+			help="reduce memory consumption by allowing duplicate output rows (default: no)"
 	)
 	group.add_argument('--report-invalid-input', '--rii', type=yesno, metavar='yes/no', nargs='?', const='yes', default='no',
 			help="report invalid input data lines in a separate output file for each type (default: no)"
