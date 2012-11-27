@@ -24,7 +24,7 @@ class Biofilter:
 	def getVersionTuple(cls):
 		# tuple = (major,minor,revision,dev,build,date)
 		# dev must be in ('a','b','rc','release') for lexicographic comparison
-		return (2,0,0,'b',4,'2012-11-14')
+		return (2,0,0,'b',5,'2012-11-27')
 	#getVersionTuple()
 	
 	
@@ -1447,8 +1447,15 @@ class Biofilter:
 			for aliasLeft in aliasPairs[0]:
 				for aliasRight in aliasPairs[-1]:
 					if aliasLeft != aliasRight:
-						aliasAdjacent[aliasLeft].add(aliasRight)
-						aliasAdjacent[aliasRight].add(aliasLeft)
+						dbLeft,tblLeft = self._queryAliasTable[aliasLeft]
+						dbRight,tblRight = self._queryAliasTable[aliasRight]
+						if (dbLeft in self._inputFilters) and not self._inputFilters[dbLeft][tblLeft]:
+							pass
+						elif (dbRight in self._inputFilters) and not self._inputFilters[dbRight][tblRight]:
+							pass
+						else:
+							aliasAdjacent[aliasLeft].add(aliasRight)
+							aliasAdjacent[aliasRight].add(aliasLeft)
 		
 		# debug
 		if self._options.debug_logic:
