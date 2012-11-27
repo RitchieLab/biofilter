@@ -2434,9 +2434,6 @@ if __name__ == "__main__":
 	group.add_argument('--stdout', type=yesno, metavar='yes/no', nargs='?', const='yes', default='no',
 			help="display all output data directly on <stdout> rather than writing to any files (default: no)"
 	)
-	group.add_argument('--allow-duplicate-output', '--ado', type=yesno, metavar='yes/no', nargs='?', const='yes', default='no',
-			help="reduce memory consumption by allowing duplicate output rows (default: no)"
-	)
 	group.add_argument('--report-invalid-input', '--rii', type=yesno, metavar='yes/no', nargs='?', const='yes', default='no',
 			help="report invalid input data lines in a separate output file for each type (default: no)"
 	)
@@ -2452,6 +2449,7 @@ if __name__ == "__main__":
 	
 	# add hidden options
 	parser.add_argument('--end-of-line', action='store_true', help=argparse.SUPPRESS)
+	parser.add_argument('--allow-duplicate-output', '--ado', type=yesno, metavar='yes/no', nargs='?', const='yes', default='no', help=argparse.SUPPRESS)
 	parser.add_argument('--debug-logic', action='store_true', help=argparse.SUPPRESS)
 	parser.add_argument('--debug-query', action='store_true', help=argparse.SUPPRESS)
 	parser.add_argument('--debug-profile', action='store_true', help=argparse.SUPPRESS)
