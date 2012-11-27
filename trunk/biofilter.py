@@ -1441,6 +1441,11 @@ class Biofilter:
 		where = where or dict()
 		query = self.getQueryTemplate()
 		
+		# re-index all input filter tables
+		for db in self._schema:
+			for tbl in self._schema[db]:
+				self.prepareTableForQuery(db, tbl)
+		
 		# generate table alias join adjacency map
 		aliasAdjacent = collections.defaultdict(set)
 		for aliasPairs in self._queryAliasJoinConditions:
@@ -1485,11 +1490,6 @@ class Biofilter:
 		for col in select:
 			query['_columns'].append(col)
 			query['SELECT'][col] = None
-		
-		# re-index all input filter tables
-		for db in self._schema:
-			for tbl in self._schema[db]:
-				self.prepareTableForQuery(db, tbl)
 		
 		# identify the primary table aliases to query
 		query['FROM'].update(alias for alias,col in where)
