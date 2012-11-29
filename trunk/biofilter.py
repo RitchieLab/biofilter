@@ -24,7 +24,7 @@ class Biofilter:
 	def getVersionTuple(cls):
 		# tuple = (major,minor,revision,dev,build,date)
 		# dev must be in ('a','b','rc','release') for lexicographic comparison
-		return (2,0,0,'b',5,'2012-11-27')
+		return (2,0,0,'b',6,'2012-11-29')
 	#getVersionTuple()
 	
 	
@@ -701,7 +701,7 @@ class Biofilter:
 	def intersectInputSNPs(self, db, snps, errorCallback=None):
 		# snps=[ rs, ... ]
 		if not self._inputFilters[db]['snp']:
-			return self.unionInputSNPs(db, snps)
+			return self.unionInputSNPs(db, snps, errorCallback)
 		self.logPush("reducing %s SNP filter ...\n" % db)
 		cursor = self._loki._db.cursor()
 		
@@ -751,7 +751,7 @@ class Biofilter:
 	def intersectInputLoci(self, db, loci, errorCallback=None):
 		# loci=[ (label,chr,pos), ... ]
 		if not self._inputFilters[db]['locus']:
-			return self.unionInputLoci(db, loci)
+			return self.unionInputLoci(db, loci, errorCallback)
 		self.logPush("reducing %s position filter ...\n" % db)
 		cursor = self._loki._db.cursor()
 		
@@ -800,7 +800,7 @@ class Biofilter:
 	def intersectInputRegions(self, db, regions, errorCallback=None):
 		# regions=[ (label,chr,posMin,posMax), ... ]
 		if not self._inputFilters[db]['region']:
-			return self.unionInputRegions(db, regions)
+			return self.unionInputRegions(db, regions, errorCallback)
 		self.logPush("reducing %s region filter ...\n" % db)
 		cursor = self._loki._db.cursor()
 		
@@ -851,7 +851,7 @@ class Biofilter:
 	def intersectInputGenes(self, db, names, errorCallback=None):
 		# names=[ (namespace,name), ... ]
 		if not self._inputFilters[db]['gene']:
-			return self.unionInputGenes(db, names)
+			return self.unionInputGenes(db, names, errorCallback)
 		self.logPush("reducing %s gene filter ...\n" % db)
 		cursor = self._loki._db.cursor()
 		
@@ -953,7 +953,7 @@ class Biofilter:
 	def intersectInputGroups(self, db, names, errorCallback=None):
 		# names=[ (namespace,name), ... ]
 		if not self._inputFilters[db]['group']:
-			return self.unionInputGroups(db, names)
+			return self.unionInputGroups(db, names, errorCallback)
 		self.logPush("reducing %s group filter ...\n" % (db,))
 		cursor = self._loki._db.cursor()
 		
@@ -1049,7 +1049,7 @@ class Biofilter:
 	def intersectInputSources(self, db, names, errorCallback=None):
 		# names=[ name, ... ]
 		if not self._inputFilters[db]['source']:
-			return self.unionInputSources(db, names)
+			return self.unionInputSources(db, names, errorCallback)
 		self.logPush("reducing %s source filter ...\n" % db)
 		cursor = self._loki._db.cursor()
 		
@@ -2563,12 +2563,12 @@ if __name__ == "__main__":
 	typeOutputPath['invalid'] = collections.OrderedDict()
 	cb = collections.defaultdict(bool)
 	cbLog = collections.OrderedDict()
-	cbMake = lambda modtype: lambda line,err: cbLog[modtype].extend(["# %s" % (err or "(unknown error"), line.rstrip()])
+	cbMake = lambda modtype: lambda line,err: cbLog[modtype].extend(["# %s" % (err or "(unknown error"), str(line).rstrip()])
 	if options.report_invalid_input == 'yes':
-		for type in ['SNP','position','region','gene','group','source']:
+		for itype in ['SNP','position','region','gene','group','source']:
 			for mod in ['','alt-']:
-				typeOutputPath['invalid'][mod+type] = options.prefix + '.invalid.' + mod+type.lower()
-				cbLog[mod+type] = list()
+				typeOutputPath['invalid'][mod+itype] = options.prefix + '.invalid.' + mod+itype.lower()
+				cbLog[mod+itype] = list()
 	#if report invalid input
 	
 	# identify all the filtering results we need to output
