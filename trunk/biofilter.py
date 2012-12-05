@@ -24,7 +24,7 @@ class Biofilter:
 	def getVersionTuple(cls):
 		# tuple = (major,minor,revision,dev,build,date)
 		# dev must be in ('a','b','rc','release') for lexicographic comparison
-		return (2,0,0,'b',6,'2012-11-29')
+		return (2,0,0,'b',7,'2012-12-05')
 	#getVersionTuple()
 	
 	
@@ -889,7 +889,7 @@ class Biofilter:
 		self.prepareTableForUpdate(db, 'gene')
 		sql = "INSERT INTO `%s`.`gene` (label,biopolymer_id) VALUES (?1,?2); SELECT 1" % db
 		numAdd = 0
-		for row in cursor.executemany(sql, self._loki.generateBiopolymerIDsBySearch(texts, typeID=typeID)):
+		for row in cursor.executemany(sql, self._loki.generateTypedBiopolymerIDsBySearch(typeID, texts)):
 			numAdd += 1
 		self.logPop("... OK: added %d genes\n" % numAdd)
 		
@@ -910,7 +910,7 @@ class Biofilter:
 		cursor.execute("UPDATE `%s`.`gene` SET flag = 0" % db)
 		numBefore = cursor.getconnection().changes()
 		sql = "UPDATE `%s`.`gene` SET flag = 1 WHERE biopolymer_id = ?2" % db
-		cursor.executemany(sql, self._loki.generateBiopolymerIDsBySearch(texts, typeID=typeID))
+		cursor.executemany(sql, self._loki.generateTypedBiopolymerIDsBySearch(typeID, texts))
 		cursor.execute("DELETE FROM `%s`.`gene` WHERE flag = 0" % db)
 		numDrop = cursor.getconnection().changes()
 		self.logPop("... OK: kept %d genes (%d dropped)\n" % (numBefore-numDrop,numDrop))
