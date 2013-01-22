@@ -1,13 +1,11 @@
 #! python
 
-
-
 from distutils.core import setup
 import distutils.command.install
-
 import autodist
 
 autodist.auto_dirs = ['loki/loadPops']
+
 
 class my_install(autodist.auto_install):
 	"""
@@ -20,7 +18,8 @@ class my_install(autodist.auto_install):
 	def initialize_options(self):
 		autodist.auto_install.initialize_options(self)
 		self.ldprofile = False
-		
+	#initialize_options()
+	
 	def run(self):
 		"""
 		Call auto_install ONLY if ldprofile is enabled!
@@ -31,10 +30,30 @@ class my_install(autodist.auto_install):
 			distutils.command.install.install.run(self)
 		else:
 			autodist.auto_install.run(self)
+	#run()
+#my_install
 
-setup(name='biofilter',version='2.0.0',
-	author='Ritchie Lab',author_email='software@ritchielab.psu.edu',
+
+setup(
+	name='biofilter',
+	version='2.0.0',
+	author='Ritchie Lab',
+	author_email='software@ritchielab.psu.edu',
 	url='http://ritchielab.psu.edu',
-	scripts=['loki/loki-build.py','biofilter.py','loki/loadPops/buildPopulations.py'],
-	packages=['loki','loki.loaders','loki.loaders/test','loki.util'],
-	cmdclass={'install':my_install, 'sdist':autodist.auto_sdist})
+	scripts=[
+		'loki/loki-build.py',
+		'loki/loadPops/buildPopulations.py',
+		'biofilter.py'
+	],
+	packages=[
+		'loki',
+		'loki.loaders',
+		'loki.loaders/test',
+		'loki.util'
+	],
+	cmdclass={
+		'install':my_install,
+		'sdist':autodist.auto_sdist
+	}
+)
+
