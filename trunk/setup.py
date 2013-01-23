@@ -41,14 +41,14 @@ setup(
 	author_email='software@ritchielab.psu.edu',
 	url='http://ritchielab.psu.edu',
 	scripts=[
-		'loki/loki-build.py',
+		'loki-build.py',
 		'loki/loadPops/buildPopulations.py',
 		'biofilter.py'
 	],
 	packages=[
 		'loki',
 		'loki.loaders',
-		'loki.loaders/test',
+		'loki.loaders.test',
 		'loki.util'
 	],
 	cmdclass={
