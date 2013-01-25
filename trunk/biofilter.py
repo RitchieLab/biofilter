@@ -24,7 +24,7 @@ class Biofilter:
 	def getVersionTuple(cls):
 		# tuple = (major,minor,revision,dev,build,date)
 		# dev must be in ('a','b','rc','release') for lexicographic comparison
-		return (2,0,0,'rc',1,'2013-01-23')
+		return (2,0,0,'rc',2,'2013-01-25')
 	#getVersionTuple()
 	
 	
@@ -237,9 +237,9 @@ class Biofilter:
 		self._geneModels = None
 		self._onlyGeneModels = True #TODO
 		
-		# verify loki_db version (case-insensitive ldprofiles in 2.0.0b2)
-		if loki_db.Database.getVersionTuple() < (2,0,0,'b',2):
-			sys.exit("ERROR: LOKI version 2.0.0b2 or later required; found %s" % (loki_db.Database.getVersionString(),))
+		# verify loki_db version (no readOnly in attachDatabase() in 2.0.0rc2)
+		if loki_db.Database.getVersionTuple() < (2,0,0,'rc',2):
+			sys.exit("ERROR: LOKI version 2.0.0rc2 or later required; found %s" % (loki_db.Database.getVersionString(),))
 		
 		# initialize instance database
 		self._loki = loki_db.Database()
@@ -330,7 +330,7 @@ class Biofilter:
 	
 	
 	def attachDatabaseFile(self, dbFile):
-		return self._loki.attachDatabaseFile(dbFile, readOnly=True)
+		return self._loki.attachDatabaseFile(dbFile)
 	#attachDatabaseFile()
 	
 	
@@ -645,6 +645,7 @@ class Biofilter:
 	
 	
 	def generateNamesFromNameFiles(self, paths, defaultNS=None, errorCallback=None):
+		utf8 = codecs.getencoder('utf8')
 		for path in paths:
 			try:
 				with (sys.stdin if (path == '-' or not path) else open(path, 'rU')) as file:
@@ -657,10 +658,12 @@ class Biofilter:
 							cols = line.split('\t')
 							if len(cols) == 1:
 								ns = defaultNS
-								name = cols[0].strip()
+								name = utf8(cols[0].strip())[0]
 							elif len(cols) >= 2:
 								ns = cols[0].strip()
-								name = cols[1].strip()
+								name = utf8(cols[1].strip())[0]
+							else:
+								continue
 							
 							if defaultNS == None:
 								yield name
@@ -978,7 +981,7 @@ class Biofilter:
 		self.logPop("... OK: kept %d groups (%d dropped)\n" % (numBefore-numDrop,numDrop))
 		
 		self._inputFilters[db]['group'] += 1
-	#intersectGroups()
+	#intersectInputGroups()
 	
 	
 	def unionInputGroupSearch(self, db, texts):
@@ -2834,21 +2837,21 @@ if __name__ == "__main__":
 	for positionFileList in (options.position_file or empty):
 		bio.intersectInputLoci('main', bio.generateLociFromMapFiles(positionFileList, errorCallback=cb['position']), errorCallback=cb['position'])
 	for geneList in (options.gene or empty):
-		bio.intersectInputGenes('main', ((options.gene_identifier_type,name) for name in geneList), errorCallback=cb['gene'])
+		bio.intersectInputGenes('main', ((options.gene_identifier_type,encodeString(name)) for name in geneList), errorCallback=cb['gene'])
 	for geneFileList in (options.gene_file or empty):
 		bio.intersectInputGenes('main', bio.generateNamesFromNameFiles(geneFileList, options.gene_identifier_type, errorCallback=cb['gene']), errorCallback=cb['gene'])
 	for geneSearch in (options.gene_search or empty):
-		bio.intersectInputGeneSearch('main', geneSearch)
+		bio.intersectInputGeneSearch('main', encodeString(geneSearch))
 	for regionList in (options.region or empty):
 		bio.intersectInputRegions('main', bio.generateRegionsFromText(regionList, separator=':', errorCallback=cb['region']), errorCallback=cb['region'])
 	for regionFileList in (options.region_file or empty):
 		bio.intersectInputRegions('main', bio.generateRegionsFromFiles(regionFileList, errorCallback=cb['region']), errorCallback=cb['region'])
 	for groupList in (options.group or empty):
-		bio.intersectInputGroups('main', ((options.group_identifier_type,name) for name in groupList), errorCallback=cb['group'])
+		bio.intersectInputGroups('main', ((options.group_identifier_type,encodeString(name)) for name in groupList), errorCallback=cb['group'])
 	for groupFileList in (options.group_file or empty):
 		bio.intersectInputGroups('main', bio.generateNamesFromNameFiles(groupFileList, options.group_identifier_type, errorCallback=cb['group']), errorCallback=cb['group'])
 	for groupSearch in (options.group_search or empty):
-		bio.intersectInputGroupSearch('main', groupSearch)
+		bio.intersectInputGroupSearch('main', encodeString(groupSearch))
 	for sourceList in (options.source or empty):
 		bio.intersectInputSources('main', sourceList, errorCallback=cb['source'])
 	for sourceFileList in (options.source_file or empty):
@@ -2864,21 +2867,21 @@ if __name__ == "__main__":
 	for positionFileList in (options.alt_position_file or empty):
 		bio.intersectInputLoci('alt', bio.generateLociFromMapFiles(positionFileList, errorCallback=cb['alt-position']), errorCallback=cb['alt-position'])
 	for geneList in (options.alt_gene or empty):
-		bio.intersectInputGenes('alt', ((options.gene_identifier_type,name) for name in geneList), errorCallback=cb['alt-gene'])
+		bio.intersectInputGenes('alt', ((options.gene_identifier_type,encodeString(name)) for name in geneList), errorCallback=cb['alt-gene'])
 	for geneFileList in (options.alt_gene_file or empty):
 		bio.intersectInputGenes('alt', bio.generateNamesFromNameFiles(geneFileList, options.gene_identifier_type, errorCallback=cb['alt-gene']), errorCallback=cb['alt-gene'])
 	for geneSearch in (options.alt_gene_search or empty):
-		bio.intersectInputGeneSearch('alt', geneSearch)
+		bio.intersectInputGeneSearch('alt', encodeString(geneSearch))
 	for regionList in (options.alt_region or empty):
 		bio.intersectInputRegions('alt', bio.generateRegionsFromText(regionList, separator=':', errorCallback=cb['alt-region']), errorCallback=cb['alt-region'])
 	for regionFileList in (options.alt_region_file or empty):
 		bio.intersectInputRegions('alt', bio.generateRegionsFromFiles(regionFileList, errorCallback=cb['alt-region']), errorCallback=cb['alt-region'])
 	for groupList in (options.alt_group or empty):
-		bio.intersectInputGroups('alt', ((options.group_identifier_type,name) for name in groupList), errorCallback=cb['alt-group'])
+		bio.intersectInputGroups('alt', ((options.group_identifier_type,encodeString(name)) for name in groupList), errorCallback=cb['alt-group'])
 	for groupFileList in (options.alt_group_file or empty):
 		bio.intersectInputGroups('alt', bio.generateNamesFromNameFiles(groupFileList, options.group_identifier_type, errorCallback=cb['alt-group']), errorCallback=cb['alt-group'])
 	for groupSearch in (options.alt_group_search or empty):
-		bio.intersectInputGroupSearch('alt', groupSearch)
+		bio.intersectInputGroupSearch('alt', encodeString(groupSearch))
 	for sourceList in (options.alt_source or empty):
 		bio.intersectInputSources('alt', sourceList, errorCallback=cb['alt-source'])
 	for sourceFileList in (options.alt_source_file or empty):
