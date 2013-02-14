@@ -40,11 +40,9 @@ class Source_kegg(loki_source.Source):
 	
 	
 	def download(self, options):
-		if (options.get('api') == 'rest'):
-			self.downloadFilesFromHTTP('rest.kegg.jp', {
-				'list-pathway-hsa':  '/list/pathway/hsa',
-				'link-hsa-pathway':  '/link/hsa/pathway',
-			})
+		if (options.get('api') == 'cache'):
+			# do nothing, update() will just expect the files to already be there
+			pass
 		elif (options.get('api') == 'soap'):
 			# connect to SOAP/WSDL service
 			import suds.client
@@ -77,9 +75,11 @@ class Source_kegg(loki_source.Source):
 				#foreach pathway
 			#with assoc cache file
 			self.log(" OK: %d associations\n" % (numAssoc,))
-		else:
-			# api==cache ; do nothing, update() will just expect the files to already be there
-			pass
+		else: # api==rest
+			self.downloadFilesFromHTTP('rest.kegg.jp', {
+				'list-pathway-hsa':  '/list/pathway/hsa',
+				'link-hsa-pathway':  '/link/hsa/pathway',
+			})
 		#if api==rest/soap/cache
 	#download()
 	
