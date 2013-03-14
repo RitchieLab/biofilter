@@ -24,7 +24,7 @@ class Biofilter:
 	def getVersionTuple(cls):
 		# tuple = (major,minor,revision,dev,build,date)
 		# dev must be in ('a','b','rc','release') for lexicographic comparison
-		return (2,0,0,'release','','2013-02-14')
+		return (2,0,1,'a',1,'2013-03-14')
 	#getVersionTuple()
 	
 	
@@ -2728,8 +2728,9 @@ if __name__ == "__main__":
 				for file,meta in verify[2].iteritems():
 					if file not in files:
 						sys.exit("ERROR: configuration requires a specific fingerprint for %s file '%s', but knowledge database reports no such file\n" % (source,file))
-					elif meta[0] != files[file][0]:
-						sys.exit("ERROR: configuration requires %s file '%s' modification date '%s', but knowledge database reports '%s'\n" % (source,file,meta[0],files[file][0]))
+					# size and hash should be sufficient comparisons, and some sources (KEGG,PharmGKB) don't provide data file timestamps anyway
+					#elif meta[0] != files[file][0]:
+					#	sys.exit("ERROR: configuration requires %s file '%s' modification date '%s', but knowledge database reports '%s'\n" % (source,file,meta[0],files[file][0]))
 					elif meta[1] != files[file][1]:
 						sys.exit("ERROR: configuration requires %s file '%s' size %s, but knowledge database reports %s\n" % (source,file,meta[1],files[file][1]))
 					elif meta[2] != files[file][2]:
