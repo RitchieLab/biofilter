@@ -24,7 +24,7 @@ class Biofilter:
 	def getVersionTuple(cls):
 		# tuple = (major,minor,revision,dev,build,date)
 		# dev must be in ('a','b','rc','release') for lexicographic comparison
-		return (2,0,1,'a',1,'2013-03-14')
+		return (2,0,1,'b',1,'2013-03-14')
 	#getVersionTuple()
 	
 	
