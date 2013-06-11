@@ -1,5 +1,13 @@
 CHANGELOG
 
+2.1.0b1 (2013-06-11)
+- added support for "upstream" and "downstream" gene annotation; the shorthand
+  outputs provide the gene label and distance, but "_id", "_start" and "_stop"
+  suffixes are also available (i.e. "upstream_start")
+- added support for "gwas" catalog ananotation by way of RS# or chr/position,
+  with a corresponding LOKI source loader; the shorthand output provides the
+  trait, SNPs, OR/beta, allele 95% CI, risk allele frequency and PubMed ID
+
 2.0.1b1 (2013-03-14)
 - removed the file timestamp check in --verify-source-file; file size and hash
   should suffice, and not all sources provide stable timestamps anyway
