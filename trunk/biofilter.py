@@ -24,7 +24,7 @@ class Biofilter:
 	def getVersionTuple(cls):
 		# tuple = (major,minor,revision,dev,build,date)
 		# dev must be in ('a','b','rc','release') for lexicographic comparison
-		return (2,1,0,'b',1,'2013-06-11')
+		return (2,1,0,'rc','1','2013-07-18')
 	#getVersionTuple()
 	
 	
@@ -1388,55 +1388,55 @@ class Biofilter:
 		],
 		
 		'upstream_id' : [
-			('a_l',  'rowid',   "(SELECT d_b.biopolymer_id         FROM `db`.`biopolymer` AS d_b JOIN `db`.`biopolymer_region` AS d_br USING (biopolymer_id) WHERE d_b.type_id+0 = {typeID_gene} AND d_br.ldprofile_id = {ldprofileID} AND d_br.chr = a_l.chr AND d_br.posMax < a_l.pos ORDER BY d_br.posMax DESC LIMIT 1)"),
-			('m_l',  'rowid',   "(SELECT d_b.biopolymer_id         FROM `db`.`biopolymer` AS d_b JOIN `db`.`biopolymer_region` AS d_br USING (biopolymer_id) WHERE d_b.type_id+0 = {typeID_gene} AND d_br.ldprofile_id = {ldprofileID} AND d_br.chr = m_l.chr AND d_br.posMax < m_l.pos ORDER BY d_br.posMax DESC LIMIT 1)"),
-			('d_sl', '_ROWID_', "(SELECT d_b.biopolymer_id         FROM `db`.`biopolymer` AS d_b JOIN `db`.`biopolymer_region` AS d_br USING (biopolymer_id) WHERE d_b.type_id+0 = {typeID_gene} AND d_br.ldprofile_id = {ldprofileID} AND d_br.chr = d_sl.chr AND d_br.posMax < d_sl.pos ORDER BY d_br.posMax DESC LIMIT 1)"),
+			('a_l',  'rowid',   "(SELECT d_b.biopolymer_id         FROM `db`.`biopolymer` AS d_b JOIN `db`.`biopolymer_region` AS d_br USING (biopolymer_id) WHERE d_b.type_id+0 = {typeID_gene} AND d_br.ldprofile_id = {ldprofileID} AND d_br.chr = a_l.chr  AND d_br.posMax < a_l.pos  - {rpMargin} ORDER BY d_br.posMax DESC LIMIT 1)"),
+			('m_l',  'rowid',   "(SELECT d_b.biopolymer_id         FROM `db`.`biopolymer` AS d_b JOIN `db`.`biopolymer_region` AS d_br USING (biopolymer_id) WHERE d_b.type_id+0 = {typeID_gene} AND d_br.ldprofile_id = {ldprofileID} AND d_br.chr = m_l.chr  AND d_br.posMax < m_l.pos  - {rpMargin} ORDER BY d_br.posMax DESC LIMIT 1)"),
+			('d_sl', '_ROWID_', "(SELECT d_b.biopolymer_id         FROM `db`.`biopolymer` AS d_b JOIN `db`.`biopolymer_region` AS d_br USING (biopolymer_id) WHERE d_b.type_id+0 = {typeID_gene} AND d_br.ldprofile_id = {ldprofileID} AND d_br.chr = d_sl.chr AND d_br.posMax < d_sl.pos - {rpMargin} ORDER BY d_br.posMax DESC LIMIT 1)"),
 		],
 		'upstream_label' : [
-			('a_l',  'rowid',   "(SELECT d_b.label                 FROM `db`.`biopolymer` AS d_b JOIN `db`.`biopolymer_region` AS d_br USING (biopolymer_id) WHERE d_b.type_id+0 = {typeID_gene} AND d_br.ldprofile_id = {ldprofileID} AND d_br.chr = a_l.chr AND d_br.posMax < a_l.pos ORDER BY d_br.posMax DESC LIMIT 1)"),
-			('m_l',  'rowid',   "(SELECT d_b.label                 FROM `db`.`biopolymer` AS d_b JOIN `db`.`biopolymer_region` AS d_br USING (biopolymer_id) WHERE d_b.type_id+0 = {typeID_gene} AND d_br.ldprofile_id = {ldprofileID} AND d_br.chr = m_l.chr AND d_br.posMax < m_l.pos ORDER BY d_br.posMax DESC LIMIT 1)"),
-			('d_sl', '_ROWID_', "(SELECT d_b.label                 FROM `db`.`biopolymer` AS d_b JOIN `db`.`biopolymer_region` AS d_br USING (biopolymer_id) WHERE d_b.type_id+0 = {typeID_gene} AND d_br.ldprofile_id = {ldprofileID} AND d_br.chr = d_sl.chr AND d_br.posMax < d_sl.pos ORDER BY d_br.posMax DESC LIMIT 1)"),
+			('a_l',  'rowid',   "(SELECT d_b.label                 FROM `db`.`biopolymer` AS d_b JOIN `db`.`biopolymer_region` AS d_br USING (biopolymer_id) WHERE d_b.type_id+0 = {typeID_gene} AND d_br.ldprofile_id = {ldprofileID} AND d_br.chr = a_l.chr  AND d_br.posMax < a_l.pos  - {rpMargin} ORDER BY d_br.posMax DESC LIMIT 1)"),
+			('m_l',  'rowid',   "(SELECT d_b.label                 FROM `db`.`biopolymer` AS d_b JOIN `db`.`biopolymer_region` AS d_br USING (biopolymer_id) WHERE d_b.type_id+0 = {typeID_gene} AND d_br.ldprofile_id = {ldprofileID} AND d_br.chr = m_l.chr  AND d_br.posMax < m_l.pos  - {rpMargin} ORDER BY d_br.posMax DESC LIMIT 1)"),
+			('d_sl', '_ROWID_', "(SELECT d_b.label                 FROM `db`.`biopolymer` AS d_b JOIN `db`.`biopolymer_region` AS d_br USING (biopolymer_id) WHERE d_b.type_id+0 = {typeID_gene} AND d_br.ldprofile_id = {ldprofileID} AND d_br.chr = d_sl.chr AND d_br.posMax < d_sl.pos - {rpMargin} ORDER BY d_br.posMax DESC LIMIT 1)"),
 		],
 		'upstream_distance' : [
-			('a_l',  'rowid',   "a_l.pos -(SELECT MAX(d_br.posMax) FROM `db`.`biopolymer` AS d_b JOIN `db`.`biopolymer_region` AS d_br USING (biopolymer_id) WHERE d_b.type_id+0 = {typeID_gene} AND d_br.ldprofile_id = {ldprofileID} AND d_br.chr = a_l.chr  AND d_br.posMax < a_l.pos )"),
-			('m_l',  'rowid',   "m_l.pos -(SELECT MAX(d_br.posMax) FROM `db`.`biopolymer` AS d_b JOIN `db`.`biopolymer_region` AS d_br USING (biopolymer_id) WHERE d_b.type_id+0 = {typeID_gene} AND d_br.ldprofile_id = {ldprofileID} AND d_br.chr = m_l.chr  AND d_br.posMax < m_l.pos )"),
-			('d_sl', '_ROWID_', "d_sl.pos-(SELECT MAX(d_br.posMax) FROM `db`.`biopolymer` AS d_b JOIN `db`.`biopolymer_region` AS d_br USING (biopolymer_id) WHERE d_b.type_id+0 = {typeID_gene} AND d_br.ldprofile_id = {ldprofileID} AND d_br.chr = d_sl.chr AND d_br.posMax < d_sl.pos)"),
+			('a_l',  'rowid',   "a_l.pos -(SELECT MAX(d_br.posMax) FROM `db`.`biopolymer` AS d_b JOIN `db`.`biopolymer_region` AS d_br USING (biopolymer_id) WHERE d_b.type_id+0 = {typeID_gene} AND d_br.ldprofile_id = {ldprofileID} AND d_br.chr = a_l.chr  AND d_br.posMax < a_l.pos  - {rpMargin})"),
+			('m_l',  'rowid',   "m_l.pos -(SELECT MAX(d_br.posMax) FROM `db`.`biopolymer` AS d_b JOIN `db`.`biopolymer_region` AS d_br USING (biopolymer_id) WHERE d_b.type_id+0 = {typeID_gene} AND d_br.ldprofile_id = {ldprofileID} AND d_br.chr = m_l.chr  AND d_br.posMax < m_l.pos  - {rpMargin})"),
+			('d_sl', '_ROWID_', "d_sl.pos-(SELECT MAX(d_br.posMax) FROM `db`.`biopolymer` AS d_b JOIN `db`.`biopolymer_region` AS d_br USING (biopolymer_id) WHERE d_b.type_id+0 = {typeID_gene} AND d_br.ldprofile_id = {ldprofileID} AND d_br.chr = d_sl.chr AND d_br.posMax < d_sl.pos - {rpMargin})"),
 		],
 		'upstream_start' : [
-			('a_l',  'rowid',   "(SELECT d_br.posMin               FROM `db`.`biopolymer` AS d_b JOIN `db`.`biopolymer_region` AS d_br USING (biopolymer_id) WHERE d_b.type_id+0 = {typeID_gene} AND d_br.ldprofile_id = {ldprofileID} AND d_br.chr = a_l.chr AND d_br.posMax < a_l.pos ORDER BY d_br.posMax DESC LIMIT 1)"),
-			('m_l',  'rowid',   "(SELECT d_br.posMin               FROM `db`.`biopolymer` AS d_b JOIN `db`.`biopolymer_region` AS d_br USING (biopolymer_id) WHERE d_b.type_id+0 = {typeID_gene} AND d_br.ldprofile_id = {ldprofileID} AND d_br.chr = m_l.chr AND d_br.posMax < m_l.pos ORDER BY d_br.posMax DESC LIMIT 1)"),
-			('d_sl', '_ROWID_', "(SELECT d_br.posMin               FROM `db`.`biopolymer` AS d_b JOIN `db`.`biopolymer_region` AS d_br USING (biopolymer_id) WHERE d_b.type_id+0 = {typeID_gene} AND d_br.ldprofile_id = {ldprofileID} AND d_br.chr = d_sl.chr AND d_br.posMax < d_sl.pos ORDER BY d_br.posMax DESC LIMIT 1)"),
+			('a_l',  'rowid',   "(SELECT d_br.posMin               FROM `db`.`biopolymer` AS d_b JOIN `db`.`biopolymer_region` AS d_br USING (biopolymer_id) WHERE d_b.type_id+0 = {typeID_gene} AND d_br.ldprofile_id = {ldprofileID} AND d_br.chr = a_l.chr  AND d_br.posMax < a_l.pos  - {rpMargin} ORDER BY d_br.posMax DESC LIMIT 1)"),
+			('m_l',  'rowid',   "(SELECT d_br.posMin               FROM `db`.`biopolymer` AS d_b JOIN `db`.`biopolymer_region` AS d_br USING (biopolymer_id) WHERE d_b.type_id+0 = {typeID_gene} AND d_br.ldprofile_id = {ldprofileID} AND d_br.chr = m_l.chr  AND d_br.posMax < m_l.pos  - {rpMargin} ORDER BY d_br.posMax DESC LIMIT 1)"),
+			('d_sl', '_ROWID_', "(SELECT d_br.posMin               FROM `db`.`biopolymer` AS d_b JOIN `db`.`biopolymer_region` AS d_br USING (biopolymer_id) WHERE d_b.type_id+0 = {typeID_gene} AND d_br.ldprofile_id = {ldprofileID} AND d_br.chr = d_sl.chr AND d_br.posMax < d_sl.pos - {rpMargin} ORDER BY d_br.posMax DESC LIMIT 1)"),
 		],
 		'upstream_stop' : [
-			('a_l',  'rowid',   "(SELECT d_br.posMax               FROM `db`.`biopolymer` AS d_b JOIN `db`.`biopolymer_region` AS d_br USING (biopolymer_id) WHERE d_b.type_id+0 = {typeID_gene} AND d_br.ldprofile_id = {ldprofileID} AND d_br.chr = a_l.chr AND d_br.posMax < a_l.pos ORDER BY d_br.posMax DESC LIMIT 1)"),
-			('m_l',  'rowid',   "(SELECT d_br.posMax               FROM `db`.`biopolymer` AS d_b JOIN `db`.`biopolymer_region` AS d_br USING (biopolymer_id) WHERE d_b.type_id+0 = {typeID_gene} AND d_br.ldprofile_id = {ldprofileID} AND d_br.chr = m_l.chr AND d_br.posMax < m_l.pos ORDER BY d_br.posMax DESC LIMIT 1)"),
-			('d_sl', '_ROWID_', "(SELECT d_br.posMax               FROM `db`.`biopolymer` AS d_b JOIN `db`.`biopolymer_region` AS d_br USING (biopolymer_id) WHERE d_b.type_id+0 = {typeID_gene} AND d_br.ldprofile_id = {ldprofileID} AND d_br.chr = d_sl.chr AND d_br.posMax < d_sl.pos ORDER BY d_br.posMax DESC LIMIT 1)"),
+			('a_l',  'rowid',   "(SELECT d_br.posMax               FROM `db`.`biopolymer` AS d_b JOIN `db`.`biopolymer_region` AS d_br USING (biopolymer_id) WHERE d_b.type_id+0 = {typeID_gene} AND d_br.ldprofile_id = {ldprofileID} AND d_br.chr = a_l.chr  AND d_br.posMax < a_l.pos  - {rpMargin} ORDER BY d_br.posMax DESC LIMIT 1)"),
+			('m_l',  'rowid',   "(SELECT d_br.posMax               FROM `db`.`biopolymer` AS d_b JOIN `db`.`biopolymer_region` AS d_br USING (biopolymer_id) WHERE d_b.type_id+0 = {typeID_gene} AND d_br.ldprofile_id = {ldprofileID} AND d_br.chr = m_l.chr  AND d_br.posMax < m_l.pos  - {rpMargin} ORDER BY d_br.posMax DESC LIMIT 1)"),
+			('d_sl', '_ROWID_', "(SELECT d_br.posMax               FROM `db`.`biopolymer` AS d_b JOIN `db`.`biopolymer_region` AS d_br USING (biopolymer_id) WHERE d_b.type_id+0 = {typeID_gene} AND d_br.ldprofile_id = {ldprofileID} AND d_br.chr = d_sl.chr AND d_br.posMax < d_sl.pos - {rpMargin} ORDER BY d_br.posMax DESC LIMIT 1)"),
 		],
 		
 		'downstream_id' : [
-			('a_l',  'rowid',   "(SELECT d_b.biopolymer_id          FROM `db`.`biopolymer` AS d_b JOIN `db`.`biopolymer_region` AS d_br USING (biopolymer_id) WHERE d_b.type_id+0 = {typeID_gene} AND d_br.ldprofile_id = {ldprofileID} AND d_br.chr = a_l.chr  AND d_br.posMin > a_l.pos  ORDER BY d_br.posMin LIMIT 1)"),
-			('m_l',  'rowid',   "(SELECT d_b.biopolymer_id          FROM `db`.`biopolymer` AS d_b JOIN `db`.`biopolymer_region` AS d_br USING (biopolymer_id) WHERE d_b.type_id+0 = {typeID_gene} AND d_br.ldprofile_id = {ldprofileID} AND d_br.chr = m_l.chr  AND d_br.posMin > m_l.pos  ORDER BY d_br.posMin LIMIT 1)"),
-			('d_sl', '_ROWID_', "(SELECT d_b.biopolymer_id          FROM `db`.`biopolymer` AS d_b JOIN `db`.`biopolymer_region` AS d_br USING (biopolymer_id) WHERE d_b.type_id+0 = {typeID_gene} AND d_br.ldprofile_id = {ldprofileID} AND d_br.chr = d_sl.chr AND d_br.posMin > d_sl.pos ORDER BY d_br.posMin LIMIT 1)"),
+			('a_l',  'rowid',   "(SELECT d_b.biopolymer_id          FROM `db`.`biopolymer` AS d_b JOIN `db`.`biopolymer_region` AS d_br USING (biopolymer_id) WHERE d_b.type_id+0 = {typeID_gene} AND d_br.ldprofile_id = {ldprofileID} AND d_br.chr = a_l.chr  AND d_br.posMin > a_l.pos  + {rpMargin} ORDER BY d_br.posMin LIMIT 1)"),
+			('m_l',  'rowid',   "(SELECT d_b.biopolymer_id          FROM `db`.`biopolymer` AS d_b JOIN `db`.`biopolymer_region` AS d_br USING (biopolymer_id) WHERE d_b.type_id+0 = {typeID_gene} AND d_br.ldprofile_id = {ldprofileID} AND d_br.chr = m_l.chr  AND d_br.posMin > m_l.pos  + {rpMargin} ORDER BY d_br.posMin LIMIT 1)"),
+			('d_sl', '_ROWID_', "(SELECT d_b.biopolymer_id          FROM `db`.`biopolymer` AS d_b JOIN `db`.`biopolymer_region` AS d_br USING (biopolymer_id) WHERE d_b.type_id+0 = {typeID_gene} AND d_br.ldprofile_id = {ldprofileID} AND d_br.chr = d_sl.chr AND d_br.posMin > d_sl.pos + {rpMargin} ORDER BY d_br.posMin LIMIT 1)"),
 		],
 		'downstream_label' : [
-			('a_l',  'rowid',   "(SELECT d_b.label                  FROM `db`.`biopolymer` AS d_b JOIN `db`.`biopolymer_region` AS d_br USING (biopolymer_id) WHERE d_b.type_id+0 = {typeID_gene} AND d_br.ldprofile_id = {ldprofileID} AND d_br.chr = a_l.chr  AND d_br.posMin > a_l.pos  ORDER BY d_br.posMin LIMIT 1)"),
-			('m_l',  'rowid',   "(SELECT d_b.label                  FROM `db`.`biopolymer` AS d_b JOIN `db`.`biopolymer_region` AS d_br USING (biopolymer_id) WHERE d_b.type_id+0 = {typeID_gene} AND d_br.ldprofile_id = {ldprofileID} AND d_br.chr = m_l.chr  AND d_br.posMin > m_l.pos  ORDER BY d_br.posMin LIMIT 1)"),
-			('d_sl', '_ROWID_', "(SELECT d_b.label                  FROM `db`.`biopolymer` AS d_b JOIN `db`.`biopolymer_region` AS d_br USING (biopolymer_id) WHERE d_b.type_id+0 = {typeID_gene} AND d_br.ldprofile_id = {ldprofileID} AND d_br.chr = d_sl.chr AND d_br.posMin > d_sl.pos ORDER BY d_br.posMin LIMIT 1)"),
+			('a_l',  'rowid',   "(SELECT d_b.label                  FROM `db`.`biopolymer` AS d_b JOIN `db`.`biopolymer_region` AS d_br USING (biopolymer_id) WHERE d_b.type_id+0 = {typeID_gene} AND d_br.ldprofile_id = {ldprofileID} AND d_br.chr = a_l.chr  AND d_br.posMin > a_l.pos  + {rpMargin} ORDER BY d_br.posMin LIMIT 1)"),
+			('m_l',  'rowid',   "(SELECT d_b.label                  FROM `db`.`biopolymer` AS d_b JOIN `db`.`biopolymer_region` AS d_br USING (biopolymer_id) WHERE d_b.type_id+0 = {typeID_gene} AND d_br.ldprofile_id = {ldprofileID} AND d_br.chr = m_l.chr  AND d_br.posMin > m_l.pos  + {rpMargin} ORDER BY d_br.posMin LIMIT 1)"),
+			('d_sl', '_ROWID_', "(SELECT d_b.label                  FROM `db`.`biopolymer` AS d_b JOIN `db`.`biopolymer_region` AS d_br USING (biopolymer_id) WHERE d_b.type_id+0 = {typeID_gene} AND d_br.ldprofile_id = {ldprofileID} AND d_br.chr = d_sl.chr AND d_br.posMin > d_sl.pos + {rpMargin} ORDER BY d_br.posMin LIMIT 1)"),
 		],
 		'downstream_distance' : [
-			('a_l',  'rowid',   "-a_l.pos +(SELECT MIN(d_br.posMin) FROM `db`.`biopolymer` AS d_b JOIN `db`.`biopolymer_region` AS d_br USING (biopolymer_id) WHERE d_b.type_id+0 = {typeID_gene} AND d_br.ldprofile_id = {ldprofileID} AND d_br.chr = a_l.chr  AND d_br.posMin > a_l.pos )"),
-			('m_l',  'rowid',   "-m_l.pos +(SELECT MIN(d_br.posMin) FROM `db`.`biopolymer` AS d_b JOIN `db`.`biopolymer_region` AS d_br USING (biopolymer_id) WHERE d_b.type_id+0 = {typeID_gene} AND d_br.ldprofile_id = {ldprofileID} AND d_br.chr = m_l.chr  AND d_br.posMin > m_l.pos )"),
-			('d_sl', '_ROWID_', "-d_sl.pos+(SELECT MIN(d_br.posMin) FROM `db`.`biopolymer` AS d_b JOIN `db`.`biopolymer_region` AS d_br USING (biopolymer_id) WHERE d_b.type_id+0 = {typeID_gene} AND d_br.ldprofile_id = {ldprofileID} AND d_br.chr = d_sl.chr AND d_br.posMin > d_sl.pos)"),
+			('a_l',  'rowid',   "-a_l.pos +(SELECT MIN(d_br.posMin) FROM `db`.`biopolymer` AS d_b JOIN `db`.`biopolymer_region` AS d_br USING (biopolymer_id) WHERE d_b.type_id+0 = {typeID_gene} AND d_br.ldprofile_id = {ldprofileID} AND d_br.chr = a_l.chr  AND d_br.posMin > a_l.pos  + {rpMargin})"),
+			('m_l',  'rowid',   "-m_l.pos +(SELECT MIN(d_br.posMin) FROM `db`.`biopolymer` AS d_b JOIN `db`.`biopolymer_region` AS d_br USING (biopolymer_id) WHERE d_b.type_id+0 = {typeID_gene} AND d_br.ldprofile_id = {ldprofileID} AND d_br.chr = m_l.chr  AND d_br.posMin > m_l.pos  + {rpMargin})"),
+			('d_sl', '_ROWID_', "-d_sl.pos+(SELECT MIN(d_br.posMin) FROM `db`.`biopolymer` AS d_b JOIN `db`.`biopolymer_region` AS d_br USING (biopolymer_id) WHERE d_b.type_id+0 = {typeID_gene} AND d_br.ldprofile_id = {ldprofileID} AND d_br.chr = d_sl.chr AND d_br.posMin > d_sl.pos + {rpMargin})"),
 		],
 		'downstream_start' : [
-			('a_l',  'rowid',   "(SELECT d_br.posMin                FROM `db`.`biopolymer` AS d_b JOIN `db`.`biopolymer_region` AS d_br USING (biopolymer_id) WHERE d_b.type_id+0 = {typeID_gene} AND d_br.ldprofile_id = {ldprofileID} AND d_br.chr = a_l.chr  AND d_br.posMin > a_l.pos  ORDER BY d_br.posMin LIMIT 1)"),
-			('m_l',  'rowid',   "(SELECT d_br.posMin                FROM `db`.`biopolymer` AS d_b JOIN `db`.`biopolymer_region` AS d_br USING (biopolymer_id) WHERE d_b.type_id+0 = {typeID_gene} AND d_br.ldprofile_id = {ldprofileID} AND d_br.chr = m_l.chr  AND d_br.posMin > m_l.pos  ORDER BY d_br.posMin LIMIT 1)"),
-			('d_sl', '_ROWID_', "(SELECT d_br.posMin                FROM `db`.`biopolymer` AS d_b JOIN `db`.`biopolymer_region` AS d_br USING (biopolymer_id) WHERE d_b.type_id+0 = {typeID_gene} AND d_br.ldprofile_id = {ldprofileID} AND d_br.chr = d_sl.chr AND d_br.posMin > d_sl.pos ORDER BY d_br.posMin LIMIT 1)"),
+			('a_l',  'rowid',   "(SELECT d_br.posMin                FROM `db`.`biopolymer` AS d_b JOIN `db`.`biopolymer_region` AS d_br USING (biopolymer_id) WHERE d_b.type_id+0 = {typeID_gene} AND d_br.ldprofile_id = {ldprofileID} AND d_br.chr = a_l.chr  AND d_br.posMin > a_l.pos  + {rpMargin} ORDER BY d_br.posMin LIMIT 1)"),
+			('m_l',  'rowid',   "(SELECT d_br.posMin                FROM `db`.`biopolymer` AS d_b JOIN `db`.`biopolymer_region` AS d_br USING (biopolymer_id) WHERE d_b.type_id+0 = {typeID_gene} AND d_br.ldprofile_id = {ldprofileID} AND d_br.chr = m_l.chr  AND d_br.posMin > m_l.pos  + {rpMargin} ORDER BY d_br.posMin LIMIT 1)"),
+			('d_sl', '_ROWID_', "(SELECT d_br.posMin                FROM `db`.`biopolymer` AS d_b JOIN `db`.`biopolymer_region` AS d_br USING (biopolymer_id) WHERE d_b.type_id+0 = {typeID_gene} AND d_br.ldprofile_id = {ldprofileID} AND d_br.chr = d_sl.chr AND d_br.posMin > d_sl.pos + {rpMargin} ORDER BY d_br.posMin LIMIT 1)"),
 		],
 		'downstream_stop' : [
-			('a_l',  'rowid',   "(SELECT d_br.posMax                FROM `db`.`biopolymer` AS d_b JOIN `db`.`biopolymer_region` AS d_br USING (biopolymer_id) WHERE d_b.type_id+0 = {typeID_gene} AND d_br.ldprofile_id = {ldprofileID} AND d_br.chr = a_l.chr  AND d_br.posMin > a_l.pos  ORDER BY d_br.posMin LIMIT 1)"),
-			('m_l',  'rowid',   "(SELECT d_br.posMax                FROM `db`.`biopolymer` AS d_b JOIN `db`.`biopolymer_region` AS d_br USING (biopolymer_id) WHERE d_b.type_id+0 = {typeID_gene} AND d_br.ldprofile_id = {ldprofileID} AND d_br.chr = m_l.chr  AND d_br.posMin > m_l.pos  ORDER BY d_br.posMin LIMIT 1)"),
-			('d_sl', '_ROWID_', "(SELECT d_br.posMax                FROM `db`.`biopolymer` AS d_b JOIN `db`.`biopolymer_region` AS d_br USING (biopolymer_id) WHERE d_b.type_id+0 = {typeID_gene} AND d_br.ldprofile_id = {ldprofileID} AND d_br.chr = d_sl.chr AND d_br.posMin > d_sl.pos ORDER BY d_br.posMin LIMIT 1)"),
+			('a_l',  'rowid',   "(SELECT d_br.posMax                FROM `db`.`biopolymer` AS d_b JOIN `db`.`biopolymer_region` AS d_br USING (biopolymer_id) WHERE d_b.type_id+0 = {typeID_gene} AND d_br.ldprofile_id = {ldprofileID} AND d_br.chr = a_l.chr  AND d_br.posMin > a_l.pos  + {rpMargin} ORDER BY d_br.posMin LIMIT 1)"),
+			('m_l',  'rowid',   "(SELECT d_br.posMax                FROM `db`.`biopolymer` AS d_b JOIN `db`.`biopolymer_region` AS d_br USING (biopolymer_id) WHERE d_b.type_id+0 = {typeID_gene} AND d_br.ldprofile_id = {ldprofileID} AND d_br.chr = m_l.chr  AND d_br.posMin > m_l.pos  + {rpMargin} ORDER BY d_br.posMin LIMIT 1)"),
+			('d_sl', '_ROWID_', "(SELECT d_br.posMax                FROM `db`.`biopolymer` AS d_b JOIN `db`.`biopolymer_region` AS d_br USING (biopolymer_id) WHERE d_b.type_id+0 = {typeID_gene} AND d_br.ldprofile_id = {ldprofileID} AND d_br.chr = d_sl.chr AND d_br.posMin > d_sl.pos + {rpMargin} ORDER BY d_br.posMin LIMIT 1)"),
 		],
 		
 		'group_id' : [
@@ -1474,6 +1474,9 @@ class Biofilter:
 			('d_c', 'source_id', "d_c.source"),
 		],
 		
+		'gwas_rs' : [
+			('d_w', '_ROWID_', "d_w.rs"),
+		],
 		'gwas_chr' : [
 			('d_w', '_ROWID_', "d_w.chr"),
 		],
