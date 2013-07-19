@@ -36,7 +36,7 @@ class my_install(autodist.auto_install):
 
 setup(
 	name='biofilter',
-	version='2.0.1',
+	version='2.1.0',
 	author='Ritchie Lab',
 	author_email='software@ritchielab.psu.edu',
 	url='http://ritchielab.psu.edu',
