@@ -1,0 +1,1114 @@
+
+<html>
+<head>
+	<style type="text/css">
+DIV.notes {
+	float: right;
+}
+TABLE {
+	float: left;
+	font-size: 11pt;
+}
+BODY:target > TABLE#table0 {
+	display: none;
+}
+BODY:not(:target) > TABLE#table1 {
+	display: none;
+}
+THEAD TH {
+	background: #aaa;
+	padding: 0.1em 0.2em;
+}
+THEAD TD {
+	min-width: 80px;
+	background: #ddd;
+	text-align: center;
+	padding: 0.1em 0.2em;
+}
+THEAD TR:first-child TD {
+	font-weight: bold;
+}
+TBODY TH {
+	background: #ddd;
+	text-align: left;
+	padding: 0.1em 0.2em;
+}
+TBODY TD {
+	background: #ddd;
+	text-align: center;
+	padding: 0.1em 0.2em;
+}
+DIV.bars {
+	display: inline-block;
+	width: 20px;
+	height: 100px;
+}
+DIV.bars > SPAN {
+	display: block;
+	border: 1px solid black;
+	border-radius: 0.5em;
+	background: #ddd;
+	padding: 0 0.25em;
+	z-index: 1;
+	font-size: 10pt;
+}
+DIV.bars > DIV.mult {
+	background-color: #e70;
+}
+DIV.bars > DIV.dupe {
+	background-color: #0dd;
+}
+DIV.bars > DIV.uniq {
+	background-color: #080;
+}
+DIV.bars > DIV.miss {
+	background-color: #f00;
+}
+DIV.bars > DIV.none {
+	background-color: #448;
+}
+
+DIV.bars > DIV > SPAN {
+	visibility: hidden;
+	border: 1px solid black;
+	border-radius: 0.5em;
+	background: #ddd;
+	padding: 0 0.25em;
+	font-size: 10pt;
+	white-space: nowrap;
+}
+DIV.bars:hover > DIV > SPAN {
+	visibility: visible;
+}
+DIV.bars > DIV.mult > SPAN {
+	background-color: #fda;
+}
+DIV.bars > DIV.dupe > SPAN {
+	background-color: #cff;
+}
+DIV.bars > DIV.uniq > SPAN {
+	background-color: #cfc;
+}
+DIV.bars > DIV.miss > SPAN {
+	background-color: #fcc;
+}
+DIV.bars > DIV.none > SPAN {
+	background-color: #ccf;
+}
+DIV.bars > DIV > SPAN {
+	float: right;
+	margin: -75% 110% 75% 0;
+}
+.key {
+	text-align: left;
+	vertical-align: top;
+}
+	</style>
+</head>
+<body id="alt">
+
+<table id="table0">
+	<thead>
+		<tr>
+			<td>inf. hops<br>(<a href="#alt">toggle</a>)</td>
+			<th>Identifier</th>
+			<td><i>(all<br>pairs)</i></td>
+			<td><i>(EHN<br>pairs)</i></td>
+			<td><i>(EN<br>pairs)</i></td>
+			<td>Ensembl</td>
+			<td>HGNC</td>
+			<td>NCBI /<br>Entrez</td>
+		</tr>
+		<tr>
+			<th>Algorithm</th>
+			<th>Count</th>
+			<td>983525</td>
+			<td>96511</td>
+			<td>29628</td>
+			<td>62323</td>
+			<td>34644</td>
+			<td>47692</td>
+		</tr>
+	</thead>
+	<tbody>
+		<tr>
+			<th>Ensembl</th>
+			<td>62323</td>
+			<td>
+				<div class="bars">
+					<div class="mult" style="height:10%"><span>97927 (10%)</span></div>
+					<div class="uniq" style="height:84%"><span>840397 (85%)</span></div>
+					<div class="miss" style="height:1%"><span>733 (0%)</span></div>
+					<div class="none" style="height:5%"><span>44468 (5%)</span></div>
+				</div>
+			</td>
+			<td>
+				<div class="bars">
+					<div class="mult" style="height:16%"><span>15513 (16%)</span></div>
+					<div class="uniq" style="height:78%"><span>76606 (79%)</span></div>
+					<div class="miss" style="height:1%"><span>123 (0%)</span></div>
+					<div class="none" style="height:4%"><span>4269 (4%)</span></div>
+				</div>
+			</td>
+			<td>
+				<div class="bars">
+					<div class="mult" style="height:26%"><span>7627 (26%)</span></div>
+					<div class="uniq" style="height:74%"><span>22001 (74%)</span></div>
+					<div class="miss" style="height:0%"><span>0 (0%)</span></div>
+					<div class="none" style="height:0%"><span>0 (0%)</span></div>
+				</div>
+			</td>
+			<td>
+				<div class="bars">
+					<div class="mult" style="height:0%"><span>0 (0%)</span></div>
+					<div class="dupe" style="height:0%"><span>0 (0%)</span></div>
+					<div class="uniq" style="height:100%"><span>62323 (100%)</span></div>
+					<div class="none" style="height:0%"><span>0 (0%)</span></div>
+				</div>
+			</td>
+			<td>
+				<div class="bars">
+					<div class="mult" style="height:5%"><span>1900 (5%)</span></div>
+					<div class="dupe" style="height:2%"><span>523 (2%)</span></div>
+					<div class="uniq" style="height:80%"><span>27843 (80%)</span></div>
+					<div class="none" style="height:13%"><span>4378 (13%)</span></div>
+				</div>
+			</td>
+			<td>
+				<div class="bars">
+					<div class="mult" style="height:6%"><span>3085 (6%)</span></div>
+					<div class="dupe" style="height:3%"><span>1504 (3%)</span></div>
+					<div class="uniq" style="height:57%"><span>27150 (57%)</span></div>
+					<div class="none" style="height:33%"><span>15953 (33%)</span></div>
+				</div>
+			</td>
+		</tr>
+		<tr>
+			<th>HGNC</th>
+			<td>34644</td>
+			<td>
+				<div class="bars">
+					<div class="mult" style="height:2%"><span>14860 (2%)</span></div>
+					<div class="uniq" style="height:92%"><span>903219 (92%)</span></div>
+					<div class="miss" style="height:1%"><span>5388 (1%)</span></div>
+					<div class="none" style="height:6%"><span>60058 (6%)</span></div>
+				</div>
+			</td>
+			<td>
+				<div class="bars">
+					<div class="mult" style="height:1%"><span>868 (1%)</span></div>
+					<div class="uniq" style="height:95%"><span>92064 (95%)</span></div>
+					<div class="miss" style="height:2%"><span>1988 (2%)</span></div>
+					<div class="none" style="height:2%"><span>1591 (2%)</span></div>
+				</div>
+			</td>
+			<td>
+				<div class="bars">
+					<div class="mult" style="height:2%"><span>647 (2%)</span></div>
+					<div class="uniq" style="height:86%"><span>25402 (86%)</span></div>
+					<div class="miss" style="height:7%"><span>1988 (7%)</span></div>
+					<div class="none" style="height:5%"><span>1591 (5%)</span></div>
+				</div>
+			</td>
+			<td>
+				<div class="bars">
+					<div class="mult" style="height:3%"><span>1786 (3%)</span></div>
+					<div class="dupe" style="height:14%"><span>8544 (14%)</span></div>
+					<div class="uniq" style="height:44%"><span>27505 (44%)</span></div>
+					<div class="none" style="height:39%"><span>24488 (39%)</span></div>
+				</div>
+			</td>
+			<td>
+				<div class="bars">
+					<div class="mult" style="height:0%"><span>0 (0%)</span></div>
+					<div class="dupe" style="height:0%"><span>0 (0%)</span></div>
+					<div class="uniq" style="height:100%"><span>34644 (100%)</span></div>
+					<div class="none" style="height:0%"><span>0 (0%)</span></div>
+				</div>
+			</td>
+			<td>
+				<div class="bars">
+					<div class="mult" style="height:1%"><span>122 (0%)</span></div>
+					<div class="dupe" style="height:3%"><span>1271 (3%)</span></div>
+					<div class="uniq" style="height:68%"><span>33071 (69%)</span></div>
+					<div class="none" style="height:28%"><span>13228 (28%)</span></div>
+				</div>
+			</td>
+		</tr>
+		<tr>
+			<th>NCBI /<br>Entrez</th>
+			<td>47692</td>
+			<td>
+				<div class="bars">
+					<div class="mult" style="height:3%"><span>30665 (3%)</span></div>
+					<div class="uniq" style="height:93%"><span>925983 (94%)</span></div>
+					<div class="miss" style="height:1%"><span>964 (0%)</span></div>
+					<div class="none" style="height:3%"><span>25913 (3%)</span></div>
+				</div>
+			</td>
+			<td>
+				<div class="bars">
+					<div class="mult" style="height:6%"><span>5816 (6%)</span></div>
+					<div class="uniq" style="height:91%"><span>90112 (93%)</span></div>
+					<div class="miss" style="height:1%"><span>118 (0%)</span></div>
+					<div class="none" style="height:1%"><span>465 (0%)</span></div>
+				</div>
+			</td>
+			<td>
+				<div class="bars">
+					<div class="mult" style="height:14%"><span>4267 (14%)</span></div>
+					<div class="uniq" style="height:86%"><span>25361 (86%)</span></div>
+					<div class="miss" style="height:0%"><span>0 (0%)</span></div>
+					<div class="none" style="height:0%"><span>0 (0%)</span></div>
+				</div>
+			</td>
+			<td>
+				<div class="bars">
+					<div class="mult" style="height:5%"><span>3156 (5%)</span></div>
+					<div class="dupe" style="height:13%"><span>8380 (13%)</span></div>
+					<div class="uniq" style="height:44%"><span>27386 (44%)</span></div>
+					<div class="none" style="height:38%"><span>23401 (38%)</span></div>
+				</div>
+			</td>
+			<td>
+				<div class="bars">
+					<div class="mult" style="height:1%"><span>152 (0%)</span></div>
+					<div class="dupe" style="height:1%"><span>419 (1%)</span></div>
+					<div class="uniq" style="height:96%"><span>33569 (97%)</span></div>
+					<div class="none" style="height:1%"><span>504 (1%)</span></div>
+				</div>
+			</td>
+			<td>
+				<div class="bars">
+					<div class="mult" style="height:0%"><span>0 (0%)</span></div>
+					<div class="dupe" style="height:0%"><span>0 (0%)</span></div>
+					<div class="uniq" style="height:100%"><span>47692 (100%)</span></div>
+					<div class="none" style="height:0%"><span>0 (0%)</span></div>
+				</div>
+			</td>
+		</tr>
+		<tr>
+			<th>N,E</th>
+			<td>83231</td>
+			<td>
+				<div class="bars">
+					<div class="mult" style="height:10%"><span>100337 (10%)</span></div>
+					<div class="uniq" style="height:88%"><span>882770 (90%)</span></div>
+					<div class="miss" style="height:1%"><span>160 (0%)</span></div>
+					<div class="none" style="height:1%"><span>258 (0%)</span></div>
+				</div>
+			</td>
+			<td>
+				<div class="bars">
+					<div class="mult" style="height:22%"><span>21182 (22%)</span></div>
+					<div class="uniq" style="height:78%"><span>75329 (78%)</span></div>
+					<div class="miss" style="height:0%"><span>0 (0%)</span></div>
+					<div class="none" style="height:0%"><span>0 (0%)</span></div>
+				</div>
+			</td>
+			<td>
+				<div class="bars">
+					<div class="mult" style="height:14%"><span>4267 (14%)</span></div>
+					<div class="uniq" style="height:86%"><span>25361 (86%)</span></div>
+					<div class="miss" style="height:0%"><span>0 (0%)</span></div>
+					<div class="none" style="height:0%"><span>0 (0%)</span></div>
+				</div>
+			</td>
+			<td>
+				<div class="bars">
+					<div class="mult" style="height:2%"><span>1423 (2%)</span></div>
+					<div class="dupe" style="height:6%"><span>4010 (6%)</span></div>
+					<div class="uniq" style="height:91%"><span>56890 (91%)</span></div>
+					<div class="none" style="height:0%"><span>0 (0%)</span></div>
+				</div>
+			</td>
+			<td>
+				<div class="bars">
+					<div class="mult" style="height:23%"><span>7846 (23%)</span></div>
+					<div class="dupe" style="height:1%"><span>114 (0%)</span></div>
+					<div class="uniq" style="height:75%"><span>26580 (77%)</span></div>
+					<div class="none" style="height:1%"><span>104 (0%)</span></div>
+				</div>
+			</td>
+			<td>
+				<div class="bars">
+					<div class="mult" style="height:0%"><span>0 (0%)</span></div>
+					<div class="dupe" style="height:0%"><span>0 (0%)</span></div>
+					<div class="uniq" style="height:100%"><span>47692 (100%)</span></div>
+					<div class="none" style="height:0%"><span>0 (0%)</span></div>
+				</div>
+			</td>
+		</tr>
+		<tr>
+			<th>E,N</th>
+			<td>85542</td>
+			<td>
+				<div class="bars">
+					<div class="mult" style="height:16%"><span>156902 (16%)</span></div>
+					<div class="uniq" style="height:82%"><span>826207 (84%)</span></div>
+					<div class="miss" style="height:1%"><span>158 (0%)</span></div>
+					<div class="none" style="height:1%"><span>258 (0%)</span></div>
+				</div>
+			</td>
+			<td>
+				<div class="bars">
+					<div class="mult" style="height:30%"><span>28997 (30%)</span></div>
+					<div class="uniq" style="height:70%"><span>67514 (70%)</span></div>
+					<div class="miss" style="height:0%"><span>0 (0%)</span></div>
+					<div class="none" style="height:0%"><span>0 (0%)</span></div>
+				</div>
+			</td>
+			<td>
+				<div class="bars">
+					<div class="mult" style="height:26%"><span>7627 (26%)</span></div>
+					<div class="uniq" style="height:74%"><span>22001 (74%)</span></div>
+					<div class="miss" style="height:0%"><span>0 (0%)</span></div>
+					<div class="none" style="height:0%"><span>0 (0%)</span></div>
+				</div>
+			</td>
+			<td>
+				<div class="bars">
+					<div class="mult" style="height:0%"><span>0 (0%)</span></div>
+					<div class="dupe" style="height:0%"><span>0 (0%)</span></div>
+					<div class="uniq" style="height:100%"><span>62323 (100%)</span></div>
+					<div class="none" style="height:0%"><span>0 (0%)</span></div>
+				</div>
+			</td>
+			<td>
+				<div class="bars">
+					<div class="mult" style="height:26%"><span>9027 (26%)</span></div>
+					<div class="dupe" style="height:1%"><span>266 (1%)</span></div>
+					<div class="uniq" style="height:72%"><span>25247 (73%)</span></div>
+					<div class="none" style="height:1%"><span>104 (0%)</span></div>
+				</div>
+			</td>
+			<td>
+				<div class="bars">
+					<div class="mult" style="height:5%"><span>2472 (5%)</span></div>
+					<div class="dupe" style="height:2%"><span>721 (2%)</span></div>
+					<div class="uniq" style="height:93%"><span>44499 (93%)</span></div>
+					<div class="none" style="height:0%"><span>0 (0%)</span></div>
+				</div>
+			</td>
+		</tr>
+		<tr>
+			<th>E+N</th>
+			<td>82011</td>
+			<td>
+				<div class="bars">
+					<div class="mult" style="height:7%"><span>66888 (7%)</span></div>
+					<div class="uniq" style="height:91%"><span>916221 (93%)</span></div>
+					<div class="miss" style="height:1%"><span>158 (0%)</span></div>
+					<div class="none" style="height:1%"><span>258 (0%)</span></div>
+				</div>
+			</td>
+			<td>
+				<div class="bars">
+					<div class="mult" style="height:15%"><span>14557 (15%)</span></div>
+					<div class="uniq" style="height:85%"><span>81954 (85%)</span></div>
+					<div class="miss" style="height:0%"><span>0 (0%)</span></div>
+					<div class="none" style="height:0%"><span>0 (0%)</span></div>
+				</div>
+			</td>
+			<td>
+				<div class="bars">
+					<div class="mult" style="height:0%"><span>0 (0%)</span></div>
+					<div class="uniq" style="height:100%"><span>29628 (100%)</span></div>
+					<div class="miss" style="height:0%"><span>0 (0%)</span></div>
+					<div class="none" style="height:0%"><span>0 (0%)</span></div>
+				</div>
+			</td>
+			<td>
+				<div class="bars">
+					<div class="mult" style="height:0%"><span>0 (0%)</span></div>
+					<div class="dupe" style="height:9%"><span>5441 (9%)</span></div>
+					<div class="uniq" style="height:91%"><span>56882 (91%)</span></div>
+					<div class="none" style="height:0%"><span>0 (0%)</span></div>
+				</div>
+			</td>
+			<td>
+				<div class="bars">
+					<div class="mult" style="height:20%"><span>6804 (20%)</span></div>
+					<div class="dupe" style="height:4%"><span>1266 (4%)</span></div>
+					<div class="uniq" style="height:75%"><span>26470 (76%)</span></div>
+					<div class="none" style="height:1%"><span>104 (0%)</span></div>
+				</div>
+			</td>
+			<td>
+				<div class="bars">
+					<div class="mult" style="height:0%"><span>0 (0%)</span></div>
+					<div class="dupe" style="height:4%"><span>1996 (4%)</span></div>
+					<div class="uniq" style="height:96%"><span>45696 (96%)</span></div>
+					<div class="none" style="height:0%"><span>0 (0%)</span></div>
+				</div>
+			</td>
+		</tr>
+		<tr>
+			<th>H,N,E</th>
+			<td>75805</td>
+			<td>
+				<div class="bars">
+					<div class="mult" style="height:5%"><span>49810 (5%)</span></div>
+					<div class="uniq" style="height:93%"><span>933560 (95%)</span></div>
+					<div class="miss" style="height:1%"><span>3 (0%)</span></div>
+					<div class="none" style="height:1%"><span>152 (0%)</span></div>
+				</div>
+			</td>
+			<td>
+				<div class="bars">
+					<div class="mult" style="height:6%"><span>5887 (6%)</span></div>
+					<div class="uniq" style="height:94%"><span>90624 (94%)</span></div>
+					<div class="miss" style="height:0%"><span>0 (0%)</span></div>
+					<div class="none" style="height:0%"><span>0 (0%)</span></div>
+				</div>
+			</td>
+			<td>
+				<div class="bars">
+					<div class="mult" style="height:15%"><span>4384 (15%)</span></div>
+					<div class="uniq" style="height:85%"><span>25244 (85%)</span></div>
+					<div class="miss" style="height:0%"><span>0 (0%)</span></div>
+					<div class="none" style="height:0%"><span>0 (0%)</span></div>
+				</div>
+			</td>
+			<td>
+				<div class="bars">
+					<div class="mult" style="height:2%"><span>1555 (2%)</span></div>
+					<div class="dupe" style="height:9%"><span>5303 (9%)</span></div>
+					<div class="uniq" style="height:89%"><span>55465 (89%)</span></div>
+					<div class="none" style="height:0%"><span>0 (0%)</span></div>
+				</div>
+			</td>
+			<td>
+				<div class="bars">
+					<div class="mult" style="height:0%"><span>0 (0%)</span></div>
+					<div class="dupe" style="height:0%"><span>0 (0%)</span></div>
+					<div class="uniq" style="height:100%"><span>34644 (100%)</span></div>
+					<div class="none" style="height:0%"><span>0 (0%)</span></div>
+				</div>
+			</td>
+			<td>
+				<div class="bars">
+					<div class="mult" style="height:1%"><span>9 (0%)</span></div>
+					<div class="dupe" style="height:1%"><span>48 (0%)</span></div>
+					<div class="uniq" style="height:98%"><span>47635 (100%)</span></div>
+					<div class="none" style="height:0%"><span>0 (0%)</span></div>
+				</div>
+			</td>
+		</tr>
+		<tr>
+			<th>E,N,H</th>
+			<td>85707</td>
+			<td>
+				<div class="bars">
+					<div class="mult" style="height:16%"><span>160733 (16%)</span></div>
+					<div class="uniq" style="height:82%"><span>822638 (84%)</span></div>
+					<div class="miss" style="height:1%"><span>2 (0%)</span></div>
+					<div class="none" style="height:1%"><span>152 (0%)</span></div>
+				</div>
+			</td>
+			<td>
+				<div class="bars">
+					<div class="mult" style="height:30%"><span>28997 (30%)</span></div>
+					<div class="uniq" style="height:70%"><span>67514 (70%)</span></div>
+					<div class="miss" style="height:0%"><span>0 (0%)</span></div>
+					<div class="none" style="height:0%"><span>0 (0%)</span></div>
+				</div>
+			</td>
+			<td>
+				<div class="bars">
+					<div class="mult" style="height:26%"><span>7627 (26%)</span></div>
+					<div class="uniq" style="height:74%"><span>22001 (74%)</span></div>
+					<div class="miss" style="height:0%"><span>0 (0%)</span></div>
+					<div class="none" style="height:0%"><span>0 (0%)</span></div>
+				</div>
+			</td>
+			<td>
+				<div class="bars">
+					<div class="mult" style="height:0%"><span>0 (0%)</span></div>
+					<div class="dupe" style="height:0%"><span>0 (0%)</span></div>
+					<div class="uniq" style="height:100%"><span>62323 (100%)</span></div>
+					<div class="none" style="height:0%"><span>0 (0%)</span></div>
+				</div>
+			</td>
+			<td>
+				<div class="bars">
+					<div class="mult" style="height:26%"><span>9012 (26%)</span></div>
+					<div class="dupe" style="height:1%"><span>184 (1%)</span></div>
+					<div class="uniq" style="height:73%"><span>25448 (73%)</span></div>
+					<div class="none" style="height:0%"><span>0 (0%)</span></div>
+				</div>
+			</td>
+			<td>
+				<div class="bars">
+					<div class="mult" style="height:5%"><span>2472 (5%)</span></div>
+					<div class="dupe" style="height:2%"><span>721 (2%)</span></div>
+					<div class="uniq" style="height:93%"><span>44499 (93%)</span></div>
+					<div class="none" style="height:0%"><span>0 (0%)</span></div>
+				</div>
+			</td>
+		</tr>
+		<tr>
+			<th>E+H+N</th>
+			<td>74449</td>
+			<td>
+				<div class="bars">
+					<div class="mult" style="height:2%"><span>19233 (2%)</span></div>
+					<div class="uniq" style="height:96%"><span>964138 (98%)</span></div>
+					<div class="miss" style="height:1%"><span>2 (0%)</span></div>
+					<div class="none" style="height:1%"><span>152 (0%)</span></div>
+				</div>
+			</td>
+			<td>
+				<div class="bars">
+					<div class="mult" style="height:0%"><span>0 (0%)</span></div>
+					<div class="uniq" style="height:100%"><span>96511 (100%)</span></div>
+					<div class="miss" style="height:0%"><span>0 (0%)</span></div>
+					<div class="none" style="height:0%"><span>0 (0%)</span></div>
+				</div>
+			</td>
+			<td>
+				<div class="bars">
+					<div class="mult" style="height:0%"><span>0 (0%)</span></div>
+					<div class="uniq" style="height:100%"><span>29628 (100%)</span></div>
+					<div class="miss" style="height:0%"><span>0 (0%)</span></div>
+					<div class="none" style="height:0%"><span>0 (0%)</span></div>
+				</div>
+			</td>
+			<td>
+				<div class="bars">
+					<div class="mult" style="height:0%"><span>0 (0%)</span></div>
+					<div class="dupe" style="height:11%"><span>6980 (11%)</span></div>
+					<div class="uniq" style="height:89%"><span>55343 (89%)</span></div>
+					<div class="none" style="height:0%"><span>0 (0%)</span></div>
+				</div>
+			</td>
+			<td>
+				<div class="bars">
+					<div class="mult" style="height:0%"><span>0 (0%)</span></div>
+					<div class="dupe" style="height:4%"><span>1433 (4%)</span></div>
+					<div class="uniq" style="height:96%"><span>33211 (96%)</span></div>
+					<div class="none" style="height:0%"><span>0 (0%)</span></div>
+				</div>
+			</td>
+			<td>
+				<div class="bars">
+					<div class="mult" style="height:0%"><span>0 (0%)</span></div>
+					<div class="dupe" style="height:5%"><span>2219 (5%)</span></div>
+					<div class="uniq" style="height:95%"><span>45473 (95%)</span></div>
+					<div class="none" style="height:0%"><span>0 (0%)</span></div>
+				</div>
+			</td>
+		</tr>
+		</tbody>
+</table>
+
+<table id="table1">
+	<thead>
+		<tr>
+			<td>1 hop<br>(<a href="#main">toggle</a>)</td>
+			<th>Identifier</th>
+			<td><i>(all<br>pairs)</i></td>
+			<td><i>(EHN<br>pairs)</i></td>
+			<td><i>(EN<br>pairs)</i></td>
+			<td>Ensembl</td>
+			<td>HGNC</td>
+			<td>NCBI /<br>Entrez</td>
+		</tr>
+		<tr>
+			<th>Algorithm</th>
+			<th>Count</th>
+			<td>983525</td>
+			<td>96511</td>
+			<td>29628</td>
+			<td>62323</td>
+			<td>34644</td>
+			<td>47692</td>
+		</tr>
+	</thead>
+	<tbody>
+		<tr>
+			<th>Ensembl</th>
+			<td>62323</td>
+			<td>
+				<div class="bars">
+					<div class="mult" style="height:5%"><span>46792 (5%)</span></div>
+					<div class="uniq" style="height:39%"><span>381375 (39%)</span></div>
+					<div class="miss" style="height:1%"><span>443 (0%)</span></div>
+					<div class="none" style="height:55%"><span>554915 (56%)</span></div>
+				</div>
+			</td>
+			<td>
+				<div class="bars">
+					<div class="mult" style="height:15%"><span>14952 (15%)</span></div>
+					<div class="uniq" style="height:72%"><span>70136 (73%)</span></div>
+					<div class="miss" style="height:1%"><span>123 (0%)</span></div>
+					<div class="none" style="height:12%"><span>11300 (12%)</span></div>
+				</div>
+			</td>
+			<td>
+				<div class="bars">
+					<div class="mult" style="height:26%"><span>7627 (26%)</span></div>
+					<div class="uniq" style="height:74%"><span>22001 (74%)</span></div>
+					<div class="miss" style="height:0%"><span>0 (0%)</span></div>
+					<div class="none" style="height:0%"><span>0 (0%)</span></div>
+				</div>
+			</td>
+			<td>
+				<div class="bars">
+					<div class="mult" style="height:0%"><span>0 (0%)</span></div>
+					<div class="dupe" style="height:0%"><span>0 (0%)</span></div>
+					<div class="uniq" style="height:100%"><span>62323 (100%)</span></div>
+					<div class="none" style="height:0%"><span>0 (0%)</span></div>
+				</div>
+			</td>
+			<td>
+				<div class="bars">
+					<div class="mult" style="height:5%"><span>1748 (5%)</span></div>
+					<div class="dupe" style="height:1%"><span>72 (0%)</span></div>
+					<div class="uniq" style="height:80%"><span>28015 (81%)</span></div>
+					<div class="none" style="height:14%"><span>4809 (14%)</span></div>
+				</div>
+			</td>
+			<td>
+				<div class="bars">
+					<div class="mult" style="height:5%"><span>2472 (5%)</span></div>
+					<div class="dupe" style="height:2%"><span>721 (2%)</span></div>
+					<div class="uniq" style="height:45%"><span>21280 (45%)</span></div>
+					<div class="none" style="height:49%"><span>23219 (49%)</span></div>
+				</div>
+			</td>
+		</tr>
+		<tr>
+			<th>HGNC</th>
+			<td>34644</td>
+			<td>
+				<div class="bars">
+					<div class="mult" style="height:1%"><span>2696 (0%)</span></div>
+					<div class="uniq" style="height:43%"><span>425062 (43%)</span></div>
+					<div class="miss" style="height:1%"><span>5107 (1%)</span></div>
+					<div class="none" style="height:55%"><span>550660 (56%)</span></div>
+				</div>
+			</td>
+			<td>
+				<div class="bars">
+					<div class="mult" style="height:1%"><span>393 (0%)</span></div>
+					<div class="uniq" style="height:93%"><span>91140 (94%)</span></div>
+					<div class="miss" style="height:2%"><span>1979 (2%)</span></div>
+					<div class="none" style="height:3%"><span>2999 (3%)</span></div>
+				</div>
+			</td>
+			<td>
+				<div class="bars">
+					<div class="mult" style="height:1%"><span>172 (1%)</span></div>
+					<div class="uniq" style="height:83%"><span>24478 (83%)</span></div>
+					<div class="miss" style="height:7%"><span>1979 (7%)</span></div>
+					<div class="none" style="height:10%"><span>2999 (10%)</span></div>
+				</div>
+			</td>
+			<td>
+				<div class="bars">
+					<div class="mult" style="height:1%"><span>97 (0%)</span></div>
+					<div class="dupe" style="height:8%"><span>4976 (8%)</span></div>
+					<div class="uniq" style="height:45%"><span>28019 (45%)</span></div>
+					<div class="none" style="height:46%"><span>29231 (47%)</span></div>
+				</div>
+			</td>
+			<td>
+				<div class="bars">
+					<div class="mult" style="height:0%"><span>0 (0%)</span></div>
+					<div class="dupe" style="height:0%"><span>0 (0%)</span></div>
+					<div class="uniq" style="height:100%"><span>34644 (100%)</span></div>
+					<div class="none" style="height:0%"><span>0 (0%)</span></div>
+				</div>
+			</td>
+			<td>
+				<div class="bars">
+					<div class="mult" style="height:1%"><span>9 (0%)</span></div>
+					<div class="dupe" style="height:1%"><span>48 (0%)</span></div>
+					<div class="uniq" style="height:68%"><span>33619 (70%)</span></div>
+					<div class="none" style="height:29%"><span>14016 (29%)</span></div>
+				</div>
+			</td>
+		</tr>
+		<tr>
+			<th>NCBI /<br>Entrez</th>
+			<td>47692</td>
+			<td>
+				<div class="bars">
+					<div class="mult" style="height:2%"><span>20890 (2%)</span></div>
+					<div class="uniq" style="height:66%"><span>656207 (67%)</span></div>
+					<div class="miss" style="height:1%"><span>946 (0%)</span></div>
+					<div class="none" style="height:31%"><span>305482 (31%)</span></div>
+				</div>
+			</td>
+			<td>
+				<div class="bars">
+					<div class="mult" style="height:6%"><span>5626 (6%)</span></div>
+					<div class="uniq" style="height:84%"><span>82336 (85%)</span></div>
+					<div class="miss" style="height:1%"><span>118 (0%)</span></div>
+					<div class="none" style="height:9%"><span>8431 (9%)</span></div>
+				</div>
+			</td>
+			<td>
+				<div class="bars">
+					<div class="mult" style="height:14%"><span>4267 (14%)</span></div>
+					<div class="uniq" style="height:86%"><span>25361 (86%)</span></div>
+					<div class="miss" style="height:0%"><span>0 (0%)</span></div>
+					<div class="none" style="height:0%"><span>0 (0%)</span></div>
+				</div>
+			</td>
+			<td>
+				<div class="bars">
+					<div class="mult" style="height:2%"><span>1423 (2%)</span></div>
+					<div class="dupe" style="height:6%"><span>4010 (6%)</span></div>
+					<div class="uniq" style="height:34%"><span>21351 (34%)</span></div>
+					<div class="none" style="height:57%"><span>35539 (57%)</span></div>
+				</div>
+			</td>
+			<td>
+				<div class="bars">
+					<div class="mult" style="height:1%"><span>27 (0%)</span></div>
+					<div class="dupe" style="height:1%"><span>12 (0%)</span></div>
+					<div class="uniq" style="height:95%"><span>33619 (97%)</span></div>
+					<div class="none" style="height:3%"><span>986 (3%)</span></div>
+				</div>
+			</td>
+			<td>
+				<div class="bars">
+					<div class="mult" style="height:0%"><span>0 (0%)</span></div>
+					<div class="dupe" style="height:0%"><span>0 (0%)</span></div>
+					<div class="uniq" style="height:100%"><span>47692 (100%)</span></div>
+					<div class="none" style="height:0%"><span>0 (0%)</span></div>
+				</div>
+			</td>
+		</tr>
+		<tr>
+			<th>N,E</th>
+			<td>83231</td>
+			<td>
+				<div class="bars">
+					<div class="mult" style="height:8%"><span>82195 (8%)</span></div>
+					<div class="uniq" style="height:72%"><span>722563 (73%)</span></div>
+					<div class="miss" style="height:1%"><span>159 (0%)</span></div>
+					<div class="none" style="height:18%"><span>178608 (18%)</span></div>
+				</div>
+			</td>
+			<td>
+				<div class="bars">
+					<div class="mult" style="height:22%"><span>21182 (22%)</span></div>
+					<div class="uniq" style="height:78%"><span>75329 (78%)</span></div>
+					<div class="miss" style="height:0%"><span>0 (0%)</span></div>
+					<div class="none" style="height:0%"><span>0 (0%)</span></div>
+				</div>
+			</td>
+			<td>
+				<div class="bars">
+					<div class="mult" style="height:14%"><span>4267 (14%)</span></div>
+					<div class="uniq" style="height:86%"><span>25361 (86%)</span></div>
+					<div class="miss" style="height:0%"><span>0 (0%)</span></div>
+					<div class="none" style="height:0%"><span>0 (0%)</span></div>
+				</div>
+			</td>
+			<td>
+				<div class="bars">
+					<div class="mult" style="height:2%"><span>1423 (2%)</span></div>
+					<div class="dupe" style="height:6%"><span>4010 (6%)</span></div>
+					<div class="uniq" style="height:91%"><span>56890 (91%)</span></div>
+					<div class="none" style="height:0%"><span>0 (0%)</span></div>
+				</div>
+			</td>
+			<td>
+				<div class="bars">
+					<div class="mult" style="height:23%"><span>7839 (23%)</span></div>
+					<div class="dupe" style="height:1%"><span>16 (0%)</span></div>
+					<div class="uniq" style="height:75%"><span>26624 (77%)</span></div>
+					<div class="none" style="height:1%"><span>165 (0%)</span></div>
+				</div>
+			</td>
+			<td>
+				<div class="bars">
+					<div class="mult" style="height:0%"><span>0 (0%)</span></div>
+					<div class="dupe" style="height:0%"><span>0 (0%)</span></div>
+					<div class="uniq" style="height:100%"><span>47692 (100%)</span></div>
+					<div class="none" style="height:0%"><span>0 (0%)</span></div>
+				</div>
+			</td>
+		</tr>
+		<tr>
+			<th>E,N</th>
+			<td>85542</td>
+			<td>
+				<div class="bars">
+					<div class="mult" style="height:13%"><span>125283 (13%)</span></div>
+					<div class="uniq" style="height:68%"><span>679476 (69%)</span></div>
+					<div class="miss" style="height:1%"><span>158 (0%)</span></div>
+					<div class="none" style="height:18%"><span>178608 (18%)</span></div>
+				</div>
+			</td>
+			<td>
+				<div class="bars">
+					<div class="mult" style="height:30%"><span>28997 (30%)</span></div>
+					<div class="uniq" style="height:70%"><span>67514 (70%)</span></div>
+					<div class="miss" style="height:0%"><span>0 (0%)</span></div>
+					<div class="none" style="height:0%"><span>0 (0%)</span></div>
+				</div>
+			</td>
+			<td>
+				<div class="bars">
+					<div class="mult" style="height:26%"><span>7627 (26%)</span></div>
+					<div class="uniq" style="height:74%"><span>22001 (74%)</span></div>
+					<div class="miss" style="height:0%"><span>0 (0%)</span></div>
+					<div class="none" style="height:0%"><span>0 (0%)</span></div>
+				</div>
+			</td>
+			<td>
+				<div class="bars">
+					<div class="mult" style="height:0%"><span>0 (0%)</span></div>
+					<div class="dupe" style="height:0%"><span>0 (0%)</span></div>
+					<div class="uniq" style="height:100%"><span>62323 (100%)</span></div>
+					<div class="none" style="height:0%"><span>0 (0%)</span></div>
+				</div>
+			</td>
+			<td>
+				<div class="bars">
+					<div class="mult" style="height:26%"><span>9012 (26%)</span></div>
+					<div class="dupe" style="height:1%"><span>184 (1%)</span></div>
+					<div class="uniq" style="height:72%"><span>25283 (73%)</span></div>
+					<div class="none" style="height:1%"><span>165 (0%)</span></div>
+				</div>
+			</td>
+			<td>
+				<div class="bars">
+					<div class="mult" style="height:5%"><span>2472 (5%)</span></div>
+					<div class="dupe" style="height:2%"><span>721 (2%)</span></div>
+					<div class="uniq" style="height:93%"><span>44499 (93%)</span></div>
+					<div class="none" style="height:0%"><span>0 (0%)</span></div>
+				</div>
+			</td>
+		</tr>
+		<tr>
+			<th>E+N</th>
+			<td>82011</td>
+			<td>
+				<div class="bars">
+					<div class="mult" style="height:6%"><span>55261 (6%)</span></div>
+					<div class="uniq" style="height:75%"><span>749498 (76%)</span></div>
+					<div class="miss" style="height:1%"><span>158 (0%)</span></div>
+					<div class="none" style="height:18%"><span>178608 (18%)</span></div>
+				</div>
+			</td>
+			<td>
+				<div class="bars">
+					<div class="mult" style="height:15%"><span>14557 (15%)</span></div>
+					<div class="uniq" style="height:85%"><span>81954 (85%)</span></div>
+					<div class="miss" style="height:0%"><span>0 (0%)</span></div>
+					<div class="none" style="height:0%"><span>0 (0%)</span></div>
+				</div>
+			</td>
+			<td>
+				<div class="bars">
+					<div class="mult" style="height:0%"><span>0 (0%)</span></div>
+					<div class="uniq" style="height:100%"><span>29628 (100%)</span></div>
+					<div class="miss" style="height:0%"><span>0 (0%)</span></div>
+					<div class="none" style="height:0%"><span>0 (0%)</span></div>
+				</div>
+			</td>
+			<td>
+				<div class="bars">
+					<div class="mult" style="height:0%"><span>0 (0%)</span></div>
+					<div class="dupe" style="height:9%"><span>5441 (9%)</span></div>
+					<div class="uniq" style="height:91%"><span>56882 (91%)</span></div>
+					<div class="none" style="height:0%"><span>0 (0%)</span></div>
+				</div>
+			</td>
+			<td>
+				<div class="bars">
+					<div class="mult" style="height:20%"><span>6797 (20%)</span></div>
+					<div class="dupe" style="height:3%"><span>1168 (3%)</span></div>
+					<div class="uniq" style="height:76%"><span>26514 (77%)</span></div>
+					<div class="none" style="height:1%"><span>165 (0%)</span></div>
+				</div>
+			</td>
+			<td>
+				<div class="bars">
+					<div class="mult" style="height:0%"><span>0 (0%)</span></div>
+					<div class="dupe" style="height:4%"><span>1996 (4%)</span></div>
+					<div class="uniq" style="height:96%"><span>45696 (96%)</span></div>
+					<div class="none" style="height:0%"><span>0 (0%)</span></div>
+				</div>
+			</td>
+		</tr>
+		<tr>
+			<th>H,N,E</th>
+			<td>75805</td>
+			<td>
+				<div class="bars">
+					<div class="mult" style="height:5%"><span>44505 (5%)</span></div>
+					<div class="uniq" style="height:82%"><span>812754 (83%)</span></div>
+					<div class="miss" style="height:1%"><span>2 (0%)</span></div>
+					<div class="none" style="height:13%"><span>126264 (13%)</span></div>
+				</div>
+			</td>
+			<td>
+				<div class="bars">
+					<div class="mult" style="height:6%"><span>5887 (6%)</span></div>
+					<div class="uniq" style="height:94%"><span>90624 (94%)</span></div>
+					<div class="miss" style="height:0%"><span>0 (0%)</span></div>
+					<div class="none" style="height:0%"><span>0 (0%)</span></div>
+				</div>
+			</td>
+			<td>
+				<div class="bars">
+					<div class="mult" style="height:15%"><span>4384 (15%)</span></div>
+					<div class="uniq" style="height:85%"><span>25244 (85%)</span></div>
+					<div class="miss" style="height:0%"><span>0 (0%)</span></div>
+					<div class="none" style="height:0%"><span>0 (0%)</span></div>
+				</div>
+			</td>
+			<td>
+				<div class="bars">
+					<div class="mult" style="height:2%"><span>1555 (2%)</span></div>
+					<div class="dupe" style="height:9%"><span>5303 (9%)</span></div>
+					<div class="uniq" style="height:89%"><span>55465 (89%)</span></div>
+					<div class="none" style="height:0%"><span>0 (0%)</span></div>
+				</div>
+			</td>
+			<td>
+				<div class="bars">
+					<div class="mult" style="height:0%"><span>0 (0%)</span></div>
+					<div class="dupe" style="height:0%"><span>0 (0%)</span></div>
+					<div class="uniq" style="height:100%"><span>34644 (100%)</span></div>
+					<div class="none" style="height:0%"><span>0 (0%)</span></div>
+				</div>
+			</td>
+			<td>
+				<div class="bars">
+					<div class="mult" style="height:1%"><span>9 (0%)</span></div>
+					<div class="dupe" style="height:1%"><span>48 (0%)</span></div>
+					<div class="uniq" style="height:98%"><span>47635 (100%)</span></div>
+					<div class="none" style="height:0%"><span>0 (0%)</span></div>
+				</div>
+			</td>
+		</tr>
+		<tr>
+			<th>E,N,H</th>
+			<td>85707</td>
+			<td>
+				<div class="bars">
+					<div class="mult" style="height:15%"><span>143919 (15%)</span></div>
+					<div class="uniq" style="height:72%"><span>713340 (73%)</span></div>
+					<div class="miss" style="height:1%"><span>2 (0%)</span></div>
+					<div class="none" style="height:13%"><span>126264 (13%)</span></div>
+				</div>
+			</td>
+			<td>
+				<div class="bars">
+					<div class="mult" style="height:30%"><span>28997 (30%)</span></div>
+					<div class="uniq" style="height:70%"><span>67514 (70%)</span></div>
+					<div class="miss" style="height:0%"><span>0 (0%)</span></div>
+					<div class="none" style="height:0%"><span>0 (0%)</span></div>
+				</div>
+			</td>
+			<td>
+				<div class="bars">
+					<div class="mult" style="height:26%"><span>7627 (26%)</span></div>
+					<div class="uniq" style="height:74%"><span>22001 (74%)</span></div>
+					<div class="miss" style="height:0%"><span>0 (0%)</span></div>
+					<div class="none" style="height:0%"><span>0 (0%)</span></div>
+				</div>
+			</td>
+			<td>
+				<div class="bars">
+					<div class="mult" style="height:0%"><span>0 (0%)</span></div>
+					<div class="dupe" style="height:0%"><span>0 (0%)</span></div>
+					<div class="uniq" style="height:100%"><span>62323 (100%)</span></div>
+					<div class="none" style="height:0%"><span>0 (0%)</span></div>
+				</div>
+			</td>
+			<td>
+				<div class="bars">
+					<div class="mult" style="height:26%"><span>9012 (26%)</span></div>
+					<div class="dupe" style="height:1%"><span>184 (1%)</span></div>
+					<div class="uniq" style="height:73%"><span>25448 (73%)</span></div>
+					<div class="none" style="height:0%"><span>0 (0%)</span></div>
+				</div>
+			</td>
+			<td>
+				<div class="bars">
+					<div class="mult" style="height:5%"><span>2472 (5%)</span></div>
+					<div class="dupe" style="height:2%"><span>721 (2%)</span></div>
+					<div class="uniq" style="height:93%"><span>44499 (93%)</span></div>
+					<div class="none" style="height:0%"><span>0 (0%)</span></div>
+				</div>
+			</td>
+		</tr>
+		<tr>
+			<th>E+H+N</th>
+			<td>74449</td>
+			<td>
+				<div class="bars">
+					<div class="mult" style="height:2%"><span>19038 (2%)</span></div>
+					<div class="uniq" style="height:84%"><span>838221 (85%)</span></div>
+					<div class="miss" style="height:1%"><span>2 (0%)</span></div>
+					<div class="none" style="height:13%"><span>126264 (13%)</span></div>
+				</div>
+			</td>
+			<td>
+				<div class="bars">
+					<div class="mult" style="height:0%"><span>0 (0%)</span></div>
+					<div class="uniq" style="height:100%"><span>96511 (100%)</span></div>
+					<div class="miss" style="height:0%"><span>0 (0%)</span></div>
+					<div class="none" style="height:0%"><span>0 (0%)</span></div>
+				</div>
+			</td>
+			<td>
+				<div class="bars">
+					<div class="mult" style="height:0%"><span>0 (0%)</span></div>
+					<div class="uniq" style="height:100%"><span>29628 (100%)</span></div>
+					<div class="miss" style="height:0%"><span>0 (0%)</span></div>
+					<div class="none" style="height:0%"><span>0 (0%)</span></div>
+				</div>
+			</td>
+			<td>
+				<div class="bars">
+					<div class="mult" style="height:0%"><span>0 (0%)</span></div>
+					<div class="dupe" style="height:11%"><span>6980 (11%)</span></div>
+					<div class="uniq" style="height:89%"><span>55343 (89%)</span></div>
+					<div class="none" style="height:0%"><span>0 (0%)</span></div>
+				</div>
+			</td>
+			<td>
+				<div class="bars">
+					<div class="mult" style="height:0%"><span>0 (0%)</span></div>
+					<div class="dupe" style="height:4%"><span>1433 (4%)</span></div>
+					<div class="uniq" style="height:96%"><span>33211 (96%)</span></div>
+					<div class="none" style="height:0%"><span>0 (0%)</span></div>
+				</div>
+			</td>
+			<td>
+				<div class="bars">
+					<div class="mult" style="height:0%"><span>0 (0%)</span></div>
+					<div class="dupe" style="height:5%"><span>2219 (5%)</span></div>
+					<div class="uniq" style="height:95%"><span>45473 (95%)</span></div>
+					<div class="none" style="height:0%"><span>0 (0%)</span></div>
+				</div>
+			</td>
+		</tr>
+	</tbody>
+</table>
+
+Graphs depict the mapping of identifiers (top) to units defined by a certain algorithm (left).<br>
+<br>
+The (all pairs) column shows adherence to the provided name equivalencies between all types.<br>
+The (EHN pairs) column shows adherence to the provided name equivalencies between only Ensembl, HGNC and NCBI/Entrez IDs.<br>
+The (EN pairs) column shows adherence to the provided name equivalencies between only Ensembl and NCBI/Entrez IDs.<br>
+<br>
+orange: ambiguous (identifier matches multiple units)<br>
+teal: redundant (distinct identifiers match the same unit)<br>
+green: unique (one identifier matches one unit)<br>
+red: mismatched (the equivalent identifiers match different units)<br>
+blue: unmatched (identifier does not match any unit)<br>
+<br>
+Hover the mouse over any graph to display the numeric details.<br>
+</body>
+</html>

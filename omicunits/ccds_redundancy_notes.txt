@@ -1,0 +1,40 @@
+5379 geneIDs with >1 ccdsID
+	5010 have uniform chr and uniform start or end pos
+	361 have uniform chr and disparate start and end pos
+		330 have cross-overlap between all regions
+		31 do not: 1390,1788,2778,2972,4660,5998,6342,8997,9659,9718,9910,10395,10611,11060,22891,25953,26086,26088,27086,51207,54477,54798,64072,64718,66004,81786,93099,125488,201176,222255,284443
+			25 have regions in a continuous overlapping chain
+			6 have gaps: 7kb,12kb,24kb,29kb,66kb,150kb
+	8 have multiple chromosomes (X/Y): 438,1438,3563,3581,4267,6473,6845,8623
+		all 8 are split across chr X and Y
+		all 8 have regions in a continuous overlapping chain, no gaps
+
+
+select count() from (
+select
+  namespace_id, name, count(distinct biopolymer_id) as n_bp
+from biopolymer_name as bn
+join biopolymer_region as br using (biopolymer_id)
+group by namespace_id, name
+having n_bp > 1
+);
+
+
+1697584 total identifiers
+	1688387 match only one geneID
+	9197 match multiple geneIDs
+		806 have 0 or 1 region
+		8391 have multiple regions
+			2047 have multiple chromosomes
+			6344 have only one chromosome
+				1522 have cross-overlap between all regions
+				4822 do not
+					52 are strictly compact (span < r*min)
+					131(183) are generally compact (span < r*avg)
+					438(621) are loosely compact (span < r*max)
+					396(1017) are closely clustered (span < 2*r*avg)
+					215(1232) are somewhat clustered (span < 3*r*avg)
+					776(2008) are loosely clustered (span < 5*r*avg)
+					382(2390) are vaguely clustered (span < 10*r*avg)
+					2432 are not clustered
+
