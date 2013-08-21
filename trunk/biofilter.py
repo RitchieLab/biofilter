@@ -24,7 +24,7 @@ class Biofilter:
 	def getVersionTuple(cls):
 		# tuple = (major,minor,revision,dev,build,date)
 		# dev must be in ('a','b','rc','release') for lexicographic comparison
-		return (2,1,0,'release','','2013-07-19')
+		return (2,1,1,'b',1,'2013-08-21')
 	#getVersionTuple()
 	
 	
@@ -2210,17 +2210,18 @@ class Biofilter:
 				self.log(str(row)+"\n")
 		elif self._options.all_pairwise_models != 'yes':
 			# expand each gene-gene model
+			diffTypes = (typesL != typesR)
 			headerR.append('score(src-grp)')
 			yield tuple(headerL + headerR)
 			modelIDs = set()
 			for model in self.getGeneModels():
-				score = ('-'.join(str(s) for s in model[2:]),)
+				score = ('%d-%d' % (model[2],model[3]),)
 				# store the expanded right-hand side, then pair them all with the expanded left-hand side
 				listR = list(cursor.execute(sqlR, model))
 				for row in cursor.execute(sqlL, model):
 					for modelR in listR:
-						modelID = (row[-1],modelR[-1])
-						if modelID not in modelIDs:
+						modelID = (row[-1],modelR[-1]) if (diffTypes or (row[-1] <= modelR[-1])) else (modelR[-1],row[-1])
+						if (diffTypes or (row[-1] != modelR[-1])) and (modelID not in modelIDs):
 							modelIDs.add(modelID)
 							yield row[:-1] + modelR[:-1] + score
 							if limit and len(modelIDs) >= limit:
