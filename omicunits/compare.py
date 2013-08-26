@@ -866,67 +866,146 @@ for maxdist in (0,1):
 		# ncbi/entrez components
 		unitNames,nameUnits = defineUnits([{namespaceID['entrez_gid']}],maxdist)
 		reportResults("NCBI /<br>Entrez",unitNames,nameUnits,report)
-	
-	# N,E components
-	unitNames,nameUnits = defineUnits([{namespaceID['entrez_gid']},{namespaceID['ensembl_gid']}],maxdist)
-	if diffNE:
-		namesNE = set()
-		for names in unitNames:
-			namesNE.add(frozenset( n for n in names if (namespaceName[nameNamespaceID[n]] in {'entrez_gid','ensembl_gid'}) ))
-	reportResults("N,E",unitNames,nameUnits,report)
-	
-	# E,N components
-	unitNames,nameUnits = defineUnits([{namespaceID['ensembl_gid']},{namespaceID['entrez_gid']}],maxdist)
-	if diffNE:
-		namesEN = set()
-		for names in unitNames:
-			namesEN.add(frozenset( n for n in names if (namespaceName[nameNamespaceID[n]] in {'entrez_gid','ensembl_gid'}) ))
-	reportResults("E,N",unitNames,nameUnits,report)
+		
+		# N,E components
+		unitNames,nameUnits = defineUnits([{namespaceID['entrez_gid']},{namespaceID['ensembl_gid']}],maxdist)
+		reportResults("N,E",unitNames,nameUnits,report)
+		
+		# E,N components
+		unitNames,nameUnits = defineUnits([{namespaceID['ensembl_gid']},{namespaceID['entrez_gid']}],maxdist)
+		reportResults("E,N",unitNames,nameUnits,report)
+	#if not diffNE
 	
 	# analyze E+N simultaneous component breakdown
 	unitNames,nameUnits = defineUnits([{namespaceID['entrez_gid'],namespaceID['ensembl_gid']}],maxdist)
-	if diffNE:
-	#	namesSS = set()
-	#	for names in unitNames:
-	#		namesSS.add(frozenset( n for n in names if (namespaceName[nameNamespaceID[n]] in {'entrez_gid','ensembl_gid'}) ))
-		namesCC = set(frozenset(names) for names in connectedComponents(None, {'entrez_gid','ensembl_gid'}))
-	#	assert(namesSS == namesCC)
 	reportResults("E+N",unitNames,nameUnits,report)
 	
 	if diffNE:
+		namesets = set(frozenset(names) for names in connectedComponents(None, {'entrez_gid','ensembl_gid'}))
 		unitNames = list()
 		nameUnits = collections.defaultdict(set)
-		unitsNE = set()
-		unitsEN = set()
-		unitsCC = set()
-		unitsCCe = set()
-		for names in (namesNE | namesEN | namesCC):
+		unitsN1E1 = set()
+		unitsN1E2 = set()
+		unitsN2E1 = set()
+		unitsN2E2 = set()
+		for nameset in namesets:
 			u = len(unitNames)
-			for n in names:
+			for n in nameset:
 				nameUnits[n].add(u)
-			if names in namesNE:
-				unitsNE.add(u)
-			if names in namesEN:
-				unitsEN.add(u)
-			if names in namesCC:
-				if (sum(1 for c in connectedComponents(names, {'entrez_gid'})) > 1) or (sum(1 for c in connectedComponents(names, {'ensembl_gid'})) > 1):
-					unitsCCe.add(u)
-				unitsCC.add(u)
-			unitNames.append(names)
-		print "%d edge cases" % (len(unitsCCe),)
-		print "%d NE, %d EN, %d CC" % (len(unitsNE),len(unitsEN),len(unitsCC))
-		assert(unitsCCe == (unitsCC - (unitsNE & unitsEN)))
-		print "%d NE-EN-CC, %d EN-NE-CC, %d CC-NE-EN" % (len(unitsNE-unitsEN-unitsCC),len(unitsEN-unitsNE-unitsCC),len(unitsCC-unitsNE-unitsEN))
-		print "%d NE&EN-CC, %d NE&CC-EN, %d EN&CC-NE" % (len((unitsNE&unitsEN)-unitsCC),len((unitsNE&unitsCC)-unitsEN),len((unitsEN&unitsCC)-unitsNE))
-		print "%d NE&EN&CC" % (len(unitsNE&unitsEN&unitsCC),)
-		names = set().union( *(unitNames[u] for u in (unitsNE^unitsEN)) )
-		components = list( c for c in connectedComponents(None, {'entrez_gid','ensembl_gid'}) if (c & names) )
-		assert(set(frozenset(c) for c in components) == set(frozenset(unitNames[u]) for u in unitsCCe))
-		print "%d names, %d components" % (len(names),len(components))
+			unitNames.append(nameset)
+			numN = sum(1 for c in connectedComponents(nameset, {'entrez_gid'}))
+			numE = sum(1 for c in connectedComponents(nameset, {'ensembl_gid'}))
+			if (numN > 1) and (numE > 1):
+				unitsN2E2.add(u)
+			elif numN > 1:
+				unitsN2E1.add(u)
+			elif numE > 1:
+				unitsN1E2.add(u)
+			else:
+				unitsN1E1.add(u)
+		print "%d 1N1E, %d 1N2E, %d 2N1E, %d 2N2E" % (len(unitsN1E1),len(unitsN1E2),len(unitsN2E1),len(unitsN2E2))
 		#detail = {}
 		#detail = {(1,5,2),(2,5,1),(2,8,2),(1,11,7),(5,8,1),(4,16,4),(7,36,7),(10,46,10),(16,64,16),(19,129,22)}
 		#detail = {(1,4,2),(2,4,1),(2,5,2),(1,8,7),(5,9,2),(4,9,4),(8,19,8),(14,32,16),(19,51,22)}
-		detail = {(1,8,7,'95%covered'),(1,10,9,'100%covered'),(3,25,20,'95%covered'),(3,6,3,'continuous'),(4,11,4,'1gaps'),(3,6,3,'2gaps'),(4,7,3,'3gaps'),(5,10,4,'4gaps'),(14,37,12,'5+gaps'),(3,5,1,'multichr'),(5,9,2,'multichr'),(1,5,3,'noregion')}
+		#detail = {(1,8,7,'95%covered'),(1,10,9,'100%covered'),(3,25,20,'95%covered'),(3,6,3,'continuous'),(4,11,4,'1gaps'),(3,6,3,'2gaps'),(4,7,3,'3gaps'),(5,10,4,'4gaps'),(14,37,12,'5+gaps'),(3,5,1,'multichr'),(5,9,2,'multichr'),(1,5,3,'noregion')}
+		"""
+1. how many have all legs contained within the core
+2. how many have all legs at least overlapping the core
+3. how many have no overlap, and what is the min distance to the core
+4. how many have one overlap, one non-overlap, and what is the max gap outside the core region
+5. how many have no regions
+"""
+		status = collections.Counter()
+		someDist = list()
+		noneDist = list()
+		someGap = list()
+		noneGap = list()
+		for u in unitsN1E2:
+			cores = set()
+			legs = set()
+			for n in unitNames[u]:
+				if nameNamespaceID[n] == namespaceID['entrez_gid']:
+					cores.update( *(nameChrRegions[n].itervalues()) )
+				else:
+					legs.update( *(nameChrRegions[n].itervalues()) )
+			if (not cores) and (not legs):
+				status['no-regions'] += 1
+				continue
+			if not cores:
+				status['no-core-regions'] += 1
+				continue
+			if not legs:
+				status['no-leg-regions'] += 1
+				continue
+			
+			cores = list(regionSpan[r] for r in cores)
+			cores.sort()
+			cC,lC,rC = cores[0]
+			for c,l,r in cores:
+				if (c != cC) or (l > rC) or (r < lC):
+					cC = None
+					break
+				lC,rC = min(lC,l),max(rC,r)
+			if not cC:
+				status['multi-core'] += 1
+				continue
+			
+			legs = list(regionSpan[r] for r in legs)
+			legs.sort()
+			allIn = allOver = allChr = True
+			someOver = False
+			minDist = maxGap = None
+			rL = None
+			for c,l,r in legs:
+				if (c != cC) or (l < lC) or (r > rC):
+					allIn = False
+				if (c != cC) or (l > rC) or (r < lC):
+					allOver = False
+					if c == cC:
+						gap = max(0, l - (rL or l))
+						maxGap = max(maxGap or gap, gap)
+				else:
+					someOver = True
+					if rL and (rL < lC):
+						gap = max(0, l - (rL or l))
+						maxGap = max(maxGap or gap, gap)
+				rL = r
+				if c == cC:
+					dist = max(l-rC,lC-r)
+					if dist > 0:
+						minDist = min(minDist or dist, dist)
+				else:
+					allChr = False
+			if allIn:
+				status['all-contained'] += 1
+			elif allOver:
+				status['all-overlap'] += 1
+			elif someOver and allChr:
+				status['some-overlap-1chr'] += 1
+				someDist.append(minDist)
+				someGap.append(maxGap)
+			elif someOver and not allChr:
+				status['some-overlap-2chr'] += 1
+			elif allChr:
+				status['no-overlap-1chr'] += 1
+				noneDist.append(minDist)
+				noneGap.append(maxGap)
+			else:
+				status['no-overlap-2chr'] += 1
+		print status
+		someDist.sort()
+		someGap.sort()
+		nd,ng = len(someDist),len(someGap)
+		print "some dist: %d [%d/%d/%d/%d/%d]" % (nd,someDist[0],someDist[nd/4],someDist[nd/2],someDist[-nd/4],someDist[-1])
+		print someDist
+		print "some gap:  %d [%d/%d/%d/%d/%d]" % (ng,someGap[0], someGap[ng/4], someGap[ng/2], someGap[-ng/4], someGap[-1])
+		print someGap
+		noneDist.sort()
+		noneGap.sort()
+		nd,ng = len(noneDist),len(noneGap)
+		print "none dist: %d [%d/%d/%d/%d/%d]" % (nd,noneDist[0],noneDist[nd/4],noneDist[nd/2],noneDist[-nd/4],noneDist[-1])
+		print "none gap:  %d [%d/%d/%d/%d/%d]" % (ng,noneGap[0], noneGap[ng/4], noneGap[ng/2], noneGap[-ng/4], noneGap[-1])
+		sys.exit(1)
 		with open('c.txt','wb') as f:
 			for c in components:
 				chms = set().union( *(nameChrRegions[n].keys() for n in c) )
