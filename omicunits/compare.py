@@ -400,8 +400,11 @@ def closestPoint(a, b, p):
 #closestPoint()
 
 
-def plot(unitsA, unitsB, unitNames, nameUnits, status):
-	names = set().union(*( unitNames[u] for u in (unitsA | unitsB) ))
+def plot(unitNames, nameUnits, units, caption):
+	nsIDs = {namespaceID['entrez_gid'],namespaceID['ensembl_gid']}
+	names = set()
+	for u in units:
+		names.update(n for n in unitNames[u] if nameNamespaceID[n] in nsIDs)
 	x = dict()
 	xlist = collections.defaultdict(list)
 	y = dict()
@@ -422,15 +425,14 @@ def plot(unitsA, unitsB, unitNames, nameUnits, status):
 		for n2 in names:
 			if n2 > n1:
 				f = 0.0
-				u = len(nameUnits[n1] & nameUnits[n2])
+				u = len(nameUnits[n1] & nameUnits[n2] & units)
 				f += 0.01 * ((u ** 0.5) if u else 0) / scale
 				f += 0.01 * (1 if (n2 in graph[n1]) else -0.01)
 				nn.append( (n1,n2,f) )
 				if n2 in graph[n1]:
-					n3s = set().union( *(unitNames[u] for u in (nameUnits[n1] | nameUnits[n2])) ) - {n1,n2}
+					n3s = (set().union( *(unitNames[u] for u in ((nameUnits[n1] | nameUnits[n2]) & units)) ) & units) - {n1,n2}
 					en.append( (n1,n2,n3s) )
 	# run force-directed layout simulation
-	caption = '%dn-%di-%de-%s' % (len(unitsA),len(names),len(unitsB),status)
 	print ("simulating %s ..." % caption),
 	phase = 3
 	t0 = time.time()
@@ -803,6 +805,169 @@ DIV.bars > DIV > SPAN {
 """)
 
 
+def analyze_units(unitNames):
+	# 80030 1N1E, 1211 1N2E, 304 2N1E, 472 2N2E
+	data = collections.defaultdict(list)
+	nsIDs = {namespaceID['entrez_gid'],namespaceID['ensembl_gid']}
+#	extras = 0
+	for u,names in enumerate(unitNames):
+		numN = sum(1 for c in connectedComponents(names, {'entrez_gid'}))
+		numE = sum(1 for c in connectedComponents(names, {'ensembl_gid'}))
+		regions = set()
+		for n in names:
+#			if nameNamespaceID[n] in nsIDs:
+				regions.update( *nameChrRegions[n].itervalues() )
+#			else:
+#				extras += sum(len(cr) for cr in nameChrRegions[n].itervalues())
+		regions = sorted(regionSpan[r] for r in regions)
+		numC = len(set(r[0] for r in regions))
+		curC = None
+		numG = 0
+		maxG = 0
+		for c,l,r in regions:
+			if curC != c:
+				curC = c
+				curR = r
+			elif l > curR:
+				numG += 1
+				maxG = max(maxG, l - curR)
+			curR = max(curR, r)
+		numN = 2 if numN > 1 else numN
+		numE = 2 if numE > 1 else numE
+		numC = 2 if numC > 1 else numC
+		data[ (numN,numE,numC) ].append( (maxG,u) )
+#	print extras
+	for key in sorted(data):
+		numN,numE,numC = key
+		lst = data[key]
+		lst.sort()
+		n = len(lst)
+		print "%d N, %d E, %d C : %-5d : %d / %d / %d / %d / %d / %d / %d" % (numN,numE,numC,n,lst[0][0],lst[n/20][0],lst[n/4][0],lst[n/2][0],lst[-n/4][0],lst[-n/20][0],lst[-1][0])
+	for key,lst in data.iteritems():
+		numN,numE,numC = key
+		maxG,u = lst[-len(lst)/4]
+		plot(unitNames, nameUnits, {u}, "%dn%de%dc_%dx_%dg" % (numN,numE,numC,len(lst),maxG))
+#analyze_units()
+
+
+def analyze_starfish(unitNames, nameUnits):
+	unitsN1E1 = set()
+	unitsN1E2 = set()
+	unitsN2E1 = set()
+	unitsN2E2 = set()
+	for u,names in enumerate(unitNames):
+		numN = sum(1 for c in connectedComponents(names, {'entrez_gid'}))
+		numE = sum(1 for c in connectedComponents(names, {'ensembl_gid'}))
+		if (numN > 1) and (numE > 1):
+			unitsN2E2.add(u)
+		elif numN > 1:
+			unitsN2E1.add(u)
+		elif numE > 1:
+			unitsN1E2.add(u)
+		else:
+			unitsN1E1.add(u)
+	print "%d 1N1E, %d 1N2E, %d 2N1E, %d 2N2E" % (len(unitsN1E1),len(unitsN1E2),len(unitsN2E1),len(unitsN2E2))
+	
+	"""
+1. how many have all legs contained within the core
+2. how many have all legs at least overlapping the core
+3. how many have no overlap, and what is the min distance to the core
+4. how many have one overlap, one non-overlap, and what is the max gap outside the core region
+5. how many have no regions
+"""
+	status = collections.Counter()
+	someDist = list()
+	noneDist = list()
+	someGap = list()
+	noneGap = list()
+	for u in unitsN1E2:
+		cores = set()
+		legs = set()
+		for n in unitNames[u]:
+			if nameNamespaceID[n] == namespaceID['entrez_gid']:
+				cores.update( *(nameChrRegions[n].itervalues()) )
+			elif nameNamespaceID[n] == namespaceID['ensembl_gid']:
+				legs.update( *(nameChrRegions[n].itervalues()) )
+		if (not cores) and (not legs):
+			status['no-regions'] += 1
+			continue
+		if not cores:
+			status['no-core-regions'] += 1
+			continue
+		if not legs:
+			status['no-leg-regions'] += 1
+			continue
+		
+		cores = list(regionSpan[r] for r in cores)
+		cores.sort()
+		cC,lC,rC = cores[0]
+		for c,l,r in cores:
+			if (c != cC) or (l > rC) or (r < lC):
+				cC = None
+				break
+			lC,rC = min(lC,l),max(rC,r)
+		if not cC:
+			status['multi-core'] += 1
+			continue
+		
+		legs = list(regionSpan[r] for r in legs)
+		legs.sort()
+		allIn = allOver = allChr = True
+		someOver = False
+		minDist = maxGap = None
+		rL = None
+		for c,l,r in legs:
+			if (c != cC) or (l < lC) or (r > rC):
+				allIn = False
+			if (c != cC) or (l > rC) or (r < lC):
+				allOver = False
+				if c == cC:
+					gap = max(0, l - (rL or l))
+					maxGap = max(maxGap or gap, gap)
+			else:
+				someOver = True
+				if rL and (rL < lC):
+					gap = max(0, l - (rL or l))
+					maxGap = max(maxGap or gap, gap)
+			rL = r
+			if c == cC:
+				dist = max(l-rC,lC-r)
+				if dist > 0:
+					minDist = min(minDist or dist, dist)
+			else:
+				allChr = False
+		if allIn:
+			status['all-contained'] += 1
+		elif allOver:
+			status['all-overlap'] += 1
+		elif someOver and allChr:
+			status['some-overlap-1chr'] += 1
+			someDist.append(minDist)
+			someGap.append(maxGap)
+		elif someOver and not allChr:
+			status['some-overlap-2chr'] += 1
+		elif allChr:
+			status['no-overlap-1chr'] += 1
+			noneDist.append(minDist)
+			noneGap.append(maxGap)
+		else:
+			status['no-overlap-2chr'] += 1
+	print status
+	someDist.sort()
+	someGap.sort()
+	nd,ng = len(someDist),len(someGap)
+	print "some dist: %d [%d/%d/%d/%d/%d]" % (nd,someDist[0],someDist[nd/4],someDist[nd/2],someDist[-nd/4],someDist[-1])
+	print someDist
+	print "some gap:  %d [%d/%d/%d/%d/%d]" % (ng,someGap[0], someGap[ng/4], someGap[ng/2], someGap[-ng/4], someGap[-1])
+	print someGap
+	noneDist.sort()
+	noneGap.sort()
+	nd,ng = len(noneDist),len(noneGap)
+	print "none dist: %d [%d/%d/%d/%d/%d]" % (nd,noneDist[0],noneDist[nd/4],noneDist[nd/2],noneDist[-nd/4],noneDist[-1])
+	print "none gap:  %d [%d/%d/%d/%d/%d]" % (ng,noneGap[0], noneGap[ng/4], noneGap[ng/2], noneGap[-ng/4], noneGap[-1])
+#analyze_starfish()
+
+
 for maxdist in (0,1):
 	if report:
 		if maxdist == 0:
@@ -881,171 +1046,8 @@ for maxdist in (0,1):
 	reportResults("E+N",unitNames,nameUnits,report)
 	
 	if diffNE:
-		namesets = set(frozenset(names) for names in connectedComponents(None, {'entrez_gid','ensembl_gid'}))
-		unitNames = list()
-		nameUnits = collections.defaultdict(set)
-		unitsN1E1 = set()
-		unitsN1E2 = set()
-		unitsN2E1 = set()
-		unitsN2E2 = set()
-		for nameset in namesets:
-			u = len(unitNames)
-			for n in nameset:
-				nameUnits[n].add(u)
-			unitNames.append(nameset)
-			numN = sum(1 for c in connectedComponents(nameset, {'entrez_gid'}))
-			numE = sum(1 for c in connectedComponents(nameset, {'ensembl_gid'}))
-			if (numN > 1) and (numE > 1):
-				unitsN2E2.add(u)
-			elif numN > 1:
-				unitsN2E1.add(u)
-			elif numE > 1:
-				unitsN1E2.add(u)
-			else:
-				unitsN1E1.add(u)
-		print "%d 1N1E, %d 1N2E, %d 2N1E, %d 2N2E" % (len(unitsN1E1),len(unitsN1E2),len(unitsN2E1),len(unitsN2E2))
-		#detail = {}
-		#detail = {(1,5,2),(2,5,1),(2,8,2),(1,11,7),(5,8,1),(4,16,4),(7,36,7),(10,46,10),(16,64,16),(19,129,22)}
-		#detail = {(1,4,2),(2,4,1),(2,5,2),(1,8,7),(5,9,2),(4,9,4),(8,19,8),(14,32,16),(19,51,22)}
-		#detail = {(1,8,7,'95%covered'),(1,10,9,'100%covered'),(3,25,20,'95%covered'),(3,6,3,'continuous'),(4,11,4,'1gaps'),(3,6,3,'2gaps'),(4,7,3,'3gaps'),(5,10,4,'4gaps'),(14,37,12,'5+gaps'),(3,5,1,'multichr'),(5,9,2,'multichr'),(1,5,3,'noregion')}
-		"""
-1. how many have all legs contained within the core
-2. how many have all legs at least overlapping the core
-3. how many have no overlap, and what is the min distance to the core
-4. how many have one overlap, one non-overlap, and what is the max gap outside the core region
-5. how many have no regions
-"""
-		status = collections.Counter()
-		someDist = list()
-		noneDist = list()
-		someGap = list()
-		noneGap = list()
-		for u in unitsN1E2:
-			cores = set()
-			legs = set()
-			for n in unitNames[u]:
-				if nameNamespaceID[n] == namespaceID['entrez_gid']:
-					cores.update( *(nameChrRegions[n].itervalues()) )
-				else:
-					legs.update( *(nameChrRegions[n].itervalues()) )
-			if (not cores) and (not legs):
-				status['no-regions'] += 1
-				continue
-			if not cores:
-				status['no-core-regions'] += 1
-				continue
-			if not legs:
-				status['no-leg-regions'] += 1
-				continue
-			
-			cores = list(regionSpan[r] for r in cores)
-			cores.sort()
-			cC,lC,rC = cores[0]
-			for c,l,r in cores:
-				if (c != cC) or (l > rC) or (r < lC):
-					cC = None
-					break
-				lC,rC = min(lC,l),max(rC,r)
-			if not cC:
-				status['multi-core'] += 1
-				continue
-			
-			legs = list(regionSpan[r] for r in legs)
-			legs.sort()
-			allIn = allOver = allChr = True
-			someOver = False
-			minDist = maxGap = None
-			rL = None
-			for c,l,r in legs:
-				if (c != cC) or (l < lC) or (r > rC):
-					allIn = False
-				if (c != cC) or (l > rC) or (r < lC):
-					allOver = False
-					if c == cC:
-						gap = max(0, l - (rL or l))
-						maxGap = max(maxGap or gap, gap)
-				else:
-					someOver = True
-					if rL and (rL < lC):
-						gap = max(0, l - (rL or l))
-						maxGap = max(maxGap or gap, gap)
-				rL = r
-				if c == cC:
-					dist = max(l-rC,lC-r)
-					if dist > 0:
-						minDist = min(minDist or dist, dist)
-				else:
-					allChr = False
-			if allIn:
-				status['all-contained'] += 1
-			elif allOver:
-				status['all-overlap'] += 1
-			elif someOver and allChr:
-				status['some-overlap-1chr'] += 1
-				someDist.append(minDist)
-				someGap.append(maxGap)
-			elif someOver and not allChr:
-				status['some-overlap-2chr'] += 1
-			elif allChr:
-				status['no-overlap-1chr'] += 1
-				noneDist.append(minDist)
-				noneGap.append(maxGap)
-			else:
-				status['no-overlap-2chr'] += 1
-		print status
-		someDist.sort()
-		someGap.sort()
-		nd,ng = len(someDist),len(someGap)
-		print "some dist: %d [%d/%d/%d/%d/%d]" % (nd,someDist[0],someDist[nd/4],someDist[nd/2],someDist[-nd/4],someDist[-1])
-		print someDist
-		print "some gap:  %d [%d/%d/%d/%d/%d]" % (ng,someGap[0], someGap[ng/4], someGap[ng/2], someGap[-ng/4], someGap[-1])
-		print someGap
-		noneDist.sort()
-		noneGap.sort()
-		nd,ng = len(noneDist),len(noneGap)
-		print "none dist: %d [%d/%d/%d/%d/%d]" % (nd,noneDist[0],noneDist[nd/4],noneDist[nd/2],noneDist[-nd/4],noneDist[-1])
-		print "none gap:  %d [%d/%d/%d/%d/%d]" % (ng,noneGap[0], noneGap[ng/4], noneGap[ng/2], noneGap[-ng/4], noneGap[-1])
-		sys.exit(1)
-		with open('c.txt','wb') as f:
-			for c in components:
-				chms = set().union( *(nameChrRegions[n].keys() for n in c) )
-				if len(chms) < 1:
-					status = 'noregion'
-				elif len(chms) > 1:
-					status = 'multichr'
-				else:
-					chm = min(chms)
-					regions = set()
-					for n in c:
-						if nameChrRegions[n][chm]:
-							regions.add( (min(regionSpan[r][1] for r in nameChrRegions[n][chm]),max(regionSpan[r][2] for r in nameChrRegions[n][chm])) )
-					span = (min(r[0] for r in regions),max(r[1] for r in regions))
-					regions = sorted(regions)
-					if span in regions:
-						status = '100%covered'
-					else:
-						gaps = 0
-						last = regions[0][1]
-						for r in regions:
-							if last < r[0]:
-								gaps += 1
-							last = max(last,r[1])
-						if gaps >= 5:
-							status = '5+gaps'
-						elif gaps:
-							status = '%dgaps' % gaps
-						elif max( 1.0*(r[1]-r[0])/(span[1]-span[0]) for r in regions ) >= 0.95:
-							status = '95%covered'
-						else:
-							status = 'continuous'
-				units = set().union(*(nameUnits[n] for n in c))
-				case = (len(units & unitsNE),len(c),len(units & unitsEN),status)
-				f.write("%d\t%d\t%d\t%s\n" % case)
-				if case in detail:
-					detail.remove(case)
-					plot(units & unitsNE, units & unitsEN, unitNames, nameUnits, status)
-		if detail:
-			print "detail cases not found:",detail
+#		analyze_starfish(unitNames, nameUnits)
+		analyze_units(unitNames)
 		sys.exit(1)
 	else:
 		# C,H,N,E components
