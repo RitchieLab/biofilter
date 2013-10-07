@@ -1,6 +1,6 @@
 CHANGELOG
 
-2.1.1b1 (2013-08-21)
+2.1.1 (2013-08-21)
 - fixed a bug in model expansion that caused some models to be duplicated in
   reverse order, and some types to be paired with themselves as a model
 
