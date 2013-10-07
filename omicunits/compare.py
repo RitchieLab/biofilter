@@ -22,7 +22,7 @@ for row in cursor.execute("select namespace_id,namespace from namespace;"):
 # load namespace aliases
 alias = dict()
 if 0:
-	for row in cursor.execute("select namespace_id1,name1,namespace_id2,name2 from unit_name_name where namespace_id1 = namespace_id2;"):
+	for row in cursor.execute("select namespace_id1,name1,namespace_id2,name2 from name_name where namespace_id1 = namespace_id2;"):
 		name1 = (row[0],row[1])
 		name1a = alias.get(name1,name1)
 		name2 = (row[2],row[3])
@@ -41,7 +41,7 @@ nameIndex = dict()
 nameNamespaceID = list()
 nameName = list()
 numEdges = 0
-for row in cursor.execute("select namespace_id1,name1,namespace_id2,name2 from unit_name_name;"):
+for row in cursor.execute("select namespace_id1,name1,namespace_id2,name2 from name_name;"):
 	name1 = (row[0],row[1])
 	name2 = (row[2],row[3])
 	while name1 in alias:
