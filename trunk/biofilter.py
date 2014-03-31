@@ -24,7 +24,7 @@ class Biofilter:
 	def getVersionTuple(cls):
 		# tuple = (major,minor,revision,dev,build,date)
 		# dev must be in ('a','b','rc','release') for lexicographic comparison
-		return (2,1,1,'release','','2013-08-21')
+		return (2,1,2,'b',1,'2014-03-31')
 	#getVersionTuple()
 	
 	
@@ -1351,7 +1351,7 @@ class Biofilter:
 			('d_b',  'biopolymer_id', "(SELECT GROUP_CONCAT(namespace||':'||name,'|') FROM `db`.`biopolymer_name` AS d_bn JOIN `db`.`namespace` AS d_n USING (namespace_id) WHERE d_bn.biopolymer_id = d_b.biopolymer_id)"),
 		],
 		'biopolymer_chr' : [ #TODO: find a way to avoid repeating the conversions already in loki_db.chr_name
-			('d_br', '_ROWID_', "(CASE d_br.chr WHEN 23 THEN 'X' WHEN 24 THEN 'Y' WHEN 25 THEN 'XY' WHEN 26 THEN 'MT' ELSE d_br.chr END)", {"d_b.type_id+0 = {typeID_gene}"}),
+			('d_br', '_ROWID_', "(CASE d_br.chr WHEN 23 THEN 'X' WHEN 24 THEN 'Y' WHEN 25 THEN 'XY' WHEN 26 THEN 'MT' ELSE d_br.chr END)"),
 		],
 		'biopolymer_zone' : [
 			('d_bz', 'zone', "d_bz.zone"),

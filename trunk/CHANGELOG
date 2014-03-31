@@ -1,5 +1,12 @@
 CHANGELOG
 
+2.1.2 (2014-03-31)
+- fixed a bug in the 'biopolymer_chr' output column (which is part of
+  the 'generegion' output shortcut) which caused a crash with certain
+  combinations of input data and requested output
+- added support for HTTP (but not SOCKS) proxy servers for downloading source
+  data via HTTP
+
 2.1.1 (2013-08-21)
 - fixed a bug in model expansion that caused some models to be duplicated in
   reverse order, and some types to be paired with themselves as a model
