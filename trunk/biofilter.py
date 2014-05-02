@@ -308,9 +308,9 @@ class Biofilter:
 		self._geneModels = None
 		self._onlyGeneModels = True #TODO
 		
-		# verify loki_db version (table gwas added 2.1.0b1)
-		if loki_db.Database.getVersionTuple() < (2,1,0,'b',1):
-			sys.exit("ERROR: LOKI version 2.1.0b1 or later required; found %s" % (loki_db.Database.getVersionString(),))
+		# verify loki_db version ('extra' input support in 2.2.0a1)
+		if loki_db.Database.getVersionTuple() < (2,2,0,'a',1):
+			sys.exit("ERROR: LOKI version 2.2.0a1 or later required; found %s" % (loki_db.Database.getVersionString(),))
 		
 		# initialize instance database
 		self._loki = loki_db.Database()
