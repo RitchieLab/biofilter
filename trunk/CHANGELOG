@@ -1,5 +1,10 @@
 CHANGELOG
 
+2.2.0 (2014-??-??)
+- added support for "extra" input data to be stored with SNPs, positions,
+  regions, genes and groups, and corresponding output columns snp_extra, etc.
+- added support for user-defined knowledge input and group-level filtering
+
 2.1.2 (2014-03-31)
 - fixed a bug in the 'biopolymer_chr' output column (which is part of
   the 'generegion' output shortcut) which caused a crash with certain

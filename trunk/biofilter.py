@@ -24,7 +24,7 @@ class Biofilter:
 	def getVersionTuple(cls):
 		# tuple = (major,minor,revision,dev,build,date)
 		# dev must be in ('a','b','rc','release') for lexicographic comparison
-		return (2,1,2,'b',1,'2014-03-31')
+		return (2,2,0,'a',1,'2014-05-02')
 	#getVersionTuple()
 	
 	
@@ -56,7 +56,8 @@ class Biofilter:
   rowid INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
   label VARCHAR(32) NOT NULL,
   rs INTEGER NOT NULL,
-  flag TINYINT NOT NULL DEFAULT 0
+  flag TINYINT NOT NULL DEFAULT 0,
+  extra TEXT
 )
 """,
 				'index' : {
@@ -72,7 +73,8 @@ class Biofilter:
   label VARCHAR(32) NOT NULL,
   chr TINYINT NOT NULL,
   pos BIGINT NOT NULL,
-  flag TINYINT NOT NULL DEFAULT 0
+  flag TINYINT NOT NULL DEFAULT 0,
+  extra TEXT
 )
 """,
 				'index' : {
@@ -89,7 +91,8 @@ class Biofilter:
   chr TINYINT NOT NULL,
   posMin BIGINT NOT NULL,
   posMax BIGINT NOT NULL,
-  flag TINYINT NOT NULL DEFAULT 0
+  flag TINYINT NOT NULL DEFAULT 0,
+  extra TEXT
 )
 """,
 				'index' : {
@@ -120,7 +123,8 @@ class Biofilter:
   rowid INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
   label VARCHAR(32) NOT NULL,
   biopolymer_id INTEGER NOT NULL,
-  flag TINYINT NOT NULL DEFAULT 0
+  flag TINYINT NOT NULL DEFAULT 0,
+  extra TEXT
 )
 """,
 				'index' : {
@@ -135,7 +139,8 @@ class Biofilter:
   rowid INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
   label VARCHAR(32) NOT NULL,
   group_id INTEGER NOT NULL,
-  flag TINYINT NOT NULL DEFAULT 0
+  flag TINYINT NOT NULL DEFAULT 0,
+  extra TEXT
 )
 """,
 				'index' : {
@@ -160,6 +165,72 @@ class Biofilter:
 			
 			
 		}, #main
+		
+		
+		##################################################
+		# user data tables
+		
+		'user' : {
+			
+			
+			'group': {
+				'table': """
+(
+  group_id INTEGER PRIMARY KEY NOT NULL,
+  label VARCHAR(64) NOT NULL,
+  description VARCHAR(256),
+  source_id INTEGER NOT NULL,
+  extra TEXT
+)
+""",
+				'index': {
+					'group__label': '(label)',
+				}
+			}, #user.group
+			
+			
+			'group_group': {
+				'table': """
+(
+  group_id INTEGER NOT NULL,
+  related_group_id INTEGER NOT NULL,
+  contains TINYINT,
+  PRIMARY KEY (group_id,related_group_id)
+)
+""",
+				'index': {
+					'group_group__related': '(related_group_id,group_id)',
+				}
+			}, #user.group_group
+			
+			
+			'group_biopolymer': {
+				'table': """
+(
+  group_id INTEGER NOT NULL,
+  biopolymer_id INTEGER NOT NULL,
+  PRIMARY KEY (group_id,biopolymer_id)
+)
+""",
+				'index': {
+					'group_biopolymer__biopolymer': '(biopolymer_id,group_id)',
+				}
+			}, #user.group_biopolymer
+			
+			
+			'source' : {
+				'table' : """
+(
+  source_id INTEGER PRIMARY KEY NOT NULL,
+  label VARCHAR(32) NOT NULL,
+  description VARCHAR(256) NOT NULL
+)
+""",
+				'index' : {}
+			}, #user.source
+			
+			
+		}, #user
 		
 		
 		##################################################
@@ -245,7 +316,7 @@ class Biofilter:
 		self._loki = loki_db.Database()
 		self._loki.setLogger(self)
 		for db in self._schema:
-			if db != 'main':
+			if db != 'main': # in SQLite 'main' is implicit, but the others must be attached as temp stores
 				self._loki.attachTempDatabase(db)
 			self._loki.createDatabaseTables(self._schema[db], db, None, doIndecies=True)
 	#__init__()
@@ -472,32 +543,36 @@ class Biofilter:
 	# input data parsers and lookup helpers
 	
 	
-	def generateRSesFromText(self, lines, errorCallback=None):
+	def generateRSesFromText(self, lines, separator=None, errorCallback=None):
+		l = 0
 		for line in lines:
+			l += 1
 			try:
-				line = line.rstrip()
-				if not line:
+				cols = line.split(separator,1)
+				if not cols:
 					continue
 				try:
-					yield long(line)
+					rs = long(cols[0])
 				except ValueError:
-					if line[0:2].upper() == 'RS':
-						yield long(line[2:])
+					if cols[0].upper().startswith('RS'):
+						rs = long(cols[0][2:])
 					else:
 						raise
+				extra = cols[1] if (len(cols) > 1) else None
+				yield (rs,extra)
 			except:
-				if errorCallback:
-					errorCallback(line, str(sys.exc_info()[1]))
+				if (l > 1) and errorCallback:
+					errorCallback(line, "%s at position %d" % (str(sys.exc_info()[1]),l))
 		#foreach line
 	#generateRSesFromText()
 	
-		
-	def generateRSesFromRSFiles(self, paths, errorCallback=None):
+	
+	def generateRSesFromRSFiles(self, paths, separator=None, errorCallback=None):
 		for path in paths:
 			try:
 				with (sys.stdin if (path == '-' or not path) else open(path, 'rU')) as file:
-					for rs in self.generateRSesFromText((line for line in file if not line.startswith('#')), errorCallback):
-						yield rs
+					for data in self.generateRSesFromText((line for line in file if not line.startswith('#')), separator, errorCallback):
+						yield data
 				#with file
 			except:
 				self.warn("WARNING: error reading input file '%s': %s\n" % (path,str(sys.exc_info()[1])))
@@ -508,19 +583,17 @@ class Biofilter:
 	
 	
 	def generateLociFromText(self, lines, separator=None, errorCallback=None):
+		l = 0
 		for line in lines:
+			l += 1
 			try:
-				line = line.rstrip()
-				if not line:
+				# parse columns
+				cols = line.split(separator,4)
+				label = chm = pos = extra = None
+				if not cols:
 					continue
-				
-				# parse line
-				label = chm = pos = None
-				cols = line.split(separator)
-				if len(cols) < 2:
-					if errorCallback:
-						errorCallback(line, "not enough columns")
-					continue
+				elif len(cols) < 2:
+					raise Exception("not enough columns")
 				elif len(cols) == 2:
 					chm = cols[0].upper()
 					pos = cols[1].upper()
@@ -532,14 +605,13 @@ class Biofilter:
 					chm = cols[0].upper()
 					label = cols[1]
 					pos = cols[3].upper()
+					extra = cols[4] if (len(cols) > 4) else None
 				
 				# parse, validate and convert chromosome
 				if chm.startswith('CHR'):
 					chm = chm[3:]
 				if chm not in self._loki.chr_num:
-					if errorCallback:
-						errorCallback(line, "invalid chromosome '%s'" % chm)
-					continue
+					raise Exception("invalid chromosome '%s'" % chm)
 				chm = self._loki.chr_num[chm]
 				
 				# parse and convert locus label
@@ -547,24 +619,25 @@ class Biofilter:
 					label = 'chr%s:%s' % (self._loki.chr_name[chm], pos)
 				
 				# parse and convert position
-				if pos == '-' or pos == 'NA':
+				if (pos == '-') or (pos == 'NA'):
 					pos = None
 				else:
 					pos = long(pos)
-				yield (label,chm,pos)
+				
+				yield (label,chm,pos,extra)
 			except:
-				if errorCallback:
-					errorCallback(line, str(sys.exc_info()[1]))
+				if (l > 1) and errorCallback:
+					errorCallback(line, "%s at position %d" % (str(sys.exc_info()[1]),l))
 		#foreach line
 	#generateLociFromText()
 	
 	
-	def generateLociFromMapFiles(self, paths, errorCallback=None):
+	def generateLociFromMapFiles(self, paths, separator=None, errorCallback=None):
 		for path in paths:
 			try:
 				with (sys.stdin if (path == '-' or not path) else open(path, 'rU')) as file:
-					for locus in self.generateLociFromText((line for line in file if not line.startswith('#')), errorCallback=errorCallback):
-						yield locus
+					for data in self.generateLociFromText((line for line in file if not line.startswith('#')), separator, errorCallback):
+						yield data
 				#with file
 			except:
 				self.warn("WARNING: error reading input file '%s': %s\n" % (path,str(sys.exc_info()[1])))
@@ -575,19 +648,17 @@ class Biofilter:
 	
 	
 	def generateRegionsFromText(self, lines, separator=None, errorCallback=None):
+		l = 0
 		for line in lines:
+			l += 1
 			try:
-				line = line.rstrip()
-				if not line:
+				# parse columns
+				cols = line.split(separator,4)
+				label = chm = posMin = posMax = extra = None
+				if not cols:
 					continue
-				
-				# parse line
-				label = chm = posMin = posMax = None
-				cols = line.split(separator)
-				if len(cols) < 3:
-					if errorCallback:
-						errorCallback(line, "not enough columns")
-					continue
+				elif len(cols) < 3:
+					raise Exception("not enough columns")
 				elif len(cols) == 3:
 					chm = cols[0].upper()
 					posMin = cols[1].upper()
@@ -597,14 +668,13 @@ class Biofilter:
 					label = cols[1]
 					posMin = cols[2].upper()
 					posMax = cols[3].upper()
+					extra = cols[4] if (len(cols) > 4) else None
 				
 				# parse, validate and convert chromosome
 				if chm.startswith('CHR'):
 					chm = chm[3:]
 				if chm not in self._loki.chr_num:
-					if errorCallback:
-						errorCallback(line, "invalid chromosome '%s'" % chm)
-					continue
+					raise Exception("invalid chromosome '%s'" % chm)
 				chm = self._loki.chr_num[chm]
 				
 				# parse and convert region label
@@ -612,29 +682,29 @@ class Biofilter:
 					label = 'chr%s:%s-%s' % (self._loki.chr_name[chm], posMin, posMax)
 				
 				# parse and convert positions
-				if posMin == '-' or posMin == 'NA':
+				if (posMin == '-') or (posMin == 'NA'):
 					posMin = None
 				else:
 					posMin = long(posMin)
-				if posMax == '-' or posMax == 'NA':
+				if (posMax == '-') or (posMax == 'NA'):
 					posMax = None
 				else:
 					posMax = long(posMax)
 				
-				yield (label,chm,posMin,posMax)
+				yield (label,chm,posMin,posMax,extra)
 			except:
-				if errorCallback:
-					errorCallback(line, str(sys.exc_info()[1]))
+				if (l > 1) and errorCallback:
+					errorCallback(line, "%s at position %d" % (str(sys.exc_info()[1]),l))
 		#foreach line
 	#generateRegionsFromText()
 	
 	
-	def generateRegionsFromFiles(self, paths, errorCallback=None):
+	def generateRegionsFromFiles(self, paths, separator=None, errorCallback=None):
 		for path in paths:
 			try:
 				with (sys.stdin if (path == '-' or not path) else open(path, 'rU')) as file:
-					for region in self.generateRegionsFromText((line for line in file if not line.startswith('#')), errorCallback=errorCallback):
-						yield region
+					for data in self.generateRegionsFromText((line for line in file if not line.startswith('#')), separator, errorCallback):
+						yield data
 				#with file
 			except:
 				self.warn("WARNING: error reading input file '%s': %s\n" % (path,str(sys.exc_info()[1])))
@@ -644,35 +714,38 @@ class Biofilter:
 	#generateRegionsFromFiles()
 	
 	
-	def generateNamesFromNameFiles(self, paths, defaultNS=None, errorCallback=None):
+	def generateNamesFromText(self, lines, defaultNS=None, separator=None, errorCallback=None):
 		utf8 = codecs.getencoder('utf8')
+		l = 0
+		for line in lines:
+			l += 1
+			try:
+				cols = line.split(separator,2)
+				ns = name = extra = None
+				if not cols:
+					continue
+				elif len(cols) == 1:
+					ns = defaultNS
+					name = utf8(cols[0].strip())[0]
+				elif len(cols) >= 2:
+					ns = cols[0].strip()
+					name = utf8(cols[1].strip())[0]
+					extra = cols[2] if (len(cols) > 2) else None
+				
+				yield (ns,name,extra)
+			except:
+				if (l > 1) and errorCallback:
+					errorCallback(line, "%s at position %d" % (str(sys.exc_info()[1]),l))
+		#foreach line in file
+	#generateNamesFromText()
+	
+	
+	def generateNamesFromNameFiles(self, paths, defaultNS=None, separator=None, errorCallback=None):
 		for path in paths:
 			try:
 				with (sys.stdin if (path == '-' or not path) else open(path, 'rU')) as file:
-					for line in file:
-						try:
-							line = line.rstrip()
-							if (not line) or line.startswith('#'):
-								continue
-							
-							cols = line.split('\t')
-							if len(cols) == 1:
-								ns = defaultNS
-								name = utf8(cols[0].strip())[0]
-							elif len(cols) >= 2:
-								ns = cols[0].strip()
-								name = utf8(cols[1].strip())[0]
-							else:
-								continue
-							
-							if defaultNS == None:
-								yield name
-							else:
-								yield (ns,name)
-						except:
-							if errorCallback:
-								errorCallback(line, str(sys.exc_info()[1]))
-					#foreach line in file
+					for data in self.generateNamesFromText((line for line in file if not line.startswith('#')), defaultNS, separator, errorCallback):
+						yield data
 				#with file
 			except:
 				self.warn("WARNING: error reading input file '%s': %s\n" % (path,str(sys.exc_info()[1])))
@@ -682,17 +755,50 @@ class Biofilter:
 	#generateNamesFromNameFiles()
 	
 	
+	def loadUserKnowledgeFile(self, path, defaultNS=None, separator=None, errorCallback=None):
+		utf8 = codecs.getencoder('utf8')
+		try:
+			with (sys.stdin if (path == '-' or not path) else open(path, 'rU')) as file:
+				label,description = utf8(file.next())[0].strip().split(separator,1)
+				usourceID = self.addUserSource(label, description)
+				ugroupID = namesets = None
+				for line in file:
+					words = line.strip().split(separator)
+					if not words:
+						pass
+					elif words[0] == 'GROUP':
+						if ugroupID and namesets:
+							self.addUserGroupBiopolymers(ugroupID, namesets, errorCallback)
+						label = words[1] if (len(words) > 1) else None
+						description = " ".join(words[2:])
+						ugroupID = self.addUserGroup(usourceID, label, description, errorCallback)
+						namesets = list()
+					elif words[0] == 'CHILDREN':
+						pass #TODO eventual support for group hierarchies
+					elif ugroupID:
+						namesets.append(list( (defaultNS,utf8(w)[0],None) for w in words ))
+				#foreach line
+				if ugroupID and namesets:
+					self.addUserGroupBiopolymers(ugroupID, namesets, errorCallback)
+			#with file
+		except:
+			self.warn("WARNING: error reading input file '%s': %s\n" % (path,str(sys.exc_info()[1])))
+			if errorCallback:
+				errorCallback("<file> %s" % path, str(sys.exc_info()[1]))
+	#loadUserKnowledgeFile()
+	
+	
 	##################################################
 	# snp input
 	
 	
 	def unionInputSNPs(self, db, snps, errorCallback=None):
-		# snps=[ rs, ... ]
+		# snps=[ (rs,extra), ... ]
 		self.logPush("adding to %s SNP filter ...\n" % db)
 		cursor = self._loki._db.cursor()
 		
 		self.prepareTableForUpdate(db, 'snp')
-		sql = "INSERT INTO `%s`.`snp` (label,rs) VALUES ('rs'||?1,?2)" % db
+		sql = "INSERT INTO `%s`.`snp` (label,extra,rs) VALUES ('rs'||?1,?2,?3)" % db
 		tally = dict()
 		cursor.executemany(sql, self._loki.generateCurrentRSesByRSes(snps, tally))
 		self.logPop("... OK: added %d SNPs (%d RS#s merged)\n" % (tally['match']+tally['merge'],tally['merge']))
@@ -702,7 +808,7 @@ class Biofilter:
 	
 	
 	def intersectInputSNPs(self, db, snps, errorCallback=None):
-		# snps=[ rs, ... ]
+		# snps=[ (rs,extra), ... ]
 		if not self._inputFilters[db]['snp']:
 			return self.unionInputSNPs(db, snps, errorCallback)
 		self.logPush("reducing %s SNP filter ...\n" % db)
@@ -711,7 +817,7 @@ class Biofilter:
 		self.prepareTableForQuery(db, 'snp')
 		cursor.execute("UPDATE `%s`.`snp` SET flag = 0" % db)
 		numBefore = cursor.getconnection().changes()
-		sql = "UPDATE `%s`.`snp` SET flag = 1 WHERE (1 OR ?1) AND rs = ?2" % db
+		sql = "UPDATE `%s`.`snp` SET flag = 1 WHERE (1 OR ?1 OR ?2) AND rs = ?3" % db
 		tally = dict()
 		cursor.executemany(sql, self._loki.generateCurrentRSesByRSes(snps, tally))
 		cursor.execute("DELETE FROM `%s`.`snp` WHERE flag = 0" % db)
@@ -727,22 +833,23 @@ class Biofilter:
 	
 	
 	def unionInputLoci(self, db, loci, errorCallback=None):
-		# loci=[ (label,chr,pos), ... ]
+		# loci=[ (label,chr,pos,extra), ... ]
 		self.logPush("adding to %s position filter ...\n" % db)
 		cursor = self._loki._db.cursor()
 		
 		# use OR IGNORE to continue on data error, i.e. missing chr or pos
 		self.prepareTableForUpdate(db, 'locus')
-		sql = "INSERT OR IGNORE INTO `%s`.`locus` (label,chr,pos) VALUES (?1,?2,?3); SELECT LAST_INSERT_ROWID(),?1,?2,?3" % db
-		lastID = numAdd = numNull = 0
+		sql = "INSERT OR IGNORE INTO `%s`.`locus` (label,chr,pos,extra) VALUES (?1,?2,?3,?4); SELECT LAST_INSERT_ROWID(),?1,?2,?3,?4" % db
+		n = lastID = numAdd = numNull = 0
 		for row in cursor.executemany(sql, (2*locus for locus in loci)):
+			n += 1
 			if lastID != row[0]:
 				numAdd += 1
 				lastID = row[0]
 			else:
 				numNull += 1
 				if errorCallback:
-					errorCallback("\t".join(row[1:]), "invalid data")
+					errorCallback("\t".join(row[1:]), "invalid data at position %d" % (n,))
 		if numNull:
 			self.warn("WARNING: ignored %d invalid positions\n" % numNull)
 		self.logPop("... OK: added %d positions\n" % numAdd)
@@ -752,7 +859,7 @@ class Biofilter:
 	
 	
 	def intersectInputLoci(self, db, loci, errorCallback=None):
-		# loci=[ (label,chr,pos), ... ]
+		# loci=[ (label,chr,pos,extra), ... ]
 		if not self._inputFilters[db]['locus']:
 			return self.unionInputLoci(db, loci, errorCallback)
 		self.logPush("reducing %s position filter ...\n" % db)
@@ -761,7 +868,7 @@ class Biofilter:
 		self.prepareTableForQuery(db, 'locus')
 		cursor.execute("UPDATE `%s`.`locus` SET flag = 0" % db)
 		numBefore = cursor.getconnection().changes()
-		sql = "UPDATE `%s`.`locus` SET flag = 1 WHERE chr = ?1 AND pos = ?2" % db
+		sql = "UPDATE `%s`.`locus` SET flag = 1 WHERE (1 OR ?1) AND chr = ?2 AND pos = ?3 AND (1 OR ?4)" % db
 		cursor.executemany(sql, loci)
 		cursor.execute("DELETE FROM `%s`.`locus` WHERE flag = 0" % db)
 		numDrop = self._loki._db.changes()
@@ -776,22 +883,23 @@ class Biofilter:
 	
 	
 	def unionInputRegions(self, db, regions, errorCallback=None):
-		# regions=[ (label,chr,posMin,posMax), ... ]
+		# regions=[ (label,chr,posMin,posMax,extra), ... ]
 		self.logPush("adding to %s region filter ...\n" % db)
 		cursor = self._loki._db.cursor()
 		
 		# use OR IGNORE to continue on data error, i.e. missing chr or pos
 		self.prepareTableForUpdate(db, 'region')
-		sql = "INSERT OR IGNORE INTO `%s`.`region` (label,chr,posMin,posMax) VALUES (?1,?2,?3,?4); SELECT LAST_INSERT_ROWID(),?1,?2,?3,?4" % db
-		lastID = numAdd = numNull = 0
+		sql = "INSERT OR IGNORE INTO `%s`.`region` (label,chr,posMin,posMax,extra) VALUES (?1,?2,?3,?4,?5); SELECT LAST_INSERT_ROWID(),?1,?2,?3,?4,?5" % db
+		n = lastID = numAdd = numNull = 0
 		for row in cursor.executemany(sql, (2*region for region in regions)):
+			n += 1
 			if lastID != row[0]:
 				numAdd += 1
 				lastID = row[0]
 			else:
 				numNull += 1
 				if errorCallback:
-					errorCallback("\t".join(row[1:]), "invalid data")
+					errorCallback("\t".join(row[1:]), "invalid data at position %d" % (n,))
 		if numNull:
 			self.warn("WARNING: ignored %d invalid regions\n" % numNull)
 		self.logPop("... OK: added %d regions\n" % numAdd)
@@ -801,7 +909,7 @@ class Biofilter:
 	
 	
 	def intersectInputRegions(self, db, regions, errorCallback=None):
-		# regions=[ (label,chr,posMin,posMax), ... ]
+		# regions=[ (label,chr,posMin,posMax,extra), ... ]
 		if not self._inputFilters[db]['region']:
 			return self.unionInputRegions(db, regions, errorCallback)
 		self.logPush("reducing %s region filter ...\n" % db)
@@ -810,7 +918,7 @@ class Biofilter:
 		self.prepareTableForQuery(db, 'region')
 		cursor.execute("UPDATE `%s`.`region` SET flag = 0" % db)
 		numBefore = cursor.getconnection().changes()
-		sql = "UPDATE `%s`.`region` SET flag = 1 WHERE (1 OR ?1) AND chr = ?2 AND posMin = ?3 AND posMax = ?4" % db
+		sql = "UPDATE `%s`.`region` SET flag = 1 WHERE (1 OR ?1) AND chr = ?2 AND posMin = ?3 AND posMax = ?4 AND (1 OR ?5)" % db
 		cursor.executemany(sql, regions)
 		cursor.execute("DELETE FROM `%s`.`region` WHERE flag = 0" % db)
 		numDrop = cursor.getconnection().changes()
@@ -825,12 +933,12 @@ class Biofilter:
 	
 	
 	def unionInputGenes(self, db, names, errorCallback=None):
-		# names=[ (namespace,name), ... ]
+		# names=[ (namespace,name,extra), ... ]
 		self.logPush("adding to %s gene filter ...\n" % db)
 		cursor = self._loki._db.cursor()
 		
 		self.prepareTableForUpdate(db, 'gene')
-		sql = "INSERT INTO `%s`.`gene` (label,biopolymer_id) VALUES (?2,?3); SELECT 1" % db
+		sql = "INSERT INTO `%s`.`gene` (label,extra,biopolymer_id) VALUES (?2,?3,?4); SELECT 1" % db
 		maxMatch = (None if self._options.allow_ambiguous_genes == 'yes' else 1)
 		tally = dict()
 		numAdd = 0
@@ -862,7 +970,7 @@ class Biofilter:
 		cursor.execute("UPDATE `%s`.`gene` SET flag = 0" % db)
 		numBefore = cursor.getconnection().changes()
 		tally = dict()
-		sql = "UPDATE `%s`.`gene` SET flag = 1 WHERE biopolymer_id = ?3" % db
+		sql = "UPDATE `%s`.`gene` SET flag = 1 WHERE biopolymer_id = ?4" % db
 		maxMatch = (None if self._options.allow_ambiguous_genes == 'yes' else 1)
 		cursor.executemany(sql, self._loki.generateTypedBiopolymerIDsByIdentifiers(
 				self.getOptionTypeID('gene'), names, minMatch=1, maxMatch=maxMatch, tally=tally, errorCallback=errorCallback
@@ -883,14 +991,14 @@ class Biofilter:
 	
 	
 	def unionInputGeneSearch(self, db, texts):
-		# texts=[ text, ... ]
+		# texts=[ (text,extra), ... ]
 		self.logPush("adding to %s gene filter by text search ...\n" % db)
 		cursor = self._loki._db.cursor()
 		
 		typeID = self.getOptionTypeID('gene')
 		
 		self.prepareTableForUpdate(db, 'gene')
-		sql = "INSERT INTO `%s`.`gene` (label,biopolymer_id) VALUES (?1,?2); SELECT 1" % db
+		sql = "INSERT INTO `%s`.`gene` (extra,label,biopolymer_id) VALUES (?1,?2,?3); SELECT 1" % db
 		numAdd = 0
 		for row in cursor.executemany(sql, self._loki.generateTypedBiopolymerIDsBySearch(typeID, texts)):
 			numAdd += 1
@@ -901,7 +1009,7 @@ class Biofilter:
 	
 	
 	def intersectInputGeneSearch(self, db, texts):
-		# texts=[ texts, ... ]
+		# texts=[ (text,extra), ... ]
 		if not self._inputFilters[db]['gene']:
 			return self.unionInputGeneSearch(db, texts)
 		self.logPush("reducing %s gene filter by text search ...\n" % db)
@@ -912,7 +1020,7 @@ class Biofilter:
 		self.prepareTableForQuery(db, 'gene')
 		cursor.execute("UPDATE `%s`.`gene` SET flag = 0" % db)
 		numBefore = cursor.getconnection().changes()
-		sql = "UPDATE `%s`.`gene` SET flag = 1 WHERE biopolymer_id = ?2" % db
+		sql = "UPDATE `%s`.`gene` SET flag = 1 WHERE biopolymer_id = ?3" % db
 		cursor.executemany(sql, self._loki.generateTypedBiopolymerIDsBySearch(typeID, texts))
 		cursor.execute("DELETE FROM `%s`.`gene` WHERE flag = 0" % db)
 		numDrop = cursor.getconnection().changes()
@@ -927,12 +1035,12 @@ class Biofilter:
 	
 	
 	def unionInputGroups(self, db, names, errorCallback=None):
-		# names=[ (namespace,name), ... ]
+		# names=[ (namespace,name,extra), ... ]
 		self.logPush("adding to %s group filter ...\n" % (db,))
 		cursor = self._loki._db.cursor()
 		
 		self.prepareTableForUpdate(db, 'group')
-		sql = "INSERT INTO `%s`.`group` (label,group_id) VALUES (?2,?3); SELECT 1" % db
+		sql = "INSERT INTO `%s`.`group` (label,extra,group_id) VALUES (?2,?3,?4); SELECT 1" % db
 		maxMatch = (None if self._options.allow_ambiguous_groups == 'yes' else 1)
 		tally = dict()
 		numAdd = 0
@@ -954,7 +1062,7 @@ class Biofilter:
 	
 	
 	def intersectInputGroups(self, db, names, errorCallback=None):
-		# names=[ (namespace,name), ... ]
+		# names=[ (namespace,name,extra), ... ]
 		if not self._inputFilters[db]['group']:
 			return self.unionInputGroups(db, names, errorCallback)
 		self.logPush("reducing %s group filter ...\n" % (db,))
@@ -965,7 +1073,7 @@ class Biofilter:
 		numBefore = cursor.getconnection().changes()
 		maxMatch = (None if self._options.allow_ambiguous_groups == 'yes' else 1)
 		tally = dict()
-		sql = "UPDATE `%s`.`group` SET flag = 1 WHERE group_id = ?3" % db
+		sql = "UPDATE `%s`.`group` SET flag = 1 WHERE group_id = ?4" % db
 		cursor.executemany(sql, self._loki.generateGroupIDsByIdentifiers(
 				names, minMatch=1, maxMatch=maxMatch, tally=tally, errorCallback=errorCallback
 		))
@@ -985,12 +1093,12 @@ class Biofilter:
 	
 	
 	def unionInputGroupSearch(self, db, texts):
-		# texts=[ text, ... ]
+		# texts=[ (text,extra), ... ]
 		self.logPush("adding to %s group filter by text search ...\n" % (db,))
 		cursor = self._loki._db.cursor()
 		
 		self.prepareTableForUpdate(db, 'group')
-		sql = "INSERT INTO `%s`.`group` (label,group_id) VALUES (?1,?2); SELECT 1" % db
+		sql = "INSERT INTO `%s`.`group` (extra,label,group_id) VALUES (?1,?2,?3); SELECT 1" % db
 		numAdd = 0
 		for row in cursor.executemany(sql, self._loki.generateGroupIDsBySearch(texts)):
 			numAdd += 1
@@ -1001,7 +1109,7 @@ class Biofilter:
 	
 	
 	def intersectInputGroupSearch(self, db, texts):
-		# texts=[ texts, ... ]
+		# texts=[ (text,extra), ... ]
 		if not self._inputFilters[db]['group']:
 			return self.unionInputGroupSearch(db, texts)
 		self.logPush("reducing %s group filter by text search ...\n" % (db,))
@@ -1010,7 +1118,7 @@ class Biofilter:
 		self.prepareTableForQuery(db, 'group')
 		cursor.execute("UPDATE `%s`.`group` SET flag = 0" % db)
 		numBefore = cursor.getconnection().changes()
-		sql = "UPDATE `%s`.`group` SET flag = 1 WHERE group_id = ?2" % db
+		sql = "UPDATE `%s`.`group` SET flag = 1 WHERE group_id = ?3" % db
 		cursor.executemany(sql, self._loki.generateGroupIDsBySearch(texts))
 		cursor.execute("DELETE FROM `%s`.`group` WHERE flag = 0" % db)
 		numDrop = cursor.getconnection().changes()
@@ -1031,8 +1139,9 @@ class Biofilter:
 		
 		self.prepareTableForUpdate(db, 'source')
 		sql = "INSERT OR IGNORE INTO `%s`.`source` (label,source_id) VALUES (?1,?2)" % db
-		numAdd = numNull = 0
+		n = numAdd = numNull = 0
 		for source in names:
+			n += 1
 			sourceID = self._loki.getSourceID(source)
 			if sourceID:
 				numAdd += 1
@@ -1040,7 +1149,7 @@ class Biofilter:
 			else:
 				numNull += 1
 				if errorCallback:
-					errorCallback(source, "invalid source")
+					errorCallback(source, "invalid source at position %d" % (n,))
 		if numNull:
 			self.warn("WARNING: ignored %d unrecognized source identifier(s)\n" % numNull)
 		self.logPop("... OK: added %d sources\n" % numAdd)
@@ -1073,6 +1182,93 @@ class Biofilter:
 	
 	
 	##################################################
+	# user data input
+	
+	
+	def addUserSource(self, label, description, errorCallback=None):
+		self.log("adding user-defined source '%s' ..." % (label,))
+		self._inputFilters['user']['source'] += 1
+		usourceID = -self._inputFilters['user']['source']
+		cursor = self._loki._db.cursor()
+		cursor.execute("INSERT INTO `user`.`source` (source_id,label,description) VALUES (?,?,?)", (usourceID,label,description))
+		self.log(" OK\n")
+		return usourceID
+	#addUserSource()
+	
+	
+	def addUserGroup(self, usourceID, label, description, errorCallback=None):
+		self.log("adding user-defined group '%s' ..." % (label,))
+		self._inputFilters['user']['group'] += 1
+		ugroupID = -self._inputFilters['user']['group']
+		cursor = self._loki._db.cursor()
+		cursor.execute("INSERT INTO `user`.`group` (group_id,label,description,source_id) VALUES (?,?,?,?)", (ugroupID,label,description,usourceID))
+		self.log(" OK\n")
+		return ugroupID
+	#addUserGroup()
+	
+	
+	def addUserGroupBiopolymers(self, ugroupID, namesets, errorCallback=None):
+		#TODO: apply ambiguity settings and heuristics?
+		# namesets=[ [ (ns,name,extra), ...], ... ]
+		self.logPush("adding genes to user-defined group ...\n")
+		cursor = self._loki._db.cursor()
+		
+		sql = "INSERT OR IGNORE INTO `user`.`group_biopolymer` (group_id,biopolymer_id) VALUES (%d,?4)" % (ugroupID,)
+		tally = dict()
+		cursor.executemany(sql, self._loki.generateTypedBiopolymerIDsByIdentifiers(
+				self.getOptionTypeID('gene'), itertools.chain(*namesets), minMatch=1, maxMatch=None, tally=tally, errorCallback=errorCallback
+		))
+		if tally['zero']:
+			self.warn("WARNING: ignored %d unrecognized gene identifier(s)\n" % tally['zero'])
+		if tally['many']:
+			self.warn("WARNING: added multiple results for %d ambiguous gene identifier(s)\n" % tally['many'])
+		numAdd = sum(row[0] for row in cursor.execute("SELECT COUNT() FROM `user`.`group_biopolymer` WHERE group_id = ?", (ugroupID,)))
+		
+		self.logPop("... OK: added %d genes\n" % numAdd)
+		self._inputFilters['user']['group_biopolymer'] += 1
+	#addUserGroupBiopolymers()
+	
+	
+	def applyUserKnowledgeFilter(self, grouplevel=False):
+		cursor = self._loki._db.cursor()
+		if grouplevel:
+			self.logPush("applying user-defined knowledge to main group filter ...\n")
+			assert(self._inputFilters['main']['group'] == 0)
+			sql = """
+INSERT INTO `main`.`group` (label,group_id,extra)
+SELECT DISTINCT u_g.label, u_g.group_id, u_g.extra
+FROM `user`.`group` AS u_g
+UNION
+SELECT DISTINCT d_g.label, d_g.group_id, NULL AS extra
+FROM `user`.`group_biopolymer` AS u_gb
+JOIN `db`.`group_biopolymer` AS d_gb
+  ON d_gb.biopolymer_id = u_gb.biopolymer_id
+JOIN `db`.`group` AS d_g
+  ON d_g.group_id = d_gb.group_id
+"""
+			cursor.execute(sql)
+			num = sum(row[0] for row in cursor.execute("SELECT COUNT() FROM `main`.`group`"))
+			self.logPop("... OK: added %d groups\n" % (num,))
+			self._inputFilters['main']['group'] += 1
+		else:
+			self.logPush("applying user-defined knowledge to main gene filter ...\n")
+			assert(self._inputFilters['main']['gene'] == 0)
+			sql = """
+INSERT INTO `main`.`gene` (label,biopolymer_id,extra)
+SELECT DISTINCT d_b.label, d_b.biopolymer_id, NULL AS extra
+FROM `user`.`group_biopolymer` AS u_gb
+JOIN `db`.`biopolymer` AS d_b
+  ON d_b.biopolymer_id = u_gb.biopolymer_id
+"""
+			cursor.execute(sql)
+			num = sum(row[0] for row in cursor.execute("SELECT COUNT() FROM `main`.`gene`"))
+			self.logPop("... OK: added %d genes\n" % (num,))
+			self._inputFilters['main']['gene'] += 1
+		#if grouplevel
+	#applyUserKnowledgeFilter()
+	
+	
+	##################################################
 	# internal query builder
 	
 	
@@ -1092,6 +1288,9 @@ class Biofilter:
 		'a_bg'   : ('alt','gene'),              # (label,biopolymer_id)
 		'a_g'    : ('alt','group'),             # (label,group_id)
 		'a_c'    : ('alt','source'),            # (label,source_id)
+		'u_gb'   : ('user','group_biopolymer'), # (group_id,biopolymer_id)
+		'u_g'    : ('user','group'),            # (group_id,source_id)
+		'u_c'    : ('user','source'),           # (source_id)
 		'c_mb_L' : ('cand','main_biopolymer'),  # (biopolymer_id)
 		'c_mb_R' : ('cand','main_biopolymer'),  # (biopolymer_id)
 		'c_ab_R' : ('cand','alt_biopolymer'),   # (biopolymer_id)
@@ -1192,7 +1391,7 @@ class Biofilter:
 		(frozenset({'m_bg','a_bg','d_br','d_b'}),) : frozenset({
 			"{L}.biopolymer_id = {R}.biopolymer_id",
 		}),
-		(frozenset({'m_bg','a_bg','d_b'}),frozenset({'d_gb'})) : frozenset({
+		(frozenset({'m_bg','a_bg','d_b'}),frozenset({'u_gb','d_gb'})) : frozenset({
 			"{L}.biopolymer_id = {R}.biopolymer_id",
 		}),
 		(frozenset({'d_gb_L','d_gb_R'}),) : frozenset({
@@ -1201,7 +1400,13 @@ class Biofilter:
 		(frozenset({'m_g','a_g','d_gb','d_g'}),) : frozenset({
 			"{L}.group_id = {R}.group_id",
 		}),
+		(frozenset({'u_gb','u_g'}),) : frozenset({
+			"{L}.group_id = {R}.group_id",
+		}),
 		(frozenset({'m_c','a_c','d_g','d_c'}),) : frozenset({
+			"{L}.source_id = {R}.source_id",
+		}),
+		(frozenset({'u_g','u_c'}),) : frozenset({
 			"{L}.source_id = {R}.source_id",
 		}),
 		
@@ -1261,6 +1466,11 @@ class Biofilter:
 			('m_s',  'rs', "m_s.label"),
 			('d_sl', 'rs', "'rs'||d_sl.rs"),
 		],
+		'snp_extra' : [
+			('a_s',  'rs', "a_s.extra"),
+			('m_s',  'rs', "m_s.extra"),
+			('d_sl', 'rs', "NULL"),
+		],
 		
 		'position_id' : [
 			('a_l',  'rowid',   "a_l.rowid"),
@@ -1281,6 +1491,11 @@ class Biofilter:
 			('a_l',  'rowid',   "a_l.pos"),
 			('m_l',  'rowid',   "m_l.pos"),
 			('d_sl', '_ROWID_', "d_sl.pos"),
+		],
+		'position_extra' : [
+			('a_l',  'rowid',   "a_l.extra"),
+			('m_l',  'rowid',   "m_l.extra"),
+			('d_sl', '_ROWID_', "NULL"),
 		],
 		
 		'region_id' : [
@@ -1312,6 +1527,11 @@ class Biofilter:
 			('a_r',  'rowid',   "a_r.posMax"),
 			('m_r',  'rowid',   "m_r.posMax"),
 			('d_br', '_ROWID_', "d_br.posMax"),
+		],
+		'region_extra' : [
+			('a_r',  'rowid',   "a_r.extra"),
+			('m_r',  'rowid',   "m_r.extra"),
+			('d_br', '_ROWID_', "NULL"),
 		],
 		
 		'biopolymer_id' : [
@@ -1362,6 +1582,11 @@ class Biofilter:
 		'biopolymer_stop' : [
 			('d_br', '_ROWID_', "d_br.posMax"),
 		],
+		'biopolymer_extra' : [
+			('a_bg', 'biopolymer_id', "a_bg.extra"),
+			('m_bg', 'biopolymer_id', "m_bg.extra"),
+			('d_b',  'biopolymer_id', "NULL"),
+		],
 		
 		'gene_id' : [
 			('a_bg', 'biopolymer_id', "a_bg.biopolymer_id"),
@@ -1385,6 +1610,11 @@ class Biofilter:
 			('a_bg', 'biopolymer_id', "(SELECT GROUP_CONCAT(name,'|') FROM `db`.`biopolymer_name` AS d_bn WHERE d_bn.biopolymer_id = a_bg.biopolymer_id AND d_bn.namespace_id = {namespaceID_symbol})"),
 			('m_bg', 'biopolymer_id', "(SELECT GROUP_CONCAT(name,'|') FROM `db`.`biopolymer_name` AS d_bn WHERE d_bn.biopolymer_id = m_bg.biopolymer_id AND d_bn.namespace_id = {namespaceID_symbol})"),
 			('d_b',  'biopolymer_id', "(SELECT GROUP_CONCAT(name,'|') FROM `db`.`biopolymer_name` AS d_bn WHERE d_bn.biopolymer_id = d_b.biopolymer_id  AND d_bn.namespace_id = {namespaceID_symbol})", {"d_b.type_id+0 = {typeID_gene}"}),
+		],
+		'gene_extra' : [
+			('a_bg', 'biopolymer_id', "a_bg.extra"),
+			('m_bg', 'biopolymer_id', "m_bg.extra"),
+			('d_b',  'biopolymer_id', "NULL", {"d_b.type_id+0 = {typeID_gene}"}),
 		],
 		
 		'upstream_id' : [
@@ -1460,6 +1690,11 @@ class Biofilter:
 			('a_g', 'group_id', "(SELECT GROUP_CONCAT(namespace||':'||name,'|') FROM `db`.`group_name` AS d_gn JOIN `db`.`namespace` AS d_n USING (namespace_id) WHERE d_gn.group_id = a_g.group_id)"),
 			('m_g', 'group_id', "(SELECT GROUP_CONCAT(namespace||':'||name,'|') FROM `db`.`group_name` AS d_gn JOIN `db`.`namespace` AS d_n USING (namespace_id) WHERE d_gn.group_id = m_g.group_id)"),
 			('d_g', 'group_id', "(SELECT GROUP_CONCAT(namespace||':'||name,'|') FROM `db`.`group_name` AS d_gn JOIN `db`.`namespace` AS d_n USING (namespace_id) WHERE d_gn.group_id = d_g.group_id)"),
+		],
+		'group_extra' : [
+			('a_g', 'group_id', "a_g.extra"),
+			('m_g', 'group_id', "m_g.extra"),
+			('d_g', 'group_id', "NULL"),
 		],
 		
 		'source_id' : [
@@ -1787,7 +2022,6 @@ class Biofilter:
 		
 		# TODO: find a way to move this back into _queryAliasConditions without the covering index problem
 		if self._options.allow_unvalidated_snp_positions != 'yes':
-			print "ausp no"
 			if 'd_sl' in query['FROM']:
 				query['WHERE'].add("d_sl.validated > 0")
 			if 'd_sl' in query['LEFT JOIN']:
@@ -2385,6 +2619,13 @@ if __name__ == "__main__":
 	group.add_argument('--verify-source-file', type=str, metavar=('source','file','date','size','md5'), nargs=5, action='append', default=None,
 			help="require that the knowledge database was built with a specific source file fingerprint"
 	)
+	group.add_argument('--user-defined-knowledge', '--udk', type=str, metavar='file', nargs='+', default=None,
+			help="file(s) from which to load user-defined knowledge"
+	)
+	group.add_argument('--user-defined-filter', '--udf', type=str, metavar='no/group/gene', default='no',
+			choices=['no','group','gene'],
+			help="method by which user-defined knowledge will also be applied as a filter on other prior knowledge, from 'no', 'group' or 'gene' (default: no)"
+	)
 	
 	# add primary input section
 	group = parser.add_argument_group("Input Data Options")
@@ -2929,9 +3170,15 @@ if __name__ == "__main__":
 		bio.logPop("... OK\n")
 	#foreach report
 	
+	# load user-defined knowledge, if any
+	for path in (options.user_defined_knowledge or empty):
+		bio.loadUserKnowledgeFile(path, options.gene_identifier_type) #TODO errorCallback?
+	if options.user_defined_filter != 'no':
+		bio.applyUserKnowledgeFilter((options.user_defined_filter == 'group'))
+	
 	# apply primary filters
 	for snpList in (options.snp or empty):
-		bio.intersectInputSNPs('main', bio.generateRSesFromText(snpList, errorCallback=cb['SNP']), errorCallback=cb['SNP'])
+		bio.intersectInputSNPs('main', bio.generateRSesFromText(snpList, separator=':', errorCallback=cb['SNP']), errorCallback=cb['SNP'])
 	for snpFileList in (options.snp_file or empty):
 		bio.intersectInputSNPs('main', bio.generateRSesFromRSFiles(snpFileList, errorCallback=cb['SNP']), errorCallback=cb['SNP'])
 	for positionList in (options.position or empty):
@@ -2939,29 +3186,29 @@ if __name__ == "__main__":
 	for positionFileList in (options.position_file or empty):
 		bio.intersectInputLoci('main', bio.generateLociFromMapFiles(positionFileList, errorCallback=cb['position']), errorCallback=cb['position'])
 	for geneList in (options.gene or empty):
-		bio.intersectInputGenes('main', ((options.gene_identifier_type,encodeString(name)) for name in geneList), errorCallback=cb['gene'])
+		bio.intersectInputGenes('main', bio.generateNamesFromText(geneList, options.gene_identifier_type, separator=':', errorCallback=cb['gene']), errorCallback=cb['gene'])
 	for geneFileList in (options.gene_file or empty):
 		bio.intersectInputGenes('main', bio.generateNamesFromNameFiles(geneFileList, options.gene_identifier_type, errorCallback=cb['gene']), errorCallback=cb['gene'])
 	for geneSearch in (options.gene_search or empty):
-		bio.intersectInputGeneSearch('main', encodeString(geneSearch))
+		bio.intersectInputGeneSearch('main', (2*(encodeString(s),) for s in geneSearch))
 	for regionList in (options.region or empty):
 		bio.intersectInputRegions('main', bio.generateRegionsFromText(regionList, separator=':', errorCallback=cb['region']), errorCallback=cb['region'])
 	for regionFileList in (options.region_file or empty):
 		bio.intersectInputRegions('main', bio.generateRegionsFromFiles(regionFileList, errorCallback=cb['region']), errorCallback=cb['region'])
 	for groupList in (options.group or empty):
-		bio.intersectInputGroups('main', ((options.group_identifier_type,encodeString(name)) for name in groupList), errorCallback=cb['group'])
+		bio.intersectInputGroups('main', bio.generateNamesFromText(groupList, options.group_identifier_type, separator=':', errorCallback=cb['group']), errorCallback=cb['group'])
 	for groupFileList in (options.group_file or empty):
 		bio.intersectInputGroups('main', bio.generateNamesFromNameFiles(groupFileList, options.group_identifier_type, errorCallback=cb['group']), errorCallback=cb['group'])
 	for groupSearch in (options.group_search or empty):
-		bio.intersectInputGroupSearch('main', encodeString(groupSearch))
+		bio.intersectInputGroupSearch('main', (2*(encodeString(s),) for s in groupSearch))
 	for sourceList in (options.source or empty):
 		bio.intersectInputSources('main', sourceList, errorCallback=cb['source'])
-	for sourceFileList in (options.source_file or empty):
-		bio.intersectInputSources('main', bio.generateNamesFromNameFiles(sourceFileList, None, errorCallback=cb['source']), errorCallback=cb['source'])
+	for sourceFile in itertools.chain(*(options.source_file or empty)):
+		bio.intersectInputSources('main', itertools.chain(*(line for line in open(sourceFile,'rU'))), errorCallback=cb['source'])
 	
 	# apply alternate filters
 	for snpList in (options.alt_snp or empty):
-		bio.intersectInputSNPs('alt', bio.generateRSesFromText(snpList, errorCallback=cb['alt-SNP']), errorCallback=cb['alt-SNP'])
+		bio.intersectInputSNPs('alt', bio.generateRSesFromText(snpList, separator=':', errorCallback=cb['alt-SNP']), errorCallback=cb['alt-SNP'])
 	for snpFileList in (options.alt_snp_file or empty):
 		bio.intersectInputSNPs('alt', bio.generateRSesFromRSFiles(snpFileList, errorCallback=cb['alt-SNP']), errorCallback=cb['alt-SNP'])
 	for positionList in (options.alt_position or empty):
@@ -2969,25 +3216,25 @@ if __name__ == "__main__":
 	for positionFileList in (options.alt_position_file or empty):
 		bio.intersectInputLoci('alt', bio.generateLociFromMapFiles(positionFileList, errorCallback=cb['alt-position']), errorCallback=cb['alt-position'])
 	for geneList in (options.alt_gene or empty):
-		bio.intersectInputGenes('alt', ((options.gene_identifier_type,encodeString(name)) for name in geneList), errorCallback=cb['alt-gene'])
+		bio.intersectInputGenes('alt', bio.generateNamesFromText(geneList, options.gene_identifier_type, separator=':', errorCallback=cb['alt-gene']), errorCallback=cb['alt-gene'])
 	for geneFileList in (options.alt_gene_file or empty):
 		bio.intersectInputGenes('alt', bio.generateNamesFromNameFiles(geneFileList, options.gene_identifier_type, errorCallback=cb['alt-gene']), errorCallback=cb['alt-gene'])
 	for geneSearch in (options.alt_gene_search or empty):
-		bio.intersectInputGeneSearch('alt', encodeString(geneSearch))
+		bio.intersectInputGeneSearch('alt', (2*(encodeString(s),) for s in geneSearch))
 	for regionList in (options.alt_region or empty):
 		bio.intersectInputRegions('alt', bio.generateRegionsFromText(regionList, separator=':', errorCallback=cb['alt-region']), errorCallback=cb['alt-region'])
 	for regionFileList in (options.alt_region_file or empty):
 		bio.intersectInputRegions('alt', bio.generateRegionsFromFiles(regionFileList, errorCallback=cb['alt-region']), errorCallback=cb['alt-region'])
 	for groupList in (options.alt_group or empty):
-		bio.intersectInputGroups('alt', ((options.group_identifier_type,encodeString(name)) for name in groupList), errorCallback=cb['alt-group'])
+		bio.intersectInputGroups('alt', bio.generateNamesFromText(groupList, options.group_identifier_type, separator=':', errorCallback=cb['alt-group']), errorCallback=cb['alt-group'])
 	for groupFileList in (options.alt_group_file or empty):
 		bio.intersectInputGroups('alt', bio.generateNamesFromNameFiles(groupFileList, options.group_identifier_type, errorCallback=cb['alt-group']), errorCallback=cb['alt-group'])
 	for groupSearch in (options.alt_group_search or empty):
-		bio.intersectInputGroupSearch('alt', encodeString(groupSearch))
+		bio.intersectInputGroupSearch('alt', (2*(encodeString(s),) for s in groupSearch))
 	for sourceList in (options.alt_source or empty):
 		bio.intersectInputSources('alt', sourceList, errorCallback=cb['alt-source'])
-	for sourceFileList in (options.alt_source_file or empty):
-		bio.intersectInputSources('alt', bio.generateNamesFromNameFiles(sourceFileList, None, errorCallback=cb['alt-source']), errorCallback=cb['alt-source'])
+	for sourceFile in itertools.chain(*(options.alt_source_file or empty)):
+		bio.intersectInputSources('alt', itertools.chain(*(line for line in open(sourceFile,'rU'))), errorCallback=cb['alt-source'])
 	
 	# report invalid input, if requested
 	if options.report_invalid_input == 'yes':
