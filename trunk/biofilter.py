@@ -24,7 +24,7 @@ class Biofilter:
 	def getVersionTuple(cls):
 		# tuple = (major,minor,revision,dev,build,date)
 		# dev must be in ('a','b','rc','release') for lexicographic comparison
-		return (2,2,0,'a',1,'2014-05-02')
+		return (2,2,0,'b',1,'2014-05-20')
 	#getVersionTuple()
 	
 	
@@ -165,72 +165,6 @@ class Biofilter:
 			
 			
 		}, #main
-		
-		
-		##################################################
-		# user data tables
-		
-		'user' : {
-			
-			
-			'group': {
-				'table': """
-(
-  group_id INTEGER PRIMARY KEY NOT NULL,
-  label VARCHAR(64) NOT NULL,
-  description VARCHAR(256),
-  source_id INTEGER NOT NULL,
-  extra TEXT
-)
-""",
-				'index': {
-					'group__label': '(label)',
-				}
-			}, #user.group
-			
-			
-			'group_group': {
-				'table': """
-(
-  group_id INTEGER NOT NULL,
-  related_group_id INTEGER NOT NULL,
-  contains TINYINT,
-  PRIMARY KEY (group_id,related_group_id)
-)
-""",
-				'index': {
-					'group_group__related': '(related_group_id,group_id)',
-				}
-			}, #user.group_group
-			
-			
-			'group_biopolymer': {
-				'table': """
-(
-  group_id INTEGER NOT NULL,
-  biopolymer_id INTEGER NOT NULL,
-  PRIMARY KEY (group_id,biopolymer_id)
-)
-""",
-				'index': {
-					'group_biopolymer__biopolymer': '(biopolymer_id,group_id)',
-				}
-			}, #user.group_biopolymer
-			
-			
-			'source' : {
-				'table' : """
-(
-  source_id INTEGER PRIMARY KEY NOT NULL,
-  label VARCHAR(32) NOT NULL,
-  description VARCHAR(256) NOT NULL
-)
-""",
-				'index' : {}
-			}, #user.source
-			
-			
-		}, #user
 		
 		
 		##################################################
@@ -548,7 +482,7 @@ class Biofilter:
 		for line in lines:
 			l += 1
 			try:
-				cols = line.split(separator,1)
+				cols = line.strip().split(separator,1)
 				if not cols:
 					continue
 				try:
@@ -588,7 +522,7 @@ class Biofilter:
 			l += 1
 			try:
 				# parse columns
-				cols = line.split(separator,4)
+				cols = line.strip().split(separator,4)
 				label = chm = pos = extra = None
 				if not cols:
 					continue
@@ -653,7 +587,7 @@ class Biofilter:
 			l += 1
 			try:
 				# parse columns
-				cols = line.split(separator,4)
+				cols = line.strip().split(separator,4)
 				label = chm = posMin = posMax = extra = None
 				if not cols:
 					continue
@@ -720,7 +654,7 @@ class Biofilter:
 		for line in lines:
 			l += 1
 			try:
-				cols = line.split(separator,2)
+				cols = line.strip().split(separator,2)
 				ns = name = extra = None
 				if not cols:
 					continue
@@ -753,39 +687,6 @@ class Biofilter:
 					errorCallback("<file> %s" % path, str(sys.exc_info()[1]))
 		#foreach path
 	#generateNamesFromNameFiles()
-	
-	
-	def loadUserKnowledgeFile(self, path, defaultNS=None, separator=None, errorCallback=None):
-		utf8 = codecs.getencoder('utf8')
-		try:
-			with (sys.stdin if (path == '-' or not path) else open(path, 'rU')) as file:
-				label,description = utf8(file.next())[0].strip().split(separator,1)
-				usourceID = self.addUserSource(label, description)
-				ugroupID = namesets = None
-				for line in file:
-					words = line.strip().split(separator)
-					if not words:
-						pass
-					elif words[0] == 'GROUP':
-						if ugroupID and namesets:
-							self.addUserGroupBiopolymers(ugroupID, namesets, errorCallback)
-						label = words[1] if (len(words) > 1) else None
-						description = " ".join(words[2:])
-						ugroupID = self.addUserGroup(usourceID, label, description, errorCallback)
-						namesets = list()
-					elif words[0] == 'CHILDREN':
-						pass #TODO eventual support for group hierarchies
-					elif ugroupID:
-						namesets.append(list( (defaultNS,utf8(w)[0],None) for w in words ))
-				#foreach line
-				if ugroupID and namesets:
-					self.addUserGroupBiopolymers(ugroupID, namesets, errorCallback)
-			#with file
-		except:
-			self.warn("WARNING: error reading input file '%s': %s\n" % (path,str(sys.exc_info()[1])))
-			if errorCallback:
-				errorCallback("<file> %s" % path, str(sys.exc_info()[1]))
-	#loadUserKnowledgeFile()
 	
 	
 	##################################################
@@ -1182,93 +1083,6 @@ class Biofilter:
 	
 	
 	##################################################
-	# user data input
-	
-	
-	def addUserSource(self, label, description, errorCallback=None):
-		self.log("adding user-defined source '%s' ..." % (label,))
-		self._inputFilters['user']['source'] += 1
-		usourceID = -self._inputFilters['user']['source']
-		cursor = self._loki._db.cursor()
-		cursor.execute("INSERT INTO `user`.`source` (source_id,label,description) VALUES (?,?,?)", (usourceID,label,description))
-		self.log(" OK\n")
-		return usourceID
-	#addUserSource()
-	
-	
-	def addUserGroup(self, usourceID, label, description, errorCallback=None):
-		self.log("adding user-defined group '%s' ..." % (label,))
-		self._inputFilters['user']['group'] += 1
-		ugroupID = -self._inputFilters['user']['group']
-		cursor = self._loki._db.cursor()
-		cursor.execute("INSERT INTO `user`.`group` (group_id,label,description,source_id) VALUES (?,?,?,?)", (ugroupID,label,description,usourceID))
-		self.log(" OK\n")
-		return ugroupID
-	#addUserGroup()
-	
-	
-	def addUserGroupBiopolymers(self, ugroupID, namesets, errorCallback=None):
-		#TODO: apply ambiguity settings and heuristics?
-		# namesets=[ [ (ns,name,extra), ...], ... ]
-		self.logPush("adding genes to user-defined group ...\n")
-		cursor = self._loki._db.cursor()
-		
-		sql = "INSERT OR IGNORE INTO `user`.`group_biopolymer` (group_id,biopolymer_id) VALUES (%d,?4)" % (ugroupID,)
-		tally = dict()
-		cursor.executemany(sql, self._loki.generateTypedBiopolymerIDsByIdentifiers(
-				self.getOptionTypeID('gene'), itertools.chain(*namesets), minMatch=1, maxMatch=None, tally=tally, errorCallback=errorCallback
-		))
-		if tally['zero']:
-			self.warn("WARNING: ignored %d unrecognized gene identifier(s)\n" % tally['zero'])
-		if tally['many']:
-			self.warn("WARNING: added multiple results for %d ambiguous gene identifier(s)\n" % tally['many'])
-		numAdd = sum(row[0] for row in cursor.execute("SELECT COUNT() FROM `user`.`group_biopolymer` WHERE group_id = ?", (ugroupID,)))
-		
-		self.logPop("... OK: added %d genes\n" % numAdd)
-		self._inputFilters['user']['group_biopolymer'] += 1
-	#addUserGroupBiopolymers()
-	
-	
-	def applyUserKnowledgeFilter(self, grouplevel=False):
-		cursor = self._loki._db.cursor()
-		if grouplevel:
-			self.logPush("applying user-defined knowledge to main group filter ...\n")
-			assert(self._inputFilters['main']['group'] == 0)
-			sql = """
-INSERT INTO `main`.`group` (label,group_id,extra)
-SELECT DISTINCT u_g.label, u_g.group_id, u_g.extra
-FROM `user`.`group` AS u_g
-UNION
-SELECT DISTINCT d_g.label, d_g.group_id, NULL AS extra
-FROM `user`.`group_biopolymer` AS u_gb
-JOIN `db`.`group_biopolymer` AS d_gb
-  ON d_gb.biopolymer_id = u_gb.biopolymer_id
-JOIN `db`.`group` AS d_g
-  ON d_g.group_id = d_gb.group_id
-"""
-			cursor.execute(sql)
-			num = sum(row[0] for row in cursor.execute("SELECT COUNT() FROM `main`.`group`"))
-			self.logPop("... OK: added %d groups\n" % (num,))
-			self._inputFilters['main']['group'] += 1
-		else:
-			self.logPush("applying user-defined knowledge to main gene filter ...\n")
-			assert(self._inputFilters['main']['gene'] == 0)
-			sql = """
-INSERT INTO `main`.`gene` (label,biopolymer_id,extra)
-SELECT DISTINCT d_b.label, d_b.biopolymer_id, NULL AS extra
-FROM `user`.`group_biopolymer` AS u_gb
-JOIN `db`.`biopolymer` AS d_b
-  ON d_b.biopolymer_id = u_gb.biopolymer_id
-"""
-			cursor.execute(sql)
-			num = sum(row[0] for row in cursor.execute("SELECT COUNT() FROM `main`.`gene`"))
-			self.logPop("... OK: added %d genes\n" % (num,))
-			self._inputFilters['main']['gene'] += 1
-		#if grouplevel
-	#applyUserKnowledgeFilter()
-	
-	
-	##################################################
 	# internal query builder
 	
 	
@@ -1288,9 +1102,6 @@ JOIN `db`.`biopolymer` AS d_b
 		'a_bg'   : ('alt','gene'),              # (label,biopolymer_id)
 		'a_g'    : ('alt','group'),             # (label,group_id)
 		'a_c'    : ('alt','source'),            # (label,source_id)
-		'u_gb'   : ('user','group_biopolymer'), # (group_id,biopolymer_id)
-		'u_g'    : ('user','group'),            # (group_id,source_id)
-		'u_c'    : ('user','source'),           # (source_id)
 		'c_mb_L' : ('cand','main_biopolymer'),  # (biopolymer_id)
 		'c_mb_R' : ('cand','main_biopolymer'),  # (biopolymer_id)
 		'c_ab_R' : ('cand','alt_biopolymer'),   # (biopolymer_id)
@@ -1391,7 +1202,7 @@ JOIN `db`.`biopolymer` AS d_b
 		(frozenset({'m_bg','a_bg','d_br','d_b'}),) : frozenset({
 			"{L}.biopolymer_id = {R}.biopolymer_id",
 		}),
-		(frozenset({'m_bg','a_bg','d_b'}),frozenset({'u_gb','d_gb'})) : frozenset({
+		(frozenset({'m_bg','a_bg','d_b'}),frozenset({'d_gb'})) : frozenset({
 			"{L}.biopolymer_id = {R}.biopolymer_id",
 		}),
 		(frozenset({'d_gb_L','d_gb_R'}),) : frozenset({
@@ -1400,13 +1211,7 @@ JOIN `db`.`biopolymer` AS d_b
 		(frozenset({'m_g','a_g','d_gb','d_g'}),) : frozenset({
 			"{L}.group_id = {R}.group_id",
 		}),
-		(frozenset({'u_gb','u_g'}),) : frozenset({
-			"{L}.group_id = {R}.group_id",
-		}),
 		(frozenset({'m_c','a_c','d_g','d_c'}),) : frozenset({
-			"{L}.source_id = {R}.source_id",
-		}),
-		(frozenset({'u_g','u_c'}),) : frozenset({
 			"{L}.source_id = {R}.source_id",
 		}),
 		
@@ -2619,13 +2424,6 @@ if __name__ == "__main__":
 	group.add_argument('--verify-source-file', type=str, metavar=('source','file','date','size','md5'), nargs=5, action='append', default=None,
 			help="require that the knowledge database was built with a specific source file fingerprint"
 	)
-	group.add_argument('--user-defined-knowledge', '--udk', type=str, metavar='file', nargs='+', default=None,
-			help="file(s) from which to load user-defined knowledge"
-	)
-	group.add_argument('--user-defined-filter', '--udf', type=str, metavar='no/group/gene', default='no',
-			choices=['no','group','gene'],
-			help="method by which user-defined knowledge will also be applied as a filter on other prior knowledge, from 'no', 'group' or 'gene' (default: no)"
-	)
 	
 	# add primary input section
 	group = parser.add_argument_group("Input Data Options")
@@ -3169,12 +2967,6 @@ if __name__ == "__main__":
 			outfile.close()
 		bio.logPop("... OK\n")
 	#foreach report
-	
-	# load user-defined knowledge, if any
-	for path in (options.user_defined_knowledge or empty):
-		bio.loadUserKnowledgeFile(path, options.gene_identifier_type) #TODO errorCallback?
-	if options.user_defined_filter != 'no':
-		bio.applyUserKnowledgeFilter((options.user_defined_filter == 'group'))
 	
 	# apply primary filters
 	for snpList in (options.snp or empty):

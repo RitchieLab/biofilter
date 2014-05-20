@@ -1,18 +1,22 @@
 CHANGELOG
 
-2.2.0 (2014-??-??)
+2.2.0b1 (2014-05-20)
 - added support for "extra" input data to be stored with SNPs, positions,
   regions, genes and groups, and corresponding output columns snp_extra, etc.
-- added support for user-defined knowledge input and group-level filtering
+- (LOKI) added support for parsing updated genome build identities from
+  http://genome.ucsc.edu/FAQ/FAQreleases.html
+- (LOKI) added warnings for unrecognized genome builds which could lead to
+  mismatched data
+- (LOKI) added a tally of SNP role records with unrecognized Entrez GeneIDs
 
-2.1.2 (2014-03-31)
+2.1.2b1 (2014-03-31)
 - fixed a bug in the 'biopolymer_chr' output column (which is part of
   the 'generegion' output shortcut) which caused a crash with certain
   combinations of input data and requested output
-- added support for HTTP (but not SOCKS) proxy servers for downloading source
-  data via HTTP
+- (LOKI) added support for HTTP (but not SOCKS) proxy servers for downloading
+  source data via HTTP
 
-2.1.1 (2013-08-21)
+2.1.1b1 (2013-08-21)
 - fixed a bug in model expansion that caused some models to be duplicated in
   reverse order, and some types to be paired with themselves as a model
 
@@ -78,4 +82,3 @@ CHANGELOG
 
 2.0.0b1 (2012-10-16)
 - first public release
-
