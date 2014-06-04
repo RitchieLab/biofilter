@@ -24,7 +24,7 @@ class Biofilter:
 	def getVersionTuple(cls):
 		# tuple = (major,minor,revision,dev,build,date)
 		# dev must be in ('a','b','rc','release') for lexicographic comparison
-		return (2,2,0,'rc',1,'2014-05-27')
+		return (2,2,0,'rc',2,'2014-06-04')
 	#getVersionTuple()
 	
 	
@@ -66,7 +66,7 @@ class Biofilter:
 			}, #main.snp
 			
 			
-			'locus' : {
+			'locus' : { # all coordinates in LOKI are 1-based closed intervals
 				'table' : """
 (
   rowid INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
@@ -83,7 +83,7 @@ class Biofilter:
 			}, #main.locus
 			
 			
-			'region' : {
+			'region' : { # all coordinates in LOKI are 1-based closed intervals
 				'table' : """
 (
   rowid INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
@@ -1239,15 +1239,17 @@ class Biofilter:
 		}),
 		(frozenset({'m_r','a_r','d_br'}),) : frozenset({
 			"{L}.chr = {R}.chr",
-			"({L}.posMax - {L}.posMin) >= {rmBases}",
-			"({R}.posMax - {R}.posMin) >= {rmBases}",
-			"((" +
-				"{L}.posMin >= {R}.posMin AND " +
-				"{L}.posMin <= {R}.posMax - MAX({rmBases}, MIN({L}.posMax - {L}.posMin, {R}.posMax - {R}.posMin) * {rmPercent} / 100.0)" +
-			") OR (" +
-				"{R}.posMin >= {L}.posMin AND " +
-				"{R}.posMin <= {L}.posMax - MAX({rmBases}, MIN({L}.posMax - {L}.posMin, {R}.posMax - {R}.posMin) * {rmPercent} / 100.0)" +
-			"))",
+			"({L}.posMax - {L}.posMin + 1) >= {rmBases}",
+			"({R}.posMax - {R}.posMin + 1) >= {rmBases}",
+			"(" +
+				"(" +
+					"{L}.posMin >= {R}.posMin AND " +
+					"{L}.posMin <= {R}.posMax + 1 - MAX({rmBases}, (MIN({L}.posMax - {L}.posMin, {R}.posMax - {R}.posMin) + 1) * {rmPercent} / 100.0)" +
+				") OR (" +
+					"{R}.posMin >= {L}.posMin AND " +
+					"{R}.posMin <= {L}.posMax + 1 - MAX({rmBases}, (MIN({L}.posMax - {L}.posMin, {R}.posMax - {R}.posMin) + 1) * {rmPercent} / 100.0)" +
+				")" +
+			")",
 		}),
 	} #class._queryAliasPairConditions{}
 	
