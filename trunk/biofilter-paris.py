@@ -6,6 +6,7 @@ import collections
 import csv
 import itertools
 import os
+import random
 import string
 import sys
 import time
@@ -24,7 +25,7 @@ class Biofilter:
 	def getVersionTuple(cls):
 		# tuple = (major,minor,revision,dev,build,date)
 		# dev must be in ('a','b','rc','release') for lexicographic comparison
-		return (2,2,0,'rc',2,'2014-06-04')
+		return (2,3,0,'a',1,'2014-06-10')
 	#getVersionTuple()
 	
 	
@@ -165,6 +166,72 @@ class Biofilter:
 			
 			
 		}, #main
+		
+		
+		##################################################
+		# user data tables
+		
+		'user' : {
+			
+			
+			'group': {
+				'table': """
+(
+  group_id INTEGER PRIMARY KEY NOT NULL,
+  label VARCHAR(64) NOT NULL,
+  description VARCHAR(256),
+  source_id INTEGER NOT NULL,
+  extra TEXT
+)
+""",
+				'index': {
+					'group__label': '(label)',
+				}
+			}, #user.group
+			
+			
+			'group_group': {
+				'table': """
+(
+  group_id INTEGER NOT NULL,
+  related_group_id INTEGER NOT NULL,
+  contains TINYINT,
+  PRIMARY KEY (group_id,related_group_id)
+)
+""",
+				'index': {
+					'group_group__related': '(related_group_id,group_id)',
+				}
+			}, #user.group_group
+			
+			
+			'group_biopolymer': {
+				'table': """
+(
+  group_id INTEGER NOT NULL,
+  biopolymer_id INTEGER NOT NULL,
+  PRIMARY KEY (group_id,biopolymer_id)
+)
+""",
+				'index': {
+					'group_biopolymer__biopolymer': '(biopolymer_id,group_id)',
+				}
+			}, #user.group_biopolymer
+			
+			
+			'source' : {
+				'table' : """
+(
+  source_id INTEGER PRIMARY KEY NOT NULL,
+  label VARCHAR(32) NOT NULL,
+  description VARCHAR(256) NOT NULL
+)
+""",
+				'index' : {}
+			}, #user.source
+			
+			
+		}, #user
 		
 		
 		##################################################
@@ -379,9 +446,9 @@ class Biofilter:
 		def _zones(size, regions):
 			# regions=[ (id,chr,posMin,posMax),... ]
 			# yields:[ (id,chr,zone),... ]
-			for r in regions:
-				for z in xrange(int(r[2]/size),int(r[3]/size)+1):
-					yield (r[0],r[1],z)
+			for rowid,chm,posMin,posMax in regions:
+				for z in xrange(int(posMin/size),int(posMax/size)+1):
+					yield (rowid,chm,z)
 		#_zones()
 		
 		# feed all regions through the zone generator
@@ -687,6 +754,39 @@ class Biofilter:
 					errorCallback("<file> %s" % path, str(sys.exc_info()[1]))
 		#foreach path
 	#generateNamesFromNameFiles()
+	
+	
+	def loadUserKnowledgeFile(self, path, defaultNS=None, separator=None, errorCallback=None):
+		utf8 = codecs.getencoder('utf8')
+		try:
+			with (sys.stdin if (path == '-' or not path) else open(path, 'rU')) as file:
+				label,description = utf8(file.next())[0].strip().split(separator,1)
+				usourceID = self.addUserSource(label, description)
+				ugroupID = namesets = None
+				for line in file:
+					words = line.strip().split(separator)
+					if not words:
+						pass
+					elif words[0] == 'GROUP':
+						if ugroupID and namesets:
+							self.addUserGroupBiopolymers(ugroupID, namesets, errorCallback)
+						label = words[1] if (len(words) > 1) else None
+						description = " ".join(words[2:])
+						ugroupID = self.addUserGroup(usourceID, label, description, errorCallback)
+						namesets = list()
+					elif words[0] == 'CHILDREN':
+						pass #TODO eventual support for group hierarchies
+					elif ugroupID:
+						namesets.append(list( (defaultNS,utf8(w)[0],None) for w in words ))
+				#foreach line
+				if ugroupID and namesets:
+					self.addUserGroupBiopolymers(ugroupID, namesets, errorCallback)
+			#with file
+		except:
+			self.warn("WARNING: error reading input file '%s': %s\n" % (path,str(sys.exc_info()[1])))
+			if errorCallback:
+				errorCallback("<file> %s" % path, str(sys.exc_info()[1]))
+	#loadUserKnowledgeFile()
 	
 	
 	##################################################
@@ -1083,6 +1183,248 @@ class Biofilter:
 	
 	
 	##################################################
+	# user data input
+	
+	
+	def addUserSource(self, label, description, errorCallback=None):
+		self.log("adding user-defined source '%s' ..." % (label,))
+		self._inputFilters['user']['source'] += 1
+		usourceID = -self._inputFilters['user']['source']
+		cursor = self._loki._db.cursor()
+		cursor.execute("INSERT INTO `user`.`source` (source_id,label,description) VALUES (?,?,?)", (usourceID,label,description))
+		self.log(" OK\n")
+		return usourceID
+	#addUserSource()
+	
+	
+	def addUserGroup(self, usourceID, label, description, errorCallback=None):
+		self.log("adding user-defined group '%s' ..." % (label,))
+		self._inputFilters['user']['group'] += 1
+		ugroupID = -self._inputFilters['user']['group']
+		cursor = self._loki._db.cursor()
+		cursor.execute("INSERT INTO `user`.`group` (group_id,label,description,source_id) VALUES (?,?,?,?)", (ugroupID,label,description,usourceID))
+		self.log(" OK\n")
+		return ugroupID
+	#addUserGroup()
+	
+	
+	def addUserGroupBiopolymers(self, ugroupID, namesets, errorCallback=None):
+		#TODO: apply ambiguity settings and heuristics?
+		# namesets=[ [ (ns,name,extra), ...], ... ]
+		self.logPush("adding genes to user-defined group ...\n")
+		cursor = self._loki._db.cursor()
+		
+		sql = "INSERT OR IGNORE INTO `user`.`group_biopolymer` (group_id,biopolymer_id) VALUES (%d,?4)" % (ugroupID,)
+		tally = dict()
+		cursor.executemany(sql, self._loki.generateTypedBiopolymerIDsByIdentifiers(
+				self.getOptionTypeID('gene'), itertools.chain(*namesets), minMatch=1, maxMatch=None, tally=tally, errorCallback=errorCallback
+		))
+		if tally['zero']:
+			self.warn("WARNING: ignored %d unrecognized gene identifier(s)\n" % tally['zero'])
+		if tally['many']:
+			self.warn("WARNING: added multiple results for %d ambiguous gene identifier(s)\n" % tally['many'])
+		numAdd = sum(row[0] for row in cursor.execute("SELECT COUNT() FROM `user`.`group_biopolymer` WHERE group_id = ?", (ugroupID,)))
+		
+		self.logPop("... OK: added %d genes\n" % numAdd)
+		self._inputFilters['user']['group_biopolymer'] += 1
+	#addUserGroupBiopolymers()
+	
+	
+	def applyUserKnowledgeFilter(self, grouplevel=False):
+		cursor = self._loki._db.cursor()
+		if grouplevel:
+			self.logPush("applying user-defined knowledge to main group filter ...\n")
+			assert(self._inputFilters['main']['group'] == 0)
+			sql = """
+INSERT INTO `main`.`group` (label,group_id,extra)
+SELECT DISTINCT u_g.label, u_g.group_id, u_g.extra
+FROM `user`.`group` AS u_g
+UNION
+SELECT DISTINCT d_g.label, d_g.group_id, NULL AS extra
+FROM `user`.`group_biopolymer` AS u_gb
+JOIN `db`.`group_biopolymer` AS d_gb
+  ON d_gb.biopolymer_id = u_gb.biopolymer_id
+JOIN `db`.`group` AS d_g
+  ON d_g.group_id = d_gb.group_id
+"""
+			cursor.execute(sql)
+			num = sum(row[0] for row in cursor.execute("SELECT COUNT() FROM `main`.`group`"))
+			self.logPop("... OK: added %d groups\n" % (num,))
+			self._inputFilters['main']['group'] += 1
+		else:
+			self.logPush("applying user-defined knowledge to main gene filter ...\n")
+			assert(self._inputFilters['main']['gene'] == 0)
+			sql = """
+INSERT INTO `main`.`gene` (label,biopolymer_id,extra)
+SELECT DISTINCT d_b.label, d_b.biopolymer_id, NULL AS extra
+FROM `user`.`group_biopolymer` AS u_gb
+JOIN `db`.`biopolymer` AS d_b
+  ON d_b.biopolymer_id = u_gb.biopolymer_id
+"""
+			cursor.execute(sql)
+			num = sum(row[0] for row in cursor.execute("SELECT COUNT() FROM `main`.`gene`"))
+			self.logPop("... OK: added %d genes\n" % (num,))
+			self._inputFilters['main']['gene'] += 1
+		#if grouplevel
+	#applyUserKnowledgeFilter()
+	
+	
+	##################################################
+	# PARIS
+	
+	
+	def generatePARISResults(self, threshold):
+		self.logPush("running PARIS ...\n")
+		cursor = self._loki._db.cursor()
+		
+		if not self._inputFilters['main']['region']:
+			raise Exception("PARIS requires input feature regions")
+		if not (self._inputFilters['main']['snp'] or self._inputFilters['main']['locus']):
+			raise Exception("PARIS requires input SNPs or positions with p-values")
+		sql = "UPDATE `main`.`snp` SET flag = 0; UPDATE `main`.`locus` SET flag = 0; UPDATE `main`.`region` SET flag = 0"
+		cursor.execute(sql)
+		
+		if self._inputFilters['main']['snp']:
+			self.logPush("mapping SNP results to feature regions ...\n")
+			querySelect = ['snp_id','region_id']
+			queryFilter = {'main':{'snp':1,'region_zone':1,'region':1}}
+			query = self.buildQuery('filter', 'main', select=querySelect, fromFilter=queryFilter, joinFilter=queryFilter)
+			sql = "UPDATE `main`.`snp` SET flag = 1 WHERE rs = ?; UPDATE `main`.`region` SET flag = flag | 1 WHERE rowid = ?"
+			cursor.executemany(sql, self.generateQueryResults(query, allowDupes=True))
+			for row in cursor.execute("SELECT COUNT(), COALESCE(SUM(flag),0) from `main`.`snp`"):
+				numSNP,numSNPRegion = row
+			for row in cursor.execute("SELECT COUNT(), COALESCE(SUM(CASE WHEN flag & 1 THEN 1 ELSE 0 END),0) from `main`.`region`"):
+				numRegion,numRegionSNP = row
+			self.logPop("... OK: %d SNPs in %d feature regions, %d singleton SNPs\n" % (numSNPRegion,numRegionSNP,numSNP-numSNPRegion))
+		#if SNPs
+		
+		if self._inputFilters['main']['locus']:
+			self.logPush("mapping position results to feature regions ...\n")
+			querySelect = ['position_id','region_id']
+			queryFilter = {'main':{'locus':1,'region_zone':1,'region':1}}
+			query = self.buildQuery('filter', 'main', select=querySelect, fromFilter=queryFilter, joinFilter=queryFilter)
+			sql = "UPDATE `main`.`locus` SET flag = 1 WHERE rowid = ?; UPDATE `main`.`region` SET flag = flag | 2 WHERE rowid = ?"
+			cursor.executemany(sql, self.generateQueryResults(query, allowDupes=True))
+			for row in cursor.execute("SELECT COUNT(), COALESCE(SUM(flag),0) from `main`.`locus`"):
+				numLocus,numLocusRegion = row
+			for row in cursor.execute("SELECT COUNT(), COALESCE(SUM(CASE WHEN flag & 2 THEN 1 ELSE 0 END),0) from `main`.`region`"):
+				numRegion,numRegionLocus = row
+			self.logPop("... OK: %d positions in %d feature regions, %d singleton positions\n" % (numLocusRegion,numRegionLocus,numLocus-numLocusRegion))
+		#if loci
+		
+		self.logPush("generating singleton features ...\n")
+		self.prepareTableForUpdate('main','region')
+		cursor.execute("DELETE FROM `main`.`region` WHERE flag = 0")
+		numRegionDrop = cursor.getconnection().changes()
+		if self._inputFilters['main']['snp']:
+			querySelect = ['snp_label','position_chr','position_pos','position_pos']
+			queryWhere = { ('m_s','flag'):{'= 0'} }
+			queryFilter = {'main':{'snp':1}}
+			query = self.buildQuery('filter', 'main', select=querySelect, where=queryWhere, fromFilter=queryFilter, joinFilter=queryFilter)
+			sql = "INSERT INTO `main`.`region` (label,chr,posMin,posMax) VALUES (?,?,?,?)"
+			cursor.executemany(sql, self.generateQueryResults(query, allowDupes=True))
+		#if SNPs
+		if self._inputFilters['main']['locus']:
+			querySelect = ['position_label','position_chr','position_pos','position_pos']
+			queryWhere = { ('m_l','flag'):{'= 0'} }
+			queryFilter = {'main':{'locus':1}}
+			query = self.buildQuery('filter', 'main', select=querySelect, where=queryWhere, fromFilter=queryFilter, joinFilter=queryFilter)
+			sql = "INSERT INTO `main`.`region` (label,chr,posMin,posMax) VALUES (?,?,?,?)"
+			cursor.executemany(sql, self.generateQueryResults(query, allowDupes=True))
+		#if loci
+		for row in cursor.execute("SELECT COUNT(), COALESCE(SUM(CASE WHEN flag = 0 THEN 1 ELSE 0 END),0) FROM `main`.`region`"):
+			numRegionFinal,numRegionAdd = row
+		self.logPop("... OK: dropped %d unused feature regions, added %d singleton features\n" % (numRegionDrop,numRegionAdd))
+		
+		self.logPush("binning features ...\n")
+		featureData = collections.defaultdict(lambda: [0,random.random(),0]) # [size,random,significance]
+		if self._inputFilters['main']['snp']:
+			querySelect = ['snp_extra','region_id']
+			queryFilter = {'main':{'snp':1,'region_zone':1,'region':1}}
+			query = self.buildQuery('filter', 'main', select=querySelect, fromFilter=queryFilter, joinFilter=queryFilter)
+			for row in self.generateQueryResults(query):
+				fid = row[1]
+				try:
+					sig = (float(row[0].split(None,2)[1]) < threshold) #TODO optional pval column position
+				except:
+					sig = False
+				featureData[fid][0] += 1
+				if sig:
+					featureData[fid][2] += 1
+		#if SNPs
+		if self._inputFilters['main']['locus']:
+			querySelect = ['position_extra','region_id']
+			queryFilter = {'main':{'locus':1,'region_zone':1,'region':1}}
+			query = self.buildQuery('filter', 'main', select=querySelect, fromFilter=queryFilter, joinFilter=queryFilter)
+			for row in self.generateQueryResults(query):
+				fid = row[1]
+				try:
+					sig = (float(row[0].split(None,2)[1]) < threshold) #TODO optional pval column position
+				except:
+					sig = False
+				featureData[fid][0] += 1
+				if sig:
+					featureData[fid][2] += 1
+		#if loci
+		fList = sorted(featureData, key=featureData.get, reverse=True)
+		featureBin = dict()
+		binFeatures = collections.defaultdict(set)
+		for b in (0,1):
+			while fList and (featureData[fList[-1]][0] == b):
+				f = fList.pop()
+				featureBin[f] = b
+				binFeatures[b].add(f)
+		count = max(1, int(0.5 + float(len(fList)) / 10000.0)) #TODO optional bin size
+		size = len(fList) / count
+		extra = len(fList) - (count * size)
+		for b in xrange(2,2+count):
+			for n in xrange(size + (1 if ((b-2) < extra) else 0)):
+				f = fList.pop()
+				featureBin[f] = b
+				binFeatures[b].add(f)
+		for b in sorted(binFeatures):
+			self.log("bin #%d: %d features (%d significant), size %d..%d (avg %g)\n" % (
+				b,
+				len(binFeatures[b]),
+				sum(1 for f in binFeatures[b] if featureData[f][2]),
+				min(featureData[f][0] for f in binFeatures[b]),
+				max(featureData[f][0] for f in binFeatures[b]),
+				1.0 * sum(featureData[f][0] for f in binFeatures[b]) / len(binFeatures[b]),
+			))
+		self.logPop("... OK\n")
+		
+		self.logPush("permuting pathways ...\n")
+		querySelect = ['group_id','group_label']
+		queryFilter = {'main':{'group':self._inputFilters['main']['group'], 'source':self._inputFilters['main']['source']}}
+		subquerySelect = ['region_id']
+		subqueryWhereCol = ('d_g','group_id')
+		subqueryWhere = dict()
+		subqueryFilter = {'main':{'region_zone':1,'region':1}}
+		for gid,glabel in itertools.chain(self.generateQueryResults(self.buildQuery('filter', 'main', select=querySelect, fromFilter=queryFilter, joinFilter=queryFilter)), [(0,'')]):
+			subqueryWhere[subqueryWhereCol] = {'= %d' % (gid,)}
+			pathFeatures = set()
+			binDraws = collections.Counter()
+			for rid, in self.generateQueryResults(self.buildQuery('filter', 'main', select=subquerySelect, where=subqueryWhere, fromFilter=subqueryFilter, joinFilter=subqueryFilter)):
+				pathFeatures.add(rid)
+				binDraws[featureBin.get(rid,0)] += 1
+			pathSig = sum(1 for f in pathFeatures if featureData[f][2])
+			self.log("pathway '%s': %d features (%d significant) ..." % (glabel,len(pathFeatures),pathSig))
+			totalSig = 0
+			for p in xrange(1000): #TODO optional permutation count
+				permSig = 0
+				for b,draws in binDraws.iteritems():
+					if 0: # old PARIS, exclude original features
+						permSig += sum(1 for f in random.sample(binFeatures[b] - pathFeatures, draws) if featureData[f][2])
+					else:
+						permSig += sum(1 for f in random.sample(binFeatures[b], draws) if featureData[f][2])
+				if permSig > pathSig:
+					totalSig += 1
+			self.log(" OK: %d significant permutations (pval ~= %g)\n" % (totalSig,float(totalSig)/1000))
+		self.logPop("... OK\n")
+	#generatePARISResults()
+	
+	
+	##################################################
 	# internal query builder
 	
 	
@@ -1102,6 +1444,9 @@ class Biofilter:
 		'a_bg'   : ('alt','gene'),              # (label,biopolymer_id)
 		'a_g'    : ('alt','group'),             # (label,group_id)
 		'a_c'    : ('alt','source'),            # (label,source_id)
+		'u_gb'   : ('user','group_biopolymer'), # (group_id,biopolymer_id)
+		'u_g'    : ('user','group'),            # (group_id,source_id)
+		'u_c'    : ('user','source'),           # (source_id)
 		'c_mb_L' : ('cand','main_biopolymer'),  # (biopolymer_id)
 		'c_mb_R' : ('cand','main_biopolymer'),  # (biopolymer_id)
 		'c_ab_R' : ('cand','alt_biopolymer'),   # (biopolymer_id)
@@ -1202,7 +1547,7 @@ class Biofilter:
 		(frozenset({'m_bg','a_bg','d_br','d_b'}),) : frozenset({
 			"{L}.biopolymer_id = {R}.biopolymer_id",
 		}),
-		(frozenset({'m_bg','a_bg','d_b'}),frozenset({'d_gb'})) : frozenset({
+		(frozenset({'m_bg','a_bg','d_b'}),frozenset({'u_gb','d_gb'})) : frozenset({
 			"{L}.biopolymer_id = {R}.biopolymer_id",
 		}),
 		(frozenset({'d_gb_L','d_gb_R'}),) : frozenset({
@@ -1211,7 +1556,13 @@ class Biofilter:
 		(frozenset({'m_g','a_g','d_gb','d_g'}),) : frozenset({
 			"{L}.group_id = {R}.group_id",
 		}),
+		(frozenset({'u_gb','u_g'}),) : frozenset({
+			"{L}.group_id = {R}.group_id",
+		}),
 		(frozenset({'m_c','a_c','d_g','d_c'}),) : frozenset({
+			"{L}.source_id = {R}.source_id",
+		}),
+		(frozenset({'u_g','u_c'}),) : frozenset({
 			"{L}.source_id = {R}.source_id",
 		}),
 		
@@ -1565,22 +1916,22 @@ class Biofilter:
 	#getQueryTemplate()
 	
 	
-	def buildQuery(self, mode, focus, select, having=None, where=None):
+	def buildQuery(self, mode, focus, select, having=None, where=None, fromFilter=None, joinFilter=None):
 		assert(mode in ('filter','annotate','modelgene','modelgroup','model'))
 		assert(focus in self._schema)
 		# select=[ column, ... ]
 		# having={ column:{'= val',...}, ... }
 		# where={ (alias,column):{'= val',...}, ... }
+		# fromFilter={ db:{table:bool, ...}, ... }
+		# joinFilter={ db:{table:bool, ...}, ... }
 		if self._options.debug_logic:
 			self.warnPush("buildQuery(mode=%s, focus=%s, select=%s, having=%s, where=%s)\n" % (mode,focus,select,having,where))
 		having = having or dict()
 		where = where or dict()
+		fromFilter = fromFilter or self._inputFilters
+		joinFilter = joinFilter or self._inputFilters
 		query = self.getQueryTemplate()
-		
-		# re-index all input filter tables
-		for db in self._schema:
-			for tbl in self._schema[db]:
-				self.prepareTableForQuery(db, tbl)
+		empty = dict()
 		
 		# generate table alias join adjacency map
 		aliasAdjacent = collections.defaultdict(set)
@@ -1590,9 +1941,9 @@ class Biofilter:
 					if aliasLeft != aliasRight:
 						dbLeft,tblLeft = self._queryAliasTable[aliasLeft]
 						dbRight,tblRight = self._queryAliasTable[aliasRight]
-						if (dbLeft in self._inputFilters) and not self._inputFilters[dbLeft][tblLeft]:
+						if (dbLeft != 'db') and not joinFilter.get(dbLeft,empty).get('region' if (tblLeft == 'region_zone') else tblLeft):
 							pass
-						elif (dbRight in self._inputFilters) and not self._inputFilters[dbRight][tblRight]:
+						elif (dbRight != 'db') and not joinFilter.get(dbRight,empty).get('region' if (tblRight == 'region_zone') else tblRight):
 							pass
 						else:
 							aliasAdjacent[aliasLeft].add(aliasRight)
@@ -1606,14 +1957,16 @@ class Biofilter:
 		
 		# generate column availability map
 		# _queryColumnSources[col] = list[ tuple(alias,rowid,expression,?conditions),... ]
-		columnAliases = collections.defaultdict(set)
+		columnAliases = collections.defaultdict(list)
 		aliasColumns = collections.defaultdict(set)
 		for col in itertools.chain(select,having):
 			if col not in self._queryColumnSources:
 				raise Exception("internal query with unsupported column '{0}'".format(col))
-			for source in self._queryColumnSources[col]:
-				columnAliases[col].add(source[0])
-				aliasColumns[source[0]].add(col)
+			if col not in columnAliases:
+				for source in self._queryColumnSources[col]:
+					if source[0] in aliasAdjacent:
+						columnAliases[col].append(source[0])
+						aliasColumns[source[0]].add(col)
 		if not (columnAliases and aliasColumns):
 			raise Exception("internal query with no outputs or conditions")
 		
@@ -1631,8 +1984,8 @@ class Biofilter:
 		query['FROM'].update(alias for alias,col in where)
 		for alias,dbtable in self._queryAliasTable.iteritems():
 			db,table = dbtable
-			# only include user input tables which contain some data
-			if (db not in self._inputFilters) or (table not in self._inputFilters[db]) or (not self._inputFilters[db][table]):
+			# only include tables which satisfy the filter (usually, user input tables which contain some data)
+			if (db != 'db') and not fromFilter.get(db,empty).get('region' if (table == 'region_zone') else table):
 				continue
 			# only include tables from the focus db (except an alt focus sometimes also includes main)
 			if not ((db == focus) or (db == 'main' and focus == 'alt' and mode != 'annotate' and self._options.alternate_model_filtering != 'yes')):
@@ -1643,7 +1996,7 @@ class Biofilter:
 			if (mode == 'modelgroup') and (table not in ('group','source')):
 				continue
 			# only re-use the main gene candidates on the right if necessary
-			if (alias == 'c_mb_R') and ((self._options.alternate_model_filtering == 'yes') or self._inputFilters['cand']['alt_biopolymer']):
+			if (alias == 'c_mb_R') and ((self._options.alternate_model_filtering == 'yes') or fromFilter.get('cand',empty).get('alt_biopolymer')):
 				continue
 			# otherwise, add it
 			query['FROM'].add(alias)
@@ -1668,6 +2021,10 @@ class Biofilter:
 			queue.append( (inside,outside,remaining) )
 			while queue:
 				inside,outside,remaining = queue.popleft()
+				if self._options.debug_logic:
+					self.warn("inside: %s\n" % ', '.join(inside))
+					self.warn("outside: %s\n" % ', '.join(outside))
+					self.warn("remaining: %s\n" % ', '.join(remaining))
 				if not remaining:
 					break
 				queue.extend( (inside|{a},outside-{a},remaining-{a}) for a in outside if inside & aliasAdjacent[a] )
@@ -1681,33 +2038,39 @@ class Biofilter:
 			self.warn("joined FROM = %s\n" % ', '.join(query['FROM']))
 		
 		# add table aliases to satisfy any remaining columns
-		columnsRemaining = set(col for col in columnAliases if not (columnAliases[col] & query['FROM']))
+		columnsRemaining = set(col for col,aliases in columnAliases.iteritems() if not (set(aliases) & query['FROM']))
 		if mode == 'annotate':
-			# when annotating, do BFS on each remaining column in order to guarantee a valid path of LEFT JOINs
+			# when annotating, do a BFS from each remaining column in order of source preference
+			# this will guarantee a valid path of LEFT JOINs to the most-preferred available source
 			while columnsRemaining:
-				target = next(col for col in itertools.chain(select,having) if col in columnsRemaining)
-				inside = query['FROM'].union(query['LEFT JOIN'])
-				outside = set( a for a,t in self._queryAliasTable.iteritems() if ((a not in inside) and (t[0] == 'db' or t[1] == 'region_zone')) )
-				path = list()
+				target = next( col for col in itertools.chain(select,having) if (col in columnsRemaining) )
 				if self._options.debug_logic:
-					self.warn("current LEFT JOIN = %s\n" % ', '.join(query['LEFT JOIN']))
 					self.warn("target column = %s\n" % target)
-					self.warn("available aliases = %s\n" % ', '.join(outside))
+				if not columnAliases[target]:
+					raise Exception("could not find source table for output column %s" % (target,))
+				alias = columnAliases[target][0]
 				queue = collections.deque()
-				queue.extend((inside,outside-{a},[a]) for a in outside if inside & aliasAdjacent[a])
+				queue.append( [alias] )
+				path = None
 				while queue:
-					inside,outside,path = queue.popleft()
-					if target in aliasColumns[path[-1]]:
+					path = queue.popleft()
+					if (path[-1] in query['FROM']) or (path[-1] in query['LEFT JOIN']):
+						path.pop()
 						break
-					queue.extend((inside,outside-{a},path+[a]) for a in outside if path[-1] in aliasAdjacent[a])
-				if (not path) or (target not in aliasColumns[path[-1]]):
-					raise Exception("could not find a source table for output column: %s" % target)
-				for alias in path:
+					queue.extend( (path+[a]) for a in aliasAdjacent[path[-1]] if (a not in path) )
+					path = None
+				if not path:
+					raise Exception("could not join source table %s for output column %s" % (alias,target))
+				while path:
+					alias = path.pop()
 					columnsRemaining.difference_update(aliasColumns[alias])
 					query['LEFT JOIN'][alias] = set()
+				if self._options.debug_logic:
+					self.warn("new LEFT JOIN = %s\n" % ', '.join(query['LEFT JOIN']))
 			#while columns need sources
 		else:
 			# when filtering, build a minimum spanning tree to connect all remaining columns in any order
+			#TODO: choose preferred source first as in annotation, rather than blindly expanding until we hit them all?
 			if columnsRemaining:
 				remaining = columnsRemaining
 				inside = query['FROM']
@@ -1901,6 +2264,13 @@ class Biofilter:
 	#getQueryText()
 	
 	
+	def prepareTablesForQuery(self, query):
+		for db,tbl in set(self._queryAliasTable[a] for a in itertools.chain(query['FROM'], query['LEFT JOIN'])):
+			if (db in self._schema) and (tbl in self._schema[db]):
+				self.prepareTableForQuery(db, tbl)
+	#prepareTablesForQuery()
+	
+	
 	def generateQueryResults(self, query, allowDupes=False, bindings=None):
 		# execute the query and yield the results
 		cursor = self._loki._db.cursor()
@@ -1909,19 +2279,21 @@ class Biofilter:
 			self.log(sql+"\n")
 			for row in cursor.execute("EXPLAIN QUERY PLAN "+sql, bindings):
 				self.log(str(row)+"\n")
-		elif allowDupes:
-			lastID = None
-			for row in cursor.execute(sql, bindings):
-				if row[-1] != lastID:
-					lastID = row[-1]
-					yield row[:-1]
 		else:
-			rowIDs = set()
-			for row in cursor.execute(sql, bindings):
-				if row[-1] not in rowIDs:
-					rowIDs.add(row[-1])
-					yield row[:-1]
-			del rowIDs
+			self.prepareTablesForQuery(query)
+			if allowDupes:
+				lastID = None
+				for row in cursor.execute(sql, bindings):
+					if row[-1] != lastID:
+						lastID = row[-1]
+						yield row[:-1]
+			else:
+				rowIDs = set()
+				for row in cursor.execute(sql, bindings):
+					if row[-1] not in rowIDs:
+						rowIDs.add(row[-1])
+						yield row[:-1]
+				del rowIDs
 	#generateQueryResults()
 	
 	
@@ -1999,6 +2371,7 @@ class Biofilter:
 		queryF = self.buildQuery(mode='filter', focus='main', select=columnsF)
 		lenF = len(queryF['_columns'])
 		sqlF = self.getQueryText(queryF, splitRowIDs=True)
+		self.prepareTablesForQuery(queryF)
 		
 		# add each filter rowid column as a condition for annotation
 		n = lenF
@@ -2017,6 +2390,7 @@ class Biofilter:
 		queryA = self.buildQuery(mode='annotate', focus='alt', select=columnsA, where=conditionsA)
 		lenA = len(queryA['_columns'])
 		sqlA = self.getQueryText(queryA, noRowIDs=True, sortRowIDs=True, splitRowIDs=True)
+		self.prepareTablesForQuery(queryA)
 		
 		# generate filtered results and annotate each of them
 		cursorF = self._loki._db.cursor()
@@ -2233,8 +2607,12 @@ class Biofilter:
 		if self._options.all_pairwise_models != 'yes':
 			conditionsL = {('gene_id' if self._onlyGeneModels else 'biopolymer_id') : {"= (CASE WHEN 1 THEN ?1 ELSE 0*?2*?3*?4 END)"}}
 			conditionsR = {('gene_id' if self._onlyGeneModels else 'biopolymer_id') : {"= (CASE WHEN 1 THEN ?2 ELSE 0*?1*?3*?4 END)"}}
-		sqlL = self.getQueryText(self.buildQuery(mode='filter', focus='main', select=columnsL, having=conditionsL))
-		sqlR = self.getQueryText(self.buildQuery(mode='filter', focus='alt', select=columnsR, having=conditionsR))
+		queryL = self.buildQuery(mode='filter', focus='main', select=columnsL, having=conditionsL)
+		sqlL = self.getQueryText(queryL)
+		self.prepareTablesForQuery(queryL)
+		queryR = self.buildQuery(mode='filter', focus='alt', select=columnsR, having=conditionsR)
+		sqlR = self.getQueryText(queryR)
+		self.prepareTablesForQuery(queryR)
 		
 		# debug or execute model expansion
 		if self._options.debug_query:
@@ -2426,6 +2804,13 @@ if __name__ == "__main__":
 	group.add_argument('--verify-source-file', type=str, metavar=('source','file','date','size','md5'), nargs=5, action='append', default=None,
 			help="require that the knowledge database was built with a specific source file fingerprint"
 	)
+	group.add_argument('--user-defined-knowledge', '--udk', type=str, metavar='file', nargs='+', default=None,
+			help="file(s) from which to load user-defined knowledge"
+	)
+	group.add_argument('--user-defined-filter', '--udf', type=str, metavar='no/group/gene', default='no',
+			choices=['no','group','gene'],
+			help="method by which user-defined knowledge will also be applied as a filter on other prior knowledge, from 'no', 'group' or 'gene' (default: no)"
+	)
 	
 	# add primary input section
 	group = parser.add_argument_group("Input Data Options")
@@ -2562,6 +2947,12 @@ if __name__ == "__main__":
 			help="output knowledge-supported models in order of descending score (default: yes)"
 	)
 	
+	# add PARIS section
+	group = parser.add_argument_group("PARIS Options")
+	group.add_argument('--paris-p-value', '--ppv', type=float, metavar='p-value', default=0.05,
+			help="maximum p-value of input results to be considered significant (default: 0.05)"
+	)
+	
 	# add output section
 	group = parser.add_argument_group("Output Options")
 	group.add_argument('--quiet', '-q', type=yesno, metavar='yes/no', nargs='?', const='yes', default='no',
@@ -2590,6 +2981,9 @@ if __name__ == "__main__":
 	)
 	group.add_argument('--model', '-m', type=str, metavar='type', nargs='+', action='append',
 			help="data types or columns to include in the output models"
+	)
+	group.add_argument('--paris', type=str, metavar='yes/no', nargs='?', const='yes', default='no',
+			help="perform a PARIS analysis with the provided input data (default: no)"
 	)
 	
 	# add hidden options
@@ -2970,6 +3364,12 @@ if __name__ == "__main__":
 		bio.logPop("... OK\n")
 	#foreach report
 	
+	# load user-defined knowledge, if any
+	for path in (options.user_defined_knowledge or empty):
+		bio.loadUserKnowledgeFile(path, options.gene_identifier_type) #TODO errorCallback?
+	if options.user_defined_filter != 'no':
+		bio.applyUserKnowledgeFilter((options.user_defined_filter == 'group'))
+	
 	# apply primary filters
 	for snpList in (options.snp or empty):
 		bio.intersectInputSNPs('main', bio.generateRSesFromText(snpList, separator=':', errorCallback=cb['SNP']), errorCallback=cb['SNP'])
@@ -3029,6 +3429,10 @@ if __name__ == "__main__":
 		bio.intersectInputSources('alt', sourceList, errorCallback=cb['alt-source'])
 	for sourceFile in itertools.chain(*(options.alt_source_file or empty)):
 		bio.intersectInputSources('alt', itertools.chain(*(line for line in open(sourceFile,'rU'))), errorCallback=cb['alt-source'])
+	
+	# run PARIS
+	if options.paris == 'yes':
+		bio.generatePARISResults(options.paris_p_value)
 	
 	# report invalid input, if requested
 	if options.report_invalid_input == 'yes':
