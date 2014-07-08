@@ -1,5 +1,14 @@
 CHANGELOG
 
+2.3.0b1 (2014-07-08)
+- changed default --report-genome-build option to 'yes'
+- added --grch-build-version and --ucsc-build-version options to specify the
+  reference gnome build of user input; if it does not match the build used
+  in the provided LOKI database, liftOver will be automatically applied
+- added --coordinate-base and --regions-half-open options to specify the
+  coordinate system conventions of user input and program output
+- fixed a bug in installation on Windows platforms
+
 2.2.0b2 (2014-06-04)
 - fixed a bug when matching gene regions to input regions of size 1
 
