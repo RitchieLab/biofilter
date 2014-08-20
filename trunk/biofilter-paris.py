@@ -25,7 +25,7 @@ class Biofilter:
 	def getVersionTuple(cls):
 		# tuple = (major,minor,revision,dev,build,date)
 		# dev must be in ('a','b','rc','release') for lexicographic comparison
-		return (2,3,0,'a',1,'2014-06-10')
+		return (2,4,0,'a',1,'2014-06-10')
 	#getVersionTuple()
 	
 	
@@ -309,9 +309,10 @@ class Biofilter:
 		self._geneModels = None
 		self._onlyGeneModels = True #TODO
 		
-		# verify loki_db version ('extra' input support in 2.2.0a1)
-		if loki_db.Database.getVersionTuple() < (2,2,0,'a',1):
-			sys.exit("ERROR: LOKI version 2.2.0a1 or later required; found %s" % (loki_db.Database.getVersionString(),))
+		# verify loki_db version 
+		minLoki = (2,2,1,'a',2) # 'extra' input support in generateLiftOver*()
+		if loki_db.Database.getVersionTuple() < minLoki:
+			sys.exit("ERROR: LOKI version %d.%d.%d%s%s or later required; found %s" % minLoki+(loki_db.Database.getVersionString(),))
 		
 		# initialize instance database
 		self._loki = loki_db.Database()
@@ -512,13 +513,13 @@ class Biofilter:
 	
 	
 	def getDatabaseGenomeBuilds(self):
-		ucschg = self._loki.getDatabaseSetting('ucschg')
-		ucschg = int(ucschg) if ucschg != None else None
-		grch = None
-		if ucschg:
-			for build in self._loki.generateGRChByUCSChg(ucschg):
-				grch = max(grch, int(build))
-		return (grch,ucschg)
+		ucscBuild = self._loki.getDatabaseSetting('ucschg')
+		ucscBuild = int(ucscBuild) if (ucscBuild != None) else None
+		grchBuild = None
+		if ucscBuild:
+			for build in self._loki.generateGRChByUCSChg(ucscBuild):
+				grchBuild = max(grchBuild, int(build))
+		return (grchBuild,ucscBuild)
 	#getDatabaseGenomeBuilds()
 	
 	
@@ -542,6 +543,21 @@ class Biofilter:
 	
 	##################################################
 	# input data parsers and lookup helpers
+	
+	
+	def getInputGenomeBuilds(self, grchBuild, ucscBuild):
+		if grchBuild:
+			if ucscBuild:
+				if ucscBuild != (self._loki.getUCSChgByGRCh(grchBuild) or ucscBuild):
+					sys.exit("ERROR: specified reference genome build GRCh%d is not known to correspond to UCSC hg%d" % (grchBuild, ucscBuild))
+			else:
+				ucscBuild = self._loki.getUCSChgByGRCh(grchBuild)
+		elif ucscBuild:
+			grchBuild = None
+			for build in self._loki.generateGRChByUCSChg(ucscBuild):
+				grchBuild = max(grchBuild, int(build))
+		return (grchBuild,ucscBuild)
+	#getInputGenomeBuilds()
 	
 	
 	def generateRSesFromText(self, lines, separator=None, errorCallback=None):
@@ -583,7 +599,10 @@ class Biofilter:
 	#generateRSesFromRSFiles()
 	
 	
-	def generateLociFromText(self, lines, separator=None, errorCallback=None):
+	def generateLociFromText(self, lines, separator=None, applyOffset=False, errorCallback=None):
+		# parse input/output coordinate offsets
+		offset = (1 - self._options.coordinate_base) if applyOffset else 0
+		
 		l = 0
 		for line in lines:
 			l += 1
@@ -623,7 +642,7 @@ class Biofilter:
 				if (pos == '-') or (pos == 'NA'):
 					pos = None
 				else:
-					pos = long(pos)
+					pos = long(pos) + offset
 				
 				yield (label,chm,pos,extra)
 			except:
@@ -633,11 +652,11 @@ class Biofilter:
 	#generateLociFromText()
 	
 	
-	def generateLociFromMapFiles(self, paths, separator=None, errorCallback=None):
+	def generateLociFromMapFiles(self, paths, separator=None, applyOffset=False, errorCallback=None):
 		for path in paths:
 			try:
 				with (sys.stdin if (path == '-' or not path) else open(path, 'rU')) as file:
-					for data in self.generateLociFromText((line for line in file if not line.startswith('#')), separator, errorCallback):
+					for data in self.generateLociFromText((line for line in file if not line.startswith('#')), separator, applyOffset, errorCallback):
 						yield data
 				#with file
 			except:
@@ -648,7 +667,33 @@ class Biofilter:
 	#generateLociFromMapFiles()
 	
 	
-	def generateRegionsFromText(self, lines, separator=None, errorCallback=None):
+	def generateLiftOverLoci(self, ucscBuildOld, ucscBuildNew, loci, errorCallback=None):
+		# loci=[ (label,chr,pos,extra), ... ]
+		newloci = loci
+		
+		if not ucscBuildOld:
+			self.warn("WARNING: UCSC hg# build version was not specified for position input; assuming it matches the knowledge database\n")
+		elif not ucscBuildNew:
+			self.warn("WARNING: UCSC hg# build version of the knowledge database could not be determined; assuming it matches user input\n")
+		elif ucscBuildOld != ucscBuildNew:
+			if not self._loki.hasLiftOverChains(ucscBuildOld, ucscBuildNew):
+				sys.exit("ERROR: knowledge database contains no chainfiles to perform liftOver from UCSC hg%s to hg%s\n" % (oldHG or "?", newHG or "?"))
+			liftoverError = "dropped during liftOver from hg%s to hg%s" % (ucscBuildOld or "?", ucscBuildNew or "?")
+			def liftoverCallback(region):
+				errorCallback("\t".join(str(s) for s in region), liftoverError)
+			#liftoverCallback()
+			newloci = self._loki.generateLiftOverLoci(ucscBuildOld, ucscBuildNew, loci, tally=None, errorCallback=(liftoverCallback if errorCallback else None))
+		#if old!=new
+		
+		return newloci
+	#generateLiftOverLoci()
+	
+	
+	def generateRegionsFromText(self, lines, separator=None, applyOffset=False, errorCallback=None):
+		offsetStart = offsetEnd = (1 - self._options.coordinate_base) if applyOffset else 0
+		if applyOffset and (self._options.regions_half_open == 'yes'):
+			offsetEnd -= 1
+		
 		l = 0
 		for line in lines:
 			l += 1
@@ -686,11 +731,11 @@ class Biofilter:
 				if (posMin == '-') or (posMin == 'NA'):
 					posMin = None
 				else:
-					posMin = long(posMin)
+					posMin = long(posMin) + offsetStart
 				if (posMax == '-') or (posMax == 'NA'):
 					posMax = None
 				else:
-					posMax = long(posMax)
+					posMax = long(posMax) + offsetEnd
 				
 				yield (label,chm,posMin,posMax,extra)
 			except:
@@ -700,11 +745,11 @@ class Biofilter:
 	#generateRegionsFromText()
 	
 	
-	def generateRegionsFromFiles(self, paths, separator=None, errorCallback=None):
+	def generateRegionsFromFiles(self, paths, separator=None, applyOffset=False, errorCallback=None):
 		for path in paths:
 			try:
 				with (sys.stdin if (path == '-' or not path) else open(path, 'rU')) as file:
-					for data in self.generateRegionsFromText((line for line in file if not line.startswith('#')), separator, errorCallback):
+					for data in self.generateRegionsFromText((line for line in file if not line.startswith('#')), separator, applyOffset, errorCallback):
 						yield data
 				#with file
 			except:
@@ -713,6 +758,28 @@ class Biofilter:
 					errorCallback("<file> %s" % path, str(sys.exc_info()[1]))
 		#foreach path
 	#generateRegionsFromFiles()
+	
+	
+	def generateLiftOverRegions(self, ucscBuildOld, ucscBuildNew, regions, errorCallback=None):
+		# regions=[ (label,chr,posMin,posMax,extra), ... ]
+		newregions = regions
+		
+		if not ucscBuildOld:
+			self.warn("WARNING: UCSC hg# build version was not specified for region input; assuming it matches the knowledge database\n")
+		elif not ucscBuildNew:
+			self.warn("WARNING: UCSC hg# build version of the knowledge database could not be determined; assuming it matches user input\n")
+		elif ucscBuildOld != ucscBuildNew:
+			if not self._loki.hasLiftOverChains(ucscBuildOld, ucscBuildNew):
+				sys.exit("ERROR: knowledge database contains no chainfiles to perform liftOver from UCSC hg%s to hg%s\n" % (oldHG or "?", newHG or "?"))
+			liftoverError = "dropped during liftOver from hg%s to hg%s" % (ucscBuildOld or "?", ucscBuildNew or "?")
+			def liftoverCallback(region):
+				errorCallback("\t".join(str(s) for s in region), liftoverError)
+			#liftoverCallback()
+			newregions = self._loki.generateLiftOverRegions(ucscBuildOld, ucscBuildNew, regions, tally=None, errorCallback=(liftoverCallback if errorCallback else None))
+		#if old!=new
+		
+		return newregions
+	#generateLiftOverRegions()
 	
 	
 	def generateNamesFromText(self, lines, defaultNS=None, separator=None, errorCallback=None):
@@ -1273,6 +1340,26 @@ JOIN `db`.`biopolymer` AS d_b
 	# PARIS
 	
 	
+	def getPARISPermutationScore(self, featureData, featureBin, binFeatures, realFeatures, numPermutations, maxScore=0):
+		realScore = sum(1 for f in realFeatures if (featureBin.get(f) and featureData[f][2]))
+		if realScore < 1:
+			return numPermutations
+		
+		_sample = random.sample
+		binDraws = collections.Counter(featureBin[f] for f in realFeatures if featureBin.get(f))
+		totalScore = 0
+		for p in xrange(numPermutations):
+			permScore = 0
+			for b,draws in binDraws.iteritems():
+				permScore += sum(1 for f in _sample(binFeatures[b], draws) if featureData[f][2])
+			if permScore > realScore:
+				totalScore += 1
+				if maxScore and (totalScore >= maxScore):
+					break
+		return totalScore
+	#getPARISPermutationScore()
+	
+	
 	def generatePARISResults(self, threshold):
 		self.logPush("running PARIS ...\n")
 		cursor = self._loki._db.cursor()
@@ -1312,16 +1399,23 @@ JOIN `db`.`biopolymer` AS d_b
 			self.logPop("... OK: %d positions in %d feature regions, %d singleton positions\n" % (numLocusRegion,numRegionLocus,numLocus-numLocusRegion))
 		#if loci
 		
+		featureData = collections.defaultdict(lambda: [0,random.random(),0,False]) # [size,random,significance,complex]
+		
 		self.logPush("generating singleton features ...\n")
 		self.prepareTableForUpdate('main','region')
-		cursor.execute("DELETE FROM `main`.`region` WHERE flag = 0")
-		numRegionDrop = cursor.getconnection().changes()
+		if 1: #DEBUG
+			cursor.execute("DELETE FROM `main`.`region` WHERE flag = 0")
+			numRegionDrop = cursor.getconnection().changes()
+		else:
+			for row in cursor.execute("SELECT rowid, flag FROM `main`.`region`"):
+				featureData[row[0]][3] = True
+			numRegionDrop = 0
 		if self._inputFilters['main']['snp']:
 			querySelect = ['snp_label','position_chr','position_pos','position_pos']
 			queryWhere = { ('m_s','flag'):{'= 0'} }
 			queryFilter = {'main':{'snp':1}}
 			query = self.buildQuery('filter', 'main', select=querySelect, where=queryWhere, fromFilter=queryFilter, joinFilter=queryFilter)
-			sql = "INSERT INTO `main`.`region` (label,chr,posMin,posMax) VALUES (?,?,?,?)"
+			sql = "INSERT INTO `main`.`region` (label,chr,posMin,posMax,flag) VALUES (?,?,?,?,0)"
 			cursor.executemany(sql, self.generateQueryResults(query, allowDupes=True))
 		#if SNPs
 		if self._inputFilters['main']['locus']:
@@ -1329,7 +1423,7 @@ JOIN `db`.`biopolymer` AS d_b
 			queryWhere = { ('m_l','flag'):{'= 0'} }
 			queryFilter = {'main':{'locus':1}}
 			query = self.buildQuery('filter', 'main', select=querySelect, where=queryWhere, fromFilter=queryFilter, joinFilter=queryFilter)
-			sql = "INSERT INTO `main`.`region` (label,chr,posMin,posMax) VALUES (?,?,?,?)"
+			sql = "INSERT INTO `main`.`region` (label,chr,posMin,posMax,flag) VALUES (?,?,?,?,0)"
 			cursor.executemany(sql, self.generateQueryResults(query, allowDupes=True))
 		#if loci
 		for row in cursor.execute("SELECT COUNT(), COALESCE(SUM(CASE WHEN flag = 0 THEN 1 ELSE 0 END),0) FROM `main`.`region`"):
@@ -1337,9 +1431,8 @@ JOIN `db`.`biopolymer` AS d_b
 		self.logPop("... OK: dropped %d unused feature regions, added %d singleton features\n" % (numRegionDrop,numRegionAdd))
 		
 		self.logPush("binning features ...\n")
-		featureData = collections.defaultdict(lambda: [0,random.random(),0]) # [size,random,significance]
 		if self._inputFilters['main']['snp']:
-			querySelect = ['snp_extra','region_id']
+			querySelect = ['snp_extra','region_id','region_start','region_stop','region_flag']
 			queryFilter = {'main':{'snp':1,'region_zone':1,'region':1}}
 			query = self.buildQuery('filter', 'main', select=querySelect, fromFilter=queryFilter, joinFilter=queryFilter)
 			for row in self.generateQueryResults(query):
@@ -1351,9 +1444,10 @@ JOIN `db`.`biopolymer` AS d_b
 				featureData[fid][0] += 1
 				if sig:
 					featureData[fid][2] += 1
+				featureData[fid][3] = (row[4] != 0)
 		#if SNPs
 		if self._inputFilters['main']['locus']:
-			querySelect = ['position_extra','region_id']
+			querySelect = ['position_extra','region_id','region_start','region_stop','region_flag']
 			queryFilter = {'main':{'locus':1,'region_zone':1,'region':1}}
 			query = self.buildQuery('filter', 'main', select=querySelect, fromFilter=queryFilter, joinFilter=queryFilter)
 			for row in self.generateQueryResults(query):
@@ -1365,6 +1459,7 @@ JOIN `db`.`biopolymer` AS d_b
 				featureData[fid][0] += 1
 				if sig:
 					featureData[fid][2] += 1
+				featureData[fid][3] = (row[4] != 0)
 		#if loci
 		fList = sorted(featureData, key=featureData.get, reverse=True)
 		featureBin = dict()
@@ -1383,6 +1478,7 @@ JOIN `db`.`biopolymer` AS d_b
 				featureBin[f] = b
 				binFeatures[b].add(f)
 		for b in sorted(binFeatures):
+			binFeatures[b] = list(binFeatures[b])
 			self.log("bin #%d: %d features (%d significant), size %d..%d (avg %g)\n" % (
 				b,
 				len(binFeatures[b]),
@@ -1393,34 +1489,65 @@ JOIN `db`.`biopolymer` AS d_b
 			))
 		self.logPop("... OK\n")
 		
-		self.logPush("permuting pathways ...\n")
-		querySelect = ['group_id','group_label']
-		queryFilter = {'main':{'group':self._inputFilters['main']['group'], 'source':self._inputFilters['main']['source']}}
-		subquerySelect = ['region_id']
-		subqueryWhereCol = ('d_g','group_id')
-		subqueryWhere = dict()
-		subqueryFilter = {'main':{'region_zone':1,'region':1}}
-		for gid,glabel in itertools.chain(self.generateQueryResults(self.buildQuery('filter', 'main', select=querySelect, fromFilter=queryFilter, joinFilter=queryFilter)), [(0,'')]):
-			subqueryWhere[subqueryWhereCol] = {'= %d' % (gid,)}
-			pathFeatures = set()
-			binDraws = collections.Counter()
-			for rid, in self.generateQueryResults(self.buildQuery('filter', 'main', select=subquerySelect, where=subqueryWhere, fromFilter=subqueryFilter, joinFilter=subqueryFilter)):
-				pathFeatures.add(rid)
-				binDraws[featureBin.get(rid,0)] += 1
-			pathSig = sum(1 for f in pathFeatures if featureData[f][2])
-			self.log("pathway '%s': %d features (%d significant) ..." % (glabel,len(pathFeatures),pathSig))
-			totalSig = 0
-			for p in xrange(1000): #TODO optional permutation count
-				permSig = 0
-				for b,draws in binDraws.iteritems():
-					if 0: # old PARIS, exclude original features
-						permSig += sum(1 for f in random.sample(binFeatures[b] - pathFeatures, draws) if featureData[f][2])
-					else:
-						permSig += sum(1 for f in random.sample(binFeatures[b], draws) if featureData[f][2])
-				if permSig > pathSig:
-					totalSig += 1
-			self.log(" OK: %d significant permutations (pval ~= %g)\n" % (totalSig,float(totalSig)/1000))
+		self.logPush("mapping pathway features ...\n")
+		queryGroupSelect = ['group_id','group_label','group_description']
+		queryGroupFilter = {'main':{'group':self._inputFilters['main']['group'], 'source':self._inputFilters['main']['source']}}
+		queryGeneSelect = ['gene_id','gene_label','gene_description']
+		queryGeneWhereCol = ('d_g','group_id')
+		queryGeneWhere = dict()
+		queryGeneFilter = {'main':{}}
+		queryFeatureSelect = ['region_id']
+		queryFeatureWhereCol = ('d_b','biopolymer_id')
+		queryFeatureWhere = dict()
+		queryFeatureFilter = {'main':{'region_zone':1,'region':1}}
+		groupData = dict()
+		geneData = dict()
+		for uid,ulabel,udesc in self.generateQueryResults(self.buildQuery('filter', 'main', select=queryGroupSelect, fromFilter=queryGroupFilter, joinFilter=queryGroupFilter)):
+			# find all genes in this pathway and aggregate their feature regions
+			genes = set()
+			groupFeatures = set()
+			queryGeneWhere[queryGeneWhereCol] = {'= %d' % (uid,)}
+			for gid,glabel,gdesc in self.generateQueryResults(self.buildQuery('filter', 'main', select=queryGeneSelect, where=queryGeneWhere, fromFilter=queryGeneFilter, joinFilter=queryGeneFilter)):
+				# if the gene hasn't been seen yet in a previous pathway, find all its feature regions
+				if gid not in geneData:
+					geneFeatures = set()
+					queryFeatureWhere[queryFeatureWhereCol] = {'= %d' % (gid,)}
+					for rid, in self.generateQueryResults(self.buildQuery('filter', 'main', select=queryFeatureSelect, where=queryFeatureWhere, fromFilter=queryFeatureFilter, joinFilter=queryFeatureFilter)):
+						geneFeatures.add(rid)
+					geneData[gid] = (glabel,gdesc,frozenset(geneFeatures))
+				groupFeatures.update(geneData[gid][2])
+				genes.add(gid)
+			groupData[uid] = (ulabel,udesc,frozenset(genes),frozenset(groupFeatures))
+		self.logPop("... OK: %d pathways, %d genes\n" % (len(groupData),len(geneData)))
+		
+		# return the output generator
 		self.logPop("... OK\n")
+		return itertools.chain(
+			[ ('group','description','genes','features','simple','(sig)','complex','(sig)','pval') ],
+			( (
+				udata[0],
+				udata[1],
+				len(udata[2]),
+				len(udata[3]),
+				sum(1 for f in udata[3] if (featureData[f][0] == 1)),
+				sum(1 for f in udata[3] if (featureData[f][2] and (featureData[f][0] == 1))),
+				sum(1 for f in udata[3] if (featureData[f][0] > 1)),
+				sum(1 for f in udata[3] if (featureData[f][2] and (featureData[f][0] > 1))),
+				(self.getPARISPermutationScore(featureData, featureBin, binFeatures, udata[3], 1000) / 1000.0) or ('< %g' % (1/1000.0,)),
+				itertools.chain(
+					[ ('gene','features','simple','(sig)','complex','(sig)','pval') ],
+					( (
+						geneData[gid][0],
+						len(geneData[gid][2]),
+						sum(1 for f in geneData[gid][2] if (featureData[f][0] == 1)),
+						sum(1 for f in geneData[gid][2] if (featureData[f][2] and (featureData[f][0] == 1))),
+						sum(1 for f in geneData[gid][2] if (featureData[f][0] > 1)),
+						sum(1 for f in geneData[gid][2] if (featureData[f][2] and (featureData[f][0] > 1))),
+						(self.getPARISPermutationScore(featureData, featureBin, binFeatures, geneData[gid][2], 1000) / 1000.0) or ('< %g' % (1/1000.0,))
+					) for gid in udata[2] )
+				)
+			) for uid,udata in groupData.iteritems() )
+		)
 	#generatePARISResults()
 	
 	
@@ -1542,7 +1669,10 @@ JOIN `db`.`biopolymer` AS d_b
 		}),
 		(frozenset({'m_rz','a_rz','d_bz'}),) : frozenset({
 			"{L}.chr = {R}.chr",
-			"{L}.zone = {R}.zone",
+			"{L}.zone >= ({R}.zone + (MIN(0,{rmBases}) - {zoneSize}) / {zoneSize})",
+			"{L}.zone <= ({R}.zone - (MIN(0,{rmBases}) - {zoneSize}) / {zoneSize})",
+			"{R}.zone >= ({L}.zone + (MIN(0,{rmBases}) - {zoneSize}) / {zoneSize})",
+			"{R}.zone <= ({L}.zone - (MIN(0,{rmBases}) - {zoneSize}) / {zoneSize})",
 		}),
 		(frozenset({'m_bg','a_bg','d_br','d_b'}),) : frozenset({
 			"{L}.biopolymer_id = {R}.biopolymer_id",
@@ -1595,10 +1725,10 @@ JOIN `db`.`biopolymer` AS d_b
 			"(" +
 				"(" +
 					"{L}.posMin >= {R}.posMin AND " +
-					"{L}.posMin <= {R}.posMax + 1 - MAX({rmBases}, (MIN({L}.posMax - {L}.posMin, {R}.posMax - {R}.posMin) + 1) * {rmPercent} / 100.0)" +
+					"{L}.posMin <= {R}.posMax + 1 - MAX({rmBases}, COALESCE((MIN({L}.posMax - {L}.posMin, {R}.posMax - {R}.posMin) + 1) * {rmPercent} / 100.0, {rmBases}))" +
 				") OR (" +
 					"{R}.posMin >= {L}.posMin AND " +
-					"{R}.posMin <= {L}.posMax + 1 - MAX({rmBases}, (MIN({L}.posMax - {L}.posMin, {R}.posMax - {R}.posMin) + 1) * {rmPercent} / 100.0)" +
+					"{R}.posMin <= {L}.posMax + 1 - MAX({rmBases}, COALESCE((MIN({L}.posMax - {L}.posMin, {R}.posMax - {R}.posMin) + 1) * {rmPercent} / 100.0, {rmBases}))" +
 				")" +
 			")",
 		}),
@@ -1629,6 +1759,11 @@ JOIN `db`.`biopolymer` AS d_b
 			('m_s',  'rs', "m_s.extra"),
 			('d_sl', 'rs', "NULL"),
 		],
+		'snp_flag' : [
+			('a_s',  'rs', "a_s.flag"),
+			('m_s',  'rs', "m_s.flag"),
+			('d_sl', 'rs', "NULL"),
+		],
 		
 		'position_id' : [
 			('a_l',  'rowid',   "a_l.rowid"),
@@ -1646,13 +1781,18 @@ JOIN `db`.`biopolymer` AS d_b
 			('d_sl', '_ROWID_', "(CASE d_sl.chr WHEN 23 THEN 'X' WHEN 24 THEN 'Y' WHEN 25 THEN 'XY' WHEN 26 THEN 'MT' ELSE d_sl.chr END)"),
 		],
 		'position_pos' : [
-			('a_l',  'rowid',   "a_l.pos"),
-			('m_l',  'rowid',   "m_l.pos"),
-			('d_sl', '_ROWID_', "d_sl.pos"),
+			('a_l',  'rowid',   "a_l.pos {pMinOffset}"),
+			('m_l',  'rowid',   "m_l.pos {pMinOffset}"),
+			('d_sl', '_ROWID_', "d_sl.pos {pMinOffset}"),
 		],
 		'position_extra' : [
 			('a_l',  'rowid',   "a_l.extra"),
 			('m_l',  'rowid',   "m_l.extra"),
+			('d_sl', '_ROWID_', "NULL"),
+		],
+		'position_flag' : [
+			('a_l',  'rowid',   "a_l.flag"),
+			('m_l',  'rowid',   "m_l.flag"),
 			('d_sl', '_ROWID_', "NULL"),
 		],
 		
@@ -1677,18 +1817,23 @@ JOIN `db`.`biopolymer` AS d_b
 			('d_bz', 'zone', "d_bz.zone"),
 		],
 		'region_start' : [
-			('a_r',  'rowid',   "a_r.posMin"),
-			('m_r',  'rowid',   "m_r.posMin"),
-			('d_br', '_ROWID_', "d_br.posMin"),
+			('a_r',  'rowid',   "a_r.posMin {pMinOffset}"),
+			('m_r',  'rowid',   "m_r.posMin {pMinOffset}"),
+			('d_br', '_ROWID_', "d_br.posMin {pMinOffset}"),
 		],
 		'region_stop' : [
-			('a_r',  'rowid',   "a_r.posMax"),
-			('m_r',  'rowid',   "m_r.posMax"),
-			('d_br', '_ROWID_', "d_br.posMax"),
+			('a_r',  'rowid',   "a_r.posMax {pMaxOffset}"),
+			('m_r',  'rowid',   "m_r.posMax {pMaxOffset}"),
+			('d_br', '_ROWID_', "d_br.posMax {pMaxOffset}"),
 		],
 		'region_extra' : [
 			('a_r',  'rowid',   "a_r.extra"),
 			('m_r',  'rowid',   "m_r.extra"),
+			('d_br', '_ROWID_', "NULL"),
+		],
+		'region_flag' : [
+			('a_r',  'rowid',   "a_r.flag"),
+			('m_r',  'rowid',   "m_r.flag"),
 			('d_br', '_ROWID_', "NULL"),
 		],
 		
@@ -1735,14 +1880,19 @@ JOIN `db`.`biopolymer` AS d_b
 			('d_bz', 'zone', "d_bz.zone"),
 		],
 		'biopolymer_start' : [
-			('d_br', '_ROWID_', "d_br.posMin"),
+			('d_br', '_ROWID_', "d_br.posMin {pMinOffset}"),
 		],
 		'biopolymer_stop' : [
-			('d_br', '_ROWID_', "d_br.posMax"),
+			('d_br', '_ROWID_', "d_br.posMax {pMaxOffset}"),
 		],
 		'biopolymer_extra' : [
 			('a_bg', 'biopolymer_id', "a_bg.extra"),
 			('m_bg', 'biopolymer_id', "m_bg.extra"),
+			('d_b',  'biopolymer_id', "NULL"),
+		],
+		'biopolymer_flag' : [
+			('a_bg', 'biopolymer_id', "a_bg.flag"),
+			('m_bg', 'biopolymer_id', "m_bg.flag"),
 			('d_b',  'biopolymer_id', "NULL"),
 		],
 		
@@ -1774,6 +1924,11 @@ JOIN `db`.`biopolymer` AS d_b
 			('m_bg', 'biopolymer_id', "m_bg.extra"),
 			('d_b',  'biopolymer_id', "NULL", {"d_b.type_id+0 = {typeID_gene}"}),
 		],
+		'gene_flag' : [
+			('a_bg', 'biopolymer_id', "a_bg.flag"),
+			('m_bg', 'biopolymer_id', "m_bg.flag"),
+			('d_b',  'biopolymer_id', "NULL", {"d_b.type_id+0 = {typeID_gene}"}),
+		],
 		
 		'upstream_id' : [
 			('a_l',  'rowid',   "(SELECT d_b.biopolymer_id         FROM `db`.`biopolymer` AS d_b JOIN `db`.`biopolymer_region` AS d_br USING (biopolymer_id) WHERE d_b.type_id+0 = {typeID_gene} AND d_br.ldprofile_id = {ldprofileID} AND d_br.chr = a_l.chr  AND d_br.posMax < a_l.pos  - {rpMargin} ORDER BY d_br.posMax DESC LIMIT 1)"),
@@ -1791,14 +1946,14 @@ JOIN `db`.`biopolymer` AS d_b
 			('d_sl', '_ROWID_', "d_sl.pos-(SELECT MAX(d_br.posMax) FROM `db`.`biopolymer` AS d_b JOIN `db`.`biopolymer_region` AS d_br USING (biopolymer_id) WHERE d_b.type_id+0 = {typeID_gene} AND d_br.ldprofile_id = {ldprofileID} AND d_br.chr = d_sl.chr AND d_br.posMax < d_sl.pos - {rpMargin})"),
 		],
 		'upstream_start' : [
-			('a_l',  'rowid',   "(SELECT d_br.posMin               FROM `db`.`biopolymer` AS d_b JOIN `db`.`biopolymer_region` AS d_br USING (biopolymer_id) WHERE d_b.type_id+0 = {typeID_gene} AND d_br.ldprofile_id = {ldprofileID} AND d_br.chr = a_l.chr  AND d_br.posMax < a_l.pos  - {rpMargin} ORDER BY d_br.posMax DESC LIMIT 1)"),
-			('m_l',  'rowid',   "(SELECT d_br.posMin               FROM `db`.`biopolymer` AS d_b JOIN `db`.`biopolymer_region` AS d_br USING (biopolymer_id) WHERE d_b.type_id+0 = {typeID_gene} AND d_br.ldprofile_id = {ldprofileID} AND d_br.chr = m_l.chr  AND d_br.posMax < m_l.pos  - {rpMargin} ORDER BY d_br.posMax DESC LIMIT 1)"),
-			('d_sl', '_ROWID_', "(SELECT d_br.posMin               FROM `db`.`biopolymer` AS d_b JOIN `db`.`biopolymer_region` AS d_br USING (biopolymer_id) WHERE d_b.type_id+0 = {typeID_gene} AND d_br.ldprofile_id = {ldprofileID} AND d_br.chr = d_sl.chr AND d_br.posMax < d_sl.pos - {rpMargin} ORDER BY d_br.posMax DESC LIMIT 1)"),
+			('a_l',  'rowid',   "(SELECT d_br.posMin {pMinOffset}  FROM `db`.`biopolymer` AS d_b JOIN `db`.`biopolymer_region` AS d_br USING (biopolymer_id) WHERE d_b.type_id+0 = {typeID_gene} AND d_br.ldprofile_id = {ldprofileID} AND d_br.chr = a_l.chr  AND d_br.posMax < a_l.pos  - {rpMargin} ORDER BY d_br.posMax DESC LIMIT 1)"),
+			('m_l',  'rowid',   "(SELECT d_br.posMin {pMinOffset}  FROM `db`.`biopolymer` AS d_b JOIN `db`.`biopolymer_region` AS d_br USING (biopolymer_id) WHERE d_b.type_id+0 = {typeID_gene} AND d_br.ldprofile_id = {ldprofileID} AND d_br.chr = m_l.chr  AND d_br.posMax < m_l.pos  - {rpMargin} ORDER BY d_br.posMax DESC LIMIT 1)"),
+			('d_sl', '_ROWID_', "(SELECT d_br.posMin {pMinOffset}  FROM `db`.`biopolymer` AS d_b JOIN `db`.`biopolymer_region` AS d_br USING (biopolymer_id) WHERE d_b.type_id+0 = {typeID_gene} AND d_br.ldprofile_id = {ldprofileID} AND d_br.chr = d_sl.chr AND d_br.posMax < d_sl.pos - {rpMargin} ORDER BY d_br.posMax DESC LIMIT 1)"),
 		],
 		'upstream_stop' : [
-			('a_l',  'rowid',   "(SELECT d_br.posMax               FROM `db`.`biopolymer` AS d_b JOIN `db`.`biopolymer_region` AS d_br USING (biopolymer_id) WHERE d_b.type_id+0 = {typeID_gene} AND d_br.ldprofile_id = {ldprofileID} AND d_br.chr = a_l.chr  AND d_br.posMax < a_l.pos  - {rpMargin} ORDER BY d_br.posMax DESC LIMIT 1)"),
-			('m_l',  'rowid',   "(SELECT d_br.posMax               FROM `db`.`biopolymer` AS d_b JOIN `db`.`biopolymer_region` AS d_br USING (biopolymer_id) WHERE d_b.type_id+0 = {typeID_gene} AND d_br.ldprofile_id = {ldprofileID} AND d_br.chr = m_l.chr  AND d_br.posMax < m_l.pos  - {rpMargin} ORDER BY d_br.posMax DESC LIMIT 1)"),
-			('d_sl', '_ROWID_', "(SELECT d_br.posMax               FROM `db`.`biopolymer` AS d_b JOIN `db`.`biopolymer_region` AS d_br USING (biopolymer_id) WHERE d_b.type_id+0 = {typeID_gene} AND d_br.ldprofile_id = {ldprofileID} AND d_br.chr = d_sl.chr AND d_br.posMax < d_sl.pos - {rpMargin} ORDER BY d_br.posMax DESC LIMIT 1)"),
+			('a_l',  'rowid',   "(SELECT d_br.posMax {pMaxOffset}  FROM `db`.`biopolymer` AS d_b JOIN `db`.`biopolymer_region` AS d_br USING (biopolymer_id) WHERE d_b.type_id+0 = {typeID_gene} AND d_br.ldprofile_id = {ldprofileID} AND d_br.chr = a_l.chr  AND d_br.posMax < a_l.pos  - {rpMargin} ORDER BY d_br.posMax DESC LIMIT 1)"),
+			('m_l',  'rowid',   "(SELECT d_br.posMax {pMaxOffset}  FROM `db`.`biopolymer` AS d_b JOIN `db`.`biopolymer_region` AS d_br USING (biopolymer_id) WHERE d_b.type_id+0 = {typeID_gene} AND d_br.ldprofile_id = {ldprofileID} AND d_br.chr = m_l.chr  AND d_br.posMax < m_l.pos  - {rpMargin} ORDER BY d_br.posMax DESC LIMIT 1)"),
+			('d_sl', '_ROWID_', "(SELECT d_br.posMax {pMaxOffset}  FROM `db`.`biopolymer` AS d_b JOIN `db`.`biopolymer_region` AS d_br USING (biopolymer_id) WHERE d_b.type_id+0 = {typeID_gene} AND d_br.ldprofile_id = {ldprofileID} AND d_br.chr = d_sl.chr AND d_br.posMax < d_sl.pos - {rpMargin} ORDER BY d_br.posMax DESC LIMIT 1)"),
 		],
 		
 		'downstream_id' : [
@@ -1817,14 +1972,14 @@ JOIN `db`.`biopolymer` AS d_b
 			('d_sl', '_ROWID_', "-d_sl.pos+(SELECT MIN(d_br.posMin) FROM `db`.`biopolymer` AS d_b JOIN `db`.`biopolymer_region` AS d_br USING (biopolymer_id) WHERE d_b.type_id+0 = {typeID_gene} AND d_br.ldprofile_id = {ldprofileID} AND d_br.chr = d_sl.chr AND d_br.posMin > d_sl.pos + {rpMargin})"),
 		],
 		'downstream_start' : [
-			('a_l',  'rowid',   "(SELECT d_br.posMin                FROM `db`.`biopolymer` AS d_b JOIN `db`.`biopolymer_region` AS d_br USING (biopolymer_id) WHERE d_b.type_id+0 = {typeID_gene} AND d_br.ldprofile_id = {ldprofileID} AND d_br.chr = a_l.chr  AND d_br.posMin > a_l.pos  + {rpMargin} ORDER BY d_br.posMin LIMIT 1)"),
-			('m_l',  'rowid',   "(SELECT d_br.posMin                FROM `db`.`biopolymer` AS d_b JOIN `db`.`biopolymer_region` AS d_br USING (biopolymer_id) WHERE d_b.type_id+0 = {typeID_gene} AND d_br.ldprofile_id = {ldprofileID} AND d_br.chr = m_l.chr  AND d_br.posMin > m_l.pos  + {rpMargin} ORDER BY d_br.posMin LIMIT 1)"),
-			('d_sl', '_ROWID_', "(SELECT d_br.posMin                FROM `db`.`biopolymer` AS d_b JOIN `db`.`biopolymer_region` AS d_br USING (biopolymer_id) WHERE d_b.type_id+0 = {typeID_gene} AND d_br.ldprofile_id = {ldprofileID} AND d_br.chr = d_sl.chr AND d_br.posMin > d_sl.pos + {rpMargin} ORDER BY d_br.posMin LIMIT 1)"),
+			('a_l',  'rowid',   "(SELECT d_br.posMin {pMinOffset}   FROM `db`.`biopolymer` AS d_b JOIN `db`.`biopolymer_region` AS d_br USING (biopolymer_id) WHERE d_b.type_id+0 = {typeID_gene} AND d_br.ldprofile_id = {ldprofileID} AND d_br.chr = a_l.chr  AND d_br.posMin > a_l.pos  + {rpMargin} ORDER BY d_br.posMin LIMIT 1)"),
+			('m_l',  'rowid',   "(SELECT d_br.posMin {pMinOffset}   FROM `db`.`biopolymer` AS d_b JOIN `db`.`biopolymer_region` AS d_br USING (biopolymer_id) WHERE d_b.type_id+0 = {typeID_gene} AND d_br.ldprofile_id = {ldprofileID} AND d_br.chr = m_l.chr  AND d_br.posMin > m_l.pos  + {rpMargin} ORDER BY d_br.posMin LIMIT 1)"),
+			('d_sl', '_ROWID_', "(SELECT d_br.posMin {pMinOffset}   FROM `db`.`biopolymer` AS d_b JOIN `db`.`biopolymer_region` AS d_br USING (biopolymer_id) WHERE d_b.type_id+0 = {typeID_gene} AND d_br.ldprofile_id = {ldprofileID} AND d_br.chr = d_sl.chr AND d_br.posMin > d_sl.pos + {rpMargin} ORDER BY d_br.posMin LIMIT 1)"),
 		],
 		'downstream_stop' : [
-			('a_l',  'rowid',   "(SELECT d_br.posMax                FROM `db`.`biopolymer` AS d_b JOIN `db`.`biopolymer_region` AS d_br USING (biopolymer_id) WHERE d_b.type_id+0 = {typeID_gene} AND d_br.ldprofile_id = {ldprofileID} AND d_br.chr = a_l.chr  AND d_br.posMin > a_l.pos  + {rpMargin} ORDER BY d_br.posMin LIMIT 1)"),
-			('m_l',  'rowid',   "(SELECT d_br.posMax                FROM `db`.`biopolymer` AS d_b JOIN `db`.`biopolymer_region` AS d_br USING (biopolymer_id) WHERE d_b.type_id+0 = {typeID_gene} AND d_br.ldprofile_id = {ldprofileID} AND d_br.chr = m_l.chr  AND d_br.posMin > m_l.pos  + {rpMargin} ORDER BY d_br.posMin LIMIT 1)"),
-			('d_sl', '_ROWID_', "(SELECT d_br.posMax                FROM `db`.`biopolymer` AS d_b JOIN `db`.`biopolymer_region` AS d_br USING (biopolymer_id) WHERE d_b.type_id+0 = {typeID_gene} AND d_br.ldprofile_id = {ldprofileID} AND d_br.chr = d_sl.chr AND d_br.posMin > d_sl.pos + {rpMargin} ORDER BY d_br.posMin LIMIT 1)"),
+			('a_l',  'rowid',   "(SELECT d_br.posMax {pMaxOffset}   FROM `db`.`biopolymer` AS d_b JOIN `db`.`biopolymer_region` AS d_br USING (biopolymer_id) WHERE d_b.type_id+0 = {typeID_gene} AND d_br.ldprofile_id = {ldprofileID} AND d_br.chr = a_l.chr  AND d_br.posMin > a_l.pos  + {rpMargin} ORDER BY d_br.posMin LIMIT 1)"),
+			('m_l',  'rowid',   "(SELECT d_br.posMax {pMaxOffset}   FROM `db`.`biopolymer` AS d_b JOIN `db`.`biopolymer_region` AS d_br USING (biopolymer_id) WHERE d_b.type_id+0 = {typeID_gene} AND d_br.ldprofile_id = {ldprofileID} AND d_br.chr = m_l.chr  AND d_br.posMin > m_l.pos  + {rpMargin} ORDER BY d_br.posMin LIMIT 1)"),
+			('d_sl', '_ROWID_', "(SELECT d_br.posMax {pMaxOffset}   FROM `db`.`biopolymer` AS d_b JOIN `db`.`biopolymer_region` AS d_br USING (biopolymer_id) WHERE d_b.type_id+0 = {typeID_gene} AND d_br.ldprofile_id = {ldprofileID} AND d_br.chr = d_sl.chr AND d_br.posMin > d_sl.pos + {rpMargin} ORDER BY d_br.posMin LIMIT 1)"),
 		],
 		
 		'group_id' : [
@@ -1854,6 +2009,11 @@ JOIN `db`.`biopolymer` AS d_b
 			('m_g', 'group_id', "m_g.extra"),
 			('d_g', 'group_id', "NULL"),
 		],
+		'group_flag' : [
+			('a_g', 'group_id', "a_g.flag"),
+			('m_g', 'group_id', "m_g.flag"),
+			('d_g', 'group_id', "NULL"),
+		],
 		
 		'source_id' : [
 			('a_c', 'source_id', "a_c.source_id"),
@@ -1874,7 +2034,7 @@ JOIN `db`.`biopolymer` AS d_b
 			('d_w', '_ROWID_', "d_w.chr"),
 		],
 		'gwas_pos' : [
-			('d_w', '_ROWID_', "d_w.pos"),
+			('d_w', '_ROWID_', "d_w.pos {pMinOffset}"),
 		],
 		'gwas_trait' : [
 			('d_w', '_ROWID_', "d_w.trait"),
@@ -1916,7 +2076,7 @@ JOIN `db`.`biopolymer` AS d_b
 	#getQueryTemplate()
 	
 	
-	def buildQuery(self, mode, focus, select, having=None, where=None, fromFilter=None, joinFilter=None):
+	def buildQuery(self, mode, focus, select, having=None, where=None, applyOffset=False, fromFilter=None, joinFilter=None):
 		assert(mode in ('filter','annotate','modelgene','modelgroup','model'))
 		assert(focus in self._schema)
 		# select=[ column, ... ]
@@ -2101,20 +2261,30 @@ JOIN `db`.`biopolymer` AS d_b
 		options = {
 			'L'           : None,
 			'R'           : None,
-			'typeID_gene' : self.getOptionTypeID('gene'),
+			'typeID_gene' : self.getOptionTypeID('gene', optional=True),
 			'namespaceID_symbol' : self.getOptionNamespaceID('symbol', optional=True),
-			'allowUSP'    : (1 if self._options.allow_unvalidated_snp_positions == 'yes' else 0),
+			'allowUSP'    : (1 if (self._options.allow_unvalidated_snp_positions == 'yes') else 0),
+			'pMinOffset'  : '',
+			'pMaxOffset'  : '',
 			'rpMargin'    : self._options.region_position_margin,
-			'rmPercent'   : self._options.region_match_percent,
-			'rmBases'     : self._options.region_match_bases,
-			'gbColumn1'   : ('specificity' if self._options.reduce_ambiguous_knowledge == 'no' else ('implication' if self._options.reduce_ambiguous_knowledge == 'any' else self._options.reduce_ambiguous_knowledge)),
-			'gbColumn2'   : ('specificity' if self._options.reduce_ambiguous_knowledge == 'no' else ('quality'     if self._options.reduce_ambiguous_knowledge == 'any' else self._options.reduce_ambiguous_knowledge)),
-			'gbCondition' : ('> 0' if self._options.allow_ambiguous_knowledge == 'yes' else '>= 100'),
+			'rmPercent'   : self._options.region_match_percent if (self._options.region_match_percent != None) else "NULL",
+			'rmBases'     : self._options.region_match_bases if (self._options.region_match_bases != None) else "NULL",
+			'gbColumn1'   : 'specificity',
+			'gbColumn2'   : 'specificity',
+			'gbCondition' : ('> 0' if (self._options.allow_ambiguous_knowledge == 'yes') else '>= 100'),
+			'zoneSize'    : int(self._loki.getDatabaseSetting('zone_size') or 0),
+			'ldprofileID' : self._loki.getLDProfileID(self._options.ld_profile or ''),
 		}
-		options['zoneSize'] = int(self._loki.getDatabaseSetting('zone_size') or 0)
-		options['ldprofileID'] = self._loki.getLDProfileID(self._options.ld_profile or '')
 		if not options['ldprofileID']:
 			sys.exit("ERROR: %s LD profile record not found in the knowledge database" % (self._options.ld_profile or '<default>',))
+		if applyOffset:
+			if (self._options.coordinate_base != 1):
+				options['pMinOffset'] = '+ %d' % (self._options.coordinate_base - 1,)
+			if (self._options.coordinate_base != 1) or (self._options.regions_half_open == 'yes'):
+				options['pMaxOffset'] = '+ %d' % (self._options.coordinate_base - 1 + (1 if (self._options.regions_half_open == 'yes') else 0),)
+		if self._options.reduce_ambiguous_knowledge == 'yes':
+			options['gbColumn1'] = ('implication' if (self._options.reduce_ambiguous_knowledge == 'any') else self._options.reduce_ambiguous_knowledge)
+			options['gbColumn2'] = ('quality'     if (self._options.reduce_ambiguous_knowledge == 'any') else self._options.reduce_ambiguous_knowledge)
 		
 		# debug
 		if self._options.debug_logic:
@@ -2349,26 +2519,26 @@ JOIN `db`.`biopolymer` AS d_b
 	#_populateColumnsFromTypes()
 	
 	
-	def generateFilterOutput(self, types):
+	def generateFilterOutput(self, types, applyOffset=False):
 		header = list()
 		columns = list()
 		self._populateColumnsFromTypes(types, columns, header)
 		if not (header and columns):
 			raise Exception("filtering with empty column list")
 		header[0] = "#" + header[0]
-		query = self.buildQuery(mode='filter', focus='main', select=columns)
+		query = self.buildQuery(mode='filter', focus='main', select=columns, applyOffset=applyOffset)
 		return itertools.chain([tuple(header)], self.generateQueryResults(query, allowDupes=(self._options.allow_duplicate_output == 'yes')))
 	#generateFilterOutput()
 	
 	
-	def generateAnnotationOutput(self, typesF, typesA):
+	def generateAnnotationOutput(self, typesF, typesA, applyOffset=False):
 		# build a baseline filtering query
 		headerF = list()
 		columnsF = list()
 		self._populateColumnsFromTypes(typesF, columnsF, headerF)
 		if not (headerF and columnsF):
 			raise Exception("annotation with no starting columns")
-		queryF = self.buildQuery(mode='filter', focus='main', select=columnsF)
+		queryF = self.buildQuery(mode='filter', focus='main', select=columnsF, applyOffset=applyOffset)
 		lenF = len(queryF['_columns'])
 		sqlF = self.getQueryText(queryF, splitRowIDs=True)
 		self.prepareTablesForQuery(queryF)
@@ -2387,7 +2557,7 @@ JOIN `db`.`biopolymer` AS d_b
 		self._populateColumnsFromTypes(typesA, columnsA, headerA)
 		if not (headerA and columnsA):
 			raise Exception("annotation with no extra columns")
-		queryA = self.buildQuery(mode='annotate', focus='alt', select=columnsA, where=conditionsA)
+		queryA = self.buildQuery(mode='annotate', focus='alt', select=columnsA, where=conditionsA, applyOffset=applyOffset)
 		lenA = len(queryA['_columns'])
 		sqlA = self.getQueryText(queryA, noRowIDs=True, sortRowIDs=True, splitRowIDs=True)
 		self.prepareTablesForQuery(queryA)
@@ -2582,7 +2752,7 @@ JOIN `db`.`biopolymer` AS d_b
 	#getGeneModels()
 	
 	
-	def generateModelOutput(self, typesL, typesR):
+	def generateModelOutput(self, typesL, typesR, applyOffset=False):
 		cursor = self._loki._db.cursor()
 		limit = max(0, self._options.maximum_model_count)
 		
@@ -2607,10 +2777,10 @@ JOIN `db`.`biopolymer` AS d_b
 		if self._options.all_pairwise_models != 'yes':
 			conditionsL = {('gene_id' if self._onlyGeneModels else 'biopolymer_id') : {"= (CASE WHEN 1 THEN ?1 ELSE 0*?2*?3*?4 END)"}}
 			conditionsR = {('gene_id' if self._onlyGeneModels else 'biopolymer_id') : {"= (CASE WHEN 1 THEN ?2 ELSE 0*?1*?3*?4 END)"}}
-		queryL = self.buildQuery(mode='filter', focus='main', select=columnsL, having=conditionsL)
+		queryL = self.buildQuery(mode='filter', focus='main', select=columnsL, having=conditionsL, applyOffset=applyOffset)
 		sqlL = self.getQueryText(queryL)
 		self.prepareTablesForQuery(queryL)
-		queryR = self.buildQuery(mode='filter', focus='alt', select=columnsR, having=conditionsR)
+		queryR = self.buildQuery(mode='filter', focus='alt', select=columnsR, having=conditionsR, applyOffset=applyOffset)
 		sqlR = self.getQueryText(queryR)
 		self.prepareTablesForQuery(queryR)
 		
@@ -2764,8 +2934,8 @@ if __name__ == "__main__":
 	group.add_argument('--knowledge', '-k', type=str, metavar='file', #default=argparse.SUPPRESS,
 			help="the prior knowledge database file to use"
 	)
-	group.add_argument('--report-genome-build', '--rgb', type=yesno, metavar='yes/no', nargs='?', const='yes', default='no',
-			help="report the genome build version number used by the knowledge database (default: no)"
+	group.add_argument('--report-genome-build', '--rgb', type=yesno, metavar='yes/no', nargs='?', const='yes', default='yes',
+			help="report the genome build version number used by the knowledge database (default: yes)"
 	)
 	group.add_argument('--report-gene-name-stats', '--rgns', type=yesno, metavar='yes/no', nargs='?', const='yes', default='no',
 			help="display statistics on available gene identifier types (default: no)"
@@ -2916,6 +3086,18 @@ if __name__ == "__main__":
 	
 	# add positional section
 	group = parser.add_argument_group("Positional Matching Options")
+	group.add_argument('--grch-build-version', '--gbv', type=int, metavar='version', default=None,
+			help="the GRCh# human reference genome build version of position and region inputs",
+	)
+	group.add_argument('--ucsc-build-version', '--ubv', type=int, metavar='version', default=None,
+			help="the UCSC hg# human reference genome build version of position and region inputs",
+	)
+	group.add_argument('--coordinate-base', '--cb', type=int, metavar='offset', default=1,
+			help="the coordinate base for position and region inputs and outputs (default: 1)",
+	)
+	group.add_argument('--regions-half-open', '--rho', type=yesno, metavar='yes/no', nargs='?', const='yes', default='no',
+			help="whether input and output regions are 'half-open' intervals and should not include their end coordinate (default: no)",
+	)
 	group.add_argument('--region-position-margin', '--rpm', type=basepairs, metavar='bases', default=0,
 			help="number of bases beyond the bounds of known regions where positions should still be matched (default: 0)"
 	)
@@ -3170,6 +3352,12 @@ if __name__ == "__main__":
 			typeOutputPath['models'][(tuple(typesL),tuple(typesR))] = options.prefix + '.' + '-'.join(typesL) + '.' + '-'.join(typesR) + '.models'
 	#foreach requested model
 	
+	# identify all the PARIS result files we need to output
+	typeOutputPath['paris'] = collections.OrderedDict()
+	if options.paris == 'yes':
+		typeOutputPath['paris']['summary'] = options.prefix + '.paris-summary'
+		typeOutputPath['paris']['detail'] = options.prefix + '.paris-detail' #TODO
+	
 	# verify that all output files are unique, writeable and nonexistant (unless overwriting)
 	typeOutputInfo = dict()
 	pathUsed = dict()
@@ -3189,6 +3377,8 @@ if __name__ == "__main__":
 					label = "'%s' models" % (" ".join(output[0]),)
 				else:
 					label = "'%s : %s' models" % (" ".join(output[0])," ".join(output[1]))
+			elif outtype == 'paris':
+				label = "PARIS %s report" % (output,)
 			else:
 				raise Exception("unexpected output type")
 			
@@ -3278,7 +3468,7 @@ if __name__ == "__main__":
 	# set default region_match_percent/bases
 	if (options.region_match_bases != None) and (options.region_match_percent == None):
 		bio.warn("WARNING: ignoring default region match percent (100) in favor of user-specified region match bases (%d)\n" % options.region_match_bases)
-		options.region_match_percent = 0.0
+		options.region_match_percent = None
 	else:
 		if options.region_match_bases == None:
 			options.region_match_bases = 0
@@ -3286,10 +3476,15 @@ if __name__ == "__main__":
 			options.region_match_percent = 100.0
 	
 	# report the genome build, if requested
+	grchBuildDB,ucscBuildDB = bio.getDatabaseGenomeBuilds()
 	if options.report_genome_build == 'yes':
-		builds = bio.getDatabaseGenomeBuilds()
-		bio.warn("knowledge database genome build: GRCh %s / UCSChg %s\n" % (builds[0] or '?', builds[1] or '?'))
+		bio.warn("knowledge database genome build: GRCh%s / UCSC hg%s\n" % (grchBuildDB or '?', ucscBuildDB or '?'))
 	#if genome build
+	
+	# parse input genome build version(s)
+	grchBuildUser,ucscBuildUser = bio.getInputGenomeBuilds(options.grch_build_version, options.ucsc_build_version)
+	if grchBuildUser or ucscBuildUser:
+		bio.warn("user input genome build: GRCh%s / UCSC hg%s\n" % (grchBuildUser or '?', ucscBuildUser or '?'))
 	
 	# define output helper functions
 	utf8 = codecs.getencoder('utf8')
@@ -3372,67 +3567,202 @@ if __name__ == "__main__":
 	
 	# apply primary filters
 	for snpList in (options.snp or empty):
-		bio.intersectInputSNPs('main', bio.generateRSesFromText(snpList, separator=':', errorCallback=cb['SNP']), errorCallback=cb['SNP'])
+		bio.intersectInputSNPs(
+			'main',
+			bio.generateRSesFromText(snpList, separator=':', errorCallback=cb['SNP']),
+			errorCallback=cb['SNP']
+		)
 	for snpFileList in (options.snp_file or empty):
-		bio.intersectInputSNPs('main', bio.generateRSesFromRSFiles(snpFileList, errorCallback=cb['SNP']), errorCallback=cb['SNP'])
+		bio.intersectInputSNPs(
+			'main',
+			bio.generateRSesFromRSFiles(snpFileList, errorCallback=cb['SNP']),
+			errorCallback=cb['SNP']
+		)
 	for positionList in (options.position or empty):
-		bio.intersectInputLoci('main', bio.generateLociFromText(positionList, separator=':', errorCallback=cb['position']), errorCallback=cb['position'])
+		bio.intersectInputLoci(
+			'main',
+			bio.generateLiftOverLoci(
+				ucscBuildUser, ucscBuildDB,
+				bio.generateLociFromText(positionList, separator=':', applyOffset=True, errorCallback=cb['position']),
+				errorCallback=cb['position']
+			),
+			errorCallback=cb['position']
+		)
 	for positionFileList in (options.position_file or empty):
-		bio.intersectInputLoci('main', bio.generateLociFromMapFiles(positionFileList, errorCallback=cb['position']), errorCallback=cb['position'])
+		bio.intersectInputLoci(
+			'main',
+			bio.generateLiftOverLoci(
+				ucscBuildUser, ucscBuildDB,
+				bio.generateLociFromMapFiles(positionFileList, applyOffset=True, errorCallback=cb['position']),
+				errorCallback=cb['position']
+			),
+			errorCallback=cb['position']
+		)
 	for geneList in (options.gene or empty):
-		bio.intersectInputGenes('main', bio.generateNamesFromText(geneList, options.gene_identifier_type, separator=':', errorCallback=cb['gene']), errorCallback=cb['gene'])
+		bio.intersectInputGenes(
+			'main',
+			bio.generateNamesFromText(geneList, options.gene_identifier_type, separator=':', errorCallback=cb['gene']),
+			errorCallback=cb['gene']
+		)
 	for geneFileList in (options.gene_file or empty):
-		bio.intersectInputGenes('main', bio.generateNamesFromNameFiles(geneFileList, options.gene_identifier_type, errorCallback=cb['gene']), errorCallback=cb['gene'])
+		bio.intersectInputGenes(
+			'main',
+			bio.generateNamesFromNameFiles(geneFileList, options.gene_identifier_type, errorCallback=cb['gene']),
+			errorCallback=cb['gene']
+		)
 	for geneSearch in (options.gene_search or empty):
-		bio.intersectInputGeneSearch('main', (2*(encodeString(s),) for s in geneSearch))
+		bio.intersectInputGeneSearch(
+			'main',
+			(2*(encodeString(s),) for s in geneSearch)
+		)
 	for regionList in (options.region or empty):
-		bio.intersectInputRegions('main', bio.generateRegionsFromText(regionList, separator=':', errorCallback=cb['region']), errorCallback=cb['region'])
+		bio.intersectInputRegions(
+			'main',
+			bio.generateLiftOverRegions(
+				ucscBuildUser, ucscBuildDB,
+				bio.generateRegionsFromText(regionList, separator=':', applyOffset=True, errorCallback=cb['region']),
+				errorCallback=cb['region']
+			),
+			errorCallback=cb['region']
+		)
 	for regionFileList in (options.region_file or empty):
-		bio.intersectInputRegions('main', bio.generateRegionsFromFiles(regionFileList, errorCallback=cb['region']), errorCallback=cb['region'])
+		bio.intersectInputRegions(
+			'main',
+			bio.generateLiftOverRegions(
+				ucscBuildUser, ucscBuildDB,
+				bio.generateRegionsFromFiles(regionFileList, applyOffset=True, errorCallback=cb['region']),
+				errorCallback=cb['region']
+			),
+			errorCallback=cb['region']
+		)
 	for groupList in (options.group or empty):
-		bio.intersectInputGroups('main', bio.generateNamesFromText(groupList, options.group_identifier_type, separator=':', errorCallback=cb['group']), errorCallback=cb['group'])
+		bio.intersectInputGroups(
+			'main',
+			bio.generateNamesFromText(groupList, options.group_identifier_type, separator=':', errorCallback=cb['group']),
+			errorCallback=cb['group']
+		)
 	for groupFileList in (options.group_file or empty):
-		bio.intersectInputGroups('main', bio.generateNamesFromNameFiles(groupFileList, options.group_identifier_type, errorCallback=cb['group']), errorCallback=cb['group'])
+		bio.intersectInputGroups(
+			'main',
+			bio.generateNamesFromNameFiles(groupFileList, options.group_identifier_type, errorCallback=cb['group']),
+			errorCallback=cb['group']
+		)
 	for groupSearch in (options.group_search or empty):
-		bio.intersectInputGroupSearch('main', (2*(encodeString(s),) for s in groupSearch))
+		bio.intersectInputGroupSearch(
+			'main',
+			(2*(encodeString(s),) for s in groupSearch)
+		)
 	for sourceList in (options.source or empty):
-		bio.intersectInputSources('main', sourceList, errorCallback=cb['source'])
+		bio.intersectInputSources(
+			'main',
+			sourceList,
+			errorCallback=cb['source']
+		)
 	for sourceFile in itertools.chain(*(options.source_file or empty)):
-		bio.intersectInputSources('main', itertools.chain(*(line for line in open(sourceFile,'rU'))), errorCallback=cb['source'])
+		bio.intersectInputSources(
+			'main',
+			itertools.chain(*(line for line in open(sourceFile,'rU'))),
+			errorCallback=cb['source']
+		)
 	
 	# apply alternate filters
 	for snpList in (options.alt_snp or empty):
-		bio.intersectInputSNPs('alt', bio.generateRSesFromText(snpList, separator=':', errorCallback=cb['alt-SNP']), errorCallback=cb['alt-SNP'])
+		bio.intersectInputSNPs(
+			'alt',
+			bio.generateRSesFromText(snpList, separator=':', errorCallback=cb['alt-SNP']),
+			errorCallback=cb['alt-SNP']
+		)
 	for snpFileList in (options.alt_snp_file or empty):
-		bio.intersectInputSNPs('alt', bio.generateRSesFromRSFiles(snpFileList, errorCallback=cb['alt-SNP']), errorCallback=cb['alt-SNP'])
+		bio.intersectInputSNPs(
+			'alt',
+			bio.generateRSesFromRSFiles(snpFileList, errorCallback=cb['alt-SNP']),
+			errorCallback=cb['alt-SNP']
+		)
 	for positionList in (options.alt_position or empty):
-		bio.intersectInputLoci('alt', bio.generateLociFromText(positionList, separator=':', errorCallback=cb['alt-position']), errorCallback=cb['alt-position'])
+		bio.intersectInputLoci(
+			'alt',
+			bio.generateLiftOverLoci(
+				ucscBuildUser, ucscBuildDB,
+				bio.generateLociFromText(positionList, separator=':', applyOffset=True, errorCallback=cb['alt-position']),
+				errorCallback=cb['alt-position']),
+			errorCallback=cb['alt-position']
+		)
 	for positionFileList in (options.alt_position_file or empty):
-		bio.intersectInputLoci('alt', bio.generateLociFromMapFiles(positionFileList, errorCallback=cb['alt-position']), errorCallback=cb['alt-position'])
+		bio.intersectInputLoci(
+			'alt',
+			bio.generateLiftOverLoci(
+				ucscBuildUser, ucscBuildDB,
+				bio.generateLociFromMapFiles(positionFileList, applyOffset=True, errorCallback=cb['alt-position']),
+				errorCallback=cb['alt-position']
+			),
+			errorCallback=cb['alt-position']
+		)
 	for geneList in (options.alt_gene or empty):
-		bio.intersectInputGenes('alt', bio.generateNamesFromText(geneList, options.gene_identifier_type, separator=':', errorCallback=cb['alt-gene']), errorCallback=cb['alt-gene'])
+		bio.intersectInputGenes(
+			'alt',
+			bio.generateNamesFromText(geneList, options.gene_identifier_type, separator=':', errorCallback=cb['alt-gene']),
+			errorCallback=cb['alt-gene']
+		)
 	for geneFileList in (options.alt_gene_file or empty):
-		bio.intersectInputGenes('alt', bio.generateNamesFromNameFiles(geneFileList, options.gene_identifier_type, errorCallback=cb['alt-gene']), errorCallback=cb['alt-gene'])
+		bio.intersectInputGenes(
+			'alt',
+			bio.generateNamesFromNameFiles(geneFileList, options.gene_identifier_type, errorCallback=cb['alt-gene']),
+			errorCallback=cb['alt-gene']
+		)
 	for geneSearch in (options.alt_gene_search or empty):
-		bio.intersectInputGeneSearch('alt', (2*(encodeString(s),) for s in geneSearch))
+		bio.intersectInputGeneSearch(
+			'alt',
+			(2*(encodeString(s),) for s in geneSearch)
+		)
 	for regionList in (options.alt_region or empty):
-		bio.intersectInputRegions('alt', bio.generateRegionsFromText(regionList, separator=':', errorCallback=cb['alt-region']), errorCallback=cb['alt-region'])
+		bio.intersectInputRegions(
+			'alt',
+			bio.generateLiftOverRegions(
+				ucscBuildUser, ucscBuildDB,
+				bio.generateRegionsFromText(regionList, separator=':', applyOffset=True, errorCallback=cb['alt-region']),
+				errorCallback=cb['alt-region']
+			),
+			errorCallback=cb['alt-region']
+		)
 	for regionFileList in (options.alt_region_file or empty):
-		bio.intersectInputRegions('alt', bio.generateRegionsFromFiles(regionFileList, errorCallback=cb['alt-region']), errorCallback=cb['alt-region'])
+		bio.intersectInputRegions(
+			'alt',
+			bio.generateLiftOverRegions(
+				ucscBuildUser, ucscBuildDB,
+				bio.generateRegionsFromFiles(regionFileList, applyOffset=True, errorCallback=cb['alt-region']),
+				errorCallback=cb['alt-region']
+			),
+			errorCallback=cb['alt-region']
+		)
 	for groupList in (options.alt_group or empty):
-		bio.intersectInputGroups('alt', bio.generateNamesFromText(groupList, options.group_identifier_type, separator=':', errorCallback=cb['alt-group']), errorCallback=cb['alt-group'])
+		bio.intersectInputGroups(
+			'alt',
+			bio.generateNamesFromText(groupList, options.group_identifier_type, separator=':', errorCallback=cb['alt-group']),
+			errorCallback=cb['alt-group']
+		)
 	for groupFileList in (options.alt_group_file or empty):
-		bio.intersectInputGroups('alt', bio.generateNamesFromNameFiles(groupFileList, options.group_identifier_type, errorCallback=cb['alt-group']), errorCallback=cb['alt-group'])
+		bio.intersectInputGroups(
+			'alt',
+			bio.generateNamesFromNameFiles(groupFileList, options.group_identifier_type, errorCallback=cb['alt-group']),
+			errorCallback=cb['alt-group']
+		)
 	for groupSearch in (options.alt_group_search or empty):
-		bio.intersectInputGroupSearch('alt', (2*(encodeString(s),) for s in groupSearch))
+		bio.intersectInputGroupSearch(
+			'alt',
+			(2*(encodeString(s),) for s in groupSearch)
+		)
 	for sourceList in (options.alt_source or empty):
-		bio.intersectInputSources('alt', sourceList, errorCallback=cb['alt-source'])
+		bio.intersectInputSources(
+			'alt',
+			sourceList,
+			errorCallback=cb['alt-source']
+		)
 	for sourceFile in itertools.chain(*(options.alt_source_file or empty)):
-		bio.intersectInputSources('alt', itertools.chain(*(line for line in open(sourceFile,'rU'))), errorCallback=cb['alt-source'])
-	
-	# run PARIS
-	if options.paris == 'yes':
-		bio.generatePARISResults(options.paris_p_value)
+		bio.intersectInputSources(
+			'alt',
+			itertools.chain(*(line for line in open(sourceFile,'rU'))),
+			errorCallback=cb['alt-source']
+		)
 	
 	# report invalid input, if requested
 	if options.report_invalid_input == 'yes':
@@ -3453,7 +3783,7 @@ if __name__ == "__main__":
 		label,path,outfile = info
 		bio.logPush("writing %s to '%s' ...\n" % (label,path))
 		n = -1 # don't count header
-		for row in bio.generateFilterOutput(types):
+		for row in bio.generateFilterOutput(types, applyOffset=True):
 			n += 1
 			outfile.write(encodeRow(row))
 		if outfile != sys.stdout:
@@ -3467,7 +3797,7 @@ if __name__ == "__main__":
 		label,path,outfile = info
 		bio.logPush("writing %s to '%s' ...\n" % (label,path))
 		n = -1 # don't count header
-		for row in bio.generateAnnotationOutput(typesF, typesA):
+		for row in bio.generateAnnotationOutput(typesF, typesA, applyOffset=True):
 			n += 1
 			outfile.write(encodeRow(row))
 		if outfile != sys.stdout:
@@ -3481,12 +3811,47 @@ if __name__ == "__main__":
 		label,path,outfile = info
 		bio.logPush("writing %s to '%s' ...\n" % (label,path))
 		n = -1 # don't count header
-		for row in bio.generateModelOutput(typesL, typesR):
+		for row in bio.generateModelOutput(typesL, typesR, applyOffset=True):
 			n += 1
 			outfile.write(encodeRow(row))
 		if outfile != sys.stdout:
 			outfile.close()
 		bio.logPop("... OK: %d results\n" % n)
 	#foreach model
+	
+	# process PARIS algorithm
+	if typeOutputInfo['paris']:
+		parisGen = bio.generatePARISResults(options.paris_p_value)
+		labelS,pathS,outfileS = typeOutputInfo['paris']['summary']
+		outfileD = None
+		if 'detail' in typeOutputInfo['paris']:
+			labelD,pathD,outfileD = typeOutputInfo['paris']['detail']
+			bio.logPush("writing PARIS summary and detail to '%s' and '%s' ...\n" % (pathS,pathD))
+		else:
+			bio.logPush("writing PARIS summary to '%s'  ...\n" % (pathS,))
+		header = next(parisGen)
+		outfileS.write(encodeRow(header))
+		n = 0
+		for row in parisGen:
+			n += 1
+			outfileS.write(encodeRow(row[:-1]))
+			if outfileD:
+				outfileD.write(encodeRow( ("Pathway Investigation:",row[0]) ))
+				outfileD.write(encodeRow( (row[1],) ))
+				outfileD.write("\n")
+				outfileD.write(encodeRow(header[2:]))
+				outfileD.write(encodeRow(row[2:-1]))
+				outfileD.write("\n")
+				outfileD.write(encodeRow( ("Gene Breakdown:",row[0]) ))
+				outfileD.write("\n")
+				for rowD in row[-1]:
+					outfileD.write(encodeRow(rowD))
+				outfileD.write("\n")
+		if outfileS != sys.stdout:
+			outfileS.close()
+		if outfileD and (outfileD != sys.stdout):
+			outfileD.close()
+		bio.logPop("... OK: %d results\n" % n)
+	#if PARIS
 	
 #__main__
