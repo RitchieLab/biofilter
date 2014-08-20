@@ -25,7 +25,7 @@ class Biofilter:
 	def getVersionTuple(cls):
 		# tuple = (major,minor,revision,dev,build,date)
 		# dev must be in ('a','b','rc','release') for lexicographic comparison
-		return (2,4,0,'a',1,'2014-06-10')
+		return (2,4,0,'a',1,'2014-08-20')
 	#getVersionTuple()
 	
 	
@@ -1341,7 +1341,7 @@ JOIN `db`.`biopolymer` AS d_b
 	
 	
 	def getPARISPermutationScore(self, featureData, featureBin, binFeatures, realFeatures, numPermutations, maxScore=0):
-		realScore = sum(1 for f in realFeatures if (featureBin.get(f) and featureData[f][2]))
+		realScore = sum(1 for f in realFeatures if (featureBin.get(f) and featureData[f][1]))
 		if realScore < 1:
 			return numPermutations
 		
@@ -1351,7 +1351,7 @@ JOIN `db`.`biopolymer` AS d_b
 		for p in xrange(numPermutations):
 			permScore = 0
 			for b,draws in binDraws.iteritems():
-				permScore += sum(1 for f in _sample(binFeatures[b], draws) if featureData[f][2])
+				permScore += sum(1 for f in _sample(binFeatures[b], draws) if featureData[f][1])
 			if permScore > realScore:
 				totalScore += 1
 				if maxScore and (totalScore >= maxScore):
@@ -1360,136 +1360,163 @@ JOIN `db`.`biopolymer` AS d_b
 	#getPARISPermutationScore()
 	
 	
-	def generatePARISResults(self, threshold):
+	def generatePARISResults(self, ucscBuildUser, ucscBuildDB):
 		self.logPush("running PARIS ...\n")
 		cursor = self._loki._db.cursor()
 		
 		if not self._inputFilters['main']['region']:
 			raise Exception("PARIS requires input feature regions")
-		if not (self._inputFilters['main']['snp'] or self._inputFilters['main']['locus']):
-			raise Exception("PARIS requires input SNPs or positions with p-values")
-		sql = "UPDATE `main`.`snp` SET flag = 0; UPDATE `main`.`locus` SET flag = 0; UPDATE `main`.`region` SET flag = 0"
-		cursor.execute(sql)
+		
+		empty = list()
+		threshold = self._options.paris_p_value
+		rpMargin = self._options.region_position_margin
+		zoneSize = 100000 # in this context it doesn't have to match what the db uses
+		self.prepareTableForUpdate('main','region')
+		
+		self.logPush("scanning feature regions ...\n")
+		featureData = dict() # featureData[rowid] = (size,sig)
+		featureBounds = dict() # featureBounds[rowid] = (rowid,chr,posMin,posMax)
+		chrZoneFeatures = collections.defaultdict(lambda: collections.defaultdict(set))
+		sql = "SELECT rowid,chr,posMin,posMax FROM `main`.`region`"
+		for fid,chm,posMin,posMax in cursor.execute(sql):
+			posMin -= rpMargin
+			posMax += rpMargin
+			featureData[fid] = [0,0]
+			featureBounds[fid] = (fid,chm,posMin,posMax)
+			for z in xrange( (posMin / zoneSize), (posMax / zoneSize) + 1 ):
+				chrZoneFeatures[chm][z].add(fid)
+		self.logPop("... OK: %d regions\n" % (len(featureData),))
+		
+		def analyzeLoci(generator):
+			numMatch = numSingle = 0
+			for chm,pos,extra in generator:
+				matched = False
+				z = pos / zoneSize
+				try:
+					sig = (float(extra.split(None,2)[1]) < threshold) #TODO optional pval column position
+				except:
+					sig = False
+				
+				for fid,fchm,fposMin,fposMax in (featureBounds[f] for f in chrZoneFeatures[chm][z]):
+					if (chm == fchm) and (pos >= fposMin) and (pos <= fposMax):
+						matched = True
+						featureData[fid][0] += 1
+						if sig:
+							featureData[fid][1] += 1
+				if matched:
+					numMatch += 1
+				else:
+					numSingle += 1
+					for row in cursor.execute("INSERT INTO `main`.`region` (label,chr,posMin,posMax) VALUES ('chr'|?1|':'|?2, ?1, ?2, ?2); SELECT LAST_INSERT_ROWID()", (chm,pos)):
+						fid = row[0]
+					posMin = pos - rpMargin
+					posMax = pos + rpMargin
+					featureData[fid] = [1,1] if sig else [1,0]
+					featureBounds[fid] = (fid,chm,posMin,posMax)
+					for z in xrange( (posMin / zoneSize), (posMax / zoneSize) + 1 ):
+						chrZoneFeatures[chm][z].add(fid)
+			#foreach position
+			return (numMatch,numSingle)
+		#analyzeLoci()
 		
 		if self._inputFilters['main']['snp']:
 			self.logPush("mapping SNP results to feature regions ...\n")
-			querySelect = ['snp_id','region_id']
-			queryFilter = {'main':{'snp':1,'region_zone':1,'region':1}}
+			querySelect = ['position_chr','position_pos','snp_extra']
+			queryFilter = {'main':{'snp':1}}
 			query = self.buildQuery('filter', 'main', select=querySelect, fromFilter=queryFilter, joinFilter=queryFilter)
-			sql = "UPDATE `main`.`snp` SET flag = 1 WHERE rs = ?; UPDATE `main`.`region` SET flag = flag | 1 WHERE rowid = ?"
-			cursor.executemany(sql, self.generateQueryResults(query, allowDupes=True))
-			for row in cursor.execute("SELECT COUNT(), COALESCE(SUM(flag),0) from `main`.`snp`"):
-				numSNP,numSNPRegion = row
-			for row in cursor.execute("SELECT COUNT(), COALESCE(SUM(CASE WHEN flag & 1 THEN 1 ELSE 0 END),0) from `main`.`region`"):
-				numRegion,numRegionSNP = row
-			self.logPop("... OK: %d SNPs in %d feature regions, %d singleton SNPs\n" % (numSNPRegion,numRegionSNP,numSNP-numSNPRegion))
+			self.logPop("... OK: %d in feature regions, %d singletons\n" % analyzeLoci(self.generateQueryResults(query)))
 		#if SNPs
 		
 		if self._inputFilters['main']['locus']:
 			self.logPush("mapping position results to feature regions ...\n")
-			querySelect = ['position_id','region_id']
-			queryFilter = {'main':{'locus':1,'region_zone':1,'region':1}}
-			query = self.buildQuery('filter', 'main', select=querySelect, fromFilter=queryFilter, joinFilter=queryFilter)
-			sql = "UPDATE `main`.`locus` SET flag = 1 WHERE rowid = ?; UPDATE `main`.`region` SET flag = flag | 2 WHERE rowid = ?"
-			cursor.executemany(sql, self.generateQueryResults(query, allowDupes=True))
-			for row in cursor.execute("SELECT COUNT(), COALESCE(SUM(flag),0) from `main`.`locus`"):
-				numLocus,numLocusRegion = row
-			for row in cursor.execute("SELECT COUNT(), COALESCE(SUM(CASE WHEN flag & 2 THEN 1 ELSE 0 END),0) from `main`.`region`"):
-				numRegion,numRegionLocus = row
-			self.logPop("... OK: %d positions in %d feature regions, %d singleton positions\n" % (numLocusRegion,numRegionLocus,numLocus-numLocusRegion))
-		#if loci
-		
-		featureData = collections.defaultdict(lambda: [0,random.random(),0,False]) # [size,random,significance,complex]
-		
-		self.logPush("generating singleton features ...\n")
-		self.prepareTableForUpdate('main','region')
-		if 1: #DEBUG
-			cursor.execute("DELETE FROM `main`.`region` WHERE flag = 0")
-			numRegionDrop = cursor.getconnection().changes()
-		else:
-			for row in cursor.execute("SELECT rowid, flag FROM `main`.`region`"):
-				featureData[row[0]][3] = True
-			numRegionDrop = 0
-		if self._inputFilters['main']['snp']:
-			querySelect = ['snp_label','position_chr','position_pos','position_pos']
-			queryWhere = { ('m_s','flag'):{'= 0'} }
-			queryFilter = {'main':{'snp':1}}
-			query = self.buildQuery('filter', 'main', select=querySelect, where=queryWhere, fromFilter=queryFilter, joinFilter=queryFilter)
-			sql = "INSERT INTO `main`.`region` (label,chr,posMin,posMax,flag) VALUES (?,?,?,?,0)"
-			cursor.executemany(sql, self.generateQueryResults(query, allowDupes=True))
-		#if SNPs
-		if self._inputFilters['main']['locus']:
-			querySelect = ['position_label','position_chr','position_pos','position_pos']
-			queryWhere = { ('m_l','flag'):{'= 0'} }
+			querySelect = ['position_chr','position_pos','position_extra']
 			queryFilter = {'main':{'locus':1}}
-			query = self.buildQuery('filter', 'main', select=querySelect, where=queryWhere, fromFilter=queryFilter, joinFilter=queryFilter)
-			sql = "INSERT INTO `main`.`region` (label,chr,posMin,posMax,flag) VALUES (?,?,?,?,0)"
-			cursor.executemany(sql, self.generateQueryResults(query, allowDupes=True))
+			query = self.buildQuery('filter', 'main', select=querySelect, fromFilter=queryFilter, joinFilter=queryFilter)
+			self.logPop("... OK: %d in feature regions, %d singletons\n" % analyzeLoci(self.generateQueryResults(query)))
 		#if loci
-		for row in cursor.execute("SELECT COUNT(), COALESCE(SUM(CASE WHEN flag = 0 THEN 1 ELSE 0 END),0) FROM `main`.`region`"):
-			numRegionFinal,numRegionAdd = row
-		self.logPop("... OK: dropped %d unused feature regions, added %d singleton features\n" % (numRegionDrop,numRegionAdd))
 		
-		self.logPush("binning features ...\n")
-		if self._inputFilters['main']['snp']:
-			querySelect = ['snp_extra','region_id','region_start','region_stop','region_flag']
-			queryFilter = {'main':{'snp':1,'region_zone':1,'region':1}}
-			query = self.buildQuery('filter', 'main', select=querySelect, fromFilter=queryFilter, joinFilter=queryFilter)
-			for row in self.generateQueryResults(query):
-				fid = row[1]
-				try:
-					sig = (float(row[0].split(None,2)[1]) < threshold) #TODO optional pval column position
-				except:
-					sig = False
-				featureData[fid][0] += 1
-				if sig:
-					featureData[fid][2] += 1
-				featureData[fid][3] = (row[4] != 0)
-		#if SNPs
-		if self._inputFilters['main']['locus']:
-			querySelect = ['position_extra','region_id','region_start','region_stop','region_flag']
-			queryFilter = {'main':{'locus':1,'region_zone':1,'region':1}}
-			query = self.buildQuery('filter', 'main', select=querySelect, fromFilter=queryFilter, joinFilter=queryFilter)
-			for row in self.generateQueryResults(query):
-				fid = row[1]
-				try:
-					sig = (float(row[0].split(None,2)[1]) < threshold) #TODO optional pval column position
-				except:
-					sig = False
-				featureData[fid][0] += 1
-				if sig:
-					featureData[fid][2] += 1
-				featureData[fid][3] = (row[4] != 0)
-		#if loci
-		fList = sorted(featureData, key=featureData.get, reverse=True)
+		for snpFileList in (self._options.paris_snp_file or empty):
+			self.logPush("reading SNP results ...\n")
+			tallyRS = dict()
+			tallyPos = dict()
+			numMatch,numSingle = analyzeLoci(
+				((chm,pos,posextra) for rs,posextra,chm,pos in self._loki.generateSNPLociByRSes(
+					((rsnew,rsextra) for rsold,rsextra,rsnew in self._loki.generateCurrentRSesByRSes(
+						self.generateRSesFromRSFiles(snpFileList),
+						tally=tallyRS
+					)),
+					maxMatch=None,
+					tally=tallyPos
+				))
+			)
+			self.logPop("... OK: %d in feature regions, %d singletons (%d RS#s merged, %d unrecognized, %d ambiguous)\n" % (numMatch,numSingle,tallyRS['merge'],tallyPos['zero'],tallyPos['many']))
+		#foreach paris_snp_file
+		
+		for positionFileList in (self._options.paris_position_file or empty):
+			self.logPush("reading position results ...\n")
+			numMatch,numSingle = analyzeLoci(
+				((chm,pos,extra) for label,chm,pos,extra in self.generateLiftOverLoci(
+					ucscBuildUser, ucscBuildDB,
+					self.generateLociFromMapFiles(positionFileList, applyOffset=True)
+				))
+			)
+			self.logPop("... OK: %d in feature regions, %d singletons\n" % (numMatch,numSingle))
+		#foreach paris_position_file
+		
+		featureBounds = chrZoneFeatures = None
+		
+		self.logPush("binning feature regions ...\n")
+		# partition features by size
+		sizeFeatures = collections.defaultdict(list)
+		for fid,data in featureData.iteritems():
+			sizeFeatures[data[0]].append(fid)
+		# randomize within each size while building a mast list in descending size order
+		listFeatures = list()
+		for size in sorted(sizeFeatures.keys(), reverse=True):
+			random.shuffle(sizeFeatures[size])
+			listFeatures.extend(sizeFeatures[size])
+		sizeFeatures = None
+		# bin all features of size 0 and 1 with eachother (no bin size limit)
 		featureBin = dict()
-		binFeatures = collections.defaultdict(set)
+		binFeatures = collections.defaultdict(list)
 		for b in (0,1):
-			while fList and (featureData[fList[-1]][0] == b):
-				f = fList.pop()
-				featureBin[f] = b
-				binFeatures[b].add(f)
-		count = max(1, int(0.5 + float(len(fList)) / 10000.0)) #TODO optional bin size
-		size = len(fList) / count
-		extra = len(fList) - (count * size)
+			while listFeatures and (featureData[listFeatures[-1]][0] == b):
+				fid = listFeatures.pop()
+				assert(fid not in featureBin)
+				featureBin[fid] = b
+				binFeatures[b].append(fid)
+		# distribute all remaining features into bins of equal size, close to the target size
+		count = max(1, int(0.5 + float(len(listFeatures)) / 10000.0)) #TODO optional bin size
+		size = len(listFeatures) / count
+		extra = len(listFeatures) - (count * size)
 		for b in xrange(2,2+count):
 			for n in xrange(size + (1 if ((b-2) < extra) else 0)):
-				f = fList.pop()
-				featureBin[f] = b
-				binFeatures[b].add(f)
+				fid = listFeatures.pop()
+				assert(fid not in featureBin)
+				featureBin[fid] = b
+				binFeatures[b].append(fid)
+		# report bin statistics
 		for b in sorted(binFeatures):
-			binFeatures[b] = list(binFeatures[b])
+			numSig = totalSize = 0
+			minSize = maxSize = None
+			for data in (featureData[f] for f in binFeatures[b]):
+				numSig += (1 if data[1] else 0)
+				minSize = min(minSize, data[0]) if (minSize != None) else data[0]
+				maxSize = max(maxSize, data[0]) if (maxSize != None) else data[0]
+				totalSize += data[0]
 			self.log("bin #%d: %d features (%d significant), size %d..%d (avg %g)\n" % (
-				b,
-				len(binFeatures[b]),
-				sum(1 for f in binFeatures[b] if featureData[f][2]),
-				min(featureData[f][0] for f in binFeatures[b]),
-				max(featureData[f][0] for f in binFeatures[b]),
-				1.0 * sum(featureData[f][0] for f in binFeatures[b]) / len(binFeatures[b]),
+				b, len(binFeatures[b]), numSig, minSize, maxSize, float(totalSize) / len(binFeatures[b]),
 			))
 		self.logPop("... OK\n")
 		
+		# cull empty feature regions from the db, to speed up region matching later
+		self.logPush("culling empty feature regions ...\n")
+		sql = "DELETE FROM `main`.`region` WHERE rowid = ?"
+		cursor.executemany(sql, itertools.izip(binFeatures[0]))
+		self.logPop("... OK\n")
+		
 		self.logPush("mapping pathway features ...\n")
+		self.prepareTableForQuery('main','region')
 		queryGroupSelect = ['group_id','group_label','group_description']
 		queryGroupFilter = {'main':{'group':self._inputFilters['main']['group'], 'source':self._inputFilters['main']['source']}}
 		queryGeneSelect = ['gene_id','gene_label','gene_description']
@@ -1530,9 +1557,9 @@ JOIN `db`.`biopolymer` AS d_b
 				len(udata[2]),
 				len(udata[3]),
 				sum(1 for f in udata[3] if (featureData[f][0] == 1)),
-				sum(1 for f in udata[3] if (featureData[f][2] and (featureData[f][0] == 1))),
+				sum(1 for f in udata[3] if (featureData[f][1] and (featureData[f][0] == 1))),
 				sum(1 for f in udata[3] if (featureData[f][0] > 1)),
-				sum(1 for f in udata[3] if (featureData[f][2] and (featureData[f][0] > 1))),
+				sum(1 for f in udata[3] if (featureData[f][1] and (featureData[f][0] > 1))),
 				(self.getPARISPermutationScore(featureData, featureBin, binFeatures, udata[3], 1000) / 1000.0) or ('< %g' % (1/1000.0,)),
 				itertools.chain(
 					[ ('gene','features','simple','(sig)','complex','(sig)','pval') ],
@@ -1540,9 +1567,9 @@ JOIN `db`.`biopolymer` AS d_b
 						geneData[gid][0],
 						len(geneData[gid][2]),
 						sum(1 for f in geneData[gid][2] if (featureData[f][0] == 1)),
-						sum(1 for f in geneData[gid][2] if (featureData[f][2] and (featureData[f][0] == 1))),
+						sum(1 for f in geneData[gid][2] if (featureData[f][1] and (featureData[f][0] == 1))),
 						sum(1 for f in geneData[gid][2] if (featureData[f][0] > 1)),
-						sum(1 for f in geneData[gid][2] if (featureData[f][2] and (featureData[f][0] > 1))),
+						sum(1 for f in geneData[gid][2] if (featureData[f][1] and (featureData[f][0] > 1))),
 						(self.getPARISPermutationScore(featureData, featureBin, binFeatures, geneData[gid][2], 1000) / 1000.0) or ('< %g' % (1/1000.0,))
 					) for gid in udata[2] )
 				)
@@ -3134,6 +3161,12 @@ if __name__ == "__main__":
 	group.add_argument('--paris-p-value', '--ppv', type=float, metavar='p-value', default=0.05,
 			help="maximum p-value of input results to be considered significant (default: 0.05)"
 	)
+	group.add_argument('--paris-snp-file', '--PS', type=str, metavar='file', nargs='+', action='append', #default=argparse.SUPPRESS,
+			help="file(s) from which to load SNP results"
+	)
+	group.add_argument('--paris-position-file', '--PP', type=str, metavar='file', nargs='+', action='append', #default=argparse.SUPPRESS,
+			help="file(s) from which to load position results"
+	)
 	
 	# add output section
 	group = parser.add_argument_group("Output Options")
@@ -3821,7 +3854,7 @@ if __name__ == "__main__":
 	
 	# process PARIS algorithm
 	if typeOutputInfo['paris']:
-		parisGen = bio.generatePARISResults(options.paris_p_value)
+		parisGen = bio.generatePARISResults(ucscBuildUser, ucscBuildDB)
 		labelS,pathS,outfileS = typeOutputInfo['paris']['summary']
 		outfileD = None
 		if 'detail' in typeOutputInfo['paris']:
