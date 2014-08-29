@@ -25,7 +25,7 @@ class Biofilter:
 	def getVersionTuple(cls):
 		# tuple = (major,minor,revision,dev,build,date)
 		# dev must be in ('a','b','rc','release') for lexicographic comparison
-		return (2,4,0,'a',1,'2014-08-20')
+		return (2,4,0,'a',2,'2014-08-29')
 	#getVersionTuple()
 	
 	
@@ -1345,6 +1345,8 @@ JOIN `db`.`biopolymer` AS d_b
 		if realScore < 1:
 			return numPermutations
 		
+		#TODO: max pval? if enough permutations fail at the start there's no point running the rest of them
+		
 		_sample = random.sample
 		binDraws = collections.Counter(featureBin[f] for f in realFeatures if featureBin.get(f))
 		totalScore = 0
@@ -1486,7 +1488,7 @@ JOIN `db`.`biopolymer` AS d_b
 				featureBin[fid] = b
 				binFeatures[b].append(fid)
 		# distribute all remaining features into bins of equal size, close to the target size
-		count = max(1, int(0.5 + float(len(listFeatures)) / 10000.0)) #TODO optional bin size
+		count = max(1, int(0.5 + float(len(listFeatures)) / self._options.paris_bin_size))
 		size = len(listFeatures) / count
 		extra = len(listFeatures) - (count * size)
 		for b in xrange(2,2+count):
@@ -1547,8 +1549,11 @@ JOIN `db`.`biopolymer` AS d_b
 			groupData[uid] = (ulabel,udesc,frozenset(genes),frozenset(groupFeatures))
 		self.logPop("... OK: %d pathways, %d genes\n" % (len(groupData),len(geneData)))
 		
+		#TODO: memoize the gene permutation results to avoid rerunning on a gene that's in multiple pathways?
+		
 		# return the output generator
 		self.logPop("... OK\n")
+		minPval = '< %g' % (1.0/self._options.paris_permutation_count,)
 		return itertools.chain(
 			[ ('group','description','genes','features','simple','(sig)','complex','(sig)','pval') ],
 			( (
@@ -1560,7 +1565,7 @@ JOIN `db`.`biopolymer` AS d_b
 				sum(1 for f in udata[3] if (featureData[f][1] and (featureData[f][0] == 1))),
 				sum(1 for f in udata[3] if (featureData[f][0] > 1)),
 				sum(1 for f in udata[3] if (featureData[f][1] and (featureData[f][0] > 1))),
-				(self.getPARISPermutationScore(featureData, featureBin, binFeatures, udata[3], 1000) / 1000.0) or ('< %g' % (1/1000.0,)),
+				(self.getPARISPermutationScore(featureData, featureBin, binFeatures, udata[3], self._options.paris_permutation_count) / float(self._options.paris_permutation_count)) or minPval,
 				itertools.chain(
 					[ ('gene','features','simple','(sig)','complex','(sig)','pval') ],
 					( (
@@ -1570,7 +1575,7 @@ JOIN `db`.`biopolymer` AS d_b
 						sum(1 for f in geneData[gid][2] if (featureData[f][1] and (featureData[f][0] == 1))),
 						sum(1 for f in geneData[gid][2] if (featureData[f][0] > 1)),
 						sum(1 for f in geneData[gid][2] if (featureData[f][1] and (featureData[f][0] > 1))),
-						(self.getPARISPermutationScore(featureData, featureBin, binFeatures, geneData[gid][2], 1000) / 1000.0) or ('< %g' % (1/1000.0,))
+						(self.getPARISPermutationScore(featureData, featureBin, binFeatures, geneData[gid][2], self._options.paris_permutation_count) / float(self._options.paris_permutation_count)) or minPval
 					) for gid in udata[2] )
 				)
 			) for uid,udata in groupData.iteritems() )
@@ -2955,6 +2960,9 @@ if __name__ == "__main__":
 	group.add_argument('--report-replication-fingerprint', '--rrf', type=yesno, metavar='yes/no', nargs='?', const='yes', default='no',
 			help="include software versions and the knowledge database file's fingerprint values in the configuration report, to ensure the same data is used in replication (default: no)"
 	)
+	group.add_argument('--random-number-generator-seed', '--rngs', type=str, metavar='seed', nargs='?', const='', default=None,
+			help="seed value for the PRNG, or blank to use the sytem default (default: blank)"
+	)
 	
 	# add knowledge database section
 	group = parser.add_argument_group("Prior Knowledge Options")
@@ -3161,11 +3169,20 @@ if __name__ == "__main__":
 	group.add_argument('--paris-p-value', '--ppv', type=float, metavar='p-value', default=0.05,
 			help="maximum p-value of input results to be considered significant (default: 0.05)"
 	)
+	group.add_argument('--paris-permutation-count', '--ppc', type=int, metavar='number', default=1000,
+			help="number of permutations to perform on each group and gene (default: 1000)"
+	)
+	group.add_argument('--paris-bin-size', '--pbs', type=int, metavar='number', default=10000,
+			help="ideal number of features per bin (default: 10000)"
+	)
 	group.add_argument('--paris-snp-file', '--PS', type=str, metavar='file', nargs='+', action='append', #default=argparse.SUPPRESS,
 			help="file(s) from which to load SNP results"
 	)
 	group.add_argument('--paris-position-file', '--PP', type=str, metavar='file', nargs='+', action='append', #default=argparse.SUPPRESS,
 			help="file(s) from which to load position results"
+	)
+	group.add_argument('--paris-details', '--pd', type=yesno, metavar='yes/no', nargs='?', const='yes', default='no',
+			help="generate the PARIS detail report (default: no)"
 	)
 	
 	# add output section
@@ -3389,7 +3406,8 @@ if __name__ == "__main__":
 	typeOutputPath['paris'] = collections.OrderedDict()
 	if options.paris == 'yes':
 		typeOutputPath['paris']['summary'] = options.prefix + '.paris-summary'
-		typeOutputPath['paris']['detail'] = options.prefix + '.paris-detail' #TODO
+		if options.paris_details == 'yes':
+			typeOutputPath['paris']['detail'] = options.prefix + '.paris-detail'
 	
 	# verify that all output files are unique, writeable and nonexistant (unless overwriting)
 	typeOutputInfo = dict()
@@ -3507,6 +3525,17 @@ if __name__ == "__main__":
 			options.region_match_bases = 0
 		if options.region_match_percent == None:
 			options.region_match_percent = 100.0
+	#if rmb/rmp
+	
+	# set the PRNG seed, if requested
+	if options.random_number_generator_seed != None:
+		try:
+			seed = long(options.random_number_generator_seed)
+		except ValueError:
+			seed = options.random_number_generator_seed or None
+		bio.warn("random number generator seed: %s\n" % (repr(seed) if (seed != None) else '<system default>',))
+		random.seed(seed)
+	#if rngs
 	
 	# report the genome build, if requested
 	grchBuildDB,ucscBuildDB = bio.getDatabaseGenomeBuilds()
