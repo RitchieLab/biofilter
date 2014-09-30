@@ -25,7 +25,7 @@ class Biofilter:
 	def getVersionTuple(cls):
 		# tuple = (major,minor,revision,dev,build,date)
 		# dev must be in ('a','b','rc','release') for lexicographic comparison
-		return (2,4,0,'a',2,'2014-08-29')
+		return (2,4,0,'a',3,'2014-09-30')
 	#getVersionTuple()
 	
 	
@@ -560,6 +560,36 @@ class Biofilter:
 	#getInputGenomeBuilds()
 	
 	
+	def generateMergedFilteredSNPs(self, snps, tally=None, errorCallback=None):
+		# snps=[ (rsInput,extra),... ]
+		# yield:[ (rsInput,extra,rsCurrent)
+		tallyMerge = dict() if (tally != None) else None
+		tallyLocus = dict() if (tally != None) else None
+		genMerge = self._loki.generateCurrentRSesByRSes(snps, tally=tallyMerge) # (rs,extra) -> (rsold,extra,rsnew)
+		if self._options.allow_ambiguous_snps == 'yes':
+			for row in genMerge:
+				yield row
+		else:
+			genMergeFormat = ((str(rsnew),str(rsold)+"\t"+str(rsextra or "")) for rsold,rsextra,rsnew in genMerge) # (rsold,extra,rsnew) -> (rsnew,rsold+extra)
+			genLocus = self._loki.generateSNPLociByRSes(
+				genMergeFormat,
+				minMatch=0,
+				maxMatch=1,
+				validated=(None if (self._options.allow_unvalidated_snp_positions == 'yes') else True),
+				tally=tallyLocus,
+				errorCallback=errorCallback
+			) # (rsnew,rsold+extra) -> (rsnew,rsold+extra,chr,pos)
+			genLocusFormat = (tuple(posextra.split("\t",1)+[rs]) for rs,posextra,chm,pos in genLocus) # (rsnew,rsold+extra,chr,pos) -> (rsold,extra,rsnew)
+			for row in genLocusFormat:
+				yield row
+		#if allow_ambiguous_snps
+		if tallyMerge != None:
+			tally.update(tallyMerge)
+		if tallyLocus != None:
+			tally.update(tallyLocus)
+	#generateMergedFilteredSNPs()
+	
+	
 	def generateRSesFromText(self, lines, separator=None, errorCallback=None):
 		l = 0
 		for line in lines:
@@ -579,7 +609,7 @@ class Biofilter:
 				yield (rs,extra)
 			except:
 				if (l > 1) and errorCallback:
-					errorCallback(line, "%s at position %d" % (str(sys.exc_info()[1]),l))
+					errorCallback(line, "%s at index %d" % (str(sys.exc_info()[1]),l))
 		#foreach line
 	#generateRSesFromText()
 	
@@ -647,7 +677,7 @@ class Biofilter:
 				yield (label,chm,pos,extra)
 			except:
 				if (l > 1) and errorCallback:
-					errorCallback(line, "%s at position %d" % (str(sys.exc_info()[1]),l))
+					errorCallback(line, "%s at index %d" % (str(sys.exc_info()[1]),l))
 		#foreach line
 	#generateLociFromText()
 	
@@ -740,7 +770,7 @@ class Biofilter:
 				yield (label,chm,posMin,posMax,extra)
 			except:
 				if (l > 1) and errorCallback:
-					errorCallback(line, "%s at position %d" % (str(sys.exc_info()[1]),l))
+					errorCallback(line, "%s at index %d" % (str(sys.exc_info()[1]),l))
 		#foreach line
 	#generateRegionsFromText()
 	
@@ -803,7 +833,7 @@ class Biofilter:
 				yield (ns,name,extra)
 			except:
 				if (l > 1) and errorCallback:
-					errorCallback(line, "%s at position %d" % (str(sys.exc_info()[1]),l))
+					errorCallback(line, "%s at index %d" % (str(sys.exc_info()[1]),l))
 		#foreach line in file
 	#generateNamesFromText()
 	
@@ -868,9 +898,12 @@ class Biofilter:
 		self.prepareTableForUpdate(db, 'snp')
 		sql = "INSERT INTO `%s`.`snp` (label,extra,rs) VALUES ('rs'||?1,?2,?3)" % db
 		tally = dict()
-		cursor.executemany(sql, self._loki.generateCurrentRSesByRSes(snps, tally))
-		self.logPop("... OK: added %d SNPs (%d RS#s merged)\n" % (tally['match']+tally['merge'],tally['merge']))
+		cursor.executemany(sql, self.generateMergedFilteredSNPs(snps, tally, errorCallback))
 		
+		if tally.get('many'):
+			self.logPop("... OK: added %d SNPs (%d RS#s merged, %d ambiguous)\n" % (tally['match']+tally['merge']-tally['many'],tally['merge'],tally['many']))
+		else:
+			self.logPop("... OK: added %d SNPs (%d RS#s merged)\n" % (tally['match']+tally['merge'],tally['merge']))
 		self._inputFilters[db]['snp'] += 1
 	#unionInputSNPs()
 	
@@ -887,11 +920,12 @@ class Biofilter:
 		numBefore = cursor.getconnection().changes()
 		sql = "UPDATE `%s`.`snp` SET flag = 1 WHERE (1 OR ?1 OR ?2) AND rs = ?3" % db
 		tally = dict()
+		# we don't have to do ambiguous snp filtering here because we're only reducing what's already loaded
 		cursor.executemany(sql, self._loki.generateCurrentRSesByRSes(snps, tally))
 		cursor.execute("DELETE FROM `%s`.`snp` WHERE flag = 0" % db)
 		numDrop = cursor.getconnection().changes()
-		self.logPop("... OK: kept %d SNPs (%d dropped, %d RS#s merged)\n" % (numBefore-numDrop,numDrop,tally['merge']))
 		
+		self.logPop("... OK: kept %d SNPs (%d dropped, %d RS#s merged)\n" % (numBefore-numDrop,numDrop,tally['merge']))
 		self._inputFilters[db]['snp'] += 1
 	#intersectInputSNPs()
 	
@@ -917,7 +951,7 @@ class Biofilter:
 			else:
 				numNull += 1
 				if errorCallback:
-					errorCallback("\t".join(row[1:]), "invalid data at position %d" % (n,))
+					errorCallback("\t".join(row[1:]), "invalid data at index %d" % (n,))
 		if numNull:
 			self.warn("WARNING: ignored %d invalid positions\n" % numNull)
 		self.logPop("... OK: added %d positions\n" % numAdd)
@@ -967,7 +1001,7 @@ class Biofilter:
 			else:
 				numNull += 1
 				if errorCallback:
-					errorCallback("\t".join(row[1:]), "invalid data at position %d" % (n,))
+					errorCallback("\t".join(row[1:]), "invalid data at index %d" % (n,))
 		if numNull:
 			self.warn("WARNING: ignored %d invalid regions\n" % numNull)
 		self.logPop("... OK: added %d regions\n" % numAdd)
@@ -1217,7 +1251,7 @@ class Biofilter:
 			else:
 				numNull += 1
 				if errorCallback:
-					errorCallback(source, "invalid source at position %d" % (n,))
+					errorCallback(source, "invalid source at index %d" % (n,))
 		if numNull:
 			self.warn("WARNING: ignored %d unrecognized source identifier(s)\n" % numNull)
 		self.logPop("... OK: added %d sources\n" % numAdd)
@@ -1345,7 +1379,7 @@ JOIN `db`.`biopolymer` AS d_b
 		if realScore < 1:
 			return numPermutations
 		
-		#TODO: max pval? if enough permutations fail at the start there's no point running the rest of them
+		#TODO: refinement?
 		
 		_sample = random.sample
 		binDraws = collections.Counter(featureBin[f] for f in realFeatures if featureBin.get(f))
@@ -1372,6 +1406,8 @@ JOIN `db`.`biopolymer` AS d_b
 		empty = list()
 		threshold = self._options.paris_p_value
 		rpMargin = self._options.region_position_margin
+		optEnforceChm = (self._options.paris_enforce_input_chromosome == 'yes')
+		optZeroPvals = self._options.paris_zero_p_values
 		zoneSize = 100000 # in this context it doesn't have to match what the db uses
 		self.prepareTableForUpdate('main','region')
 		
@@ -1385,21 +1421,42 @@ JOIN `db`.`biopolymer` AS d_b
 			posMax += rpMargin
 			featureData[fid] = [0,0]
 			featureBounds[fid] = (fid,chm,posMin,posMax)
-			for z in xrange( (posMin / zoneSize), (posMax / zoneSize) + 1 ):
+			for z in xrange( int(posMin / zoneSize), int(posMax / zoneSize) + 1 ):
 				chrZoneFeatures[chm][z].add(fid)
 		self.logPop("... OK: %d regions\n" % (len(featureData),))
 		
 		def analyzeLoci(generator):
-			numMatch = numSingle = 0
+			numMatch = numSingle = numIgnore = 0
 			for chm,pos,extra in generator:
-				matched = False
-				z = pos / zoneSize
+				extra = extra.split()
+				
+				if optEnforceChm:
+					try:
+						ichm = self._loki.chr_num[extra[0].strip()] #TODO optional ichm column position
+						if ichm and (ichm != chm):
+							continue
+					except:
+						continue
+				#if enforce input chromosome
+				
 				try:
-					sig = (float(extra.split(None,2)[1]) < threshold) #TODO optional pval column position
+					pval = float(extra[1].strip()) #TODO optional pval column position
+					if pval <= 0.0:
+						if optZeroPvals == 'significant':
+							sig = True
+						elif optZeroPvals == 'insignificant':
+							sig = False
+						else:
+							numIgnore += 1
+							continue
+					else:
+						sig = (pval <= threshold) #TODO <= or < ?
 				except:
 					sig = False
 				
-				for fid,fchm,fposMin,fposMax in (featureBounds[f] for f in chrZoneFeatures[chm][z]):
+				matched = False
+				for f in chrZoneFeatures[chm][pos / zoneSize]:
+					fid,fchm,fposMin,fposMax = featureBounds[f]
 					if (chm == fchm) and (pos >= fposMin) and (pos <= fposMax):
 						matched = True
 						featureData[fid][0] += 1
@@ -1415,10 +1472,10 @@ JOIN `db`.`biopolymer` AS d_b
 					posMax = pos + rpMargin
 					featureData[fid] = [1,1] if sig else [1,0]
 					featureBounds[fid] = (fid,chm,posMin,posMax)
-					for z in xrange( (posMin / zoneSize), (posMax / zoneSize) + 1 ):
+					for z in xrange( int(posMin / zoneSize), int(posMax / zoneSize) + 1 ):
 						chrZoneFeatures[chm][z].add(fid)
 			#foreach position
-			return (numMatch,numSingle)
+			return (numMatch,numSingle,numIgnore)
 		#analyzeLoci()
 		
 		if self._inputFilters['main']['snp']:
@@ -1426,7 +1483,8 @@ JOIN `db`.`biopolymer` AS d_b
 			querySelect = ['position_chr','position_pos','snp_extra']
 			queryFilter = {'main':{'snp':1}}
 			query = self.buildQuery('filter', 'main', select=querySelect, fromFilter=queryFilter, joinFilter=queryFilter)
-			self.logPop("... OK: %d in feature regions, %d singletons\n" % analyzeLoci(self.generateQueryResults(query)))
+			numMatch,numSingle,numIgnore = analyzeLoci(self.generateQueryResults(query))
+			self.logPop("... OK: %d in feature regions, %d singletons (%d ignored)\n" % (numMatch,numSingle,numIgnore))
 		#if SNPs
 		
 		if self._inputFilters['main']['locus']:
@@ -1434,35 +1492,37 @@ JOIN `db`.`biopolymer` AS d_b
 			querySelect = ['position_chr','position_pos','position_extra']
 			queryFilter = {'main':{'locus':1}}
 			query = self.buildQuery('filter', 'main', select=querySelect, fromFilter=queryFilter, joinFilter=queryFilter)
-			self.logPop("... OK: %d in feature regions, %d singletons\n" % analyzeLoci(self.generateQueryResults(query)))
+			numMatch,numSingle,numIgnore = analyzeLoci(self.generateQueryResults(query))
+			self.logPop("... OK: %d in feature regions, %d singletons (%d ignored)\n" % (numMatch,numSingle,numIgnore))
 		#if loci
 		
 		for snpFileList in (self._options.paris_snp_file or empty):
 			self.logPush("reading SNP results ...\n")
 			tallyRS = dict()
 			tallyPos = dict()
-			numMatch,numSingle = analyzeLoci(
+			numMatch,numSingle,numIgnore = analyzeLoci(
 				((chm,pos,posextra) for rs,posextra,chm,pos in self._loki.generateSNPLociByRSes(
 					((rsnew,rsextra) for rsold,rsextra,rsnew in self._loki.generateCurrentRSesByRSes(
 						self.generateRSesFromRSFiles(snpFileList),
 						tally=tallyRS
 					)),
-					maxMatch=None,
+					minMatch=1,
+					maxMatch=(None if (self._options.allow_ambiguous_snps == 'yes') else 1),
 					tally=tallyPos
 				))
 			)
-			self.logPop("... OK: %d in feature regions, %d singletons (%d RS#s merged, %d unrecognized, %d ambiguous)\n" % (numMatch,numSingle,tallyRS['merge'],tallyPos['zero'],tallyPos['many']))
+			self.logPop("... OK: %d in feature regions, %d singletons (%d ignored, %d merged, %d unrecognized, %d ambiguous)\n" % (numMatch,numSingle,numIgnore,tallyRS['merge'],tallyPos['zero'],tallyPos['many']))
 		#foreach paris_snp_file
 		
 		for positionFileList in (self._options.paris_position_file or empty):
 			self.logPush("reading position results ...\n")
-			numMatch,numSingle = analyzeLoci(
+			numMatch,numSingle,numIgnore = analyzeLoci(
 				((chm,pos,extra) for label,chm,pos,extra in self.generateLiftOverLoci(
 					ucscBuildUser, ucscBuildDB,
 					self.generateLociFromMapFiles(positionFileList, applyOffset=True)
 				))
 			)
-			self.logPop("... OK: %d in feature regions, %d singletons\n" % (numMatch,numSingle))
+			self.logPop("... OK: %d in feature regions, %d singletons (%d ignored)\n" % (numMatch,numSingle,numIgnore))
 		#foreach paris_position_file
 		
 		featureBounds = chrZoneFeatures = None
@@ -1472,7 +1532,7 @@ JOIN `db`.`biopolymer` AS d_b
 		sizeFeatures = collections.defaultdict(list)
 		for fid,data in featureData.iteritems():
 			sizeFeatures[data[0]].append(fid)
-		# randomize within each size while building a mast list in descending size order
+		# randomize within each size while building a master list in descending size order
 		listFeatures = list()
 		for size in sorted(sizeFeatures.keys(), reverse=True):
 			random.shuffle(sizeFeatures[size])
@@ -1528,13 +1588,14 @@ JOIN `db`.`biopolymer` AS d_b
 		queryFeatureSelect = ['region_id']
 		queryFeatureWhereCol = ('d_b','biopolymer_id')
 		queryFeatureWhere = dict()
+	#	queryFeatureWhere[('m_r','posMin')] = {'<= d_br.posMax'} #DEBUG paris 1.1.2
 		queryFeatureFilter = {'main':{'region_zone':1,'region':1}}
 		groupData = dict()
 		geneData = dict()
 		for uid,ulabel,udesc in self.generateQueryResults(self.buildQuery('filter', 'main', select=queryGroupSelect, fromFilter=queryGroupFilter, joinFilter=queryGroupFilter)):
 			# find all genes in this pathway and aggregate their feature regions
 			genes = set()
-			groupFeatures = set()
+			groupFeatures = set() #TODO: option to allow redundant features (build as list)
 			queryGeneWhere[queryGeneWhereCol] = {'= %d' % (uid,)}
 			for gid,glabel,gdesc in self.generateQueryResults(self.buildQuery('filter', 'main', select=queryGeneSelect, where=queryGeneWhere, fromFilter=queryGeneFilter, joinFilter=queryGeneFilter)):
 				# if the gene hasn't been seen yet in a previous pathway, find all its feature regions
@@ -1553,7 +1614,18 @@ JOIN `db`.`biopolymer` AS d_b
 		
 		# return the output generator
 		self.logPop("... OK\n")
-		minPval = '< %g' % (1.0/self._options.paris_permutation_count,)
+		def renderPermuPVal(realFeatures):
+			maxScore = None
+			if self._options.paris_max_p_value != None:
+				maxScore = int(self._options.paris_max_p_value * self._options.paris_permutation_count + 0.5)
+			realScore = self.getPARISPermutationScore(featureData, featureBin, binFeatures, realFeatures, self._options.paris_permutation_count, maxScore)
+			if realScore < 1:
+				return '< %g' % (1.0 / self._options.paris_permutation_count,)
+			ret = '%g' % (float(realScore) / self._options.paris_permutation_count,)
+			if maxScore and (realScore >= maxScore):
+				ret = '>= ' + ret
+			return ret
+		#renderPermuPVal()
 		return itertools.chain(
 			[ ('group','description','genes','features','simple','(sig)','complex','(sig)','pval') ],
 			( (
@@ -1565,7 +1637,7 @@ JOIN `db`.`biopolymer` AS d_b
 				sum(1 for f in udata[3] if (featureData[f][1] and (featureData[f][0] == 1))),
 				sum(1 for f in udata[3] if (featureData[f][0] > 1)),
 				sum(1 for f in udata[3] if (featureData[f][1] and (featureData[f][0] > 1))),
-				(self.getPARISPermutationScore(featureData, featureBin, binFeatures, udata[3], self._options.paris_permutation_count) / float(self._options.paris_permutation_count)) or minPval,
+				renderPermuPVal(udata[3]),
 				itertools.chain(
 					[ ('gene','features','simple','(sig)','complex','(sig)','pval') ],
 					( (
@@ -1575,7 +1647,7 @@ JOIN `db`.`biopolymer` AS d_b
 						sum(1 for f in geneData[gid][2] if (featureData[f][1] and (featureData[f][0] == 1))),
 						sum(1 for f in geneData[gid][2] if (featureData[f][0] > 1)),
 						sum(1 for f in geneData[gid][2] if (featureData[f][1] and (featureData[f][0] > 1))),
-						(self.getPARISPermutationScore(featureData, featureBin, binFeatures, geneData[gid][2], self._options.paris_permutation_count) / float(self._options.paris_permutation_count)) or minPval
+						renderPermuPVal(geneData[gid][2])
 					) for gid in udata[2] )
 				)
 			) for uid,udata in groupData.iteritems() )
@@ -1756,11 +1828,11 @@ JOIN `db`.`biopolymer` AS d_b
 			"({R}.posMax - {R}.posMin + 1) >= {rmBases}",
 			"(" +
 				"(" +
-					"{L}.posMin >= {R}.posMin AND " +
-					"{L}.posMin <= {R}.posMax + 1 - MAX({rmBases}, COALESCE((MIN({L}.posMax - {L}.posMin, {R}.posMax - {R}.posMin) + 1) * {rmPercent} / 100.0, {rmBases}))" +
+					"({L}.posMin >= {R}.posMin) AND " +
+					"({L}.posMin <= {R}.posMax + 1 - MAX({rmBases}, COALESCE((MIN({L}.posMax - {L}.posMin, {R}.posMax - {R}.posMin) + 1) * {rmPercent} / 100.0, {rmBases})))" +
 				") OR (" +
-					"{R}.posMin >= {L}.posMin AND " +
-					"{R}.posMin <= {L}.posMax + 1 - MAX({rmBases}, COALESCE((MIN({L}.posMax - {L}.posMin, {R}.posMax - {R}.posMin) + 1) * {rmPercent} / 100.0, {rmBases}))" +
+					"({R}.posMin >= {L}.posMin) AND " +
+					"({R}.posMin <= {L}.posMax + 1 - MAX({rmBases}, COALESCE((MIN({L}.posMax - {L}.posMin, {R}.posMax - {R}.posMin) + 1) * {rmPercent} / 100.0, {rmBases})))" +
 				")" +
 			")",
 		}),
@@ -1777,24 +1849,24 @@ JOIN `db`.`biopolymer` AS d_b
 	#   conditions = optional set of additional conditions
 	_queryColumnSources = {
 		'snp_id' : [
-			('a_s',  'rs', "a_s.rs"),
-			('m_s',  'rs', "m_s.rs"),
-			('d_sl', 'rs', "d_sl.rs"),
+			('a_s',  'rowid', "a_s.rs"),
+			('m_s',  'rowid', "m_s.rs"),
+			('d_sl', '_ROWID_', "d_sl.rs"),
 		],
 		'snp_label' : [
-			('a_s',  'rs', "a_s.label"),
-			('m_s',  'rs', "m_s.label"),
-			('d_sl', 'rs', "'rs'||d_sl.rs"),
+			('a_s',  'rowid', "a_s.label"),
+			('m_s',  'rowid', "m_s.label"),
+			('d_sl', '_ROWID_', "'rs'||d_sl.rs"),
 		],
 		'snp_extra' : [
-			('a_s',  'rs', "a_s.extra"),
-			('m_s',  'rs', "m_s.extra"),
-			('d_sl', 'rs', "NULL"),
+			('a_s',  'rowid', "a_s.extra"),
+			('m_s',  'rowid', "m_s.extra"),
+			('d_sl', '_ROWID_', "NULL"),
 		],
 		'snp_flag' : [
-			('a_s',  'rs', "a_s.flag"),
-			('m_s',  'rs', "m_s.flag"),
-			('d_sl', 'rs', "NULL"),
+			('a_s',  'rowid', "a_s.flag"),
+			('m_s',  'rowid', "m_s.flag"),
+			('d_sl', '_ROWID_', "NULL"),
 		],
 		
 		'position_id' : [
@@ -2918,6 +2990,14 @@ if __name__ == "__main__":
 		return val
 	#percent()
 	
+	# define custom [0.0..1.0] type handler
+	def zerotoone(val):
+		val = float(val)
+		if val < 0.0 or val > 1.0:
+			raise argparse.ArgumentTypeError("'%s' must be between 0.0 and 1.0" % (val,))
+		return val
+	#zerotoone()
+	
 	# define custom basepairs handler
 	def basepairs(val):
 		val = str(val).strip().lower()
@@ -2933,6 +3013,20 @@ if __name__ == "__main__":
 			val = long(val)
 		return val
 	#basepairs()
+	
+	# define custom type handler for --paris-zero-p-values
+	def typePZPV(val):
+		val = str(val).strip().lower()
+		if 'significant'.startswith(val):
+			return 'significant'
+		if val == 'i':
+			raise argparse.ArgumentTypeError("ambiguous value: '%s' could match insignificant, ignore" % (val,))
+		if 'insignificant'.startswith(val):
+			return 'insignificant'
+		if 'ignore'.startswith(val):
+			return 'ignore'
+		raise argparse.ArgumentTypeError("'%s' must be significant, insignificant or ignore" % (val,))
+	#typePZPV()
 	
 	# add general configuration section
 	group = parser.add_argument_group("Configuration Options")
@@ -2980,6 +3074,9 @@ if __name__ == "__main__":
 	)
 	group.add_argument('--allow-unvalidated-snp-positions', '--ausp', type=yesno, metavar='yes/no', nargs='?', const='yes', default='yes',
 			help="use unvalidated SNP positions in the knowledge database (default: yes)"
+	)
+	group.add_argument('--allow-ambiguous-snps', '--aas', type=yesno, metavar='yes/no', nargs='?', const='yes', default='no',
+			help="use SNPs which have ambiguous loci in the knowledge database (default: no)"
 	)
 	group.add_argument('--allow-ambiguous-knowledge', '--aak', type=yesno, metavar='yes/no', nargs='?', const='yes', default='no',
 			help="use ambiguous group<->gene associations in the knowledge database (default: no)"
@@ -3166,8 +3263,17 @@ if __name__ == "__main__":
 	
 	# add PARIS section
 	group = parser.add_argument_group("PARIS Options")
-	group.add_argument('--paris-p-value', '--ppv', type=float, metavar='p-value', default=0.05,
+	group.add_argument('--paris-p-value', '--ppv', type=zerotoone, metavar='p-value', default=0.05,
 			help="maximum p-value of input results to be considered significant (default: 0.05)"
+	)
+	group.add_argument('--paris-zero-p-values', '--pzpv', type=typePZPV, metavar='sig/insig/ignore', default='ignore',
+			help="how to consider input result p-values of zero (default: ignore)"
+	)
+	group.add_argument('--paris-max-p-value', '--pmpv', type=zerotoone, metavar='p-value', default=None,
+			help="maximum meaningful permutation p-value (default: none)"
+	)
+	group.add_argument('--paris-enforce-input-chromosome', '--peic', type=yesno, metavar='yes/no', nargs='?', const='yes', default='yes',
+			help="limit input result SNPs to positions on the specified chromosome (default: yes)"
 	)
 	group.add_argument('--paris-permutation-count', '--ppc', type=int, metavar='number', default=1000,
 			help="number of permutations to perform on each group and gene (default: 1000)"
@@ -3883,6 +3989,7 @@ if __name__ == "__main__":
 	
 	# process PARIS algorithm
 	if typeOutputInfo['paris']:
+		#TODO html reports?
 		parisGen = bio.generatePARISResults(ucscBuildUser, ucscBuildDB)
 		labelS,pathS,outfileS = typeOutputInfo['paris']['summary']
 		outfileD = None
