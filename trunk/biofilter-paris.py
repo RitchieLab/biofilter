@@ -25,7 +25,7 @@ class Biofilter:
 	def getVersionTuple(cls):
 		# tuple = (major,minor,revision,dev,build,date)
 		# dev must be in ('a','b','rc','release') for lexicographic comparison
-		return (2,4,0,'a',3,'2014-09-30')
+		return (2,4,0,'a',4,'2015-01-20')
 	#getVersionTuple()
 	
 	
@@ -223,7 +223,7 @@ class Biofilter:
 				'table' : """
 (
   source_id INTEGER PRIMARY KEY NOT NULL,
-  label VARCHAR(32) NOT NULL,
+  source VARCHAR(32) NOT NULL,
   description VARCHAR(256) NOT NULL
 )
 """,
@@ -857,11 +857,13 @@ class Biofilter:
 		utf8 = codecs.getencoder('utf8')
 		try:
 			with (sys.stdin if (path == '-' or not path) else open(path, 'rU')) as file:
-				label,description = utf8(file.next())[0].strip().split(separator,1)
+				words = utf8(file.next())[0].strip().split(separator,1)
+				label = words[0]
+				description = words[1] if (len(words) > 1) else ''
 				usourceID = self.addUserSource(label, description)
 				ugroupID = namesets = None
 				for line in file:
-					words = line.strip().split(separator)
+					words = utf8(line)[0].strip().split(separator)
 					if not words:
 						pass
 					elif words[0] == 'GROUP':
@@ -874,7 +876,7 @@ class Biofilter:
 					elif words[0] == 'CHILDREN':
 						pass #TODO eventual support for group hierarchies
 					elif ugroupID:
-						namesets.append(list( (defaultNS,utf8(w)[0],None) for w in words ))
+						namesets.append(list( (defaultNS,w,None) for w in words ))
 				#foreach line
 				if ugroupID and namesets:
 					self.addUserGroupBiopolymers(ugroupID, namesets, errorCallback)
@@ -1244,7 +1246,7 @@ class Biofilter:
 		n = numAdd = numNull = 0
 		for source in names:
 			n += 1
-			sourceID = self._loki.getSourceID(source)
+			sourceID = self._loki.getSourceID(source) or self.getUserSourceID(source)
 			if sourceID:
 				numAdd += 1
 				cursor.execute(sql, (source,sourceID))
@@ -1272,7 +1274,7 @@ class Biofilter:
 		numBefore = cursor.getconnection().changes()
 		sql = "UPDATE `%s`.`source` SET flag = 1 WHERE source_id = ?1" % db
 		for source in names:
-			sourceID = self._loki.getSourceID(source)
+			sourceID = self._loki.getSourceID(source) or self.getUserSourceID(source)
 			if sourceID:
 				cursor.execute(sql, (sourceID,))
 		cursor.execute("DELETE FROM `%s`.`source` WHERE flag = 0" % db)
@@ -1284,7 +1286,7 @@ class Biofilter:
 	
 	
 	##################################################
-	# user data input
+	# user knowledge input
 	
 	
 	def addUserSource(self, label, description, errorCallback=None):
@@ -1292,7 +1294,7 @@ class Biofilter:
 		self._inputFilters['user']['source'] += 1
 		usourceID = -self._inputFilters['user']['source']
 		cursor = self._loki._db.cursor()
-		cursor.execute("INSERT INTO `user`.`source` (source_id,label,description) VALUES (?,?,?)", (usourceID,label,description))
+		cursor.execute("INSERT INTO `user`.`source` (source_id,source,description) VALUES (?,?,?)", (usourceID,label,description))
 		self.log(" OK\n")
 		return usourceID
 	#addUserSource()
@@ -1317,9 +1319,16 @@ class Biofilter:
 		
 		sql = "INSERT OR IGNORE INTO `user`.`group_biopolymer` (group_id,biopolymer_id) VALUES (%d,?4)" % (ugroupID,)
 		tally = dict()
-		cursor.executemany(sql, self._loki.generateTypedBiopolymerIDsByIdentifiers(
-				self.getOptionTypeID('gene'), itertools.chain(*namesets), minMatch=1, maxMatch=None, tally=tally, errorCallback=errorCallback
-		))
+		cursor.executemany(sql,
+			self._loki.generateTypedBiopolymerIDsByIdentifiers(
+				self.getOptionTypeID('gene'),
+				itertools.chain(*namesets),
+				minMatch=1,
+				maxMatch=None,
+				tally=tally,
+				errorCallback=errorCallback
+			)
+		)
 		if tally['zero']:
 			self.warn("WARNING: ignored %d unrecognized gene identifier(s)\n" % tally['zero'])
 		if tally['many']:
@@ -1335,7 +1344,7 @@ class Biofilter:
 		cursor = self._loki._db.cursor()
 		if grouplevel:
 			self.logPush("applying user-defined knowledge to main group filter ...\n")
-			assert(self._inputFilters['main']['group'] == 0)
+			assert(self._inputFilters['main']['group'] == 0) #TODO
 			sql = """
 INSERT INTO `main`.`group` (label,group_id,extra)
 SELECT DISTINCT u_g.label, u_g.group_id, u_g.extra
@@ -1354,7 +1363,7 @@ JOIN `db`.`group` AS d_g
 			self._inputFilters['main']['group'] += 1
 		else:
 			self.logPush("applying user-defined knowledge to main gene filter ...\n")
-			assert(self._inputFilters['main']['gene'] == 0)
+			assert(self._inputFilters['main']['gene'] == 0) #TODO
 			sql = """
 INSERT INTO `main`.`gene` (label,biopolymer_id,extra)
 SELECT DISTINCT d_b.label, d_b.biopolymer_id, NULL AS extra
@@ -1368,6 +1377,27 @@ JOIN `db`.`biopolymer` AS d_b
 			self._inputFilters['main']['gene'] += 1
 		#if grouplevel
 	#applyUserKnowledgeFilter()
+	
+	
+	##################################################
+	# user knowledge retrieval
+	
+	
+	def getUserSourceID(self, source):
+		return self.getUserSourceIDs([source])[source]
+	#getSourceID()
+	
+	
+	def getUserSourceIDs(self, sources=None):
+		cursor = self._loki._db.cursor()
+		if sources:
+			sql = "SELECT i.source, s.source_id FROM (SELECT ? AS source) AS i LEFT JOIN `user`.`source` AS s ON LOWER(s.source) = LOWER(i.source)"
+			ret = { row[0]:row[1] for row in cursor.executemany(sql, itertools.izip(sources)) }
+		else:
+			sql = "SELECT source, source_id FROM `user`.`source`"
+			ret = { row[0]:row[1] for row in cursor.execute(sql) }
+		return ret
+	#getSourceIDs()
 	
 	
 	##################################################
@@ -1577,58 +1607,80 @@ JOIN `db`.`biopolymer` AS d_b
 		cursor.executemany(sql, itertools.izip(binFeatures[0]))
 		self.logPop("... OK\n")
 		
-		self.logPush("mapping pathway features ...\n")
-		self.prepareTableForQuery('main','region')
-		queryGroupSelect = ['group_id','group_label','group_description']
+		self.logPush("mapping pathway genes ...\n")
+		queryGroupSelect = ['group_id','group_label','group_description','biopolymer_id','biopolymer_label','biopolymer_description']
 		queryGroupFilter = {'main':{'group':self._inputFilters['main']['group'], 'source':self._inputFilters['main']['source']}}
-		queryGeneSelect = ['gene_id','gene_label','gene_description']
-		queryGeneWhereCol = ('d_g','group_id')
-		queryGeneWhere = dict()
-		queryGeneFilter = {'main':{}}
-		queryFeatureSelect = ['region_id']
-		queryFeatureWhereCol = ('d_b','biopolymer_id')
-		queryFeatureWhere = dict()
-	#	queryFeatureWhere[('m_r','posMin')] = {'<= d_br.posMax'} #DEBUG paris 1.1.2
-		queryFeatureFilter = {'main':{'region_zone':1,'region':1}}
+		queryGroup = self.buildQuery('filter', 'main', select=queryGroupSelect, fromFilter=queryGroupFilter, joinFilter=queryGroupFilter)
+		queryGroupU = None
+		if self._inputFilters['user']['source']:
+			queryGroupU = self.buildQuery('filter', 'main', select=queryGroupSelect, fromFilter=queryGroupFilter, joinFilter=queryGroupFilter, userKnowledge=True)
 		groupData = dict()
 		geneData = dict()
-		for uid,ulabel,udesc in self.generateQueryResults(self.buildQuery('filter', 'main', select=queryGroupSelect, fromFilter=queryGroupFilter, joinFilter=queryGroupFilter)):
-			# find all genes in this pathway and aggregate their feature regions
-			genes = set()
-			groupFeatures = set() #TODO: option to allow redundant features (build as list)
-			queryGeneWhere[queryGeneWhereCol] = {'= %d' % (uid,)}
-			for gid,glabel,gdesc in self.generateQueryResults(self.buildQuery('filter', 'main', select=queryGeneSelect, where=queryGeneWhere, fromFilter=queryGeneFilter, joinFilter=queryGeneFilter)):
-				# if the gene hasn't been seen yet in a previous pathway, find all its feature regions
-				if gid not in geneData:
-					geneFeatures = set()
-					queryFeatureWhere[queryFeatureWhereCol] = {'= %d' % (gid,)}
-					for rid, in self.generateQueryResults(self.buildQuery('filter', 'main', select=queryFeatureSelect, where=queryFeatureWhere, fromFilter=queryFeatureFilter, joinFilter=queryFeatureFilter)):
-						geneFeatures.add(rid)
-					geneData[gid] = (glabel,gdesc,frozenset(geneFeatures))
-				groupFeatures.update(geneData[gid][2])
-				genes.add(gid)
-			groupData[uid] = (ulabel,udesc,frozenset(genes),frozenset(groupFeatures))
+		for uid,ulabel,udesc,gid,glabel,gdesc in self.generateQueryResults(queryGroup, allowDupes=True, query2=queryGroupU):
+			if uid not in groupData:
+				groupData[uid] = [ulabel,udesc,set()]
+			groupData[uid][2].add(gid)
+			if gid not in geneData:
+				geneData[gid] = [glabel,gdesc]
+		#foreach group/gene pair
 		self.logPop("... OK: %d pathways, %d genes\n" % (len(groupData),len(geneData)))
 		
-		#TODO: memoize the gene permutation results to avoid rerunning on a gene that's in multiple pathways?
+		self.logPush("mapping gene features ...\n")
+		self.prepareTableForQuery('main','region')
+		queryGeneSelect = ['region_id']
+		queryGeneWhereCol = ('d_b','biopolymer_id')
+		queryGeneWhere = dict()
+	#	queryGeneWhere[('m_r','posMin')] = {'<= d_br.posMax'} #DEBUG paris 1.1.2
+		queryGeneFilter = {'main':{'region_zone':1,'region':1}}
+		n = 0
+		for gid,gdata in geneData.iteritems():
+			features = set()
+			queryGeneWhere[queryGeneWhereCol] = {'= %d' % (gid,)}
+			queryGene = self.buildQuery('filter', 'main', select=queryGeneSelect, where=queryGeneWhere, fromFilter=queryGeneFilter, joinFilter=queryGeneFilter)
+			for rid, in self.generateQueryResults(queryGene, allowDupes=True):
+				features.add(rid)
+			n += len(features)
+			geneData[gid].append(frozenset(features))
+			#foreach feature
+		#foreach gene
+		self.logPop("... OK: %d matched features\n" % (n,))
+		
+		self.logPush("mapping pathway features ...\n")
+		n = 0
+		for uid,udata in groupData.iteritems():
+			features = set() # TODO: allow duplicate features (build as list)
+			for gid in udata[2]:
+				features.update(geneData[gid][2])
+			n += len(features)
+			groupData[uid].append(frozenset(features))
+		self.logPop("... OK: %d matched features\n" % (n,))
 		
 		# return the output generator
 		self.logPop("... OK\n")
-		def renderPermuPVal(realFeatures):
+		
+		genePvalCache = dict()
+		def renderPermuPVal(realFeatures, geneID=None):
+			ret = genePvalCache.get(geneID)
+			if ret != None:
+				return ret
 			maxScore = None
 			if self._options.paris_max_p_value != None:
 				maxScore = int(self._options.paris_max_p_value * self._options.paris_permutation_count + 0.5)
 			realScore = self.getPARISPermutationScore(featureData, featureBin, binFeatures, realFeatures, self._options.paris_permutation_count, maxScore)
 			if realScore < 1:
-				return '< %g' % (1.0 / self._options.paris_permutation_count,)
-			ret = '%g' % (float(realScore) / self._options.paris_permutation_count,)
-			if maxScore and (realScore >= maxScore):
-				ret = '>= ' + ret
+				ret = '< %g' % (1.0 / self._options.paris_permutation_count,)
+			else:
+				ret = '%g' % (float(realScore) / self._options.paris_permutation_count,)
+				if maxScore and (realScore >= maxScore):
+					ret = '>= ' + ret
+			if geneID:
+				genePvalCache[geneID] = ret
 			return ret
 		#renderPermuPVal()
-		return itertools.chain(
-			[ ('group','description','genes','features','simple','(sig)','complex','(sig)','pval') ],
-			( (
+		
+		yield ('group','description','genes','features','simple','(sig)','complex','(sig)','pval')
+		for uid,udata in groupData.iteritems():
+			yield (
 				udata[0],
 				udata[1],
 				len(udata[2]),
@@ -1647,11 +1699,10 @@ JOIN `db`.`biopolymer` AS d_b
 						sum(1 for f in geneData[gid][2] if (featureData[f][1] and (featureData[f][0] == 1))),
 						sum(1 for f in geneData[gid][2] if (featureData[f][0] > 1)),
 						sum(1 for f in geneData[gid][2] if (featureData[f][1] and (featureData[f][0] > 1))),
-						renderPermuPVal(geneData[gid][2])
+						renderPermuPVal(geneData[gid][2], gid)
 					) for gid in udata[2] )
 				)
-			) for uid,udata in groupData.iteritems() )
-		)
+			)
 	#generatePARISResults()
 	
 	
@@ -1675,13 +1726,15 @@ JOIN `db`.`biopolymer` AS d_b
 		'a_bg'   : ('alt','gene'),              # (label,biopolymer_id)
 		'a_g'    : ('alt','group'),             # (label,group_id)
 		'a_c'    : ('alt','source'),            # (label,source_id)
-		'u_gb'   : ('user','group_biopolymer'), # (group_id,biopolymer_id)
-		'u_g'    : ('user','group'),            # (group_id,source_id)
-		'u_c'    : ('user','source'),           # (source_id)
 		'c_mb_L' : ('cand','main_biopolymer'),  # (biopolymer_id)
 		'c_mb_R' : ('cand','main_biopolymer'),  # (biopolymer_id)
 		'c_ab_R' : ('cand','alt_biopolymer'),   # (biopolymer_id)
 		'c_g'    : ('cand','group'),            # (group_id)
+		'u_gb'   : ('user','group_biopolymer'), # (group_id,biopolymer_id)
+		'u_gb_L' : ('user','group_biopolymer'), # (group_id,biopolymer_id)
+		'u_gb_R' : ('user','group_biopolymer'), # (group_id,biopolymer_id)
+		'u_g'    : ('user','group'),            # (group_id,source_id)
+		'u_c'    : ('user','source'),           # (source_id)
 		'd_sl'   : ('db','snp_locus'),          # (rs,chr,pos)
 		'd_br'   : ('db','biopolymer_region'),  # (biopolymer_id,ldprofile_id,chr,posMin,posMax)
 		'd_bz'   : ('db','biopolymer_zone'),    # (biopolymer_id,chr,zone)
@@ -1787,26 +1840,32 @@ JOIN `db`.`biopolymer` AS d_b
 		(frozenset({'d_gb_L','d_gb_R'}),) : frozenset({
 			"{L}.biopolymer_id != {R}.biopolymer_id",
 		}),
+		(frozenset({'u_gb_L','u_gb_R'}),) : frozenset({
+			"{L}.biopolymer_id != {R}.biopolymer_id",
+		}),
 		(frozenset({'m_g','a_g','d_gb','d_g'}),) : frozenset({
 			"{L}.group_id = {R}.group_id",
 		}),
-		(frozenset({'u_gb','u_g'}),) : frozenset({
+		(frozenset({'m_g','a_g','u_gb','u_g'}),) : frozenset({
 			"{L}.group_id = {R}.group_id",
 		}),
 		(frozenset({'m_c','a_c','d_g','d_c'}),) : frozenset({
 			"{L}.source_id = {R}.source_id",
 		}),
-		(frozenset({'u_g','u_c'}),) : frozenset({
+		(frozenset({'m_c','a_c','u_g','u_c'}),) : frozenset({
 			"{L}.source_id = {R}.source_id",
 		}),
 		
-		(frozenset({'c_mb_L'}),frozenset({'d_gb_L'})) : frozenset({
+		(frozenset({'c_mb_L'}),frozenset({'u_gb_L','d_gb_L'})) : frozenset({
 			"{L}.biopolymer_id = {R}.biopolymer_id",
 		}),
-		(frozenset({'c_mb_R','c_ab_R'}),frozenset({'d_gb_R'})) : frozenset({
+		(frozenset({'c_mb_R','c_ab_R'}),frozenset({'u_gb_R','d_gb_R'})) : frozenset({
 			"{L}.biopolymer_id = {R}.biopolymer_id",
 		}),
 		(frozenset({'c_g','d_g'}),frozenset({'d_gb','d_gb_L','d_gb_R','d_g'})) : frozenset({
+			"{L}.group_id = {R}.group_id",
+		}),
+		(frozenset({'c_g','u_g'}),frozenset({'u_gb','u_gb_L','u_gb_R','u_g'})) : frozenset({
 			"{L}.group_id = {R}.group_id",
 		}),
 	} #class._queryAliasJoinConditions{}
@@ -1947,6 +2006,7 @@ JOIN `db`.`biopolymer` AS d_b
 			('c_mb_L', 'biopolymer_id', "c_mb_L.biopolymer_id"),
 			('c_mb_R', 'biopolymer_id', "c_mb_R.biopolymer_id"),
 			('c_ab_R', 'biopolymer_id', "c_ab_R.biopolymer_id"),
+			('u_gb',   'biopolymer_id', "u_gb.biopolymer_id"),
 			('d_br',   'biopolymer_id', "d_br.biopolymer_id"),
 			('d_gb',   'biopolymer_id', "d_gb.biopolymer_id"),
 			('d_gb_L', 'biopolymer_id', "d_gb_L.biopolymer_id"),
@@ -1955,12 +2015,14 @@ JOIN `db`.`biopolymer` AS d_b
 		],
 		'biopolymer_id_L' : [
 			('c_mb_L', 'biopolymer_id', "c_mb_L.biopolymer_id"),
+			('u_gb_L', 'biopolymer_id', "u_gb_L.biopolymer_id"),
 			('d_gb_L', 'biopolymer_id', "d_gb_L.biopolymer_id"),
 			('d_b',    'biopolymer_id', "d_b.biopolymer_id"),
 		],
 		'biopolymer_id_R' : [
 			('c_mb_R', 'biopolymer_id', "c_mb_R.biopolymer_id"),
 			('c_ab_R', 'biopolymer_id', "c_ab_R.biopolymer_id"),
+			('u_gb_R', 'biopolymer_id', "d_gb_R.biopolymer_id"),
 			('d_gb_R', 'biopolymer_id', "d_gb_R.biopolymer_id"),
 			('d_b',    'biopolymer_id', "d_b.biopolymer_id"),
 		],
@@ -2090,6 +2152,10 @@ JOIN `db`.`biopolymer` AS d_b
 			('a_g',    'group_id', "a_g.group_id"),
 			('m_g',    'group_id', "m_g.group_id"),
 			('c_g',    'group_id', "c_g.group_id"),
+			('u_gb',   'group_id', "u_gb.group_id"),
+			('u_gb_L', 'group_id', "u_gb_L.group_id"),
+			('u_gb_R', 'group_id', "u_gb_R.group_id"),
+			('u_g',    'group_id', "u_g.group_id"),
 			('d_gb',   'group_id', "d_gb.group_id"),
 			('d_gb_L', 'group_id', "d_gb_L.group_id"),
 			('d_gb_R', 'group_id', "d_gb_R.group_id"),
@@ -2098,36 +2164,44 @@ JOIN `db`.`biopolymer` AS d_b
 		'group_label' : [
 			('a_g', 'group_id', "a_g.label"),
 			('m_g', 'group_id', "m_g.label"),
+			('u_g', 'group_id', "u_g.label"),
 			('d_g', 'group_id', "d_g.label"),
 		],
 		'group_description' : [
+			('u_g', 'group_id', "u_g.description"),
 			('d_g', 'group_id', "d_g.description"),
 		],
 		'group_identifiers' : [
 			('a_g', 'group_id', "(SELECT GROUP_CONCAT(namespace||':'||name,'|') FROM `db`.`group_name` AS d_gn JOIN `db`.`namespace` AS d_n USING (namespace_id) WHERE d_gn.group_id = a_g.group_id)"),
 			('m_g', 'group_id', "(SELECT GROUP_CONCAT(namespace||':'||name,'|') FROM `db`.`group_name` AS d_gn JOIN `db`.`namespace` AS d_n USING (namespace_id) WHERE d_gn.group_id = m_g.group_id)"),
+			('u_g', 'group_id', "u_g.label"),
 			('d_g', 'group_id', "(SELECT GROUP_CONCAT(namespace||':'||name,'|') FROM `db`.`group_name` AS d_gn JOIN `db`.`namespace` AS d_n USING (namespace_id) WHERE d_gn.group_id = d_g.group_id)"),
 		],
 		'group_extra' : [
 			('a_g', 'group_id', "a_g.extra"),
 			('m_g', 'group_id', "m_g.extra"),
+			('u_g', 'group_id', "NULL"),
 			('d_g', 'group_id', "NULL"),
 		],
 		'group_flag' : [
 			('a_g', 'group_id', "a_g.flag"),
 			('m_g', 'group_id', "m_g.flag"),
+			('u_g', 'group_id', "NULL"),
 			('d_g', 'group_id', "NULL"),
 		],
 		
 		'source_id' : [
 			('a_c', 'source_id', "a_c.source_id"),
 			('m_c', 'source_id', "m_c.source_id"),
+			('u_g', 'source_id', "u_g.source_id"),
+			('u_c', 'source_id', "u_c.source_id"),
 			('d_g', 'source_id', "d_g.source_id"),
 			('d_c', 'source_id', "d_c.source_id"),
 		],
 		'source_label' : [
 			('a_c', 'source_id', "a_c.label"),
 			('m_c', 'source_id', "m_c.label"),
+			('u_c', 'source_id', "u_c.source"),
 			('d_c', 'source_id', "d_c.source"),
 		],
 		
@@ -2180,7 +2254,7 @@ JOIN `db`.`biopolymer` AS d_b
 	#getQueryTemplate()
 	
 	
-	def buildQuery(self, mode, focus, select, having=None, where=None, applyOffset=False, fromFilter=None, joinFilter=None):
+	def buildQuery(self, mode, focus, select, having=None, where=None, applyOffset=False, fromFilter=None, joinFilter=None, userKnowledge=False):
 		assert(mode in ('filter','annotate','modelgene','modelgroup','model'))
 		assert(focus in self._schema)
 		# select=[ column, ... ]
@@ -2192,12 +2266,24 @@ JOIN `db`.`biopolymer` AS d_b
 			self.warnPush("buildQuery(mode=%s, focus=%s, select=%s, having=%s, where=%s)\n" % (mode,focus,select,having,where))
 		having = having or dict()
 		where = where or dict()
-		fromFilter = fromFilter or self._inputFilters
-		joinFilter = joinFilter or self._inputFilters
+		if fromFilter == None:
+			fromFilter = { db:{ tbl:bool(flag) for tbl,flag in self._inputFilters[db].iteritems() } for db in ('main','alt') }
+		if joinFilter == None:
+			joinFilter = { db:{ tbl:bool(flag) for tbl,flag in self._inputFilters[db].iteritems() } for db in ('main','alt') }
+		knowFilter = { 'db':{ tbl:True for db,tbl in self._queryAliasTable.itervalues() if (db == 'db') } }
+		if userKnowledge:
+			knowFilter['user'] = dict()
+			for db,tbl in self._queryAliasTable.itervalues():
+				if (db == 'user') and knowFilter['db'].get(tbl):
+					knowFilter['db'][tbl] = False
+					knowFilter['user'][tbl] = True
 		query = self.getQueryTemplate()
 		empty = dict()
 		
 		# generate table alias join adjacency map
+		# (usually this is the entire table join graph, minus nodes that
+		# represent empty user input tables, since joining through them would
+		# yield zero results by default)
 		aliasAdjacent = collections.defaultdict(set)
 		for aliasPairs in self._queryAliasJoinConditions:
 			for aliasLeft in aliasPairs[0]:
@@ -2205,13 +2291,18 @@ JOIN `db`.`biopolymer` AS d_b
 					if aliasLeft != aliasRight:
 						dbLeft,tblLeft = self._queryAliasTable[aliasLeft]
 						dbRight,tblRight = self._queryAliasTable[aliasRight]
-						if (dbLeft != 'db') and not joinFilter.get(dbLeft,empty).get('region' if (tblLeft == 'region_zone') else tblLeft):
-							pass
-						elif (dbRight != 'db') and not joinFilter.get(dbRight,empty).get('region' if (tblRight == 'region_zone') else tblRight):
-							pass
-						else:
-							aliasAdjacent[aliasLeft].add(aliasRight)
-							aliasAdjacent[aliasRight].add(aliasLeft)
+						tblLeft = 'region' if (tblLeft == 'region_zone') else tblLeft
+						tblRight = 'region' if (tblRight == 'region_zone') else tblRight
+						if knowFilter.get(dbLeft,empty).get(tblLeft) or joinFilter.get(dbLeft,empty).get(tblLeft):
+							if knowFilter.get(dbRight,empty).get(tblRight) or joinFilter.get(dbRight,empty).get(tblRight):
+								aliasAdjacent[aliasLeft].add(aliasRight)
+								aliasAdjacent[aliasRight].add(aliasLeft)
+							#if aliasRight passes knowledge or join filter
+						#if aliasLeft passes knowledge or join filter
+					#if aliases differ
+				#foreach aliasRight
+			#foreach aliasLeft
+		#foreach _queryAliasJoinConditions
 		
 		# debug
 		if self._options.debug_logic:
@@ -2245,11 +2336,15 @@ JOIN `db`.`biopolymer` AS d_b
 			query['SELECT'][col] = None
 		
 		# identify the primary table aliases to query
+		# (usually this is all of the user input tables which contain some
+		# data, and which match the main/alt focus of this query; since user
+		# input represents filters, we always need to join through the tables
+		# with that data, even if we're not selecting any of their columns)
 		query['FROM'].update(alias for alias,col in where)
 		for alias,dbtable in self._queryAliasTable.iteritems():
 			db,table = dbtable
 			# only include tables which satisfy the filter (usually, user input tables which contain some data)
-			if (db != 'db') and not fromFilter.get(db,empty).get('region' if (table == 'region_zone') else table):
+			if not fromFilter.get(db,empty).get('region' if (table == 'region_zone') else table):
 				continue
 			# only include tables from the focus db (except an alt focus sometimes also includes main)
 			if not ((db == focus) or (db == 'main' and focus == 'alt' and mode != 'annotate' and self._options.alternate_model_filtering != 'yes')):
@@ -2269,7 +2364,10 @@ JOIN `db`.`biopolymer` AS d_b
 		# if we have no starting point yet, start from the last-resort source for a random output or condition column
 		if not query['FROM']:
 			col = next(itertools.chain(select,having))
-			alias = self._queryColumnSources[col][-1][0]
+			for source in self._queryColumnSources[col]:
+				db,tbl = self._queryAliasTable[source[0]]
+				if knowFilter.get(db,empty).get(tbl):
+					alias = source[0]
 			query['FROM'].add(alias)
 		
 		# debug
@@ -2338,7 +2436,7 @@ JOIN `db`.`biopolymer` AS d_b
 			if columnsRemaining:
 				remaining = columnsRemaining
 				inside = query['FROM']
-				outside = set( a for a,t in self._queryAliasTable.iteritems() if ((a not in inside) and (a not in query['LEFT JOIN']) and (t[0] == 'db' or t[1] == 'region_zone')) )
+				outside = set( a for a,t in self._queryAliasTable.iteritems() if ((a not in inside) and (a not in query['LEFT JOIN']) and (knowFilter.get(t[0],empty).get(t[1]) or t[1] == 'region_zone')) )
 				if self._options.debug_logic:
 					self.warn("remaining columns = %s\n" % ', '.join(columnsRemaining))
 					self.warn("available aliases = %s\n" % ', '.join(outside))
@@ -2545,28 +2643,46 @@ JOIN `db`.`biopolymer` AS d_b
 	#prepareTablesForQuery()
 	
 	
-	def generateQueryResults(self, query, allowDupes=False, bindings=None):
+	def generateQueryResults(self, query, allowDupes=False, bindings=None, query2=None):
 		# execute the query and yield the results
 		cursor = self._loki._db.cursor()
 		sql = self.getQueryText(query)
+		sql2 = self.getQueryText(query2) if query2 else None
 		if self._options.debug_query:
 			self.log(sql+"\n")
 			for row in cursor.execute("EXPLAIN QUERY PLAN "+sql, bindings):
 				self.log(str(row)+"\n")
+			if query2:
+				self.log(sql2+"\n")
+				for row in cursor.execute("EXPLAIN QUERY PLAN "+sql2, bindings):
+					self.log(str(row)+"\n")
 		else:
 			self.prepareTablesForQuery(query)
+			if query2:
+				self.prepareTablesForQuery(query2)
 			if allowDupes:
 				lastID = None
 				for row in cursor.execute(sql, bindings):
 					if row[-1] != lastID:
 						lastID = row[-1]
 						yield row[:-1]
+				if query2:
+					lastID = None
+					for row in cursor.execute(sql2, bindings):
+						if row[-1] != lastID:
+							lastID = row[-1]
+							yield row[:-1]
 			else:
 				rowIDs = set()
 				for row in cursor.execute(sql, bindings):
 					if row[-1] not in rowIDs:
 						rowIDs.add(row[-1])
 						yield row[:-1]
+				if query2:
+					for row in cursor.execute(sql2, bindings):
+						if row[-1] not in rowIDs:
+							rowIDs.add(row[-1])
+							yield row[:-1]
 				del rowIDs
 	#generateQueryResults()
 	
@@ -2631,11 +2747,16 @@ JOIN `db`.`biopolymer` AS d_b
 			raise Exception("filtering with empty column list")
 		header[0] = "#" + header[0]
 		query = self.buildQuery(mode='filter', focus='main', select=columns, applyOffset=applyOffset)
-		return itertools.chain([tuple(header)], self.generateQueryResults(query, allowDupes=(self._options.allow_duplicate_output == 'yes')))
+		query2 = None
+		if self._inputFilters['user']['source']:
+			query2 = self.buildQuery(mode='filter', focus='main', select=columns, applyOffset=applyOffset, userKnowledge=True)
+		return itertools.chain( [tuple(header)], self.generateQueryResults(query, allowDupes=(self._options.allow_duplicate_output == 'yes'), query2=query2) )
 	#generateFilterOutput()
 	
 	
 	def generateAnnotationOutput(self, typesF, typesA, applyOffset=False):
+		#TODO user knowledge
+		
 		# build a baseline filtering query
 		headerF = list()
 		columnsF = list()
@@ -2857,6 +2978,8 @@ JOIN `db`.`biopolymer` AS d_b
 	
 	
 	def generateModelOutput(self, typesL, typesR, applyOffset=False):
+		#TODO user knowledge
+		
 		cursor = self._loki._db.cursor()
 		limit = max(0, self._options.maximum_model_count)
 		
@@ -3446,6 +3569,9 @@ if __name__ == "__main__":
 			for mod in ['','alt-']:
 				typeOutputPath['invalid'][mod+itype] = options.prefix + '.invalid.' + mod+itype.lower()
 				cbLog[mod+itype] = list()
+		for itype in ['userknowledge']:
+			typeOutputPath['invalid'][itype] = options.prefix + '.invalid.' + itype.lower()
+			cbLog[itype] = list()
 	#if report invalid input
 	
 	# identify all the filtering results we need to output
@@ -3729,7 +3855,7 @@ if __name__ == "__main__":
 	
 	# load user-defined knowledge, if any
 	for path in (options.user_defined_knowledge or empty):
-		bio.loadUserKnowledgeFile(path, options.gene_identifier_type) #TODO errorCallback?
+		bio.loadUserKnowledgeFile(path, options.gene_identifier_type, errorCallback=cb['userknowledge'])
 	if options.user_defined_filter != 'no':
 		bio.applyUserKnowledgeFilter((options.user_defined_filter == 'group'))
 	
@@ -3940,6 +4066,7 @@ if __name__ == "__main__":
 				bio.logPush("writing invalid %s input report to '%s' ...\n" % (modtype,path))
 				outfile = (sys.stdout if options.stdout == 'yes' else open(path, 'wb'))
 				outfile.write("\n".join(lines))
+				outfile.write("\n")
 				if outfile != sys.stdout:
 					outfile.close()
 				bio.logPop("... OK: %d invalid inputs\n" % (len(lines)/2))
