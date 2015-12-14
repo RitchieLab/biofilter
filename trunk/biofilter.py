@@ -24,7 +24,7 @@ class Biofilter:
 	def getVersionTuple(cls):
 		# tuple = (major,minor,revision,dev,build,date)
 		# dev must be in ('a','b','rc','release') for lexicographic comparison
-		return (2,3,0,'b',1,'2014-07-08')
+		return (2,3,0,'b',2,'2015-12-14')
 	#getVersionTuple()
 	
 	
@@ -2524,8 +2524,8 @@ if __name__ == "__main__":
 	group.add_argument('--gene-file', '-G', type=str, metavar='file', nargs='+', action='append', #default=argparse.SUPPRESS,
 			help="file(s) from which to load input genes"
 	)
-	group.add_argument('--gene-identifier-type', '--git', type=str, metavar='type', nargs='?', const='', default='-',
-			help="the default type of any gene identifiers without types, or empty for any or '-' for primary labels (default: primary labels)"
+	group.add_argument('--gene-identifier-type', '--git', type=str, metavar='type', nargs='?', const='*', default='-',
+			help="the default type of any gene identifiers without types, or a special type '=', '-' or '*' (default: '-' for primary labels)"
 	)
 	group.add_argument('--allow-ambiguous-genes', '--aag', type=yesno, metavar='yes/no', nargs='?', const='yes', default='no',
 			help="use ambiguous input gene identifiers by including all possibilities (default: no)"
@@ -2545,8 +2545,8 @@ if __name__ == "__main__":
 	group.add_argument('--group-file', '-U', type=str, metavar='file', nargs='+', action='append', #default=argparse.SUPPRESS,
 			help="file(s) from which to load input groups"
 	)
-	group.add_argument('--group-identifier-type', '--uit', type=str, metavar='type', nargs='?', const='', default='-',
-			help="the default type of any group identifiers without types, or empty for any or '-' for primary labels (default: primary labels)"
+	group.add_argument('--group-identifier-type', '--uit', type=str, metavar='type', nargs='?', const='*', default='-',
+			help="the default type of any group identifiers without types, or a special type '=', '-' or '*' (default: '-' for primary labels)"
 	)
 	group.add_argument('--allow-ambiguous-groups', '--aau', type=yesno, metavar='yes/no', nargs='?', const='yes', default='no',
 			help="use ambiguous input group identifiers by including all possibilities (default: no)"
