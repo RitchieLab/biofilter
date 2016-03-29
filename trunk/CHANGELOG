@@ -1,6 +1,12 @@
 CHANGELOG
 
-2.3.0 (TBD)
+2.4.0 (TBD)
+- implemented the PARIS algorithm with the corresponding --paris output option and other related configuration options
+- added limited support for user-defined knowledge (custom gene groups) in --filter and --paris modes
+- added --allow-ambiguous-snps option to accept input SNPs with multiple known positions
+- fixed a bug in --region-match-bases with a negative value so that it correctly functions like --region-position-margin except for region-region matching
+
+2.3.0 (2015-12-14)
 - changed default --report-genome-build option to 'yes'
 - added --grch-build-version and --ucsc-build-version options to specify the
   reference gnome build of user input; if it does not match the build used
