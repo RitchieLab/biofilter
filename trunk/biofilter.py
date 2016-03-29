@@ -6,6 +6,7 @@ import collections
 import csv
 import itertools
 import os
+import random
 import string
 import sys
 import time
@@ -24,7 +25,7 @@ class Biofilter:
 	def getVersionTuple(cls):
 		# tuple = (major,minor,revision,dev,build,date)
 		# dev must be in ('a','b','rc','release') for lexicographic comparison
-		return (2,3,0,'b',2,'2015-12-14')
+		return (2,4,0,'a',4,'2015-01-20')
 	#getVersionTuple()
 	
 	
@@ -165,6 +166,72 @@ class Biofilter:
 			
 			
 		}, #main
+		
+		
+		##################################################
+		# user data tables
+		
+		'user' : {
+			
+			
+			'group': {
+				'table': """
+(
+  group_id INTEGER PRIMARY KEY NOT NULL,
+  label VARCHAR(64) NOT NULL,
+  description VARCHAR(256),
+  source_id INTEGER NOT NULL,
+  extra TEXT
+)
+""",
+				'index': {
+					'group__label': '(label)',
+				}
+			}, #user.group
+			
+			
+			'group_group': {
+				'table': """
+(
+  group_id INTEGER NOT NULL,
+  related_group_id INTEGER NOT NULL,
+  contains TINYINT,
+  PRIMARY KEY (group_id,related_group_id)
+)
+""",
+				'index': {
+					'group_group__related': '(related_group_id,group_id)',
+				}
+			}, #user.group_group
+			
+			
+			'group_biopolymer': {
+				'table': """
+(
+  group_id INTEGER NOT NULL,
+  biopolymer_id INTEGER NOT NULL,
+  PRIMARY KEY (group_id,biopolymer_id)
+)
+""",
+				'index': {
+					'group_biopolymer__biopolymer': '(biopolymer_id,group_id)',
+				}
+			}, #user.group_biopolymer
+			
+			
+			'source' : {
+				'table' : """
+(
+  source_id INTEGER PRIMARY KEY NOT NULL,
+  source VARCHAR(32) NOT NULL,
+  description VARCHAR(256) NOT NULL
+)
+""",
+				'index' : {}
+			}, #user.source
+			
+			
+		}, #user
 		
 		
 		##################################################
@@ -380,9 +447,9 @@ class Biofilter:
 		def _zones(size, regions):
 			# regions=[ (id,chr,posMin,posMax),... ]
 			# yields:[ (id,chr,zone),... ]
-			for r in regions:
-				for z in xrange(int(r[2]/size),int(r[3]/size)+1):
-					yield (r[0],r[1],z)
+			for rowid,chm,posMin,posMax in regions:
+				for z in xrange(int(posMin/size),int(posMax/size)+1):
+					yield (rowid,chm,z)
 		#_zones()
 		
 		# feed all regions through the zone generator
@@ -493,6 +560,36 @@ class Biofilter:
 	#getInputGenomeBuilds()
 	
 	
+	def generateMergedFilteredSNPs(self, snps, tally=None, errorCallback=None):
+		# snps=[ (rsInput,extra),... ]
+		# yield:[ (rsInput,extra,rsCurrent)
+		tallyMerge = dict() if (tally != None) else None
+		tallyLocus = dict() if (tally != None) else None
+		genMerge = self._loki.generateCurrentRSesByRSes(snps, tally=tallyMerge) # (rs,extra) -> (rsold,extra,rsnew)
+		if self._options.allow_ambiguous_snps == 'yes':
+			for row in genMerge:
+				yield row
+		else:
+			genMergeFormat = ((str(rsnew),str(rsold)+"\t"+str(rsextra or "")) for rsold,rsextra,rsnew in genMerge) # (rsold,extra,rsnew) -> (rsnew,rsold+extra)
+			genLocus = self._loki.generateSNPLociByRSes(
+				genMergeFormat,
+				minMatch=0,
+				maxMatch=1,
+				validated=(None if (self._options.allow_unvalidated_snp_positions == 'yes') else True),
+				tally=tallyLocus,
+				errorCallback=errorCallback
+			) # (rsnew,rsold+extra) -> (rsnew,rsold+extra,chr,pos)
+			genLocusFormat = (tuple(posextra.split("\t",1)+[rs]) for rs,posextra,chm,pos in genLocus) # (rsnew,rsold+extra,chr,pos) -> (rsold,extra,rsnew)
+			for row in genLocusFormat:
+				yield row
+		#if allow_ambiguous_snps
+		if tallyMerge != None:
+			tally.update(tallyMerge)
+		if tallyLocus != None:
+			tally.update(tallyLocus)
+	#generateMergedFilteredSNPs()
+	
+	
 	def generateRSesFromText(self, lines, separator=None, errorCallback=None):
 		l = 0
 		for line in lines:
@@ -512,7 +609,7 @@ class Biofilter:
 				yield (rs,extra)
 			except:
 				if (l > 1) and errorCallback:
-					errorCallback(line, "%s at position %d" % (str(sys.exc_info()[1]),l))
+					errorCallback(line, "%s at index %d" % (str(sys.exc_info()[1]),l))
 		#foreach line
 	#generateRSesFromText()
 	
@@ -580,7 +677,7 @@ class Biofilter:
 				yield (label,chm,pos,extra)
 			except:
 				if (l > 1) and errorCallback:
-					errorCallback(line, "%s at position %d" % (str(sys.exc_info()[1]),l))
+					errorCallback(line, "%s at index %d" % (str(sys.exc_info()[1]),l))
 		#foreach line
 	#generateLociFromText()
 	
@@ -673,7 +770,7 @@ class Biofilter:
 				yield (label,chm,posMin,posMax,extra)
 			except:
 				if (l > 1) and errorCallback:
-					errorCallback(line, "%s at position %d" % (str(sys.exc_info()[1]),l))
+					errorCallback(line, "%s at index %d" % (str(sys.exc_info()[1]),l))
 		#foreach line
 	#generateRegionsFromText()
 	
@@ -736,7 +833,7 @@ class Biofilter:
 				yield (ns,name,extra)
 			except:
 				if (l > 1) and errorCallback:
-					errorCallback(line, "%s at position %d" % (str(sys.exc_info()[1]),l))
+					errorCallback(line, "%s at index %d" % (str(sys.exc_info()[1]),l))
 		#foreach line in file
 	#generateNamesFromText()
 	
@@ -756,6 +853,41 @@ class Biofilter:
 	#generateNamesFromNameFiles()
 	
 	
+	def loadUserKnowledgeFile(self, path, defaultNS=None, separator=None, errorCallback=None):
+		utf8 = codecs.getencoder('utf8')
+		try:
+			with (sys.stdin if (path == '-' or not path) else open(path, 'rU')) as file:
+				words = utf8(file.next())[0].strip().split(separator,1)
+				label = words[0]
+				description = words[1] if (len(words) > 1) else ''
+				usourceID = self.addUserSource(label, description)
+				ugroupID = namesets = None
+				for line in file:
+					words = utf8(line)[0].strip().split(separator)
+					if not words:
+						pass
+					elif words[0] == 'GROUP':
+						if ugroupID and namesets:
+							self.addUserGroupBiopolymers(ugroupID, namesets, errorCallback)
+						label = words[1] if (len(words) > 1) else None
+						description = " ".join(words[2:])
+						ugroupID = self.addUserGroup(usourceID, label, description, errorCallback)
+						namesets = list()
+					elif words[0] == 'CHILDREN':
+						pass #TODO eventual support for group hierarchies
+					elif ugroupID:
+						namesets.append(list( (defaultNS,w,None) for w in words ))
+				#foreach line
+				if ugroupID and namesets:
+					self.addUserGroupBiopolymers(ugroupID, namesets, errorCallback)
+			#with file
+		except:
+			self.warn("WARNING: error reading input file '%s': %s\n" % (path,str(sys.exc_info()[1])))
+			if errorCallback:
+				errorCallback("<file> %s" % path, str(sys.exc_info()[1]))
+	#loadUserKnowledgeFile()
+	
+	
 	##################################################
 	# snp input
 	
@@ -768,9 +900,12 @@ class Biofilter:
 		self.prepareTableForUpdate(db, 'snp')
 		sql = "INSERT INTO `%s`.`snp` (label,extra,rs) VALUES ('rs'||?1,?2,?3)" % db
 		tally = dict()
-		cursor.executemany(sql, self._loki.generateCurrentRSesByRSes(snps, tally))
-		self.logPop("... OK: added %d SNPs (%d RS#s merged)\n" % (tally['match']+tally['merge'],tally['merge']))
+		cursor.executemany(sql, self.generateMergedFilteredSNPs(snps, tally, errorCallback))
 		
+		if tally.get('many'):
+			self.logPop("... OK: added %d SNPs (%d RS#s merged, %d ambiguous)\n" % (tally['match']+tally['merge']-tally['many'],tally['merge'],tally['many']))
+		else:
+			self.logPop("... OK: added %d SNPs (%d RS#s merged)\n" % (tally['match']+tally['merge'],tally['merge']))
 		self._inputFilters[db]['snp'] += 1
 	#unionInputSNPs()
 	
@@ -787,11 +922,12 @@ class Biofilter:
 		numBefore = cursor.getconnection().changes()
 		sql = "UPDATE `%s`.`snp` SET flag = 1 WHERE (1 OR ?1 OR ?2) AND rs = ?3" % db
 		tally = dict()
+		# we don't have to do ambiguous snp filtering here because we're only reducing what's already loaded
 		cursor.executemany(sql, self._loki.generateCurrentRSesByRSes(snps, tally))
 		cursor.execute("DELETE FROM `%s`.`snp` WHERE flag = 0" % db)
 		numDrop = cursor.getconnection().changes()
-		self.logPop("... OK: kept %d SNPs (%d dropped, %d RS#s merged)\n" % (numBefore-numDrop,numDrop,tally['merge']))
 		
+		self.logPop("... OK: kept %d SNPs (%d dropped, %d RS#s merged)\n" % (numBefore-numDrop,numDrop,tally['merge']))
 		self._inputFilters[db]['snp'] += 1
 	#intersectInputSNPs()
 	
@@ -817,7 +953,7 @@ class Biofilter:
 			else:
 				numNull += 1
 				if errorCallback:
-					errorCallback("\t".join(row[1:]), "invalid data at position %d" % (n,))
+					errorCallback("\t".join(row[1:]), "invalid data at index %d" % (n,))
 		if numNull:
 			self.warn("WARNING: ignored %d invalid positions\n" % numNull)
 		self.logPop("... OK: added %d positions\n" % numAdd)
@@ -867,7 +1003,7 @@ class Biofilter:
 			else:
 				numNull += 1
 				if errorCallback:
-					errorCallback("\t".join(row[1:]), "invalid data at position %d" % (n,))
+					errorCallback("\t".join(row[1:]), "invalid data at index %d" % (n,))
 		if numNull:
 			self.warn("WARNING: ignored %d invalid regions\n" % numNull)
 		self.logPop("... OK: added %d regions\n" % numAdd)
@@ -1110,14 +1246,14 @@ class Biofilter:
 		n = numAdd = numNull = 0
 		for source in names:
 			n += 1
-			sourceID = self._loki.getSourceID(source)
+			sourceID = self._loki.getSourceID(source) or self.getUserSourceID(source)
 			if sourceID:
 				numAdd += 1
 				cursor.execute(sql, (source,sourceID))
 			else:
 				numNull += 1
 				if errorCallback:
-					errorCallback(source, "invalid source at position %d" % (n,))
+					errorCallback(source, "invalid source at index %d" % (n,))
 		if numNull:
 			self.warn("WARNING: ignored %d unrecognized source identifier(s)\n" % numNull)
 		self.logPop("... OK: added %d sources\n" % numAdd)
@@ -1138,7 +1274,7 @@ class Biofilter:
 		numBefore = cursor.getconnection().changes()
 		sql = "UPDATE `%s`.`source` SET flag = 1 WHERE source_id = ?1" % db
 		for source in names:
-			sourceID = self._loki.getSourceID(source)
+			sourceID = self._loki.getSourceID(source) or self.getUserSourceID(source)
 			if sourceID:
 				cursor.execute(sql, (sourceID,))
 		cursor.execute("DELETE FROM `%s`.`source` WHERE flag = 0" % db)
@@ -1147,6 +1283,427 @@ class Biofilter:
 		
 		self._inputFilters[db]['source'] += 1
 	#intersectInputSources()
+	
+	
+	##################################################
+	# user knowledge input
+	
+	
+	def addUserSource(self, label, description, errorCallback=None):
+		self.log("adding user-defined source '%s' ..." % (label,))
+		self._inputFilters['user']['source'] += 1
+		usourceID = -self._inputFilters['user']['source']
+		cursor = self._loki._db.cursor()
+		cursor.execute("INSERT INTO `user`.`source` (source_id,source,description) VALUES (?,?,?)", (usourceID,label,description))
+		self.log(" OK\n")
+		return usourceID
+	#addUserSource()
+	
+	
+	def addUserGroup(self, usourceID, label, description, errorCallback=None):
+		self.log("adding user-defined group '%s' ..." % (label,))
+		self._inputFilters['user']['group'] += 1
+		ugroupID = -self._inputFilters['user']['group']
+		cursor = self._loki._db.cursor()
+		cursor.execute("INSERT INTO `user`.`group` (group_id,label,description,source_id) VALUES (?,?,?,?)", (ugroupID,label,description,usourceID))
+		self.log(" OK\n")
+		return ugroupID
+	#addUserGroup()
+	
+	
+	def addUserGroupBiopolymers(self, ugroupID, namesets, errorCallback=None):
+		#TODO: apply ambiguity settings and heuristics?
+		# namesets=[ [ (ns,name,extra), ...], ... ]
+		self.logPush("adding genes to user-defined group ...\n")
+		cursor = self._loki._db.cursor()
+		
+		sql = "INSERT OR IGNORE INTO `user`.`group_biopolymer` (group_id,biopolymer_id) VALUES (%d,?4)" % (ugroupID,)
+		tally = dict()
+		cursor.executemany(sql,
+			self._loki.generateTypedBiopolymerIDsByIdentifiers(
+				self.getOptionTypeID('gene'),
+				itertools.chain(*namesets),
+				minMatch=1,
+				maxMatch=None,
+				tally=tally,
+				errorCallback=errorCallback
+			)
+		)
+		if tally['zero']:
+			self.warn("WARNING: ignored %d unrecognized gene identifier(s)\n" % tally['zero'])
+		if tally['many']:
+			self.warn("WARNING: added multiple results for %d ambiguous gene identifier(s)\n" % tally['many'])
+		numAdd = sum(row[0] for row in cursor.execute("SELECT COUNT() FROM `user`.`group_biopolymer` WHERE group_id = ?", (ugroupID,)))
+		
+		self.logPop("... OK: added %d genes\n" % numAdd)
+		self._inputFilters['user']['group_biopolymer'] += 1
+	#addUserGroupBiopolymers()
+	
+	
+	def applyUserKnowledgeFilter(self, grouplevel=False):
+		cursor = self._loki._db.cursor()
+		if grouplevel:
+			self.logPush("applying user-defined knowledge to main group filter ...\n")
+			assert(self._inputFilters['main']['group'] == 0) #TODO
+			sql = """
+INSERT INTO `main`.`group` (label,group_id,extra)
+SELECT DISTINCT u_g.label, u_g.group_id, u_g.extra
+FROM `user`.`group` AS u_g
+UNION
+SELECT DISTINCT d_g.label, d_g.group_id, NULL AS extra
+FROM `user`.`group_biopolymer` AS u_gb
+JOIN `db`.`group_biopolymer` AS d_gb
+  ON d_gb.biopolymer_id = u_gb.biopolymer_id
+JOIN `db`.`group` AS d_g
+  ON d_g.group_id = d_gb.group_id
+"""
+			cursor.execute(sql)
+			num = sum(row[0] for row in cursor.execute("SELECT COUNT() FROM `main`.`group`"))
+			self.logPop("... OK: added %d groups\n" % (num,))
+			self._inputFilters['main']['group'] += 1
+		else:
+			self.logPush("applying user-defined knowledge to main gene filter ...\n")
+			assert(self._inputFilters['main']['gene'] == 0) #TODO
+			sql = """
+INSERT INTO `main`.`gene` (label,biopolymer_id,extra)
+SELECT DISTINCT d_b.label, d_b.biopolymer_id, NULL AS extra
+FROM `user`.`group_biopolymer` AS u_gb
+JOIN `db`.`biopolymer` AS d_b
+  ON d_b.biopolymer_id = u_gb.biopolymer_id
+"""
+			cursor.execute(sql)
+			num = sum(row[0] for row in cursor.execute("SELECT COUNT() FROM `main`.`gene`"))
+			self.logPop("... OK: added %d genes\n" % (num,))
+			self._inputFilters['main']['gene'] += 1
+		#if grouplevel
+	#applyUserKnowledgeFilter()
+	
+	
+	##################################################
+	# user knowledge retrieval
+	
+	
+	def getUserSourceID(self, source):
+		return self.getUserSourceIDs([source])[source]
+	#getSourceID()
+	
+	
+	def getUserSourceIDs(self, sources=None):
+		cursor = self._loki._db.cursor()
+		if sources:
+			sql = "SELECT i.source, s.source_id FROM (SELECT ? AS source) AS i LEFT JOIN `user`.`source` AS s ON LOWER(s.source) = LOWER(i.source)"
+			ret = { row[0]:row[1] for row in cursor.executemany(sql, itertools.izip(sources)) }
+		else:
+			sql = "SELECT source, source_id FROM `user`.`source`"
+			ret = { row[0]:row[1] for row in cursor.execute(sql) }
+		return ret
+	#getSourceIDs()
+	
+	
+	##################################################
+	# PARIS
+	
+	
+	def getPARISPermutationScore(self, featureData, featureBin, binFeatures, realFeatures, numPermutations, maxScore=0):
+		realScore = sum(1 for f in realFeatures if (featureBin.get(f) and featureData[f][1]))
+		if realScore < 1:
+			return numPermutations
+		
+		#TODO: refinement?
+		
+		_sample = random.sample
+		binDraws = collections.Counter(featureBin[f] for f in realFeatures if featureBin.get(f))
+		totalScore = 0
+		for p in xrange(numPermutations):
+			permScore = 0
+			for b,draws in binDraws.iteritems():
+				permScore += sum(1 for f in _sample(binFeatures[b], draws) if featureData[f][1])
+			if permScore > realScore:
+				totalScore += 1
+				if maxScore and (totalScore >= maxScore):
+					break
+		return totalScore
+	#getPARISPermutationScore()
+	
+	
+	def generatePARISResults(self, ucscBuildUser, ucscBuildDB):
+		self.logPush("running PARIS ...\n")
+		cursor = self._loki._db.cursor()
+		
+		if not self._inputFilters['main']['region']:
+			raise Exception("PARIS requires input feature regions")
+		
+		empty = list()
+		threshold = self._options.paris_p_value
+		rpMargin = self._options.region_position_margin
+		optEnforceChm = (self._options.paris_enforce_input_chromosome == 'yes')
+		optZeroPvals = self._options.paris_zero_p_values
+		zoneSize = 100000 # in this context it doesn't have to match what the db uses
+		self.prepareTableForUpdate('main','region')
+		
+		self.logPush("scanning feature regions ...\n")
+		featureData = dict() # featureData[rowid] = (size,sig)
+		featureBounds = dict() # featureBounds[rowid] = (rowid,chr,posMin,posMax)
+		chrZoneFeatures = collections.defaultdict(lambda: collections.defaultdict(set))
+		sql = "SELECT rowid,chr,posMin,posMax FROM `main`.`region`"
+		for fid,chm,posMin,posMax in cursor.execute(sql):
+			posMin -= rpMargin
+			posMax += rpMargin
+			featureData[fid] = [0,0]
+			featureBounds[fid] = (fid,chm,posMin,posMax)
+			for z in xrange( int(posMin / zoneSize), int(posMax / zoneSize) + 1 ):
+				chrZoneFeatures[chm][z].add(fid)
+		self.logPop("... OK: %d regions\n" % (len(featureData),))
+		
+		def analyzeLoci(generator):
+			numMatch = numSingle = numIgnore = 0
+			for chm,pos,extra in generator:
+				extra = extra.split()
+				
+				if optEnforceChm:
+					try:
+						ichm = self._loki.chr_num[extra[0].strip()] #TODO optional ichm column position
+						if ichm and (ichm != chm):
+							continue
+					except:
+						continue
+				#if enforce input chromosome
+				
+				try:
+					pval = float(extra[1].strip()) #TODO optional pval column position
+					if pval <= 0.0:
+						if optZeroPvals == 'significant':
+							sig = True
+						elif optZeroPvals == 'insignificant':
+							sig = False
+						else:
+							numIgnore += 1
+							continue
+					else:
+						sig = (pval <= threshold) #TODO <= or < ?
+				except:
+					sig = False
+				
+				matched = False
+				for f in chrZoneFeatures[chm][pos / zoneSize]:
+					fid,fchm,fposMin,fposMax = featureBounds[f]
+					if (chm == fchm) and (pos >= fposMin) and (pos <= fposMax):
+						matched = True
+						featureData[fid][0] += 1
+						if sig:
+							featureData[fid][1] += 1
+				if matched:
+					numMatch += 1
+				else:
+					numSingle += 1
+					for row in cursor.execute("INSERT INTO `main`.`region` (label,chr,posMin,posMax) VALUES ('chr'|?1|':'|?2, ?1, ?2, ?2); SELECT LAST_INSERT_ROWID()", (chm,pos)):
+						fid = row[0]
+					posMin = pos - rpMargin
+					posMax = pos + rpMargin
+					featureData[fid] = [1,1] if sig else [1,0]
+					featureBounds[fid] = (fid,chm,posMin,posMax)
+					for z in xrange( int(posMin / zoneSize), int(posMax / zoneSize) + 1 ):
+						chrZoneFeatures[chm][z].add(fid)
+			#foreach position
+			return (numMatch,numSingle,numIgnore)
+		#analyzeLoci()
+		
+		if self._inputFilters['main']['snp']:
+			self.logPush("mapping SNP results to feature regions ...\n")
+			querySelect = ['position_chr','position_pos','snp_extra']
+			queryFilter = {'main':{'snp':1}}
+			query = self.buildQuery('filter', 'main', select=querySelect, fromFilter=queryFilter, joinFilter=queryFilter)
+			numMatch,numSingle,numIgnore = analyzeLoci(self.generateQueryResults(query))
+			self.logPop("... OK: %d in feature regions, %d singletons (%d ignored)\n" % (numMatch,numSingle,numIgnore))
+		#if SNPs
+		
+		if self._inputFilters['main']['locus']:
+			self.logPush("mapping position results to feature regions ...\n")
+			querySelect = ['position_chr','position_pos','position_extra']
+			queryFilter = {'main':{'locus':1}}
+			query = self.buildQuery('filter', 'main', select=querySelect, fromFilter=queryFilter, joinFilter=queryFilter)
+			numMatch,numSingle,numIgnore = analyzeLoci(self.generateQueryResults(query))
+			self.logPop("... OK: %d in feature regions, %d singletons (%d ignored)\n" % (numMatch,numSingle,numIgnore))
+		#if loci
+		
+		for snpFileList in (self._options.paris_snp_file or empty):
+			self.logPush("reading SNP results ...\n")
+			tallyRS = dict()
+			tallyPos = dict()
+			numMatch,numSingle,numIgnore = analyzeLoci(
+				((chm,pos,posextra) for rs,posextra,chm,pos in self._loki.generateSNPLociByRSes(
+					((rsnew,rsextra) for rsold,rsextra,rsnew in self._loki.generateCurrentRSesByRSes(
+						self.generateRSesFromRSFiles(snpFileList),
+						tally=tallyRS
+					)),
+					minMatch=1,
+					maxMatch=(None if (self._options.allow_ambiguous_snps == 'yes') else 1),
+					tally=tallyPos
+				))
+			)
+			self.logPop("... OK: %d in feature regions, %d singletons (%d ignored, %d merged, %d unrecognized, %d ambiguous)\n" % (numMatch,numSingle,numIgnore,tallyRS['merge'],tallyPos['zero'],tallyPos['many']))
+		#foreach paris_snp_file
+		
+		for positionFileList in (self._options.paris_position_file or empty):
+			self.logPush("reading position results ...\n")
+			numMatch,numSingle,numIgnore = analyzeLoci(
+				((chm,pos,extra) for label,chm,pos,extra in self.generateLiftOverLoci(
+					ucscBuildUser, ucscBuildDB,
+					self.generateLociFromMapFiles(positionFileList, applyOffset=True)
+				))
+			)
+			self.logPop("... OK: %d in feature regions, %d singletons (%d ignored)\n" % (numMatch,numSingle,numIgnore))
+		#foreach paris_position_file
+		
+		featureBounds = chrZoneFeatures = None
+		
+		self.logPush("binning feature regions ...\n")
+		# partition features by size
+		sizeFeatures = collections.defaultdict(list)
+		for fid,data in featureData.iteritems():
+			sizeFeatures[data[0]].append(fid)
+		# randomize within each size while building a master list in descending size order
+		listFeatures = list()
+		for size in sorted(sizeFeatures.keys(), reverse=True):
+			random.shuffle(sizeFeatures[size])
+			listFeatures.extend(sizeFeatures[size])
+		sizeFeatures = None
+		# bin all features of size 0 and 1 with eachother (no bin size limit)
+		featureBin = dict()
+		binFeatures = collections.defaultdict(list)
+		for b in (0,1):
+			while listFeatures and (featureData[listFeatures[-1]][0] == b):
+				fid = listFeatures.pop()
+				assert(fid not in featureBin)
+				featureBin[fid] = b
+				binFeatures[b].append(fid)
+		# distribute all remaining features into bins of equal size, close to the target size
+		count = max(1, int(0.5 + float(len(listFeatures)) / self._options.paris_bin_size))
+		size = len(listFeatures) / count
+		extra = len(listFeatures) - (count * size)
+		for b in xrange(2,2+count):
+			for n in xrange(size + (1 if ((b-2) < extra) else 0)):
+				fid = listFeatures.pop()
+				assert(fid not in featureBin)
+				featureBin[fid] = b
+				binFeatures[b].append(fid)
+		# report bin statistics
+		for b in sorted(binFeatures):
+			numSig = totalSize = 0
+			minSize = maxSize = None
+			for data in (featureData[f] for f in binFeatures[b]):
+				numSig += (1 if data[1] else 0)
+				minSize = min(minSize, data[0]) if (minSize != None) else data[0]
+				maxSize = max(maxSize, data[0]) if (maxSize != None) else data[0]
+				totalSize += data[0]
+			self.log("bin #%d: %d features (%d significant), size %d..%d (avg %g)\n" % (
+				b, len(binFeatures[b]), numSig, minSize, maxSize, float(totalSize) / len(binFeatures[b]),
+			))
+		self.logPop("... OK\n")
+		
+		# cull empty feature regions from the db, to speed up region matching later
+		self.logPush("culling empty feature regions ...\n")
+		sql = "DELETE FROM `main`.`region` WHERE rowid = ?"
+		cursor.executemany(sql, itertools.izip(binFeatures[0]))
+		self.logPop("... OK\n")
+		
+		self.logPush("mapping pathway genes ...\n")
+		queryGroupSelect = ['group_id','group_label','group_description','biopolymer_id','biopolymer_label','biopolymer_description']
+		queryGroupFilter = {'main':{'group':self._inputFilters['main']['group'], 'source':self._inputFilters['main']['source']}}
+		queryGroup = self.buildQuery('filter', 'main', select=queryGroupSelect, fromFilter=queryGroupFilter, joinFilter=queryGroupFilter)
+		queryGroupU = None
+		if self._inputFilters['user']['source']:
+			queryGroupU = self.buildQuery('filter', 'main', select=queryGroupSelect, fromFilter=queryGroupFilter, joinFilter=queryGroupFilter, userKnowledge=True)
+		groupData = dict()
+		geneData = dict()
+		for uid,ulabel,udesc,gid,glabel,gdesc in self.generateQueryResults(queryGroup, allowDupes=True, query2=queryGroupU):
+			if uid not in groupData:
+				groupData[uid] = [ulabel,udesc,set()]
+			groupData[uid][2].add(gid)
+			if gid not in geneData:
+				geneData[gid] = [glabel,gdesc]
+		#foreach group/gene pair
+		self.logPop("... OK: %d pathways, %d genes\n" % (len(groupData),len(geneData)))
+		
+		self.logPush("mapping gene features ...\n")
+		self.prepareTableForQuery('main','region')
+		queryGeneSelect = ['region_id']
+		queryGeneWhereCol = ('d_b','biopolymer_id')
+		queryGeneWhere = dict()
+	#	queryGeneWhere[('m_r','posMin')] = {'<= d_br.posMax'} #DEBUG paris 1.1.2
+		queryGeneFilter = {'main':{'region_zone':1,'region':1}}
+		n = 0
+		for gid,gdata in geneData.iteritems():
+			features = set()
+			queryGeneWhere[queryGeneWhereCol] = {'= %d' % (gid,)}
+			queryGene = self.buildQuery('filter', 'main', select=queryGeneSelect, where=queryGeneWhere, fromFilter=queryGeneFilter, joinFilter=queryGeneFilter)
+			for rid, in self.generateQueryResults(queryGene, allowDupes=True):
+				features.add(rid)
+			n += len(features)
+			geneData[gid].append(frozenset(features))
+			#foreach feature
+		#foreach gene
+		self.logPop("... OK: %d matched features\n" % (n,))
+		
+		self.logPush("mapping pathway features ...\n")
+		n = 0
+		for uid,udata in groupData.iteritems():
+			features = set() # TODO: allow duplicate features (build as list)
+			for gid in udata[2]:
+				features.update(geneData[gid][2])
+			n += len(features)
+			groupData[uid].append(frozenset(features))
+		self.logPop("... OK: %d matched features\n" % (n,))
+		
+		# return the output generator
+		self.logPop("... OK\n")
+		
+		genePvalCache = dict()
+		def renderPermuPVal(realFeatures, geneID=None):
+			ret = genePvalCache.get(geneID)
+			if ret != None:
+				return ret
+			maxScore = None
+			if self._options.paris_max_p_value != None:
+				maxScore = int(self._options.paris_max_p_value * self._options.paris_permutation_count + 0.5)
+			realScore = self.getPARISPermutationScore(featureData, featureBin, binFeatures, realFeatures, self._options.paris_permutation_count, maxScore)
+			if realScore < 1:
+				ret = '< %g' % (1.0 / self._options.paris_permutation_count,)
+			else:
+				ret = '%g' % (float(realScore) / self._options.paris_permutation_count,)
+				if maxScore and (realScore >= maxScore):
+					ret = '>= ' + ret
+			if geneID:
+				genePvalCache[geneID] = ret
+			return ret
+		#renderPermuPVal()
+		
+		yield ('group','description','genes','features','simple','(sig)','complex','(sig)','pval')
+		for uid,udata in groupData.iteritems():
+			yield (
+				udata[0],
+				udata[1],
+				len(udata[2]),
+				len(udata[3]),
+				sum(1 for f in udata[3] if (featureData[f][0] == 1)),
+				sum(1 for f in udata[3] if (featureData[f][1] and (featureData[f][0] == 1))),
+				sum(1 for f in udata[3] if (featureData[f][0] > 1)),
+				sum(1 for f in udata[3] if (featureData[f][1] and (featureData[f][0] > 1))),
+				renderPermuPVal(udata[3]),
+				itertools.chain(
+					[ ('gene','features','simple','(sig)','complex','(sig)','pval') ],
+					( (
+						geneData[gid][0],
+						len(geneData[gid][2]),
+						sum(1 for f in geneData[gid][2] if (featureData[f][0] == 1)),
+						sum(1 for f in geneData[gid][2] if (featureData[f][1] and (featureData[f][0] == 1))),
+						sum(1 for f in geneData[gid][2] if (featureData[f][0] > 1)),
+						sum(1 for f in geneData[gid][2] if (featureData[f][1] and (featureData[f][0] > 1))),
+						renderPermuPVal(geneData[gid][2], gid)
+					) for gid in udata[2] )
+				)
+			)
+	#generatePARISResults()
 	
 	
 	##################################################
@@ -1173,6 +1730,11 @@ class Biofilter:
 		'c_mb_R' : ('cand','main_biopolymer'),  # (biopolymer_id)
 		'c_ab_R' : ('cand','alt_biopolymer'),   # (biopolymer_id)
 		'c_g'    : ('cand','group'),            # (group_id)
+		'u_gb'   : ('user','group_biopolymer'), # (group_id,biopolymer_id)
+		'u_gb_L' : ('user','group_biopolymer'), # (group_id,biopolymer_id)
+		'u_gb_R' : ('user','group_biopolymer'), # (group_id,biopolymer_id)
+		'u_g'    : ('user','group'),            # (group_id,source_id)
+		'u_c'    : ('user','source'),           # (source_id)
 		'd_sl'   : ('db','snp_locus'),          # (rs,chr,pos)
 		'd_br'   : ('db','biopolymer_region'),  # (biopolymer_id,ldprofile_id,chr,posMin,posMax)
 		'd_bz'   : ('db','biopolymer_zone'),    # (biopolymer_id,chr,zone)
@@ -1264,31 +1826,46 @@ class Biofilter:
 		}),
 		(frozenset({'m_rz','a_rz','d_bz'}),) : frozenset({
 			"{L}.chr = {R}.chr",
-			"{L}.zone = {R}.zone",
+			"{L}.zone >= ({R}.zone + (MIN(0,{rmBases}) - {zoneSize}) / {zoneSize})",
+			"{L}.zone <= ({R}.zone - (MIN(0,{rmBases}) - {zoneSize}) / {zoneSize})",
+			"{R}.zone >= ({L}.zone + (MIN(0,{rmBases}) - {zoneSize}) / {zoneSize})",
+			"{R}.zone <= ({L}.zone - (MIN(0,{rmBases}) - {zoneSize}) / {zoneSize})",
 		}),
 		(frozenset({'m_bg','a_bg','d_br','d_b'}),) : frozenset({
 			"{L}.biopolymer_id = {R}.biopolymer_id",
 		}),
-		(frozenset({'m_bg','a_bg','d_b'}),frozenset({'d_gb'})) : frozenset({
+		(frozenset({'m_bg','a_bg','d_b'}),frozenset({'u_gb','d_gb'})) : frozenset({
 			"{L}.biopolymer_id = {R}.biopolymer_id",
 		}),
 		(frozenset({'d_gb_L','d_gb_R'}),) : frozenset({
 			"{L}.biopolymer_id != {R}.biopolymer_id",
 		}),
+		(frozenset({'u_gb_L','u_gb_R'}),) : frozenset({
+			"{L}.biopolymer_id != {R}.biopolymer_id",
+		}),
 		(frozenset({'m_g','a_g','d_gb','d_g'}),) : frozenset({
+			"{L}.group_id = {R}.group_id",
+		}),
+		(frozenset({'m_g','a_g','u_gb','u_g'}),) : frozenset({
 			"{L}.group_id = {R}.group_id",
 		}),
 		(frozenset({'m_c','a_c','d_g','d_c'}),) : frozenset({
 			"{L}.source_id = {R}.source_id",
 		}),
+		(frozenset({'m_c','a_c','u_g','u_c'}),) : frozenset({
+			"{L}.source_id = {R}.source_id",
+		}),
 		
-		(frozenset({'c_mb_L'}),frozenset({'d_gb_L'})) : frozenset({
+		(frozenset({'c_mb_L'}),frozenset({'u_gb_L','d_gb_L'})) : frozenset({
 			"{L}.biopolymer_id = {R}.biopolymer_id",
 		}),
-		(frozenset({'c_mb_R','c_ab_R'}),frozenset({'d_gb_R'})) : frozenset({
+		(frozenset({'c_mb_R','c_ab_R'}),frozenset({'u_gb_R','d_gb_R'})) : frozenset({
 			"{L}.biopolymer_id = {R}.biopolymer_id",
 		}),
 		(frozenset({'c_g','d_g'}),frozenset({'d_gb','d_gb_L','d_gb_R','d_g'})) : frozenset({
+			"{L}.group_id = {R}.group_id",
+		}),
+		(frozenset({'c_g','u_g'}),frozenset({'u_gb','u_gb_L','u_gb_R','u_g'})) : frozenset({
 			"{L}.group_id = {R}.group_id",
 		}),
 	} #class._queryAliasJoinConditions{}
@@ -1310,11 +1887,11 @@ class Biofilter:
 			"({R}.posMax - {R}.posMin + 1) >= {rmBases}",
 			"(" +
 				"(" +
-					"{L}.posMin >= {R}.posMin AND " +
-					"{L}.posMin <= {R}.posMax + 1 - MAX({rmBases}, (MIN({L}.posMax - {L}.posMin, {R}.posMax - {R}.posMin) + 1) * {rmPercent} / 100.0)" +
+					"({L}.posMin >= {R}.posMin) AND " +
+					"({L}.posMin <= {R}.posMax + 1 - MAX({rmBases}, COALESCE((MIN({L}.posMax - {L}.posMin, {R}.posMax - {R}.posMin) + 1) * {rmPercent} / 100.0, {rmBases})))" +
 				") OR (" +
-					"{R}.posMin >= {L}.posMin AND " +
-					"{R}.posMin <= {L}.posMax + 1 - MAX({rmBases}, (MIN({L}.posMax - {L}.posMin, {R}.posMax - {R}.posMin) + 1) * {rmPercent} / 100.0)" +
+					"({R}.posMin >= {L}.posMin) AND " +
+					"({R}.posMin <= {L}.posMax + 1 - MAX({rmBases}, COALESCE((MIN({L}.posMax - {L}.posMin, {R}.posMax - {R}.posMin) + 1) * {rmPercent} / 100.0, {rmBases})))" +
 				")" +
 			")",
 		}),
@@ -1331,19 +1908,24 @@ class Biofilter:
 	#   conditions = optional set of additional conditions
 	_queryColumnSources = {
 		'snp_id' : [
-			('a_s',  'rs', "a_s.rs"),
-			('m_s',  'rs', "m_s.rs"),
-			('d_sl', 'rs', "d_sl.rs"),
+			('a_s',  'rowid', "a_s.rs"),
+			('m_s',  'rowid', "m_s.rs"),
+			('d_sl', '_ROWID_', "d_sl.rs"),
 		],
 		'snp_label' : [
-			('a_s',  'rs', "a_s.label"),
-			('m_s',  'rs', "m_s.label"),
-			('d_sl', 'rs', "'rs'||d_sl.rs"),
+			('a_s',  'rowid', "a_s.label"),
+			('m_s',  'rowid', "m_s.label"),
+			('d_sl', '_ROWID_', "'rs'||d_sl.rs"),
 		],
 		'snp_extra' : [
-			('a_s',  'rs', "a_s.extra"),
-			('m_s',  'rs', "m_s.extra"),
-			('d_sl', 'rs', "NULL"),
+			('a_s',  'rowid', "a_s.extra"),
+			('m_s',  'rowid', "m_s.extra"),
+			('d_sl', '_ROWID_', "NULL"),
+		],
+		'snp_flag' : [
+			('a_s',  'rowid', "a_s.flag"),
+			('m_s',  'rowid', "m_s.flag"),
+			('d_sl', '_ROWID_', "NULL"),
 		],
 		
 		'position_id' : [
@@ -1369,6 +1951,11 @@ class Biofilter:
 		'position_extra' : [
 			('a_l',  'rowid',   "a_l.extra"),
 			('m_l',  'rowid',   "m_l.extra"),
+			('d_sl', '_ROWID_', "NULL"),
+		],
+		'position_flag' : [
+			('a_l',  'rowid',   "a_l.flag"),
+			('m_l',  'rowid',   "m_l.flag"),
 			('d_sl', '_ROWID_', "NULL"),
 		],
 		
@@ -1407,6 +1994,11 @@ class Biofilter:
 			('m_r',  'rowid',   "m_r.extra"),
 			('d_br', '_ROWID_', "NULL"),
 		],
+		'region_flag' : [
+			('a_r',  'rowid',   "a_r.flag"),
+			('m_r',  'rowid',   "m_r.flag"),
+			('d_br', '_ROWID_', "NULL"),
+		],
 		
 		'biopolymer_id' : [
 			('a_bg',   'biopolymer_id', "a_bg.biopolymer_id"),
@@ -1414,6 +2006,7 @@ class Biofilter:
 			('c_mb_L', 'biopolymer_id', "c_mb_L.biopolymer_id"),
 			('c_mb_R', 'biopolymer_id', "c_mb_R.biopolymer_id"),
 			('c_ab_R', 'biopolymer_id', "c_ab_R.biopolymer_id"),
+			('u_gb',   'biopolymer_id', "u_gb.biopolymer_id"),
 			('d_br',   'biopolymer_id', "d_br.biopolymer_id"),
 			('d_gb',   'biopolymer_id', "d_gb.biopolymer_id"),
 			('d_gb_L', 'biopolymer_id', "d_gb_L.biopolymer_id"),
@@ -1422,12 +2015,14 @@ class Biofilter:
 		],
 		'biopolymer_id_L' : [
 			('c_mb_L', 'biopolymer_id', "c_mb_L.biopolymer_id"),
+			('u_gb_L', 'biopolymer_id', "u_gb_L.biopolymer_id"),
 			('d_gb_L', 'biopolymer_id', "d_gb_L.biopolymer_id"),
 			('d_b',    'biopolymer_id', "d_b.biopolymer_id"),
 		],
 		'biopolymer_id_R' : [
 			('c_mb_R', 'biopolymer_id', "c_mb_R.biopolymer_id"),
 			('c_ab_R', 'biopolymer_id', "c_ab_R.biopolymer_id"),
+			('u_gb_R', 'biopolymer_id', "d_gb_R.biopolymer_id"),
 			('d_gb_R', 'biopolymer_id', "d_gb_R.biopolymer_id"),
 			('d_b',    'biopolymer_id', "d_b.biopolymer_id"),
 		],
@@ -1461,6 +2056,11 @@ class Biofilter:
 			('m_bg', 'biopolymer_id', "m_bg.extra"),
 			('d_b',  'biopolymer_id', "NULL"),
 		],
+		'biopolymer_flag' : [
+			('a_bg', 'biopolymer_id', "a_bg.flag"),
+			('m_bg', 'biopolymer_id', "m_bg.flag"),
+			('d_b',  'biopolymer_id', "NULL"),
+		],
 		
 		'gene_id' : [
 			('a_bg', 'biopolymer_id', "a_bg.biopolymer_id"),
@@ -1488,6 +2088,11 @@ class Biofilter:
 		'gene_extra' : [
 			('a_bg', 'biopolymer_id', "a_bg.extra"),
 			('m_bg', 'biopolymer_id', "m_bg.extra"),
+			('d_b',  'biopolymer_id', "NULL", {"d_b.type_id+0 = {typeID_gene}"}),
+		],
+		'gene_flag' : [
+			('a_bg', 'biopolymer_id', "a_bg.flag"),
+			('m_bg', 'biopolymer_id', "m_bg.flag"),
 			('d_b',  'biopolymer_id', "NULL", {"d_b.type_id+0 = {typeID_gene}"}),
 		],
 		
@@ -1547,6 +2152,10 @@ class Biofilter:
 			('a_g',    'group_id', "a_g.group_id"),
 			('m_g',    'group_id', "m_g.group_id"),
 			('c_g',    'group_id', "c_g.group_id"),
+			('u_gb',   'group_id', "u_gb.group_id"),
+			('u_gb_L', 'group_id', "u_gb_L.group_id"),
+			('u_gb_R', 'group_id', "u_gb_R.group_id"),
+			('u_g',    'group_id', "u_g.group_id"),
 			('d_gb',   'group_id', "d_gb.group_id"),
 			('d_gb_L', 'group_id', "d_gb_L.group_id"),
 			('d_gb_R', 'group_id', "d_gb_R.group_id"),
@@ -1555,31 +2164,44 @@ class Biofilter:
 		'group_label' : [
 			('a_g', 'group_id', "a_g.label"),
 			('m_g', 'group_id', "m_g.label"),
+			('u_g', 'group_id', "u_g.label"),
 			('d_g', 'group_id', "d_g.label"),
 		],
 		'group_description' : [
+			('u_g', 'group_id', "u_g.description"),
 			('d_g', 'group_id', "d_g.description"),
 		],
 		'group_identifiers' : [
 			('a_g', 'group_id', "(SELECT GROUP_CONCAT(namespace||':'||name,'|') FROM `db`.`group_name` AS d_gn JOIN `db`.`namespace` AS d_n USING (namespace_id) WHERE d_gn.group_id = a_g.group_id)"),
 			('m_g', 'group_id', "(SELECT GROUP_CONCAT(namespace||':'||name,'|') FROM `db`.`group_name` AS d_gn JOIN `db`.`namespace` AS d_n USING (namespace_id) WHERE d_gn.group_id = m_g.group_id)"),
+			('u_g', 'group_id', "u_g.label"),
 			('d_g', 'group_id', "(SELECT GROUP_CONCAT(namespace||':'||name,'|') FROM `db`.`group_name` AS d_gn JOIN `db`.`namespace` AS d_n USING (namespace_id) WHERE d_gn.group_id = d_g.group_id)"),
 		],
 		'group_extra' : [
 			('a_g', 'group_id', "a_g.extra"),
 			('m_g', 'group_id', "m_g.extra"),
+			('u_g', 'group_id', "NULL"),
+			('d_g', 'group_id', "NULL"),
+		],
+		'group_flag' : [
+			('a_g', 'group_id', "a_g.flag"),
+			('m_g', 'group_id', "m_g.flag"),
+			('u_g', 'group_id', "NULL"),
 			('d_g', 'group_id', "NULL"),
 		],
 		
 		'source_id' : [
 			('a_c', 'source_id', "a_c.source_id"),
 			('m_c', 'source_id', "m_c.source_id"),
+			('u_g', 'source_id', "u_g.source_id"),
+			('u_c', 'source_id', "u_c.source_id"),
 			('d_g', 'source_id', "d_g.source_id"),
 			('d_c', 'source_id', "d_c.source_id"),
 		],
 		'source_label' : [
 			('a_c', 'source_id', "a_c.label"),
 			('m_c', 'source_id', "m_c.label"),
+			('u_c', 'source_id', "u_c.source"),
 			('d_c', 'source_id', "d_c.source"),
 		],
 		
@@ -1632,24 +2254,36 @@ class Biofilter:
 	#getQueryTemplate()
 	
 	
-	def buildQuery(self, mode, focus, select, having=None, where=None, applyOffset=False):
+	def buildQuery(self, mode, focus, select, having=None, where=None, applyOffset=False, fromFilter=None, joinFilter=None, userKnowledge=False):
 		assert(mode in ('filter','annotate','modelgene','modelgroup','model'))
 		assert(focus in self._schema)
 		# select=[ column, ... ]
 		# having={ column:{'= val',...}, ... }
 		# where={ (alias,column):{'= val',...}, ... }
+		# fromFilter={ db:{table:bool, ...}, ... }
+		# joinFilter={ db:{table:bool, ...}, ... }
 		if self._options.debug_logic:
 			self.warnPush("buildQuery(mode=%s, focus=%s, select=%s, having=%s, where=%s)\n" % (mode,focus,select,having,where))
 		having = having or dict()
 		where = where or dict()
+		if fromFilter == None:
+			fromFilter = { db:{ tbl:bool(flag) for tbl,flag in self._inputFilters[db].iteritems() } for db in ('main','alt') }
+		if joinFilter == None:
+			joinFilter = { db:{ tbl:bool(flag) for tbl,flag in self._inputFilters[db].iteritems() } for db in ('main','alt') }
+		knowFilter = { 'db':{ tbl:True for db,tbl in self._queryAliasTable.itervalues() if (db == 'db') } }
+		if userKnowledge:
+			knowFilter['user'] = dict()
+			for db,tbl in self._queryAliasTable.itervalues():
+				if (db == 'user') and knowFilter['db'].get(tbl):
+					knowFilter['db'][tbl] = False
+					knowFilter['user'][tbl] = True
 		query = self.getQueryTemplate()
-		
-		# re-index all input filter tables
-		for db in self._schema:
-			for tbl in self._schema[db]:
-				self.prepareTableForQuery(db, tbl)
+		empty = dict()
 		
 		# generate table alias join adjacency map
+		# (usually this is the entire table join graph, minus nodes that
+		# represent empty user input tables, since joining through them would
+		# yield zero results by default)
 		aliasAdjacent = collections.defaultdict(set)
 		for aliasPairs in self._queryAliasJoinConditions:
 			for aliasLeft in aliasPairs[0]:
@@ -1657,13 +2291,18 @@ class Biofilter:
 					if aliasLeft != aliasRight:
 						dbLeft,tblLeft = self._queryAliasTable[aliasLeft]
 						dbRight,tblRight = self._queryAliasTable[aliasRight]
-						if (dbLeft in self._inputFilters) and not self._inputFilters[dbLeft][tblLeft]:
-							pass
-						elif (dbRight in self._inputFilters) and not self._inputFilters[dbRight][tblRight]:
-							pass
-						else:
-							aliasAdjacent[aliasLeft].add(aliasRight)
-							aliasAdjacent[aliasRight].add(aliasLeft)
+						tblLeft = 'region' if (tblLeft == 'region_zone') else tblLeft
+						tblRight = 'region' if (tblRight == 'region_zone') else tblRight
+						if knowFilter.get(dbLeft,empty).get(tblLeft) or joinFilter.get(dbLeft,empty).get(tblLeft):
+							if knowFilter.get(dbRight,empty).get(tblRight) or joinFilter.get(dbRight,empty).get(tblRight):
+								aliasAdjacent[aliasLeft].add(aliasRight)
+								aliasAdjacent[aliasRight].add(aliasLeft)
+							#if aliasRight passes knowledge or join filter
+						#if aliasLeft passes knowledge or join filter
+					#if aliases differ
+				#foreach aliasRight
+			#foreach aliasLeft
+		#foreach _queryAliasJoinConditions
 		
 		# debug
 		if self._options.debug_logic:
@@ -1673,14 +2312,16 @@ class Biofilter:
 		
 		# generate column availability map
 		# _queryColumnSources[col] = list[ tuple(alias,rowid,expression,?conditions),... ]
-		columnAliases = collections.defaultdict(set)
+		columnAliases = collections.defaultdict(list)
 		aliasColumns = collections.defaultdict(set)
 		for col in itertools.chain(select,having):
 			if col not in self._queryColumnSources:
 				raise Exception("internal query with unsupported column '{0}'".format(col))
-			for source in self._queryColumnSources[col]:
-				columnAliases[col].add(source[0])
-				aliasColumns[source[0]].add(col)
+			if col not in columnAliases:
+				for source in self._queryColumnSources[col]:
+					if source[0] in aliasAdjacent:
+						columnAliases[col].append(source[0])
+						aliasColumns[source[0]].add(col)
 		if not (columnAliases and aliasColumns):
 			raise Exception("internal query with no outputs or conditions")
 		
@@ -1695,11 +2336,15 @@ class Biofilter:
 			query['SELECT'][col] = None
 		
 		# identify the primary table aliases to query
+		# (usually this is all of the user input tables which contain some
+		# data, and which match the main/alt focus of this query; since user
+		# input represents filters, we always need to join through the tables
+		# with that data, even if we're not selecting any of their columns)
 		query['FROM'].update(alias for alias,col in where)
 		for alias,dbtable in self._queryAliasTable.iteritems():
 			db,table = dbtable
-			# only include user input tables which contain some data
-			if (db not in self._inputFilters) or (table not in self._inputFilters[db]) or (not self._inputFilters[db][table]):
+			# only include tables which satisfy the filter (usually, user input tables which contain some data)
+			if not fromFilter.get(db,empty).get('region' if (table == 'region_zone') else table):
 				continue
 			# only include tables from the focus db (except an alt focus sometimes also includes main)
 			if not ((db == focus) or (db == 'main' and focus == 'alt' and mode != 'annotate' and self._options.alternate_model_filtering != 'yes')):
@@ -1710,7 +2355,7 @@ class Biofilter:
 			if (mode == 'modelgroup') and (table not in ('group','source')):
 				continue
 			# only re-use the main gene candidates on the right if necessary
-			if (alias == 'c_mb_R') and ((self._options.alternate_model_filtering == 'yes') or self._inputFilters['cand']['alt_biopolymer']):
+			if (alias == 'c_mb_R') and ((self._options.alternate_model_filtering == 'yes') or fromFilter.get('cand',empty).get('alt_biopolymer')):
 				continue
 			# otherwise, add it
 			query['FROM'].add(alias)
@@ -1719,7 +2364,10 @@ class Biofilter:
 		# if we have no starting point yet, start from the last-resort source for a random output or condition column
 		if not query['FROM']:
 			col = next(itertools.chain(select,having))
-			alias = self._queryColumnSources[col][-1][0]
+			for source in self._queryColumnSources[col]:
+				db,tbl = self._queryAliasTable[source[0]]
+				if knowFilter.get(db,empty).get(tbl):
+					alias = source[0]
 			query['FROM'].add(alias)
 		
 		# debug
@@ -1735,6 +2383,10 @@ class Biofilter:
 			queue.append( (inside,outside,remaining) )
 			while queue:
 				inside,outside,remaining = queue.popleft()
+				if self._options.debug_logic:
+					self.warn("inside: %s\n" % ', '.join(inside))
+					self.warn("outside: %s\n" % ', '.join(outside))
+					self.warn("remaining: %s\n" % ', '.join(remaining))
 				if not remaining:
 					break
 				queue.extend( (inside|{a},outside-{a},remaining-{a}) for a in outside if inside & aliasAdjacent[a] )
@@ -1748,37 +2400,43 @@ class Biofilter:
 			self.warn("joined FROM = %s\n" % ', '.join(query['FROM']))
 		
 		# add table aliases to satisfy any remaining columns
-		columnsRemaining = set(col for col in columnAliases if not (columnAliases[col] & query['FROM']))
+		columnsRemaining = set(col for col,aliases in columnAliases.iteritems() if not (set(aliases) & query['FROM']))
 		if mode == 'annotate':
-			# when annotating, do BFS on each remaining column in order to guarantee a valid path of LEFT JOINs
+			# when annotating, do a BFS from each remaining column in order of source preference
+			# this will guarantee a valid path of LEFT JOINs to the most-preferred available source
 			while columnsRemaining:
-				target = next(col for col in itertools.chain(select,having) if col in columnsRemaining)
-				inside = query['FROM'].union(query['LEFT JOIN'])
-				outside = set( a for a,t in self._queryAliasTable.iteritems() if ((a not in inside) and (t[0] == 'db' or t[1] == 'region_zone')) )
-				path = list()
+				target = next( col for col in itertools.chain(select,having) if (col in columnsRemaining) )
 				if self._options.debug_logic:
-					self.warn("current LEFT JOIN = %s\n" % ', '.join(query['LEFT JOIN']))
 					self.warn("target column = %s\n" % target)
-					self.warn("available aliases = %s\n" % ', '.join(outside))
+				if not columnAliases[target]:
+					raise Exception("could not find source table for output column %s" % (target,))
+				alias = columnAliases[target][0]
 				queue = collections.deque()
-				queue.extend((inside,outside-{a},[a]) for a in outside if inside & aliasAdjacent[a])
+				queue.append( [alias] )
+				path = None
 				while queue:
-					inside,outside,path = queue.popleft()
-					if target in aliasColumns[path[-1]]:
+					path = queue.popleft()
+					if (path[-1] in query['FROM']) or (path[-1] in query['LEFT JOIN']):
+						path.pop()
 						break
-					queue.extend((inside,outside-{a},path+[a]) for a in outside if path[-1] in aliasAdjacent[a])
-				if (not path) or (target not in aliasColumns[path[-1]]):
-					raise Exception("could not find a source table for output column: %s" % target)
-				for alias in path:
+					queue.extend( (path+[a]) for a in aliasAdjacent[path[-1]] if (a not in path) )
+					path = None
+				if not path:
+					raise Exception("could not join source table %s for output column %s" % (alias,target))
+				while path:
+					alias = path.pop()
 					columnsRemaining.difference_update(aliasColumns[alias])
 					query['LEFT JOIN'][alias] = set()
+				if self._options.debug_logic:
+					self.warn("new LEFT JOIN = %s\n" % ', '.join(query['LEFT JOIN']))
 			#while columns need sources
 		else:
 			# when filtering, build a minimum spanning tree to connect all remaining columns in any order
+			#TODO: choose preferred source first as in annotation, rather than blindly expanding until we hit them all?
 			if columnsRemaining:
 				remaining = columnsRemaining
 				inside = query['FROM']
-				outside = set( a for a,t in self._queryAliasTable.iteritems() if ((a not in inside) and (a not in query['LEFT JOIN']) and (t[0] == 'db' or t[1] == 'region_zone')) )
+				outside = set( a for a,t in self._queryAliasTable.iteritems() if ((a not in inside) and (a not in query['LEFT JOIN']) and (knowFilter.get(t[0],empty).get(t[1]) or t[1] == 'region_zone')) )
 				if self._options.debug_logic:
 					self.warn("remaining columns = %s\n" % ', '.join(columnsRemaining))
 					self.warn("available aliases = %s\n" % ', '.join(outside))
@@ -1811,8 +2469,8 @@ class Biofilter:
 			'pMinOffset'  : '',
 			'pMaxOffset'  : '',
 			'rpMargin'    : self._options.region_position_margin,
-			'rmPercent'   : self._options.region_match_percent,
-			'rmBases'     : self._options.region_match_bases,
+			'rmPercent'   : self._options.region_match_percent if (self._options.region_match_percent != None) else "NULL",
+			'rmBases'     : self._options.region_match_bases if (self._options.region_match_bases != None) else "NULL",
 			'gbColumn1'   : 'specificity',
 			'gbColumn2'   : 'specificity',
 			'gbCondition' : ('> 0' if (self._options.allow_ambiguous_knowledge == 'yes') else '>= 100'),
@@ -1978,27 +2636,54 @@ class Biofilter:
 	#getQueryText()
 	
 	
-	def generateQueryResults(self, query, allowDupes=False, bindings=None):
+	def prepareTablesForQuery(self, query):
+		for db,tbl in set(self._queryAliasTable[a] for a in itertools.chain(query['FROM'], query['LEFT JOIN'])):
+			if (db in self._schema) and (tbl in self._schema[db]):
+				self.prepareTableForQuery(db, tbl)
+	#prepareTablesForQuery()
+	
+	
+	def generateQueryResults(self, query, allowDupes=False, bindings=None, query2=None):
 		# execute the query and yield the results
 		cursor = self._loki._db.cursor()
 		sql = self.getQueryText(query)
+		sql2 = self.getQueryText(query2) if query2 else None
 		if self._options.debug_query:
 			self.log(sql+"\n")
 			for row in cursor.execute("EXPLAIN QUERY PLAN "+sql, bindings):
 				self.log(str(row)+"\n")
-		elif allowDupes:
-			lastID = None
-			for row in cursor.execute(sql, bindings):
-				if row[-1] != lastID:
-					lastID = row[-1]
-					yield row[:-1]
+			if query2:
+				self.log(sql2+"\n")
+				for row in cursor.execute("EXPLAIN QUERY PLAN "+sql2, bindings):
+					self.log(str(row)+"\n")
 		else:
-			rowIDs = set()
-			for row in cursor.execute(sql, bindings):
-				if row[-1] not in rowIDs:
-					rowIDs.add(row[-1])
-					yield row[:-1]
-			del rowIDs
+			self.prepareTablesForQuery(query)
+			if query2:
+				self.prepareTablesForQuery(query2)
+			if allowDupes:
+				lastID = None
+				for row in cursor.execute(sql, bindings):
+					if row[-1] != lastID:
+						lastID = row[-1]
+						yield row[:-1]
+				if query2:
+					lastID = None
+					for row in cursor.execute(sql2, bindings):
+						if row[-1] != lastID:
+							lastID = row[-1]
+							yield row[:-1]
+			else:
+				rowIDs = set()
+				for row in cursor.execute(sql, bindings):
+					if row[-1] not in rowIDs:
+						rowIDs.add(row[-1])
+						yield row[:-1]
+				if query2:
+					for row in cursor.execute(sql2, bindings):
+						if row[-1] not in rowIDs:
+							rowIDs.add(row[-1])
+							yield row[:-1]
+				del rowIDs
 	#generateQueryResults()
 	
 	
@@ -2062,11 +2747,16 @@ class Biofilter:
 			raise Exception("filtering with empty column list")
 		header[0] = "#" + header[0]
 		query = self.buildQuery(mode='filter', focus='main', select=columns, applyOffset=applyOffset)
-		return itertools.chain([tuple(header)], self.generateQueryResults(query, allowDupes=(self._options.allow_duplicate_output == 'yes')))
+		query2 = None
+		if self._inputFilters['user']['source']:
+			query2 = self.buildQuery(mode='filter', focus='main', select=columns, applyOffset=applyOffset, userKnowledge=True)
+		return itertools.chain( [tuple(header)], self.generateQueryResults(query, allowDupes=(self._options.allow_duplicate_output == 'yes'), query2=query2) )
 	#generateFilterOutput()
 	
 	
 	def generateAnnotationOutput(self, typesF, typesA, applyOffset=False):
+		#TODO user knowledge
+		
 		# build a baseline filtering query
 		headerF = list()
 		columnsF = list()
@@ -2076,6 +2766,7 @@ class Biofilter:
 		queryF = self.buildQuery(mode='filter', focus='main', select=columnsF, applyOffset=applyOffset)
 		lenF = len(queryF['_columns'])
 		sqlF = self.getQueryText(queryF, splitRowIDs=True)
+		self.prepareTablesForQuery(queryF)
 		
 		# add each filter rowid column as a condition for annotation
 		n = lenF
@@ -2094,6 +2785,7 @@ class Biofilter:
 		queryA = self.buildQuery(mode='annotate', focus='alt', select=columnsA, where=conditionsA, applyOffset=applyOffset)
 		lenA = len(queryA['_columns'])
 		sqlA = self.getQueryText(queryA, noRowIDs=True, sortRowIDs=True, splitRowIDs=True)
+		self.prepareTablesForQuery(queryA)
 		
 		# generate filtered results and annotate each of them
 		cursorF = self._loki._db.cursor()
@@ -2286,6 +2978,8 @@ class Biofilter:
 	
 	
 	def generateModelOutput(self, typesL, typesR, applyOffset=False):
+		#TODO user knowledge
+		
 		cursor = self._loki._db.cursor()
 		limit = max(0, self._options.maximum_model_count)
 		
@@ -2310,8 +3004,12 @@ class Biofilter:
 		if self._options.all_pairwise_models != 'yes':
 			conditionsL = {('gene_id' if self._onlyGeneModels else 'biopolymer_id') : {"= (CASE WHEN 1 THEN ?1 ELSE 0*?2*?3*?4 END)"}}
 			conditionsR = {('gene_id' if self._onlyGeneModels else 'biopolymer_id') : {"= (CASE WHEN 1 THEN ?2 ELSE 0*?1*?3*?4 END)"}}
-		sqlL = self.getQueryText(self.buildQuery(mode='filter', focus='main', select=columnsL, having=conditionsL, applyOffset=applyOffset))
-		sqlR = self.getQueryText(self.buildQuery(mode='filter', focus='alt', select=columnsR, having=conditionsR, applyOffset=applyOffset))
+		queryL = self.buildQuery(mode='filter', focus='main', select=columnsL, having=conditionsL, applyOffset=applyOffset)
+		sqlL = self.getQueryText(queryL)
+		self.prepareTablesForQuery(queryL)
+		queryR = self.buildQuery(mode='filter', focus='alt', select=columnsR, having=conditionsR, applyOffset=applyOffset)
+		sqlR = self.getQueryText(queryR)
+		self.prepareTablesForQuery(queryR)
 		
 		# debug or execute model expansion
 		if self._options.debug_query:
@@ -2415,6 +3113,14 @@ if __name__ == "__main__":
 		return val
 	#percent()
 	
+	# define custom [0.0..1.0] type handler
+	def zerotoone(val):
+		val = float(val)
+		if val < 0.0 or val > 1.0:
+			raise argparse.ArgumentTypeError("'%s' must be between 0.0 and 1.0" % (val,))
+		return val
+	#zerotoone()
+	
 	# define custom basepairs handler
 	def basepairs(val):
 		val = str(val).strip().lower()
@@ -2430,6 +3136,20 @@ if __name__ == "__main__":
 			val = long(val)
 		return val
 	#basepairs()
+	
+	# define custom type handler for --paris-zero-p-values
+	def typePZPV(val):
+		val = str(val).strip().lower()
+		if 'significant'.startswith(val):
+			return 'significant'
+		if val == 'i':
+			raise argparse.ArgumentTypeError("ambiguous value: '%s' could match insignificant, ignore" % (val,))
+		if 'insignificant'.startswith(val):
+			return 'insignificant'
+		if 'ignore'.startswith(val):
+			return 'ignore'
+		raise argparse.ArgumentTypeError("'%s' must be significant, insignificant or ignore" % (val,))
+	#typePZPV()
 	
 	# add general configuration section
 	group = parser.add_argument_group("Configuration Options")
@@ -2457,6 +3177,9 @@ if __name__ == "__main__":
 	group.add_argument('--report-replication-fingerprint', '--rrf', type=yesno, metavar='yes/no', nargs='?', const='yes', default='no',
 			help="include software versions and the knowledge database file's fingerprint values in the configuration report, to ensure the same data is used in replication (default: no)"
 	)
+	group.add_argument('--random-number-generator-seed', '--rngs', type=str, metavar='seed', nargs='?', const='', default=None,
+			help="seed value for the PRNG, or blank to use the sytem default (default: blank)"
+	)
 	
 	# add knowledge database section
 	group = parser.add_argument_group("Prior Knowledge Options")
@@ -2474,6 +3197,9 @@ if __name__ == "__main__":
 	)
 	group.add_argument('--allow-unvalidated-snp-positions', '--ausp', type=yesno, metavar='yes/no', nargs='?', const='yes', default='yes',
 			help="use unvalidated SNP positions in the knowledge database (default: yes)"
+	)
+	group.add_argument('--allow-ambiguous-snps', '--aas', type=yesno, metavar='yes/no', nargs='?', const='yes', default='no',
+			help="use SNPs which have ambiguous loci in the knowledge database (default: no)"
 	)
 	group.add_argument('--allow-ambiguous-knowledge', '--aak', type=yesno, metavar='yes/no', nargs='?', const='yes', default='no',
 			help="use ambiguous group<->gene associations in the knowledge database (default: no)"
@@ -2502,6 +3228,13 @@ if __name__ == "__main__":
 	)
 	group.add_argument('--verify-source-file', type=str, metavar=('source','file','date','size','md5'), nargs=5, action='append', default=None,
 			help="require that the knowledge database was built with a specific source file fingerprint"
+	)
+	group.add_argument('--user-defined-knowledge', '--udk', type=str, metavar='file', nargs='+', default=None,
+			help="file(s) from which to load user-defined knowledge"
+	)
+	group.add_argument('--user-defined-filter', '--udf', type=str, metavar='no/group/gene', default='no',
+			choices=['no','group','gene'],
+			help="method by which user-defined knowledge will also be applied as a filter on other prior knowledge, from 'no', 'group' or 'gene' (default: no)"
 	)
 	
 	# add primary input section
@@ -2651,6 +3384,36 @@ if __name__ == "__main__":
 			help="output knowledge-supported models in order of descending score (default: yes)"
 	)
 	
+	# add PARIS section
+	group = parser.add_argument_group("PARIS Options")
+	group.add_argument('--paris-p-value', '--ppv', type=zerotoone, metavar='p-value', default=0.05,
+			help="maximum p-value of input results to be considered significant (default: 0.05)"
+	)
+	group.add_argument('--paris-zero-p-values', '--pzpv', type=typePZPV, metavar='sig/insig/ignore', default='ignore',
+			help="how to consider input result p-values of zero (default: ignore)"
+	)
+	group.add_argument('--paris-max-p-value', '--pmpv', type=zerotoone, metavar='p-value', default=None,
+			help="maximum meaningful permutation p-value (default: none)"
+	)
+	group.add_argument('--paris-enforce-input-chromosome', '--peic', type=yesno, metavar='yes/no', nargs='?', const='yes', default='yes',
+			help="limit input result SNPs to positions on the specified chromosome (default: yes)"
+	)
+	group.add_argument('--paris-permutation-count', '--ppc', type=int, metavar='number', default=1000,
+			help="number of permutations to perform on each group and gene (default: 1000)"
+	)
+	group.add_argument('--paris-bin-size', '--pbs', type=int, metavar='number', default=10000,
+			help="ideal number of features per bin (default: 10000)"
+	)
+	group.add_argument('--paris-snp-file', '--PS', type=str, metavar='file', nargs='+', action='append', #default=argparse.SUPPRESS,
+			help="file(s) from which to load SNP results"
+	)
+	group.add_argument('--paris-position-file', '--PP', type=str, metavar='file', nargs='+', action='append', #default=argparse.SUPPRESS,
+			help="file(s) from which to load position results"
+	)
+	group.add_argument('--paris-details', '--pd', type=yesno, metavar='yes/no', nargs='?', const='yes', default='no',
+			help="generate the PARIS detail report (default: no)"
+	)
+	
 	# add output section
 	group = parser.add_argument_group("Output Options")
 	group.add_argument('--quiet', '-q', type=yesno, metavar='yes/no', nargs='?', const='yes', default='no',
@@ -2679,6 +3442,9 @@ if __name__ == "__main__":
 	)
 	group.add_argument('--model', '-m', type=str, metavar='type', nargs='+', action='append',
 			help="data types or columns to include in the output models"
+	)
+	group.add_argument('--paris', type=str, metavar='yes/no', nargs='?', const='yes', default='no',
+			help="perform a PARIS analysis with the provided input data (default: no)"
 	)
 	
 	# add hidden options
@@ -2803,6 +3569,9 @@ if __name__ == "__main__":
 			for mod in ['','alt-']:
 				typeOutputPath['invalid'][mod+itype] = options.prefix + '.invalid.' + mod+itype.lower()
 				cbLog[mod+itype] = list()
+		for itype in ['userknowledge']:
+			typeOutputPath['invalid'][itype] = options.prefix + '.invalid.' + itype.lower()
+			cbLog[itype] = list()
 	#if report invalid input
 	
 	# identify all the filtering results we need to output
@@ -2865,6 +3634,13 @@ if __name__ == "__main__":
 			typeOutputPath['models'][(tuple(typesL),tuple(typesR))] = options.prefix + '.' + '-'.join(typesL) + '.' + '-'.join(typesR) + '.models'
 	#foreach requested model
 	
+	# identify all the PARIS result files we need to output
+	typeOutputPath['paris'] = collections.OrderedDict()
+	if options.paris == 'yes':
+		typeOutputPath['paris']['summary'] = options.prefix + '.paris-summary'
+		if options.paris_details == 'yes':
+			typeOutputPath['paris']['detail'] = options.prefix + '.paris-detail'
+	
 	# verify that all output files are unique, writeable and nonexistant (unless overwriting)
 	typeOutputInfo = dict()
 	pathUsed = dict()
@@ -2884,6 +3660,8 @@ if __name__ == "__main__":
 					label = "'%s' models" % (" ".join(output[0]),)
 				else:
 					label = "'%s : %s' models" % (" ".join(output[0])," ".join(output[1]))
+			elif outtype == 'paris':
+				label = "PARIS %s report" % (output,)
 			else:
 				raise Exception("unexpected output type")
 			
@@ -2973,12 +3751,23 @@ if __name__ == "__main__":
 	# set default region_match_percent/bases
 	if (options.region_match_bases != None) and (options.region_match_percent == None):
 		bio.warn("WARNING: ignoring default region match percent (100) in favor of user-specified region match bases (%d)\n" % options.region_match_bases)
-		options.region_match_percent = 0.0
+		options.region_match_percent = None
 	else:
 		if options.region_match_bases == None:
 			options.region_match_bases = 0
 		if options.region_match_percent == None:
 			options.region_match_percent = 100.0
+	#if rmb/rmp
+	
+	# set the PRNG seed, if requested
+	if options.random_number_generator_seed != None:
+		try:
+			seed = long(options.random_number_generator_seed)
+		except ValueError:
+			seed = options.random_number_generator_seed or None
+		bio.warn("random number generator seed: %s\n" % (repr(seed) if (seed != None) else '<system default>',))
+		random.seed(seed)
+	#if rngs
 	
 	# report the genome build, if requested
 	grchBuildDB,ucscBuildDB = bio.getDatabaseGenomeBuilds()
@@ -3063,6 +3852,12 @@ if __name__ == "__main__":
 			outfile.close()
 		bio.logPop("... OK\n")
 	#foreach report
+	
+	# load user-defined knowledge, if any
+	for path in (options.user_defined_knowledge or empty):
+		bio.loadUserKnowledgeFile(path, options.gene_identifier_type, errorCallback=cb['userknowledge'])
+	if options.user_defined_filter != 'no':
+		bio.applyUserKnowledgeFilter((options.user_defined_filter == 'group'))
 	
 	# apply primary filters
 	for snpList in (options.snp or empty):
@@ -3271,6 +4066,7 @@ if __name__ == "__main__":
 				bio.logPush("writing invalid %s input report to '%s' ...\n" % (modtype,path))
 				outfile = (sys.stdout if options.stdout == 'yes' else open(path, 'wb'))
 				outfile.write("\n".join(lines))
+				outfile.write("\n")
 				if outfile != sys.stdout:
 					outfile.close()
 				bio.logPop("... OK: %d invalid inputs\n" % (len(lines)/2))
@@ -3317,5 +4113,41 @@ if __name__ == "__main__":
 			outfile.close()
 		bio.logPop("... OK: %d results\n" % n)
 	#foreach model
+	
+	# process PARIS algorithm
+	if typeOutputInfo['paris']:
+		#TODO html reports?
+		parisGen = bio.generatePARISResults(ucscBuildUser, ucscBuildDB)
+		labelS,pathS,outfileS = typeOutputInfo['paris']['summary']
+		outfileD = None
+		if 'detail' in typeOutputInfo['paris']:
+			labelD,pathD,outfileD = typeOutputInfo['paris']['detail']
+			bio.logPush("writing PARIS summary and detail to '%s' and '%s' ...\n" % (pathS,pathD))
+		else:
+			bio.logPush("writing PARIS summary to '%s'  ...\n" % (pathS,))
+		header = next(parisGen)
+		outfileS.write(encodeRow(header))
+		n = 0
+		for row in parisGen:
+			n += 1
+			outfileS.write(encodeRow(row[:-1]))
+			if outfileD:
+				outfileD.write(encodeRow( ("Pathway Investigation:",row[0]) ))
+				outfileD.write(encodeRow( (row[1],) ))
+				outfileD.write("\n")
+				outfileD.write(encodeRow(header[2:]))
+				outfileD.write(encodeRow(row[2:-1]))
+				outfileD.write("\n")
+				outfileD.write(encodeRow( ("Gene Breakdown:",row[0]) ))
+				outfileD.write("\n")
+				for rowD in row[-1]:
+					outfileD.write(encodeRow(rowD))
+				outfileD.write("\n")
+		if outfileS != sys.stdout:
+			outfileS.close()
+		if outfileD and (outfileD != sys.stdout):
+			outfileD.close()
+		bio.logPop("... OK: %d results\n" % n)
+	#if PARIS
 	
 #__main__
