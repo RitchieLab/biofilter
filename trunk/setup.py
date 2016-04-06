@@ -36,7 +36,7 @@ class my_install(autodist.auto_install):
 
 setup(
 	name='biofilter',
-	version='2.2.0',
+	version='2.4.0b1',
 	author='Ritchie Lab',
 	author_email='software@ritchielab.psu.edu',
 	url='http://ritchielab.psu.edu',
@@ -56,7 +56,6 @@ setup(
 		'sdist':autodist.auto_sdist
 	},
 	data_files=[
-		('', ['CHANGELOG','biofilter-manual-2.2.pdf'])
+		('', ['CHANGELOG','biofilter-manual-2.4.pdf'])
 	]
 )
-
