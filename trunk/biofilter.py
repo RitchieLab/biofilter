@@ -25,7 +25,7 @@ class Biofilter:
 	def getVersionTuple(cls):
 		# tuple = (major,minor,revision,dev,build,date)
 		# dev must be in ('a','b','rc','release') for lexicographic comparison
-		return (2,4,0,'b',1,'2016-03-29')
+		return (2,4,0,'b',2,'2016-04-18')
 	#getVersionTuple()
 	
 	
@@ -2267,9 +2267,9 @@ JOIN `db`.`biopolymer` AS d_b
 		having = having or dict()
 		where = where or dict()
 		if fromFilter == None:
-			fromFilter = { db:{ tbl:bool(flag) for tbl,flag in self._inputFilters[db].iteritems() } for db in ('main','alt') }
+			fromFilter = { db:{ tbl:bool(flag) for tbl,flag in self._inputFilters[db].iteritems() } for db in ('main','alt','cand') }
 		if joinFilter == None:
-			joinFilter = { db:{ tbl:bool(flag) for tbl,flag in self._inputFilters[db].iteritems() } for db in ('main','alt') }
+			joinFilter = { db:{ tbl:bool(flag) for tbl,flag in self._inputFilters[db].iteritems() } for db in ('main','alt','cand') }
 		knowFilter = { 'db':{ tbl:True for db,tbl in self._queryAliasTable.itervalues() if (db == 'db') } }
 		if userKnowledge:
 			knowFilter['user'] = dict()

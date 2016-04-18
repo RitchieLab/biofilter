@@ -1,6 +1,6 @@
 CHANGELOG
 
-2.4.0 (2016-03-29)
+2.4.0 (2016-04-18)
 - implemented the PARIS algorithm with the corresponding --paris output option and other related configuration options
 - added limited support for user-defined knowledge (custom gene groups) in --filter and --paris modes
 - added --allow-ambiguous-snps option to accept input SNPs with multiple known positions
