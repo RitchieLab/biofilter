@@ -1,10 +1,11 @@
 CHANGELOG
 
-2.4.0 (2016-04-18)
+2.4.0 (2016-05-09)
 - implemented the PARIS algorithm with the corresponding --paris output option and other related configuration options
 - added limited support for user-defined knowledge (custom gene groups) in --filter and --paris modes
 - added --allow-ambiguous-snps option to accept input SNPs with multiple known positions
 - fixed a bug in --region-match-bases with a negative value so that it correctly functions like --region-position-margin except for region-region matching
+- updated LOKI loaders for gwas and dbsnp
 
 2.3.0 (2015-12-14)
 - changed default --report-genome-build option to 'yes'
