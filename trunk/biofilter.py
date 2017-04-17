@@ -25,7 +25,7 @@ class Biofilter:
 	def getVersionTuple(cls):
 		# tuple = (major,minor,revision,dev,build,date)
 		# dev must be in ('a','b','rc','release') for lexicographic comparison
-		return (2,4,0,'release','','2016-05-09')
+		return (2,4,1,'release','','2017-04-17')
 	#getVersionTuple()
 	
 	
@@ -1608,7 +1608,7 @@ JOIN `db`.`biopolymer` AS d_b
 		self.logPop("... OK\n")
 		
 		self.logPush("mapping pathway genes ...\n")
-		queryGroupSelect = ['group_id','group_label','group_description','biopolymer_id','biopolymer_label','biopolymer_description']
+		queryGroupSelect = ['group_id','group_label','group_description','gene_id','gene_label','gene_description']
 		queryGroupFilter = {'main':{'group':self._inputFilters['main']['group'], 'source':self._inputFilters['main']['source']}}
 		queryGroup = self.buildQuery('filter', 'main', select=queryGroupSelect, fromFilter=queryGroupFilter, joinFilter=queryGroupFilter)
 		queryGroupU = None

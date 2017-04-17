@@ -1,5 +1,9 @@
 CHANGELOG
 
+2.4.1 (2017-04-17)
+- fixed a bug in PARIS which included non-gene regions
+- updated LOKI loaders for dbSNP, GO and PharmGKB
+
 2.4.0 (2016-05-09)
 - implemented the PARIS algorithm with the corresponding --paris output option and other related configuration options
 - added limited support for user-defined knowledge (custom gene groups) in --filter and --paris modes
