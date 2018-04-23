@@ -1,5 +1,0 @@
-omicunits/compare.db filter=lfs diff=lfs merge=lfs -text
-omicunits/compare.tar.gz filter=lfs diff=lfs merge=lfs -text
-tags/0.5.0/bin/bio-settings.cn filter=lfs diff=lfs merge=lfs -text
-tags/0.5.0/bin/simple-model-summary.txt filter=lfs diff=lfs merge=lfs -text
-tags/0.5.0/bin/variations.bn filter=lfs diff=lfs merge=lfs -text
