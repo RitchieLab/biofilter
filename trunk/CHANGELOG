@@ -1,5 +1,9 @@
 CHANGELOG
 
+2.4.2 (2018-09-06)
+- fixed a bug in PARIS which may have inflated the reported permutation significance in some cases
+- modified PARIS output report formats to reduce redundancy and simplify batch processing
+
 2.4.1 (2017-04-17)
 - fixed a bug in PARIS which included non-gene regions
 - updated LOKI loaders for dbSNP, GO and PharmGKB

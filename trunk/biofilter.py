@@ -25,7 +25,7 @@ class Biofilter:
 	def getVersionTuple(cls):
 		# tuple = (major,minor,revision,dev,build,date)
 		# dev must be in ('a','b','rc','release') for lexicographic comparison
-		return (2,4,1,'release','','2017-04-17')
+		return (2,4,2,'a',1,'2018-09-06')
 	#getVersionTuple()
 	
 	
@@ -1418,7 +1418,7 @@ JOIN `db`.`biopolymer` AS d_b
 			permScore = 0
 			for b,draws in binDraws.iteritems():
 				permScore += sum(1 for f in _sample(binFeatures[b], draws) if featureData[f][1])
-			if permScore > realScore:
+			if permScore >= realScore:
 				totalScore += 1
 				if maxScore and (totalScore >= maxScore):
 					break
@@ -1678,9 +1678,13 @@ JOIN `db`.`biopolymer` AS d_b
 			return ret
 		#renderPermuPVal()
 		
-		yield ('group','description','genes','features','simple','(sig)','complex','(sig)','pval')
+		yield (
+			'id','group','description','genes','features','simple','(sig)','complex','(sig)','pval',
+			('gene','features','simple','(sig)','complex','(sig)','pval')
+		)
 		for uid,udata in groupData.iteritems():
 			yield (
+				uid,
 				udata[0],
 				udata[1],
 				len(udata[2]),
@@ -1690,18 +1694,15 @@ JOIN `db`.`biopolymer` AS d_b
 				sum(1 for f in udata[3] if (featureData[f][0] > 1)),
 				sum(1 for f in udata[3] if (featureData[f][1] and (featureData[f][0] > 1))),
 				renderPermuPVal(udata[3]),
-				itertools.chain(
-					[ ('gene','features','simple','(sig)','complex','(sig)','pval') ],
-					( (
-						geneData[gid][0],
-						len(geneData[gid][2]),
-						sum(1 for f in geneData[gid][2] if (featureData[f][0] == 1)),
-						sum(1 for f in geneData[gid][2] if (featureData[f][1] and (featureData[f][0] == 1))),
-						sum(1 for f in geneData[gid][2] if (featureData[f][0] > 1)),
-						sum(1 for f in geneData[gid][2] if (featureData[f][1] and (featureData[f][0] > 1))),
-						renderPermuPVal(geneData[gid][2], gid)
-					) for gid in udata[2] )
-				)
+				( (
+					geneData[gid][0],
+					len(geneData[gid][2]),
+					sum(1 for f in geneData[gid][2] if (featureData[f][0] == 1)),
+					sum(1 for f in geneData[gid][2] if (featureData[f][1] and (featureData[f][0] == 1))),
+					sum(1 for f in geneData[gid][2] if (featureData[f][0] > 1)),
+					sum(1 for f in geneData[gid][2] if (featureData[f][1] and (featureData[f][0] > 1))),
+					renderPermuPVal(geneData[gid][2], gid)
+				) for gid in udata[2] )
 			)
 	#generatePARISResults()
 	
@@ -4126,23 +4127,17 @@ if __name__ == "__main__":
 		else:
 			bio.logPush("writing PARIS summary to '%s'  ...\n" % (pathS,))
 		header = next(parisGen)
-		outfileS.write(encodeRow(header))
+		outfileS.write(encodeRow(header[:-1]))
+		if outfileD:
+			outfileD.write(encodeRow(header[0:2] + header[-1]))
 		n = 0
 		for row in parisGen:
 			n += 1
 			outfileS.write(encodeRow(row[:-1]))
 			if outfileD:
-				outfileD.write(encodeRow( ("Pathway Investigation:",row[0]) ))
-				outfileD.write(encodeRow( (row[1],) ))
-				outfileD.write("\n")
-				outfileD.write(encodeRow(header[2:]))
-				outfileD.write(encodeRow(row[2:-1]))
-				outfileD.write("\n")
-				outfileD.write(encodeRow( ("Gene Breakdown:",row[0]) ))
-				outfileD.write("\n")
+				outfileD.write(encodeRow(row[0:2] + ('*',) + row[4:-1]))
 				for rowD in row[-1]:
-					outfileD.write(encodeRow(rowD))
-				outfileD.write("\n")
+					outfileD.write(encodeRow(row[0:2] + rowD))
 		if outfileS != sys.stdout:
 			outfileS.close()
 		if outfileD and (outfileD != sys.stdout):

@@ -36,10 +36,10 @@ class my_install(autodist.auto_install):
 
 setup(
 	name='biofilter',
-	version='2.4.1',
+	version='2.4.2',
 	author='Ritchie Lab',
-	author_email='software@ritchielab.psu.edu',
-	url='http://ritchielab.psu.edu',
+	author_email='Software_RitchieLab@pennmedicine.upenn.edu',
+	url='https://ritchielab.org',
 	scripts=[
 		'loki-build.py',
 		'loki/loadPops/buildPopulations.py',
