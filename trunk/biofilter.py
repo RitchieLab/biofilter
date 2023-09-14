@@ -302,7 +302,7 @@ class Biofilter:
 			logPath = options.prefix + '.log'
 			if (options.overwrite != 'yes') and os.path.exists(logPath):
 				sys.exit("ERROR: log file '%s' already exists, must specify --overwrite or a different --prefix" % logPath)
-			self._logFile = open(logPath, 'wb')
+			self._logFile = open(logPath, 'w')
 		
 		self._tablesDeindexed = {db:set() for db in self._schema}
 		self._inputFilters  = {db:{tbl:0 for tbl in self._schema[db]} for db in self._schema}
@@ -448,7 +448,7 @@ class Biofilter:
 			# regions=[ (id,chr,posMin,posMax),... ]
 			# yields:[ (id,chr,zone),... ]
 			for rowid,chm,posMin,posMax in regions:
-				for z in xrange(int(posMin/size),int(posMax/size)+1):
+				for z in range(int(posMin/size),int(posMax/size)+1):
 					yield (rowid,chm,z)
 		#_zones()
 		
@@ -518,6 +518,9 @@ class Biofilter:
 		grchBuild = None
 		if ucscBuild:
 			for build in self._loki.generateGRChByUCSChg(ucscBuild):
+				if grchBuild is None:
+					grchBuild = int(build)
+					continue
 				grchBuild = max(grchBuild, int(build))
 		return (grchBuild,ucscBuild)
 	#getDatabaseGenomeBuilds()
@@ -599,10 +602,10 @@ class Biofilter:
 				if not cols:
 					continue
 				try:
-					rs = long(cols[0])
+					rs = int(cols[0])
 				except ValueError:
 					if cols[0].upper().startswith('RS'):
-						rs = long(cols[0][2:])
+						rs = int(cols[0][2:])
 					else:
 						raise
 				extra = cols[1] if (len(cols) > 1) else None
@@ -617,7 +620,7 @@ class Biofilter:
 	def generateRSesFromRSFiles(self, paths, separator=None, errorCallback=None):
 		for path in paths:
 			try:
-				with (sys.stdin if (path == '-' or not path) else open(path, 'rU')) as file:
+				with (sys.stdin if (path == '-' or not path) else open(path, 'r')) as file:
 					for data in self.generateRSesFromText((line for line in file if not line.startswith('#')), separator, errorCallback):
 						yield data
 				#with file
@@ -672,7 +675,7 @@ class Biofilter:
 				if (pos == '-') or (pos == 'NA'):
 					pos = None
 				else:
-					pos = long(pos) + offset
+					pos = int(pos) + offset
 				
 				yield (label,chm,pos,extra)
 			except:
@@ -685,7 +688,7 @@ class Biofilter:
 	def generateLociFromMapFiles(self, paths, separator=None, applyOffset=False, errorCallback=None):
 		for path in paths:
 			try:
-				with (sys.stdin if (path == '-' or not path) else open(path, 'rU')) as file:
+				with (sys.stdin if (path == '-' or not path) else open(path, 'r')) as file:
 					for data in self.generateLociFromText((line for line in file if not line.startswith('#')), separator, applyOffset, errorCallback):
 						yield data
 				#with file
@@ -761,11 +764,11 @@ class Biofilter:
 				if (posMin == '-') or (posMin == 'NA'):
 					posMin = None
 				else:
-					posMin = long(posMin) + offsetStart
+					posMin = int(posMin) + offsetStart
 				if (posMax == '-') or (posMax == 'NA'):
 					posMax = None
 				else:
-					posMax = long(posMax) + offsetEnd
+					posMax = int(posMax) + offsetEnd
 				
 				yield (label,chm,posMin,posMax,extra)
 			except:
@@ -778,7 +781,7 @@ class Biofilter:
 	def generateRegionsFromFiles(self, paths, separator=None, applyOffset=False, errorCallback=None):
 		for path in paths:
 			try:
-				with (sys.stdin if (path == '-' or not path) else open(path, 'rU')) as file:
+				with (sys.stdin if (path == '-' or not path) else open(path, 'r')) as file:
 					for data in self.generateRegionsFromText((line for line in file if not line.startswith('#')), separator, applyOffset, errorCallback):
 						yield data
 				#with file
@@ -841,7 +844,7 @@ class Biofilter:
 	def generateNamesFromNameFiles(self, paths, defaultNS=None, separator=None, errorCallback=None):
 		for path in paths:
 			try:
-				with (sys.stdin if (path == '-' or not path) else open(path, 'rU')) as file:
+				with (sys.stdin if (path == '-' or not path) else open(path, 'r')) as file:
 					for data in self.generateNamesFromText((line for line in file if not line.startswith('#')), defaultNS, separator, errorCallback):
 						yield data
 				#with file
@@ -983,7 +986,7 @@ class Biofilter:
 	
 	
 	##################################################
-	# region input
+	## region input
 	
 	
 	def unionInputRegions(self, db, regions, errorCallback=None):
@@ -1414,9 +1417,9 @@ JOIN `db`.`biopolymer` AS d_b
 		_sample = random.sample
 		binDraws = collections.Counter(featureBin[f] for f in realFeatures if featureBin.get(f))
 		totalScore = 0
-		for p in xrange(numPermutations):
+		for p in range(numPermutations):
 			permScore = 0
-			for b,draws in binDraws.iteritems():
+			for b,draws in binDraws.items():
 				permScore += sum(1 for f in _sample(binFeatures[b], draws) if featureData[f][1])
 			if permScore >= realScore:
 				totalScore += 1
@@ -1451,7 +1454,7 @@ JOIN `db`.`biopolymer` AS d_b
 			posMax += rpMargin
 			featureData[fid] = [0,0]
 			featureBounds[fid] = (fid,chm,posMin,posMax)
-			for z in xrange( int(posMin / zoneSize), int(posMax / zoneSize) + 1 ):
+			for z in range( int(posMin / zoneSize), int(posMax / zoneSize) + 1 ):
 				chrZoneFeatures[chm][z].add(fid)
 		self.logPop("... OK: %d regions\n" % (len(featureData),))
 		
@@ -1502,7 +1505,7 @@ JOIN `db`.`biopolymer` AS d_b
 					posMax = pos + rpMargin
 					featureData[fid] = [1,1] if sig else [1,0]
 					featureBounds[fid] = (fid,chm,posMin,posMax)
-					for z in xrange( int(posMin / zoneSize), int(posMax / zoneSize) + 1 ):
+					for z in range( int(posMin / zoneSize), int(posMax / zoneSize) + 1 ):
 						chrZoneFeatures[chm][z].add(fid)
 			#foreach position
 			return (numMatch,numSingle,numIgnore)
@@ -1560,7 +1563,7 @@ JOIN `db`.`biopolymer` AS d_b
 		self.logPush("binning feature regions ...\n")
 		# partition features by size
 		sizeFeatures = collections.defaultdict(list)
-		for fid,data in featureData.iteritems():
+		for fid,data in featureData.items():
 			sizeFeatures[data[0]].append(fid)
 		# randomize within each size while building a master list in descending size order
 		listFeatures = list()
@@ -1581,8 +1584,8 @@ JOIN `db`.`biopolymer` AS d_b
 		count = max(1, int(0.5 + float(len(listFeatures)) / self._options.paris_bin_size))
 		size = len(listFeatures) / count
 		extra = len(listFeatures) - (count * size)
-		for b in xrange(2,2+count):
-			for n in xrange(size + (1 if ((b-2) < extra) else 0)):
+		for b in range(2,2+count):
+			for n in range(size + (1 if ((b-2) < extra) else 0)):
 				fid = listFeatures.pop()
 				assert(fid not in featureBin)
 				featureBin[fid] = b
@@ -1633,7 +1636,7 @@ JOIN `db`.`biopolymer` AS d_b
 	#	queryGeneWhere[('m_r','posMin')] = {'<= d_br.posMax'} #DEBUG paris 1.1.2
 		queryGeneFilter = {'main':{'region_zone':1,'region':1}}
 		n = 0
-		for gid,gdata in geneData.iteritems():
+		for gid,gdata in geneData.items():
 			features = set()
 			queryGeneWhere[queryGeneWhereCol] = {'= %d' % (gid,)}
 			queryGene = self.buildQuery('filter', 'main', select=queryGeneSelect, where=queryGeneWhere, fromFilter=queryGeneFilter, joinFilter=queryGeneFilter)
@@ -1647,7 +1650,7 @@ JOIN `db`.`biopolymer` AS d_b
 		
 		self.logPush("mapping pathway features ...\n")
 		n = 0
-		for uid,udata in groupData.iteritems():
+		for uid,udata in groupData.items():
 			features = set() # TODO: allow duplicate features (build as list)
 			for gid in udata[2]:
 				features.update(geneData[gid][2])
@@ -1682,7 +1685,7 @@ JOIN `db`.`biopolymer` AS d_b
 			'id','group','description','genes','features','simple','(sig)','complex','(sig)','pval',
 			('gene','features','simple','(sig)','complex','(sig)','pval')
 		)
-		for uid,udata in groupData.iteritems():
+		for uid,udata in groupData.items():
 			yield (
 				uid,
 				udata[0],
@@ -2268,10 +2271,10 @@ JOIN `db`.`biopolymer` AS d_b
 		having = having or dict()
 		where = where or dict()
 		if fromFilter == None:
-			fromFilter = { db:{ tbl:bool(flag) for tbl,flag in self._inputFilters[db].iteritems() } for db in ('main','alt','cand') }
+			fromFilter = { db:{ tbl:bool(flag) for tbl,flag in self._inputFilters[db].items() } for db in ('main','alt','cand') }
 		if joinFilter == None:
-			joinFilter = { db:{ tbl:bool(flag) for tbl,flag in self._inputFilters[db].iteritems() } for db in ('main','alt','cand') }
-		knowFilter = { 'db':{ tbl:True for db,tbl in self._queryAliasTable.itervalues() if (db == 'db') } }
+			joinFilter = { db:{ tbl:bool(flag) for tbl,flag in self._inputFilters[db].items() } for db in ('main','alt','cand') }
+		knowFilter = { 'db':{ tbl:True for db,tbl in iter(self._queryAliasTable.values()) if (db == 'db') } }
 		if userKnowledge:
 			knowFilter['user'] = dict()
 			for db,tbl in self._queryAliasTable.itervalues():
@@ -2342,7 +2345,7 @@ JOIN `db`.`biopolymer` AS d_b
 		# input represents filters, we always need to join through the tables
 		# with that data, even if we're not selecting any of their columns)
 		query['FROM'].update(alias for alias,col in where)
-		for alias,dbtable in self._queryAliasTable.iteritems():
+		for alias,dbtable in self._queryAliasTable.items():
 			db,table = dbtable
 			# only include tables which satisfy the filter (usually, user input tables which contain some data)
 			if not fromFilter.get(db,empty).get('region' if (table == 'region_zone') else table):
@@ -2401,7 +2404,7 @@ JOIN `db`.`biopolymer` AS d_b
 			self.warn("joined FROM = %s\n" % ', '.join(query['FROM']))
 		
 		# add table aliases to satisfy any remaining columns
-		columnsRemaining = set(col for col,aliases in columnAliases.iteritems() if not (set(aliases) & query['FROM']))
+		columnsRemaining = set(col for col,aliases in columnAliases.items() if not (set(aliases) & query['FROM']))
 		if mode == 'annotate':
 			# when annotating, do a BFS from each remaining column in order of source preference
 			# this will guarantee a valid path of LEFT JOINs to the most-preferred available source
@@ -2437,7 +2440,7 @@ JOIN `db`.`biopolymer` AS d_b
 			if columnsRemaining:
 				remaining = columnsRemaining
 				inside = query['FROM']
-				outside = set( a for a,t in self._queryAliasTable.iteritems() if ((a not in inside) and (a not in query['LEFT JOIN']) and (knowFilter.get(t[0],empty).get(t[1]) or t[1] == 'region_zone')) )
+				outside = set( a for a,t in self._queryAliasTable.items() if ((a not in inside) and (a not in query['LEFT JOIN']) and (knowFilter.get(t[0],empty).get(t[1]) or t[1] == 'region_zone')) )
 				if self._options.debug_logic:
 					self.warn("remaining columns = %s\n" % ', '.join(columnsRemaining))
 					self.warn("available aliases = %s\n" % ', '.join(outside))
@@ -2521,7 +2524,7 @@ JOIN `db`.`biopolymer` AS d_b
 			self.warn("col WHERE = %s\n" % query['WHERE'])
 		
 		# assign 'having' column conditions
-		for col,conds in having.iteritems():
+		for col,conds in having.items():
 			# _queryColumnSources[col] = list[ tuple(alias,rowid,expression,?conditions),... ]
 			for colsrc in self._queryColumnSources[col]:
 				if (colsrc[0] in query['FROM']) or (colsrc[0] in query['LEFT JOIN']):
@@ -2547,7 +2550,7 @@ JOIN `db`.`biopolymer` AS d_b
 			self.warn("having WHERE = %s\n" % query['WHERE'])
 		
 		# add 'where' column conditions
-		for tblcol,conds in where.iteritems():
+		for tblcol,conds in where.items():
 			query['WHERE'].update("{0}.{1} {2}".format(tblcol[0], tblcol[1], formatter.vformat(c, args=None, kwargs=options)) for c in conds)
 		
 		# debug
@@ -2555,7 +2558,7 @@ JOIN `db`.`biopolymer` AS d_b
 			self.warn("cond WHERE = %s\n" % query['WHERE'])
 		
 		# add general constraints for included table aliases
-		for aliases,conds in self._queryAliasConditions.iteritems():
+		for aliases,conds in self._queryAliasConditions.items():
 			for alias in aliases.intersection(query['FROM']):
 				options['L'] = alias
 				query['WHERE'].update(formatter.vformat(c, args=None, kwargs=options) for c in conds)
@@ -2575,7 +2578,7 @@ JOIN `db`.`biopolymer` AS d_b
 			self.warn("table WHERE = %s\n" % query['WHERE'])
 		
 		# add join and pair constraints for included table alias pairs
-		for aliasPairs,conds in itertools.chain(self._queryAliasJoinConditions.iteritems(), self._queryAliasPairConditions.iteritems()):
+		for aliasPairs,conds in itertools.chain(self._queryAliasJoinConditions.items(), self._queryAliasPairConditions.items()):
 			for aliasLeft in aliasPairs[0]:
 				for aliasRight in aliasPairs[-1]:
 					options['L'] = aliasLeft
@@ -2589,8 +2592,8 @@ JOIN `db`.`biopolymer` AS d_b
 					elif (aliasLeft in query['LEFT JOIN']) and (aliasRight in query['FROM']):
 						query['LEFT JOIN'][aliasLeft].update(formatter.vformat(c, args=None, kwargs=options) for c in conds)
 					elif (aliasLeft in query['LEFT JOIN']) and (aliasRight in query['LEFT JOIN']):
-						indexLeft = query['LEFT JOIN'].keys().index(aliasLeft)
-						indexRight = query['LEFT JOIN'].keys().index(aliasRight)
+						indexLeft = list(query['LEFT JOIN'].keys()).index(aliasLeft)
+						indexRight = list(query['LEFT JOIN'].keys()).index(aliasRight)
 						if indexLeft > indexRight:
 							query['LEFT JOIN'][aliasLeft].update(formatter.vformat(c, args=None, kwargs=options) for c in conds)
 						else:
@@ -2608,18 +2611,18 @@ JOIN `db`.`biopolymer` AS d_b
 		sql = "SELECT " + (",\n  ".join("{0} AS {1}".format(query['SELECT'][col] or "NULL",col) for col in query['_columns'])) + "\n"
 		rowIDs = list()
 		orderBy = list(query['ORDER BY'])
-		for alias,cols in query['_rowid'].iteritems():
+		for alias,cols in query['_rowid'].items():
 			rowIDs.extend("COALESCE({0}.{1},'')".format(alias,col) for col in cols)
 			if sortRowIDs:
 				orderBy.extend("({0}.{1} IS NULL)".format(alias,col) for col in cols)
 		if splitRowIDs:
-			for n in xrange(len(rowIDs)):
+			for n in range(len(rowIDs)):
 				sql += "  , {0} AS _rowid_{1}\n".format(rowIDs[n],n)
 		if not noRowIDs:
 			sql += "  , (" + ("||'_'||".join(rowIDs)) + ") AS _rowid\n"
 		if query['FROM']:
 			sql += "FROM " + (",\n  ".join("`{0[0]}`.`{0[1]}` AS {1}".format(self._queryAliasTable[a],a) for a in sorted(query['FROM']))) + "\n"
-		for alias,joinon in query['LEFT JOIN'].iteritems():
+		for alias,joinon in query['LEFT JOIN'].items():
 			sql += "LEFT JOIN `{0[0]}`.`{0[1]}` AS {1}\n".format(self._queryAliasTable[alias],alias)
 			if joinon:
 				sql += "  ON " + ("\n  AND ".join(sorted(joinon))) + "\n"
@@ -2772,7 +2775,7 @@ JOIN `db`.`biopolymer` AS d_b
 		# add each filter rowid column as a condition for annotation
 		n = lenF
 		conditionsA = collections.defaultdict(set)
-		for alias,cols in queryF['_rowid'].iteritems():
+		for alias,cols in queryF['_rowid'].items():
 			for col in cols:
 				n += 1
 				conditionsA[(alias,col)].add("= ?%d" % n)
@@ -2854,7 +2857,7 @@ JOIN `db`.`biopolymer` AS d_b
 		self.prepareTableForUpdate('cand','alt_biopolymer')
 		
 		# identify main candidiates from applicable filters
-		if sum(filters for table,filters in self._inputFilters['main'].iteritems() if table not in ('group','source')):
+		if sum(filters for table,filters in self._inputFilters['main'].items() if table not in ('group','source')):
 			self.log("identifying main model candidiates ...")
 			query = self.buildQuery(mode='modelgene', focus='main', select=['gene_id' if self._onlyGeneModels else 'biopolymer_id'])
 			sql = "INSERT OR IGNORE INTO `cand`.`main_biopolymer` (biopolymer_id, flag) VALUES (?,0)"
@@ -2865,7 +2868,7 @@ JOIN `db`.`biopolymer` AS d_b
 		#if any main filters other than group/source
 		
 		# identify alt candidiates from applicable filters
-		if sum(filters for table,filters in self._inputFilters['alt'].iteritems() if table not in ('group','source')):
+		if sum(filters for table,filters in self._inputFilters['alt'].items() if table not in ('group','source')):
 			self.log("identifying alternate model candidiates ...")
 			query = self.buildQuery(mode='modelgene', focus='alt', select=['gene_id' if self._onlyGeneModels else 'biopolymer_id'])
 			sql = "INSERT OR IGNORE INTO `cand`.`alt_biopolymer` (biopolymer_id, flag) VALUES (?,0)"
@@ -2887,7 +2890,7 @@ JOIN `db`.`biopolymer` AS d_b
 		cursor.execute("DELETE FROM `cand`.`group`")
 		
 		# identify candidiates from applicable main filters
-		if sum(filters for table,filters in self._inputFilters['main'].iteritems() if table in ('group','source')):
+		if sum(filters for table,filters in self._inputFilters['main'].items() if table in ('group','source')):
 			query = self.buildQuery(mode='modelgroup', focus='main', select=['group_id'])
 			if self._inputFilters['cand']['group']:
 				cursor.execute("UPDATE `cand`.`group` SET flag = 0")
@@ -2901,7 +2904,7 @@ JOIN `db`.`biopolymer` AS d_b
 		#if any main group/source filters
 		
 		# identify candidiates from applicable alt filters
-		if sum(filters for table,filters in self._inputFilters['alt'].iteritems() if table in ('group','source')):
+		if sum(filters for table,filters in self._inputFilters['alt'].items() if table in ('group','source')):
 			query = self.buildQuery(mode='modelgroup', focus='alt', select=['group_id'])
 			if self._inputFilters['cand']['group']:
 				cursor.execute("UPDATE `cand`.`group` SET flag = 0")
@@ -3128,13 +3131,13 @@ if __name__ == "__main__":
 		if val[-1:] == 'b':
 			val = val[:-1]
 		if val[-1:] == 'k':
-			val = long(val[:-1]) * 1000
+			val = int(val[:-1]) * 1000
 		elif val[-1:] == 'm':
-			val = long(val[:-1]) * 1000 * 1000
+			val = int(val[:-1]) * 1000 * 1000
 		elif val[-1:] == 'g':
-			val = long(val[:-1]) * 1000 * 1000 * 1000
+			val = int(val[:-1]) * 1000 * 1000 * 1000
 		else:
-			val = long(val)
+			val = int(val)
 		return val
 	#basepairs()
 	
@@ -3457,11 +3460,11 @@ if __name__ == "__main__":
 	
 	# if there are no arguments, just print usage and exit
 	if len(sys.argv) < 2:
-		print version
+		print (version)
 		print
 		parser.print_usage()
 		print
-		print "Use -h for details."
+		print ("Use -h for details.")
 		sys.exit(2)
 	#if no args
 	
@@ -3506,7 +3509,7 @@ if __name__ == "__main__":
 		cfStack.append(cfAbs)
 		
 		# set up iterators
-		cfHandle = (sys.stdin if cfName == '-' else open(cfName,'rb'))
+		cfHandle = (sys.stdin if cfName == '-' else open(cfName,'r'))
 		cfStream = (line.replace('\t',' ').strip() for line in cfHandle)
 		cfLines = (line for line in cfStream if line and not line.startswith('#'))
 		cfReader = csv.reader(cfLines, dialect=cfDialect)
@@ -3516,7 +3519,7 @@ if __name__ == "__main__":
 		for line in cfReader:
 			line[0] = '--' + line[0].lower().replace('_','-')
 			if line[0] == '--include':
-				for l in xrange(1,len(line)):
+				for l in range(1,len(line)):
 					parseCFile(line[l])
 			else:
 				cfArgs.extend(line)
@@ -3533,7 +3536,7 @@ if __name__ == "__main__":
 			if options.configuration:
 				raise Exception("unexpected argument(s): %s" % (' '.join(options.configuration)))
 		except:
-			print "(in configuration file '%s')" % cfName
+			print ("(in configuration file '%s')" % cfName)
 			raise
 		
 		# pop the stack and return
@@ -3645,9 +3648,9 @@ if __name__ == "__main__":
 	# verify that all output files are unique, writeable and nonexistant (unless overwriting)
 	typeOutputInfo = dict()
 	pathUsed = dict()
-	for outtype,outputPath in typeOutputPath.iteritems():
+	for outtype,outputPath in typeOutputPath.items():
 		typeOutputInfo[outtype] = collections.OrderedDict()
-		for output,path in outputPath.iteritems():
+		for output,path in outputPath.items():
 			if outtype == 'report':
 				label = "%s report" % (output,)
 			elif outtype == 'invalid':
@@ -3713,7 +3716,7 @@ if __name__ == "__main__":
 	for source,file,date,size,md5 in (options.verify_source_file or empty):
 		if not sourceVerify[source][2]:
 			sourceVerify[source][2] = dict()
-		sourceVerify[source][2][file] = (date,long(size),md5)
+		sourceVerify[source][2][file] = (date,int(size),md5)
 	if sourceVerify or options.verify_biofilter_version or options.verify_loki_version:
 		bio.logPush("verifying replication fingerprint ...\n")
 		if options.verify_biofilter_version and (options.verify_biofilter_version != Biofilter.getVersionString()):
@@ -3730,12 +3733,12 @@ if __name__ == "__main__":
 				sys.exit("ERROR: configuration requires %s loader version %s, but knowledge database reports version %s\n" % (source,verify[0],version))
 			if verify[1]:
 				options = bio._loki.getSourceIDOptions(sourceID)
-				for opt,val in verify[1].iteritems():
+				for opt,val in verify[1].items():
 					if opt not in options or val != options[opt]:
 						sys.exit("ERROR: configuration requires %s loader option %s = %s, but knowledge database reports setting = %s\n" % (source,opt,val,options.get(opt)))
 			if verify[2]:
 				files = bio._loki.getSourceIDFiles(sourceID)
-				for file,meta in verify[2].iteritems():
+				for file,meta in verify[2].items():
 					if file not in files:
 						sys.exit("ERROR: configuration requires a specific fingerprint for %s file '%s', but knowledge database reports no such file\n" % (source,file))
 					# size and hash should be sufficient comparisons, and some sources (KEGG,PharmGKB) don't provide data file timestamps anyway
@@ -3763,7 +3766,7 @@ if __name__ == "__main__":
 	# set the PRNG seed, if requested
 	if options.random_number_generator_seed != None:
 		try:
-			seed = long(options.random_number_generator_seed)
+			seed = int(options.random_number_generator_seed)
 		except ValueError:
 			seed = options.random_number_generator_seed or None
 		bio.warn("random number generator seed: %s\n" % (repr(seed) if (seed != None) else '<system default>',))
@@ -3788,10 +3791,10 @@ if __name__ == "__main__":
 	def encodeLine(line, term="\n"):
 		return utf8("%s%s" % (line,term))[0]
 	def encodeRow(row, term="\n", delim="\t"):
-		return utf8("%s%s" % ((delim.join((col if isinstance(col,basestring) else str('' if col == None else col)) for col in row)),term))[0]
+		return utf8("%s%s" % ((delim.join((col if isinstance(col,str) else str('' if col == None else col)) for col in row)),term))[0]
 	
 	# process reports
-	for report,info in typeOutputInfo['report'].iteritems():
+	for report,info in typeOutputInfo['report'].items():
 		label,path,outfile = info
 		bio.logPush("writing %s to '%s' ...\n" % (label,path))
 		if report == 'configuration':
@@ -3803,7 +3806,7 @@ if __name__ == "__main__":
 			if options.report_replication_fingerprint == 'yes':
 				outfile.write(encodeLine("%-35s \"%s\"" % ('VERIFY_BIOFILTER_VERSION', Biofilter.getVersionString(),)))
 				outfile.write(encodeLine("%-35s \"%s\"" % ('VERIFY_LOKI_VERSION', loki_db.Database.getVersionString(),)))
-				for source,fingerprint in bio.getSourceFingerprints().iteritems():
+				for source,fingerprint in bio.getSourceFingerprints().items():
 					outfile.write(encodeLine("%-35s %s \"%s\"" % ('VERIFY_SOURCE_LOADER',source,fingerprint[0])))
 					for srcopt in sorted(fingerprint[1]):
 						outfile.write(encodeLine("%-35s %s %s " % ('VERIFY_SOURCE_OPTION',source,srcopt), term=""))
@@ -3956,7 +3959,7 @@ if __name__ == "__main__":
 	for sourceFile in itertools.chain(*(options.source_file or empty)):
 		bio.intersectInputSources(
 			'main',
-			itertools.chain(*(line for line in open(sourceFile,'rU'))),
+			itertools.chain(*(line for line in open(sourceFile,'r'))),
 			errorCallback=cb['source']
 		)
 	
@@ -4055,17 +4058,17 @@ if __name__ == "__main__":
 	for sourceFile in itertools.chain(*(options.alt_source_file or empty)):
 		bio.intersectInputSources(
 			'alt',
-			itertools.chain(*(line for line in open(sourceFile,'rU'))),
+			itertools.chain(*(line for line in open(sourceFile,'r'))),
 			errorCallback=cb['alt-source']
 		)
 	
 	# report invalid input, if requested
 	if options.report_invalid_input == 'yes':
-		for modtype,lines in cbLog.iteritems():
+		for modtype,lines in cbLog.items():
 			if lines:
 				path = ('<stdout>' if options.stdout == 'yes' else typeOutputInfo['invalid'][modtype][1])
 				bio.logPush("writing invalid %s input report to '%s' ...\n" % (modtype,path))
-				outfile = (sys.stdout if options.stdout == 'yes' else open(path, 'wb'))
+				outfile = (sys.stdout if options.stdout == 'yes' else open(path, 'w'))
 				outfile.write("\n".join(lines))
 				outfile.write("\n")
 				if outfile != sys.stdout:
@@ -4075,7 +4078,7 @@ if __name__ == "__main__":
 	#if report invalid input
 	
 	# process filters
-	for types,info in typeOutputInfo['filter'].iteritems():
+	for types,info in typeOutputInfo['filter'].items():
 		label,path,outfile = info
 		bio.logPush("writing %s to '%s' ...\n" % (label,path))
 		n = -1 # don't count header
@@ -4088,7 +4091,7 @@ if __name__ == "__main__":
 	#foreach filter
 	
 	# process annotations
-	for types,info in typeOutputInfo['annotation'].iteritems():
+	for types,info in typeOutputInfo['annotation'].items():
 		typesF,typesA = types
 		label,path,outfile = info
 		bio.logPush("writing %s to '%s' ...\n" % (label,path))
@@ -4102,7 +4105,7 @@ if __name__ == "__main__":
 	#foreach annotation
 	
 	# process models
-	for types,info in typeOutputInfo['models'].iteritems():
+	for types,info in typeOutputInfo['models'].items():
 		typesL,typesR = types
 		label,path,outfile = info
 		bio.logPush("writing %s to '%s' ...\n" % (label,path))
