@@ -816,7 +816,7 @@ class Biofilter:
 	
 	
 	def generateNamesFromText(self, lines, defaultNS=None, separator=None, errorCallback=None):
-		utf8 = codecs.getencoder('utf8')
+#		utf8 = codecs.getencoder('utf8')
 		l = 0
 		for line in lines:
 			l += 1
@@ -827,12 +827,11 @@ class Biofilter:
 					continue
 				elif len(cols) == 1:
 					ns = defaultNS
-					name = utf8(cols[0].strip())[0]
+					name = str(cols[0].strip())
 				elif len(cols) >= 2:
 					ns = cols[0].strip()
-					name = utf8(cols[1].strip())[0]
+					name = str(cols[1].strip())
 					extra = cols[2] if (len(cols) > 2) else None
-				
 				yield (ns,name,extra)
 			except:
 				if (l > 1) and errorCallback:
@@ -840,7 +839,7 @@ class Biofilter:
 		#foreach line in file
 	#generateNamesFromText()
 	
-	
+
 	def generateNamesFromNameFiles(self, paths, defaultNS=None, separator=None, errorCallback=None):
 		for path in paths:
 			try:
@@ -1043,7 +1042,7 @@ class Biofilter:
 		# names=[ (namespace,name,extra), ... ]
 		self.logPush("adding to %s gene filter ...\n" % db)
 		cursor = self._loki._db.cursor()
-		
+
 		self.prepareTableForUpdate(db, 'gene')
 		sql = "INSERT INTO `%s`.`gene` (label,extra,biopolymer_id) VALUES (?2,?3,?4); SELECT 1" % db
 		maxMatch = (None if self._options.allow_ambiguous_genes == 'yes' else 1)
