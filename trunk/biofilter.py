@@ -25,7 +25,7 @@ class Biofilter:
 	def getVersionTuple(cls):
 		# tuple = (major,minor,revision,dev,build,date)
 		# dev must be in ('a','b','rc','release') for lexicographic comparison
-		return (2,4,2,'release','','2019-03-15')
+		return (2,4,3,'release','','2023-09-20')
 	#getVersionTuple()
 	
 	
@@ -1042,7 +1042,6 @@ class Biofilter:
 		# names=[ (namespace,name,extra), ... ]
 		self.logPush("adding to %s gene filter ...\n" % db)
 		cursor = self._loki._db.cursor()
-
 		self.prepareTableForUpdate(db, 'gene')
 		sql = "INSERT INTO `%s`.`gene` (label,extra,biopolymer_id) VALUES (?2,?3,?4); SELECT 1" % db
 		maxMatch = (None if self._options.allow_ambiguous_genes == 'yes' else 1)
