@@ -558,7 +558,10 @@ class Biofilter:
 		elif ucscBuild:
 			grchBuild = None
 			for build in self._loki.generateGRChByUCSChg(ucscBuild):
-				grchBuild = max(grchBuild, int(build))
+				if grchBuild:
+					grchBuild = max(grchBuild, int(build))
+				else:
+					grchBuild = int(build)
 		return (grchBuild,ucscBuild)
 	#getInputGenomeBuilds()
 	
