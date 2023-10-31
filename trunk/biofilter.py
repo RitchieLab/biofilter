@@ -679,7 +679,6 @@ class Biofilter:
 					pos = None
 				else:
 					pos = int(pos) + offset
-				
 				yield (label,chm,pos,extra)
 			except:
 				if (l > 1) and errorCallback:
@@ -2734,6 +2733,24 @@ JOIN `db`.`biopolymer` AS d_b
 			elif t == 'gwas':
 				header.extend(['trait','snps','OR/beta','allele95%CI','riskAfreq','pubmed'])
 				columns.extend(['gwas_trait','gwas_snps','gwas_orbeta','gwas_allele95ci','gwas_riskAfreq','gwas_pubmed'])
+			elif t == 'snpinput':
+				header.extend(['user_input'])
+				columns.extend(['snp_label'])
+			elif t == 'positioninput':
+				header.extend(['user_input'])
+				columns.extend(['position_label'])
+			elif t == 'geneinput':
+				header.extend(['user_input'])
+				columns.extend(['gene_label'])
+			elif t == 'regioninput':
+				header.extend(['user_input'])
+				columns.extend(['region_label'])
+			elif t == 'groupinput':
+				header.extend(['user_input'])
+				columns.extend(['group_label'])
+			elif t == 'sourceinput':
+				header.extend(['user_input'])
+				columns.extend(['source_label'])
 			elif t in self._queryColumnSources:
 				header.append(t)
 				columns.append(t)
@@ -2772,7 +2789,6 @@ JOIN `db`.`biopolymer` AS d_b
 		lenF = len(queryF['_columns'])
 		sqlF = self.getQueryText(queryF, splitRowIDs=True)
 		self.prepareTablesForQuery(queryF)
-		
 		# add each filter rowid column as a condition for annotation
 		n = lenF
 		conditionsA = collections.defaultdict(set)
@@ -2827,16 +2843,14 @@ JOIN `db`.`biopolymer` AS d_b
 		else:
 			headerF[0] = "#" + headerF[0]
 			yield tuple(headerF + headerA)
-			idsF = set()
 			emptyA = tuple(None for c in columnsA)
 			for rowF in cursorF.execute(sqlF):
-				if rowF[-1] not in idsF:
-					idsF.add(rowF[-1])
 					idsA = set()
 					for rowA in cursorA.execute(sqlA, rowF[:-1]):
 						rowidA = rowA[lenA:]
 						if rowidA not in idsA:
 							idsA.update(itertools.product(*( (v,) if v == '' else (v,'') for v in rowidA )))
+							# return annotation results
 							yield rowF[:lenF] + rowA[:lenA]
 					#foreach annotation result
 					if not idsA:
@@ -3591,20 +3605,35 @@ if __name__ == "__main__":
 	
 	# identify all the annotation results we need to output
 	typeOutputPath['annotation'] = collections.OrderedDict()
+	if options.snp or options.snp_file:
+		userInputType = ['snpinput']
+	elif options.position_file or options.position:
+		userInputType = ['positioninput']
+	elif options.gene or options.gene_file or options.gene_search:
+		userInputType = ['geneinput']
+	elif options.region or options.region_file:
+		userInputType = ['regioninput']
+	elif options.group or options.group_file or options.group_search:
+		userInputType = ['groupinput']
+	elif options.source or options.source_file:
+		userInputType = ['sourceinput']
+	else:
+		userInputType = []
+
 	for types in (options.annotate or empty):
 		n = types.count(':')
 		if n > 1:
 			sys.exit("ERROR: cannot annotate '%s', only two sets of outputs are allowed\n" % (' '.join(types),))
 		elif n:
 			i = types.index(':')
-			typesF = types[:i]
+			typesF = userInputType + types[:i]
 			typesA = types[i+1:None]
 		else:
-			typesF = types[0:1]
+			typesF = userInputType + types[0:1]
 			typesA = types[1:None]
-		
+
 		if typesF and typesA:
-			typeOutputPath['annotation'][(tuple(typesF),tuple(typesA))] = options.prefix + '.' + '-'.join(typesF) + '.' + '-'.join(typesA)
+			typeOutputPath['annotation'][(tuple(typesF),tuple(typesA))] = options.prefix + '.' + '-'.join(typesF[1:]) + '.' + '-'.join(typesA)
 		elif typesF:
 			bio.warn("WARNING: annotating '%s' is equivalent to filtering '%s'\n" % (' '.join(types),' '.join(typesF)))
 			typeOutputPath['filter'][tuple(typesF)] = options.prefix + '.' + '-'.join(typesF)
@@ -3614,7 +3643,7 @@ if __name__ == "__main__":
 			# ignore empty annotations
 			pass
 	#foreach requested annotation
-	
+
 	# identify all the model results we need to output
 	typeOutputPath['models'] = collections.OrderedDict()
 	for types in (options.model or empty):
@@ -3659,7 +3688,7 @@ if __name__ == "__main__":
 			elif outtype == 'filter':
 				label = "'%s' filter" % (" ".join(output),)
 			elif outtype == 'annotation':
-				label = "'%s : %s' annotation" % (" ".join(output[0])," ".join(output[1]))
+				label = "'%s : %s' annotation" % (" ".join(output[0][1:])," ".join(output[1]))
 			elif outtype == 'models':
 				if output[0] == output[1]:
 					label = "'%s' models" % (" ".join(output[0]),)
@@ -3682,7 +3711,6 @@ if __name__ == "__main__":
 					bio.warn("WARNING: %s file '%s' already exists and will be overwritten\n" % (label,path))
 				else:
 					sys.exit("ERROR: %s file '%s' already exists, must specify --overwrite or a different --prefix\n" % (label,path))
-			
 			pathUsed[path] = label
 			file = sys.stdout if options.stdout == 'yes' else (open(path,'wb') if outtype != 'invalid' else None)
 			typeOutputInfo[outtype][output] = (label,path,file)
