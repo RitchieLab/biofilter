@@ -2236,6 +2236,16 @@ JOIN `db`.`biopolymer` AS d_b
 		'gwas_pubmed' : [
 			('d_w', '_ROWID_', "d_w.pubmed_id"),
 		],
+		'disease_label' : [
+			('a_g', 'group_id', "(SELECT name FROM `db`.`group_name` AS d_gn JOIN `db`.`namespace` AS d_n USING (namespace_id) WHERE d_gn.group_id = a_g.group_id AND d_n.namespace = 'disease')"),
+			('m_g', 'group_id', "(SELECT name FROM `db`.`group_name` AS d_gn JOIN `db`.`namespace` AS d_n USING (namespace_id) WHERE d_gn.group_id = m_g.group_id AND d_n.namespace = 'disease')"),
+			('d_g', 'group_id', "(SELECT name FROM `db`.`group_name` AS d_gn JOIN `db`.`namespace` AS d_n USING (namespace_id) WHERE d_gn.group_id = d_g.group_id AND d_n.namespace = 'disease')"),
+		],
+		'disease_category' : [
+			('a_g', 'group_id', "(SELECT subtype FROM `db`.`subtype` AS d_s JOIN `db`.`group` AS dg USING (subtype_id) JOIN `db`.`type` AS d_t USING (type_id) WHERE dg.group_id = a_g.group_id AND d_t.type = 'disease')"),
+			('m_g', 'group_id', "(SELECT subtype FROM `db`.`subtype` AS d_s JOIN `db`.`group` AS dg USING (subtype_id) JOIN `db`.`type` AS d_t USING (type_id) WHERE dg.group_id = m_g.group_id AND d_t.type = 'disease')"),
+			('d_g', 'group_id', "(SELECT subtype FROM `db`.`subtype` AS d_s JOIN `db`.`group` AS dg USING (subtype_id) JOIN `db`.`type` AS d_t USING (type_id) WHERE dg.group_id = d_g.group_id AND d_t.type = 'disease')"),
+		]
 	} #class._queryColumnSources
 	
 	
@@ -2751,6 +2761,9 @@ JOIN `db`.`biopolymer` AS d_b
 			elif t == 'sourceinput':
 				header.extend(['user_input'])
 				columns.extend(['source_label'])
+			elif t == 'disease':
+				header.extend(['disease','disease_category'])
+				columns.extend(['disease_label','disease_category'])
 			elif t in self._queryColumnSources:
 				header.append(t)
 				columns.append(t)
