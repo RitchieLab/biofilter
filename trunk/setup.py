@@ -6,7 +6,7 @@ import distutils.command.sdist
 
 distutils.core.setup(
 	name='biofilter',
-	version='2.4.2',
+	version='3.0.0',
 	author='Ritchie Lab',
 	author_email='Software_RitchieLab@pennmedicine.upenn.edu',
 	url='https://ritchielab.org',
