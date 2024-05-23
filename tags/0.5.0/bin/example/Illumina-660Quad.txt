@@ -1,1 +1,0 @@
-../Illumina-660Quad.txt
