@@ -25,7 +25,7 @@ class Biofilter:
 	def getVersionTuple(cls):
 		# tuple = (major,minor,revision,dev,build,date)
 		# dev must be in ('a','b','rc','release') for lexicographic comparison
-		return (2,4,3,'release','','2023-09-20')
+		return (3,0,0,'release','','2024-04-20')
 	#getVersionTuple()
 	
 	
@@ -173,7 +173,7 @@ class Biofilter:
 		
 		'user' : {
 			
-			
+
 			'group': {
 				'table': """
 (
@@ -2820,7 +2820,7 @@ JOIN `db`.`biopolymer` AS d_b
 		lenA = len(queryA['_columns'])
 		sqlA = self.getQueryText(queryA, noRowIDs=True, sortRowIDs=True, splitRowIDs=True)
 		self.prepareTablesForQuery(queryA)
-		
+
 		# generate filtered results and annotate each of them
 		cursorF = self._loki._db.cursor()
 		cursorA = self._loki._db.cursor()
@@ -2857,6 +2857,7 @@ JOIN `db`.`biopolymer` AS d_b
 			headerF[0] = "#" + headerF[0]
 			yield tuple(headerF + headerA)
 			emptyA = tuple(None for c in columnsA)
+			
 			for rowF in cursorF.execute(sqlF):
 					idsA = set()
 					for rowA in cursorA.execute(sqlA, rowF[:-1]):
