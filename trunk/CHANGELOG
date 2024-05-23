@@ -1,5 +1,10 @@
 CHANGELOG
 
+2.4.3 (2023-09-15)
+- updated from Python2 to Python3 
+- updated LOKI loaders
+- fixed a bug in removing redundant results
+
 2.4.2 (2019-03-15)
 - fixed a bug in PARIS which may have inflated the reported permutation significance in some cases
 - modified PARIS output report formats to reduce redundancy and simplify batch processing
