@@ -15,22 +15,49 @@ from loki import loki_db
 
 
 class Biofilter:
-	
-	
+	"""
+	Biofilter class for managing biological data filtering.
+
+	This class provides functionality for managing biological data filtering using various tables and schemas.
+
+	Class methods:
+	- getVersionTuple(): Returns the version tuple of the Biofilter class.
+	- getVersionString(): Returns the version string of the Biofilter class.
+
+	Private class data:
+	- _schema: Dictionary containing the schema information for main input filter tables.
+
+	Example usage:
+	biofilter = Biofilter()
+	version_tuple = biofilter.getVersionTuple()
+	version_string = biofilter.getVersionString()
+	"""		
 	##################################################
 	# class interrogation
 	
 	
 	@classmethod
 	def getVersionTuple(cls):
+		"""
+		Returns the version tuple of the Biofilter class.
+
+		Returns:
+			tuple: A tuple representing the version information (major, minor, revision, dev, build, date).
+		"""			
 		# tuple = (major,minor,revision,dev,build,date)
 		# dev must be in ('a','b','rc','release') for lexicographic comparison
-		return (3,0,0,'release','','2024-04-20')
+		return (2,4,3,'release','','2023-09-20')
 	#getVersionTuple()
 	
 	
 	@classmethod
 	def getVersionString(cls):
+		"""
+		Returns the version string of the Biofilter class.
+
+		Returns:
+			str: A string representing the version information.
+		"""		
 		v = list(cls.getVersionTuple())
 		# tuple = (major,minor,revision,dev,build,date)
 		# dev must be > 'rc' for releases for lexicographic comparison,
@@ -173,7 +200,7 @@ class Biofilter:
 		
 		'user' : {
 			
-
+			
 			'group': {
 				'table': """
 (
@@ -286,6 +313,17 @@ class Biofilter:
 	
 	
 	def __init__(self, options=None):
+		"""
+		Constructor for the Biofilter class.
+
+		Initializes a Biofilter object with the given options.
+
+		Args:
+			options (object): An object containing options for Biofilter initialization. If None, default options are used.
+
+		Returns:
+			None
+		"""			
 		if not options:
 			class Empty(object):
 				def __getattr__(self, name):
@@ -329,6 +367,16 @@ class Biofilter:
 	
 	
 	def _log(self, message="", warning=False):
+		"""
+		Internal method for logging messages.
+
+		Args:
+			message (str): The message to log.
+			warning (bool): A flag indicating if the message is a warning.
+
+		Returns:
+			None
+		"""	
 		if (self._logIndent > 0) and (not self._logHanging):
 			if self._logFile:
 				self._logFile.write(self._logIndent * "  ")
@@ -353,11 +401,29 @@ class Biofilter:
 	
 	
 	def log(self, message=""):
+		"""
+		Logs a message.
+
+		Args:
+			message (str): The message to log.
+
+		Returns:
+			None
+		"""	
 		self._log(message, False)
 	#log()
 	
 	
 	def logPush(self, message=None):
+		"""
+		Pushes the current log indentation level.
+
+		Args:
+			message (str): An optional message to log before pushing the indentation level.
+
+		Returns:
+			None
+		"""	
 		if message:
 			self.log(message)
 		if self._logHanging:
@@ -367,6 +433,15 @@ class Biofilter:
 	
 	
 	def logPop(self, message=None):
+		"""
+		Pops the current log indentation level.
+
+		Args:
+			message (str): An optional message to log after popping the indentation level.
+
+		Returns:
+			None
+		"""			
 		if self._logHanging:
 			self.log("\n")
 		self._logIndent = max(0, self._logIndent - 1)
@@ -376,11 +451,29 @@ class Biofilter:
 	
 	
 	def warn(self, message=""):
+		"""
+		Logs a warning message.
+
+		Args:
+			message (str): The warning message to log.
+
+		Returns:
+			None
+		"""		
 		self._log(message, True)
 	#warn()
 	
 	
 	def warnPush(self, message=None):
+		"""
+		Pushes the current warning log indentation level.
+
+		Args:
+			message (str): An optional warning message to log before pushing the indentation level.
+
+		Returns:
+			None
+		"""	
 		if message:
 			self.warn(message)
 		if self._logHanging:
@@ -390,6 +483,15 @@ class Biofilter:
 	
 	
 	def warnPop(self, message=None):
+		"""
+		Pops the current warning log indentation level.
+
+		Args:
+			message (str): An optional warning message to log after popping the indentation level.
+
+		Returns:
+			None
+		"""	
 		if self._logHanging:
 			self.warn("\n")
 		self._logIndent = max(0, self._logIndent - 1)
@@ -403,11 +505,30 @@ class Biofilter:
 	
 	
 	def attachDatabaseFile(self, dbFile):
+		"""
+		Attaches a database file.
+
+		Args:
+			dbFile (str): The path to the database file.
+
+		Returns:
+			None
+		"""				
 		return self._loki.attachDatabaseFile(dbFile)
 	#attachDatabaseFile()
 	
 	
 	def prepareTableForUpdate(self, db, table):
+		"""
+		Prepares a table for update by dropping its indices.
+
+		Args:
+			db (str): The database name.
+			table (str): The table name.
+
+		Returns:
+			None
+		"""	
 		assert((db in self._schema) and (table in self._schema[db]))
 		if table not in self._tablesDeindexed[db]:
 			self._tablesDeindexed[db].add(table)
@@ -416,6 +537,16 @@ class Biofilter:
 	
 	
 	def prepareTableForQuery(self, db, table):
+		"""
+		Prepares a table for query by creating its indices.
+
+		Args:
+			db (str): The database name.
+			table (str): The table name.
+
+		Returns:
+			None
+		"""	
 		assert((db in self._schema) and (table in self._schema[db]))
 		if table in self._tablesDeindexed[db]:
 			self._tablesDeindexed[db].remove(table)
@@ -426,11 +557,30 @@ class Biofilter:
 	
 	
 	def tableHasData(self, db, table):
+		"""
+		Checks if a table has data.
+
+		Args:
+			db (str): The database name.
+			table (str): The table name.
+
+		Returns:
+			bool: True if the table has data, False otherwise.
+		"""		
 		return (sum(row[0] for row in self._loki._db.cursor().execute("SELECT 1 FROM `%s`.`%s` LIMIT 1" % (db,table))) > 0)
 	#tableHasData()
 	
 	
 	def updateRegionZones(self, db):
+		"""
+		Updates region zones.
+
+		Args:
+			db (str): The database name.
+
+		Returns:
+			None
+		"""		
 		assert((db in self._schema) and 'region' in self._schema[db] and 'region_zone' in self._schema[db])
 		self.log("calculating %s region zone coverage ..." % db)
 		cursor = self._loki._db.cursor()
@@ -445,6 +595,16 @@ class Biofilter:
 		
 		# define zone generator
 		def _zones(size, regions):
+			"""
+			Generates zone information for regions.
+
+			Args:
+				size (int): The zone size.
+				regions: The regions.
+
+			Yields:
+				tuple: Zone information.
+			"""				
 			# regions=[ (id,chr,posMin,posMax),... ]
 			# yields:[ (id,chr,zone),... ]
 			for rowid,chm,posMin,posMax in regions:
@@ -476,6 +636,12 @@ class Biofilter:
 	
 	
 	def getSourceFingerprints(self):
+		"""
+		Retrieves source fingerprints.
+
+		Returns:
+			OrderedDict: Source fingerprints.
+		"""			
 		ret = collections.OrderedDict()
 		sourceIDs = self._loki.getSourceIDs()
 		for source in sorted(sourceIDs):
@@ -489,6 +655,12 @@ class Biofilter:
 	
 	
 	def generateGeneNameStats(self):
+		"""
+		Generates statistics for gene names.
+
+		Returns:
+			dict: Gene name statistics.
+		"""		
 		typeID = self._loki.getTypeID('gene')
 		if not typeID:
 			sys.exit("ERROR: knowledge file contains no gene data")
@@ -497,11 +669,23 @@ class Biofilter:
 	
 	
 	def generateGroupNameStats(self):
+		"""
+		Generates statistics for group names.
+
+		Returns:
+			dict: Group name statistics.
+		"""		
 		return self._loki.generateGroupNameStats()
 	#generateGroupNameStats()
 	
 	
 	def generateLDProfiles(self):
+		"""
+		Generates LD profiles.
+
+		Yields:
+			tuple: LD profile information.
+		"""		
 		ldprofiles = self._loki.getLDProfiles()
 		for l in sorted(ldprofiles):
 			yield (l,)+ldprofiles[l][1:]
@@ -513,6 +697,12 @@ class Biofilter:
 	
 	
 	def getDatabaseGenomeBuilds(self):
+		"""
+		Retrieves genome build information from the database.
+
+		Returns:
+			tuple: A tuple containing the GRCh build and UCSC hg build.
+		"""	
 		ucscBuild = self._loki.getDatabaseSetting('ucschg')
 		ucscBuild = int(ucscBuild) if (ucscBuild != None) else None
 		grchBuild = None
@@ -527,6 +717,19 @@ class Biofilter:
 	
 	
 	def getOptionTypeID(self, value, optional=False):
+		"""
+		Retrieves the type ID corresponding to the given value.
+
+		Args:
+			value (str): The value to retrieve the type ID for.
+			optional (bool, optional): Whether the value is optional. Defaults to False.
+
+		Returns:
+			int: The type ID.
+
+		Raises:
+			SystemExit: If the database contains no data for the specified value and it's not optional.
+		"""		
 		typeID = self._loki.getTypeID(value)
 		if not (typeID or optional):
 			sys.exit("ERROR: database contains no %s data\n" % (value,))
@@ -535,6 +738,19 @@ class Biofilter:
 	
 	
 	def getOptionNamespaceID(self, value, optional=False):
+		"""
+		Retrieves the namespace ID corresponding to the given value.
+
+		Args:
+			value (str): The value to retrieve the namespace ID for.
+			optional (bool, optional): Whether the value is optional. Defaults to False.
+
+		Returns:
+			int: The namespace ID.
+
+		Raises:
+			SystemExit: If the value is not found in the database and it's not optional.
+		"""		
 		if value == '-': # primary labels
 			return None
 		namespaceID = self._loki.getNamespaceID(value)
@@ -549,6 +765,16 @@ class Biofilter:
 	
 	
 	def getInputGenomeBuilds(self, grchBuild, ucscBuild):
+		"""
+		Retrieves genome build information for input data.
+
+		Args:
+			grchBuild (int): The GRCh build.
+			ucscBuild (int): The UCSC hg build.
+
+		Returns:
+			tuple: A tuple containing the GRCh build and UCSC hg build.
+		"""	
 		if grchBuild:
 			if ucscBuild:
 				if ucscBuild != (self._loki.getUCSChgByGRCh(grchBuild) or ucscBuild):
@@ -567,6 +793,17 @@ class Biofilter:
 	
 	
 	def generateMergedFilteredSNPs(self, snps, tally=None, errorCallback=None):
+		"""
+		Generates merged and filtered SNPs.
+
+		Args:
+			snps: SNPs data.
+			tally (dict, optional): Dictionary to tally SNP counts. Defaults to None.
+			errorCallback (function, optional): Error callback function. Defaults to None.
+
+		Yields:
+			tuple: Merged SNP information.
+		"""	
 		# snps=[ (rsInput,extra),... ]
 		# yield:[ (rsInput,extra,rsCurrent)
 		tallyMerge = dict() if (tally != None) else None
@@ -597,6 +834,17 @@ class Biofilter:
 	
 	
 	def generateRSesFromText(self, lines, separator=None, errorCallback=None):
+		"""
+		Generates RSes from text data.
+
+		Args:
+			lines: Lines of text data.
+			separator (str, optional): Separator for columns. Defaults to None.
+			errorCallback (function, optional): Error callback function. Defaults to None.
+
+		Yields:
+			tuple: RS information.
+		"""	
 		l = 0
 		for line in lines:
 			l += 1
@@ -621,6 +869,17 @@ class Biofilter:
 	
 	
 	def generateRSesFromRSFiles(self, paths, separator=None, errorCallback=None):
+		"""
+		Generates RSes from RS files.
+
+		Args:
+			paths: Paths to RS files.
+			separator (str, optional): Separator for columns. Defaults to None.
+			errorCallback (function, optional): Error callback function. Defaults to None.
+
+		Yields:
+			tuple: RS information.
+		"""	
 		for path in paths:
 			try:
 				with (sys.stdin if (path == '-' or not path) else open(path, 'r')) as file:
@@ -636,6 +895,18 @@ class Biofilter:
 	
 	
 	def generateLociFromText(self, lines, separator=None, applyOffset=False, errorCallback=None):
+		"""
+		Generates loci from text data.
+
+		Args:
+			lines: Lines of text data.
+			separator (str, optional): Separator for columns. Defaults to None.
+			applyOffset (bool, optional): Whether to apply an offset. Defaults to False.
+			errorCallback (function, optional): Error callback function. Defaults to None.
+
+		Yields:
+			tuple: Locus information.
+		"""	
 		# parse input/output coordinate offsets
 		offset = (1 - self._options.coordinate_base) if applyOffset else 0
 		
@@ -688,6 +959,18 @@ class Biofilter:
 	
 	
 	def generateLociFromMapFiles(self, paths, separator=None, applyOffset=False, errorCallback=None):
+		"""
+		Generates loci from map files.
+
+		Args:
+			paths: Paths to map files.
+			separator (str, optional): Separator for columns. Defaults to None.
+			applyOffset (bool, optional): Whether to apply an offset. Defaults to False.
+			errorCallback (function, optional): Error callback function. Defaults to None.
+
+		Yields:
+			tuple: Locus information.
+		"""	
 		for path in paths:
 			try:
 				with (sys.stdin if (path == '-' or not path) else open(path, 'r')) as file:
@@ -703,6 +986,18 @@ class Biofilter:
 	
 	
 	def generateLiftOverLoci(self, ucscBuildOld, ucscBuildNew, loci, errorCallback=None):
+		"""
+		Generates lift-over loci.
+
+		Args:
+			ucscBuildOld (int): Old UCSC build version.
+			ucscBuildNew (int): New UCSC build version.
+			loci: Loci data.
+			errorCallback (function, optional): Error callback function. Defaults to None.
+
+		Returns:
+			list: Lift-over loci.
+		"""	
 		# loci=[ (label,chr,pos,extra), ... ]
 		newloci = loci
 		
@@ -725,6 +1020,18 @@ class Biofilter:
 	
 	
 	def generateRegionsFromText(self, lines, separator=None, applyOffset=False, errorCallback=None):
+		"""
+		Generates regions from text data.
+
+		Args:
+			lines: Lines of text data.
+			separator (str, optional): Separator for columns. Defaults to None.
+			applyOffset (bool, optional): Whether to apply an offset. Defaults to False.
+			errorCallback (function, optional): Error callback function. Defaults to None.
+
+		Yields:
+			tuple: Region information.
+		"""	
 		offsetStart = offsetEnd = (1 - self._options.coordinate_base) if applyOffset else 0
 		if applyOffset and (self._options.regions_half_open == 'yes'):
 			offsetEnd -= 1
@@ -781,6 +1088,18 @@ class Biofilter:
 	
 	
 	def generateRegionsFromFiles(self, paths, separator=None, applyOffset=False, errorCallback=None):
+		"""
+		Generates regions from files.
+
+		Args:
+			paths: Paths to region files.
+			separator (str, optional): Separator for columns. Defaults to None.
+			applyOffset (bool, optional): Whether to apply an offset. Defaults to False.
+			errorCallback (function, optional): Error callback function. Defaults to None.
+
+		Yields:
+			tuple: Region information.
+		"""	
 		for path in paths:
 			try:
 				with (sys.stdin if (path == '-' or not path) else open(path, 'r')) as file:
@@ -796,6 +1115,18 @@ class Biofilter:
 	
 	
 	def generateLiftOverRegions(self, ucscBuildOld, ucscBuildNew, regions, errorCallback=None):
+		"""
+		Generates lift-over regions.
+
+		Args:
+			ucscBuildOld (int): Old UCSC build version.
+			ucscBuildNew (int): New UCSC build version.
+			regions: Regions data.
+			errorCallback (function, optional): Error callback function. Defaults to None.
+
+		Returns:
+			list: Lift-over regions.
+		"""		
 		# regions=[ (label,chr,posMin,posMax,extra), ... ]
 		newregions = regions
 		
@@ -818,6 +1149,18 @@ class Biofilter:
 	
 	
 	def generateNamesFromText(self, lines, defaultNS=None, separator=None, errorCallback=None):
+		"""
+		Generates names from text data.
+
+		Args:
+			lines: Lines of text data.
+			defaultNS (str, optional): Default namespace. Defaults to None.
+			separator (str, optional): Separator for columns. Defaults to None.
+			errorCallback (function, optional): Error callback function. Defaults to None.
+
+		Yields:
+			tuple: Name information.
+		"""	
 #		utf8 = codecs.getencoder('utf8')
 		l = 0
 		for line in lines:
@@ -843,6 +1186,18 @@ class Biofilter:
 	
 
 	def generateNamesFromNameFiles(self, paths, defaultNS=None, separator=None, errorCallback=None):
+		"""
+		Generates names from name files.
+
+		Args:
+			paths: Paths to name files.
+			defaultNS (str, optional): Default namespace. Defaults to None.
+			separator (str, optional): Separator for columns. Defaults to None.
+			errorCallback (function, optional): Error callback function. Defaults to None.
+
+		Yields:
+			tuple: Name information.
+		"""	
 		for path in paths:
 			try:
 				with (sys.stdin if (path == '-' or not path) else open(path, 'r')) as file:
@@ -858,6 +1213,15 @@ class Biofilter:
 	
 	
 	def loadUserKnowledgeFile(self, path, defaultNS=None, separator=None, errorCallback=None):
+		"""
+		Loads user knowledge from a file.
+
+		Args:
+			path (str): Path to the knowledge file.
+			defaultNS (str, optional): Default namespace. Defaults to None.
+			separator (str, optional): Separator for columns. Defaults to None.
+			errorCallback (function, optional): Error callback function. Defaults to None.
+		"""	
 		utf8 = codecs.getencoder('utf8')
 		try:
 			with (sys.stdin if (path == '-' or not path) else open(path, 'rU')) as file:
@@ -897,6 +1261,14 @@ class Biofilter:
 	
 	
 	def unionInputSNPs(self, db, snps, errorCallback=None):
+		"""
+		Adds SNPs to the SNP filter.
+
+		Args:
+			db (str): Database name.
+			snps: SNP data.
+			errorCallback (function, optional): Error callback function. Defaults to None.
+		"""	
 		# snps=[ (rs,extra), ... ]
 		self.logPush("adding to %s SNP filter ...\n" % db)
 		cursor = self._loki._db.cursor()
@@ -915,6 +1287,14 @@ class Biofilter:
 	
 	
 	def intersectInputSNPs(self, db, snps, errorCallback=None):
+		"""
+		Reduces the SNP filter.
+
+		Args:
+			db (str): Database name.
+			snps: SNP data.
+			errorCallback (function, optional): Error callback function. Defaults to None.
+		"""	
 		# snps=[ (rs,extra), ... ]
 		if not self._inputFilters[db]['snp']:
 			return self.unionInputSNPs(db, snps, errorCallback)
@@ -941,6 +1321,14 @@ class Biofilter:
 	
 	
 	def unionInputLoci(self, db, loci, errorCallback=None):
+		"""
+		Adds loci to the position filter.
+
+		Args:
+			db (str): Database name.
+			loci: Loci data.
+			errorCallback (function, optional): Error callback function. Defaults to None.
+		"""	
 		# loci=[ (label,chr,pos,extra), ... ]
 		self.logPush("adding to %s position filter ...\n" % db)
 		cursor = self._loki._db.cursor()
@@ -967,6 +1355,14 @@ class Biofilter:
 	
 	
 	def intersectInputLoci(self, db, loci, errorCallback=None):
+		"""
+		Reduces the position filter.
+
+		Args:
+			db (str): Database name.
+			loci: Loci data.
+			errorCallback (function, optional): Error callback function. Defaults to None.
+		"""	
 		# loci=[ (label,chr,pos,extra), ... ]
 		if not self._inputFilters[db]['locus']:
 			return self.unionInputLoci(db, loci, errorCallback)
@@ -991,6 +1387,14 @@ class Biofilter:
 	
 	
 	def unionInputRegions(self, db, regions, errorCallback=None):
+		"""
+		Adds regions to the region filter.
+
+		Args:
+			db (str): Database name.
+			regions: Region data.
+			errorCallback (function, optional): Error callback function. Defaults to None.
+		"""	
 		# regions=[ (label,chr,posMin,posMax,extra), ... ]
 		self.logPush("adding to %s region filter ...\n" % db)
 		cursor = self._loki._db.cursor()
@@ -1017,6 +1421,14 @@ class Biofilter:
 	
 	
 	def intersectInputRegions(self, db, regions, errorCallback=None):
+		"""
+		Reduces the region filter.
+
+		Args:
+			db (str): Database name.
+			regions: Region data.
+			errorCallback (function, optional): Error callback function. Defaults to None.
+		"""	
 		# regions=[ (label,chr,posMin,posMax,extra), ... ]
 		if not self._inputFilters[db]['region']:
 			return self.unionInputRegions(db, regions, errorCallback)
@@ -1041,6 +1453,14 @@ class Biofilter:
 	
 	
 	def unionInputGenes(self, db, names, errorCallback=None):
+		"""
+		Adds genes to the gene filter.
+
+		Args:
+			db (str): Database name.
+			names: Gene names.
+			errorCallback (function, optional): Error callback function. Defaults to None.
+		"""	
 		# names=[ (namespace,name,extra), ... ]
 		self.logPush("adding to %s gene filter ...\n" % db)
 		cursor = self._loki._db.cursor()
@@ -1067,6 +1487,14 @@ class Biofilter:
 	
 	
 	def intersectInputGenes(self, db, names, errorCallback=None):
+		"""
+		Reduces the gene filter.
+
+		Args:
+			db (str): Database name.
+			names: Gene names.
+			errorCallback (function, optional): Error callback function. Defaults to None.
+		"""	
 		# names=[ (namespace,name), ... ]
 		if not self._inputFilters[db]['gene']:
 			return self.unionInputGenes(db, names, errorCallback)
@@ -1098,6 +1526,13 @@ class Biofilter:
 	
 	
 	def unionInputGeneSearch(self, db, texts):
+		"""
+		Adds genes to the gene filter by text search.
+
+		Args:
+			db (str): Database name.
+			texts: Text data for gene search.
+		"""		
 		# texts=[ (text,extra), ... ]
 		self.logPush("adding to %s gene filter by text search ...\n" % db)
 		cursor = self._loki._db.cursor()
@@ -1116,6 +1551,13 @@ class Biofilter:
 	
 	
 	def intersectInputGeneSearch(self, db, texts):
+		"""
+		Reduces the gene filter by text search.
+
+		Args:
+			db (str): Database name.
+			texts: Text data for gene search.
+		"""	
 		# texts=[ (text,extra), ... ]
 		if not self._inputFilters[db]['gene']:
 			return self.unionInputGeneSearch(db, texts)
@@ -1142,6 +1584,14 @@ class Biofilter:
 	
 	
 	def unionInputGroups(self, db, names, errorCallback=None):
+		"""
+		Adds groups to the group filter.
+
+		Args:
+			db (str): Database name.
+			names: Group names.
+			errorCallback (function, optional): Error callback function. Defaults to None.
+		"""
 		# names=[ (namespace,name,extra), ... ]
 		self.logPush("adding to %s group filter ...\n" % (db,))
 		cursor = self._loki._db.cursor()
@@ -1169,6 +1619,14 @@ class Biofilter:
 	
 	
 	def intersectInputGroups(self, db, names, errorCallback=None):
+		"""
+		Reduces the group filter.
+
+		Args:
+			db (str): Database name.
+			names: Group names.
+			errorCallback (function, optional): Error callback function. Defaults to None.
+		"""	
 		# names=[ (namespace,name,extra), ... ]
 		if not self._inputFilters[db]['group']:
 			return self.unionInputGroups(db, names, errorCallback)
@@ -1200,6 +1658,13 @@ class Biofilter:
 	
 	
 	def unionInputGroupSearch(self, db, texts):
+		"""
+		Adds groups to the group filter by text search.
+
+		Args:
+			db (str): Database name.
+			texts: Text data for group search.
+		"""	
 		# texts=[ (text,extra), ... ]
 		self.logPush("adding to %s group filter by text search ...\n" % (db,))
 		cursor = self._loki._db.cursor()
@@ -1216,6 +1681,13 @@ class Biofilter:
 	
 	
 	def intersectInputGroupSearch(self, db, texts):
+		"""
+		Reduces the group filter by text search.
+
+		Args:
+			db (str): Database name.
+			texts: Text data for group search.
+		"""	
 		# texts=[ (text,extra), ... ]
 		if not self._inputFilters[db]['group']:
 			return self.unionInputGroupSearch(db, texts)
@@ -1240,6 +1712,14 @@ class Biofilter:
 	
 	
 	def unionInputSources(self, db, names, errorCallback=None):
+		"""
+		Adds sources to the source filter.
+
+		Args:
+			db (str): Database name.
+			names: Source names.
+			errorCallback (function, optional): Error callback function. Defaults to None.
+		"""	
 		# names=[ name, ... ]
 		self.logPush("adding to %s source filter ...\n" % db)
 		cursor = self._loki._db.cursor()
@@ -1266,6 +1746,14 @@ class Biofilter:
 	
 	
 	def intersectInputSources(self, db, names, errorCallback=None):
+		"""
+		Reduces the source filter.
+
+		Args:
+			db (str): Database name.
+			names: Source names.
+			errorCallback (function, optional): Error callback function. Defaults to None.
+		"""	
 		# names=[ name, ... ]
 		if not self._inputFilters[db]['source']:
 			return self.unionInputSources(db, names, errorCallback)
@@ -1293,6 +1781,17 @@ class Biofilter:
 	
 	
 	def addUserSource(self, label, description, errorCallback=None):
+		"""
+		Adds a user-defined source.
+
+		Args:
+			label (str): Source label.
+			description (str): Source description.
+			errorCallback (function, optional): Error callback function. Defaults to None.
+
+		Returns:
+			int: User source ID.
+		"""	
 		self.log("adding user-defined source '%s' ..." % (label,))
 		self._inputFilters['user']['source'] += 1
 		usourceID = -self._inputFilters['user']['source']
@@ -1304,6 +1803,18 @@ class Biofilter:
 	
 	
 	def addUserGroup(self, usourceID, label, description, errorCallback=None):
+		"""
+		Adds a user-defined group.
+
+		Args:
+			usourceID (int): User source ID.
+			label (str): Group label.
+			description (str): Group description.
+			errorCallback (function, optional): Error callback function. Defaults to None.
+
+		Returns:
+			int: User group ID.
+		"""	
 		self.log("adding user-defined group '%s' ..." % (label,))
 		self._inputFilters['user']['group'] += 1
 		ugroupID = -self._inputFilters['user']['group']
@@ -1315,6 +1826,14 @@ class Biofilter:
 	
 	
 	def addUserGroupBiopolymers(self, ugroupID, namesets, errorCallback=None):
+		"""
+		Adds genes to a user-defined group.
+
+		Args:
+			ugroupID (int): User group ID.
+			namesets: Gene names.
+			errorCallback (function, optional): Error callback function. Defaults to None.
+		"""	
 		#TODO: apply ambiguity settings and heuristics?
 		# namesets=[ [ (ns,name,extra), ...], ... ]
 		self.logPush("adding genes to user-defined group ...\n")
@@ -1344,6 +1863,12 @@ class Biofilter:
 	
 	
 	def applyUserKnowledgeFilter(self, grouplevel=False):
+		"""
+		Applies user-defined knowledge to the filter.
+
+		Args:
+			grouplevel (bool, optional): Whether to apply knowledge at the group level. Defaults to False.
+		"""	
 		cursor = self._loki._db.cursor()
 		if grouplevel:
 			self.logPush("applying user-defined knowledge to main group filter ...\n")
@@ -1387,11 +1912,29 @@ JOIN `db`.`biopolymer` AS d_b
 	
 	
 	def getUserSourceID(self, source):
+		"""
+		Gets the user source ID.
+
+		Args:
+			source (str): Source name.
+
+		Returns:
+			int: User source ID.
+		"""	
 		return self.getUserSourceIDs([source])[source]
 	#getSourceID()
 	
 	
 	def getUserSourceIDs(self, sources=None):
+		"""
+		Gets user source IDs.
+
+		Args:
+			sources (list, optional): Source names. Defaults to None.
+
+		Returns:
+			dict: Dictionary containing source names as keys and their corresponding IDs as values.
+		"""	
 		cursor = self._loki._db.cursor()
 		if sources:
 			sql = "SELECT i.source, s.source_id FROM (SELECT ? AS source) AS i LEFT JOIN `user`.`source` AS s ON LOWER(s.source) = LOWER(i.source)"
@@ -1408,6 +1951,21 @@ JOIN `db`.`biopolymer` AS d_b
 	
 	
 	def getPARISPermutationScore(self, featureData, featureBin, binFeatures, realFeatures, numPermutations, maxScore=0):
+		"""
+		Calculate the permutation score for a set of features based on observed and randomized data.
+
+		Parameters:
+			featureData (dict): Dictionary containing information about each feature. Keys are feature IDs,
+								values are lists containing the size of the feature and whether it is significant.
+			featureBin (dict): Dictionary mapping feature IDs to bin numbers.
+			binFeatures (dict): Dictionary where keys are bin numbers and values are lists of feature IDs in that bin.
+			realFeatures (set): Set containing the IDs of the real features.
+			numPermutations (int): Number of permutations to perform.
+			maxScore (int, optional): Maximum score to reach before stopping permutations. Defaults to 0.
+
+		Returns:
+			int: Total permutation score.
+		"""	
 		realScore = sum(1 for f in realFeatures if (featureBin.get(f) and featureData[f][1]))
 		if realScore < 1:
 			return numPermutations
@@ -1430,6 +1988,18 @@ JOIN `db`.`biopolymer` AS d_b
 	
 	
 	def generatePARISResults(self, ucscBuildUser, ucscBuildDB):
+		"""
+		Orchestrates the PARIS (Pathway Analysis by Randomization Incorporating Structure) algorithm,
+		performing various tasks such as preparing and analyzing data, mapping SNPs and positions to feature regions,
+		generating results, and yielding the output.
+
+		Parameters:
+			ucscBuildUser (str): UCSC build version for user-defined data.
+			ucscBuildDB (str): UCSC build version for the database.
+
+		Yields:
+			tuple: Output data tuples containing information about groups, genes, features, and permutation scores.
+		"""	
 		self.logPush("running PARIS ...\n")
 		cursor = self._loki._db.cursor()
 		
@@ -1459,6 +2029,15 @@ JOIN `db`.`biopolymer` AS d_b
 		self.logPop("... OK: %d regions\n" % (len(featureData),))
 		
 		def analyzeLoci(generator):
+			"""
+			Analyzes loci data from the given generator, updating feature data and counts.
+
+			Parameters:
+				generator: A generator yielding tuples of chromosome, position, and extra data.
+
+			Returns:
+				tuple: A tuple containing counts of matched loci, singletons, and ignored loci.
+			"""	
 			numMatch = numSingle = numIgnore = 0
 			for chm,pos,extra in generator:
 				extra = extra.split()
@@ -1663,6 +2242,16 @@ JOIN `db`.`biopolymer` AS d_b
 		
 		genePvalCache = dict()
 		def renderPermuPVal(realFeatures, geneID=None):
+			"""
+			Renders the permutation p-value for the given set of features.
+
+			Parameters:
+				realFeatures (set): A set of feature IDs.
+				geneID (int, optional): The ID of the gene associated with the features.
+
+			Returns:
+				str: The rendered permutation p-value.
+			"""	
 			ret = genePvalCache.get(geneID)
 			if ret != None:
 				return ret
@@ -2250,6 +2839,12 @@ JOIN `db`.`biopolymer` AS d_b
 	
 	
 	def getQueryTemplate(self):
+		"""
+		Returns a template for constructing a SQL query.
+
+		Returns:
+			dict: A dictionary representing the query template with placeholders for different parts of the SQL query.
+		"""	
 		return {
 			'_columns'  : list(), # [ colA, colB, ... ]
 			'SELECT'    : collections.OrderedDict(), # { colA:expA, colB:expB, ... }
@@ -2269,6 +2864,23 @@ JOIN `db`.`biopolymer` AS d_b
 	
 	
 	def buildQuery(self, mode, focus, select, having=None, where=None, applyOffset=False, fromFilter=None, joinFilter=None, userKnowledge=False):
+		"""
+		Builds a SQL query based on the provided parameters.
+
+		Parameters:
+			mode (str): The mode of the query ('filter', 'annotate', 'modelgene', 'modelgroup', 'model').
+			focus (str): The focus of the query.
+			select (list): A list of columns to be selected.
+			having (dict, optional): A dictionary containing columns and their conditions for filtering after grouping.
+			where (dict, optional): A dictionary containing table alias and column pairs along with their conditions for filtering before grouping.
+			applyOffset (bool, optional): Whether to apply an offset to the query.
+			fromFilter (dict, optional): A dictionary specifying table filters for the FROM clause.
+			joinFilter (dict, optional): A dictionary specifying table filters for the JOIN clause.
+			userKnowledge (bool, optional): Whether user knowledge is considered in the query.
+
+		Returns:
+			dict: A dictionary representing the constructed SQL query.
+		"""	
 		assert(mode in ('filter','annotate','modelgene','modelgroup','model'))
 		assert(focus in self._schema)
 		# select=[ column, ... ]
@@ -2618,6 +3230,18 @@ JOIN `db`.`biopolymer` AS d_b
 	
 	
 	def getQueryText(self, query, noRowIDs=False, sortRowIDs=False, splitRowIDs=False):
+		"""
+		Generates SQL text from the provided query.
+
+		Parameters:
+			query (dict): A dictionary representing the query.
+			noRowIDs (bool, optional): Whether to exclude row IDs from the query text.
+			sortRowIDs (bool, optional): Whether to sort row IDs in the query text.
+			splitRowIDs (bool, optional): Whether to split row IDs into separate columns in the query text.
+
+		Returns:
+			str: The SQL text generated from the query.
+		"""		
 		sql = "SELECT " + (",\n  ".join("{0} AS {1}".format(query['SELECT'][col] or "NULL",col) for col in query['_columns'])) + "\n"
 		rowIDs = list()
 		orderBy = list(query['ORDER BY'])
@@ -2651,6 +3275,12 @@ JOIN `db`.`biopolymer` AS d_b
 	
 	
 	def prepareTablesForQuery(self, query):
+		"""
+		Prepares tables referenced in the query for execution.
+
+		Parameters:
+			query (dict): A dictionary representing the query.
+		"""	
 		for db,tbl in set(self._queryAliasTable[a] for a in itertools.chain(query['FROM'], query['LEFT JOIN'])):
 			if (db in self._schema) and (tbl in self._schema[db]):
 				self.prepareTableForQuery(db, tbl)
@@ -2658,6 +3288,18 @@ JOIN `db`.`biopolymer` AS d_b
 	
 	
 	def generateQueryResults(self, query, allowDupes=False, bindings=None, query2=None):
+		"""
+		Generates query results based on the provided query.
+
+		Parameters:
+			query (dict): A dictionary representing the primary query.
+			allowDupes (bool, optional): Whether to allow duplicate results.
+			bindings (dict, optional): Bindings for parameterized queries.
+			query2 (dict, optional): An optional secondary query.
+
+		Yields:
+			tuple: Rows of query results.
+		"""	
 		# execute the query and yield the results
 		cursor = self._loki._db.cursor()
 		sql = self.getQueryText(query)
@@ -2706,6 +3348,18 @@ JOIN `db`.`biopolymer` AS d_b
 	
 	
 	def _populateColumnsFromTypes(self, types, columns=None, header=None, ids=None):
+		"""
+		Populates column and header lists based on the provided types.
+
+		Parameters:
+			types (list): A list of types for which columns and headers are to be populated.
+			columns (list, optional): A list of column names. Defaults to None.
+			header (list, optional): A list of header names. Defaults to None.
+			ids (list, optional): A list of IDs. Defaults to None.
+
+		Returns:
+			list: The populated columns list.
+		"""
 		if columns == None:
 			columns = list()
 		if header == None:
@@ -2775,6 +3429,16 @@ JOIN `db`.`biopolymer` AS d_b
 	
 	
 	def generateFilterOutput(self, types, applyOffset=False):
+		"""
+		Generates filtered output based on the provided types.
+
+		Parameters:
+			types (list): A list of types for filtering.
+			applyOffset (bool, optional): Whether to apply an offset. Defaults to False.
+
+		Yields:
+			tuple: Rows of filtered output.
+		"""	
 		header = list()
 		columns = list()
 		self._populateColumnsFromTypes(types, columns, header)
@@ -2790,6 +3454,17 @@ JOIN `db`.`biopolymer` AS d_b
 	
 	
 	def generateAnnotationOutput(self, typesF, typesA, applyOffset=False):
+		"""
+		Generates annotated output based on the provided filter and annotation types.
+
+		Parameters:
+			typesF (list): A list of types for filtering.
+			typesA (list): A list of types for annotation.
+			applyOffset (bool, optional): Whether to apply an offset. Defaults to False.
+
+		Yields:
+			tuple: Rows of annotated output.
+		"""	
 		#TODO user knowledge
 		
 		# build a baseline filtering query
@@ -2820,7 +3495,7 @@ JOIN `db`.`biopolymer` AS d_b
 		lenA = len(queryA['_columns'])
 		sqlA = self.getQueryText(queryA, noRowIDs=True, sortRowIDs=True, splitRowIDs=True)
 		self.prepareTablesForQuery(queryA)
-
+		
 		# generate filtered results and annotate each of them
 		cursorF = self._loki._db.cursor()
 		cursorA = self._loki._db.cursor()
@@ -2857,7 +3532,6 @@ JOIN `db`.`biopolymer` AS d_b
 			headerF[0] = "#" + headerF[0]
 			yield tuple(headerF + headerA)
 			emptyA = tuple(None for c in columnsA)
-			
 			for rowF in cursorF.execute(sqlF):
 					idsA = set()
 					for rowA in cursorA.execute(sqlA, rowF[:-1]):
@@ -2875,6 +3549,9 @@ JOIN `db`.`biopolymer` AS d_b
 	
 	
 	def identifyCandidateModelBiopolymers(self):
+		"""
+		Identifies candidate model biopolymers.
+		"""	
 		cursor = self._loki._db.cursor()
 		
 		# reset candidate tables
@@ -2910,6 +3587,9 @@ JOIN `db`.`biopolymer` AS d_b
 	
 	
 	def identifyCandidateModelGroups(self):
+		"""
+		Identifies candidate model groups.
+		"""	
 		self.log("identifying candidiate model groups ...")
 		cursor = self._loki._db.cursor()
 		
@@ -2976,6 +3656,12 @@ JOIN `db`.`biopolymer` AS d_b
 	
 	
 	def getGeneModels(self):
+		"""
+		Retrieves gene models based on identified candidate biopolymers and groups.
+
+		Returns:
+			list: List of gene models.
+		"""	
 		# generate the models if we haven't already
 		if self._geneModels == None:
 			# find all model component candidiates
@@ -3011,6 +3697,17 @@ JOIN `db`.`biopolymer` AS d_b
 	
 	
 	def generateModelOutput(self, typesL, typesR, applyOffset=False):
+		"""
+		Generates model output based on the provided left-hand and right-hand types.
+
+		Parameters:
+			typesL (list): A list of types for the left-hand side.
+			typesR (list): A list of types for the right-hand side.
+			applyOffset (bool, optional): Whether to apply an offset. Defaults to False.
+
+		Yields:
+			tuple: Rows of model output.
+		"""		
 		#TODO user knowledge
 		
 		cursor = self._loki._db.cursor()
@@ -3113,7 +3810,28 @@ JOIN `db`.`biopolymer` AS d_b
 
 ##################################################
 # command line interface
+"""
+This script defines a command-line interface (CLI) for Biofilter, a tool for filtering, annotating, and modeling genetic data. It utilizes Python's argparse module to parse command-line arguments and provides custom type handlers for validating input values.
 
+The script defines several custom type handlers to ensure that input arguments are correctly parsed and validated according to the expected formats and ranges:
+
+- `yesno`: Handles boolean-like arguments, accepting values like "yes", "no", "true", "false", "on", or "off".
+- `percent`: Handles percentage values, ensuring they are within the range of 0 to 100.
+- `zerotoone`: Ensures that the input value is a float between 0.0 and 1.0.
+- `basepairs`: Handles values representing base pairs (e.g., "1000" for 1000 base pairs, "1k" for 1000 base pairs, "1m" for 1 million base pairs, etc.).
+- `typePZPV`: Handles values related to Paris-zero p-values, accepting "significant", "insignificant", or "ignore".
+
+The CLI allows users to interact with Biofilter, providing options for specifying filtering criteria, annotation types, model generation parameters, and more.
+
+To run the script, users can provide command-line arguments corresponding to the desired Biofilter functionalities, such as filtering genetic data, annotating variants, generating models, and configuring various parameters.
+
+For usage instructions and available command-line options, users can invoke the script with the `-h` or `--help` flag.
+
+Example usage:
+    python script.py --input-file data.txt --output-file results.txt --filter-gene ABC --annotation gwas --model-score 0.8
+
+For detailed information on each command-line argument and its usage, please refer to the argparse module documentation.
+"""
 
 if __name__ == "__main__":
 	
@@ -3497,6 +4215,33 @@ if __name__ == "__main__":
 		sys.exit(2)
 	#if no args
 	
+	"""
+	This part of the script handles the generation of various reports based on the provided options and configurations:
+
+	1. **OrderedNamespace**: Defines a custom namespace class that preserves the order of attribute additions.
+
+	2. **cfDialect**: Defines a custom CSV dialect named `cfDialect` for configuration files, ensuring compatibility with quoted substrings.
+
+	3. **parseCFile**: A recursive function to parse configuration files, supporting 'include' directives and cyclic include detection. It populates the `OrderedNamespace` with parsed arguments.
+
+	4. **Parsing Command Line for Configuration Files**: Parses command-line arguments to identify configuration files and re-parses them to override the previous configurations.
+
+	5. **Identifying Output Paths**: Determines the paths for various types of reports, filtering results, annotations, and models based on user-specified options.
+
+	6. **Verification and Error Handling**: Verifies the uniqueness, writability, and non-existence of output files. It also handles errors related to conflicting file paths and overwriting.
+
+	7. **Attaching Knowledge Database**: Attaches a knowledge database file if provided in the options.
+
+	8. **Verifying Replication Fingerprint**: Verifies the replication fingerprint, including Biofilter and LOKI versions, source loader versions, options, and file hashes.
+
+	9. **Processing Reports**: Writes various reports based on user options, such as configuration file details, gene name statistics, group name statistics, and LD profiles.
+
+	10. **Output Helper Functions**: Defines utility functions to encode strings, lines, and rows into UTF-8 format for writing to files.
+
+	11. **Generating Reports**: Iterates through different types of reports, writes them to respective files, and logs the process.
+
+	This part of the script is responsible for generating and writing various reports based on user-defined configurations and input data.
+	"""		
 	# define an argparse.Namespace that remembers the order in which attributes are added
 	class OrderedNamespace(argparse.Namespace):
 		def __setattr__(self, name, value):
