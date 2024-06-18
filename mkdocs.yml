@@ -2,6 +2,7 @@ site_name: Biofilter 3.0 Documentation
 
 nav:
   - Home: index.md
+  - Biofilter: Biofilter.md
 
 theme:
   name: "material"
