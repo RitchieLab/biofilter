@@ -11,11 +11,7 @@ import string
 import sys
 import time
 
-#from loki import loki_db
-
-"""
-Biofilter
-"""
+from loki import loki_db
 
 
 class Biofilter:
