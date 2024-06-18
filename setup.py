@@ -45,3 +45,27 @@ distutils.core.setup(
 		('', ['CHANGELOG','biofilter-manual-2.4.pdf'])
 	]
 )
+
+distutils.core.setup(
+	name='LOKI',
+	version='3.0.0',
+	author='Ritchie Lab',
+	author_email='Software_RitchieLab@pennmedicine.upenn.edu',
+	url='https://ritchielab.org',
+	scripts=[
+		'loki-build.py'
+	],
+	packages=[
+		'loki',
+		'loki.loaders',
+		'loki.loaders.test',
+		'loki.util'
+	],
+	cmdclass={
+		'install':distutils.command.install.install,
+		'sdist':distutils.command.sdist.sdist
+	},
+	data_files=[
+		('', ['CHANGELOG'])
+	]
+)
