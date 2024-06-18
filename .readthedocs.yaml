@@ -10,12 +10,8 @@ python:
     - requirements: docs/requirements.txt
       # Install our python package before building the docs
     - method: pip
-      path: .
+      path: docs/
 
 mkdocs:
   configuration: mkdocs.yml
   fail_on_warning: false
-
-submodules:
-  include:
-    - loki
