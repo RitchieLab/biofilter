@@ -12,7 +12,6 @@ plugins:
 - mkdocstrings:
     handlers:
       python:
-        paths: [src]
         load_external_modules: true
         options:
           show_submodules: true
