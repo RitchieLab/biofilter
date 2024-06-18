@@ -13,6 +13,10 @@ import time
 
 #from loki import loki_db
 
+"""
+Biofilter 3.0
+"""
+
 
 class Biofilter:
 	"""
