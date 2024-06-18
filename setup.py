@@ -24,6 +24,7 @@ import distutils.command.sdist
 distutils.core.setup(
 	name='biofilter',
 	version='3.0.0',
+    description='Biofilter is a software tool that provides a convenient single interface for accessing multiple publicly available human genetic data sources.',
 	author='Ritchie Lab',
 	author_email='Software_RitchieLab@pennmedicine.upenn.edu',
 	url='https://ritchielab.org',
