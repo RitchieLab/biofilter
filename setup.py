@@ -8,6 +8,7 @@ This script is used to configure the installation of the biofilter package. It s
 Attributes:
     name (str): The name of the package.
     version (str): The version number of the package.
+    description (str): The description of the package.
     author (str): The author(s) of the package.
     author_email (str): The email address of the package author(s).
     url (str): The URL of the package's homepage.
