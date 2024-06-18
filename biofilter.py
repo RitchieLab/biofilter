@@ -1,5 +1,11 @@
 #!/usr/bin/env python
 
+"""
+
+Biofilter
+
+"""
+
 import argparse
 import codecs
 import collections
