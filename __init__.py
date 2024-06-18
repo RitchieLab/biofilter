@@ -1,1 +1,1 @@
-__all__ = ["biofilter"]
+__all__ = ["biofilter", "./loki"]
