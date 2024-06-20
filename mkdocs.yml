@@ -13,7 +13,6 @@ plugins:
 - mkdocstrings:
     handlers:
       python:
-        load_external_modules: true
         options:
           allow_inspection: true
           show_inheritance_diagram: true
