@@ -18,7 +18,7 @@ Attributes:
     data_files (list): A list of additional data files to be included in the package.
 """
 
-from setuptools import setup
+import setuptools
 
 setuptools.setup(
         name='biofilter',
@@ -36,10 +36,6 @@ setuptools.setup(
                 'loki.loaders.test',
                 'loki.util'
         ],
-	cmdclass={
-                'install':setuptools.command.install.install,
-                'sdist':setuptools.command.sdist.sdist
-        },
 	data_files=[
                 ('', ['CHANGELOG','biofilter-manual-2.4.pdf'])
         ]
