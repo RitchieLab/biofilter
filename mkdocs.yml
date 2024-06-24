@@ -1,4 +1,4 @@
-site_name: Biofilter 3.0 Documentation
+site_name: Ritchie Lab Documentation
 
 nav:
   - Biofilter Dev: Biofilter_docstring.md
