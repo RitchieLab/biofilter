@@ -11,6 +11,8 @@ import string
 import sys
 import time
 
+sys.path.insert(0, os.path.abspath('.'))
+
 from loki import loki_db
 from biofilterClass import Biofilter
 
