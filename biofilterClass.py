@@ -11,25 +11,26 @@ import string
 import sys
 import time
 
+"""
+Biofilter class for managing biological data filtering.
+
+This class provides functionality for managing biological data filtering using various tables and schemas.
+
+Class methods:
+	* getVersionTuple(): Returns the version tuple of the Biofilter class.
+
+	* getVersionString(): Returns the version string of the Biofilter class.
+
+Private class data:
+	* _schema: Dictionary containing the schema information for main input filter tables.
+
+Example usage:
+	<code>biofilter = Biofilter()</code>	
+	<code>version_tuple = biofilter.getVersionTuple()</code>	
+	<code>version_string = biofilter.getVersionString()</code>	
+"""	
 class Biofilter:
-	"""
-	Biofilter class for managing biological data filtering.
-
-	This class provides functionality for managing biological data filtering using various tables and schemas.
-
-	Class methods:
-		* getVersionTuple(): Returns the version tuple of the Biofilter class.
-
-		* getVersionString(): Returns the version string of the Biofilter class.
-
-	Private class data:
-		* _schema: Dictionary containing the schema information for main input filter tables.
-
-	Example usage:
-		<code>biofilter = Biofilter()</code>	
-		<code>version_tuple = biofilter.getVersionTuple()</code>	
-		<code>version_string = biofilter.getVersionString()</code>	
-	"""		
+	
 	##################################################
 	# class interrogation
 	
