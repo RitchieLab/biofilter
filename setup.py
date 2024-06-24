@@ -28,7 +28,8 @@ setuptools.setup(
         url='https://ritchielab.org',
         scripts=[
                 'loki-build.py',
-                'biofilter.py'
+                'biofilter.py',
+		'biofilterClass.py'
         ],
 	packages=[
                 'loki',
