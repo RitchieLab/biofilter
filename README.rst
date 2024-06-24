@@ -1,3 +1,2 @@
-# Biofilter Version 3.0 User Manual and Documentation
+Biofilter Version 3.0
 
-Please follow this link to the software site! https://ritchielab.github.io/biofilter-manual/
