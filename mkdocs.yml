@@ -1,0 +1,20 @@
+site_name: Biofilter 3.0 Documentation
+
+nav:
+  - Home: index.md
+  - Biofilter Dev: Biofilter_docstring.md
+
+theme:
+  name: "material"
+
+plugins:
+- search
+- autorefs
+- mkdocstrings:
+    handlers:
+      python:
+        paths: .
+        options:
+          allow_inspection: true
+          show_inheritance_diagram: true
+          show_source: false
