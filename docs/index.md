@@ -1,1 +1,1 @@
-# Biofilter 3.0 Documentation
+::: biofilter.biofilter
