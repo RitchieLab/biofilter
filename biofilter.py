@@ -1,21 +1,5 @@
 #!/usr/bin/env python
 
-import argparse
-import codecs
-import collections
-import csv
-import itertools
-import os
-import random
-import string
-import sys
-import time
-
-sys.path.insert(0, os.path.abspath('.'))
-
-from loki import loki_db
-from biofilterClass import Biofilter
-
 """
 This script defines a command-line interface (CLI) for Biofilter, a tool for filtering, annotating, and modeling genetic data. It utilizes Python's argparse module to parse command-line arguments and provides custom type handlers for validating input values.
 
@@ -38,6 +22,22 @@ Example usage:
 
 For detailed information on each command-line argument and its usage, please refer to the argparse module documentation.
 """
+
+import argparse
+import codecs
+import collections
+import csv
+import itertools
+import os
+import random
+import string
+import sys
+import time
+
+sys.path.insert(0, os.path.abspath('.'))
+
+from loki import loki_db
+from biofilterClass import Biofilter
 
 if __name__ == "__main__":
 	
