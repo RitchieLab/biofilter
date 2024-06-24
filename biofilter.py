@@ -10,7 +10,6 @@ import random
 import string
 import sys
 import time
-import apsw
 
 sys.path.insert(0, os.path.abspath('.'))
 

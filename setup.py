@@ -39,5 +39,6 @@ setuptools.setup(
         ],
 	data_files=[
                 ('', ['CHANGELOG','biofilter-manual-2.4.pdf'])
-        ]
+        ],
+        install_requires=['apsw']
 )
