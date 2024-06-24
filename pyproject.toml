@@ -7,5 +7,5 @@ name = "biofilter"
 authors = [{name = "Li", email = "xueqiong.li@pennmedicine.upenn.edu"}]
 dynamic = ["version", "description"]
 dependencies = [
-    "mkdocstrings-python",
+    "mkdocstrings-python","apsw"
 ]
