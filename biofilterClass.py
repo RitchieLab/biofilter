@@ -29,8 +29,8 @@ Example usage:
 	<code>version_tuple = biofilter.getVersionTuple()</code>	
 	<code>version_string = biofilter.getVersionString()</code>	
 """	
+
 class Biofilter:
-	
 	##################################################
 	# class interrogation
 	

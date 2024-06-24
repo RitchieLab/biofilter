@@ -41,3 +41,4 @@ setuptools.setup(
                 ('', ['CHANGELOG','biofilter-manual-2.4.pdf'])
         ]
 )
+
