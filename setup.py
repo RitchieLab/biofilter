@@ -18,32 +18,29 @@ Attributes:
     data_files (list): A list of additional data files to be included in the package.
 """
 
-import distutils.core
-import distutils.command.install
-import distutils.command.sdist
+from setuptools import setup
 
-distutils.core.setup(
-	name='biofilter',
-	version='3.0.0',
-    description='Biofilter is a software tool that provides a convenient single interface for accessing multiple publicly available human genetic data sources.',
-	author='Ritchie Lab',
-	author_email='Software_RitchieLab@pennmedicine.upenn.edu',
-	url='https://ritchielab.org',
-	scripts=[
-		'loki-build.py',
-		'biofilter.py'
-	],
+setuptools.setup(
+        name='biofilter',
+        version='3.0.0',
+        author='Ritchie Lab',
+        author_email='Software_RitchieLab@pennmedicine.upenn.edu',
+        url='https://ritchielab.org',
+        scripts=[
+                'loki-build.py',
+                'biofilter.py'
+        ],
 	packages=[
-		'loki',
-		'loki.loaders',
-		'loki.loaders.test',
-		'loki.util'
-	],
+                'loki',
+                'loki.loaders',
+                'loki.loaders.test',
+                'loki.util'
+        ],
 	cmdclass={
-		'install':distutils.command.install.install,
-		'sdist':distutils.command.sdist.sdist
-	},
+                'install':setuptools.command.install.install,
+                'sdist':setuptools.command.sdist.sdist
+        },
 	data_files=[
-		('', ['CHANGELOG','biofilter-manual-2.4.pdf'])
-	]
+                ('', ['CHANGELOG','biofilter-manual-2.4.pdf'])
+        ]
 )
