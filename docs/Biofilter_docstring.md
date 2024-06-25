@@ -1,1 +1,1 @@
-::: biofilterClass
+::: classbiofilter

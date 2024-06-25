@@ -29,7 +29,7 @@ setuptools.setup(
         scripts=[
                 'loki-build.py',
                 'biofilter.py',
-		'biofilterClass.py'
+		'classbiofilter.py'
         ],
 	packages=[
                 'loki',
