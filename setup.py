@@ -1,44 +1,42 @@
-#! python
+#! python Setup.py
 
-"""
-Setup script for biofilter package.
+from setuptools import setup, find_packages
 
-This script is used to configure the installation of the biofilter package. It specifies various metadata about the package, such as its name, version, author, and dependencies. Additionally, it defines the distribution files to be included in the package and any custom commands needed for installation and distribution.
-
-Attributes:
-    name (str): The name of the package.
-    version (str): The version number of the package.
-    description (str): The description of the package.
-    author (str): The author(s) of the package.
-    author_email (str): The email address of the package author(s).
-    url (str): The URL of the package's homepage.
-    scripts (list): A list of script files to be included in the package.
-    packages (list): A list of Python packages to be included in the package.
-    cmdclass (dict): A dictionary mapping custom command names to their respective classes.
-    data_files (list): A list of additional data files to be included in the package.
-"""
-
-import setuptools
-
-setuptools.setup(
-        name='biofilter',
-        version='3.0.0',
-        author='Ritchie Lab',
-        author_email='Software_RitchieLab@pennmedicine.upenn.edu',
-        url='https://ritchielab.org',
-        scripts=[
-                'loki-build.py',
-                'biofilter.py',
-		'classbiofilter.py'
-        ],
-	packages=[
-                'loki',
-                'loki.loaders',
-                'loki.loaders.test',
-                'loki.util'
-        ],
-	data_files=[
-                ('', ['CHANGELOG','biofilter-manual-2.4.pdf'])
+setup(
+    name="biofilter",
+    version="3.1.0",
+    author="Ritchie Lab",
+    author_email="Software_RitchieLab@pennmedicine.upenn.edu",
+    url="https://ritchielab.org",
+    packages=find_packages(
+        include=[
+            "biofilter_modules",
+            "biofilter_modules.*",
+            "loki_modules",
+            "loki_modules.*",
         ]
+    ),
+    install_requires=[
+        "apsw==3.46.1.0",
+        "click==8.1.7",
+        "iniconfig==2.0.0",
+        "packaging==24.1",
+        "platformdirs==4.3.6",
+        "pluggy==1.5.0",
+    ],
+    include_package_data=True,
+    # package_data={
+    #     "": ["CHANGELOG", "biofilter-manual-2.4.pdf"],
+    # },
+    classifiers=[
+        "Programming Language :: Python :: 3",
+        "License :: OSI Approved :: MIT License",
+        "Operating System :: OS Independent",
+    ],
+    entry_points={
+        "console_scripts": [
+            "biofilter=biofilter_modules.biofilter:main",
+            "loki-build=loki_modules.loki_build:main",
+        ],
+    },
 )
-

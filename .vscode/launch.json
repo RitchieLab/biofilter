@@ -1,0 +1,29 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python Debugger: Current File",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "Biofilter Debugger",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/biofilter_modules/biofilter.py",
+            "args": [
+                "--verbose",
+                "--knowledge", "/Users/andrerico/Works/Sys/BIOFILTER/loki_modules/loki-20220926.db",
+                "--position-file", "/Users/andrerico/Works/Sys/BIOFILTER/data_test/input_filename",
+                "--annotate", "position_label", "snp", "position", "gene", "upstream", "downstream",
+                "--report-invalid-input",
+                "--overwrite",
+                "--prefix", "output_prefix",
+                "--ucsc-build-version", "38"
+            ],
+            "console": "integratedTerminal"
+        }
+    ]
+}
