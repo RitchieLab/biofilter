@@ -1,4 +1,4 @@
-# Running Coverage for Your Project
+# Running Coverage in the Biofilter Project
 
 To measure test coverage in the Biofilter project, we can use `Coverage.py`. Follow these steps to install and run `coverage` to generate coverage reports.
 
