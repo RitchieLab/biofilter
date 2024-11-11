@@ -128,6 +128,17 @@ class Biofilter(
 
             class Empty(object):
                 def __getattr__(self, name):
+                    # attributes default to None
+                    if name == "prefix":
+                        return "default_prefix"
+                    elif name == "overwrite":
+                        return "yes"
+                    elif name == "stdout":
+                        return "no"
+                    elif name == "quiet":
+                        return "no"
+                    elif name == "verbose":
+                        return "no"
                     return None
 
             options = Empty()
@@ -158,10 +169,18 @@ class Biofilter(
         # verify loki_db version 'extra' input support in generateLiftOver*()
         minLoki = (2, 2, 1, "a", 2)
         if loki_db.Database.getVersionTuple() < minLoki:
+            # sys.exit(
+            #     "ERROR: LOKI version %d.%d.%d%s%s later required; found %s"
+            #     % minLoki  # noqa: E501
+            #     + (loki_db.Database.getVersionString(),)
+            # )
+            found_version = loki_db.Database.getVersionString()
             sys.exit(
                 "ERROR: LOKI version %d.%d.%d%s%s or later required; found %s"
-                % minLoki  # noqa: E501
-                + (loki_db.Database.getVersionString(),)
+                % (
+                    *minLoki,
+                    found_version,
+                )  # Desempacota minLoki e adiciona found_version
             )
 
         # initialize instance database

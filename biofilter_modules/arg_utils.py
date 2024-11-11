@@ -54,7 +54,7 @@ class cfDialect(csv.Dialect):
     skipinitialspace = True
 
 
-def parseCFile(cfName, parser, options):
+def parseCFile(cfName, parser, options, cfStack=None):
     """
     This function reads and interprets a configuration file, processing
     command-line options and allowing the inclusion of other configuration
@@ -62,10 +62,13 @@ def parseCFile(cfName, parser, options):
     configuration files with recursive references to other configuration files.
     """
 
+    # Initialize cfStack on the first call to track included files
+    if cfStack is None:
+        cfStack = []
+
     # 1. Control of recursion and prevention of cycles:
     # cfStack keep track of the configuration files being processed to avoid
     # cycles.
-    cfStack = []
     cfAbs = "<stdin>" if cfName == "-" else os.path.abspath(cfName)
     # Check if the current file i(cfAbs) s already in the stack, which would
     # indicate a cycle. If so, the program exits with an error message.
@@ -100,7 +103,7 @@ def parseCFile(cfName, parser, options):
         # configuration files.
         if line[0] == "--include":
             for ln in range(1, len(line)):
-                parseCFile(line[ln], parser, options)
+                parseCFile(line[ln], parser, options, cfStack)
         # Otherwise, the arguments are added to cfArgs, and --end-of-line is
         # inserted to mark the end of a line
         else:
