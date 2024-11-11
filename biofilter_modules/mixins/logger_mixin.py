@@ -22,7 +22,30 @@ class LoggerMixin:
     """
 
     def _log(self, message="", warning=False):
-        if (self._logIndent > 0) and (not self._logHanging):
+        """
+        Logs a message to the log file and/or standard error output.
+
+        Parameters:
+        message (str): The message to log. Defaults to an empty string.
+        warning (bool): If True, the message is treated as a warning and will
+                        be logged even if the verbose mode is off, provided
+                        the quiet mode is not enabled.
+                        Defaults to False.
+
+        Behavior:
+        - Indents the message if there is a log indent level set and the log
+        is not hanging.
+        - Writes the message to the log file if it is set.
+        - Writes the message to standard error output if verbose mode is
+        enabled or if it is a warning
+        and quiet mode is not enabled.
+        - Flushes the log file and standard error output if the message does
+        not end with a newline.
+        - Sets the log hanging state based on whether the message ends with a
+        newline.
+        """
+        should_indent = (self._logIndent > 0) and (not self._logHanging)
+        if should_indent:
             if self._logFile:
                 self._logFile.write(self._logIndent * "  ")
             if self._verbose or (warning and not self._quiet):
