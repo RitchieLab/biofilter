@@ -1,49 +1,51 @@
 # schema.py
-"""
-A Schema class that defines the database schema for the Biofilter application.
-
-This class serves as a container for the database schema definition, allowing
-the Biofilter class to easily access and use the structure of the database
-tables needed for processing genetic and biological data.
-
-Attributes:
-----------
-_schema : dict
-    A dictionary representing the database schema. Each key at the top level
-    corresponds to a database category ('main', 'user', 'cand'.), and within
-    each category, there are specific tables with SQL definitions for creating
-    the tables, as well as other properties.
-
-    Example structure:
-    {
-        'main': {
-            'snp': {
-                'table':
-                (
-                    rowid INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-                    label VARCHAR(32) NOT NULL,
-                    rs INTEGER NOT NULL,
-                    flag TINYINT NOT NULL DEFAULT 0,
-                    extra TEXT
-                )
-                ,
-                # Additional table specifications...
-            },
-            # More tables under 'main'...
-        },
-        # More categories (e.g., 'alt') with tables...
-    }
-
-Purpose:
---------
-Encapsulating the schema in this class helps keep the database structure
-organized and separated from the logic within the Biofilter class, promoting
-maintainability and clarity. The schema can be expanded or modified within
-this file without altering the main application code in Biofilter.
-"""
 
 
 class Schema:
+    """
+    A Schema class that defines the database schema for the Biofilter
+    application.
+
+    This class serves as a container for the database schema definition,
+    allowing the Biofilter class to easily access and use the structure of the
+    database tables needed for processing genetic and biological data.
+
+    Attributes:
+    ----------
+    _schema : dict
+        A dictionary representing the database schema. Each key at the top
+        level corresponds to a database category ('main', 'user', 'cand'.),
+        and within each category, there are specific tables with SQL
+        definitions for creating the tables, as well as other properties.
+
+        Example structure:
+        {
+            'main': {
+                'snp': {
+                    'table':
+                    (
+                        rowid INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        label VARCHAR(32) NOT NULL,
+                        rs INTEGER NOT NULL,
+                        flag TINYINT NOT NULL DEFAULT 0,
+                        extra TEXT
+                    )
+                    ,
+                    # Additional table specifications...
+                },
+                # More tables under 'main'...
+            },
+            # More categories (e.g., 'alt') with tables...
+        }
+
+    Purpose:
+    --------
+    Encapsulating the schema in this class helps keep the database structure
+    organized and separated from the logic within the Biofilter class,promoting
+    maintainability and clarity. The schema can be expanded or modified within
+    this file without altering the main application code in Biofilter.
+    """
+
     schema = {
         # #################################################
         # main input filter tables (copied for alt)

@@ -1,6 +1,6 @@
-# Biofilter v3.1.0 (Development Branch)
+# Biofilter v2.4.4 (Development Branch)
 
-**Version**: 3.1.0  
+**Version**: 2.4.4
 **Status**: In Development  
 **Focus**: Refactoring and alignment with best practices
 
@@ -10,7 +10,7 @@ This branch represents an ongoing development effort to improve the Biofilter so
 
 ---
 
-## Objectives for Version 3.1.0
+## Objectives for Version 2.4.4
 
 ### 1. Refactoring and Modularization
 - Reorganization of the codebase into logical modules and components, improving readability and maintainability.

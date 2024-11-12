@@ -33,8 +33,9 @@ class FilterAnnotModelMixin:
     - [getGeneModels]:
         Generates and returns gene models based on defined filters and
         parameters.
-    - [generateFilterOutput]:
-        Generates filter output based on provided data types.
+    - [generateModelOutput]:
+        Generates and returns output models by combining and expanding
+        specified column types.
 
     """
 
