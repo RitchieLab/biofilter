@@ -1,6 +1,8 @@
 import pytest
 from unittest.mock import MagicMock
-from biofilter_modules.mixins.filter_annot_model_mixin import FilterAnnotModelMixin  # noqa: E501
+from biofilter_modules.mixins.filter_annot_model_mixin import (
+    FilterAnnotModelMixin,
+)  # noqa: E501
 
 
 class TestFilterAnnotModelMixin:
@@ -29,7 +31,12 @@ class TestFilterAnnotModelMixin:
                 ],
                 "upstream": ["upstream_label", "upstream_distance"],
                 "downstream": ["downstream_label", "downstream_distance"],
-                "region": ["region_chr", "region_label", "region_start", "region_stop"],  # noqa: E501
+                "region": [
+                    "region_chr",
+                    "region_label",
+                    "region_start",
+                    "region_stop",
+                ],  # noqa: E501
                 "group": ["group_label"],
                 "source": ["source_label"],
                 "gwas": [
@@ -54,7 +61,11 @@ class TestFilterAnnotModelMixin:
                 "user": {"source": False},
                 "main": {"group": 0, "source": 0},
                 "alt": {"group": 0, "source": 0},
-                "cand": {"main_biopolymer": 0, "alt_biopolymer": 0, "group": 0},
+                "cand": {
+                    "main_biopolymer": 0,
+                    "alt_biopolymer": 0,
+                    "group": 0,
+                },  # noqa: E501
             }
             _options = {
                 "allow_duplicate_output": "no",
@@ -102,14 +113,20 @@ class TestFilterAnnotModelMixin:
                 }
 
             def getQueryText(
-                self, query, splitRowIDs=False, noRowIDs=False, sortRowIDs=False
+                self,
+                query,
+                splitRowIDs=False,
+                noRowIDs=False,
+                sortRowIDs=False,  # noqa: E501
             ):
                 return "SELECT * FROM table"
 
             def prepareTablesForQuery(self, query):
                 pass
 
-            def generateQueryResults(self, query, allowDupes=False, query2=None):
+            def generateQueryResults(
+                self, query, allowDupes=False, query2=None
+            ):  # noqa: E501
                 return iter([("result1",), ("result2",)])
 
             # Mock prepareTableForUpdate for testing
@@ -164,8 +181,13 @@ class TestFilterAnnotModelMixin:
 
     def test_generateModelOutput(self, mixin):
         mixin._loki._db.cursor.return_value.execute.return_value = [(1,)]
-        mixin.getGeneModels = MagicMock(return_value=[("result1", "result2", 1, 2)])  # noqa: E501
+        mixin.getGeneModels = MagicMock(
+            return_value=[("result1", "result2", 1, 2)]
+        )  # noqa: E501
         typesL = ["snp"]
         typesR = ["gene"]
         result = list(mixin.generateModelOutput(typesL, typesR))
         assert result == [("#snp1", "gene2", "score(src-grp)"), ("1-2",)]
+
+
+# 95-95 / 102-177
