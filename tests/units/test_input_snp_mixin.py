@@ -59,6 +59,47 @@ def test_unionInputSNPs(snp_input_mixin):
     assert snp_input_mixin._inputFilters[db]["snp"] == 1
 
 
+def test_unionInputSNPs_with_ambiguous_snps(snp_input_mixin):
+    """
+    Test the unionInputSNPs method to ensure it handles ambiguous SNPs
+    correctly.
+    """
+    db = "test_db"
+    snps = [("rs1", "extra1"), ("rs2", "extra2")]
+    errorCallback = MagicMock()
+
+    # Define a return value to simulate `generateMergedFilteredSNPs`
+    def generate_snps_with_tally(snps, tally, errorCallback):
+        tally["match"] = 1
+        tally["merge"] = 1
+        tally["many"] = 1
+        return snps
+
+    # Mock the methods called by unionInputSNPs
+    snp_input_mixin.generateMergedFilteredSNPs = MagicMock(
+        side_effect=generate_snps_with_tally
+    )
+    snp_input_mixin.logPush = MagicMock()
+    snp_input_mixin.logPop = MagicMock()
+    snp_input_mixin.prepareTableForUpdate = MagicMock()
+
+    # Call the method under test
+    snp_input_mixin.unionInputSNPs(db, snps, errorCallback)
+
+    # Verify that the expected methods were called
+    snp_input_mixin.logPush.assert_called_once_with(
+        "adding to %s SNP filter ...\n" % db
+    )
+    # Verify that the prepareTableForUpdate method was called w/correct args
+    snp_input_mixin.prepareTableForUpdate.assert_called_once_with(db, "snp")
+    # Verify that the executemany method was called w/correct SQL and SNPs
+    snp_input_mixin._loki._db.cursor().executemany.assert_called_once()
+    snp_input_mixin.logPop.assert_called_once_with(
+        "... OK: added 1 SNPs (1 RS#s merged, 1 ambiguous)\n"
+    )
+    assert snp_input_mixin._inputFilters[db]["snp"] == 1
+
+
 def test_intersectInputSNPs_initializes_with_union(snp_input_mixin):
     db = "test_db"
     snps = [("rs1", "extra1"), ("rs2", "extra2")]
@@ -119,7 +160,8 @@ def test_intersectInputSNPs(snp_input_mixin):
         ]
     )
     snp_input_mixin._loki._db.cursor().executemany.assert_called_once_with(
-        "UPDATE `%s`.`snp` SET flag = 1 WHERE (1 OR ?1 OR ?2) AND rs = ?3" % db,
+        "UPDATE `%s`.`snp` SET flag = 1 WHERE (1 OR ?1 OR ?2) AND rs = ?3"
+        % db,  # noqa  E501
         snps,  # noqa  E501
     )
     snp_input_mixin.logPop.assert_called_once_with(
