@@ -248,20 +248,20 @@ class TestGroupInputMixin:
         db = "test_db"
         texts = [("text", "extra")]
 
-        # Simula a inicialização do filtro de grupo
+        # Start group filter at 1 to trigger loop
         mixin._inputFilters[db]["group"] = 1
 
-        # Mock para `generateGroupIDsBySearch`
+        # Mock to `generateGroupIDsBySearch`
         mixin._loki.generateGroupIDsBySearch.return_value = [(1, 2, 3)]
         mixin.prepareTableForQuery = MagicMock()
         mixin.logPush = MagicMock()
         mixin.logPop = MagicMock()
         mixin._loki._db.cursor().getconnection().changes.side_effect = [10, 3]
 
-        # Executa o método
+        # Run method under test
         mixin.intersectInputGroupSearch(db, texts)
 
-        # Verificações
+        # Checks
         mixin.prepareTableForQuery.assert_called_once_with(db, "group")
         mixin._loki._db.cursor().executemany.assert_called_once()
         mixin.logPush.assert_called_once_with(
@@ -280,11 +280,11 @@ class TestGroupInputMixin:
         db = "test_db"
         texts = [("text", "extra")]
 
-        # Mock para `unionInputGroupSearch`
+        # Mock to `unionInputGroupSearch`
         mixin.unionInputGroupSearch = MagicMock()
 
-        # Executa o método
+        # Run method under test
         mixin.intersectInputGroupSearch(db, texts)
 
-        # Verifica se `unionInputGroupSearch` foi chamado
+        # Chack if the `unionInputGroupSearch` method was called
         mixin.unionInputGroupSearch.assert_called_once_with(db, texts)
