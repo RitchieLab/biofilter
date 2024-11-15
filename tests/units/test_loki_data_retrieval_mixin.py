@@ -1,6 +1,8 @@
 import pytest
 from unittest.mock import MagicMock
-from biofilter_modules.mixins.loki_data_retrieval_mixin import LokiDataRetrievalMixin  # noqa: E501
+from biofilter_modules.mixins.loki_data_retrieval_mixin import (
+    LokiDataRetrievalMixin,
+)  # noqa: E501
 
 
 class TestLokiDataRetrievalMixin:
@@ -41,7 +43,10 @@ class TestLokiDataRetrievalMixin:
             mixin.generateGeneNameStats()
 
     def test_generateGroupNameStats(self, mixin):
-        mixin._loki.generateGroupNameStats.return_value = {"group1": 5, "group2": 15}  # noqa: E501
+        mixin._loki.generateGroupNameStats.return_value = {
+            "group1": 5,
+            "group2": 15,
+        }  # noqa: E501
 
         result = mixin.generateGroupNameStats()
         expected = {"group1": 5, "group2": 15}

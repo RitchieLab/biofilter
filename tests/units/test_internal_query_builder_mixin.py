@@ -2,7 +2,9 @@ import pytest
 from unittest.mock import MagicMock
 import collections
 import itertools
-from biofilter_modules.mixins.internal_query_builder_mixin import InternalQueryBuilderMixin
+from biofilter_modules.mixins.internal_query_builder_mixin import (
+    InternalQueryBuilderMixin,
+)
 
 
 class TestInternalQueryBuilderMixin:
@@ -76,9 +78,7 @@ class TestInternalQueryBuilderMixin:
             "alias1": ("main", "table1"),
             "alias2": ("main", "table2"),
         }
-        mock_query_builder._queryAliasJoinConditions = [
-            (["alias1"], ["alias2"])
-        ]
+        mock_query_builder._queryAliasJoinConditions = [(["alias1"], ["alias2"])]
         mock_query_builder.aliasAdjacent = collections.defaultdict(set)
         mock_query_builder.aliasAdjacent["alias1"].add("alias2")
         mock_query_builder.aliasAdjacent["alias2"].add("alias1")
@@ -103,37 +103,29 @@ class TestInternalQueryBuilderMixin:
     def test_build_query_invalid_mode(self, query_builder):
         with pytest.raises(AssertionError):
             query_builder.buildQuery(
-                mode="invalid_mode",
-                focus="main",
-                select=["snp_id", "snp_label"]
+                mode="invalid_mode", focus="main", select=["snp_id", "snp_label"]
             )
 
     def test_build_query_invalid_focus(self, query_builder):
         with pytest.raises(AssertionError):
             query_builder.buildQuery(
-                mode="filter",
-                focus="invalid_focus",
-                select=["snp_id", "snp_label"]
+                mode="filter", focus="invalid_focus", select=["snp_id", "snp_label"]
             )
 
     def test_build_query_no_outputs_or_conditions(self, query_builder):
         query_builder._queryColumnSources = {"snp_id": [("alias", 1, "expr")]}
-        with pytest.raises(Exception, match="internal query with no outputs or conditions"):
+        with pytest.raises(
+            Exception, match="internal query with no outputs or conditions"
+        ):
             query_builder.buildQuery(
-                mode="filter",
-                focus="main",
-                select=[],
-                having={},
-                where={}
+                mode="filter", focus="main", select=[], having={}, where={}
             )
 
     def test_build_query_unsupported_column(self, query_builder):
         query_builder._queryColumnSources = {}
         with pytest.raises(Exception, match="internal query with unsupported column"):
             query_builder.buildQuery(
-                mode="filter",
-                focus="main",
-                select=["unsupported_column"]
+                mode="filter", focus="main", select=["unsupported_column"]
             )
 
     # # news
