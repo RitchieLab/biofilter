@@ -43,7 +43,7 @@ This branch represents an ongoing development effort to improve the Biofilter so
 
 Clone the repository and switch to the development branch:
 ```bash
-git clone https://github.com/yourusername/biofilter.git
+git clone https://github.com/RitchieLab/biofilter.git
 cd biofilter
 git checkout development
 ```
@@ -101,7 +101,3 @@ This project is licensed under the MIT License. See LICENSE for details.
 
 Acknowledgments
 Special thanks to the Ritchie Lab for their contributions to the Biofilter and Loki projects.
-
-```javascript
-Este `README.md` fornece um guia de desenvolvimento e alinhamento com as melhores práticas para a versão 3.1.0 do Biofilter e facilita a colaboração e integração contínua.
-```

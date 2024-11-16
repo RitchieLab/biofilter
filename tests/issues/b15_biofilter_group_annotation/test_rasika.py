@@ -5,7 +5,7 @@ from pathlib import Path
 
 
 """
-biofilter.py 
+biofilter.py
 --knowledge ~/group/datasets/loki/loki-20220926.db
 --gene-file ROSMAP_RNAseq_FPKM_gene_ensembl_list_edit.txt
 --gene-identifier-type ensembl_gid
@@ -35,11 +35,11 @@ def setup_paths():
     knowledge_path = base_dir / "data/loki-20220926.db"
     gene_file_path = (
         base_dir
-        / "integrations/rasika/data-in/ROSMAP_RNAseq_FPKM_gene_ensembl_list_edit.txt"  # noqa E501
+        / "issues/b15_biofilter_group_annotation/data-in/ROSMAP_RNAseq_FPKM_gene_ensembl_list_edit.txt"  # noqa E501
     )  # noqa E501
     output_prefix = (
         base_dir
-        / "integrations/rasika/data-out/ROSMAP_RNAseq_ENSEMBL_gene_pathways"  # noqa E501
+        / "issues/b15_biofilter_group_annotation/data-out/ROSMAP_RNAseq_ENSEMBL_gene_pathways"  # noqa E501
     )  # noqa E501
 
     # Create output directory if it does not exist
