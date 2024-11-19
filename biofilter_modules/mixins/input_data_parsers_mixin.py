@@ -2,7 +2,8 @@
 # INPUT DATA PARSERS AND LOOKUP HELPERS MIXIN
 # #################################################
 import sys
-import codecs
+
+# import codecs
 
 
 class InputDataParsersMixin:
@@ -964,7 +965,7 @@ class InputDataParsersMixin:
         `user` schema.
 
         """
-        utf8 = codecs.getencoder("utf8")
+        # utf8 = codecs.getencoder("utf8")
         try:
             with (
                 sys.stdin if (path == "-" or not path) else open(path, "r")
@@ -978,7 +979,8 @@ class InputDataParsersMixin:
                 for line in file:
                     # words = utf8(line)[0].strip().split(separator)
                     words = line.strip().split(separator)
-                    if not words:
+                    # if not any(word.strip() for word in words):
+                    if all(word.strip() == "" for word in words):
                         pass
                     elif words[0] == "GROUP":
                         if ugroupID and namesets:
