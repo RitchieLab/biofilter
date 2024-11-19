@@ -510,9 +510,11 @@ class InputDataParsersMixin:
                 sys.exit(
                     "ERROR: knowledge database contains no chainfiles to perform liftOver from UCSC hg%s to hg%s\n"  # noqa: E501
                     % (
-                        oldHG or "?",
-                        newHG or "?",
-                    )  # noqa F821  # FIXME: oldHG not defined
+                        # oldHG or "?",
+                        # newHG or "?",
+                        ucscBuildOld or "?",
+                        ucscBuildNew or "?",
+                    )
                 )
             liftoverError = "dropped during liftOver from hg%s to hg%s" % (
                 ucscBuildOld or "?",
@@ -601,7 +603,7 @@ class InputDataParsersMixin:
                 if not cols:
                     continue
                 elif len(cols) < 3:
-                    raise Exception("not enough columns")
+                    raise Exception("not enough columns")  # NEED TEST
                 elif len(cols) == 3:
                     chm = cols[0].upper()
                     posMin = cols[1].upper()
@@ -774,9 +776,9 @@ class InputDataParsersMixin:
                 sys.exit(
                     "ERROR: knowledge database contains no chainfiles to perform liftOver from UCSC hg%s to hg%s\n"  # noqa: E501
                     % (
-                        oldHG or "?",
-                        newHG or "?",
-                    )  # noqa F821  # FIXME: oldHG not defined
+                        ucscBuildOld or "?",
+                        ucscBuildNew or "?",
+                    )
                 )
             liftoverError = "dropped during liftOver from hg%s to hg%s" % (
                 ucscBuildOld or "?",
@@ -965,15 +967,17 @@ class InputDataParsersMixin:
         utf8 = codecs.getencoder("utf8")
         try:
             with (
-                sys.stdin if (path == "-" or not path) else open(path, "rU")
+                sys.stdin if (path == "-" or not path) else open(path, "r")
             ) as file:  # noqa: E501
-                words = utf8(file.next())[0].strip().split(separator, 1)
+                # words = utf8(file.next())[0].strip().split(separator, 1)
+                words = next(file).strip().split(separator, 1)
                 label = words[0]
                 description = words[1] if (len(words) > 1) else ""
                 usourceID = self.addUserSource(label, description)
                 ugroupID = namesets = None
                 for line in file:
-                    words = utf8(line)[0].strip().split(separator)
+                    # words = utf8(line)[0].strip().split(separator)
+                    words = line.strip().split(separator)
                     if not words:
                         pass
                     elif words[0] == "GROUP":

@@ -1,7 +1,7 @@
 # #################################################
 # USER KNOWLEDGE RETRIEVAL MIXIN
 # #################################################
-import itertools
+# import itertools
 
 
 class UserKnowledgeRetrievalMixin:
@@ -72,10 +72,15 @@ class UserKnowledgeRetrievalMixin:
         cursor = self._loki._db.cursor()
         if sources:
             sql = "SELECT i.source, s.source_id FROM (SELECT ? AS source) AS i LEFT JOIN `user`.`source` AS s ON LOWER(s.source) = LOWER(i.source)"  # noqa E501
-            ret = {
-                row[0]: row[1]
-                for row in cursor.executemany(sql, itertools.izip(sources))
-            }
+            # ret = {
+            #     row[0]: row[1]
+            #     for row in cursor.executemany(sql, itertools.izip(sources))
+            # }
+            ret = {}
+            for source in sources:
+                cursor.execute(sql, (source,))
+                row = cursor.fetchone()
+                ret[source] = row[1] if row else None
         else:
             sql = "SELECT source, source_id FROM `user`.`source`"
             ret = {row[0]: row[1] for row in cursor.execute(sql)}
