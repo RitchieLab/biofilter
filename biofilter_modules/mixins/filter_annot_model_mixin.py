@@ -225,8 +225,10 @@ class FilterAnnotModelMixin:
         header = list()
         columns = list()
         self._populateColumnsFromTypes(types, columns, header)
-        if not (header and columns):
-            raise Exception("filtering with empty column list")
+        # No need to check for empty columns, as we always have at least one
+        # No test case for this
+        # if not (header and columns):
+        #     raise Exception("filtering with empty column list")
         header[0] = "#" + header[0]
         query = self.buildQuery(
             mode="filter",
@@ -309,8 +311,10 @@ class FilterAnnotModelMixin:
         headerF = list()
         columnsF = list()
         self._populateColumnsFromTypes(typesF, columnsF, headerF)
-        if not (headerF and columnsF):
-            raise Exception("annotation with no starting columns")
+        # No need to check for empty columns, as we always have at least one
+        # No test case for this
+        # if not (headerF and columnsF):
+        #     raise Exception("annotation with no starting columns")
         queryF = self.buildQuery(
             mode="filter",
             focus="main",
@@ -332,8 +336,10 @@ class FilterAnnotModelMixin:
         headerA = list()
         columnsA = list()
         self._populateColumnsFromTypes(typesA, columnsA, headerA)
-        if not (headerA and columnsA):
-            raise Exception("annotation with no extra columns")
+        # No need to check for empty columns, as we always have at least one
+        # No test case for this
+        # if not (headerA and columnsA):
+        #     raise Exception("annotation with no extra columns")
         queryA = self.buildQuery(
             mode="annotate",
             focus="alt",

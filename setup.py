@@ -4,7 +4,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="biofilter",
-    version="3.1.0",
+    version="2.4.4",
     author="Ritchie Lab",
     author_email="Software_RitchieLab@pennmedicine.upenn.edu",
     url="https://ritchielab.org",
