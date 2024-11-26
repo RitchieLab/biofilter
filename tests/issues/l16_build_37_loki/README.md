@@ -2,6 +2,8 @@
 
 Github Issue: https://github.com/RitchieLab/LOKI/issues/16
 
+## <span style="color:orange;">🔍 IN ANALYSIS</span>
+
 ## Problem Description
 The Biofilter system supports compatibility with both GRCh37 (b37) and GRCh38 (b38) genome assemblies. However, there is a notable discrepancy in the recency of the LOKI database versions available on the LPC cluster. Specifically, the GRCh37 version of LOKI was last updated in 2014, while the GRCh38 version was updated in 2022. This creates a challenge for users relying on GRCh37, as they are limited to an outdated dataset, potentially affecting the accuracy and relevance of their analyses.
 

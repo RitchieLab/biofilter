@@ -2,6 +2,8 @@
 
 Github Issue: https://github.com/RitchieLab/biofilter/issues/15
 
+## <span style="color:orange;">🔍 IN ANALYSIS</span>
+
 ## Problem Description
 This test aims to validate the consistency of gene annotations across versions 2.4.2 and 2.4.3 of Biofilter. In version 2.4.2, it was observed that, when running pathway annotation on an initial list of genes, some genes that should have been annotated were ignored. Re-running the process on a subsequent version with a subset of previously removed genes resulted in correct annotations for some genes that should have been included in the initial run.
 
