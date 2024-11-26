@@ -492,7 +492,9 @@ class TestFilterAnnotModelMixin:
         mixin._inputFilters["main"][
             "gene"
         ] = 1  # adding a filter that is not "group" or "source"
-        mixin._inputFilters["main"]["source"] = 0  # "source" e "group" will be ignored  # noqa: E501
+        mixin._inputFilters["main"][
+            "source"
+        ] = 0  # "source" e "group" will be ignored  # noqa: E501
 
         mock_cursor = MagicMock()
         # Define `side_effect` to return a count of candidates as integers
@@ -502,9 +504,7 @@ class TestFilterAnnotModelMixin:
                 ("filter_result_2", 2),
             ],  # call 1 for insertions
             iter([(2,)]),  # call 2 SELECT COUNT()
-            iter(
-                [(2,)]
-            ),  # additional call to ensure `execute` has enough values
+            iter([(2,)]),  # additional call to ensure `execute` has enough values
         ]
 
         # Mock para `generateQueryResults` avoid real execution
@@ -525,7 +525,9 @@ class TestFilterAnnotModelMixin:
         mixin._inputFilters["alt"][
             "gene"
         ] = 1  # adding a filter that is not "group" or "source"
-        mixin._inputFilters["alt"]["group"] = 0  # "group" e "source" will be ignored  # noqa: E501
+        mixin._inputFilters["alt"][
+            "group"
+        ] = 0  # "group" e "source" will be ignored  # noqa: E501
 
         mock_cursor = MagicMock()
         # Define `side_effect` to return a count of candidates as integers
@@ -535,9 +537,7 @@ class TestFilterAnnotModelMixin:
                 ("filter_result_2", 2),
             ],
             iter([(2,)]),
-            iter(
-                [(2,)]
-            ),
+            iter([(2,)]),
         ]
 
         # Mock to avoid real execution in `generateQueryResults`

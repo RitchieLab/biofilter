@@ -634,7 +634,14 @@ def main():
     if options.user_defined_filter != "no":
         bio.applyUserKnowledgeFilter((options.user_defined_filter == "group"))
 
-    # apply primary filters
+    # APPLY PRIMARY FILTERS
+    # Based on the input arguments provided in the command, this block will
+    # add all argument values (provided directly or via a file) to tables in
+    # the temporary databases `main` and `alt`.
+    # For example, if the user provides a file containing a list of positions
+    # using the "--position-file" argument, the content of the file will be
+    # added to the `main.locus` table.
+
     for snpList in options.snp or empty:
         bio.intersectInputSNPs(
             "main",
@@ -772,7 +779,7 @@ def main():
             errorCallback=cb["source"],
         )
 
-    # apply alternate filters
+    # APPLY ALTERNATE FILTERS
     for snpList in options.alt_snp or empty:
         bio.intersectInputSNPs(
             "alt",

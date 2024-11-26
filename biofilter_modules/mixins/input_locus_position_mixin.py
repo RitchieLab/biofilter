@@ -110,8 +110,8 @@ class LocusPositionInputMixin:
 
         Operation:
         - If the `locus` filter is uninitialized (`_inputFilters[db]['locus']`
-        is 0), calls `unionInputLoci`
-        to create the filter with all provided loci.
+        is 0), calls `unionInputLoci` to create the filter with all provided
+        loci.
         - Otherwise:
         - Logs the start of the locus filter reduction process.
         - Calls `prepareTableForQuery` to ensure the `locus` table is ready
