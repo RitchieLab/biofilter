@@ -1,12 +1,7 @@
-<!-- TODO in the TEST -->
-
-- check why only 18k genes was found in the LOKI
-- Why the genes numbers dont match:
-(+) input = 55889
-(-) WARNING: ignored 22673 unrecognized gene identifier(s)
-(-)  WARNING: ignored 114 ambiguous gene identifier(s)
-(=) OK: added 33102 genes
--- but --
-(=) output = 18486
-
-- create the second run
+Number of Genes
+(=) 55,889 Input Ensembl Genes Codes
+(-) 22,673 Not found in biopolymer_name table
+(-)    114 Ambiguous Genes
+(=) 33,102 Genes found in LOKI biopolymer_name table
+(-) 14,606 No references in group_biopolymer table to sources (3:GO, 5:REACTOME, 7:KEGG)  
+(=) 18,496 Unique Genes in Outcome Result
