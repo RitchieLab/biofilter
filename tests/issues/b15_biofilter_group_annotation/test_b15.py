@@ -52,7 +52,6 @@ def setup_paths():
         / "issues/b15_biofilter_group_annotation/data-out/outcome_run_2"  # noqa E501
     )  # noqa E501
 
-
     # Create output directory if it does not exist
     if output_prefix.parent.exists():
         for file in output_prefix.parent.glob("*"):
@@ -132,17 +131,17 @@ def test_issue_b15_run_1(setup_paths):
         line_count == 294620
     ), f"Expected 16000 lines, but found {line_count}"  # noqa E501
 
-    # Check if the log file was created and content is as expected
-    log_file_path = Path(str(setup_paths["output_prefix"]) + ".log")
+    # # Check if the log file was created and content is as expected
+    # log_file_path = Path(str(setup_paths["output_prefix"]) + ".log")
 
-    # Trechos esperados no log
-    expected_log_snippets = [
-        "WARNING: ignored 22673 unrecognized gene identifier(s)",
-    ]
+    # # Trechos esperados no log
+    # expected_log_snippets = [
+    #     "WARNING: ignored 22673 unrecognized gene identifier(s)",
+    # ]
 
-    # Abre o arquivo de log e lê o conteúdo
-    with log_file_path.open("r") as log_file:
-        log_content = log_file.read()
+    # # Abre o arquivo de log e lê o conteúdo
+    # with log_file_path.open("r") as log_file:
+    #     log_content = log_file.read()
 
     # # Realiza asserts para cada trecho esperado no log
     # for snippet in expected_log_snippets:

@@ -97,4 +97,21 @@ Upon examining the LOKI database, these genes are indeed present. However, in th
 To address this, I will:
 
 1. Debug the system to investigate why BIOFILTER includes these records in the query output.
+  --> Analysis on Analysis_run_2.doc
+  --> in the Analysis_run_1_source_id.docx was report the source_id between the group e group_biopolymer tables to address in next versions.
+
+  --> I identified an issue where, when querying a gene (e.g., **ENSG00000055208**) in the `biopolymer_name` table, other genes (e.g., **ENSG00000228408**) may share the same `biopolymer_id`. In such cases, the system only considers the first gene it locates and disregards the others. This behavior explains why 18 genes were missing from the results during the first execution.
+  
+After isolating these 18 genes and running the process again, they appeared in the results. There seems to be an option that allows handling genes with duplicate `biopolymer_id`s. However, this option verifies if the last gene has the same `biopolymer_id` and excludes it from the results if the condition is met.
+  
+I believe the output or log reports could be more detailed to provide clarity to users and prevent confusion.
+
+--> I need to check the biofilter query in my manual test!!
+
 2. Analyze LOKI further to determine the reason for the source_id being set to 0 in these cases.
+
+
+
+
+
+
