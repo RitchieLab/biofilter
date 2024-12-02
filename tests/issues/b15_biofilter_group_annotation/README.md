@@ -2,7 +2,7 @@
 
 Github Issue: https://github.com/RitchieLab/biofilter/issues/15
 
-## <span style="color:orange;">🔍 IN ANALYSIS</span>
+#### <span style="color:#ADD8E6;">🛠️ **IN PROGRESS**</span>
 
 ## Problem Description
 This test aims to validate the consistency of gene annotations across versions 2.4.2 and 2.4.3 of Biofilter. In version 2.4.2, it was observed that, when running pathway annotation on an initial list of genes, some genes that should have been annotated were ignored. Re-running the process on a subsequent version with a subset of previously removed genes resulted in correct annotations for some genes that should have been included in the initial run.
@@ -64,13 +64,7 @@ At this point, I require assistance from someone familiar with ENTREZ data to ve
 
 Another factor reducing the number of genes in the filter output is the presence of genes registered as `biopolymers` but without associated groups for the three sources analyzed (GO, REACTOME, and KEGG). This information is tracked in the `group_biopolymer` table, and the absence of group associations directly impacts the filtering process.
 
----
-
-### Filter Flow Summary
-
-A summary of the filter flow is available below, with additional details in the file **Analysis_run_1.xlsx**.
-
-Number of Genes
+A summary of the filter flow from first run:
 - (=) 55,889 Input Ensembl Genes Codes
 - (-) 22,673 Not found in biopolymer_name table
 - (-)    114 Ambiguous Genes
@@ -78,37 +72,37 @@ Number of Genes
 - (-) 14,606 No references in group_biopolymer table to sources (3:GO, 5:REACTOME, 7:KEGG)  
 - (=) 18,496 Unique Genes in Outcome Result
 
----
+Details in the file **Analysis_run_1.xlsx** and **Analysis_run_1.docx**.
 
-### Recommendations and Next Steps
-
-For this Run 1, my main consideration is whether LOKI should account for Ensembl Gene codes from **GRCh37**. If it is decided that GRCh37 should not be supported, then the process is functioning as designed. However, if GRCh37 support is required, we could consider adding extractors for GRCh37 Ensembl genes in future LOKI versions. These genes could be retained in the `biopolymer_name` table and mapped to a single gene in the `biopolymer` table. 
-
-Further validation would be needed to determine if this approach is feasible.
-
----
 
 ## Run 2: Run Genes Out from the first run
 
 In Run 2, only the genes that did not return data during the first execution (Run 1) were processed. The expected scenario was that no groups would be returned, but the outcome mirrored the issue described earlier: 314 records with 18 unique genes were returned.
 
-Upon examining the LOKI database, these genes are indeed present. However, in the group_biopolymer table, where group associations for these genes are stored, the source_id is recorded as 0. This creates a problem, as it is not possible to trace the original source of these groups due to the lack of relationship keys in LOKI.
+Identified an issue where, when querying a gene (e.g., **ENSG00000055208**) in the `biopolymer_name` table, other genes (e.g., **ENSG00000228408**) may share the same `biopolymer_id`. In such cases, the system only considers the first gene it locates and disregards the others. This behavior explains why 18 genes were missing from the results during the first execution.
 
-To address this, I will:
+Details in the file **Analysis_run_2.xlsx** and **Analysis_run_2.docx**.
 
-1. Debug the system to investigate why BIOFILTER includes these records in the query output.
-  --> Analysis on Analysis_run_2.doc
-  --> in the Analysis_run_1_source_id.docx was report the source_id between the group e group_biopolymer tables to address in next versions.
 
-  --> I identified an issue where, when querying a gene (e.g., **ENSG00000055208**) in the `biopolymer_name` table, other genes (e.g., **ENSG00000228408**) may share the same `biopolymer_id`. In such cases, the system only considers the first gene it locates and disregards the others. This behavior explains why 18 genes were missing from the results during the first execution.
-  
-After isolating these 18 genes and running the process again, they appeared in the results. There seems to be an option that allows handling genes with duplicate `biopolymer_id`s. However, this option verifies if the last gene has the same `biopolymer_id` and excludes it from the results if the condition is met.
-  
-I believe the output or log reports could be more detailed to provide clarity to users and prevent confusion.
+---
+---
 
---> I need to check the biofilter query in my manual test!!
+# Points for discussion:
 
-2. Analyze LOKI further to determine the reason for the source_id being set to 0 in these cases.
+- In the **manual_query.py** script, a flow was created to manually query LOKI and may be useful for future analyses.
+
+- As a potential improvement for future versions of Biofilter, we could implement a more detailed logging mechanism that explicitly lists all genes that were not found, as well as those identified as ambiguous.
+
+- One point of concern that can be challenging to understand is that the source_id field in the group_biopolymer table is not actively used, and all entries in this field are given a placeholder value of 0. Instead, the links between groups and their sources are managed in the group table. For example, in the current logic, a biopolymer is linked to a group, and the source(s) of the group are then determined from the group table, which can contain one or more records per group. While this flow appears to work and does not appear to introduce any logical issues, having a source_id field in the group_biopolymer table with unassigned values ​​creates unnecessary confusion during debugging.
+
+- For this Run 1, my main consideration is whether LOKI should account for Ensembl Gene codes from **GRCh37**. If it is decided that GRCh37 should not be supported, then the process is functioning as designed. However, if GRCh37 support is required, we could consider adding extractors for GRCh37 Ensembl genes in future LOKI versions. These genes could be retained in the `biopolymer_name` table and mapped to a single gene in the `biopolymer` table. Further validation would be needed to determine if this approach is feasible.
+
+- As previously noted, genes such as **ENSG00000055208** and **ENSG00000228408** share the same biopolymer_id. Since the control argument --allow-duplicate-output was not specified in the call, Biofilter only considers one of these genes. A test (Run 1) was conducted with the --allow-duplicate-output argument enabled, resulting in 18,514 unique genes, compared to 18,496 genes without the argument.
+
+
+
+
+
 
 
 

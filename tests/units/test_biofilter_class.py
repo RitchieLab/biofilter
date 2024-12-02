@@ -18,7 +18,7 @@ def mock_options():
 
 def test_get_version_string():
     # Testa o método getVersionString da classe Biofilter
-    expected_version = "2.4.3 (2023-09-20)"  # ajuste conforme necessário
+    expected_version = "2.4.4 (2024-12-01)"  # ajuste conforme necessário
     version_string = Biofilter.getVersionString()
     assert (
         version_string == expected_version
