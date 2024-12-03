@@ -46,7 +46,7 @@
   
   
   
-    <title>Using Poetry for Dependency Management and Project Setup &#8212; Biofilter Developer Documentation 2.4.4 documentation</title>
+    <title>Poetry Guider &#8212; Biofilter Developer Documentation 2.4.4 documentation</title>
     <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=83e35b93" />
     <link rel="stylesheet" type="text/css" href="_static/material.css?v=79c92029" />
     <script src="_static/documentation_options.js?v=b1e24531"></script>
@@ -54,8 +54,8 @@
     <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
-    <link rel="next" title="Running Coverage in the Biofilter Project" href="usage-of-coverage.html" />
-    <link rel="prev" title="Setting Up and Running Sphinx for Biofilter Documentation" href="usage-of-sphinx.html" />
+    <link rel="next" title="Black Guide" href="usage-of-black.html" />
+    <link rel="prev" title="Branching Structure Guide" href="usage-of-branching.html" />
   
    
 
@@ -92,7 +92,7 @@
       <div class="md-flex__cell md-flex__cell--stretch">
         <div class="md-flex__ellipsis md-header-nav__title" data-md-component="title">
           <span class="md-header-nav__topic">Biofilter Developer Docs</span>
-          <span class="md-header-nav__topic"> Using Poetry for Dependency Management and Project Setup </span>
+          <span class="md-header-nav__topic"> Poetry Guider </span>
         </div>
       </div>
       <div class="md-flex__cell md-flex__cell--shrink">
@@ -127,7 +127,7 @@
       
         <div class="md-flex__cell md-flex__cell--shrink">
           <div class="md-header-nav__source">
-            <a href="https://github.com/your-org/biofilter" title="Go to repository" class="md-source" data-md-source="github">
+            <a href="https://github.com/RitchieLab/biofilter" title="Go to repository" class="md-source" data-md-source="github">
 
     <div class="md-source__icon">
       <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 24 24" width="28" height="28">
@@ -186,7 +186,7 @@
        title="Biofilter Developer Documentation 2.4.4 documentation">Biofilter Developer Docs</a>
   </label>
     <div class="md-nav__source">
-      <a href="https://github.com/your-org/biofilter" title="Go to repository" class="md-source" data-md-source="github">
+      <a href="https://github.com/RitchieLab/biofilter" title="Go to repository" class="md-source" data-md-source="github">
 
     <div class="md-source__icon">
       <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 24 24" width="28" height="28">
@@ -202,6 +202,154 @@
   
   
 
+  
+  <ul class="md-nav__list">
+    <li class="md-nav__item">
+    
+      <span class="md-nav__link caption"><span class="caption-text">Contents:</span></span>
+    
+    </li>
+    <li class="md-nav__item">
+    
+    
+      <a href="usage-of-branching.html" class="md-nav__link">Branching Structure Guide</a>
+      
+    
+    </li>
+    <li class="md-nav__item">
+    
+    
+    <input class="md-toggle md-nav__toggle" data-md-toggle="toc" type="checkbox" id="__toc">
+    <label class="md-nav__link md-nav__link--active" for="__toc"> Poetry Guider </label>
+    
+      <a href="#" class="md-nav__link md-nav__link--active">Poetry Guider</a>
+      
+        
+<nav class="md-nav md-nav--secondary">
+    <label class="md-nav__title" for="__toc">"Contents"</label>
+  <ul class="md-nav__list" data-md-scrollfix="">
+        <li class="md-nav__item"><a href="#usage-of-poetry--page-root" class="md-nav__link">Poetry Guider</a><nav class="md-nav">
+              <ul class="md-nav__list">
+        <li class="md-nav__item"><a href="#what-is-poetry" class="md-nav__link">What is Poetry?</a>
+        </li>
+        <li class="md-nav__item"><a href="#why-use-poetry" class="md-nav__link">Why Use Poetry?</a>
+        </li>
+        <li class="md-nav__item"><a href="#setting-up-the-project-locally" class="md-nav__link">Setting Up the Project Locally</a>
+        </li>
+        <li class="md-nav__item"><a href="#creating-installation-packages" class="md-nav__link">Creating Installation Packages</a>
+        </li>
+        <li class="md-nav__item"><a href="#automating-the-workflow" class="md-nav__link">Automating the Workflow</a>
+        </li>
+        <li class="md-nav__item"><a href="#managing-dependencies" class="md-nav__link">Managing Dependencies</a>
+        </li>
+        <li class="md-nav__item"><a href="#reproducibility" class="md-nav__link">Reproducibility</a>
+        </li>
+        <li class="md-nav__item"><a href="#additional-resources" class="md-nav__link">Additional Resources</a>
+        </li></ul>
+            </nav>
+        </li>
+    
+<li class="md-nav__item"><a class="md-nav__extra_link" href="_sources/usage-of-poetry.rst.txt">Show Source</a> </li>
+
+  </ul>
+</nav>
+      <ul class="md-nav__list"> 
+    <li class="md-nav__item">
+    
+    
+      <a href="#what-is-poetry" class="md-nav__link">What is Poetry?</a>
+      
+    
+    </li>
+    <li class="md-nav__item">
+    
+    
+      <a href="#why-use-poetry" class="md-nav__link">Why Use Poetry?</a>
+      
+    
+    </li>
+    <li class="md-nav__item">
+    
+    
+      <a href="#setting-up-the-project-locally" class="md-nav__link">Setting Up the Project Locally</a>
+      
+    
+    </li>
+    <li class="md-nav__item">
+    
+    
+      <a href="#creating-installation-packages" class="md-nav__link">Creating Installation Packages</a>
+      
+    
+    </li>
+    <li class="md-nav__item">
+    
+    
+      <a href="#automating-the-workflow" class="md-nav__link">Automating the Workflow</a>
+      
+    
+    </li>
+    <li class="md-nav__item">
+    
+    
+      <a href="#managing-dependencies" class="md-nav__link">Managing Dependencies</a>
+      
+    
+    </li>
+    <li class="md-nav__item">
+    
+    
+      <a href="#reproducibility" class="md-nav__link">Reproducibility</a>
+      
+    
+    </li>
+    <li class="md-nav__item">
+    
+    
+      <a href="#additional-resources" class="md-nav__link">Additional Resources</a>
+      
+    
+    </li></ul>
+    
+    </li>
+    <li class="md-nav__item">
+    
+    
+      <a href="usage-of-black.html" class="md-nav__link">Black Guide</a>
+      
+    
+    </li>
+    <li class="md-nav__item">
+    
+    
+      <a href="usage-of-coverage.html" class="md-nav__link">Coverage Guide</a>
+      
+    
+    </li>
+    <li class="md-nav__item">
+    
+    
+      <a href="usage-of-tox.html" class="md-nav__link">Tox Guider</a>
+      
+    
+    </li>
+    <li class="md-nav__item">
+    
+    
+      <a href="usage-of-sphinx.html" class="md-nav__link">Sphinx Guider</a>
+      
+    
+    </li>
+    <li class="md-nav__item">
+    
+    
+      <a href="usage-of-git.html" class="md-nav__link">Using git and CI/CD by Actions</a>
+      
+    
+    </li>
+  </ul>
+  
+
 </nav>
               </div>
             </div>
@@ -213,7 +361,7 @@
 <nav class="md-nav md-nav--secondary">
     <label class="md-nav__title" for="__toc">"Contents"</label>
   <ul class="md-nav__list" data-md-scrollfix="">
-        <li class="md-nav__item"><a href="#usage-of-poetry--page-root" class="md-nav__link">Using Poetry for Dependency Management and Project Setup</a><nav class="md-nav">
+        <li class="md-nav__item"><a href="#usage-of-poetry--page-root" class="md-nav__link">Poetry Guider</a><nav class="md-nav">
               <ul class="md-nav__list">
         <li class="md-nav__item"><a href="#what-is-poetry" class="md-nav__link">What is Poetry?</a>
         </li>
@@ -247,8 +395,8 @@
         <div class="md-content">
           <article class="md-content__inner md-typeset" role="main">
             
-  <section id="using-poetry-for-dependency-management-and-project-setup">
-<h1 id="usage-of-poetry--page-root">Using Poetry for Dependency Management and Project Setup<a class="headerlink" href="#usage-of-poetry--page-root" title="Link to this heading">¶</a></h1>
+  <section id="poetry-guider">
+<h1 id="usage-of-poetry--page-root">Poetry Guider<a class="headerlink" href="#usage-of-poetry--page-root" title="Link to this heading">¶</a></h1>
 <p>This document provides a guide to understanding Poetry, setting up the project locally, and creating installation packages for the Biofilter project.</p>
 <section id="what-is-poetry">
 <h2 id="what-is-poetry">What is Poetry?<a class="headerlink" href="#what-is-poetry" title="Link to this heading">¶</a></h2>
@@ -413,7 +561,7 @@ poetry<span class="w"> </span>publish<span class="w"> </span>--build
     <div class="md-footer-nav">
       <nav class="md-footer-nav__inner md-grid">
           
-            <a href="usage-of-sphinx.html" title="Setting Up and Running Sphinx for Biofilter Documentation"
+            <a href="usage-of-branching.html" title="Branching Structure Guide"
                class="md-flex md-footer-nav__link md-footer-nav__link--prev"
                rel="prev">
               <div class="md-flex__cell md-flex__cell--shrink">
@@ -422,17 +570,17 @@ poetry<span class="w"> </span>publish<span class="w"> </span>--build
               <div class="md-flex__cell md-flex__cell--stretch md-footer-nav__title">
                 <span class="md-flex__ellipsis">
                   <span
-                      class="md-footer-nav__direction"> "Previous" </span> Setting Up and Running Sphinx for Biofilter Documentation </span>
+                      class="md-footer-nav__direction"> "Previous" </span> Branching Structure Guide </span>
               </div>
             </a>
           
           
-            <a href="usage-of-coverage.html" title="Running Coverage in the Biofilter Project"
+            <a href="usage-of-black.html" title="Black Guide"
                class="md-flex md-footer-nav__link md-footer-nav__link--next"
                rel="next">
             <div class="md-flex__cell md-flex__cell--stretch md-footer-nav__title"><span
                 class="md-flex__ellipsis"> <span
-                class="md-footer-nav__direction"> "Next" </span> Running Coverage in the Biofilter Project </span>
+                class="md-footer-nav__direction"> "Next" </span> Black Guide </span>
             </div>
             <div class="md-flex__cell md-flex__cell--shrink"><i
                 class="md-icon md-icon--arrow-forward md-footer-nav__button"></i>

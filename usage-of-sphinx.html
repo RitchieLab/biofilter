@@ -46,7 +46,7 @@
   
   
   
-    <title>Setting Up and Running Sphinx for Biofilter Documentation &#8212; Biofilter Developer Documentation 2.4.4 documentation</title>
+    <title>Sphinx Guider &#8212; Biofilter Developer Documentation 2.4.4 documentation</title>
     <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=83e35b93" />
     <link rel="stylesheet" type="text/css" href="_static/material.css?v=79c92029" />
     <script src="_static/documentation_options.js?v=b1e24531"></script>
@@ -54,8 +54,8 @@
     <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
-    <link rel="next" title="Using Poetry for Dependency Management and Project Setup" href="usage-of-poetry.html" />
-    <link rel="prev" title="Using Tox in the Biofilter Project" href="usage-of-tox.html" />
+    <link rel="next" title="Using git and CI/CD by Actions" href="usage-of-git.html" />
+    <link rel="prev" title="Tox Guider" href="usage-of-tox.html" />
   
    
 
@@ -92,7 +92,7 @@
       <div class="md-flex__cell md-flex__cell--stretch">
         <div class="md-flex__ellipsis md-header-nav__title" data-md-component="title">
           <span class="md-header-nav__topic">Biofilter Developer Docs</span>
-          <span class="md-header-nav__topic"> Setting Up and Running Sphinx for Biofilter Documentation </span>
+          <span class="md-header-nav__topic"> Sphinx Guider </span>
         </div>
       </div>
       <div class="md-flex__cell md-flex__cell--shrink">
@@ -127,7 +127,7 @@
       
         <div class="md-flex__cell md-flex__cell--shrink">
           <div class="md-header-nav__source">
-            <a href="https://github.com/your-org/biofilter" title="Go to repository" class="md-source" data-md-source="github">
+            <a href="https://github.com/RitchieLab/biofilter" title="Go to repository" class="md-source" data-md-source="github">
 
     <div class="md-source__icon">
       <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 24 24" width="28" height="28">
@@ -186,7 +186,7 @@
        title="Biofilter Developer Documentation 2.4.4 documentation">Biofilter Developer Docs</a>
   </label>
     <div class="md-nav__source">
-      <a href="https://github.com/your-org/biofilter" title="Go to repository" class="md-source" data-md-source="github">
+      <a href="https://github.com/RitchieLab/biofilter" title="Go to repository" class="md-source" data-md-source="github">
 
     <div class="md-source__icon">
       <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 24 24" width="28" height="28">
@@ -202,6 +202,163 @@
   
   
 
+  
+  <ul class="md-nav__list">
+    <li class="md-nav__item">
+    
+      <span class="md-nav__link caption"><span class="caption-text">Contents:</span></span>
+    
+    </li>
+    <li class="md-nav__item">
+    
+    
+      <a href="usage-of-branching.html" class="md-nav__link">Branching Structure Guide</a>
+      
+    
+    </li>
+    <li class="md-nav__item">
+    
+    
+      <a href="usage-of-poetry.html" class="md-nav__link">Poetry Guider</a>
+      
+    
+    </li>
+    <li class="md-nav__item">
+    
+    
+      <a href="usage-of-black.html" class="md-nav__link">Black Guide</a>
+      
+    
+    </li>
+    <li class="md-nav__item">
+    
+    
+      <a href="usage-of-coverage.html" class="md-nav__link">Coverage Guide</a>
+      
+    
+    </li>
+    <li class="md-nav__item">
+    
+    
+      <a href="usage-of-tox.html" class="md-nav__link">Tox Guider</a>
+      
+    
+    </li>
+    <li class="md-nav__item">
+    
+    
+    <input class="md-toggle md-nav__toggle" data-md-toggle="toc" type="checkbox" id="__toc">
+    <label class="md-nav__link md-nav__link--active" for="__toc"> Sphinx Guider </label>
+    
+      <a href="#" class="md-nav__link md-nav__link--active">Sphinx Guider</a>
+      
+        
+<nav class="md-nav md-nav--secondary">
+    <label class="md-nav__title" for="__toc">"Contents"</label>
+  <ul class="md-nav__list" data-md-scrollfix="">
+        <li class="md-nav__item"><a href="#usage-of-sphinx--page-root" class="md-nav__link">Sphinx Guider</a><nav class="md-nav">
+              <ul class="md-nav__list">
+        <li class="md-nav__item"><a href="#prerequisites" class="md-nav__link">Prerequisites</a>
+        </li>
+        <li class="md-nav__item"><a href="#setting-up-the-environment" class="md-nav__link">Setting Up the Environment</a>
+        </li>
+        <li class="md-nav__item"><a href="#initializing-sphinx" class="md-nav__link">Initializing Sphinx</a>
+        </li>
+        <li class="md-nav__item"><a href="#generating-the-documentation" class="md-nav__link">Generating the Documentation</a>
+        </li>
+        <li class="md-nav__item"><a href="#customizing-documentation" class="md-nav__link">Customizing Documentation</a>
+        </li>
+        <li class="md-nav__item"><a href="#regenerating-documentation" class="md-nav__link">Regenerating Documentation</a>
+        </li>
+        <li class="md-nav__item"><a href="#tips-for-contributors" class="md-nav__link">Tips for Contributors</a>
+        </li>
+        <li class="md-nav__item"><a href="#troubleshooting" class="md-nav__link">Troubleshooting</a>
+        </li>
+        <li class="md-nav__item"><a href="#additional-resources" class="md-nav__link">Additional Resources</a>
+        </li></ul>
+            </nav>
+        </li>
+    
+<li class="md-nav__item"><a class="md-nav__extra_link" href="_sources/usage-of-sphinx.rst.txt">Show Source</a> </li>
+
+  </ul>
+</nav>
+      <ul class="md-nav__list"> 
+    <li class="md-nav__item">
+    
+    
+      <a href="#prerequisites" class="md-nav__link">Prerequisites</a>
+      
+    
+    </li>
+    <li class="md-nav__item">
+    
+    
+      <a href="#setting-up-the-environment" class="md-nav__link">Setting Up the Environment</a>
+      
+    
+    </li>
+    <li class="md-nav__item">
+    
+    
+      <a href="#initializing-sphinx" class="md-nav__link">Initializing Sphinx</a>
+      
+    
+    </li>
+    <li class="md-nav__item">
+    
+    
+      <a href="#generating-the-documentation" class="md-nav__link">Generating the Documentation</a>
+      
+    
+    </li>
+    <li class="md-nav__item">
+    
+    
+      <a href="#customizing-documentation" class="md-nav__link">Customizing Documentation</a>
+      
+    
+    </li>
+    <li class="md-nav__item">
+    
+    
+      <a href="#regenerating-documentation" class="md-nav__link">Regenerating Documentation</a>
+      
+    
+    </li>
+    <li class="md-nav__item">
+    
+    
+      <a href="#tips-for-contributors" class="md-nav__link">Tips for Contributors</a>
+      
+    
+    </li>
+    <li class="md-nav__item">
+    
+    
+      <a href="#troubleshooting" class="md-nav__link">Troubleshooting</a>
+      
+    
+    </li>
+    <li class="md-nav__item">
+    
+    
+      <a href="#additional-resources" class="md-nav__link">Additional Resources</a>
+      
+    
+    </li></ul>
+    
+    </li>
+    <li class="md-nav__item">
+    
+    
+      <a href="usage-of-git.html" class="md-nav__link">Using git and CI/CD by Actions</a>
+      
+    
+    </li>
+  </ul>
+  
+
 </nav>
               </div>
             </div>
@@ -213,7 +370,7 @@
 <nav class="md-nav md-nav--secondary">
     <label class="md-nav__title" for="__toc">"Contents"</label>
   <ul class="md-nav__list" data-md-scrollfix="">
-        <li class="md-nav__item"><a href="#usage-of-sphinx--page-root" class="md-nav__link">Setting Up and Running Sphinx for Biofilter Documentation</a><nav class="md-nav">
+        <li class="md-nav__item"><a href="#usage-of-sphinx--page-root" class="md-nav__link">Sphinx Guider</a><nav class="md-nav">
               <ul class="md-nav__list">
         <li class="md-nav__item"><a href="#prerequisites" class="md-nav__link">Prerequisites</a>
         </li>
@@ -249,8 +406,8 @@
         <div class="md-content">
           <article class="md-content__inner md-typeset" role="main">
             
-  <section id="setting-up-and-running-sphinx-for-biofilter-documentation">
-<h1 id="usage-of-sphinx--page-root">Setting Up and Running Sphinx for Biofilter Documentation<a class="headerlink" href="#usage-of-sphinx--page-root" title="Link to this heading">¶</a></h1>
+  <section id="sphinx-guider">
+<h1 id="usage-of-sphinx--page-root">Sphinx Guider<a class="headerlink" href="#usage-of-sphinx--page-root" title="Link to this heading">¶</a></h1>
 <p>This document provides instructions for contributors on how to set up, customize, and run Sphinx to generate documentation for the <strong>Biofilter</strong> project.</p>
 <section id="prerequisites">
 <h2 id="prerequisites">Prerequisites<a class="headerlink" href="#prerequisites" title="Link to this heading">¶</a></h2>
@@ -492,7 +649,7 @@ git<span class="w"> </span>commit<span class="w"> </span>-m<span class="w"> </sp
     <div class="md-footer-nav">
       <nav class="md-footer-nav__inner md-grid">
           
-            <a href="usage-of-tox.html" title="Using Tox in the Biofilter Project"
+            <a href="usage-of-tox.html" title="Tox Guider"
                class="md-flex md-footer-nav__link md-footer-nav__link--prev"
                rel="prev">
               <div class="md-flex__cell md-flex__cell--shrink">
@@ -501,17 +658,17 @@ git<span class="w"> </span>commit<span class="w"> </span>-m<span class="w"> </sp
               <div class="md-flex__cell md-flex__cell--stretch md-footer-nav__title">
                 <span class="md-flex__ellipsis">
                   <span
-                      class="md-footer-nav__direction"> "Previous" </span> Using Tox in the Biofilter Project </span>
+                      class="md-footer-nav__direction"> "Previous" </span> Tox Guider </span>
               </div>
             </a>
           
           
-            <a href="usage-of-poetry.html" title="Using Poetry for Dependency Management and Project Setup"
+            <a href="usage-of-git.html" title="Using git and CI/CD by Actions"
                class="md-flex md-footer-nav__link md-footer-nav__link--next"
                rel="next">
             <div class="md-flex__cell md-flex__cell--stretch md-footer-nav__title"><span
                 class="md-flex__ellipsis"> <span
-                class="md-footer-nav__direction"> "Next" </span> Using Poetry for Dependency Management and Project Setup </span>
+                class="md-footer-nav__direction"> "Next" </span> Using git and CI/CD by Actions </span>
             </div>
             <div class="md-flex__cell md-flex__cell--shrink"><i
                 class="md-icon md-icon--arrow-forward md-footer-nav__button"></i>

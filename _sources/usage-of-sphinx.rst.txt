@@ -1,5 +1,5 @@
-Setting Up and Running Sphinx for Biofilter Documentation
-=========================================================
+Sphinx Guider
+=============
 
 This document provides instructions for contributors on how to set up, customize, and run Sphinx to generate documentation for the **Biofilter** project.
 

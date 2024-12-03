@@ -46,7 +46,7 @@
   
   
   
-    <title>Biofilter Developer Documentation &#8212; Biofilter Developer Documentation 2.4.4 documentation</title>
+    <title>Biofilter Project Documentation &#8212; Biofilter Developer Documentation 2.4.4 documentation</title>
     <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=83e35b93" />
     <link rel="stylesheet" type="text/css" href="_static/material.css?v=79c92029" />
     <script src="_static/documentation_options.js?v=b1e24531"></script>
@@ -54,7 +54,7 @@
     <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
-    <link rel="next" title="Using Tox in the Biofilter Project" href="usage-of-tox.html" />
+    <link rel="next" title="Branching Structure Guide" href="usage-of-branching.html" />
   
    
 
@@ -91,7 +91,7 @@
       <div class="md-flex__cell md-flex__cell--stretch">
         <div class="md-flex__ellipsis md-header-nav__title" data-md-component="title">
           <span class="md-header-nav__topic">Biofilter Developer Docs</span>
-          <span class="md-header-nav__topic"> Biofilter Developer Documentation </span>
+          <span class="md-header-nav__topic"> Biofilter Project Documentation </span>
         </div>
       </div>
       <div class="md-flex__cell md-flex__cell--shrink">
@@ -126,7 +126,7 @@
       
         <div class="md-flex__cell md-flex__cell--shrink">
           <div class="md-header-nav__source">
-            <a href="https://github.com/your-org/biofilter" title="Go to repository" class="md-source" data-md-source="github">
+            <a href="https://github.com/RitchieLab/biofilter" title="Go to repository" class="md-source" data-md-source="github">
 
     <div class="md-source__icon">
       <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 24 24" width="28" height="28">
@@ -185,7 +185,7 @@
        title="Biofilter Developer Documentation 2.4.4 documentation">Biofilter Developer Docs</a>
   </label>
     <div class="md-nav__source">
-      <a href="https://github.com/your-org/biofilter" title="Go to repository" class="md-source" data-md-source="github">
+      <a href="https://github.com/RitchieLab/biofilter" title="Go to repository" class="md-source" data-md-source="github">
 
     <div class="md-source__icon">
       <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 24 24" width="28" height="28">
@@ -201,6 +201,65 @@
   
   
 
+  
+  <ul class="md-nav__list">
+    <li class="md-nav__item">
+    
+      <span class="md-nav__link caption"><span class="caption-text">Contents:</span></span>
+    
+    </li>
+    <li class="md-nav__item">
+    
+    
+      <a href="usage-of-branching.html" class="md-nav__link">Branching Structure Guide</a>
+      
+    
+    </li>
+    <li class="md-nav__item">
+    
+    
+      <a href="usage-of-poetry.html" class="md-nav__link">Poetry Guider</a>
+      
+    
+    </li>
+    <li class="md-nav__item">
+    
+    
+      <a href="usage-of-black.html" class="md-nav__link">Black Guide</a>
+      
+    
+    </li>
+    <li class="md-nav__item">
+    
+    
+      <a href="usage-of-coverage.html" class="md-nav__link">Coverage Guide</a>
+      
+    
+    </li>
+    <li class="md-nav__item">
+    
+    
+      <a href="usage-of-tox.html" class="md-nav__link">Tox Guider</a>
+      
+    
+    </li>
+    <li class="md-nav__item">
+    
+    
+      <a href="usage-of-sphinx.html" class="md-nav__link">Sphinx Guider</a>
+      
+    
+    </li>
+    <li class="md-nav__item">
+    
+    
+      <a href="usage-of-git.html" class="md-nav__link">Using git and CI/CD by Actions</a>
+      
+    
+    </li>
+  </ul>
+  
+
 </nav>
               </div>
             </div>
@@ -212,9 +271,19 @@
 <nav class="md-nav md-nav--secondary">
     <label class="md-nav__title" for="__toc">"Contents"</label>
   <ul class="md-nav__list" data-md-scrollfix="">
-        <li class="md-nav__item"><a href="#index--page-root" class="md-nav__link">Biofilter Developer Documentation</a>
+        <li class="md-nav__item"><a href="#index--page-root" class="md-nav__link">Biofilter Project Documentation</a><nav class="md-nav">
+              <ul class="md-nav__list">
+        <li class="md-nav__item"><a href="#overview" class="md-nav__link">Overview</a>
         </li>
-        <li class="md-nav__item"><a href="#indices-and-tables" class="md-nav__link">Indices and tables</a>
+        <li class="md-nav__item"><a href="#documentation-for-users" class="md-nav__link">Documentation for Users</a>
+        </li>
+        <li class="md-nav__item"><a href="#key-features" class="md-nav__link">Key Features</a>
+        </li>
+        <li class="md-nav__item"><a href="#development-resources" class="md-nav__link">Development Resources</a>
+        </li>
+        <li class="md-nav__item"><a href="#getting-started" class="md-nav__link">Getting Started</a>
+        </li></ul>
+            </nav>
         </li>
     
 <li class="md-nav__item"><a class="md-nav__extra_link" href="_sources/index.rst.txt">Show Source</a> </li>
@@ -230,15 +299,190 @@
         <div class="md-content">
           <article class="md-content__inner md-typeset" role="main">
             
-  <section id="biofilter-developer-documentation">
-<h1 id="index--page-root">Biofilter Developer Documentation<a class="headerlink" href="#index--page-root" title="Link to this heading">¶</a></h1>
-<p>Add content using <code class="docutils literal notranslate"><span class="pre">reStructuredText</span></code> syntax. See the
-<a class="reference external" href="https://www.sphinx-doc.org/en/master/usage/restructuredtext/index.html">reStructuredText</a>
-documentation for details.</p>
+  <section id="biofilter-project-documentation">
+<h1 id="index--page-root">Biofilter Project Documentation<a class="headerlink" href="#index--page-root" title="Link to this heading">¶</a></h1>
+<p>Welcome to the <strong>Biofilter</strong> project documentation! This guide provides an overview of the project, its structure, and resources to help both power users and developers get started.</p>
+<section id="overview">
+<h2 id="overview">Overview<a class="headerlink" href="#overview" title="Link to this heading">¶</a></h2>
+<p>The <strong>Biofilter</strong> project is a Python-based tool designed for efficient data processing and analysis using SQLite as its core data storage. The project is organized into two main modules:</p>
+<ol class="arabic simple">
+<li><p><strong>Biofilter Module</strong>: Responsible for managing and running the functionalities specific to the Biofilter system, such as filtering genes, groups, and annotations based on user-defined criteria.</p></li>
+<li><p><strong>LOKI Module</strong>: Manages functionalities related to the LOKI database, including data transformations and preparation for Biofilter analysis.</p></li>
+</ol>
+<p>Both modules work with a SQLite database file, which must be provided as an input argument. This database stores all the necessary data for Biofilter and LOKI functionalities, ensuring a consistent and centralized data source.</p>
+</section>
+<section id="documentation-for-users">
+<h2 id="documentation-for-users">Documentation for Users<a class="headerlink" href="#documentation-for-users" title="Link to this heading">¶</a></h2>
+<p>For more detailed instructions and usage examples, refer to the user documentation:</p>
+<ul class="simple">
+<li><p>Biofilter User Guide</p></li>
+<li><p>LOKI User Guide</p></li>
+</ul>
+</section>
+<section id="key-features">
+<h2 id="key-features">Key Features<a class="headerlink" href="#key-features" title="Link to this heading">¶</a></h2>
+<ul>
+<li><p><strong>Python-Based</strong>:</p>
+<p>The entire project is developed in Python, leveraging modern tools and libraries to ensure maintainability, scalability, and ease of use.</p>
+</li>
+<li><p><strong>Integrated SQLite Database</strong>:</p>
+<p>All data required by Biofilter and LOKI is stored in a single SQLite file. The path to this database must be provided as an argument when running either module.</p>
+</li>
+<li><p><strong>Modular Design</strong>:</p>
+<ul class="simple">
+<li><p>The Biofilter module focuses on filtering and querying functionalities.</p></li>
+<li><p>The LOKI module handles data preparation and transformations.</p></li>
+</ul>
+</li>
+<li><p><strong>Development Tools</strong>:</p>
+<ul class="simple">
+<li><p><strong>Poetry</strong>: Used for dependency management and virtual environment creation.</p></li>
+<li><p><strong>Tox</strong>: Ensures testing across multiple Python versions.</p></li>
+<li><p><strong>Black</strong>: Enforces consistent code formatting.</p></li>
+<li><p><strong>Sphinx</strong>: Generates project documentation.</p></li>
+<li><p><strong>Coverage</strong>: Measures code coverage during testing.</p></li>
+</ul>
+</li>
+</ul>
+</section>
+<section id="development-resources">
+<h2 id="development-resources">Development Resources<a class="headerlink" href="#development-resources" title="Link to this heading">¶</a></h2>
+<p>As a new contributor, here are some key points to help you navigate and contribute to the project:</p>
+<ul class="simple">
+<li><p><strong>Code Organization:</strong></p>
+<ul>
+<li><p>biofilter_modules: Contains core functionalities for Biofilter.</p></li>
+<li><p>loki_modules: Handles LOKI-specific operations.</p></li>
+<li><p>tests: Includes unit and functional tests for both modules.</p></li>
+</ul>
+</li>
+<li><p><strong>Development Workflow:</strong> Follow these guidelines to maintain consistency and quality in your contributions:</p>
+<ul>
+<li><p>Use Poetry as the central tool for managing dependencies and virtual environments.</p></li>
+<li><p>Run tests with Tox to ensure compatibility across supported Python versions.</p></li>
+<li><p>Follow code formatting standards enforced by Black.</p></li>
+</ul>
+</li>
+<li><p><strong>Environment Setup:</strong> Ensure your environment is consistent with the project’s requirements:</p>
+<ul>
+<li><p>Python &gt;= 3.10</p></li>
+<li><p>Dependencies managed through poetry install</p></li>
+</ul>
+</li>
+<li><p><strong>Tips for New Developers:</strong></p>
+<ul>
+<li><p>Start by reviewing the README and this documentation to understand the project’s goals and architecture.</p></li>
+<li><p>Use the provided tools (e.g., Black, Tox) to maintain consistency and quality in your contributions.</p></li>
+<li><p>Always run tests before submitting changes.</p></li>
+</ul>
+</li>
+</ul>
+</section>
+<section id="getting-started">
+<h2 id="getting-started">Getting Started<a class="headerlink" href="#getting-started" title="Link to this heading">¶</a></h2>
+<p>Follow these steps to set up the <strong>Biofilter</strong> project for development or testing:</p>
+<ol class="arabic simple">
+<li><p><strong>Clone the Repository</strong>:</p></li>
+</ol>
+<blockquote>
+<div><div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/RitchieLab/biofilter.git
+<span class="nb">cd</span><span class="w"> </span>biofilter
+</pre></div>
+</div>
+</div></blockquote>
+<ol class="arabic simple" start="2">
+<li><p><strong>Switch to the development Branch.</strong> Ensure you are working with the latest code:**</p></li>
+</ol>
+<blockquote>
+<div><div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>git<span class="w"> </span>checkout<span class="w"> </span>development
+</pre></div>
+</div>
+</div></blockquote>
+<ol class="arabic simple" start="3">
+<li><p><strong>Set Up Python Environment:</strong></p></li>
+</ol>
+<blockquote>
+<div><p>If you are using pyenv, set the desired Python version for the project</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pyenv<span class="w"> </span>install<span class="w"> </span><span class="m">3</span>.11.9<span class="w">  </span><span class="c1"># Example version</span>
+pyenv<span class="w"> </span><span class="nb">local</span><span class="w"> </span><span class="m">3</span>.11.9
+</pre></div>
+</div>
+<p>Ensure the Python version matches the project requirements (Python &gt;= 3.10).</p>
+</div></blockquote>
+<ol class="arabic simple" start="4">
+<li><p><strong>Install Poetry.</strong> Install Poetry, the dependency and environment manager:</p></li>
+</ol>
+<blockquote>
+<div><div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>curl<span class="w"> </span>-sSL<span class="w"> </span>https://install.python-poetry.org<span class="w"> </span><span class="p">|</span><span class="w"> </span>python3<span class="w"> </span>-
+poetry<span class="w"> </span>--version<span class="w">  </span><span class="c1"># Verify the installation</span>
+</pre></div>
+</div>
+</div></blockquote>
+<ol class="arabic simple" start="5">
+<li><p><strong>Install Project Dependencies.</strong> Use Poetry to install all required dependencies:</p></li>
+</ol>
+<blockquote>
+<div><div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>poetry<span class="w"> </span>install
+</pre></div>
+</div>
+</div></blockquote>
+<ol class="arabic simple" start="6">
+<li><p><strong>Configure Python Versions in tox.</strong> Update the tox.ini file to include the Python versions available in your environment. For example:</p></li>
+</ol>
+<blockquote>
+<div><div class="highlight-ini notranslate"><div class="highlight"><pre><span></span><span class="k">[tox]</span>
+<span class="na">envlist</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">py310, py311, py312</span>
+</pre></div>
+</div>
+</div></blockquote>
+<ol class="arabic simple" start="7">
+<li><p><strong>Run Tests.</strong> Verify your setup by running the test suite:</p></li>
+</ol>
+<blockquote>
+<div><div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>poetry<span class="w"> </span>run<span class="w"> </span>pytest
+</pre></div>
+</div>
+</div></blockquote>
 <div class="toctree-wrapper compound">
 <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="usage-of-tox.html">Using Tox in the Biofilter Project</a><ul>
+<li class="toctree-l1"><a class="reference internal" href="usage-of-branching.html">Branching Structure Guide</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="usage-of-branching.html#branches">Branches</a></li>
+<li class="toctree-l2"><a class="reference internal" href="usage-of-branching.html#workflow-summary">Workflow Summary</a></li>
+<li class="toctree-l2"><a class="reference internal" href="usage-of-branching.html#branching-best-practices">Branching Best Practices</a></li>
+<li class="toctree-l2"><a class="reference internal" href="usage-of-branching.html#conclusion">Conclusion</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="usage-of-poetry.html">Poetry Guider</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="usage-of-poetry.html#what-is-poetry">What is Poetry?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="usage-of-poetry.html#why-use-poetry">Why Use Poetry?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="usage-of-poetry.html#setting-up-the-project-locally">Setting Up the Project Locally</a></li>
+<li class="toctree-l2"><a class="reference internal" href="usage-of-poetry.html#creating-installation-packages">Creating Installation Packages</a></li>
+<li class="toctree-l2"><a class="reference internal" href="usage-of-poetry.html#automating-the-workflow">Automating the Workflow</a></li>
+<li class="toctree-l2"><a class="reference internal" href="usage-of-poetry.html#managing-dependencies">Managing Dependencies</a></li>
+<li class="toctree-l2"><a class="reference internal" href="usage-of-poetry.html#reproducibility">Reproducibility</a></li>
+<li class="toctree-l2"><a class="reference internal" href="usage-of-poetry.html#additional-resources">Additional Resources</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="usage-of-black.html">Black Guide</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="usage-of-black.html#installation">Installation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="usage-of-black.html#basic-usage">Basic Usage</a></li>
+<li class="toctree-l2"><a class="reference internal" href="usage-of-black.html#common-options">Common Options</a></li>
+<li class="toctree-l2"><a class="reference internal" href="usage-of-black.html#integrating-black-with-pre-commit-hooks">Integrating Black with Pre-Commit Hooks</a></li>
+<li class="toctree-l2"><a class="reference internal" href="usage-of-black.html#tips-for-working-with-black">Tips for Working with Black</a></li>
+<li class="toctree-l2"><a class="reference internal" href="usage-of-black.html#further-documentation">Further Documentation</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="usage-of-coverage.html">Coverage Guide</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="usage-of-coverage.html#install-coverage-py">1. Install Coverage.py</a></li>
+<li class="toctree-l2"><a class="reference internal" href="usage-of-coverage.html#run-tests-with-coverage">2. Run Tests with Coverage</a></li>
+<li class="toctree-l2"><a class="reference internal" href="usage-of-coverage.html#generate-a-coverage-report-in-the-terminal">3. Generate a Coverage Report in the Terminal</a></li>
+<li class="toctree-l2"><a class="reference internal" href="usage-of-coverage.html#generate-an-html-report">4. Generate an HTML Report</a></li>
+<li class="toctree-l2"><a class="reference internal" href="usage-of-coverage.html#exclude-files-or-lines-from-the-report-optional">5. Exclude Files or Lines from the Report (Optional)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="usage-of-coverage.html#summary-of-commands">Summary of Commands</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="usage-of-tox.html">Tox Guider</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="usage-of-tox.html#overview">Overview</a></li>
 <li class="toctree-l2"><a class="reference internal" href="usage-of-tox.html#setting-up-tox">Setting Up Tox</a></li>
 <li class="toctree-l2"><a class="reference internal" href="usage-of-tox.html#tox-configuration">Tox Configuration</a></li>
@@ -247,7 +491,7 @@ documentation for details.</p>
 <li class="toctree-l2"><a class="reference internal" href="usage-of-tox.html#cleaning-up-tox">Cleaning Up Tox</a></li>
 </ul>
 </li>
-<li class="toctree-l1"><a class="reference internal" href="usage-of-sphinx.html">Setting Up and Running Sphinx for Biofilter Documentation</a><ul>
+<li class="toctree-l1"><a class="reference internal" href="usage-of-sphinx.html">Sphinx Guider</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="usage-of-sphinx.html#prerequisites">Prerequisites</a></li>
 <li class="toctree-l2"><a class="reference internal" href="usage-of-sphinx.html#setting-up-the-environment">Setting Up the Environment</a></li>
 <li class="toctree-l2"><a class="reference internal" href="usage-of-sphinx.html#initializing-sphinx">Initializing Sphinx</a></li>
@@ -259,53 +503,10 @@ documentation for details.</p>
 <li class="toctree-l2"><a class="reference internal" href="usage-of-sphinx.html#additional-resources">Additional Resources</a></li>
 </ul>
 </li>
-<li class="toctree-l1"><a class="reference internal" href="usage-of-poetry.html">Using Poetry for Dependency Management and Project Setup</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="usage-of-poetry.html#what-is-poetry">What is Poetry?</a></li>
-<li class="toctree-l2"><a class="reference internal" href="usage-of-poetry.html#why-use-poetry">Why Use Poetry?</a></li>
-<li class="toctree-l2"><a class="reference internal" href="usage-of-poetry.html#setting-up-the-project-locally">Setting Up the Project Locally</a></li>
-<li class="toctree-l2"><a class="reference internal" href="usage-of-poetry.html#creating-installation-packages">Creating Installation Packages</a></li>
-<li class="toctree-l2"><a class="reference internal" href="usage-of-poetry.html#automating-the-workflow">Automating the Workflow</a></li>
-<li class="toctree-l2"><a class="reference internal" href="usage-of-poetry.html#managing-dependencies">Managing Dependencies</a></li>
-<li class="toctree-l2"><a class="reference internal" href="usage-of-poetry.html#reproducibility">Reproducibility</a></li>
-<li class="toctree-l2"><a class="reference internal" href="usage-of-poetry.html#additional-resources">Additional Resources</a></li>
-</ul>
-</li>
-<li class="toctree-l1"><a class="reference internal" href="usage-of-coverage.html">Running Coverage in the Biofilter Project</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="usage-of-coverage.html#install-coverage-py">1. Install Coverage.py</a></li>
-<li class="toctree-l2"><a class="reference internal" href="usage-of-coverage.html#run-tests-with-coverage">2. Run Tests with Coverage</a></li>
-<li class="toctree-l2"><a class="reference internal" href="usage-of-coverage.html#generate-a-coverage-report-in-the-terminal">3. Generate a Coverage Report in the Terminal</a></li>
-<li class="toctree-l2"><a class="reference internal" href="usage-of-coverage.html#generate-an-html-report">4. Generate an HTML Report</a></li>
-<li class="toctree-l2"><a class="reference internal" href="usage-of-coverage.html#exclude-files-or-lines-from-the-report-optional">5. Exclude Files or Lines from the Report (Optional)</a></li>
-<li class="toctree-l2"><a class="reference internal" href="usage-of-coverage.html#summary-of-commands">Summary of Commands</a></li>
-</ul>
-</li>
-<li class="toctree-l1"><a class="reference internal" href="usage-of-black.html">Black Code Formatter Guide</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="usage-of-black.html#installation">Installation</a></li>
-<li class="toctree-l2"><a class="reference internal" href="usage-of-black.html#basic-usage">Basic Usage</a></li>
-<li class="toctree-l2"><a class="reference internal" href="usage-of-black.html#common-options">Common Options</a></li>
-<li class="toctree-l2"><a class="reference internal" href="usage-of-black.html#integrating-black-with-pre-commit-hooks">Integrating Black with Pre-Commit Hooks</a></li>
-<li class="toctree-l2"><a class="reference internal" href="usage-of-black.html#tips-for-working-with-black">Tips for Working with Black</a></li>
-<li class="toctree-l2"><a class="reference internal" href="usage-of-black.html#further-documentation">Further Documentation</a></li>
-</ul>
-</li>
-<li class="toctree-l1"><a class="reference internal" href="usage-of-branching.html">Branching Structure Guide</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="usage-of-branching.html#branches">Branches</a></li>
-<li class="toctree-l2"><a class="reference internal" href="usage-of-branching.html#workflow-summary">Workflow Summary</a></li>
-<li class="toctree-l2"><a class="reference internal" href="usage-of-branching.html#branching-best-practices">Branching Best Practices</a></li>
-<li class="toctree-l2"><a class="reference internal" href="usage-of-branching.html#conclusion">Conclusion</a></li>
-</ul>
-</li>
-<li class="toctree-l1"><a class="reference internal" href="usage-of-testing.html">This is just a test</a></li>
+<li class="toctree-l1"><a class="reference internal" href="usage-of-git.html">Using git and CI/CD by Actions</a></li>
 </ul>
 </div>
 </section>
-<section id="indices-and-tables">
-<h1 id="indices-and-tables">Indices and tables<a class="headerlink" href="#indices-and-tables" title="Link to this heading">¶</a></h1>
-<ul class="simple">
-<li><p><a class="reference internal" href="genindex.html"><span class="std std-ref">Index</span></a></p></li>
-<li><p><a class="reference internal" href="py-modindex.html"><span class="std std-ref">Module Index</span></a></p></li>
-<li><p><a class="reference internal" href="search.html"><span class="std std-ref">Search Page</span></a></p></li>
-</ul>
 </section>
 
 
@@ -319,12 +520,12 @@ documentation for details.</p>
       <nav class="md-footer-nav__inner md-grid">
           
           
-            <a href="usage-of-tox.html" title="Using Tox in the Biofilter Project"
+            <a href="usage-of-branching.html" title="Branching Structure Guide"
                class="md-flex md-footer-nav__link md-footer-nav__link--next"
                rel="next">
             <div class="md-flex__cell md-flex__cell--stretch md-footer-nav__title"><span
                 class="md-flex__ellipsis"> <span
-                class="md-footer-nav__direction"> "Next" </span> Using Tox in the Biofilter Project </span>
+                class="md-footer-nav__direction"> "Next" </span> Branching Structure Guide </span>
             </div>
             <div class="md-flex__cell md-flex__cell--shrink"><i
                 class="md-icon md-icon--arrow-forward md-footer-nav__button"></i>

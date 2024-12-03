@@ -1,5 +1,5 @@
-Using Poetry for Dependency Management and Project Setup
-========================================================
+Poetry Guider
+=============
 
 This document provides a guide to understanding Poetry, setting up the project locally, and creating installation packages for the Biofilter project.
 

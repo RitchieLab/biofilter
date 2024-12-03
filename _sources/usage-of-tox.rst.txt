@@ -1,5 +1,5 @@
-Using Tox in the Biofilter Project
-==================================
+Tox Guider
+==========
 
 Tox is a tool used to automate testing across multiple Python versions and environments. It ensures consistency and compatibility in your project's workflows.
 
