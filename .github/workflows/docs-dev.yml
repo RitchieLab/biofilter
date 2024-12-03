@@ -33,7 +33,9 @@ jobs:
       # 4. Build the Sphinx documentation
       - name: Build Docs
         working-directory: docs-dev
-        run: make html
+        run: |
+          sphinx_exec=$(poetry env info --path)/bin/sphinx-build
+          make SPHINXBUILD=$sphinx_exec html
 
       # 5. Deploy to the 'gh-pages' branch
       - name: Deploy to GitHub Pages
