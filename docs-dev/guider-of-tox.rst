@@ -1,4 +1,4 @@
-Tox Guider
+Tox Guide
 ==========
 
 Tox is a tool used to automate testing across multiple Python versions and environments. It ensures consistency and compatibility in your project's workflows.
@@ -13,19 +13,10 @@ Tox allows you to:
 - Automate dependency installation and testing.
 - Isolate environments to ensure reproducibility.
 
-Setting Up Tox
---------------
-
-Tox is already included as a development dependency in the **Biofilter** project. If you need to install it manually, use the following command:
-
-.. code-block:: bash
-
-    poetry add --group dev tox
-
 Tox Configuration
 ------------------
 
-Tox is configured via the `tox.ini` file in the root of the project. Below is an example configuration:
+Tox is configured via the ``tox.ini`` file in the root of the project. Below is an example configuration:
 
 .. code-block:: ini
 
@@ -47,7 +38,8 @@ Tox is configured via the `tox.ini` file in the root of the project. Below is an
 Using Tox
 ---------
 
-### Running All Environments
+Running All Environments
+~~~~~~~~~~~~~~~~~~~~~~~~
 
 To run tests across all configured Python versions, execute:
 
@@ -57,47 +49,52 @@ To run tests across all configured Python versions, execute:
 
 Tox will create isolated environments and execute the tests in each.
 
-### Running Specific Environments
+Running Specific Environments
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-To test a specific Python version or configuration, use the `-e` flag:
-
-.. code-block:: bash
-
-poetry run tox -e py310 
-
-### Recreating Environments
-
-If you make changes to the `tox.ini` file or dependencies, recreate the environments:
+To test a specific Python version or configuration, use the ``-e`` flag:
 
 .. code-block:: bash
 
-    poetry run tox --recreate   
+    poetry run tox -e py310
+
+Recreating Environments
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+If you make changes to the ``tox.ini`` file or dependencies, recreate the environments:
+
+.. code-block:: bash
+
+    poetry run tox --recreate
 
 Customizing Tox
 ---------------
 
-### Specifying Python Interpreter Paths
+Specifying Python Interpreter Paths
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-If Tox cannot find a specific Python version, specify its path in the `tox.ini` file:
+If Tox cannot find a specific Python version, specify its path in the ``tox.ini`` file:
 
 .. code-block:: ini
 
     [testenv:py310]
     basepython = /path/to/python3.10
 
-Replace `/path/to/python3.10` with the actual path of your Python interpreter.
+Replace ``/path/to/python3.10`` with the actual path of your Python interpreter.
 
-### Parallel Execution
+Parallel Execution
+~~~~~~~~~~~~~~~~~~
 
 To speed up testing, you can run environments in parallel:
 
 .. code-block:: bash
 
-    poetry run tox -p auto  
+    poetry run tox -p auto
 
-### Adding Environment Variables
+Adding Environment Variables
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-To pass environment variables during testing, add them to the `tox.ini` file:
+To pass environment variables during testing, add them to the ``tox.ini`` file:
 
 .. code-block:: ini
 
@@ -116,8 +113,23 @@ Run Tox with the environment variable set:
 Cleaning Up Tox
 ---------------
 
-To clean up all Tox environments, remove the `.tox/` directory:
+To clean up all Tox environments, remove the ``.tox/`` directory:
 
 .. code-block:: bash
 
     rm -rf .tox/
+
+CI/CD Integration
+------------------
+
+Tox is integrated into the project's CI/CD pipeline. Whenever changes are pushed to the repository, Tox automatically validates the codebase across the specified Python versions. This ensures that new changes are compatible and do not introduce regressions.
+
+.. important::
+
+    Always run Tox locally before committing to identify and fix any compatibility issues in advance.
+
+Additional Resources
+--------------------
+
+- `Tox Documentation <https://tox.readthedocs.io/en/latest/>`_
+- `Poetry Documentation <https://python-poetry.org/docs/>`_

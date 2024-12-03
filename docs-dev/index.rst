@@ -20,8 +20,8 @@ Documentation for Users
 -----------------------
 For more detailed instructions and usage examples, refer to the user documentation:
 
-- Biofilter User Guide
-- LOKI User Guide
+- `Biofilter User Guide  <https://ritchielab.readthedocs.io/en/latest/k>`_.
+- `LOKI User Guide  <https://ritchielab.readthedocs.io/en/latest/k>`_.
 
 
 Key Features
@@ -136,13 +136,13 @@ Follow these steps to set up the **Biofilter** project for development or testin
 
 .. toctree::
   :maxdepth: 2
-  :caption: Contents:
 
-  usage-of-branching
-  usage-of-poetry
-  usage-of-black
-  usage-of-coverage
-  usage-of-tox
-  usage-of-sphinx
-  usage-of-git
+  guider-of-branching
+  guider-of-poetry
+  guider-of-black
+  guider-of-tests
+  guider-of-coverage
+  guider-of-tox
+  guider-of-sphinx
+  guider-of-git
   
