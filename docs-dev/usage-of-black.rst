@@ -1,4 +1,4 @@
-Black Code Formatter Guide
+Black Guide
 ==========================
 
 Black is a code formatter for Python that automatically reformats your code to be more readable and standardized. This guide provides essential information for using Black within this project.

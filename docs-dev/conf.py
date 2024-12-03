@@ -28,8 +28,6 @@ extensions = [
 templates_path = ['_templates']
 exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
 
-
-
 # -- Options for HTML output -------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
 
@@ -40,11 +38,21 @@ html_theme = "sphinx_material"
 
 html_theme_options = {
     "nav_title": "Biofilter Developer Docs",
+    "base_url": "https://github.com/RitchieLab/biofilter",
     "color_primary": "blue",
     "color_accent": "light-blue",
-    "repo_url": "https://github.com/your-org/biofilter",
+    "repo_url": "https://github.com/RitchieLab/biofilter",
     "repo_name": "Biofilter",
     "globaltoc_depth": 2,
     "globaltoc_collapse": True,
     "globaltoc_includehidden": True,
+}
+
+html_sidebars = {
+    "**": [
+        "logo-text.html",
+        "globaltoc.html",
+        "localtoc.html",
+        "searchbox.html"
+        ]
 }

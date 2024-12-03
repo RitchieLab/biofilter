@@ -3,7 +3,7 @@ name: Build and Deploy Docs-Dev
 on:
   push:
     branches:
-      - development  # O workflow será acionado em pushes no branch 'development'
+      - development  # The workflow will be triggered on pushes to the 'development' branch
 
 jobs:
   build-and-deploy:
@@ -14,13 +14,13 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v3
         with:
-          fetch-depth: 1  # Apenas a última revisão para otimizar
+          fetch-depth: 1  # Only the last commit is needed for the workflow
 
       # 2. Set up Python environment
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: 3.11  # Use a versão de Python que seu projeto requer
+          python-version: 3.11  # Same as the version of Python required in project
 
       # 3. Install dependencies using Poetry
       - name: Install dependencies
