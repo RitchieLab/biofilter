@@ -54,7 +54,7 @@
     <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
-    <link rel="next" title="Poetry Guider" href="usage-of-poetry.html" />
+    <link rel="next" title="Poetry Guider" href="guider-of-poetry.html" />
     <link rel="prev" title="Biofilter Project Documentation" href="index.html" />
   
    
@@ -74,7 +74,7 @@
   <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer">
   <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search">
   <label class="md-overlay" data-md-component="overlay" for="__drawer"></label>
-  <a href="#usage-of-branching" tabindex="1" class="md-skip"> Skip to content </a>
+  <a href="#guider-of-branching" tabindex="1" class="md-skip"> Skip to content </a>
   <header class="md-header" data-md-component="header">
   <nav class="md-header-nav md-grid">
     <div class="md-flex navheader">
@@ -206,11 +206,6 @@
   <ul class="md-nav__list">
     <li class="md-nav__item">
     
-      <span class="md-nav__link caption"><span class="caption-text">Contents:</span></span>
-    
-    </li>
-    <li class="md-nav__item">
-    
     
     <input class="md-toggle md-nav__toggle" data-md-toggle="toc" type="checkbox" id="__toc">
     <label class="md-nav__link md-nav__link--active" for="__toc"> Branching Structure Guide </label>
@@ -221,9 +216,19 @@
 <nav class="md-nav md-nav--secondary">
     <label class="md-nav__title" for="__toc">"Contents"</label>
   <ul class="md-nav__list" data-md-scrollfix="">
-        <li class="md-nav__item"><a href="#usage-of-branching--page-root" class="md-nav__link">Branching Structure Guide</a><nav class="md-nav">
+        <li class="md-nav__item"><a href="#guider-of-branching--page-root" class="md-nav__link">Branching Structure Guide</a><nav class="md-nav">
               <ul class="md-nav__list">
         <li class="md-nav__item"><a href="#branches" class="md-nav__link">Branches</a>
+        </li>
+        <li class="md-nav__item"><a href="#main-branch-main" class="md-nav__link">Main Branch: <code class="docutils literal notranslate"><span class="pre">main</span></code></a>
+        </li>
+        <li class="md-nav__item"><a href="#development-branch-development" class="md-nav__link">Development Branch: <code class="docutils literal notranslate"><span class="pre">development</span></code></a>
+        </li>
+        <li class="md-nav__item"><a href="#feature-branch-dev-3-0-0" class="md-nav__link">Feature Branch: <code class="docutils literal notranslate"><span class="pre">dev-3.0.0</span></code></a>
+        </li>
+        <li class="md-nav__item"><a href="#documentation-branch-gh-pages" class="md-nav__link">Documentation Branch: <code class="docutils literal notranslate"><span class="pre">gh-pages</span></code></a>
+        </li>
+        <li class="md-nav__item"><a href="#workflow-for-updating-documentation" class="md-nav__link">Workflow for Updating Documentation</a>
         </li>
         <li class="md-nav__item"><a href="#workflow-summary" class="md-nav__link">Workflow Summary</a>
         </li>
@@ -234,7 +239,7 @@
             </nav>
         </li>
     
-<li class="md-nav__item"><a class="md-nav__extra_link" href="_sources/usage-of-branching.rst.txt">Show Source</a> </li>
+<li class="md-nav__item"><a class="md-nav__extra_link" href="_sources/guider-of-branching.rst.txt">Show Source</a> </li>
 
   </ul>
 </nav>
@@ -243,6 +248,41 @@
     
     
       <a href="#branches" class="md-nav__link">Branches</a>
+      
+    
+    </li>
+    <li class="md-nav__item">
+    
+    
+      <a href="#main-branch-main" class="md-nav__link">Main Branch: <code class="docutils literal notranslate"><span class="pre">main</span></code></a>
+      
+    
+    </li>
+    <li class="md-nav__item">
+    
+    
+      <a href="#development-branch-development" class="md-nav__link">Development Branch: <code class="docutils literal notranslate"><span class="pre">development</span></code></a>
+      
+    
+    </li>
+    <li class="md-nav__item">
+    
+    
+      <a href="#feature-branch-dev-3-0-0" class="md-nav__link">Feature Branch: <code class="docutils literal notranslate"><span class="pre">dev-3.0.0</span></code></a>
+      
+    
+    </li>
+    <li class="md-nav__item">
+    
+    
+      <a href="#documentation-branch-gh-pages" class="md-nav__link">Documentation Branch: <code class="docutils literal notranslate"><span class="pre">gh-pages</span></code></a>
+      
+    
+    </li>
+    <li class="md-nav__item">
+    
+    
+      <a href="#workflow-for-updating-documentation" class="md-nav__link">Workflow for Updating Documentation</a>
       
     
     </li>
@@ -272,42 +312,49 @@
     <li class="md-nav__item">
     
     
-      <a href="usage-of-poetry.html" class="md-nav__link">Poetry Guider</a>
+      <a href="guider-of-poetry.html" class="md-nav__link">Poetry Guider</a>
       
     
     </li>
     <li class="md-nav__item">
     
     
-      <a href="usage-of-black.html" class="md-nav__link">Black Guide</a>
+      <a href="guider-of-black.html" class="md-nav__link">Black Guide</a>
       
     
     </li>
     <li class="md-nav__item">
     
     
-      <a href="usage-of-coverage.html" class="md-nav__link">Coverage Guide</a>
+      <a href="guider-of-tests.html" class="md-nav__link">Testing Guider</a>
       
     
     </li>
     <li class="md-nav__item">
     
     
-      <a href="usage-of-tox.html" class="md-nav__link">Tox Guider</a>
+      <a href="guider-of-coverage.html" class="md-nav__link">Coverage Guide</a>
       
     
     </li>
     <li class="md-nav__item">
     
     
-      <a href="usage-of-sphinx.html" class="md-nav__link">Sphinx Guider</a>
+      <a href="guider-of-tox.html" class="md-nav__link">Tox Guide</a>
       
     
     </li>
     <li class="md-nav__item">
     
     
-      <a href="usage-of-git.html" class="md-nav__link">Using git and CI/CD by Actions</a>
+      <a href="guider-of-sphinx.html" class="md-nav__link">Sphinx Guide</a>
+      
+    
+    </li>
+    <li class="md-nav__item">
+    
+    
+      <a href="guider-of-git.html" class="md-nav__link">GIT Guider</a>
       
     
     </li>
@@ -325,9 +372,19 @@
 <nav class="md-nav md-nav--secondary">
     <label class="md-nav__title" for="__toc">"Contents"</label>
   <ul class="md-nav__list" data-md-scrollfix="">
-        <li class="md-nav__item"><a href="#usage-of-branching--page-root" class="md-nav__link">Branching Structure Guide</a><nav class="md-nav">
+        <li class="md-nav__item"><a href="#guider-of-branching--page-root" class="md-nav__link">Branching Structure Guide</a><nav class="md-nav">
               <ul class="md-nav__list">
         <li class="md-nav__item"><a href="#branches" class="md-nav__link">Branches</a>
+        </li>
+        <li class="md-nav__item"><a href="#main-branch-main" class="md-nav__link">Main Branch: <code class="docutils literal notranslate"><span class="pre">main</span></code></a>
+        </li>
+        <li class="md-nav__item"><a href="#development-branch-development" class="md-nav__link">Development Branch: <code class="docutils literal notranslate"><span class="pre">development</span></code></a>
+        </li>
+        <li class="md-nav__item"><a href="#feature-branch-dev-3-0-0" class="md-nav__link">Feature Branch: <code class="docutils literal notranslate"><span class="pre">dev-3.0.0</span></code></a>
+        </li>
+        <li class="md-nav__item"><a href="#documentation-branch-gh-pages" class="md-nav__link">Documentation Branch: <code class="docutils literal notranslate"><span class="pre">gh-pages</span></code></a>
+        </li>
+        <li class="md-nav__item"><a href="#workflow-for-updating-documentation" class="md-nav__link">Workflow for Updating Documentation</a>
         </li>
         <li class="md-nav__item"><a href="#workflow-summary" class="md-nav__link">Workflow Summary</a>
         </li>
@@ -338,7 +395,7 @@
             </nav>
         </li>
     
-<li class="md-nav__item"><a class="md-nav__extra_link" href="_sources/usage-of-branching.rst.txt">Show Source</a> </li>
+<li class="md-nav__item"><a class="md-nav__extra_link" href="_sources/guider-of-branching.rst.txt">Show Source</a> </li>
 
 <li id="searchbox" class="md-nav__item"></li>
 
@@ -352,25 +409,31 @@
           <article class="md-content__inner md-typeset" role="main">
             
   <section id="branching-structure-guide">
-<h1 id="usage-of-branching--page-root">Branching Structure Guide<a class="headerlink" href="#usage-of-branching--page-root" title="Link to this heading">¶</a></h1>
+<h1 id="guider-of-branching--page-root">Branching Structure Guide<a class="headerlink" href="#guider-of-branching--page-root" title="Link to this heading">¶</a></h1>
 <p>This project follows a structured branching strategy to manage different versions and stages of development efficiently. Here’s a breakdown of each main branch and its purpose.</p>
 <section id="branches">
 <h2 id="branches">Branches<a class="headerlink" href="#branches" title="Link to this heading">¶</a></h2>
-<p>### Main Branch: <code class="docutils literal notranslate"><span class="pre">main</span></code></p>
+</section>
+<section id="main-branch-main">
+<h2 id="main-branch-main">Main Branch: <code class="docutils literal notranslate"><span class="pre">main</span></code><a class="headerlink" href="#main-branch-main" title="Link to this heading">¶</a></h2>
 <p>The <code class="docutils literal notranslate"><span class="pre">main</span></code> branch represents the stable, production-ready version of the codebase. It contains the latest official release of the project. Code in <code class="docutils literal notranslate"><span class="pre">main</span></code> is fully tested and approved for production use.</p>
 <ul class="simple">
 <li><p><strong>Current Version</strong>: 2.4.3</p></li>
 <li><p><strong>Purpose</strong>: Serves as the default branch for stable releases.</p></li>
 <li><p><strong>Merge Strategy</strong>: Only merges from fully tested and verified branches (such as <code class="docutils literal notranslate"><span class="pre">development</span></code>) are allowed.</p></li>
 </ul>
-<p>### Development Branch: <code class="docutils literal notranslate"><span class="pre">development</span></code></p>
+</section>
+<section id="development-branch-development">
+<h2 id="development-branch-development">Development Branch: <code class="docutils literal notranslate"><span class="pre">development</span></code><a class="headerlink" href="#development-branch-development" title="Link to this heading">¶</a></h2>
 <p>The <code class="docutils literal notranslate"><span class="pre">development</span></code> branch is where active development for minor versions takes place. Features, bug fixes, and improvements for the upcoming stable release are integrated here before they are fully tested and merged into <code class="docutils literal notranslate"><span class="pre">main</span></code>.</p>
 <ul class="simple">
 <li><p><strong>Current Version</strong>: 2.4.4 (in-progress)</p></li>
 <li><p><strong>Purpose</strong>: Acts as the integration branch for ongoing work and testing of the next stable release.</p></li>
 <li><p><strong>Merge Strategy</strong>: Developers create feature branches off <code class="docutils literal notranslate"><span class="pre">development</span></code> and merge completed features back into <code class="docutils literal notranslate"><span class="pre">development</span></code> after testing.</p></li>
 </ul>
-<p>### Feature Branch: <code class="docutils literal notranslate"><span class="pre">dev-3.0.0</span></code></p>
+</section>
+<section id="feature-branch-dev-3-0-0">
+<h2 id="feature-branch-dev-3-0-0">Feature Branch: <code class="docutils literal notranslate"><span class="pre">dev-3.0.0</span></code><a class="headerlink" href="#feature-branch-dev-3-0-0" title="Link to this heading">¶</a></h2>
 <p>The <code class="docutils literal notranslate"><span class="pre">dev-3.0.0</span></code> branch is dedicated to developing and testing major updates or changes that are not yet stable enough for integration with <code class="docutils literal notranslate"><span class="pre">main</span></code>. This branch includes work on significant new features and alterations, such as the introduction of new data sources and schema changes in the database.</p>
 <ul class="simple">
 <li><p><strong>Current Version</strong>: 3.0.0 (under development)</p></li>
@@ -379,6 +442,42 @@
 <li><p><strong>Versioning Note</strong>: This branch was initially created from version 2.4.3. Any updates beyond 2.4.3 should be reflected in this branch to maintain continuity.</p></li>
 </ul>
 </section>
+<section id="documentation-branch-gh-pages">
+<h2 id="documentation-branch-gh-pages">Documentation Branch: <code class="docutils literal notranslate"><span class="pre">gh-pages</span></code><a class="headerlink" href="#documentation-branch-gh-pages" title="Link to this heading">¶</a></h2>
+<p>The <code class="docutils literal notranslate"><span class="pre">gh-pages</span></code> branch is a dedicated branch used exclusively for hosting the development documentation of the project. This branch is managed automatically by GitHub Actions, and its content is regenerated every time a new commit is pushed to the <code class="docutils literal notranslate"><span class="pre">development</span></code> branch.</p>
+<ul class="simple">
+<li><p><strong>Purpose</strong>: Hosts the HTML files generated by Sphinx for the developer documentation.</p></li>
+<li><dl class="simple">
+<dt><strong>Restrictions</strong>:</dt><dd><ul>
+<li><p><strong>Do Not Edit Directly</strong>: The branch is overwritten automatically during each deployment. Any manual changes to this branch will be lost.</p></li>
+<li><p>All updates to the documentation must be made in the <code class="docutils literal notranslate"><span class="pre">docs-dev</span></code> directory on the <code class="docutils literal notranslate"><span class="pre">development</span></code> branch. The GitHub Actions workflow then builds and deploys these changes to the <code class="docutils literal notranslate"><span class="pre">gh-pages</span></code> branch.</p></li>
+</ul>
+</dd>
+</dl>
+</li>
+<li><dl class="simple">
+<dt><strong>Access</strong>: The documentation can be accessed at:</dt><dd><p>[<a class="reference external" href="https://ritchielab.github.io/biofilter/](https://ritchielab.github.io/biofilter/">https://ritchielab.github.io/biofilter/](https://ritchielab.github.io/biofilter/</a>)</p>
+</dd>
+</dl>
+</li>
+</ul>
+</section>
+<section id="workflow-for-updating-documentation">
+<h2 id="workflow-for-updating-documentation">Workflow for Updating Documentation<a class="headerlink" href="#workflow-for-updating-documentation" title="Link to this heading">¶</a></h2>
+<ol class="arabic simple">
+<li><p>Make changes to the documentation in the <code class="docutils literal notranslate"><span class="pre">docs-dev</span></code> directory in the <code class="docutils literal notranslate"><span class="pre">development</span></code> branch.</p></li>
+<li><p>Commit and push your changes to the <code class="docutils literal notranslate"><span class="pre">development</span></code> branch.</p></li>
+<li><dl class="simple">
+<dt>GitHub Actions will automatically:</dt><dd><ul class="simple">
+<li><p>Build the documentation using Sphinx.</p></li>
+<li><p>Deploy the generated HTML files to the <code class="docutils literal notranslate"><span class="pre">gh-pages</span></code> branch.</p></li>
+</ul>
+</dd>
+</dl>
+</li>
+<li><p>Verify the updated documentation.</p></li>
+</ol>
+</section>
 <section id="workflow-summary">
 <h2 id="workflow-summary">Workflow Summary<a class="headerlink" href="#workflow-summary" title="Link to this heading">¶</a></h2>
 <ol class="arabic simple">
@@ -386,14 +485,16 @@
 <li><p><strong>Testing and Integration</strong>: When a feature is complete, it is merged into <code class="docutils literal notranslate"><span class="pre">development</span></code> for testing and integration with other recent changes.</p></li>
 <li><p><strong>Stable Release Preparation</strong>: Once the <code class="docutils literal notranslate"><span class="pre">development</span></code> branch is stable and ready for release, it is merged into <code class="docutils literal notranslate"><span class="pre">main</span></code>, creating an official, stable release.</p></li>
 <li><p><strong>Major Version Development</strong>: Experimental or significant changes go into <code class="docutils literal notranslate"><span class="pre">dev-3.0.0</span></code> until they are ready for production.</p></li>
+<li><p><strong>Documentation Deployment</strong>: Updates to the <code class="docutils literal notranslate"><span class="pre">docs-dev</span></code> directory are built and deployed to the <code class="docutils literal notranslate"><span class="pre">gh-pages</span></code> branch automatically by GitHub Actions.</p></li>
 </ol>
 </section>
 <section id="branching-best-practices">
 <h2 id="branching-best-practices">Branching Best Practices<a class="headerlink" href="#branching-best-practices" title="Link to this heading">¶</a></h2>
 <ul class="simple">
-<li><p><strong>Keep ``main`` stable</strong>: Only tested, production-ready code should be merged into <code class="docutils literal notranslate"><span class="pre">main</span></code>.</p></li>
+<li><p><strong>Keep main stable</strong>: Only tested, production-ready code should be merged into <code class="docutils literal notranslate"><span class="pre">main</span></code>.</p></li>
 <li><p><strong>Use Feature Branches</strong>: For each new feature or fix, create a branch off <code class="docutils literal notranslate"><span class="pre">development</span></code>. This keeps <code class="docutils literal notranslate"><span class="pre">development</span></code> organized and easier to manage.</p></li>
 <li><p><strong>Document and Review Changes</strong>: Always document significant changes to the codebase. Use pull requests to review and approve changes before merging into shared branches.</p></li>
+<li><p><strong>Do Not Modify ``gh-pages`` Directly</strong>: Always update documentation in the <code class="docutils literal notranslate"><span class="pre">docs-dev</span></code> directory in the <code class="docutils literal notranslate"><span class="pre">development</span></code> branch.</p></li>
 </ul>
 </section>
 <section id="conclusion">
@@ -426,7 +527,7 @@
             </a>
           
           
-            <a href="usage-of-poetry.html" title="Poetry Guider"
+            <a href="guider-of-poetry.html" title="Poetry Guider"
                class="md-flex md-footer-nav__link md-footer-nav__link--next"
                rel="next">
             <div class="md-flex__cell md-flex__cell--stretch md-footer-nav__title"><span

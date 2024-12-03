@@ -46,7 +46,7 @@
   
   
   
-    <title>Sphinx Guider &#8212; Biofilter Developer Documentation 2.4.4 documentation</title>
+    <title>Sphinx Guide &#8212; Biofilter Developer Documentation 2.4.4 documentation</title>
     <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=83e35b93" />
     <link rel="stylesheet" type="text/css" href="_static/material.css?v=79c92029" />
     <script src="_static/documentation_options.js?v=b1e24531"></script>
@@ -54,8 +54,8 @@
     <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
-    <link rel="next" title="Using git and CI/CD by Actions" href="usage-of-git.html" />
-    <link rel="prev" title="Tox Guider" href="usage-of-tox.html" />
+    <link rel="next" title="GIT Guider" href="guider-of-git.html" />
+    <link rel="prev" title="Tox Guide" href="guider-of-tox.html" />
   
    
 
@@ -74,7 +74,7 @@
   <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer">
   <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search">
   <label class="md-overlay" data-md-component="overlay" for="__drawer"></label>
-  <a href="#usage-of-sphinx" tabindex="1" class="md-skip"> Skip to content </a>
+  <a href="#guider-of-sphinx" tabindex="1" class="md-skip"> Skip to content </a>
   <header class="md-header" data-md-component="header">
   <nav class="md-header-nav md-grid">
     <div class="md-flex navheader">
@@ -92,7 +92,7 @@
       <div class="md-flex__cell md-flex__cell--stretch">
         <div class="md-flex__ellipsis md-header-nav__title" data-md-component="title">
           <span class="md-header-nav__topic">Biofilter Developer Docs</span>
-          <span class="md-header-nav__topic"> Sphinx Guider </span>
+          <span class="md-header-nav__topic"> Sphinx Guide </span>
         </div>
       </div>
       <div class="md-flex__cell md-flex__cell--shrink">
@@ -206,41 +206,43 @@
   <ul class="md-nav__list">
     <li class="md-nav__item">
     
-      <span class="md-nav__link caption"><span class="caption-text">Contents:</span></span>
     
-    </li>
-    <li class="md-nav__item">
-    
-    
-      <a href="usage-of-branching.html" class="md-nav__link">Branching Structure Guide</a>
+      <a href="guider-of-branching.html" class="md-nav__link">Branching Structure Guide</a>
       
     
     </li>
     <li class="md-nav__item">
     
     
-      <a href="usage-of-poetry.html" class="md-nav__link">Poetry Guider</a>
+      <a href="guider-of-poetry.html" class="md-nav__link">Poetry Guider</a>
       
     
     </li>
     <li class="md-nav__item">
     
     
-      <a href="usage-of-black.html" class="md-nav__link">Black Guide</a>
+      <a href="guider-of-black.html" class="md-nav__link">Black Guide</a>
       
     
     </li>
     <li class="md-nav__item">
     
     
-      <a href="usage-of-coverage.html" class="md-nav__link">Coverage Guide</a>
+      <a href="guider-of-tests.html" class="md-nav__link">Testing Guider</a>
       
     
     </li>
     <li class="md-nav__item">
     
     
-      <a href="usage-of-tox.html" class="md-nav__link">Tox Guider</a>
+      <a href="guider-of-coverage.html" class="md-nav__link">Coverage Guide</a>
+      
+    
+    </li>
+    <li class="md-nav__item">
+    
+    
+      <a href="guider-of-tox.html" class="md-nav__link">Tox Guide</a>
       
     
     </li>
@@ -248,27 +250,35 @@
     
     
     <input class="md-toggle md-nav__toggle" data-md-toggle="toc" type="checkbox" id="__toc">
-    <label class="md-nav__link md-nav__link--active" for="__toc"> Sphinx Guider </label>
+    <label class="md-nav__link md-nav__link--active" for="__toc"> Sphinx Guide </label>
     
-      <a href="#" class="md-nav__link md-nav__link--active">Sphinx Guider</a>
+      <a href="#" class="md-nav__link md-nav__link--active">Sphinx Guide</a>
       
         
 <nav class="md-nav md-nav--secondary">
     <label class="md-nav__title" for="__toc">"Contents"</label>
   <ul class="md-nav__list" data-md-scrollfix="">
-        <li class="md-nav__item"><a href="#usage-of-sphinx--page-root" class="md-nav__link">Sphinx Guider</a><nav class="md-nav">
+        <li class="md-nav__item"><a href="#guider-of-sphinx--page-root" class="md-nav__link">Sphinx Guide</a><nav class="md-nav">
               <ul class="md-nav__list">
+        <li class="md-nav__item"><a href="#documentation-structure" class="md-nav__link">Documentation Structure</a>
+        </li>
         <li class="md-nav__item"><a href="#prerequisites" class="md-nav__link">Prerequisites</a>
         </li>
-        <li class="md-nav__item"><a href="#setting-up-the-environment" class="md-nav__link">Setting Up the Environment</a>
+        <li class="md-nav__item"><a href="#working-with-documentation" class="md-nav__link">Working with Documentation</a><nav class="md-nav">
+              <ul class="md-nav__list">
+        <li class="md-nav__item"><a href="#user-documentation-docs" class="md-nav__link">User Documentation (<code class="docutils literal notranslate"><span class="pre">docs/</span></code>)</a>
         </li>
-        <li class="md-nav__item"><a href="#initializing-sphinx" class="md-nav__link">Initializing Sphinx</a>
+        <li class="md-nav__item"><a href="#developer-documentation-docs-dev" class="md-nav__link">Developer Documentation (<code class="docutils literal notranslate"><span class="pre">docs-dev/</span></code>)</a>
+        </li></ul>
+            </nav>
         </li>
-        <li class="md-nav__item"><a href="#generating-the-documentation" class="md-nav__link">Generating the Documentation</a>
+        <li class="md-nav__item"><a href="#customizing-documentation" class="md-nav__link">Customizing Documentation</a><nav class="md-nav">
+              <ul class="md-nav__list">
+        <li class="md-nav__item"><a href="#configuration-files" class="md-nav__link">Configuration Files</a>
+        </li></ul>
+            </nav>
         </li>
-        <li class="md-nav__item"><a href="#customizing-documentation" class="md-nav__link">Customizing Documentation</a>
-        </li>
-        <li class="md-nav__item"><a href="#regenerating-documentation" class="md-nav__link">Regenerating Documentation</a>
+        <li class="md-nav__item"><a href="#customizing-and-regenerating" class="md-nav__link">Customizing and Regenerating</a>
         </li>
         <li class="md-nav__item"><a href="#tips-for-contributors" class="md-nav__link">Tips for Contributors</a>
         </li>
@@ -279,11 +289,18 @@
             </nav>
         </li>
     
-<li class="md-nav__item"><a class="md-nav__extra_link" href="_sources/usage-of-sphinx.rst.txt">Show Source</a> </li>
+<li class="md-nav__item"><a class="md-nav__extra_link" href="_sources/guider-of-sphinx.rst.txt">Show Source</a> </li>
 
   </ul>
 </nav>
       <ul class="md-nav__list"> 
+    <li class="md-nav__item">
+    
+    
+      <a href="#documentation-structure" class="md-nav__link">Documentation Structure</a>
+      
+    
+    </li>
     <li class="md-nav__item">
     
     
@@ -294,21 +311,7 @@
     <li class="md-nav__item">
     
     
-      <a href="#setting-up-the-environment" class="md-nav__link">Setting Up the Environment</a>
-      
-    
-    </li>
-    <li class="md-nav__item">
-    
-    
-      <a href="#initializing-sphinx" class="md-nav__link">Initializing Sphinx</a>
-      
-    
-    </li>
-    <li class="md-nav__item">
-    
-    
-      <a href="#generating-the-documentation" class="md-nav__link">Generating the Documentation</a>
+      <a href="#working-with-documentation" class="md-nav__link">Working with Documentation</a>
       
     
     </li>
@@ -322,7 +325,7 @@
     <li class="md-nav__item">
     
     
-      <a href="#regenerating-documentation" class="md-nav__link">Regenerating Documentation</a>
+      <a href="#customizing-and-regenerating" class="md-nav__link">Customizing and Regenerating</a>
       
     
     </li>
@@ -352,7 +355,7 @@
     <li class="md-nav__item">
     
     
-      <a href="usage-of-git.html" class="md-nav__link">Using git and CI/CD by Actions</a>
+      <a href="guider-of-git.html" class="md-nav__link">GIT Guider</a>
       
     
     </li>
@@ -370,19 +373,27 @@
 <nav class="md-nav md-nav--secondary">
     <label class="md-nav__title" for="__toc">"Contents"</label>
   <ul class="md-nav__list" data-md-scrollfix="">
-        <li class="md-nav__item"><a href="#usage-of-sphinx--page-root" class="md-nav__link">Sphinx Guider</a><nav class="md-nav">
+        <li class="md-nav__item"><a href="#guider-of-sphinx--page-root" class="md-nav__link">Sphinx Guide</a><nav class="md-nav">
               <ul class="md-nav__list">
+        <li class="md-nav__item"><a href="#documentation-structure" class="md-nav__link">Documentation Structure</a>
+        </li>
         <li class="md-nav__item"><a href="#prerequisites" class="md-nav__link">Prerequisites</a>
         </li>
-        <li class="md-nav__item"><a href="#setting-up-the-environment" class="md-nav__link">Setting Up the Environment</a>
+        <li class="md-nav__item"><a href="#working-with-documentation" class="md-nav__link">Working with Documentation</a><nav class="md-nav">
+              <ul class="md-nav__list">
+        <li class="md-nav__item"><a href="#user-documentation-docs" class="md-nav__link">User Documentation (<code class="docutils literal notranslate"><span class="pre">docs/</span></code>)</a>
         </li>
-        <li class="md-nav__item"><a href="#initializing-sphinx" class="md-nav__link">Initializing Sphinx</a>
+        <li class="md-nav__item"><a href="#developer-documentation-docs-dev" class="md-nav__link">Developer Documentation (<code class="docutils literal notranslate"><span class="pre">docs-dev/</span></code>)</a>
+        </li></ul>
+            </nav>
         </li>
-        <li class="md-nav__item"><a href="#generating-the-documentation" class="md-nav__link">Generating the Documentation</a>
+        <li class="md-nav__item"><a href="#customizing-documentation" class="md-nav__link">Customizing Documentation</a><nav class="md-nav">
+              <ul class="md-nav__list">
+        <li class="md-nav__item"><a href="#configuration-files" class="md-nav__link">Configuration Files</a>
+        </li></ul>
+            </nav>
         </li>
-        <li class="md-nav__item"><a href="#customizing-documentation" class="md-nav__link">Customizing Documentation</a>
-        </li>
-        <li class="md-nav__item"><a href="#regenerating-documentation" class="md-nav__link">Regenerating Documentation</a>
+        <li class="md-nav__item"><a href="#customizing-and-regenerating" class="md-nav__link">Customizing and Regenerating</a>
         </li>
         <li class="md-nav__item"><a href="#tips-for-contributors" class="md-nav__link">Tips for Contributors</a>
         </li>
@@ -393,7 +404,7 @@
             </nav>
         </li>
     
-<li class="md-nav__item"><a class="md-nav__extra_link" href="_sources/usage-of-sphinx.rst.txt">Show Source</a> </li>
+<li class="md-nav__item"><a class="md-nav__extra_link" href="_sources/guider-of-sphinx.rst.txt">Show Source</a> </li>
 
 <li id="searchbox" class="md-nav__item"></li>
 
@@ -406,64 +417,116 @@
         <div class="md-content">
           <article class="md-content__inner md-typeset" role="main">
             
-  <section id="sphinx-guider">
-<h1 id="usage-of-sphinx--page-root">Sphinx Guider<a class="headerlink" href="#usage-of-sphinx--page-root" title="Link to this heading">¶</a></h1>
-<p>This document provides instructions for contributors on how to set up, customize, and run Sphinx to generate documentation for the <strong>Biofilter</strong> project.</p>
+  <section id="sphinx-guide">
+<h1 id="guider-of-sphinx--page-root">Sphinx Guide<a class="headerlink" href="#guider-of-sphinx--page-root" title="Link to this heading">¶</a></h1>
+<p>This document provides instructions for contributors on how to set up, customize, and run Sphinx to generate documentation for the <strong>Biofilter</strong> project. The project uses Sphinx to maintain two separate documentations: one for <strong>user documentation</strong> and another for <strong>developer documentation</strong>.</p>
+<section id="documentation-structure">
+<h2 id="documentation-structure">Documentation Structure<a class="headerlink" href="#documentation-structure" title="Link to this heading">¶</a></h2>
+<p>The Biofilter project maintains two distinct documentation directories:</p>
+<ol class="arabic simple">
+<li><dl class="simple">
+<dt><strong>User Documentation</strong>:</dt><dd><ul class="simple">
+<li><p>Located in the <code class="docutils literal notranslate"><span class="pre">docs/</span></code> directory.</p></li>
+<li><p>Hosted on <strong>ReadTheDocs</strong>.</p></li>
+<li><p>Contains user-facing guides, usage instructions, and detailed module documentation.</p></li>
+</ul>
+</dd>
+</dl>
+</li>
+<li><dl class="simple">
+<dt><strong>Developer Documentation</strong>:</dt><dd><ul class="simple">
+<li><p>Located in the <code class="docutils literal notranslate"><span class="pre">docs-dev/</span></code> directory.</p></li>
+<li><p>Hosted on <strong>GitHub Pages</strong>.</p></li>
+<li><p>Contains internal technical documentation for contributors, including guides on tools like Tox, Poetry, Black, and branching strategies.</p></li>
+</ul>
+</dd>
+</dl>
+</li>
+</ol>
+<p>Each directory has its own Sphinx configuration file (<code class="docutils literal notranslate"><span class="pre">conf.py</span></code>) and operates independently.</p>
+</section>
 <section id="prerequisites">
 <h2 id="prerequisites">Prerequisites<a class="headerlink" href="#prerequisites" title="Link to this heading">¶</a></h2>
-<p>Before working with the documentation, ensure you have the following installed:</p>
+<p>Ensure you have the following tools installed:</p>
 <ul class="simple">
-<li><p>Python (version &gt;= 3.10)</p></li>
-<li><p>Poetry (for dependency management)</p></li>
+<li><p>Python (&gt;= 3.10)</p></li>
+<li><p>Poetry (manages dependencies, including Sphinx)</p></li>
 </ul>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Sphinx is already included as a development dependency in the <code class="docutils literal notranslate"><span class="pre">pyproject.toml</span></code> file. You do not need to install it manually.</p>
+</div>
 </section>
-<section id="setting-up-the-environment">
-<h2 id="setting-up-the-environment">Setting Up the Environment<a class="headerlink" href="#setting-up-the-environment" title="Link to this heading">¶</a></h2>
+<section id="working-with-documentation">
+<h2 id="working-with-documentation">Working with Documentation<a class="headerlink" href="#working-with-documentation" title="Link to this heading">¶</a></h2>
+<section id="user-documentation-docs">
+<h3 id="user-documentation-docs">User Documentation (<code class="docutils literal notranslate"><span class="pre">docs/</span></code>)<a class="headerlink" href="#user-documentation-docs" title="Link to this heading">¶</a></h3>
+<p>To build and preview the user documentation:</p>
 <ol class="arabic">
-<li><p><strong>Clone the Repository</strong>:</p>
+<li><p>Navigate to the <code class="docutils literal notranslate"><span class="pre">docs/</span></code> directory:</p>
 <blockquote>
-<div><div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/.../biofilter.git
-<span class="nb">cd</span><span class="w"> </span>biofilter
+<div><div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nb">cd</span><span class="w"> </span>docs
 </pre></div>
 </div>
 </div></blockquote>
 </li>
-<li><p><strong>Install Dependencies</strong>:</p>
+<li><p>Build the HTML documentation:</p>
 <blockquote>
-<div><p>Install all project dependencies, including Sphinx, using Poetry:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>poetry<span class="w"> </span>install
+<div><div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>make<span class="w"> </span>html
 </pre></div>
 </div>
-<p>Activate the virtual environment:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>poetry<span class="w"> </span>shell
+</div></blockquote>
+</li>
+<li><p>Open the generated documentation in a browser:</p>
+<blockquote>
+<div><div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>open<span class="w"> </span>_build/html/index.html
 </pre></div>
 </div>
 </div></blockquote>
 </li>
 </ol>
+<p>This documentation is automatically built and hosted on <strong>ReadTheDocs</strong>.</p>
 </section>
-<section id="initializing-sphinx">
-<h2 id="initializing-sphinx">Initializing Sphinx<a class="headerlink" href="#initializing-sphinx" title="Link to this heading">¶</a></h2>
+<section id="developer-documentation-docs-dev">
+<h3 id="developer-documentation-docs-dev">Developer Documentation (<code class="docutils literal notranslate"><span class="pre">docs-dev/</span></code>)<a class="headerlink" href="#developer-documentation-docs-dev" title="Link to this heading">¶</a></h3>
+<p>To build and preview the developer documentation:</p>
 <ol class="arabic">
-<li><p><strong>Navigate to the ``docs/`` Directory</strong>:</p>
+<li><p>Navigate to the <code class="docutils literal notranslate"><span class="pre">docs-dev/</span></code> directory:</p>
 <blockquote>
-<div><p>The documentation is located in the <code class="docutils literal notranslate"><span class="pre">docs/</span></code> directory. Navigate to it:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nb">cd</span><span class="w"> </span>docs
+<div><div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nb">cd</span><span class="w"> </span>docs-dev
 </pre></div>
 </div>
 </div></blockquote>
 </li>
-<li><p><strong>Customize the Configuration</strong>:</p>
+<li><p>Build the HTML documentation:</p>
 <blockquote>
-<div><p>The main configuration file for Sphinx is <code class="docutils literal notranslate"><span class="pre">conf.py</span></code> in the <code class="docutils literal notranslate"><span class="pre">docs/</span></code> directory. Open and edit it as needed:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>nano<span class="w"> </span>conf.py
+<div><div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>make<span class="w"> </span>html
 </pre></div>
 </div>
-<p>Key sections you may want to customize:</p>
 </div></blockquote>
-<ul class="simple">
-<li><p><strong>Project Information</strong>:</p></li>
-</ul>
+</li>
+<li><p>Open the generated documentation in a browser:</p>
+<blockquote>
+<div><div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>open<span class="w"> </span>_build/html/index.html
+</pre></div>
+</div>
+</div></blockquote>
+</li>
+</ol>
+<p>This documentation is hosted on <strong>GitHub Pages</strong>, and any updates are automatically deployed through a GitHub Actions workflow.</p>
+<div class="admonition important">
+<p class="admonition-title">Important</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">gh-pages</span></code> branch is used exclusively for hosting the developer documentation. It is automatically managed by GitHub Actions and <strong>should not be modified manually</strong>.</p>
+</div>
+</section>
+</section>
+<section id="customizing-documentation">
+<h2 id="customizing-documentation">Customizing Documentation<a class="headerlink" href="#customizing-documentation" title="Link to this heading">¶</a></h2>
+<section id="configuration-files">
+<h3 id="configuration-files">Configuration Files<a class="headerlink" href="#configuration-files" title="Link to this heading">¶</a></h3>
+<p>Each documentation directory has its own <code class="docutils literal notranslate"><span class="pre">conf.py</span></code> file for configuration. Key sections to customize include:</p>
+<ol class="arabic">
+<li><p><strong>Project Information</strong>:</p>
 <blockquote>
 <div><div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">project</span> <span class="o">=</span> <span class="s1">'Biofilter'</span>
 <span class="n">author</span> <span class="o">=</span> <span class="s1">'Ritchie Lab'</span>
@@ -471,22 +534,20 @@
 </pre></div>
 </div>
 </div></blockquote>
-<ul class="simple">
-<li><p><strong>Path Settings</strong>:</p></li>
-</ul>
+</li>
+<li><p><strong>Path Settings</strong>:</p>
 <blockquote>
-<div><p>Ensure the project’s modules are accessible to Sphinx:</p>
+<div><p>Ensure modules are accessible to Sphinx:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">os</span>
 <span class="kn">import</span> <span class="nn">sys</span>
 <span class="n">sys</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">insert</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">abspath</span><span class="p">(</span><span class="s2">".."</span><span class="p">))</span>
 </pre></div>
 </div>
 </div></blockquote>
-<ul class="simple">
-<li><p><strong>Extensions</strong>:</p></li>
-</ul>
+</li>
+<li><p><strong>Extensions</strong>:</p>
 <blockquote>
-<div><p>Add or remove Sphinx extensions as needed:</p>
+<div><p>Add or modify Sphinx extensions as needed:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">extensions</span> <span class="o">=</span> <span class="p">[</span>
     <span class="s1">'sphinx.ext.autodoc'</span><span class="p">,</span>
     <span class="s1">'sphinx.ext.viewcode'</span><span class="p">,</span>
@@ -496,110 +557,78 @@
 </pre></div>
 </div>
 </div></blockquote>
-<ul class="simple">
-<li><p><strong>HTML Theme</strong>:</p></li>
+</li>
+<li><p><strong>HTML Theme</strong>:</p>
+<blockquote>
+<div><p>Set the theme for the documentation:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">html_theme</span> <span class="o">=</span> <span class="s1">'sphinx_rtd_theme'</span>  <span class="c1"># For user documentation</span>
+<span class="n">html_theme</span> <span class="o">=</span> <span class="s1">'sphinx_material'</span>  <span class="c1"># For developer documentation</span>
+</pre></div>
+</div>
+</div></blockquote>
+</li>
+</ol>
+</section>
+</section>
+<section id="customizing-and-regenerating">
+<h2 id="customizing-and-regenerating">Customizing and Regenerating<a class="headerlink" href="#customizing-and-regenerating" title="Link to this heading">¶</a></h2>
+<ol class="arabic">
+<li><p><strong>Edit Index Files</strong>:</p>
+<blockquote>
+<div><ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">docs/index.rst</span></code>: Entry point for user documentation.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">docs-dev/index.rst</span></code>: Entry point for developer documentation.</p></li>
 </ul>
-<blockquote>
-<div><p>Set the theme for the generated documentation:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">html_theme</span> <span class="o">=</span> <span class="s1">'sphinx_rtd_theme'</span>
-</pre></div>
-</div>
-</div></blockquote>
-</li>
-</ol>
-</section>
-<section id="generating-the-documentation">
-<h2 id="generating-the-documentation">Generating the Documentation<a class="headerlink" href="#generating-the-documentation" title="Link to this heading">¶</a></h2>
-<ol class="arabic">
-<li><p><strong>Build the HTML Documentation</strong>:</p>
-<blockquote>
-<div><p>To generate the HTML version of the documentation:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>make<span class="w"> </span>html
-</pre></div>
-</div>
-<p>The output will be located in the <code class="docutils literal notranslate"><span class="pre">_build/html/</span></code> directory.</p>
-</div></blockquote>
-</li>
-<li><p><strong>View the Documentation</strong>:</p>
-<blockquote>
-<div><p>Open the <code class="docutils literal notranslate"><span class="pre">index.html</span></code> file in a browser to view the documentation:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>xdg-open<span class="w"> </span>_build/html/index.html
-</pre></div>
-</div>
-<p>On macOS:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>open<span class="w"> </span>_build/html/index.html
-</pre></div>
-</div>
-</div></blockquote>
-</li>
-</ol>
-</section>
-<section id="customizing-documentation">
-<h2 id="customizing-documentation">Customizing Documentation<a class="headerlink" href="#customizing-documentation" title="Link to this heading">¶</a></h2>
-<ol class="arabic">
-<li><p><strong>Edit ``index.rst``</strong>:</p>
-<blockquote>
-<div><p>The <code class="docutils literal notranslate"><span class="pre">index.rst</span></code> file serves as the main entry point for your documentation. You can add sections or include additional <code class="docutils literal notranslate"><span class="pre">.rst</span></code> files here.</p>
-</div></blockquote>
-</li>
-<li><p><strong>Generate Module Documentation Automatically</strong>:</p>
-<blockquote>
-<div><p>Use <code class="docutils literal notranslate"><span class="pre">sphinx-apidoc</span></code> to generate <code class="docutils literal notranslate"><span class="pre">.rst</span></code> files for your Python modules:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>sphinx-apidoc<span class="w"> </span>-o<span class="w"> </span>.<span class="w"> </span>../biofilter_modules
-</pre></div>
-</div>
-<p>This command scans the <code class="docutils literal notranslate"><span class="pre">biofilter_modules</span></code> directory and generates <code class="docutils literal notranslate"><span class="pre">.rst</span></code> files for each module.</p>
-</div></blockquote>
-</li>
-<li><p><strong>Add New Sections</strong>:</p>
-<blockquote>
-<div><p>Create new <code class="docutils literal notranslate"><span class="pre">.rst</span></code> files for additional sections and include them in <code class="docutils literal notranslate"><span class="pre">index.rst</span></code> using:</p>
+<p>Add or modify sections and include additional <code class="docutils literal notranslate"><span class="pre">.rst</span></code> files using:</p>
 <div class="highlight-rst notranslate"><div class="highlight"><pre><span></span><span class="p">..</span> <span class="ow">toctree</span><span class="p">::</span>
     <span class="nc">:maxdepth:</span> 2
     <span class="nc">:caption:</span> Contents:
 
-    modules
-    new_section
+    usage-guide
+    developer-guide
+</pre></div>
+</div>
+</div></blockquote>
+</li>
+<li><p><strong>Generate Module Documentation</strong>:</p>
+<blockquote>
+<div><p>Use <code class="docutils literal notranslate"><span class="pre">sphinx-apidoc</span></code> to create <code class="docutils literal notranslate"><span class="pre">.rst</span></code> files for modules:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>sphinx-apidoc<span class="w"> </span>-o<span class="w"> </span>.<span class="w"> </span>../biofilter_modules
+</pre></div>
+</div>
+</div></blockquote>
+</li>
+<li><p><strong>Rebuild Documentation</strong>:</p>
+<blockquote>
+<div><p>After making changes, rebuild the documentation:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>make<span class="w"> </span>clean
+make<span class="w"> </span>html
 </pre></div>
 </div>
 </div></blockquote>
 </li>
 </ol>
 </section>
-<section id="regenerating-documentation">
-<h2 id="regenerating-documentation">Regenerating Documentation<a class="headerlink" href="#regenerating-documentation" title="Link to this heading">¶</a></h2>
-<p>If you make changes to the codebase or <code class="docutils literal notranslate"><span class="pre">.rst</span></code> files, regenerate the documentation:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>make<span class="w"> </span>clean
-make<span class="w"> </span>html
-</pre></div>
-</div>
-</section>
 <section id="tips-for-contributors">
 <h2 id="tips-for-contributors">Tips for Contributors<a class="headerlink" href="#tips-for-contributors" title="Link to this heading">¶</a></h2>
-<ol class="arabic">
-<li><p><strong>Use Docstrings</strong>:</p>
-<blockquote>
-<div><p>Write detailed docstrings in your Python code using Google or NumPy style for compatibility with the <code class="docutils literal notranslate"><span class="pre">napoleon</span></code> extension.</p>
-</div></blockquote>
+<ol class="arabic simple">
+<li><dl class="simple">
+<dt><strong>Docstrings</strong>:</dt><dd><p>Write detailed docstrings in your codebase. Use Google or NumPy style for compatibility with the <code class="docutils literal notranslate"><span class="pre">napoleon</span></code> extension.</p>
+</dd>
+</dl>
 </li>
-<li><p><strong>Update ``conf.py``</strong>:</p>
-<blockquote>
-<div><p>If new directories or modules are added, update the <code class="docutils literal notranslate"><span class="pre">sys.path</span></code> in <code class="docutils literal notranslate"><span class="pre">conf.py</span></code> to ensure Sphinx can locate them.</p>
-</div></blockquote>
+<li><dl class="simple">
+<dt><strong>Test Locally</strong>:</dt><dd><p>Always test your changes locally by building the documentation before pushing updates.</p>
+</dd>
+</dl>
 </li>
-<li><p><strong>Preview Locally</strong>:</p>
-<blockquote>
-<div><p>Always preview the generated documentation locally before submitting changes.</p>
-</div></blockquote>
-</li>
-<li><p><strong>Commit Changes</strong>:</p>
-<blockquote>
-<div><p>If you add or update <code class="docutils literal notranslate"><span class="pre">.rst</span></code> files, commit them to the repository:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>git<span class="w"> </span>add<span class="w"> </span>docs/
-git<span class="w"> </span>commit<span class="w"> </span>-m<span class="w"> </span><span class="s2">"Update Sphinx documentation"</span>
-</pre></div>
-</div>
-</div></blockquote>
+<li><dl class="simple">
+<dt><strong>Branch Management</strong>:</dt><dd><ul class="simple">
+<li><p>User documentation updates should be committed to the <code class="docutils literal notranslate"><span class="pre">main</span></code> branch.</p></li>
+<li><p>Developer documentation updates should be committed to the <code class="docutils literal notranslate"><span class="pre">development</span></code> branch. GitHub Actions will handle the deployment to <code class="docutils literal notranslate"><span class="pre">gh-pages</span></code>.</p></li>
+</ul>
+</dd>
+</dl>
 </li>
 </ol>
 </section>
@@ -614,17 +643,17 @@ git<span class="w"> </span>commit<span class="w"> </span>-m<span class="w"> </sp
 </div>
 </div></blockquote>
 </li>
-<li><p><strong>Missing Modules in Documentation</strong>:</p>
-<blockquote>
-<div><p>Check that the module paths are included in <code class="docutils literal notranslate"><span class="pre">conf.py</span></code> under <code class="docutils literal notranslate"><span class="pre">sys.path</span></code>.</p>
-</div></blockquote>
-</li>
 <li><p><strong>Broken Links</strong>:</p>
 <blockquote>
-<div><p>Run the following command to check for broken links:</p>
+<div><p>Check for broken links using:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>make<span class="w"> </span>linkcheck
 </pre></div>
 </div>
+</div></blockquote>
+</li>
+<li><p><strong>Missing Modules</strong>:</p>
+<blockquote>
+<div><p>Verify module paths in <code class="docutils literal notranslate"><span class="pre">conf.py</span></code> under <code class="docutils literal notranslate"><span class="pre">sys.path</span></code>.</p>
 </div></blockquote>
 </li>
 </ul>
@@ -649,7 +678,7 @@ git<span class="w"> </span>commit<span class="w"> </span>-m<span class="w"> </sp
     <div class="md-footer-nav">
       <nav class="md-footer-nav__inner md-grid">
           
-            <a href="usage-of-tox.html" title="Tox Guider"
+            <a href="guider-of-tox.html" title="Tox Guide"
                class="md-flex md-footer-nav__link md-footer-nav__link--prev"
                rel="prev">
               <div class="md-flex__cell md-flex__cell--shrink">
@@ -658,17 +687,17 @@ git<span class="w"> </span>commit<span class="w"> </span>-m<span class="w"> </sp
               <div class="md-flex__cell md-flex__cell--stretch md-footer-nav__title">
                 <span class="md-flex__ellipsis">
                   <span
-                      class="md-footer-nav__direction"> "Previous" </span> Tox Guider </span>
+                      class="md-footer-nav__direction"> "Previous" </span> Tox Guide </span>
               </div>
             </a>
           
           
-            <a href="usage-of-git.html" title="Using git and CI/CD by Actions"
+            <a href="guider-of-git.html" title="GIT Guider"
                class="md-flex md-footer-nav__link md-footer-nav__link--next"
                rel="next">
             <div class="md-flex__cell md-flex__cell--stretch md-footer-nav__title"><span
                 class="md-flex__ellipsis"> <span
-                class="md-footer-nav__direction"> "Next" </span> Using git and CI/CD by Actions </span>
+                class="md-footer-nav__direction"> "Next" </span> GIT Guider </span>
             </div>
             <div class="md-flex__cell md-flex__cell--shrink"><i
                 class="md-icon md-icon--arrow-forward md-footer-nav__button"></i>

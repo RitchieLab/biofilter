@@ -54,8 +54,8 @@
     <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
-    <link rel="next" title="Black Guide" href="usage-of-black.html" />
-    <link rel="prev" title="Branching Structure Guide" href="usage-of-branching.html" />
+    <link rel="next" title="Black Guide" href="guider-of-black.html" />
+    <link rel="prev" title="Branching Structure Guide" href="guider-of-branching.html" />
   
    
 
@@ -74,7 +74,7 @@
   <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer">
   <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search">
   <label class="md-overlay" data-md-component="overlay" for="__drawer"></label>
-  <a href="#usage-of-poetry" tabindex="1" class="md-skip"> Skip to content </a>
+  <a href="#guider-of-poetry" tabindex="1" class="md-skip"> Skip to content </a>
   <header class="md-header" data-md-component="header">
   <nav class="md-header-nav md-grid">
     <div class="md-flex navheader">
@@ -206,13 +206,8 @@
   <ul class="md-nav__list">
     <li class="md-nav__item">
     
-      <span class="md-nav__link caption"><span class="caption-text">Contents:</span></span>
     
-    </li>
-    <li class="md-nav__item">
-    
-    
-      <a href="usage-of-branching.html" class="md-nav__link">Branching Structure Guide</a>
+      <a href="guider-of-branching.html" class="md-nav__link">Branching Structure Guide</a>
       
     
     </li>
@@ -228,19 +223,49 @@
 <nav class="md-nav md-nav--secondary">
     <label class="md-nav__title" for="__toc">"Contents"</label>
   <ul class="md-nav__list" data-md-scrollfix="">
-        <li class="md-nav__item"><a href="#usage-of-poetry--page-root" class="md-nav__link">Poetry Guider</a><nav class="md-nav">
+        <li class="md-nav__item"><a href="#guider-of-poetry--page-root" class="md-nav__link">Poetry Guider</a><nav class="md-nav">
               <ul class="md-nav__list">
         <li class="md-nav__item"><a href="#what-is-poetry" class="md-nav__link">What is Poetry?</a>
         </li>
         <li class="md-nav__item"><a href="#why-use-poetry" class="md-nav__link">Why Use Poetry?</a>
         </li>
-        <li class="md-nav__item"><a href="#setting-up-the-project-locally" class="md-nav__link">Setting Up the Project Locally</a>
+        <li class="md-nav__item"><a href="#setting-up-the-project-locally" class="md-nav__link">Setting Up the Project Locally</a><nav class="md-nav">
+              <ul class="md-nav__list">
+        <li class="md-nav__item"><a href="#step-1-install-poetry" class="md-nav__link">Step 1: Install Poetry</a>
         </li>
-        <li class="md-nav__item"><a href="#creating-installation-packages" class="md-nav__link">Creating Installation Packages</a>
+        <li class="md-nav__item"><a href="#step-2-clone-the-repository" class="md-nav__link">Step 2: Clone the Repository</a>
+        </li>
+        <li class="md-nav__item"><a href="#step-3-install-project-dependencies" class="md-nav__link">Step 3: Install Project Dependencies</a>
+        </li>
+        <li class="md-nav__item"><a href="#step-4-activate-the-virtual-environment" class="md-nav__link">Step 4: Activate the Virtual Environment</a>
+        </li>
+        <li class="md-nav__item"><a href="#step-5-run-the-project" class="md-nav__link">Step 5: Run the Project</a>
+        </li></ul>
+            </nav>
+        </li>
+        <li class="md-nav__item"><a href="#creating-installation-packages" class="md-nav__link">Creating Installation Packages</a><nav class="md-nav">
+              <ul class="md-nav__list">
+        <li class="md-nav__item"><a href="#step-1-validate-the-project-setup" class="md-nav__link">Step 1: Validate the Project Setup</a>
+        </li>
+        <li class="md-nav__item"><a href="#step-2-build-the-package" class="md-nav__link">Step 2: Build the Package</a>
+        </li>
+        <li class="md-nav__item"><a href="#step-3-verify-the-package" class="md-nav__link">Step 3: Verify the Package</a>
+        </li>
+        <li class="md-nav__item"><a href="#step-4-publish-the-package" class="md-nav__link">Step 4: Publish the Package</a>
+        </li></ul>
+            </nav>
         </li>
         <li class="md-nav__item"><a href="#automating-the-workflow" class="md-nav__link">Automating the Workflow</a>
         </li>
-        <li class="md-nav__item"><a href="#managing-dependencies" class="md-nav__link">Managing Dependencies</a>
+        <li class="md-nav__item"><a href="#managing-dependencies" class="md-nav__link">Managing Dependencies</a><nav class="md-nav">
+              <ul class="md-nav__list">
+        <li class="md-nav__item"><a href="#adding-a-dependency" class="md-nav__link">Adding a Dependency</a>
+        </li>
+        <li class="md-nav__item"><a href="#adding-a-development-dependency" class="md-nav__link">Adding a Development Dependency</a>
+        </li>
+        <li class="md-nav__item"><a href="#removing-a-dependency" class="md-nav__link">Removing a Dependency</a>
+        </li></ul>
+            </nav>
         </li>
         <li class="md-nav__item"><a href="#reproducibility" class="md-nav__link">Reproducibility</a>
         </li>
@@ -249,7 +274,7 @@
             </nav>
         </li>
     
-<li class="md-nav__item"><a class="md-nav__extra_link" href="_sources/usage-of-poetry.rst.txt">Show Source</a> </li>
+<li class="md-nav__item"><a class="md-nav__extra_link" href="_sources/guider-of-poetry.rst.txt">Show Source</a> </li>
 
   </ul>
 </nav>
@@ -315,35 +340,42 @@
     <li class="md-nav__item">
     
     
-      <a href="usage-of-black.html" class="md-nav__link">Black Guide</a>
+      <a href="guider-of-black.html" class="md-nav__link">Black Guide</a>
       
     
     </li>
     <li class="md-nav__item">
     
     
-      <a href="usage-of-coverage.html" class="md-nav__link">Coverage Guide</a>
+      <a href="guider-of-tests.html" class="md-nav__link">Testing Guider</a>
       
     
     </li>
     <li class="md-nav__item">
     
     
-      <a href="usage-of-tox.html" class="md-nav__link">Tox Guider</a>
+      <a href="guider-of-coverage.html" class="md-nav__link">Coverage Guide</a>
       
     
     </li>
     <li class="md-nav__item">
     
     
-      <a href="usage-of-sphinx.html" class="md-nav__link">Sphinx Guider</a>
+      <a href="guider-of-tox.html" class="md-nav__link">Tox Guide</a>
       
     
     </li>
     <li class="md-nav__item">
     
     
-      <a href="usage-of-git.html" class="md-nav__link">Using git and CI/CD by Actions</a>
+      <a href="guider-of-sphinx.html" class="md-nav__link">Sphinx Guide</a>
+      
+    
+    </li>
+    <li class="md-nav__item">
+    
+    
+      <a href="guider-of-git.html" class="md-nav__link">GIT Guider</a>
       
     
     </li>
@@ -361,19 +393,49 @@
 <nav class="md-nav md-nav--secondary">
     <label class="md-nav__title" for="__toc">"Contents"</label>
   <ul class="md-nav__list" data-md-scrollfix="">
-        <li class="md-nav__item"><a href="#usage-of-poetry--page-root" class="md-nav__link">Poetry Guider</a><nav class="md-nav">
+        <li class="md-nav__item"><a href="#guider-of-poetry--page-root" class="md-nav__link">Poetry Guider</a><nav class="md-nav">
               <ul class="md-nav__list">
         <li class="md-nav__item"><a href="#what-is-poetry" class="md-nav__link">What is Poetry?</a>
         </li>
         <li class="md-nav__item"><a href="#why-use-poetry" class="md-nav__link">Why Use Poetry?</a>
         </li>
-        <li class="md-nav__item"><a href="#setting-up-the-project-locally" class="md-nav__link">Setting Up the Project Locally</a>
+        <li class="md-nav__item"><a href="#setting-up-the-project-locally" class="md-nav__link">Setting Up the Project Locally</a><nav class="md-nav">
+              <ul class="md-nav__list">
+        <li class="md-nav__item"><a href="#step-1-install-poetry" class="md-nav__link">Step 1: Install Poetry</a>
         </li>
-        <li class="md-nav__item"><a href="#creating-installation-packages" class="md-nav__link">Creating Installation Packages</a>
+        <li class="md-nav__item"><a href="#step-2-clone-the-repository" class="md-nav__link">Step 2: Clone the Repository</a>
+        </li>
+        <li class="md-nav__item"><a href="#step-3-install-project-dependencies" class="md-nav__link">Step 3: Install Project Dependencies</a>
+        </li>
+        <li class="md-nav__item"><a href="#step-4-activate-the-virtual-environment" class="md-nav__link">Step 4: Activate the Virtual Environment</a>
+        </li>
+        <li class="md-nav__item"><a href="#step-5-run-the-project" class="md-nav__link">Step 5: Run the Project</a>
+        </li></ul>
+            </nav>
+        </li>
+        <li class="md-nav__item"><a href="#creating-installation-packages" class="md-nav__link">Creating Installation Packages</a><nav class="md-nav">
+              <ul class="md-nav__list">
+        <li class="md-nav__item"><a href="#step-1-validate-the-project-setup" class="md-nav__link">Step 1: Validate the Project Setup</a>
+        </li>
+        <li class="md-nav__item"><a href="#step-2-build-the-package" class="md-nav__link">Step 2: Build the Package</a>
+        </li>
+        <li class="md-nav__item"><a href="#step-3-verify-the-package" class="md-nav__link">Step 3: Verify the Package</a>
+        </li>
+        <li class="md-nav__item"><a href="#step-4-publish-the-package" class="md-nav__link">Step 4: Publish the Package</a>
+        </li></ul>
+            </nav>
         </li>
         <li class="md-nav__item"><a href="#automating-the-workflow" class="md-nav__link">Automating the Workflow</a>
         </li>
-        <li class="md-nav__item"><a href="#managing-dependencies" class="md-nav__link">Managing Dependencies</a>
+        <li class="md-nav__item"><a href="#managing-dependencies" class="md-nav__link">Managing Dependencies</a><nav class="md-nav">
+              <ul class="md-nav__list">
+        <li class="md-nav__item"><a href="#adding-a-dependency" class="md-nav__link">Adding a Dependency</a>
+        </li>
+        <li class="md-nav__item"><a href="#adding-a-development-dependency" class="md-nav__link">Adding a Development Dependency</a>
+        </li>
+        <li class="md-nav__item"><a href="#removing-a-dependency" class="md-nav__link">Removing a Dependency</a>
+        </li></ul>
+            </nav>
         </li>
         <li class="md-nav__item"><a href="#reproducibility" class="md-nav__link">Reproducibility</a>
         </li>
@@ -382,7 +444,7 @@
             </nav>
         </li>
     
-<li class="md-nav__item"><a class="md-nav__extra_link" href="_sources/usage-of-poetry.rst.txt">Show Source</a> </li>
+<li class="md-nav__item"><a class="md-nav__extra_link" href="_sources/guider-of-poetry.rst.txt">Show Source</a> </li>
 
 <li id="searchbox" class="md-nav__item"></li>
 
@@ -396,7 +458,7 @@
           <article class="md-content__inner md-typeset" role="main">
             
   <section id="poetry-guider">
-<h1 id="usage-of-poetry--page-root">Poetry Guider<a class="headerlink" href="#usage-of-poetry--page-root" title="Link to this heading">¶</a></h1>
+<h1 id="guider-of-poetry--page-root">Poetry Guider<a class="headerlink" href="#guider-of-poetry--page-root" title="Link to this heading">¶</a></h1>
 <p>This document provides a guide to understanding Poetry, setting up the project locally, and creating installation packages for the Biofilter project.</p>
 <section id="what-is-poetry">
 <h2 id="what-is-poetry">What is Poetry?<a class="headerlink" href="#what-is-poetry" title="Link to this heading">¶</a></h2>
@@ -418,7 +480,8 @@
 </section>
 <section id="setting-up-the-project-locally">
 <h2 id="setting-up-the-project-locally">Setting Up the Project Locally<a class="headerlink" href="#setting-up-the-project-locally" title="Link to this heading">¶</a></h2>
-<p>### Step 1: Install Poetry</p>
+<section id="step-1-install-poetry">
+<h3 id="step-1-install-poetry">Step 1: Install Poetry<a class="headerlink" href="#step-1-install-poetry" title="Link to this heading">¶</a></h3>
 <p>Follow the official Poetry installation instructions:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>curl<span class="w"> </span>-sSL<span class="w"> </span>https://install.python-poetry.org<span class="w"> </span><span class="p">|</span><span class="w"> </span>python3<span class="w"> </span>-
 </pre></div>
@@ -428,31 +491,45 @@
 </pre></div>
 </div>
 <p>If you’re on Windows, you can use the official installer or refer to the <a class="reference external" href="https://python-poetry.org/docs/">Poetry documentation</a>.</p>
-<p>### Step 2: Clone the Repository</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/.../biofilter.git
+</section>
+<section id="step-2-clone-the-repository">
+<h3 id="step-2-clone-the-repository">Step 2: Clone the Repository<a class="headerlink" href="#step-2-clone-the-repository" title="Link to this heading">¶</a></h3>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/RitchieLab/biofilter.git
 <span class="nb">cd</span><span class="w"> </span>biofilter
 </pre></div>
 </div>
-<p>### Step 3: Install Project Dependencies</p>
+</section>
+<section id="step-3-install-project-dependencies">
+<h3 id="step-3-install-project-dependencies">Step 3: Install Project Dependencies<a class="headerlink" href="#step-3-install-project-dependencies" title="Link to this heading">¶</a></h3>
 <p>Poetry will automatically create a virtual environment and install all dependencies specified in <code class="docutils literal notranslate"><span class="pre">pyproject.toml</span></code>:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>poetry<span class="w"> </span>install
 </pre></div>
 </div>
-<p>### Step 4: Activate the Virtual Environment</p>
+<div class="admonition important">
+<p class="admonition-title">Important</p>
+<p>Before running <cite>poetry install</cite>, ensure you are using the desired Python version. This can either be the globally installed Python version or a specific version managed through tools like pyenv. If using pyenv, set the Python version for the project using pyenv local &lt;desired-version&gt; before proceeding with the installation.</p>
+</div>
+</section>
+<section id="step-4-activate-the-virtual-environment">
+<h3 id="step-4-activate-the-virtual-environment">Step 4: Activate the Virtual Environment<a class="headerlink" href="#step-4-activate-the-virtual-environment" title="Link to this heading">¶</a></h3>
 <p>To activate the virtual environment created by Poetry, run:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>poetry<span class="w"> </span>shell
 </pre></div>
 </div>
 <p>You can now use the installed dependencies and run project-specific commands within this environment.</p>
-<p>### Step 5: Run the Project</p>
+</section>
+<section id="step-5-run-the-project">
+<h3 id="step-5-run-the-project">Step 5: Run the Project<a class="headerlink" href="#step-5-run-the-project" title="Link to this heading">¶</a></h3>
 <p>For example, to run one of the entry-point scripts defined in the project:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>poetry<span class="w"> </span>run<span class="w"> </span>biofilter
 </pre></div>
 </div>
 </section>
+</section>
 <section id="creating-installation-packages">
 <h2 id="creating-installation-packages">Creating Installation Packages<a class="headerlink" href="#creating-installation-packages" title="Link to this heading">¶</a></h2>
-<p>### Step 1: Validate the Project Setup</p>
+<section id="step-1-validate-the-project-setup">
+<h3 id="step-1-validate-the-project-setup">Step 1: Validate the Project Setup<a class="headerlink" href="#step-1-validate-the-project-setup" title="Link to this heading">¶</a></h3>
 <p>Ensure the <code class="docutils literal notranslate"><span class="pre">pyproject.toml</span></code> file is properly configured with all required metadata, dependencies, and entry points. Example fields to check:
 - <code class="docutils literal notranslate"><span class="pre">name</span></code>
 - <code class="docutils literal notranslate"><span class="pre">version</span></code>
@@ -466,7 +543,9 @@
 <span class="n">loki-build</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"loki_modules.loki_build:main"</span>
 </pre></div>
 </div>
-<p>### Step 2: Build the Package</p>
+</section>
+<section id="step-2-build-the-package">
+<h3 id="step-2-build-the-package">Step 2: Build the Package<a class="headerlink" href="#step-2-build-the-package" title="Link to this heading">¶</a></h3>
 <p>Run the following command to generate distribution files (<code class="docutils literal notranslate"><span class="pre">.tar.gz</span></code> and <code class="docutils literal notranslate"><span class="pre">.whl</span></code>) in the <code class="docutils literal notranslate"><span class="pre">dist/</span></code> directory:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>poetry<span class="w"> </span>build
 </pre></div>
@@ -474,13 +553,17 @@
 <p>This command will create:
 - A source distribution (<code class="docutils literal notranslate"><span class="pre">.tar.gz</span></code>).
 - A wheel distribution (<code class="docutils literal notranslate"><span class="pre">.whl</span></code>).</p>
-<p>### Step 3: Verify the Package</p>
+</section>
+<section id="step-3-verify-the-package">
+<h3 id="step-3-verify-the-package">Step 3: Verify the Package<a class="headerlink" href="#step-3-verify-the-package" title="Link to this heading">¶</a></h3>
 <p>To test the installation of the package locally, use:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span>dist/biofilter-&lt;version&gt;.whl
 </pre></div>
 </div>
 <p>Replace <code class="docutils literal notranslate"><span class="pre">&lt;version&gt;</span></code> with the version number of the package.</p>
-<p>### Step 4: Publish the Package</p>
+</section>
+<section id="step-4-publish-the-package">
+<h3 id="step-4-publish-the-package">Step 4: Publish the Package<a class="headerlink" href="#step-4-publish-the-package" title="Link to this heading">¶</a></h3>
 <p>To publish the package to PyPI (or a private repository), use:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>poetry<span class="w"> </span>publish<span class="w"> </span>--build
 </pre></div>
@@ -489,6 +572,7 @@
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>poetry<span class="w"> </span>config<span class="w"> </span>pypi-token.pypi<span class="w"> </span>&lt;your-token&gt;
 </pre></div>
 </div>
+</section>
 </section>
 <section id="automating-the-workflow">
 <h2 id="automating-the-workflow">Automating the Workflow<a class="headerlink" href="#automating-the-workflow" title="Link to this heading">¶</a></h2>
@@ -518,21 +602,27 @@ poetry<span class="w"> </span>publish<span class="w"> </span>--build
 </section>
 <section id="managing-dependencies">
 <h2 id="managing-dependencies">Managing Dependencies<a class="headerlink" href="#managing-dependencies" title="Link to this heading">¶</a></h2>
-<p>### Adding a Dependency</p>
+<section id="adding-a-dependency">
+<h3 id="adding-a-dependency">Adding a Dependency<a class="headerlink" href="#adding-a-dependency" title="Link to this heading">¶</a></h3>
 <p>To add a new dependency to the project, use:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>poetry<span class="w"> </span>add<span class="w"> </span>&lt;package-name&gt;
 </pre></div>
 </div>
-<p>### Adding a Development Dependency</p>
+</section>
+<section id="adding-a-development-dependency">
+<h3 id="adding-a-development-dependency">Adding a Development Dependency<a class="headerlink" href="#adding-a-development-dependency" title="Link to this heading">¶</a></h3>
 <p>To add a dependency for development purposes (e.g., linters, testing frameworks):</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>poetry<span class="w"> </span>add<span class="w"> </span>--dev<span class="w"> </span>&lt;package-name&gt;
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>poetry<span class="w"> </span>add<span class="w"> </span>--group<span class="w"> </span>dev<span class="w"> </span>&lt;package-name&gt;
 </pre></div>
 </div>
-<p>### Removing a Dependency</p>
+</section>
+<section id="removing-a-dependency">
+<h3 id="removing-a-dependency">Removing a Dependency<a class="headerlink" href="#removing-a-dependency" title="Link to this heading">¶</a></h3>
 <p>To remove a dependency from the project:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>poetry<span class="w"> </span>remove<span class="w"> </span>&lt;package-name&gt;
 </pre></div>
 </div>
+</section>
 </section>
 <section id="reproducibility">
 <h2 id="reproducibility">Reproducibility<a class="headerlink" href="#reproducibility" title="Link to this heading">¶</a></h2>
@@ -561,7 +651,7 @@ poetry<span class="w"> </span>publish<span class="w"> </span>--build
     <div class="md-footer-nav">
       <nav class="md-footer-nav__inner md-grid">
           
-            <a href="usage-of-branching.html" title="Branching Structure Guide"
+            <a href="guider-of-branching.html" title="Branching Structure Guide"
                class="md-flex md-footer-nav__link md-footer-nav__link--prev"
                rel="prev">
               <div class="md-flex__cell md-flex__cell--shrink">
@@ -575,7 +665,7 @@ poetry<span class="w"> </span>publish<span class="w"> </span>--build
             </a>
           
           
-            <a href="usage-of-black.html" title="Black Guide"
+            <a href="guider-of-black.html" title="Black Guide"
                class="md-flex md-footer-nav__link md-footer-nav__link--next"
                rel="next">
             <div class="md-flex__cell md-flex__cell--stretch md-footer-nav__title"><span

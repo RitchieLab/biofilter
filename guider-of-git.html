@@ -1,0 +1,741 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="./">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta http-equiv="x-ua-compatible" content="ie=edge">
+  <meta name="lang:clipboard.copy" content="Copy to clipboard">
+  <meta name="lang:clipboard.copied" content="Copied to clipboard">
+  <meta name="lang:search.language" content="en">
+  <meta name="lang:search.pipeline.stopwords" content="True">
+  <meta name="lang:search.pipeline.trimmer" content="True">
+  <meta name="lang:search.result.none" content="No matching documents">
+  <meta name="lang:search.result.one" content="1 matching document">
+  <meta name="lang:search.result.other" content="# matching documents">
+  <meta name="lang:search.tokenizer" content="[\s\-]+">
+
+  
+    <link href="https://fonts.gstatic.com/" rel="preconnect" crossorigin>
+    <link href="https://fonts.googleapis.com/css?family=Roboto+Mono:400,500,700|Roboto:300,400,400i,700&display=fallback" rel="stylesheet">
+
+    <style>
+      body,
+      input {
+        font-family: "Roboto", "Helvetica Neue", Helvetica, Arial, sans-serif
+      }
+
+      code,
+      kbd,
+      pre {
+        font-family: "Roboto Mono", "Courier New", Courier, monospace
+      }
+    </style>
+  
+
+  <link rel="stylesheet" href="_static/stylesheets/application.css"/>
+  <link rel="stylesheet" href="_static/stylesheets/application-palette.css"/>
+  <link rel="stylesheet" href="_static/stylesheets/application-fixes.css"/>
+  
+  <link rel="stylesheet" href="_static/fonts/material-icons.css"/>
+  
+  <meta name="theme-color" content="#3f51b5">
+  <script src="_static/javascripts/modernizr.js"></script>
+  
+  
+  
+    <title>GIT Guider &#8212; Biofilter Developer Documentation 2.4.4 documentation</title>
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=83e35b93" />
+    <link rel="stylesheet" type="text/css" href="_static/material.css?v=79c92029" />
+    <script src="_static/documentation_options.js?v=b1e24531"></script>
+    <script src="_static/doctools.js?v=9bcbadda"></script>
+    <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="prev" title="Sphinx Guide" href="guider-of-sphinx.html" />
+  
+   
+
+  </head>
+  <body dir=ltr
+        data-md-color-primary=blue data-md-color-accent=light-blue>
+  
+  <svg class="md-svg">
+    <defs data-children-count="0">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" width="416" height="448" viewBox="0 0 416 448" id="__github"><path fill="currentColor" d="M160 304q0 10-3.125 20.5t-10.75 19T128 352t-18.125-8.5-10.75-19T96 304t3.125-20.5 10.75-19T128 256t18.125 8.5 10.75 19T160 304zm160 0q0 10-3.125 20.5t-10.75 19T288 352t-18.125-8.5-10.75-19T256 304t3.125-20.5 10.75-19T288 256t18.125 8.5 10.75 19T320 304zm40 0q0-30-17.25-51T296 232q-10.25 0-48.75 5.25Q229.5 240 208 240t-39.25-2.75Q130.75 232 120 232q-29.5 0-46.75 21T56 304q0 22 8 38.375t20.25 25.75 30.5 15 35 7.375 37.25 1.75h42q20.5 0 37.25-1.75t35-7.375 30.5-15 20.25-25.75T360 304zm56-44q0 51.75-15.25 82.75-9.5 19.25-26.375 33.25t-35.25 21.5-42.5 11.875-42.875 5.5T212 416q-19.5 0-35.5-.75t-36.875-3.125-38.125-7.5-34.25-12.875T37 371.5t-21.5-28.75Q0 312 0 260q0-59.25 34-99-6.75-20.5-6.75-42.5 0-29 12.75-54.5 27 0 47.5 9.875t47.25 30.875Q171.5 96 212 96q37 0 70 8 26.25-20.5 46.75-30.25T376 64q12.75 25.5 12.75 54.5 0 21.75-6.75 42 34 40 34 99.5z"/></svg>
+      
+    </defs>
+  </svg>
+  
+  <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer">
+  <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search">
+  <label class="md-overlay" data-md-component="overlay" for="__drawer"></label>
+  <a href="#guider-of-git" tabindex="1" class="md-skip"> Skip to content </a>
+  <header class="md-header" data-md-component="header">
+  <nav class="md-header-nav md-grid">
+    <div class="md-flex navheader">
+      <div class="md-flex__cell md-flex__cell--shrink">
+        <a href="index.html" title="Biofilter Developer Documentation 2.4.4 documentation"
+           class="md-header-nav__button md-logo">
+          
+            &nbsp;
+          
+        </a>
+      </div>
+      <div class="md-flex__cell md-flex__cell--shrink">
+        <label class="md-icon md-icon--menu md-header-nav__button" for="__drawer"></label>
+      </div>
+      <div class="md-flex__cell md-flex__cell--stretch">
+        <div class="md-flex__ellipsis md-header-nav__title" data-md-component="title">
+          <span class="md-header-nav__topic">Biofilter Developer Docs</span>
+          <span class="md-header-nav__topic"> GIT Guider </span>
+        </div>
+      </div>
+      <div class="md-flex__cell md-flex__cell--shrink">
+        <label class="md-icon md-icon--search md-header-nav__button" for="__search"></label>
+        
+<div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" action="search.html" method="get" name="search">
+      <input type="text" class="md-search__input" name="q" placeholder=""Search""
+             autocapitalize="off" autocomplete="off" spellcheck="false"
+             data-md-component="query" data-md-state="active">
+      <label class="md-icon md-search__icon" for="__search"></label>
+      <button type="reset" class="md-icon md-search__icon" data-md-component="reset" tabindex="-1">
+        &#xE5CD;
+      </button>
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="result">
+          <div class="md-search-result__meta">
+            Type to start searching
+          </div>
+          <ol class="md-search-result__list"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+      </div>
+      
+        <div class="md-flex__cell md-flex__cell--shrink">
+          <div class="md-header-nav__source">
+            <a href="https://github.com/RitchieLab/biofilter" title="Go to repository" class="md-source" data-md-source="github">
+
+    <div class="md-source__icon">
+      <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 24 24" width="28" height="28">
+        <use xlink:href="#__github" width="24" height="24"></use>
+      </svg>
+    </div>
+  
+  <div class="md-source__repository">
+    Biofilter
+  </div>
+</a>
+          </div>
+        </div>
+      
+      
+  
+  <script src="_static/javascripts/version_dropdown.js"></script>
+  <script>
+    var json_loc = ""versions.json"",
+        target_loc = "../",
+        text = "Versions";
+    $( document ).ready( add_version_dropdown(json_loc, target_loc, text));
+  </script>
+  
+
+    </div>
+  </nav>
+</header>
+
+  
+  <div class="md-container">
+    
+    
+    
+  <nav class="md-tabs" data-md-component="tabs">
+    <div class="md-tabs__inner md-grid">
+      <ul class="md-tabs__list">
+          <li class="md-tabs__item"><a href="index.html" class="md-tabs__link">Biofilter Developer Documentation 2.4.4 documentation</a></li>
+      </ul>
+    </div>
+  </nav>
+    <main class="md-main">
+      <div class="md-main__inner md-grid" data-md-component="container">
+        
+          <div class="md-sidebar md-sidebar--primary" data-md-component="navigation">
+            <div class="md-sidebar__scrollwrap">
+              <div class="md-sidebar__inner">
+                <nav class="md-nav md-nav--primary" data-md-level="0">
+  <label class="md-nav__title md-nav__title--site" for="__drawer">
+    <a href="index.html" title="Biofilter Developer Documentation 2.4.4 documentation" class="md-nav__button md-logo">
+      
+        <img src="_static/" alt=" logo" width="48" height="48">
+      
+    </a>
+    <a href="index.html"
+       title="Biofilter Developer Documentation 2.4.4 documentation">Biofilter Developer Docs</a>
+  </label>
+    <div class="md-nav__source">
+      <a href="https://github.com/RitchieLab/biofilter" title="Go to repository" class="md-source" data-md-source="github">
+
+    <div class="md-source__icon">
+      <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 24 24" width="28" height="28">
+        <use xlink:href="#__github" width="24" height="24"></use>
+      </svg>
+    </div>
+  
+  <div class="md-source__repository">
+    Biofilter
+  </div>
+</a>
+    </div>
+  
+  
+
+  
+  <ul class="md-nav__list">
+    <li class="md-nav__item">
+    
+    
+      <a href="guider-of-branching.html" class="md-nav__link">Branching Structure Guide</a>
+      
+    
+    </li>
+    <li class="md-nav__item">
+    
+    
+      <a href="guider-of-poetry.html" class="md-nav__link">Poetry Guider</a>
+      
+    
+    </li>
+    <li class="md-nav__item">
+    
+    
+      <a href="guider-of-black.html" class="md-nav__link">Black Guide</a>
+      
+    
+    </li>
+    <li class="md-nav__item">
+    
+    
+      <a href="guider-of-tests.html" class="md-nav__link">Testing Guider</a>
+      
+    
+    </li>
+    <li class="md-nav__item">
+    
+    
+      <a href="guider-of-coverage.html" class="md-nav__link">Coverage Guide</a>
+      
+    
+    </li>
+    <li class="md-nav__item">
+    
+    
+      <a href="guider-of-tox.html" class="md-nav__link">Tox Guide</a>
+      
+    
+    </li>
+    <li class="md-nav__item">
+    
+    
+      <a href="guider-of-sphinx.html" class="md-nav__link">Sphinx Guide</a>
+      
+    
+    </li>
+    <li class="md-nav__item">
+    
+    
+    <input class="md-toggle md-nav__toggle" data-md-toggle="toc" type="checkbox" id="__toc">
+    <label class="md-nav__link md-nav__link--active" for="__toc"> GIT Guider </label>
+    
+      <a href="#" class="md-nav__link md-nav__link--active">GIT Guider</a>
+      
+        
+<nav class="md-nav md-nav--secondary">
+    <label class="md-nav__title" for="__toc">"Contents"</label>
+  <ul class="md-nav__list" data-md-scrollfix="">
+        <li class="md-nav__item"><a href="#guider-of-git--page-root" class="md-nav__link">GIT Guider</a><nav class="md-nav">
+              <ul class="md-nav__list">
+        <li class="md-nav__item"><a href="#getting-started" class="md-nav__link">Getting Started</a><nav class="md-nav">
+              <ul class="md-nav__list">
+        <li class="md-nav__item"><a href="#clone-the-repository" class="md-nav__link">Clone the Repository</a>
+        </li>
+        <li class="md-nav__item"><a href="#switch-to-the-development-branch" class="md-nav__link">Switch to the Development Branch</a>
+        </li></ul>
+            </nav>
+        </li>
+        <li class="md-nav__item"><a href="#working-with-branches" class="md-nav__link">Working with Branches</a><nav class="md-nav">
+              <ul class="md-nav__list">
+        <li class="md-nav__item"><a href="#create-a-new-feature-or-bug-fix-branch" class="md-nav__link">Create a New Feature or Bug Fix Branch</a>
+        </li>
+        <li class="md-nav__item"><a href="#naming-conventions-for-branches" class="md-nav__link">Naming Conventions for Branches</a>
+        </li>
+        <li class="md-nav__item"><a href="#linking-changes-to-github-issues" class="md-nav__link">Linking Changes to GitHub Issues</a>
+        </li></ul>
+            </nav>
+        </li>
+        <li class="md-nav__item"><a href="#commit-and-push-changes" class="md-nav__link">Commit and Push Changes</a><nav class="md-nav">
+              <ul class="md-nav__list">
+        <li class="md-nav__item"><a href="#commit-your-changes" class="md-nav__link">Commit Your Changes</a>
+        </li>
+        <li class="md-nav__item"><a href="#push-your-changes-to-github" class="md-nav__link">Push Your Changes to GitHub</a>
+        </li>
+        <li class="md-nav__item"><a href="#create-a-pull-request-pr" class="md-nav__link">Create a Pull Request (PR)</a>
+        </li></ul>
+            </nav>
+        </li>
+        <li class="md-nav__item"><a href="#github-actions" class="md-nav__link">GitHub Actions</a><nav class="md-nav">
+              <ul class="md-nav__list">
+        <li class="md-nav__item"><a href="#key-github-actions" class="md-nav__link">Key GitHub Actions</a>
+        </li>
+        <li class="md-nav__item"><a href="#workflow-triggers" class="md-nav__link">Workflow Triggers</a>
+        </li>
+        <li class="md-nav__item"><a href="#reviewing-action-results" class="md-nav__link">Reviewing Action Results</a>
+        </li></ul>
+            </nav>
+        </li>
+        <li class="md-nav__item"><a href="#common-commands" class="md-nav__link">Common Commands</a>
+        </li>
+        <li class="md-nav__item"><a href="#best-practices" class="md-nav__link">Best Practices</a>
+        </li>
+        <li class="md-nav__item"><a href="#troubleshooting" class="md-nav__link">Troubleshooting</a>
+        </li>
+        <li class="md-nav__item"><a href="#additional-resources" class="md-nav__link">Additional Resources</a>
+        </li></ul>
+            </nav>
+        </li>
+    
+<li class="md-nav__item"><a class="md-nav__extra_link" href="_sources/guider-of-git.rst.txt">Show Source</a> </li>
+
+  </ul>
+</nav>
+      <ul class="md-nav__list"> 
+    <li class="md-nav__item">
+    
+    
+      <a href="#getting-started" class="md-nav__link">Getting Started</a>
+      
+    
+    </li>
+    <li class="md-nav__item">
+    
+    
+      <a href="#working-with-branches" class="md-nav__link">Working with Branches</a>
+      
+    
+    </li>
+    <li class="md-nav__item">
+    
+    
+      <a href="#commit-and-push-changes" class="md-nav__link">Commit and Push Changes</a>
+      
+    
+    </li>
+    <li class="md-nav__item">
+    
+    
+      <a href="#github-actions" class="md-nav__link">GitHub Actions</a>
+      
+    
+    </li>
+    <li class="md-nav__item">
+    
+    
+      <a href="#common-commands" class="md-nav__link">Common Commands</a>
+      
+    
+    </li>
+    <li class="md-nav__item">
+    
+    
+      <a href="#best-practices" class="md-nav__link">Best Practices</a>
+      
+    
+    </li>
+    <li class="md-nav__item">
+    
+    
+      <a href="#troubleshooting" class="md-nav__link">Troubleshooting</a>
+      
+    
+    </li>
+    <li class="md-nav__item">
+    
+    
+      <a href="#additional-resources" class="md-nav__link">Additional Resources</a>
+      
+    
+    </li></ul>
+    
+    </li>
+  </ul>
+  
+
+</nav>
+              </div>
+            </div>
+          </div>
+          <div class="md-sidebar md-sidebar--secondary" data-md-component="toc">
+            <div class="md-sidebar__scrollwrap">
+              <div class="md-sidebar__inner">
+                
+<nav class="md-nav md-nav--secondary">
+    <label class="md-nav__title" for="__toc">"Contents"</label>
+  <ul class="md-nav__list" data-md-scrollfix="">
+        <li class="md-nav__item"><a href="#guider-of-git--page-root" class="md-nav__link">GIT Guider</a><nav class="md-nav">
+              <ul class="md-nav__list">
+        <li class="md-nav__item"><a href="#getting-started" class="md-nav__link">Getting Started</a><nav class="md-nav">
+              <ul class="md-nav__list">
+        <li class="md-nav__item"><a href="#clone-the-repository" class="md-nav__link">Clone the Repository</a>
+        </li>
+        <li class="md-nav__item"><a href="#switch-to-the-development-branch" class="md-nav__link">Switch to the Development Branch</a>
+        </li></ul>
+            </nav>
+        </li>
+        <li class="md-nav__item"><a href="#working-with-branches" class="md-nav__link">Working with Branches</a><nav class="md-nav">
+              <ul class="md-nav__list">
+        <li class="md-nav__item"><a href="#create-a-new-feature-or-bug-fix-branch" class="md-nav__link">Create a New Feature or Bug Fix Branch</a>
+        </li>
+        <li class="md-nav__item"><a href="#naming-conventions-for-branches" class="md-nav__link">Naming Conventions for Branches</a>
+        </li>
+        <li class="md-nav__item"><a href="#linking-changes-to-github-issues" class="md-nav__link">Linking Changes to GitHub Issues</a>
+        </li></ul>
+            </nav>
+        </li>
+        <li class="md-nav__item"><a href="#commit-and-push-changes" class="md-nav__link">Commit and Push Changes</a><nav class="md-nav">
+              <ul class="md-nav__list">
+        <li class="md-nav__item"><a href="#commit-your-changes" class="md-nav__link">Commit Your Changes</a>
+        </li>
+        <li class="md-nav__item"><a href="#push-your-changes-to-github" class="md-nav__link">Push Your Changes to GitHub</a>
+        </li>
+        <li class="md-nav__item"><a href="#create-a-pull-request-pr" class="md-nav__link">Create a Pull Request (PR)</a>
+        </li></ul>
+            </nav>
+        </li>
+        <li class="md-nav__item"><a href="#github-actions" class="md-nav__link">GitHub Actions</a><nav class="md-nav">
+              <ul class="md-nav__list">
+        <li class="md-nav__item"><a href="#key-github-actions" class="md-nav__link">Key GitHub Actions</a>
+        </li>
+        <li class="md-nav__item"><a href="#workflow-triggers" class="md-nav__link">Workflow Triggers</a>
+        </li>
+        <li class="md-nav__item"><a href="#reviewing-action-results" class="md-nav__link">Reviewing Action Results</a>
+        </li></ul>
+            </nav>
+        </li>
+        <li class="md-nav__item"><a href="#common-commands" class="md-nav__link">Common Commands</a>
+        </li>
+        <li class="md-nav__item"><a href="#best-practices" class="md-nav__link">Best Practices</a>
+        </li>
+        <li class="md-nav__item"><a href="#troubleshooting" class="md-nav__link">Troubleshooting</a>
+        </li>
+        <li class="md-nav__item"><a href="#additional-resources" class="md-nav__link">Additional Resources</a>
+        </li></ul>
+            </nav>
+        </li>
+    
+<li class="md-nav__item"><a class="md-nav__extra_link" href="_sources/guider-of-git.rst.txt">Show Source</a> </li>
+
+<li id="searchbox" class="md-nav__item"></li>
+
+  </ul>
+</nav>
+              </div>
+            </div>
+          </div>
+        
+        <div class="md-content">
+          <article class="md-content__inner md-typeset" role="main">
+            
+  <section id="git-guider">
+<h1 id="guider-of-git--page-root">GIT Guider<a class="headerlink" href="#guider-of-git--page-root" title="Link to this heading">¶</a></h1>
+<p>This document provides instructions for contributors on how to effectively use Git in the <strong>Biofilter</strong> project. It includes steps for cloning the repository, working with branches, linking changes to GitHub Issues, using GitHub Actions, and other project-specific practices.</p>
+<section id="getting-started">
+<h2 id="getting-started">Getting Started<a class="headerlink" href="#getting-started" title="Link to this heading">¶</a></h2>
+<section id="clone-the-repository">
+<h3 id="clone-the-repository">Clone the Repository<a class="headerlink" href="#clone-the-repository" title="Link to this heading">¶</a></h3>
+<p>To start working on the project, clone the GitHub repository to your local machine:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/RitchieLab/biofilter.git
+<span class="nb">cd</span><span class="w"> </span>biofilter
+</pre></div>
+</div>
+</section>
+<section id="switch-to-the-development-branch">
+<h3 id="switch-to-the-development-branch">Switch to the Development Branch<a class="headerlink" href="#switch-to-the-development-branch" title="Link to this heading">¶</a></h3>
+<p>The project follows a structured branching strategy, with active development happening on the <code class="docutils literal notranslate"><span class="pre">development</span></code> branch. Switch to this branch before making any changes:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>git<span class="w"> </span>checkout<span class="w"> </span>development
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">main</span></code> branch is reserved for stable, production-ready code. Always use <code class="docutils literal notranslate"><span class="pre">development</span></code> for feature work or bug fixes.</p>
+</div>
+</section>
+</section>
+<section id="working-with-branches">
+<h2 id="working-with-branches">Working with Branches<a class="headerlink" href="#working-with-branches" title="Link to this heading">¶</a></h2>
+<section id="create-a-new-feature-or-bug-fix-branch">
+<h3 id="create-a-new-feature-or-bug-fix-branch">Create a New Feature or Bug Fix Branch<a class="headerlink" href="#create-a-new-feature-or-bug-fix-branch" title="Link to this heading">¶</a></h3>
+<p>To avoid conflicts and maintain a clean workflow, create a new branch for each feature or bug fix:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>git<span class="w"> </span>checkout<span class="w"> </span>-b<span class="w"> </span>feature/&lt;your-feature-name&gt;
+</pre></div>
+</div>
+<p>For bug fixes, use:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>git<span class="w"> </span>checkout<span class="w"> </span>-b<span class="w"> </span>bugfix/&lt;your-bugfix-name&gt;
+</pre></div>
+</div>
+</section>
+<section id="naming-conventions-for-branches">
+<h3 id="naming-conventions-for-branches">Naming Conventions for Branches<a class="headerlink" href="#naming-conventions-for-branches" title="Link to this heading">¶</a></h3>
+<ul class="simple">
+<li><p><strong>Feature branches</strong>: <code class="docutils literal notranslate"><span class="pre">feature/&lt;description&gt;</span></code></p></li>
+<li><p><strong>Bug fix branches</strong>: <code class="docutils literal notranslate"><span class="pre">bugfix/&lt;description&gt;</span></code></p></li>
+<li><p><strong>Hotfix branches</strong>: <code class="docutils literal notranslate"><span class="pre">hotfix/&lt;description&gt;</span></code></p></li>
+</ul>
+<p>Example:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>git<span class="w"> </span>checkout<span class="w"> </span>-b<span class="w"> </span>feature/add-tox-tests
+</pre></div>
+</div>
+</section>
+<section id="linking-changes-to-github-issues">
+<h3 id="linking-changes-to-github-issues">Linking Changes to GitHub Issues<a class="headerlink" href="#linking-changes-to-github-issues" title="Link to this heading">¶</a></h3>
+<p>To link your changes to a GitHub Issue, reference the Issue number in your branch name or commit messages:</p>
+<ul>
+<li><p>Include the Issue number in your branch name:</p>
+<blockquote>
+<div><div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>git<span class="w"> </span>checkout<span class="w"> </span>-b<span class="w"> </span>feature/12-add-tox-tests
+</pre></div>
+</div>
+</div></blockquote>
+</li>
+<li><p>Mention the Issue in your commit message:</p>
+<blockquote>
+<div><div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>git<span class="w"> </span>commit<span class="w"> </span>-m<span class="w"> </span><span class="s2">"Fixes #12: Add tox tests for Python 3.10 and 3.12"</span>
+</pre></div>
+</div>
+</div></blockquote>
+</li>
+</ul>
+</section>
+</section>
+<section id="commit-and-push-changes">
+<h2 id="commit-and-push-changes">Commit and Push Changes<a class="headerlink" href="#commit-and-push-changes" title="Link to this heading">¶</a></h2>
+<section id="commit-your-changes">
+<h3 id="commit-your-changes">Commit Your Changes<a class="headerlink" href="#commit-your-changes" title="Link to this heading">¶</a></h3>
+<p>Once you’ve made changes, stage and commit them:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>git<span class="w"> </span>add<span class="w"> </span>.
+git<span class="w"> </span>commit<span class="w"> </span>-m<span class="w"> </span><span class="s2">"Brief description of your changes"</span>
+</pre></div>
+</div>
+</section>
+<section id="push-your-changes-to-github">
+<h3 id="push-your-changes-to-github">Push Your Changes to GitHub<a class="headerlink" href="#push-your-changes-to-github" title="Link to this heading">¶</a></h3>
+<p>Push your branch to the remote repository:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>git<span class="w"> </span>push<span class="w"> </span>origin<span class="w"> </span>&lt;your-branch-name&gt;
+</pre></div>
+</div>
+<p>Example:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>git<span class="w"> </span>push<span class="w"> </span>origin<span class="w"> </span>feature/add-tox-tests
+</pre></div>
+</div>
+</section>
+<section id="create-a-pull-request-pr">
+<h3 id="create-a-pull-request-pr">Create a Pull Request (PR)<a class="headerlink" href="#create-a-pull-request-pr" title="Link to this heading">¶</a></h3>
+<p>After pushing your changes, open a Pull Request on GitHub to merge your branch into the <code class="docutils literal notranslate"><span class="pre">development</span></code> branch. Make sure to:
+- Assign reviewers.
+- Link any relevant Issues in the PR description.
+- Provide a detailed summary of your changes.</p>
+</section>
+</section>
+<section id="github-actions">
+<h2 id="github-actions">GitHub Actions<a class="headerlink" href="#github-actions" title="Link to this heading">¶</a></h2>
+<p>The Biofilter project uses <strong>GitHub Actions</strong> for Continuous Integration (CI). These actions automatically validate your changes by running tests and building documentation.</p>
+<section id="key-github-actions">
+<h3 id="key-github-actions">Key GitHub Actions<a class="headerlink" href="#key-github-actions" title="Link to this heading">¶</a></h3>
+<ul class="simple">
+<li><p><strong>Tests</strong>: Runs <cite>tox</cite> across multiple Python versions.</p></li>
+<li><p><strong>Documentation Build</strong>: Builds and deploys Sphinx documentation for both user and developer guides.</p></li>
+</ul>
+</section>
+<section id="workflow-triggers">
+<h3 id="workflow-triggers">Workflow Triggers<a class="headerlink" href="#workflow-triggers" title="Link to this heading">¶</a></h3>
+<p>Actions are triggered automatically when:
+- A Pull Request is opened or updated.
+- Changes are pushed to the <code class="docutils literal notranslate"><span class="pre">development</span></code> or <code class="docutils literal notranslate"><span class="pre">main</span></code> branches.</p>
+</section>
+<section id="reviewing-action-results">
+<h3 id="reviewing-action-results">Reviewing Action Results<a class="headerlink" href="#reviewing-action-results" title="Link to this heading">¶</a></h3>
+<p>After pushing your changes, check the <strong>Actions</strong> tab on GitHub to review the results. Address any failing checks before requesting a review.</p>
+</section>
+</section>
+<section id="common-commands">
+<h2 id="common-commands">Common Commands<a class="headerlink" href="#common-commands" title="Link to this heading">¶</a></h2>
+<p>Here’s a quick reference for common Git commands used in the project:</p>
+<ul>
+<li><p><strong>Check Current Branch</strong>:</p>
+<blockquote>
+<div><div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>git<span class="w"> </span>branch
+</pre></div>
+</div>
+</div></blockquote>
+</li>
+<li><p><strong>Fetch Latest Changes</strong>:</p>
+<blockquote>
+<div><div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>git<span class="w"> </span>fetch
+</pre></div>
+</div>
+</div></blockquote>
+</li>
+<li><p><strong>Pull Updates for a Branch</strong>:</p>
+<blockquote>
+<div><div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>git<span class="w"> </span>pull<span class="w"> </span>origin<span class="w"> </span>&lt;branch-name&gt;
+</pre></div>
+</div>
+</div></blockquote>
+</li>
+<li><p><strong>Delete a Local Branch</strong>:</p>
+<blockquote>
+<div><div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>git<span class="w"> </span>branch<span class="w"> </span>-d<span class="w"> </span>&lt;branch-name&gt;
+</pre></div>
+</div>
+</div></blockquote>
+</li>
+<li><p><strong>Delete a Remote Branch</strong>:</p>
+<blockquote>
+<div><div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>git<span class="w"> </span>push<span class="w"> </span>origin<span class="w"> </span>--delete<span class="w"> </span>&lt;branch-name&gt;
+</pre></div>
+</div>
+</div></blockquote>
+</li>
+</ul>
+</section>
+<section id="best-practices">
+<h2 id="best-practices">Best Practices<a class="headerlink" href="#best-practices" title="Link to this heading">¶</a></h2>
+<ol class="arabic">
+<li><dl>
+<dt><strong>Always Pull Latest Changes</strong>:</dt><dd><p>Before starting any work, ensure your <code class="docutils literal notranslate"><span class="pre">development</span></code> branch is up to date:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>git<span class="w"> </span>checkout<span class="w"> </span>development
+git<span class="w"> </span>pull<span class="w"> </span>origin<span class="w"> </span>development
+</pre></div>
+</div>
+</dd>
+</dl>
+</li>
+<li><dl class="simple">
+<dt><strong>Commit Often</strong>:</dt><dd><p>Make small, incremental commits with descriptive messages.</p>
+</dd>
+</dl>
+</li>
+<li><dl class="simple">
+<dt><strong>Keep Pull Requests Small</strong>:</dt><dd><p>Focus on one feature or fix per PR to make reviews easier.</p>
+</dd>
+</dl>
+</li>
+<li><dl>
+<dt><strong>Run Tests Locally</strong>:</dt><dd><p>Always run tests locally before pushing changes:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>poetry<span class="w"> </span>run<span class="w"> </span>tox
+</pre></div>
+</div>
+</dd>
+</dl>
+</li>
+<li><dl class="simple">
+<dt><strong>Follow Branching Strategy</strong>:</dt><dd><p>Ensure you create branches from <code class="docutils literal notranslate"><span class="pre">development</span></code> and merge them back into <code class="docutils literal notranslate"><span class="pre">development</span></code>.</p>
+</dd>
+</dl>
+</li>
+</ol>
+</section>
+<section id="troubleshooting">
+<h2 id="troubleshooting">Troubleshooting<a class="headerlink" href="#troubleshooting" title="Link to this heading">¶</a></h2>
+<ul>
+<li><dl class="simple">
+<dt><strong>Merge Conflicts</strong>:</dt><dd><p>If you encounter merge conflicts when pulling updates, resolve them manually and commit the resolved files.</p>
+</dd>
+</dl>
+</li>
+<li><dl>
+<dt><strong>Forgotten to Switch Branch</strong>:</dt><dd><p>If you accidentally commit to the wrong branch, create a new branch and reset the original:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>git<span class="w"> </span>branch<span class="w"> </span>feature/fix-issue-123
+git<span class="w"> </span>reset<span class="w"> </span>--hard<span class="w"> </span>origin/development
+</pre></div>
+</div>
+</dd>
+</dl>
+</li>
+<li><dl>
+<dt><strong>Changes Not Reflecting</strong>:</dt><dd><p>Ensure you’ve staged and committed all changes:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>git<span class="w"> </span>status
+</pre></div>
+</div>
+</dd>
+</dl>
+</li>
+</ul>
+</section>
+<section id="additional-resources">
+<h2 id="additional-resources">Additional Resources<a class="headerlink" href="#additional-resources" title="Link to this heading">¶</a></h2>
+<ul class="simple">
+<li><p><a class="reference external" href="https://git-scm.com/doc">Git Documentation</a></p></li>
+<li><p><a class="reference external" href="https://docs.github.com/en/actions">GitHub Actions</a></p></li>
+</ul>
+</section>
+</section>
+
+
+          </article>
+        </div>
+      </div>
+    </main>
+  </div>
+  <footer class="md-footer">
+    <div class="md-footer-nav">
+      <nav class="md-footer-nav__inner md-grid">
+          
+            <a href="guider-of-sphinx.html" title="Sphinx Guide"
+               class="md-flex md-footer-nav__link md-footer-nav__link--prev"
+               rel="prev">
+              <div class="md-flex__cell md-flex__cell--shrink">
+                <i class="md-icon md-icon--arrow-back md-footer-nav__button"></i>
+              </div>
+              <div class="md-flex__cell md-flex__cell--stretch md-footer-nav__title">
+                <span class="md-flex__ellipsis">
+                  <span
+                      class="md-footer-nav__direction"> "Previous" </span> Sphinx Guide </span>
+              </div>
+            </a>
+          
+          
+        </a>
+        
+      </nav>
+    </div>
+    <div class="md-footer-meta md-typeset">
+      <div class="md-footer-meta__inner md-grid">
+        <div class="md-footer-copyright">
+          <div class="md-footer-copyright__highlight">
+              &#169; Copyright 2024, Ritchie Lab.
+              
+          </div>
+            Created using
+            <a href="http://www.sphinx-doc.org/">Sphinx</a> 8.1.3.
+             and
+            <a href="https://github.com/bashtage/sphinx-material/">Material for
+              Sphinx</a>
+        </div>
+      </div>
+    </div>
+  </footer>
+  <script src="_static/javascripts/application.js"></script>
+  <script>app.initialize({version: "1.0.4", url: {base: ".."}})</script>
+  </body>
+</html>

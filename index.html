@@ -54,7 +54,7 @@
     <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
-    <link rel="next" title="Branching Structure Guide" href="usage-of-branching.html" />
+    <link rel="next" title="Branching Structure Guide" href="guider-of-branching.html" />
   
    
 
@@ -205,55 +205,57 @@
   <ul class="md-nav__list">
     <li class="md-nav__item">
     
-      <span class="md-nav__link caption"><span class="caption-text">Contents:</span></span>
     
-    </li>
-    <li class="md-nav__item">
-    
-    
-      <a href="usage-of-branching.html" class="md-nav__link">Branching Structure Guide</a>
+      <a href="guider-of-branching.html" class="md-nav__link">Branching Structure Guide</a>
       
     
     </li>
     <li class="md-nav__item">
     
     
-      <a href="usage-of-poetry.html" class="md-nav__link">Poetry Guider</a>
+      <a href="guider-of-poetry.html" class="md-nav__link">Poetry Guider</a>
       
     
     </li>
     <li class="md-nav__item">
     
     
-      <a href="usage-of-black.html" class="md-nav__link">Black Guide</a>
+      <a href="guider-of-black.html" class="md-nav__link">Black Guide</a>
       
     
     </li>
     <li class="md-nav__item">
     
     
-      <a href="usage-of-coverage.html" class="md-nav__link">Coverage Guide</a>
+      <a href="guider-of-tests.html" class="md-nav__link">Testing Guider</a>
       
     
     </li>
     <li class="md-nav__item">
     
     
-      <a href="usage-of-tox.html" class="md-nav__link">Tox Guider</a>
+      <a href="guider-of-coverage.html" class="md-nav__link">Coverage Guide</a>
       
     
     </li>
     <li class="md-nav__item">
     
     
-      <a href="usage-of-sphinx.html" class="md-nav__link">Sphinx Guider</a>
+      <a href="guider-of-tox.html" class="md-nav__link">Tox Guide</a>
       
     
     </li>
     <li class="md-nav__item">
     
     
-      <a href="usage-of-git.html" class="md-nav__link">Using git and CI/CD by Actions</a>
+      <a href="guider-of-sphinx.html" class="md-nav__link">Sphinx Guide</a>
+      
+    
+    </li>
+    <li class="md-nav__item">
+    
+    
+      <a href="guider-of-git.html" class="md-nav__link">GIT Guider</a>
       
     
     </li>
@@ -315,8 +317,8 @@
 <h2 id="documentation-for-users">Documentation for Users<a class="headerlink" href="#documentation-for-users" title="Link to this heading">¶</a></h2>
 <p>For more detailed instructions and usage examples, refer to the user documentation:</p>
 <ul class="simple">
-<li><p>Biofilter User Guide</p></li>
-<li><p>LOKI User Guide</p></li>
+<li><p><a class="reference external" href="https://ritchielab.readthedocs.io/en/latest/k">Biofilter User Guide</a>.</p></li>
+<li><p><a class="reference external" href="https://ritchielab.readthedocs.io/en/latest/k">LOKI User Guide</a>.</p></li>
 </ul>
 </section>
 <section id="key-features">
@@ -444,66 +446,92 @@ poetry<span class="w"> </span>--version<span class="w">  </span><span class="c1"
 </div>
 </div></blockquote>
 <div class="toctree-wrapper compound">
-<p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="usage-of-branching.html">Branching Structure Guide</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="usage-of-branching.html#branches">Branches</a></li>
-<li class="toctree-l2"><a class="reference internal" href="usage-of-branching.html#workflow-summary">Workflow Summary</a></li>
-<li class="toctree-l2"><a class="reference internal" href="usage-of-branching.html#branching-best-practices">Branching Best Practices</a></li>
-<li class="toctree-l2"><a class="reference internal" href="usage-of-branching.html#conclusion">Conclusion</a></li>
+<li class="toctree-l1"><a class="reference internal" href="guider-of-branching.html">Branching Structure Guide</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="guider-of-branching.html#branches">Branches</a></li>
+<li class="toctree-l2"><a class="reference internal" href="guider-of-branching.html#main-branch-main">Main Branch: <code class="docutils literal notranslate"><span class="pre">main</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="guider-of-branching.html#development-branch-development">Development Branch: <code class="docutils literal notranslate"><span class="pre">development</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="guider-of-branching.html#feature-branch-dev-3-0-0">Feature Branch: <code class="docutils literal notranslate"><span class="pre">dev-3.0.0</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="guider-of-branching.html#documentation-branch-gh-pages">Documentation Branch: <code class="docutils literal notranslate"><span class="pre">gh-pages</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="guider-of-branching.html#workflow-for-updating-documentation">Workflow for Updating Documentation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="guider-of-branching.html#workflow-summary">Workflow Summary</a></li>
+<li class="toctree-l2"><a class="reference internal" href="guider-of-branching.html#branching-best-practices">Branching Best Practices</a></li>
+<li class="toctree-l2"><a class="reference internal" href="guider-of-branching.html#conclusion">Conclusion</a></li>
 </ul>
 </li>
-<li class="toctree-l1"><a class="reference internal" href="usage-of-poetry.html">Poetry Guider</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="usage-of-poetry.html#what-is-poetry">What is Poetry?</a></li>
-<li class="toctree-l2"><a class="reference internal" href="usage-of-poetry.html#why-use-poetry">Why Use Poetry?</a></li>
-<li class="toctree-l2"><a class="reference internal" href="usage-of-poetry.html#setting-up-the-project-locally">Setting Up the Project Locally</a></li>
-<li class="toctree-l2"><a class="reference internal" href="usage-of-poetry.html#creating-installation-packages">Creating Installation Packages</a></li>
-<li class="toctree-l2"><a class="reference internal" href="usage-of-poetry.html#automating-the-workflow">Automating the Workflow</a></li>
-<li class="toctree-l2"><a class="reference internal" href="usage-of-poetry.html#managing-dependencies">Managing Dependencies</a></li>
-<li class="toctree-l2"><a class="reference internal" href="usage-of-poetry.html#reproducibility">Reproducibility</a></li>
-<li class="toctree-l2"><a class="reference internal" href="usage-of-poetry.html#additional-resources">Additional Resources</a></li>
+<li class="toctree-l1"><a class="reference internal" href="guider-of-poetry.html">Poetry Guider</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="guider-of-poetry.html#what-is-poetry">What is Poetry?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="guider-of-poetry.html#why-use-poetry">Why Use Poetry?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="guider-of-poetry.html#setting-up-the-project-locally">Setting Up the Project Locally</a></li>
+<li class="toctree-l2"><a class="reference internal" href="guider-of-poetry.html#creating-installation-packages">Creating Installation Packages</a></li>
+<li class="toctree-l2"><a class="reference internal" href="guider-of-poetry.html#automating-the-workflow">Automating the Workflow</a></li>
+<li class="toctree-l2"><a class="reference internal" href="guider-of-poetry.html#managing-dependencies">Managing Dependencies</a></li>
+<li class="toctree-l2"><a class="reference internal" href="guider-of-poetry.html#reproducibility">Reproducibility</a></li>
+<li class="toctree-l2"><a class="reference internal" href="guider-of-poetry.html#additional-resources">Additional Resources</a></li>
 </ul>
 </li>
-<li class="toctree-l1"><a class="reference internal" href="usage-of-black.html">Black Guide</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="usage-of-black.html#installation">Installation</a></li>
-<li class="toctree-l2"><a class="reference internal" href="usage-of-black.html#basic-usage">Basic Usage</a></li>
-<li class="toctree-l2"><a class="reference internal" href="usage-of-black.html#common-options">Common Options</a></li>
-<li class="toctree-l2"><a class="reference internal" href="usage-of-black.html#integrating-black-with-pre-commit-hooks">Integrating Black with Pre-Commit Hooks</a></li>
-<li class="toctree-l2"><a class="reference internal" href="usage-of-black.html#tips-for-working-with-black">Tips for Working with Black</a></li>
-<li class="toctree-l2"><a class="reference internal" href="usage-of-black.html#further-documentation">Further Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="guider-of-black.html">Black Guide</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="guider-of-black.html#installation">Installation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="guider-of-black.html#basic-usage">Basic Usage</a></li>
+<li class="toctree-l2"><a class="reference internal" href="guider-of-black.html#common-options">Common Options</a></li>
+<li class="toctree-l2"><a class="reference internal" href="guider-of-black.html#integration-with-ci-cd">Integration with CI/CD</a></li>
+<li class="toctree-l2"><a class="reference internal" href="guider-of-black.html#integrating-black-with-pre-commit-hooks">Integrating Black with Pre-Commit Hooks</a></li>
+<li class="toctree-l2"><a class="reference internal" href="guider-of-black.html#tips-for-working-with-black">Tips for Working with Black</a></li>
+<li class="toctree-l2"><a class="reference internal" href="guider-of-black.html#further-documentation">Further Documentation</a></li>
 </ul>
 </li>
-<li class="toctree-l1"><a class="reference internal" href="usage-of-coverage.html">Coverage Guide</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="usage-of-coverage.html#install-coverage-py">1. Install Coverage.py</a></li>
-<li class="toctree-l2"><a class="reference internal" href="usage-of-coverage.html#run-tests-with-coverage">2. Run Tests with Coverage</a></li>
-<li class="toctree-l2"><a class="reference internal" href="usage-of-coverage.html#generate-a-coverage-report-in-the-terminal">3. Generate a Coverage Report in the Terminal</a></li>
-<li class="toctree-l2"><a class="reference internal" href="usage-of-coverage.html#generate-an-html-report">4. Generate an HTML Report</a></li>
-<li class="toctree-l2"><a class="reference internal" href="usage-of-coverage.html#exclude-files-or-lines-from-the-report-optional">5. Exclude Files or Lines from the Report (Optional)</a></li>
-<li class="toctree-l2"><a class="reference internal" href="usage-of-coverage.html#summary-of-commands">Summary of Commands</a></li>
+<li class="toctree-l1"><a class="reference internal" href="guider-of-tests.html">Testing Guider</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="guider-of-tests.html#test-structure">Test Structure</a></li>
+<li class="toctree-l2"><a class="reference internal" href="guider-of-tests.html#vs-code-integration">VS Code Integration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="guider-of-tests.html#unit-tests-and-fixtures">Unit Tests and Fixtures</a></li>
+<li class="toctree-l2"><a class="reference internal" href="guider-of-tests.html#integration-with-ci-cd">Integration with CI/CD</a></li>
+<li class="toctree-l2"><a class="reference internal" href="guider-of-tests.html#running-tests-locally">Running Tests Locally</a></li>
+<li class="toctree-l2"><a class="reference internal" href="guider-of-tests.html#best-practices">Best Practices</a></li>
+<li class="toctree-l2"><a class="reference internal" href="guider-of-tests.html#additional-resources">Additional Resources</a></li>
 </ul>
 </li>
-<li class="toctree-l1"><a class="reference internal" href="usage-of-tox.html">Tox Guider</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="usage-of-tox.html#overview">Overview</a></li>
-<li class="toctree-l2"><a class="reference internal" href="usage-of-tox.html#setting-up-tox">Setting Up Tox</a></li>
-<li class="toctree-l2"><a class="reference internal" href="usage-of-tox.html#tox-configuration">Tox Configuration</a></li>
-<li class="toctree-l2"><a class="reference internal" href="usage-of-tox.html#using-tox">Using Tox</a></li>
-<li class="toctree-l2"><a class="reference internal" href="usage-of-tox.html#customizing-tox">Customizing Tox</a></li>
-<li class="toctree-l2"><a class="reference internal" href="usage-of-tox.html#cleaning-up-tox">Cleaning Up Tox</a></li>
+<li class="toctree-l1"><a class="reference internal" href="guider-of-coverage.html">Coverage Guide</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="guider-of-coverage.html#install-coverage-py">1. Install Coverage.py</a></li>
+<li class="toctree-l2"><a class="reference internal" href="guider-of-coverage.html#run-tests-with-coverage">2. Run Tests with Coverage</a></li>
+<li class="toctree-l2"><a class="reference internal" href="guider-of-coverage.html#generate-a-coverage-report-in-the-terminal">3. Generate a Coverage Report in the Terminal</a></li>
+<li class="toctree-l2"><a class="reference internal" href="guider-of-coverage.html#generate-an-html-report">4. Generate an HTML Report</a></li>
+<li class="toctree-l2"><a class="reference internal" href="guider-of-coverage.html#exclude-files-or-lines-from-the-report-optional">5. Exclude Files or Lines from the Report (Optional)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="guider-of-coverage.html#integration-with-ci-cd">Integration with CI/CD</a></li>
+<li class="toctree-l2"><a class="reference internal" href="guider-of-coverage.html#summary-of-commands">Summary of Commands</a></li>
 </ul>
 </li>
-<li class="toctree-l1"><a class="reference internal" href="usage-of-sphinx.html">Sphinx Guider</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="usage-of-sphinx.html#prerequisites">Prerequisites</a></li>
-<li class="toctree-l2"><a class="reference internal" href="usage-of-sphinx.html#setting-up-the-environment">Setting Up the Environment</a></li>
-<li class="toctree-l2"><a class="reference internal" href="usage-of-sphinx.html#initializing-sphinx">Initializing Sphinx</a></li>
-<li class="toctree-l2"><a class="reference internal" href="usage-of-sphinx.html#generating-the-documentation">Generating the Documentation</a></li>
-<li class="toctree-l2"><a class="reference internal" href="usage-of-sphinx.html#customizing-documentation">Customizing Documentation</a></li>
-<li class="toctree-l2"><a class="reference internal" href="usage-of-sphinx.html#regenerating-documentation">Regenerating Documentation</a></li>
-<li class="toctree-l2"><a class="reference internal" href="usage-of-sphinx.html#tips-for-contributors">Tips for Contributors</a></li>
-<li class="toctree-l2"><a class="reference internal" href="usage-of-sphinx.html#troubleshooting">Troubleshooting</a></li>
-<li class="toctree-l2"><a class="reference internal" href="usage-of-sphinx.html#additional-resources">Additional Resources</a></li>
+<li class="toctree-l1"><a class="reference internal" href="guider-of-tox.html">Tox Guide</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="guider-of-tox.html#overview">Overview</a></li>
+<li class="toctree-l2"><a class="reference internal" href="guider-of-tox.html#tox-configuration">Tox Configuration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="guider-of-tox.html#using-tox">Using Tox</a></li>
+<li class="toctree-l2"><a class="reference internal" href="guider-of-tox.html#customizing-tox">Customizing Tox</a></li>
+<li class="toctree-l2"><a class="reference internal" href="guider-of-tox.html#cleaning-up-tox">Cleaning Up Tox</a></li>
+<li class="toctree-l2"><a class="reference internal" href="guider-of-tox.html#ci-cd-integration">CI/CD Integration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="guider-of-tox.html#additional-resources">Additional Resources</a></li>
 </ul>
 </li>
-<li class="toctree-l1"><a class="reference internal" href="usage-of-git.html">Using git and CI/CD by Actions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="guider-of-sphinx.html">Sphinx Guide</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="guider-of-sphinx.html#documentation-structure">Documentation Structure</a></li>
+<li class="toctree-l2"><a class="reference internal" href="guider-of-sphinx.html#prerequisites">Prerequisites</a></li>
+<li class="toctree-l2"><a class="reference internal" href="guider-of-sphinx.html#working-with-documentation">Working with Documentation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="guider-of-sphinx.html#customizing-documentation">Customizing Documentation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="guider-of-sphinx.html#customizing-and-regenerating">Customizing and Regenerating</a></li>
+<li class="toctree-l2"><a class="reference internal" href="guider-of-sphinx.html#tips-for-contributors">Tips for Contributors</a></li>
+<li class="toctree-l2"><a class="reference internal" href="guider-of-sphinx.html#troubleshooting">Troubleshooting</a></li>
+<li class="toctree-l2"><a class="reference internal" href="guider-of-sphinx.html#additional-resources">Additional Resources</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="guider-of-git.html">GIT Guider</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="guider-of-git.html#getting-started">Getting Started</a></li>
+<li class="toctree-l2"><a class="reference internal" href="guider-of-git.html#working-with-branches">Working with Branches</a></li>
+<li class="toctree-l2"><a class="reference internal" href="guider-of-git.html#commit-and-push-changes">Commit and Push Changes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="guider-of-git.html#github-actions">GitHub Actions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="guider-of-git.html#common-commands">Common Commands</a></li>
+<li class="toctree-l2"><a class="reference internal" href="guider-of-git.html#best-practices">Best Practices</a></li>
+<li class="toctree-l2"><a class="reference internal" href="guider-of-git.html#troubleshooting">Troubleshooting</a></li>
+<li class="toctree-l2"><a class="reference internal" href="guider-of-git.html#additional-resources">Additional Resources</a></li>
+</ul>
+</li>
 </ul>
 </div>
 </section>
@@ -520,7 +548,7 @@ poetry<span class="w"> </span>--version<span class="w">  </span><span class="c1"
       <nav class="md-footer-nav__inner md-grid">
           
           
-            <a href="usage-of-branching.html" title="Branching Structure Guide"
+            <a href="guider-of-branching.html" title="Branching Structure Guide"
                class="md-flex md-footer-nav__link md-footer-nav__link--next"
                rel="next">
             <div class="md-flex__cell md-flex__cell--stretch md-footer-nav__title"><span

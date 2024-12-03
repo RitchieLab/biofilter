@@ -27,7 +27,8 @@ Why Use Poetry?
 Setting Up the Project Locally
 ------------------------------
 
-### Step 1: Install Poetry
+Step 1: Install Poetry
+~~~~~~~~~~~~~~~~~~~~~~
 
 Follow the official Poetry installation instructions:
 
@@ -43,14 +44,16 @@ After installation, verify the installation:
 
 If you're on Windows, you can use the official installer or refer to the `Poetry documentation <https://python-poetry.org/docs/>`_.
 
-### Step 2: Clone the Repository
+Step 2: Clone the Repository
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: bash
 
-   git clone https://github.com/.../biofilter.git
+   git clone https://github.com/RitchieLab/biofilter.git
    cd biofilter
 
-### Step 3: Install Project Dependencies
+Step 3: Install Project Dependencies
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Poetry will automatically create a virtual environment and install all dependencies specified in ``pyproject.toml``:
 
@@ -58,7 +61,14 @@ Poetry will automatically create a virtual environment and install all dependenc
 
    poetry install
 
-### Step 4: Activate the Virtual Environment
+   
+.. important::
+   
+   Before running `poetry install`, ensure you are using the desired Python version. This can either be the globally installed Python version or a specific version managed through tools like pyenv. If using pyenv, set the Python version for the project using pyenv local <desired-version> before proceeding with the installation.
+
+
+Step 4: Activate the Virtual Environment
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 To activate the virtual environment created by Poetry, run:
 
@@ -68,7 +78,8 @@ To activate the virtual environment created by Poetry, run:
 
 You can now use the installed dependencies and run project-specific commands within this environment.
 
-### Step 5: Run the Project
+Step 5: Run the Project
+~~~~~~~~~~~~~~~~~~~~~~~~
 
 For example, to run one of the entry-point scripts defined in the project:
 
@@ -79,7 +90,8 @@ For example, to run one of the entry-point scripts defined in the project:
 Creating Installation Packages
 ------------------------------
 
-### Step 1: Validate the Project Setup
+Step 1: Validate the Project Setup
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Ensure the ``pyproject.toml`` file is properly configured with all required metadata, dependencies, and entry points. Example fields to check:
 - ``name``
@@ -97,7 +109,8 @@ Example entry in ``pyproject.toml``:
    biofilter = "biofilter_modules.biofilter:main"
    loki-build = "loki_modules.loki_build:main"
 
-### Step 2: Build the Package
+Step 2: Build the Package
+~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Run the following command to generate distribution files (``.tar.gz`` and ``.whl``) in the ``dist/`` directory:
 
@@ -109,7 +122,8 @@ This command will create:
 - A source distribution (``.tar.gz``).
 - A wheel distribution (``.whl``).
 
-### Step 3: Verify the Package
+Step 3: Verify the Package
+~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 To test the installation of the package locally, use:
 
@@ -119,7 +133,8 @@ To test the installation of the package locally, use:
 
 Replace ``<version>`` with the version number of the package.
 
-### Step 4: Publish the Package
+Step 4: Publish the Package
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 To publish the package to PyPI (or a private repository), use:
 
@@ -168,7 +183,8 @@ Run it:
 Managing Dependencies
 ----------------------
 
-### Adding a Dependency
+Adding a Dependency
+~~~~~~~~~~~~~~~~~~~
 
 To add a new dependency to the project, use:
 
@@ -176,21 +192,24 @@ To add a new dependency to the project, use:
 
    poetry add <package-name>
 
-### Adding a Development Dependency
+Adding a Development Dependency
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 To add a dependency for development purposes (e.g., linters, testing frameworks):
 
 .. code-block:: bash
 
-   poetry add --dev <package-name>
+   poetry add --group dev <package-name>
 
-### Removing a Dependency
+Removing a Dependency
+~~~~~~~~~~~~~~~~~~~~~
 
 To remove a dependency from the project:
 
 .. code-block:: bash
 
    poetry remove <package-name>
+
 
 Reproducibility
 ---------------

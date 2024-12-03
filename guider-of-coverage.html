@@ -46,7 +46,7 @@
   
   
   
-    <title>Black Guide &#8212; Biofilter Developer Documentation 2.4.4 documentation</title>
+    <title>Coverage Guide &#8212; Biofilter Developer Documentation 2.4.4 documentation</title>
     <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=83e35b93" />
     <link rel="stylesheet" type="text/css" href="_static/material.css?v=79c92029" />
     <script src="_static/documentation_options.js?v=b1e24531"></script>
@@ -54,8 +54,8 @@
     <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
-    <link rel="next" title="Coverage Guide" href="usage-of-coverage.html" />
-    <link rel="prev" title="Poetry Guider" href="usage-of-poetry.html" />
+    <link rel="next" title="Tox Guide" href="guider-of-tox.html" />
+    <link rel="prev" title="Testing Guider" href="guider-of-tests.html" />
   
    
 
@@ -74,7 +74,7 @@
   <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer">
   <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search">
   <label class="md-overlay" data-md-component="overlay" for="__drawer"></label>
-  <a href="#usage-of-black" tabindex="1" class="md-skip"> Skip to content </a>
+  <a href="#guider-of-coverage" tabindex="1" class="md-skip"> Skip to content </a>
   <header class="md-header" data-md-component="header">
   <nav class="md-header-nav md-grid">
     <div class="md-flex navheader">
@@ -92,7 +92,7 @@
       <div class="md-flex__cell md-flex__cell--stretch">
         <div class="md-flex__ellipsis md-header-nav__title" data-md-component="title">
           <span class="md-header-nav__topic">Biofilter Developer Docs</span>
-          <span class="md-header-nav__topic"> Black Guide </span>
+          <span class="md-header-nav__topic"> Coverage Guide </span>
         </div>
       </div>
       <div class="md-flex__cell md-flex__cell--shrink">
@@ -206,20 +206,29 @@
   <ul class="md-nav__list">
     <li class="md-nav__item">
     
-      <span class="md-nav__link caption"><span class="caption-text">Contents:</span></span>
     
-    </li>
-    <li class="md-nav__item">
-    
-    
-      <a href="usage-of-branching.html" class="md-nav__link">Branching Structure Guide</a>
+      <a href="guider-of-branching.html" class="md-nav__link">Branching Structure Guide</a>
       
     
     </li>
     <li class="md-nav__item">
     
     
-      <a href="usage-of-poetry.html" class="md-nav__link">Poetry Guider</a>
+      <a href="guider-of-poetry.html" class="md-nav__link">Poetry Guider</a>
+      
+    
+    </li>
+    <li class="md-nav__item">
+    
+    
+      <a href="guider-of-black.html" class="md-nav__link">Black Guide</a>
+      
+    
+    </li>
+    <li class="md-nav__item">
+    
+    
+      <a href="guider-of-tests.html" class="md-nav__link">Testing Guider</a>
       
     
     </li>
@@ -227,32 +236,34 @@
     
     
     <input class="md-toggle md-nav__toggle" data-md-toggle="toc" type="checkbox" id="__toc">
-    <label class="md-nav__link md-nav__link--active" for="__toc"> Black Guide </label>
+    <label class="md-nav__link md-nav__link--active" for="__toc"> Coverage Guide </label>
     
-      <a href="#" class="md-nav__link md-nav__link--active">Black Guide</a>
+      <a href="#" class="md-nav__link md-nav__link--active">Coverage Guide</a>
       
         
 <nav class="md-nav md-nav--secondary">
     <label class="md-nav__title" for="__toc">"Contents"</label>
   <ul class="md-nav__list" data-md-scrollfix="">
-        <li class="md-nav__item"><a href="#usage-of-black--page-root" class="md-nav__link">Black Guide</a><nav class="md-nav">
+        <li class="md-nav__item"><a href="#guider-of-coverage--page-root" class="md-nav__link">Coverage Guide</a><nav class="md-nav">
               <ul class="md-nav__list">
-        <li class="md-nav__item"><a href="#installation" class="md-nav__link">Installation</a>
+        <li class="md-nav__item"><a href="#install-coverage-py" class="md-nav__link">1. Install Coverage.py</a>
         </li>
-        <li class="md-nav__item"><a href="#basic-usage" class="md-nav__link">Basic Usage</a>
+        <li class="md-nav__item"><a href="#run-tests-with-coverage" class="md-nav__link">2. Run Tests with Coverage</a>
         </li>
-        <li class="md-nav__item"><a href="#common-options" class="md-nav__link">Common Options</a>
+        <li class="md-nav__item"><a href="#generate-a-coverage-report-in-the-terminal" class="md-nav__link">3. Generate a Coverage Report in the Terminal</a>
         </li>
-        <li class="md-nav__item"><a href="#integrating-black-with-pre-commit-hooks" class="md-nav__link">Integrating Black with Pre-Commit Hooks</a>
+        <li class="md-nav__item"><a href="#generate-an-html-report" class="md-nav__link">4. Generate an HTML Report</a>
         </li>
-        <li class="md-nav__item"><a href="#tips-for-working-with-black" class="md-nav__link">Tips for Working with Black</a>
+        <li class="md-nav__item"><a href="#exclude-files-or-lines-from-the-report-optional" class="md-nav__link">5. Exclude Files or Lines from the Report (Optional)</a>
         </li>
-        <li class="md-nav__item"><a href="#further-documentation" class="md-nav__link">Further Documentation</a>
+        <li class="md-nav__item"><a href="#integration-with-ci-cd" class="md-nav__link">Integration with CI/CD</a>
+        </li>
+        <li class="md-nav__item"><a href="#summary-of-commands" class="md-nav__link">Summary of Commands</a>
         </li></ul>
             </nav>
         </li>
     
-<li class="md-nav__item"><a class="md-nav__extra_link" href="_sources/usage-of-black.rst.txt">Show Source</a> </li>
+<li class="md-nav__item"><a class="md-nav__extra_link" href="_sources/guider-of-coverage.rst.txt">Show Source</a> </li>
 
   </ul>
 </nav>
@@ -260,42 +271,49 @@
     <li class="md-nav__item">
     
     
-      <a href="#installation" class="md-nav__link">Installation</a>
+      <a href="#install-coverage-py" class="md-nav__link">1. Install Coverage.py</a>
       
     
     </li>
     <li class="md-nav__item">
     
     
-      <a href="#basic-usage" class="md-nav__link">Basic Usage</a>
+      <a href="#run-tests-with-coverage" class="md-nav__link">2. Run Tests with Coverage</a>
       
     
     </li>
     <li class="md-nav__item">
     
     
-      <a href="#common-options" class="md-nav__link">Common Options</a>
+      <a href="#generate-a-coverage-report-in-the-terminal" class="md-nav__link">3. Generate a Coverage Report in the Terminal</a>
       
     
     </li>
     <li class="md-nav__item">
     
     
-      <a href="#integrating-black-with-pre-commit-hooks" class="md-nav__link">Integrating Black with Pre-Commit Hooks</a>
+      <a href="#generate-an-html-report" class="md-nav__link">4. Generate an HTML Report</a>
       
     
     </li>
     <li class="md-nav__item">
     
     
-      <a href="#tips-for-working-with-black" class="md-nav__link">Tips for Working with Black</a>
+      <a href="#exclude-files-or-lines-from-the-report-optional" class="md-nav__link">5. Exclude Files or Lines from the Report (Optional)</a>
       
     
     </li>
     <li class="md-nav__item">
     
     
-      <a href="#further-documentation" class="md-nav__link">Further Documentation</a>
+      <a href="#integration-with-ci-cd" class="md-nav__link">Integration with CI/CD</a>
+      
+    
+    </li>
+    <li class="md-nav__item">
+    
+    
+      <a href="#summary-of-commands" class="md-nav__link">Summary of Commands</a>
       
     
     </li></ul>
@@ -304,28 +322,21 @@
     <li class="md-nav__item">
     
     
-      <a href="usage-of-coverage.html" class="md-nav__link">Coverage Guide</a>
+      <a href="guider-of-tox.html" class="md-nav__link">Tox Guide</a>
       
     
     </li>
     <li class="md-nav__item">
     
     
-      <a href="usage-of-tox.html" class="md-nav__link">Tox Guider</a>
+      <a href="guider-of-sphinx.html" class="md-nav__link">Sphinx Guide</a>
       
     
     </li>
     <li class="md-nav__item">
     
     
-      <a href="usage-of-sphinx.html" class="md-nav__link">Sphinx Guider</a>
-      
-    
-    </li>
-    <li class="md-nav__item">
-    
-    
-      <a href="usage-of-git.html" class="md-nav__link">Using git and CI/CD by Actions</a>
+      <a href="guider-of-git.html" class="md-nav__link">GIT Guider</a>
       
     
     </li>
@@ -343,24 +354,26 @@
 <nav class="md-nav md-nav--secondary">
     <label class="md-nav__title" for="__toc">"Contents"</label>
   <ul class="md-nav__list" data-md-scrollfix="">
-        <li class="md-nav__item"><a href="#usage-of-black--page-root" class="md-nav__link">Black Guide</a><nav class="md-nav">
+        <li class="md-nav__item"><a href="#guider-of-coverage--page-root" class="md-nav__link">Coverage Guide</a><nav class="md-nav">
               <ul class="md-nav__list">
-        <li class="md-nav__item"><a href="#installation" class="md-nav__link">Installation</a>
+        <li class="md-nav__item"><a href="#install-coverage-py" class="md-nav__link">1. Install Coverage.py</a>
         </li>
-        <li class="md-nav__item"><a href="#basic-usage" class="md-nav__link">Basic Usage</a>
+        <li class="md-nav__item"><a href="#run-tests-with-coverage" class="md-nav__link">2. Run Tests with Coverage</a>
         </li>
-        <li class="md-nav__item"><a href="#common-options" class="md-nav__link">Common Options</a>
+        <li class="md-nav__item"><a href="#generate-a-coverage-report-in-the-terminal" class="md-nav__link">3. Generate a Coverage Report in the Terminal</a>
         </li>
-        <li class="md-nav__item"><a href="#integrating-black-with-pre-commit-hooks" class="md-nav__link">Integrating Black with Pre-Commit Hooks</a>
+        <li class="md-nav__item"><a href="#generate-an-html-report" class="md-nav__link">4. Generate an HTML Report</a>
         </li>
-        <li class="md-nav__item"><a href="#tips-for-working-with-black" class="md-nav__link">Tips for Working with Black</a>
+        <li class="md-nav__item"><a href="#exclude-files-or-lines-from-the-report-optional" class="md-nav__link">5. Exclude Files or Lines from the Report (Optional)</a>
         </li>
-        <li class="md-nav__item"><a href="#further-documentation" class="md-nav__link">Further Documentation</a>
+        <li class="md-nav__item"><a href="#integration-with-ci-cd" class="md-nav__link">Integration with CI/CD</a>
+        </li>
+        <li class="md-nav__item"><a href="#summary-of-commands" class="md-nav__link">Summary of Commands</a>
         </li></ul>
             </nav>
         </li>
     
-<li class="md-nav__item"><a class="md-nav__extra_link" href="_sources/usage-of-black.rst.txt">Show Source</a> </li>
+<li class="md-nav__item"><a class="md-nav__extra_link" href="_sources/guider-of-coverage.rst.txt">Show Source</a> </li>
 
 <li id="searchbox" class="md-nav__item"></li>
 
@@ -373,100 +386,96 @@
         <div class="md-content">
           <article class="md-content__inner md-typeset" role="main">
             
-  <section id="black-guide">
-<h1 id="usage-of-black--page-root">Black Guide<a class="headerlink" href="#usage-of-black--page-root" title="Link to this heading">¶</a></h1>
-<p>Black is a code formatter for Python that automatically reformats your code to be more readable and standardized. This guide provides essential information for using Black within this project.</p>
-<section id="installation">
-<h2 id="installation">Installation<a class="headerlink" href="#installation" title="Link to this heading">¶</a></h2>
-<p>To install Black, use pip:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span>black
+  <section id="coverage-guide">
+<h1 id="guider-of-coverage--page-root">Coverage Guide<a class="headerlink" href="#guider-of-coverage--page-root" title="Link to this heading">¶</a></h1>
+<p>To measure test coverage in the Biofilter project, we use <cite>Coverage.py</cite>. This guide outlines the steps to install, run, and generate coverage reports while considering the integration with Poetry and the CI/CD pipeline.</p>
+<section id="install-coverage-py">
+<h2 id="install-coverage-py">1. Install Coverage.py<a class="headerlink" href="#install-coverage-py" title="Link to this heading">¶</a></h2>
+<p><cite>Coverage.py</cite> is already included in the project’s development dependencies via Poetry. To ensure it is installed, simply run:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>poetry<span class="w"> </span>install
 </pre></div>
+</div>
+<p>This command installs all development dependencies, including <cite>Coverage.py</cite>.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>There is no need to install <cite>coverage</cite> manually using <cite>pip</cite>, as it is managed through Poetry.</p>
 </div>
 </section>
-<section id="basic-usage">
-<h2 id="basic-usage">Basic Usage<a class="headerlink" href="#basic-usage" title="Link to this heading">¶</a></h2>
-<p>To format all Python files in your project, run the following command from the root directory:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>black<span class="w"> </span>.
+<section id="run-tests-with-coverage">
+<h2 id="run-tests-with-coverage">2. Run Tests with Coverage<a class="headerlink" href="#run-tests-with-coverage" title="Link to this heading">¶</a></h2>
+<p>In the Biofilter project directory, use <cite>coverage</cite> to run the tests and collect coverage data. Since we are using Poetry, the command is:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>poetry<span class="w"> </span>run<span class="w"> </span>coverage<span class="w"> </span>run<span class="w"> </span>-m<span class="w"> </span>pytest
 </pre></div>
 </div>
-<p>This command applies Black’s formatting rules to all <code class="docutils literal notranslate"><span class="pre">.py</span></code> files in the directory and its subdirectories.</p>
-<p>### Formatting a Specific File</p>
-<p>To format a specific file, specify the filename:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>black<span class="w"> </span>path/to/your_file.py
-</pre></div>
-</div>
+<p>This command uses <cite>coverage</cite> to execute <cite>pytest</cite>, running all tests and collecting information on which parts of the code are covered.</p>
 </section>
-<section id="common-options">
-<h2 id="common-options">Common Options<a class="headerlink" href="#common-options" title="Link to this heading">¶</a></h2>
-<ul>
-<li><p><strong>Check Mode</strong>: To check if files would be reformatted without making changes, use:</p>
-<blockquote>
-<div><div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>black<span class="w"> </span>--check<span class="w"> </span>.
+<section id="generate-a-coverage-report-in-the-terminal">
+<h2 id="generate-a-coverage-report-in-the-terminal">3. Generate a Coverage Report in the Terminal<a class="headerlink" href="#generate-a-coverage-report-in-the-terminal" title="Link to this heading">¶</a></h2>
+<p>After running the tests, generate a coverage report in the terminal:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>poetry<span class="w"> </span>run<span class="w"> </span>coverage<span class="w"> </span>report<span class="w"> </span>-m
 </pre></div>
 </div>
-</div></blockquote>
-</li>
-<li><p><strong>Line Length</strong>: By default, Black limits lines to 88 characters. You can set a different line length:</p>
-<blockquote>
-<div><div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>black<span class="w"> </span>--line-length<span class="w"> </span><span class="m">100</span><span class="w"> </span>.
-</pre></div>
-</div>
-</div></blockquote>
-</li>
-<li><p><strong>Exclude Files</strong>: To exclude specific files or directories from formatting, use:</p>
-<blockquote>
-<div><div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>black<span class="w"> </span>--exclude<span class="w"> </span><span class="s2">"migrations|env"</span><span class="w"> </span>.
-</pre></div>
-</div>
-</div></blockquote>
-</li>
+<ul class="simple">
+<li><p>The <code class="docutils literal notranslate"><span class="pre">-m</span></code> option displays which lines were not covered.</p></li>
 </ul>
 </section>
-<section id="integrating-black-with-pre-commit-hooks">
-<h2 id="integrating-black-with-pre-commit-hooks">Integrating Black with Pre-Commit Hooks<a class="headerlink" href="#integrating-black-with-pre-commit-hooks" title="Link to this heading">¶</a></h2>
-<p>To ensure consistent formatting before commits, you can set up a pre-commit hook.</p>
+<section id="generate-an-html-report">
+<h2 id="generate-an-html-report">4. Generate an HTML Report<a class="headerlink" href="#generate-an-html-report" title="Link to this heading">¶</a></h2>
+<p>For a more detailed view, generate an HTML report:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>poetry<span class="w"> </span>run<span class="w"> </span>coverage<span class="w"> </span>html
+</pre></div>
+</div>
+<p>This creates a directory called <code class="docutils literal notranslate"><span class="pre">htmlcov</span></code> with an <code class="docutils literal notranslate"><span class="pre">index.html</span></code> file. Open this file in a browser for a detailed view of the coverage.</p>
+</section>
+<section id="exclude-files-or-lines-from-the-report-optional">
+<h2 id="exclude-files-or-lines-from-the-report-optional">5. Exclude Files or Lines from the Report (Optional)<a class="headerlink" href="#exclude-files-or-lines-from-the-report-optional" title="Link to this heading">¶</a></h2>
+<p>To exclude specific files or certain lines (e.g., docstrings or debugging instructions), create a <code class="docutils literal notranslate"><span class="pre">.coveragerc</span></code> file in the root directory of the Biofilter project. Use the following example:</p>
+<div class="highlight-ini notranslate"><div class="highlight"><pre><span></span><span class="k">[run]</span>
+<span class="na">omit</span><span class="w"> </span><span class="o">=</span>
+<span class="w">   </span><span class="na">tests/*</span>
+<span class="w">   </span><span class="na">setup.py</span>
+
+<span class="k">[report]</span>
+<span class="na">exclude_lines</span><span class="w"> </span><span class="o">=</span>
+<span class="w">   </span><span class="c1"># Exclude debug lines</span>
+<span class="w">   </span><span class="na">if __name__</span><span class="w"> </span><span class="o">=</span><span class="s">= "__main__":</span>
+<span class="w">   </span><span class="na">pragma</span><span class="o">:</span><span class="w"> </span><span class="s">no cover</span>
+</pre></div>
+</div>
+<p>This configuration ensures that coverage focuses only on the relevant parts of the codebase.</p>
+</section>
+<section id="integration-with-ci-cd">
+<h2 id="integration-with-ci-cd">Integration with CI/CD<a class="headerlink" href="#integration-with-ci-cd" title="Link to this heading">¶</a></h2>
+<p>Test coverage is also verified automatically in the CI/CD pipeline through GitHub Actions. This ensures that every change to the codebase maintains or improves test coverage. Before pushing changes, it is recommended to check the coverage locally using the commands outlined above.</p>
+<div class="admonition important">
+<p class="admonition-title">Important</p>
+<p>Always verify coverage locally before committing to avoid failures during the CI/CD process.</p>
+</div>
+</section>
+<section id="summary-of-commands">
+<h2 id="summary-of-commands">Summary of Commands<a class="headerlink" href="#summary-of-commands" title="Link to this heading">¶</a></h2>
 <ol class="arabic">
-<li><p>First, install <code class="docutils literal notranslate"><span class="pre">pre-commit</span></code> if it’s not already installed:</p>
-<blockquote>
-<div><div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span>pre-commit
+<li><p><strong>Install dependencies</strong>: (if not already installed)</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>poetry<span class="w"> </span>install
 </pre></div>
 </div>
-</div></blockquote>
 </li>
-<li><p>Then, create a <code class="docutils literal notranslate"><span class="pre">.pre-commit-config.yaml</span></code> file in the root directory with this content:</p>
-<blockquote>
-<div><div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">repos</span><span class="p">:</span>
-<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">repo</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://github.com/psf/black</span>
-<span class="w">    </span><span class="l l-Scalar l-Scalar-Plain">rev</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">23.1.0</span><span class="w">  </span><span class="c1"># Use the latest Black version</span>
-<span class="w">    </span><span class="nt">hooks</span><span class="p">:</span>
-<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">black</span>
+<li><p><strong>Run tests with coverage</strong>:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>poetry<span class="w"> </span>run<span class="w"> </span>coverage<span class="w"> </span>run<span class="w"> </span>-m<span class="w"> </span>pytest
 </pre></div>
 </div>
-</div></blockquote>
 </li>
-<li><p>Install the hook:</p>
-<blockquote>
-<div><div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pre-commit<span class="w"> </span>install
+<li><p><strong>Generate terminal report</strong>:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>poetry<span class="w"> </span>run<span class="w"> </span>coverage<span class="w"> </span>report<span class="w"> </span>-m
 </pre></div>
 </div>
-</div></blockquote>
+</li>
+<li><p><strong>Generate HTML report</strong>:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>poetry<span class="w"> </span>run<span class="w"> </span>coverage<span class="w"> </span>html
+</pre></div>
+</div>
 </li>
 </ol>
-<p>With this setup, Black will automatically format your code before each commit.</p>
-</section>
-<section id="tips-for-working-with-black">
-<h2 id="tips-for-working-with-black">Tips for Working with Black<a class="headerlink" href="#tips-for-working-with-black" title="Link to this heading">¶</a></h2>
-<ul class="simple">
-<li><p><strong>Consistency</strong>: Black enforces a uniform style, helping keep code consistent across the project.</p></li>
-<li><p><strong>Automation</strong>: Use Black in your CI/CD pipeline to automate code style checks.</p></li>
-<li><p><strong>Editor Integration</strong>: Black is supported by most IDEs and editors, including VS Code and PyCharm.</p></li>
-</ul>
-</section>
-<section id="further-documentation">
-<h2 id="further-documentation">Further Documentation<a class="headerlink" href="#further-documentation" title="Link to this heading">¶</a></h2>
-<p>For more options and detailed documentation, visit the <a class="reference external" href="https://github.com/psf/black">Black GitHub repository</a>.</p>
-<p>—</p>
-<p>By following this guide, you can maintain a clean, readable, and standardized codebase using Black.</p>
 </section>
 </section>
 
@@ -480,7 +489,7 @@
     <div class="md-footer-nav">
       <nav class="md-footer-nav__inner md-grid">
           
-            <a href="usage-of-poetry.html" title="Poetry Guider"
+            <a href="guider-of-tests.html" title="Testing Guider"
                class="md-flex md-footer-nav__link md-footer-nav__link--prev"
                rel="prev">
               <div class="md-flex__cell md-flex__cell--shrink">
@@ -489,17 +498,17 @@
               <div class="md-flex__cell md-flex__cell--stretch md-footer-nav__title">
                 <span class="md-flex__ellipsis">
                   <span
-                      class="md-footer-nav__direction"> "Previous" </span> Poetry Guider </span>
+                      class="md-footer-nav__direction"> "Previous" </span> Testing Guider </span>
               </div>
             </a>
           
           
-            <a href="usage-of-coverage.html" title="Coverage Guide"
+            <a href="guider-of-tox.html" title="Tox Guide"
                class="md-flex md-footer-nav__link md-footer-nav__link--next"
                rel="next">
             <div class="md-flex__cell md-flex__cell--stretch md-footer-nav__title"><span
                 class="md-flex__ellipsis"> <span
-                class="md-footer-nav__direction"> "Next" </span> Coverage Guide </span>
+                class="md-footer-nav__direction"> "Next" </span> Tox Guide </span>
             </div>
             <div class="md-flex__cell md-flex__cell--shrink"><i
                 class="md-icon md-icon--arrow-forward md-footer-nav__button"></i>
