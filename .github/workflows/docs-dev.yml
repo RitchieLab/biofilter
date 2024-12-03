@@ -1,0 +1,43 @@
+name: Build and Deploy Docs-Dev
+
+on:
+  push:
+    branches:
+      - development  # O workflow será acionado em pushes no branch 'development'
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Checkout the code from the 'development' branch
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 1  # Apenas a última revisão para otimizar
+
+      # 2. Set up Python environment
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.11  # Use a versão de Python que seu projeto requer
+
+      # 3. Install dependencies using Poetry
+      - name: Install dependencies
+        run: |
+          pip install poetry
+          poetry install
+
+      # 4. Build the Sphinx documentation
+      - name: Build Docs
+        working-directory: docs-dev
+        run: make html
+
+      # 5. Deploy to the 'gh-pages' branch
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_branch: gh-pages       # Corrigido: Branch de destino para o deploy
+          publish_dir: docs-dev/_build/html  # Pasta com os arquivos HTML gerados
+          keep_files: true               # Opcional: mantém arquivos antigos no destino (se necessário)
