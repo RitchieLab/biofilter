@@ -22,6 +22,7 @@ documentation for details.
    usage-of-coverage
    usage-of-black
    usage-of-branching
+   usage-of-testing
 
 
 Indices and tables
