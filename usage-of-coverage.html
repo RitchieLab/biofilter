@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="./">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta http-equiv="x-ua-compatible" content="ie=edge">
+  <meta name="lang:clipboard.copy" content="Copy to clipboard">
+  <meta name="lang:clipboard.copied" content="Copied to clipboard">
+  <meta name="lang:search.language" content="en">
+  <meta name="lang:search.pipeline.stopwords" content="True">
+  <meta name="lang:search.pipeline.trimmer" content="True">
+  <meta name="lang:search.result.none" content="No matching documents">
+  <meta name="lang:search.result.one" content="1 matching document">
+  <meta name="lang:search.result.other" content="# matching documents">
+  <meta name="lang:search.tokenizer" content="[\s\-]+">
+
+  
+    <link href="https://fonts.gstatic.com/" rel="preconnect" crossorigin>
+    <link href="https://fonts.googleapis.com/css?family=Roboto+Mono:400,500,700|Roboto:300,400,400i,700&display=fallback" rel="stylesheet">
+
+    <style>
+      body,
+      input {
+        font-family: "Roboto", "Helvetica Neue", Helvetica, Arial, sans-serif
+      }
+
+      code,
+      kbd,
+      pre {
+        font-family: "Roboto Mono", "Courier New", Courier, monospace
+      }
+    </style>
+  
+
+  <link rel="stylesheet" href="_static/stylesheets/application.css"/>
+  <link rel="stylesheet" href="_static/stylesheets/application-palette.css"/>
+  <link rel="stylesheet" href="_static/stylesheets/application-fixes.css"/>
+  
+  <link rel="stylesheet" href="_static/fonts/material-icons.css"/>
+  
+  <meta name="theme-color" content="#3f51b5">
+  <script src="_static/javascripts/modernizr.js"></script>
+  
+  
+  
+    <title>Running Coverage in the Biofilter Project &#8212; Biofilter Developer Documentation 2.4.4 documentation</title>
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=83e35b93" />
+    <link rel="stylesheet" type="text/css" href="_static/material.css?v=79c92029" />
+    <script src="_static/documentation_options.js?v=b1e24531"></script>
+    <script src="_static/doctools.js?v=9bcbadda"></script>
+    <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Black Code Formatter Guide" href="usage-of-black.html" />
+    <link rel="prev" title="Using Poetry for Dependency Management and Project Setup" href="usage-of-poetry.html" />
+  
+   
+
+  </head>
+  <body dir=ltr
+        data-md-color-primary=blue data-md-color-accent=light-blue>
+  
+  <svg class="md-svg">
+    <defs data-children-count="0">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" width="416" height="448" viewBox="0 0 416 448" id="__github"><path fill="currentColor" d="M160 304q0 10-3.125 20.5t-10.75 19T128 352t-18.125-8.5-10.75-19T96 304t3.125-20.5 10.75-19T128 256t18.125 8.5 10.75 19T160 304zm160 0q0 10-3.125 20.5t-10.75 19T288 352t-18.125-8.5-10.75-19T256 304t3.125-20.5 10.75-19T288 256t18.125 8.5 10.75 19T320 304zm40 0q0-30-17.25-51T296 232q-10.25 0-48.75 5.25Q229.5 240 208 240t-39.25-2.75Q130.75 232 120 232q-29.5 0-46.75 21T56 304q0 22 8 38.375t20.25 25.75 30.5 15 35 7.375 37.25 1.75h42q20.5 0 37.25-1.75t35-7.375 30.5-15 20.25-25.75T360 304zm56-44q0 51.75-15.25 82.75-9.5 19.25-26.375 33.25t-35.25 21.5-42.5 11.875-42.875 5.5T212 416q-19.5 0-35.5-.75t-36.875-3.125-38.125-7.5-34.25-12.875T37 371.5t-21.5-28.75Q0 312 0 260q0-59.25 34-99-6.75-20.5-6.75-42.5 0-29 12.75-54.5 27 0 47.5 9.875t47.25 30.875Q171.5 96 212 96q37 0 70 8 26.25-20.5 46.75-30.25T376 64q12.75 25.5 12.75 54.5 0 21.75-6.75 42 34 40 34 99.5z"/></svg>
+      
+    </defs>
+  </svg>
+  
+  <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer">
+  <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search">
+  <label class="md-overlay" data-md-component="overlay" for="__drawer"></label>
+  <a href="#usage-of-coverage" tabindex="1" class="md-skip"> Skip to content </a>
+  <header class="md-header" data-md-component="header">
+  <nav class="md-header-nav md-grid">
+    <div class="md-flex navheader">
+      <div class="md-flex__cell md-flex__cell--shrink">
+        <a href="index.html" title="Biofilter Developer Documentation 2.4.4 documentation"
+           class="md-header-nav__button md-logo">
+          
+            &nbsp;
+          
+        </a>
+      </div>
+      <div class="md-flex__cell md-flex__cell--shrink">
+        <label class="md-icon md-icon--menu md-header-nav__button" for="__drawer"></label>
+      </div>
+      <div class="md-flex__cell md-flex__cell--stretch">
+        <div class="md-flex__ellipsis md-header-nav__title" data-md-component="title">
+          <span class="md-header-nav__topic">Biofilter Developer Docs</span>
+          <span class="md-header-nav__topic"> Running Coverage in the Biofilter Project </span>
+        </div>
+      </div>
+      <div class="md-flex__cell md-flex__cell--shrink">
+        <label class="md-icon md-icon--search md-header-nav__button" for="__search"></label>
+        
+<div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" action="search.html" method="get" name="search">
+      <input type="text" class="md-search__input" name="q" placeholder=""Search""
+             autocapitalize="off" autocomplete="off" spellcheck="false"
+             data-md-component="query" data-md-state="active">
+      <label class="md-icon md-search__icon" for="__search"></label>
+      <button type="reset" class="md-icon md-search__icon" data-md-component="reset" tabindex="-1">
+        &#xE5CD;
+      </button>
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="result">
+          <div class="md-search-result__meta">
+            Type to start searching
+          </div>
+          <ol class="md-search-result__list"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+      </div>
+      
+        <div class="md-flex__cell md-flex__cell--shrink">
+          <div class="md-header-nav__source">
+            <a href="https://github.com/your-org/biofilter" title="Go to repository" class="md-source" data-md-source="github">
+
+    <div class="md-source__icon">
+      <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 24 24" width="28" height="28">
+        <use xlink:href="#__github" width="24" height="24"></use>
+      </svg>
+    </div>
+  
+  <div class="md-source__repository">
+    Biofilter
+  </div>
+</a>
+          </div>
+        </div>
+      
+      
+  
+  <script src="_static/javascripts/version_dropdown.js"></script>
+  <script>
+    var json_loc = ""versions.json"",
+        target_loc = "../",
+        text = "Versions";
+    $( document ).ready( add_version_dropdown(json_loc, target_loc, text));
+  </script>
+  
+
+    </div>
+  </nav>
+</header>
+
+  
+  <div class="md-container">
+    
+    
+    
+  <nav class="md-tabs" data-md-component="tabs">
+    <div class="md-tabs__inner md-grid">
+      <ul class="md-tabs__list">
+          <li class="md-tabs__item"><a href="index.html" class="md-tabs__link">Biofilter Developer Documentation 2.4.4 documentation</a></li>
+      </ul>
+    </div>
+  </nav>
+    <main class="md-main">
+      <div class="md-main__inner md-grid" data-md-component="container">
+        
+          <div class="md-sidebar md-sidebar--primary" data-md-component="navigation">
+            <div class="md-sidebar__scrollwrap">
+              <div class="md-sidebar__inner">
+                <nav class="md-nav md-nav--primary" data-md-level="0">
+  <label class="md-nav__title md-nav__title--site" for="__drawer">
+    <a href="index.html" title="Biofilter Developer Documentation 2.4.4 documentation" class="md-nav__button md-logo">
+      
+        <img src="_static/" alt=" logo" width="48" height="48">
+      
+    </a>
+    <a href="index.html"
+       title="Biofilter Developer Documentation 2.4.4 documentation">Biofilter Developer Docs</a>
+  </label>
+    <div class="md-nav__source">
+      <a href="https://github.com/your-org/biofilter" title="Go to repository" class="md-source" data-md-source="github">
+
+    <div class="md-source__icon">
+      <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 24 24" width="28" height="28">
+        <use xlink:href="#__github" width="24" height="24"></use>
+      </svg>
+    </div>
+  
+  <div class="md-source__repository">
+    Biofilter
+  </div>
+</a>
+    </div>
+  
+  
+
+</nav>
+              </div>
+            </div>
+          </div>
+          <div class="md-sidebar md-sidebar--secondary" data-md-component="toc">
+            <div class="md-sidebar__scrollwrap">
+              <div class="md-sidebar__inner">
+                
+<nav class="md-nav md-nav--secondary">
+    <label class="md-nav__title" for="__toc">"Contents"</label>
+  <ul class="md-nav__list" data-md-scrollfix="">
+        <li class="md-nav__item"><a href="#usage-of-coverage--page-root" class="md-nav__link">Running Coverage in the Biofilter Project</a><nav class="md-nav">
+              <ul class="md-nav__list">
+        <li class="md-nav__item"><a href="#install-coverage-py" class="md-nav__link">1. Install Coverage.py</a>
+        </li>
+        <li class="md-nav__item"><a href="#run-tests-with-coverage" class="md-nav__link">2. Run Tests with Coverage</a>
+        </li>
+        <li class="md-nav__item"><a href="#generate-a-coverage-report-in-the-terminal" class="md-nav__link">3. Generate a Coverage Report in the Terminal</a>
+        </li>
+        <li class="md-nav__item"><a href="#generate-an-html-report" class="md-nav__link">4. Generate an HTML Report</a>
+        </li>
+        <li class="md-nav__item"><a href="#exclude-files-or-lines-from-the-report-optional" class="md-nav__link">5. Exclude Files or Lines from the Report (Optional)</a>
+        </li>
+        <li class="md-nav__item"><a href="#summary-of-commands" class="md-nav__link">Summary of Commands</a>
+        </li></ul>
+            </nav>
+        </li>
+    
+<li class="md-nav__item"><a class="md-nav__extra_link" href="_sources/usage-of-coverage.rst.txt">Show Source</a> </li>
+
+<li id="searchbox" class="md-nav__item"></li>
+
+  </ul>
+</nav>
+              </div>
+            </div>
+          </div>
+        
+        <div class="md-content">
+          <article class="md-content__inner md-typeset" role="main">
+            
+  <section id="running-coverage-in-the-biofilter-project">
+<h1 id="usage-of-coverage--page-root">Running Coverage in the Biofilter Project<a class="headerlink" href="#usage-of-coverage--page-root" title="Link to this heading">¶</a></h1>
+<p>To measure test coverage in the Biofilter project, we use <cite>Coverage.py</cite>. This guide outlines the steps to install and run <cite>coverage</cite> and generate reports.</p>
+<section id="install-coverage-py">
+<h2 id="install-coverage-py">1. Install Coverage.py<a class="headerlink" href="#install-coverage-py" title="Link to this heading">¶</a></h2>
+<p>Install <cite>coverage</cite> via pip:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span>coverage
+</pre></div>
+</div>
+</section>
+<section id="run-tests-with-coverage">
+<h2 id="run-tests-with-coverage">2. Run Tests with Coverage<a class="headerlink" href="#run-tests-with-coverage" title="Link to this heading">¶</a></h2>
+<p>In the Biofilter project directory, use <cite>coverage</cite> to run the tests and collect coverage data:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>coverage<span class="w"> </span>run<span class="w"> </span>-m<span class="w"> </span>pytest
+</pre></div>
+</div>
+<p>This command uses <cite>coverage</cite> to execute <cite>pytest</cite>, running all tests and collecting information on which parts of the code are covered.</p>
+</section>
+<section id="generate-a-coverage-report-in-the-terminal">
+<h2 id="generate-a-coverage-report-in-the-terminal">3. Generate a Coverage Report in the Terminal<a class="headerlink" href="#generate-a-coverage-report-in-the-terminal" title="Link to this heading">¶</a></h2>
+<p>After running the tests, generate a coverage report in the terminal:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>coverage<span class="w"> </span>report<span class="w"> </span>-m
+</pre></div>
+</div>
+<ul class="simple">
+<li><p>The <code class="docutils literal notranslate"><span class="pre">-m</span></code> option displays which lines were not covered.</p></li>
+</ul>
+</section>
+<section id="generate-an-html-report">
+<h2 id="generate-an-html-report">4. Generate an HTML Report<a class="headerlink" href="#generate-an-html-report" title="Link to this heading">¶</a></h2>
+<p>For a more detailed view, generate an HTML report:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>coverage<span class="w"> </span>html
+</pre></div>
+</div>
+<p>This creates a directory called <code class="docutils literal notranslate"><span class="pre">htmlcov</span></code> with an <code class="docutils literal notranslate"><span class="pre">index.html</span></code> file. Open this file in a browser for a detailed view of the coverage.</p>
+</section>
+<section id="exclude-files-or-lines-from-the-report-optional">
+<h2 id="exclude-files-or-lines-from-the-report-optional">5. Exclude Files or Lines from the Report (Optional)<a class="headerlink" href="#exclude-files-or-lines-from-the-report-optional" title="Link to this heading">¶</a></h2>
+<p>To exclude specific files or certain lines (e.g., docstrings or debugging instructions), create a <code class="docutils literal notranslate"><span class="pre">.coveragerc</span></code> file in the root directory of the Biofilter project. Use the following example:</p>
+<div class="highlight-ini notranslate"><div class="highlight"><pre><span></span><span class="k">[run]</span>
+<span class="na">omit</span><span class="w"> </span><span class="o">=</span>
+<span class="w">   </span><span class="na">tests/*</span>
+<span class="w">   </span><span class="na">setup.py</span>
+
+<span class="k">[report]</span>
+<span class="na">exclude_lines</span><span class="w"> </span><span class="o">=</span>
+<span class="w">   </span><span class="c1"># Exclude debug lines</span>
+<span class="w">   </span><span class="na">if __name__</span><span class="w"> </span><span class="o">=</span><span class="s">= "__main__":</span>
+<span class="w">   </span><span class="na">pragma</span><span class="o">:</span><span class="w"> </span><span class="s">no cover</span>
+</pre></div>
+</div>
+<p>This configuration ensures that coverage focuses only on the relevant parts of the codebase.</p>
+</section>
+<section id="summary-of-commands">
+<h2 id="summary-of-commands">Summary of Commands<a class="headerlink" href="#summary-of-commands" title="Link to this heading">¶</a></h2>
+<ol class="arabic">
+<li><p><strong>Install</strong>:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span>coverage
+</pre></div>
+</div>
+</li>
+<li><p><strong>Run tests with coverage</strong>:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>coverage<span class="w"> </span>run<span class="w"> </span>-m<span class="w"> </span>pytest
+</pre></div>
+</div>
+</li>
+<li><p><strong>Generate terminal report</strong>:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>coverage<span class="w"> </span>report<span class="w"> </span>-m
+</pre></div>
+</div>
+</li>
+<li><p><strong>Generate HTML report</strong>:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>coverage<span class="w"> </span>html
+</pre></div>
+</div>
+</li>
+</ol>
+<p>These steps will help you measure test coverage in the Biofilter project using <cite>Coverage.py</cite>.</p>
+</section>
+</section>
+
+
+          </article>
+        </div>
+      </div>
+    </main>
+  </div>
+  <footer class="md-footer">
+    <div class="md-footer-nav">
+      <nav class="md-footer-nav__inner md-grid">
+          
+            <a href="usage-of-poetry.html" title="Using Poetry for Dependency Management and Project Setup"
+               class="md-flex md-footer-nav__link md-footer-nav__link--prev"
+               rel="prev">
+              <div class="md-flex__cell md-flex__cell--shrink">
+                <i class="md-icon md-icon--arrow-back md-footer-nav__button"></i>
+              </div>
+              <div class="md-flex__cell md-flex__cell--stretch md-footer-nav__title">
+                <span class="md-flex__ellipsis">
+                  <span
+                      class="md-footer-nav__direction"> "Previous" </span> Using Poetry for Dependency Management and Project Setup </span>
+              </div>
+            </a>
+          
+          
+            <a href="usage-of-black.html" title="Black Code Formatter Guide"
+               class="md-flex md-footer-nav__link md-footer-nav__link--next"
+               rel="next">
+            <div class="md-flex__cell md-flex__cell--stretch md-footer-nav__title"><span
+                class="md-flex__ellipsis"> <span
+                class="md-footer-nav__direction"> "Next" </span> Black Code Formatter Guide </span>
+            </div>
+            <div class="md-flex__cell md-flex__cell--shrink"><i
+                class="md-icon md-icon--arrow-forward md-footer-nav__button"></i>
+            </div>
+          
+        </a>
+        
+      </nav>
+    </div>
+    <div class="md-footer-meta md-typeset">
+      <div class="md-footer-meta__inner md-grid">
+        <div class="md-footer-copyright">
+          <div class="md-footer-copyright__highlight">
+              &#169; Copyright 2024, Ritchie Lab.
+              
+          </div>
+            Created using
+            <a href="http://www.sphinx-doc.org/">Sphinx</a> 8.1.3.
+             and
+            <a href="https://github.com/bashtage/sphinx-material/">Material for
+              Sphinx</a>
+        </div>
+      </div>
+    </div>
+  </footer>
+  <script src="_static/javascripts/application.js"></script>
+  <script>app.initialize({version: "1.0.4", url: {base: ".."}})</script>
+  </body>
+</html>
