@@ -28,6 +28,7 @@ jobs:
           pip install poetry
           poetry install
           poetry add --group dev sphinx sphinx-rtd-theme
+          source $(poetry env info --path)/bin/activate
 
       # 4. Build the Sphinx documentation
       - name: Build Docs
