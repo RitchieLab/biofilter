@@ -27,6 +27,7 @@ jobs:
         run: |
           pip install poetry
           poetry install
+          poetry add --group dev sphinx sphinx-rtd-theme
 
       # 4. Build the Sphinx documentation
       - name: Build Docs
@@ -40,4 +41,4 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_branch: gh-pages       # Corrigido: Branch de destino para o deploy
           publish_dir: docs-dev/_build/html  # Pasta com os arquivos HTML gerados
-          keep_files: true               # Opcional: mantém arquivos antigos no destino (se necessário)
+          # keep_files: true               # Opcional: mantém arquivos antigos no destino (se necessário)
