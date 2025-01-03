@@ -37,7 +37,8 @@ def setup_paths():
     knowledge_path = base_dir / "data/loki-20220926.db"
     gene_file_path = (
         base_dir
-        / "issues/b15_biofilter_group_annotation/data-in/ROSMAP_RNAseq_FPKM_gene_ensembl_list_edit.txt"  # noqa E501
+        # / "issues/b15_biofilter_group_annotation/data-in/ROSMAP_RNAseq_FPKM_gene_ensembl_list_edit.txt"  # noqa E501
+        / "issues/b15_biofilter_group_annotation/data-in/TEST_SINGLE_GENE.txt"  # noqa E501
     )  # noqa E501
     output_prefix = (
         base_dir
@@ -99,8 +100,8 @@ def test_issue_b15_run_1(setup_paths):
         "--report-configuration",
         "--prefix",
         str(setup_paths["output_prefix"]),
-        "--allow-duplicate-output",
-        "yes",
+        # "--allow-duplicate-output",
+        # "yes",
         "--overwrite",
     ]
 
