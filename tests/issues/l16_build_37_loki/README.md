@@ -33,3 +33,38 @@ This solution ensures that users working with different genome assemblies can se
 
 ## Success Criteria
 Not defined yet
+
+
+## Notes
+Jan 7 2025:
+The LOKI and Biofilter systems work together to handle queries, and currently, the system is configured as follows:
+- Single Build with Automatic Conversion (Liftover):
+- The LOKI database is designed to operate with a single build (setup in setting table).
+- When users provide input data in a different build (e.g., build 37 and the LOKI is in 38), they must specify it as an argument.
+- The Biofilter then triggers a Liftover function that converts the input positions to the build configured in LOKI (e.g., input in build 37 will be lifted over to build 38 using the chain and chain_data tables), enabling the queries to run based on the current knowledge base.
+
+Important Limitation - Patches Are Not Considered:
+- The current knowledge base does not account for patches within the same build.
+- As documented by the GRC ([https://www.ncbi.nlm.nih.gov/grc/help/patches/]), patches can introduce significant modifications to genomic positions even within the same build, potentially leading to inconsistencies
+
+My Recommendation:
+For now, I suggest maintaining the current format of LOKI and Biofilter, as it meets the basic needs with the Liftover function. However, for the next generation of the knowledge base, I recommend implementing a model that we can discuss collaboratively as a group to:
+- Support multiple builds and patches incrementally.
+- Explicitly document the build and patch used during data processing.
+
+CALL TO LIFTOVER
+for positionFileList in options.position_file or empty:
+        bio.intersectInputLoci(
+            "main",
+                bio.generateLiftOverLoci(
+                ucscBuildUser,
+                ucscBuildDB,
+                bio.generateLociFromMapFiles(
+                    positionFileList,
+                    applyOffset=True,
+                    errorCallback=cb["position"],  # noqa E501
+                ),
+                errorCallback=cb["position"],
+            ),
+            errorCallback=cb["position"],
+        )

@@ -24,6 +24,25 @@
                 "--ucsc-build-version", "38"
             ],
             "console": "integratedTerminal"
+        },
+        {
+            "name": "Biofilter Builds",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/biofilter_modules/biofilter.py",
+            "args": [
+                "--verbose",
+                "--knowledge", "/Users/andrerico/Works/Sys/BIOFILTER/loki_modules/loki-20220926.db",
+                "--position-file", "/Users/andrerico/Works/Sys/BIOFILTER/tests/issues/l16_build_37_loki/data-in/input_filename",
+                "--source", "kegg", "reactome", "go",
+                "--annotate", "position_label", "snp", "position", "gene", "upstream", "downstream",
+                "--report-invalid-input",
+                "--report-configuration",
+                "--overwrite",
+                "--prefix", "/Users/andrerico/Works/Sys/BIOFILTER/tests/issues/l16_build_37_loki/data-out/outcomes",
+                "--ucsc-build-version", "19"
+            ],
+            "console": "integratedTerminal"
         }
     ]
 }
