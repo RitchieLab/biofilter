@@ -1,0 +1,12 @@
+apsw==3.46.1.0
+-e git+https://github.com/RitchieLab/biofilter.git@bf0d657f20219bd04ceb756705235dc8df46b3c7#egg=biofilter
+black==24.10.0
+click==8.1.7
+coverage==7.6.4
+iniconfig==2.0.0
+mypy-extensions==1.0.0
+packaging==24.1
+pathspec==0.12.1
+platformdirs==4.3.6
+pluggy==1.5.0
+pytest==8.3.3

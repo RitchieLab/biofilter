@@ -1,0 +1,40 @@
+SELECT
+    m_l.label AS position_label,
+    m_l.label AS position_label,
+    COALESCE(m_l.rowid,'') AS _rowid_0,
+    (COALESCE(m_l.rowid,'')) AS _rowid
+FROM
+    `db`.`biopolymer` AS d_b,
+    `db`.`biopolymer_region` AS d_br,
+    `db`.`biopolymer_zone` AS d_bz,
+    `db`.`group` AS d_g,
+    `db`.`group_biopolymer` AS d_gb,
+    `main`.`source` AS m_c,
+    `main`.`locus` AS m_l
+WHERE 
+    ((d_bz.zone + 1) * 100000) > d_br.posMin
+    AND ((m_l.pos + 0) / 100000) >= d_bz.zone
+    AND ((m_l.pos - 0) / 100000) <= d_bz.zone
+    AND (d_bz.zone * 100000) <= d_br.posMax
+    AND (d_gb.specificity >= 100 OR d_gb.specificity >= 100)
+    AND (m_l.pos + 0) >= d_br.posMin
+    AND (m_l.pos - 0) <= d_br.posMax
+    AND d_b.biopolymer_id = d_br.biopolymer_id
+    AND d_b.biopolymer_id = d_gb.biopolymer_id
+    AND d_br.biopolymer_id = d_b.biopolymer_id
+    AND d_br.ldprofile_id = 1
+    AND d_bz.biopolymer_id = d_br.biopolymer_id
+    AND d_bz.chr = d_br.chr
+    AND d_bz.zone <= (d_br.posMax / 100000)
+    AND d_bz.zone >= (d_br.posMin / 100000)
+    AND d_g.group_id = d_gb.group_id
+    AND d_g.source_id = m_c.source_id
+    AND d_gb.biopolymer_id != 0
+    AND d_gb.group_id = d_g.group_id
+    AND m_c.source_id = d_g.source_id
+    AND m_l.chr = d_br.chr
+    AND m_l.chr = d_bz.chr
+    AND m_l.pos < (((d_bz.zone + 1) * 100000) + 0)
+    AND m_l.pos <= (d_br.posMax + 0)
+    AND m_l.pos >= ((d_bz.zone * 100000) - 0)
+    AND m_l.pos >= (d_br.posMin - 0)

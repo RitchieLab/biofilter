@@ -1,0 +1,8 @@
+[run]
+omit =
+    */tests/*
+
+[report]
+exclude_lines =
+    # Adicione outras regras para excluir linhas, se necessário
+    if __name__ == "__main__"

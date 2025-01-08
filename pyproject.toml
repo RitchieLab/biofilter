@@ -1,0 +1,41 @@
+[tool.poetry]
+name = "biofilter"
+version = "2.4.4"
+description = "Biofilter for LOKI data processing"
+authors = ["Ritchie Lab <Software_RitchieLab@pennmedicine.upenn.edu>"]
+license = "MIT"
+homepage = "https://ritchielab.org"
+readme = "README.md"
+packages = [
+    { include = "biofilter_modules" },
+    { include = "loki_modules" }
+]
+
+[tool.poetry.scripts]
+biofilter = "biofilter_modules.biofilter:main"
+loki-build = "loki_modules.loki_build:main"
+
+[tool.poetry.dependencies]
+python = "^3.10"
+apsw = "3.46.1.0"
+click = "8.1.7"
+iniconfig = "2.0.0"
+packaging = "24.1"
+platformdirs = "4.3.6"
+pluggy = "1.5.0"
+
+[tool.poetry.group.dev.dependencies]
+black = "^24.10.0"
+coverage = "^7.6.8"
+pytest = "^8.3.4"
+sphinx = "^8.1.3"
+sphinx-rtd-theme = "^3.0.2"
+tox = "^4.23.2"
+sphinx-material = "^0.0.36"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.tox]
+envlist = "py310,py311,py312"
