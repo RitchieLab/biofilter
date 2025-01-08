@@ -1,7 +1,7 @@
 # Biofilter v2.4.4 (Development Branch)
 
 **Version**: 2.4.4
-**Status**: In Development  
+**Status**: Actual 
 **Focus**: Refactoring and alignment with best practices
 
 ## Project Overview
