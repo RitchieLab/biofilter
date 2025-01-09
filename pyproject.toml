@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "biofilter"
-version = "2.4.4"
+version = "3.0.1"
 description = "Biofilter for LOKI data processing"
 authors = ["Ritchie Lab <Software_RitchieLab@pennmedicine.upenn.edu>"]
 license = "MIT"

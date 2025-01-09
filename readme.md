@@ -1,34 +1,22 @@
-# Biofilter v2.4.4 (Development Branch)
+# Biofilter v3.0.1 (Development Branch)
 
-**Version**: 2.4.4
+**Version**: 3.0.1
 **Status**: In Development  
-**Focus**: Refactoring and alignment with best practices
+**Focus**: Adding new Data Sources
 
 ## Project Overview
 
-This branch represents an ongoing development effort to improve the Biofilter software, aligning it with modern best practices, refactoring key components for modularity and readability, and enhancing integration with the Loki database. Our goal is to provide a cleaner, more efficient, and testable Biofilter that supports CI/CD and streamlined development workflows.
+The goal of Biofilter version 3.0.1 is to enhance the existing schema to support new adapters for external data sources and officially integrate LOKI into the Biofilter framework. This integration will include the creation of comprehensive unit tests to ensure the reliability and robustness of the new features.
+
+By extending the schema and incorporating LOKI, this release aims to streamline data processing workflows, improve compatibility with external systems, and maintain high-quality standards through rigorous testing. This marks a significant step forward in expanding Biofilter's functionality and versatility.
 
 ---
 
-## Objectives for Version 2.4.4
+## Objectives for Version 3.0.1
 
-### 1. Refactoring and Modularization
-- Reorganization of the codebase into logical modules and components, improving readability and maintainability.
-- Enhanced modularity to facilitate the addition of new features and simplify debugging.
-  
-### 2. Improved Testing
-- **Unit Testing**: Expanded coverage of unit tests to validate individual functions and methods.
-- **Integration Testing**: Comprehensive tests that validate proper integration with the Loki database.
-- **Testing Tools**: Set up `pytest` as the primary testing framework, configured with necessary fixtures and setup files.
-  
-### 3. Integration with Loki Database
-- Refined integration between Biofilter and Loki to ensure data consistency and query reliability.
-- Added support for configurations specific to Loki, enhancing flexibility for users working with multiple database versions.
+### 1. ....
 
-### 4. CI/CD and Code Formatting
-- **Continuous Integration/Continuous Deployment (CI/CD)**: Implementation of automated testing and deployment workflows.
-- **PEP8 Compliance**: Code formatted with `black` for consistency with PEP8 standards.
-- **Automated Linting**: Configuration of `black` and other linters as part of the CI/CD pipeline.
+### 2. ....
 
 ---
 
