@@ -1,7 +1,17 @@
 CHANGELOG
 
-2.4.4 (2024-DEV)
-- IN DEVELOPMENT
+3.0.1 (2025-DEV)
+ - In development
+
+3.0.0 (Transition)
+
+2.4.4 (2025-01-08)
+- Reorganized code into functional packages
+- Developed unit tests
+- Added tools to support the project, such as black, phinx, poetry, pytest, and tox
+- Migrated setup.py configuration to Poetry, applying all dependencies
+- Fixed inconsistencies to ensure compatibility with Python versions 3.10 to 3.12
+- Added technical documentation for the project
 
 2.4.3 (2023-09-15)
 - updated from Python2 to Python3 

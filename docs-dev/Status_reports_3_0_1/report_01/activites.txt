@@ -1,0 +1,4 @@
+- Close the 2.4.4 version
+- Merged development branch to Main branch
+- Change development branch to 3.0.1 version
+- Comparacao entre o Schema do Biofilter 2.4.4 e 3.0.0 (nao vi diferencas)
