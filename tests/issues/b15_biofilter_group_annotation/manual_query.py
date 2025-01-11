@@ -6,9 +6,9 @@ from pathlib import Path
 base_dir = Path(__file__).parent.parent.parent
 DATABASE_FILE = base_dir / "data/loki-20220926.db"
 GENES_FILE = (
-        base_dir
-        / "issues/b15_biofilter_group_annotation/data-in/TEST_ALL_GENES.txt"  # noqa E501
-    )  # noqa E501
+    base_dir
+    / "issues/b15_biofilter_group_annotation/data-in/TEST_ALL_GENES.txt"  # noqa E501
+)  # noqa E501
 
 
 def read_genes(file_path):
@@ -16,7 +16,7 @@ def read_genes(file_path):
     Reads a file containing genes and returns them as a list.
     Assumes each line contains a single gene.
     """
-    with open(file_path, 'r') as file:
+    with open(file_path, "r") as file:
         return [line.strip() for line in file]
 
 
@@ -30,12 +30,14 @@ def query_genes(database_file, genes):
 
     # Create a temporary table to hold the gene filter
     # Include biopolymer_id from the biopolymer_name table
-    cursor.execute("""
+    cursor.execute(
+        """
     CREATE TEMP TABLE main_genes (
         gene_label TEXT,
         biopolymer_id TEXT
     );
-    """)
+    """
+    )
     # Insert gene labels and lookup biopolymer_id
     cursor.executemany(
         """
@@ -44,22 +46,24 @@ def query_genes(database_file, genes):
         FROM biopolymer_name
         WHERE name = ?;
         """,
-        [(gene, gene) for gene in genes]
+        [(gene, gene) for gene in genes],
     )
 
     # Create a temporary table to hold the source filter
-    source_ids = {3: 'GO', 5: 'REACTOME', 7: 'KEGG'}
-    cursor.execute("""
+    source_ids = {3: "GO", 5: "REACTOME", 7: "KEGG"}
+    cursor.execute(
+        """
     CREATE TEMP TABLE main_source (
         source_id INTEGER,
         source_label TEXT
     );
-    """)
+    """
+    )
 
     # Insert source filter values
     cursor.executemany(
         "INSERT INTO main_source (source_id, source_label) VALUES (?, ?);",
-        source_ids.items()
+        source_ids.items(),
     )
 
     sql_query = """
@@ -87,16 +91,22 @@ def query_genes(database_file, genes):
     results = cursor.execute(sql_query).fetchall()
 
     output_csv = (
-            base_dir
-            / "issues/b15_biofilter_group_annotation/data-out/results.txt"  # noqa E501
-        )  # noqa E501
+        base_dir
+        / "issues/b15_biofilter_group_annotation/data-out/results.txt"  # noqa E501
+    )  # noqa E501
 
     # Salvando os resultados no CSV
     with open(output_csv, mode="w", newline="", encoding="utf-8") as csvfile:
         csv_writer = csv.writer(csvfile)
 
         # Escrevendo o cabeçalho do CSV (opcional, ajuste conforme necessário)
-        header = ["Gene_ID", "Gene_code", "group_id", "source_gb_id", "source_group_id"]  # noqa E501
+        header = [
+            "Gene_ID",
+            "Gene_code",
+            "group_id",
+            "source_gb_id",
+            "source_group_id",
+        ]  # noqa E501
         csv_writer.writerow(header)
 
         # Escrevendo os dados

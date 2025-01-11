@@ -83,7 +83,6 @@ def test_issue_b15_run_1(setup_paths):
         # INPUT
         "--gene-file",
         str(setup_paths["gene_file"]),
-
         "--source",
         "kegg",
         "reactome",
@@ -169,7 +168,6 @@ def test_issue_b15_run_2(setup_paths):
         # INPUT
         "--gene-file",
         str(setup_paths["gene_file_2"]),
-
         "--source",
         "kegg",
         "reactome",
