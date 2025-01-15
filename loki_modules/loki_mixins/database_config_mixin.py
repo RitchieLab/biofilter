@@ -37,7 +37,8 @@ class DatabaseConfigMixin:
         Sets a new memory limit for the database.
 
         Args:
-            limit (int, optional): The new memory limit in bytes. Defaults to 0, which sets no limit.
+            limit (int, optional): The new memory limit in bytes. Defaults to
+            0, which sets no limit.
         """
         apsw.softheaplimit(limit)
 
@@ -48,10 +49,12 @@ class DatabaseConfigMixin:
         Configures database settings for performance and behavior.
 
         Args:
-            db (str, optional): The name of the database to configure. Defaults to None.
-            tempMem (bool, optional): If True, configures the temporary storage to use memory. Defaults to False.
+            db (str, optional): The name of the database to configure.
+            Defaults to None. tempMem (bool, optional): If True, configures
+            the temporary storage to use memory. Defaults to False.
 
-        The function sets various PRAGMA settings to optimize performance for typical usage scenarios.
+        The function sets various PRAGMA settings to optimize performance for
+        typical usage scenarios.
         """
         cursor = self._db.cursor()
         db = ("%s." % db) if db else ""
@@ -73,7 +76,7 @@ class DatabaseConfigMixin:
         # the journal isn't that big, so keeping it in memory is faster; the
         # cost is that a system crash will corrupt the database rather than
         # leaving it recoverable with the on-disk journal (a program crash
-        # should be fine since sqlite will rollback transactions before exiting)
+        # should be fine since sqlite rollback transactions before exiting)
         cursor.execute("PRAGMA %sjournal_mode = MEMORY" % (db,))
 
         # the temp store is used for all of sqlite's internal scratch space
@@ -97,7 +100,8 @@ class DatabaseConfigMixin:
         Args:
             db (str): The name of the temporary database to attach.
 
-        The function first detaches any existing temporary database with the same name, then attaches a new one.
+        The function first detaches any existing temporary database with the
+        same name, then attaches a new one.
         """
         cursor = self._db.cursor()
 
@@ -118,16 +122,20 @@ class DatabaseConfigMixin:
 
         Args:
             dbFile (str): The path to the database file to attach.
-            quiet (bool, optional): If True, suppresses log messages. Defaults to False.
+            quiet (bool, optional): If True, suppresses log messages. Defaults
+            to False.
 
-        The function detaches any currently attached database file, then attaches the new one and configures it.
-        It also establishes or audits the database schema.
+        The function detaches any currently attached database file, then
+        attaches the new one and configures it. It also establishes or audits
+        the database schema.
         """
         cursor = self._db.cursor()
 
         # detach the current db file, if any
         if self._dbFile and not quiet:
-            self.log("unloading knowledge database file '%s' ..." % self._dbFile)
+            self.log(
+                "unloading knowledge database file '%s' ..." % self._dbFile
+            )  # noqa E501
         try:
             cursor.execute("DETACH DATABASE `db`")
         except apsw.SQLError as e:
@@ -143,12 +151,16 @@ class DatabaseConfigMixin:
         # attach the new db file, if any
         if dbFile:
             if not quiet:
-                self.logPush("loading knowledge database file '%s' ..." % dbFile)
+                self.logPush(
+                    "loading knowledge database file '%s' ..." % dbFile
+                )  # noqa E501
             cursor.execute("ATTACH DATABASE ? AS `db`", (dbFile,))
             self._dbFile = dbFile
             self._dbNew = 0 == max(
                 row[0]
-                for row in cursor.execute("SELECT COUNT(1) FROM `db`.`sqlite_master`")
+                for row in cursor.execute(
+                    "SELECT COUNT(1) FROM `db`.`sqlite_master`"
+                )  # noqa E501
             )
             self.configureDatabase("db")
 
@@ -167,7 +179,7 @@ class DatabaseConfigMixin:
                 if ok and self._updating:
                     ok = self._checkTesting()
                     if not ok:
-                        err_msg = "Testing settings do not match loaded database"
+                        err_msg = "Testing settings dont match loaded database"
 
             if ok:
                 if not quiet:
@@ -184,7 +196,7 @@ class DatabaseConfigMixin:
         Detaches the currently attached database file.
 
         Args:
-            quiet (bool, optional): If True, suppresses log messages. Defaults to False.
+            quiet (bool,opt): If True, suppresses messages. Defaults False
 
         Returns:
             None
@@ -196,19 +208,26 @@ class DatabaseConfigMixin:
         Tests if the current database file is writeable.
 
         Raises:
-            Exception: If no database file is loaded or if the database is read-only.
+            Exception: If no database file is loaded or if the database is
+            read-only.
 
         Returns:
             bool: True if the database file is writeable.
         """
-        if self._dbFile == None:
+        if self._dbFile is None:
             raise Exception("ERROR: no knowledge database file is loaded")
         try:
             if self._db.readonly("db"):
-                raise Exception("ERROR: knowledge database file cannot be modified")
+                raise Exception(
+                    "ERROR: knowledge database file cannot be modified"
+                )  # noqa E501
         except AttributeError:  # apsw.Connection.readonly() added in 3.7.11
             try:
-                self._db.cursor().execute("UPDATE `db`.`setting` SET value = value")
+                self._db.cursor().execute(
+                    "UPDATE `db`.`setting` SET value = value"
+                )  # noqa E501
             except apsw.ReadOnlyError:
-                raise Exception("ERROR: knowledge database file cannot be modified")
+                raise Exception(
+                    "ERROR: knowledge database file cannot be modified"
+                )  # noqa E501
         return True

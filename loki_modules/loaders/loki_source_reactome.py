@@ -1,9 +1,6 @@
-#!/usr/bin/env python
-
 import collections
-import itertools
 import zipfile
-from loki import loki_source
+from loki_modules import loki_source
 
 
 class Source_reactome(loki_source.Source):
@@ -12,43 +9,24 @@ class Source_reactome(loki_source.Source):
     def getVersionString(cls):
         return "2.1 (2015-01-23)"
 
-    # getVersionString()
-
-    def download(self, options, path):
+    def download(self, options):
         # download the latest source files
         self.downloadFilesFromHTTP(
             "www.reactome.org",
             {
-                path
-                + "/ReactomePathways.txt": "/download/current/ReactomePathways.txt",
-                path
-                + "/ReactomePathwaysRelation.txt": "/download/current/ReactomePathwaysRelation.txt",
-                path
-                + "/ReactomePathways.gmt.zip": "/download/current/ReactomePathways.gmt.zip",
-                path
-                + "/UniProt2Reactome.txt": "/download/current/UniProt2Reactome.txt",
-                path
-                + "/Ensembl2Reactome.txt": "/download/current/Ensembl2Reactome.txt",
-                # 	path+'/homo_sapiens.interactions.txt.gz'            : '/download/current/homo_sapiens.interactions.txt.gz',
-                # 	path+'/gene_association.reactome'                   : '/download/current/gene_association.reactome',
+                "ReactomePathways.txt": "/download/current/ReactomePathways.txt",  # noqa E501
+                "ReactomePathwaysRelation.txt": "/download/current/ReactomePathwaysRelation.txt",  # noqa E501
+                "ReactomePathways.gmt.zip": "/download/current/ReactomePathways.gmt.zip",  # noqa E501
+                "UniProt2Reactome.txt": "/download/current/UniProt2Reactome.txt",  # noqa E501
+                "Ensembl2Reactome.txt": "/download/current/Ensembl2Reactome.txt",  # noqa E501
             },
         )
 
-        return [
-            path + "/ReactomePathways.txt",
-            path + "/ReactomePathwaysRelation.txt",
-            path + "/ReactomePathways.gmt.zip",
-            path + "/UniProt2Reactome.txt",
-            path + "/Ensembl2Reactome.txt",
-        ]
-
-    # download()
-
-    def update(self, options, path):
+    def update(self, options):
         # clear out all old data from this source
-        self.log("deleting old records from the database ...\n")
+        self.log("deleting old records from the database ...")
         self.deleteAll()
-        self.log("deleting old records from the database completed\n")
+        self.log(" OK\n")
 
         # get or create the required metadata records
         namespaceID = self.addNamespaces(
@@ -73,11 +51,6 @@ class Source_reactome(loki_source.Source):
                 ("pathway",),
             ]
         )
-        subtypeID = self.addSubtypes(
-            [
-                ("-",),
-            ]
-        )
 
         # initialize storage
         numPath = 0
@@ -95,10 +68,10 @@ class Source_reactome(loki_source.Source):
 
         # process pathways
         # <react_id>\t<description>\t<species>
-        self.log("processing pathways ...\n")
+        self.log("processing pathways ...")
         numNewPath = 0
         numMismatch = 0
-        with open(path + "/ReactomePathways.txt", "r") as pathFile:
+        with open("ReactomePathways.txt", "rU") as pathFile:
             # no header
             for line in pathFile:
                 words = line.rstrip().split("\t")
@@ -109,27 +82,26 @@ class Source_reactome(loki_source.Source):
                 ):
                     continue
                 reactID = words[0]
-                pathway = words[1]
+                path = words[1]
 
                 if reactID not in reactPath:
                     numNewPath += 1
-                    reactPath[reactID] = pathway
-                    pathReact[pathway] = reactID
-                elif reactPath[reactID] != pathway:
+                    reactPath[reactID] = path
+                    pathReact[path] = reactID
+                elif reactPath[reactID] != path:
                     numMismatch += 1
             # for line in pathFile
         # with pathFile
         self.log(
-            "processing pathways completed: %d pathways (%d mismatches)\n"
-            % (numNewPath, numMismatch)
-        )
+            " OK: %d pathways (%d mismatches)\n" % (numNewPath, numMismatch)
+        )  # noqa E501
         numPath += numNewPath
 
         # process pathway relationships
         # <parent>\t<child>
-        self.log("processing pathway hierarchy ...\n")
+        self.log("processing pathway hierarchy ...")
         numRelations = 0
-        with open(path + "/ReactomePathwaysRelation.txt", "r") as relFile:
+        with open("ReactomePathwaysRelation.txt", "rU") as relFile:
             # no header
             for line in relFile:
                 words = line.rstrip().split("\t")
@@ -139,25 +111,23 @@ class Source_reactome(loki_source.Source):
                 numRelations += 1
                 listRelationships.append((words[0], words[1]))
         # with relFile
-        self.log(
-            "processing pathway hierarchy completed: %d relationships\n"
-            % (numRelations,)
-        )
+        self.log(" OK: %d relationships\n" % (numRelations,))
 
         # process gene sets
         # <description>\t"Reactome Pathway"\t<symbol1>\t<symbol2>...
-        self.log("verifying gene set archive ...\n")
+        self.log("verifying gene set archive ...")
         numNewPath = 0
         numNewAssoc = 0
-        with zipfile.ZipFile(path + "/ReactomePathways.gmt.zip", "r") as geneZip:
+        with zipfile.ZipFile("ReactomePathways.gmt.zip", "r") as geneZip:
             err = geneZip.testzip()
             if err:
                 self.log(" ERROR\n")
                 raise Exception("CRC failed for %s\n" % err)
-            self.log("verifying gene set archive completed\n")
-            self.log("processing gene sets ...\n")
+            self.log(" OK\n")
+            self.log("processing gene sets ...")
             for info in geneZip.infolist():
-                # there should be only one file in the archive, but just in case..
+                # there should be only one file in the archive,
+                # but just in case..
                 if info.filename == "ReactomePathways.gmt":
                     geneFile = geneZip.open(info, "r")
                     for line in geneFile:
@@ -168,27 +138,29 @@ class Source_reactome(loki_source.Source):
                             or (words[1] != "Reactome Pathway")
                         ):
                             continue
-                        pathway = words[0]
+                        path = words[0]
 
-                        if pathway not in pathReact:
+                        if path not in pathReact:
                             numPath += 1
                             numNewPath += 1
                             reactID = "REACT_unknown_%d" % (numPath,)
-                            pathReact[pathway] = reactID
-                            reactPath[reactID] = pathway
+                            pathReact[path] = reactID
+                            reactPath[reactID] = path
 
                         for n in range(2, len(words)):
                             numAssoc += 1
                             numNewAssoc += 1
-                            nsAssoc["symbol"]["path"].add((pathway, numAssoc, words[n]))
+                            nsAssoc["symbol"]["path"].add(
+                                (path, numAssoc, words[n])
+                            )  # noqa E501
                         # foreach gene symbol
                     # foreach line in geneFile
                     geneFile.close()
                 # if file ok
             # foreach file in geneZip
             self.log(
-                "processing gene sets completed: %d associations (%d new pathways)\n"
-                % (numNewAssoc, numNewPath)
+                " OK: %d associations (%d new pathways)\n"
+                % (numNewAssoc, numNewPath)  # noqa E501
             )
         # with geneZip
 
@@ -197,11 +169,11 @@ class Source_reactome(loki_source.Source):
         # process ensembl mappings (to lowest reactome pathway, not parents)
         # http://www.reactome.org/download/mapping.README.txt
         # <mapID>\t<reactID>\t<url>\t<pathway>\t<evidence>\t<species>
-        self.log("processing ensembl associations ...\n")
+        self.log("processing ensembl associations ...")
         numNewPath = 0
         numMismatch = 0
         numNewAssoc = 0
-        with open(path + "/Ensembl2Reactome.txt", "r") as assocFile:
+        with open("Ensembl2Reactome.txt", "rU") as assocFile:
             for line in assocFile:
                 words = line.rstrip().split("\t")
                 if (
@@ -212,7 +184,7 @@ class Source_reactome(loki_source.Source):
                     continue
                 ensemblID = words[0]
                 reactID = words[1]
-                pathway = words[3]
+                path = words[3]
 
                 if ensemblID.startswith("ENSG"):
                     ns = "ensembl_gid"
@@ -224,30 +196,30 @@ class Source_reactome(loki_source.Source):
                 if reactID not in reactPath:
                     numPath += 1
                     numNewPath += 1
-                    reactPath[reactID] = pathway
-                    pathReact[pathway] = reactID
-                elif reactPath[reactID] != pathway:
+                    reactPath[reactID] = path
+                    pathReact[path] = reactID
+                elif reactPath[reactID] != path:
                     numMismatch += 1
                     continue
 
                 numAssoc += 1
                 numNewAssoc += 1
-                nsAssoc[ns]["path"].add((pathway, numAssoc, ensemblID))
+                nsAssoc[ns]["path"].add((path, numAssoc, ensemblID))
             # foreach line in assocFile
         # with assocFile
         self.log(
-            "processing ensembl associations completed: %d associations (%d new pathways, %d mismatches)\n"
+            " OK: %d associations (%d new pathways, %d mismatches)\n"
             % (numNewAssoc, numNewPath, numMismatch)
         )
 
         # process uniprot mappings (to lowest reactome pathway, not parents)
         # http://www.reactome.org/download/mapping.README.txt
         # <mapID>\t<reactID>\t<url>\t<pathway>\t<evidence>\t<species>
-        self.log("processing uniprot associations ...\n")
+        self.log("processing uniprot associations ...")
         numNewPath = 0
         numMismatch = 0
         numNewAssoc = 0
-        with open(path + "/UniProt2Reactome.txt", "r") as assocFile:
+        with open("UniProt2Reactome.txt", "rU") as assocFile:
             for line in assocFile:
                 words = line.rstrip().split("\t")
                 if (
@@ -258,24 +230,26 @@ class Source_reactome(loki_source.Source):
                     continue
                 uniprotPID = words[0]
                 reactID = words[1]
-                pathway = words[3]
+                path = words[3]
 
                 if reactID not in reactPath:
                     numPath += 1
                     numNewPath += 1
-                    reactPath[reactID] = pathway
-                    pathReact[pathway] = reactID
-                elif reactPath[reactID] != pathway:
+                    reactPath[reactID] = path
+                    pathReact[path] = reactID
+                elif reactPath[reactID] != path:
                     numMismatch += 1
                     continue
 
                 numAssoc += 1
                 numNewAssoc += 1
-                nsAssoc["uniprot_pid"]["path"].add((pathway, numAssoc, uniprotPID))
+                nsAssoc["uniprot_pid"]["path"].add(
+                    (path, numAssoc, uniprotPID)
+                )  # noqa E501
             # foreach line in assocFile
         # with assocFile
         self.log(
-            "processing uniprot associations completed: %d associations (%d new pathways, %d mismatches)\n"
+            " OK: %d associations (%d new pathways, %d mismatches)\n"
             % (numNewAssoc, numNewPath, numMismatch)
         )
         numPath += numNewPath
@@ -287,40 +261,56 @@ class Source_reactome(loki_source.Source):
             tally = collections.defaultdict(int)
             # http://www.reactome.org/download/interactions.README.txt
             # <uniprot>\t<ensembl>\t<entrez>\t<uniprot>\t<ensembl>\t<entrez>\t<reacttype>\t<reactID>["<->"<reactID>]\t<pubmedIDs>
-            self.log("processing protein interactions ...\n")
+            self.log("processing protein interactions ...")
             numNewPath = 0
             numNewAssoc = 0
             iaFile = self.zfile(
-                path + "/homo_sapiens.interactions.txt.gz"
+                "homo_sapiens.interactions.txt.gz"
             )  # TODO:context manager,iterator
             for line in iaFile:
                 words = line.decode("latin-1").rstrip().split("\t")
                 if line.decode().startswith("#") or (len(words) < 8):
                     continue
-                uniprotP1 = words[0][8:] if words[0].startswith("UniProt:") else None
+                uniprotP1 = (
+                    words[0][8:] if words[0].startswith("UniProt:") else None
+                )  # noqa E501
                 ensemblG1 = (
-                    words[1][8:] if words[1].startswith("ENSEMBL:ENSG") else None
+                    words[1][8:]
+                    if words[1].startswith("ENSEMBL:ENSG")
+                    else None  # noqa E501
                 )
                 ensemblP1 = (
-                    words[1][8:] if words[1].startswith("ENSEMBL:ENSP") else None
+                    words[1][8:]
+                    if words[1].startswith("ENSEMBL:ENSP")
+                    else None  # noqa E501
                 )
-                entrezG1 = (
-                    words[2][12:] if words[2].startswith("Entrez Gene:") else None
-                )
-                uniprotP2 = words[3][8:] if words[3].startswith("UniProt:") else None
+                # entrezG1 = (
+                #     words[2][12:] if words[2].startswith("Entrez Gene:") else None  # noqa E501
+                # )
+                uniprotP2 = (
+                    words[3][8:] if words[3].startswith("UniProt:") else None
+                )  # noqa E501
                 ensemblG2 = (
-                    words[4][8:] if words[4].startswith("ENSEMBL:ENSG") else None
+                    words[4][8:]
+                    if words[4].startswith("ENSEMBL:ENSG")
+                    else None  # noqa E501
                 )
                 ensemblP2 = (
-                    words[4][8:] if words[4].startswith("ENSEMBL:ENSP") else None
+                    words[4][8:]
+                    if words[4].startswith("ENSEMBL:ENSP")
+                    else None  # noqa E501
                 )
-                entrezG2 = (
-                    words[5][12:] if words[5].startswith("Entrez Gene:") else None
-                )
-                reacttype = words[6]
+                # entrezG2 = (
+                #     words[5][12:] if words[5].startswith("Entrez Gene:") else None  # noqa E501
+                # )
+                # reacttype = words[6]
                 reactIDs = words[7].split("<->")
                 reactID1 = reactIDs[0].split(".", 1)[0]
-                reactID2 = reactIDs[1].split(".", 1)[0] if (len(reactIDs) > 1) else None
+                reactID2 = (
+                    reactIDs[1].split(".", 1)[0]
+                    if (len(reactIDs) > 1)
+                    else None  # noqa E501
+                )  # noqa E501
                 reactID2 = reactID2 if (reactID2 != reactID1) else None
 
                 # if reacttype is "direct_complex" or "indirect_complex",
@@ -339,20 +329,35 @@ class Source_reactome(loki_source.Source):
                     in1 = of1 = 0
                     if uniprotP1:
                         in1 += max(
-                            ((alias == uniprotP1) and (pathway == reactPath[reactID1]))
-                            for pathway, _, alias in nsAssoc["uniprot_pid"]["path"]
+                            (
+                                (alias == uniprotP1)
+                                and (path == reactPath[reactID1])  # noqa E501
+                            )  # noqa E501
+                            for path, _, alias in nsAssoc["uniprot_pid"][
+                                "path"
+                            ]  # noqa E501
                         )
                         of1 += 1
                     if ensemblG1:
                         in1 += max(
-                            ((alias == ensemblG1) and (pathway == reactPath[reactID1]))
-                            for pathway, _, alias in nsAssoc["ensembl_gid"]["path"]
+                            (
+                                (alias == ensemblG1)
+                                and (path == reactPath[reactID1])  # noqa E501
+                            )  # noqa E501
+                            for path, _, alias in nsAssoc["ensembl_gid"][
+                                "path"
+                            ]  # noqa E501
                         )
                         of1 += 1
                     if ensemblP1:
                         in1 += max(
-                            ((alias == ensemblP1) and (pathway == reactPath[reactID1]))
-                            for pathway, _, alias in nsAssoc["ensembl_pid"]["path"]
+                            (
+                                (alias == ensemblP1)
+                                and (path == reactPath[reactID1])  # noqa E501
+                            )  # noqa E501
+                            for path, _, alias in nsAssoc["ensembl_pid"][
+                                "path"
+                            ]  # noqa E501
                         )
                         of1 += 1
                     tally["%d/%d protein 1 in react 1" % (in1, of1)] += 1
@@ -360,20 +365,35 @@ class Source_reactome(loki_source.Source):
                     in2 = of2 = 0
                     if uniprotP2:
                         in2 += max(
-                            ((alias == uniprotP2) and (pathway == reactPath[reactID1]))
-                            for pathway, _, alias in nsAssoc["uniprot_pid"]["path"]
+                            (
+                                (alias == uniprotP2)
+                                and (path == reactPath[reactID1])  # noqa E501
+                            )  # noqa E501
+                            for path, _, alias in nsAssoc["uniprot_pid"][
+                                "path"
+                            ]  # noqa E501
                         )
                         of2 += 1
                     if ensemblG2:
                         in2 += max(
-                            ((alias == ensemblG2) and (pathway == reactPath[reactID1]))
-                            for pathway, _, alias in nsAssoc["ensembl_gid"]["path"]
+                            (
+                                (alias == ensemblG2)
+                                and (path == reactPath[reactID1])  # noqa E501
+                            )  # noqa E501
+                            for path, _, alias in nsAssoc["ensembl_gid"][
+                                "path"
+                            ]  # noqa E501
                         )
                         of2 += 1
                     if ensemblP2:
                         in2 += max(
-                            ((alias == ensemblP2) and (pathway == reactPath[reactID1]))
-                            for pathway, _, alias in nsAssoc["ensembl_pid"]["path"]
+                            (
+                                (alias == ensemblP2)
+                                and (path == reactPath[reactID1])  # noqa E501
+                            )  # noqa E501
+                            for path, _, alias in nsAssoc["ensembl_pid"][
+                                "path"
+                            ]  # noqa E501
                         )
                         of2 += 1
                     tally["%d/%d protein 2 in react 1" % (in2, of2)] += 1
@@ -387,20 +407,35 @@ class Source_reactome(loki_source.Source):
                     in1 = of1 = 0
                     if uniprotP1:
                         in1 += max(
-                            ((alias == uniprotP1) and (pathway == reactPath[reactID2]))
-                            for pathway, _, alias in nsAssoc["uniprot_pid"]["path"]
+                            (
+                                (alias == uniprotP1)
+                                and (path == reactPath[reactID2])  # noqa E501
+                            )  # noqa E501
+                            for path, _, alias in nsAssoc["uniprot_pid"][
+                                "path"
+                            ]  # noqa E501
                         )
                         of1 += 1
                     if ensemblG1:
                         in1 += max(
-                            ((alias == ensemblG1) and (pathway == reactPath[reactID2]))
-                            for pathway, _, alias in nsAssoc["ensembl_gid"]["path"]
+                            (
+                                (alias == ensemblG1)
+                                and (path == reactPath[reactID2])  # noqa E501
+                            )  # noqa E501
+                            for path, _, alias in nsAssoc["ensembl_gid"][
+                                "path"
+                            ]  # noqa E501
                         )
                         of1 += 1
                     if ensemblP1:
                         in1 += max(
-                            ((alias == ensemblP1) and (pathway == reactPath[reactID2]))
-                            for pathway, _, alias in nsAssoc["ensembl_pid"]["path"]
+                            (
+                                (alias == ensemblP1)
+                                and (path == reactPath[reactID2])  # noqa E501
+                            )  # noqa E501
+                            for path, _, alias in nsAssoc["ensembl_pid"][
+                                "path"
+                            ]  # noqa E501
                         )
                         of1 += 1
                     tally["%d/%d protein 1 in react 1" % (in1, of1)] += 1
@@ -408,28 +443,43 @@ class Source_reactome(loki_source.Source):
                     in2 = of2 = 0
                     if uniprotP2:
                         in2 += max(
-                            ((alias == uniprotP2) and (pathway == reactPath[reactID2]))
-                            for pathway, _, alias in nsAssoc["uniprot_pid"]["path"]
+                            (
+                                (alias == uniprotP2)
+                                and (path == reactPath[reactID2])  # noqa E501
+                            )  # noqa E501
+                            for path, _, alias in nsAssoc["uniprot_pid"][
+                                "path"
+                            ]  # noqa E501
                         )
                         of2 += 1
                     if ensemblG2:
                         in2 += max(
-                            ((alias == ensemblG2) and (pathway == reactPath[reactID2]))
-                            for pathway, _, alias in nsAssoc["ensembl_gid"]["path"]
+                            (
+                                (alias == ensemblG2)
+                                and (path == reactPath[reactID2])  # noqa E501
+                            )  # noqa E501
+                            for path, _, alias in nsAssoc["ensembl_gid"][
+                                "path"
+                            ]  # noqa E501
                         )
                         of2 += 1
                     if ensemblP2:
                         in2 += max(
-                            ((alias == ensemblP2) and (pathway == reactPath[reactID2]))
-                            for pathway, _, alias in nsAssoc["ensembl_pid"]["path"]
+                            (
+                                (alias == ensemblP2)
+                                and (path == reactPath[reactID2])  # noqa E501
+                            )  # noqa E501
+                            for path, _, alias in nsAssoc["ensembl_pid"][
+                                "path"
+                            ]  # noqa E501
                         )
                         of2 += 1
                     tally["%d/%d protein 2 in react 1" % (in2, of2)] += 1
                 # if reactID1
             # foreach line in iaFile
             self.log(
-                "processing protein interactions completed: %d associations (%d new pathways)\n"
-                % (numNewAssoc, numNewPath)
+                " OK: %d associations (%d new pathways)\n"
+                % (numNewAssoc, numNewPath)  # noqa E501
             )
             numPath += numNewPath
             numAssoc += numNewAssoc
@@ -438,17 +488,17 @@ class Source_reactome(loki_source.Source):
         # TODO
 
         # store pathways
-        self.log("writing pathways to the database ...\n")
+        self.log("writing pathways to the database ...")
         listReact = list(reactPath.keys())
         listGID = self.addTypedGroups(
             typeID["pathway"],
-            ((subtypeID["-"], reactID, reactPath[reactID]) for reactID in listReact),
+            ((reactID, reactPath[reactID]) for reactID in listReact),  # noqa E501
         )
         reactGID = dict(zip(listReact, listGID))
-        self.log("writing pathways to the database completed\n")
+        self.log(" OK\n")
 
         # store pathway names
-        self.log("writing pathway names to the database ...\n")
+        self.log("writing pathway names to the database ...")
         self.addGroupNamespacedNames(
             namespaceID["reactome_id"],
             ((gid, reactID) for reactID, gid in reactGID.items()),
@@ -457,19 +507,19 @@ class Source_reactome(loki_source.Source):
             namespaceID["pathway"],
             ((gid, reactPath[reactID]) for reactID, gid in reactGID.items()),
         )
-        self.log("writing pathway names to the database completed\n")
+        self.log(" OK\n")
 
         # store pathway relationships
-        self.log("writing pathway relationships to the database ...\n")
+        self.log("writing pathway relationships to the database ...")
         self.addGroupParentRelationships(
             (reactGID[parentID], reactGID[childID], relationshipID[""])
             for parentID, childID in listRelationships
             if ((parentID in reactGID) and (childID in reactGID))
         )
-        self.log("writing pathway relationships to the database completed\n")
+        self.log(" OK\n")
 
         # store gene associations
-        self.log("writing gene associations to the database ...\n")
+        self.log("writing gene associations to the database ...")
         for ns in nsAssoc:
             self.addGroupMemberTypedNamespacedNames(
                 typeID["gene"],
@@ -487,9 +537,4 @@ class Source_reactome(loki_source.Source):
                     for path, num, name in nsAssoc[ns]["path"]
                 ),
             )
-        self.log("writing gene associations to the database completed\n")
-
-    # update()
-
-
-# Source_reactome
+        self.log(" OK\n")

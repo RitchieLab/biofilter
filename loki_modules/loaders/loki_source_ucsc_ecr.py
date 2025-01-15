@@ -1,9 +1,6 @@
-#!/usr/bin/env python
-
-# import collections
 import itertools
 from threading import Thread
-from loki import loki_source
+from loki_modules import loki_source
 
 
 class Source_ucsc_ecr(loki_source.Source):
@@ -49,21 +46,16 @@ class Source_ucsc_ecr(loki_source.Source):
     }
     chr_grp_ids = []
 
-    ##################################################
-    # source interface
-
     @classmethod
     def getVersionString(cls):
         return "2.0.1 (2013-03-01)"
-
-    # getVersionString()
 
     @classmethod
     def getOptions(cls):
         return {
             "size": "minimum length of an ECR in bases (default: 100)",
             "identity": "minimum identity of an ECR (default: 0.7)",
-            "gap": "maximum gap length below the identity threshold (default: 50)",
+            "gap": "maximum gap length below the identity threshold (default: 50)",  # noqa E501
         }
 
     # getOptions()
@@ -82,16 +74,27 @@ class Source_ucsc_ecr(loki_source.Source):
                     v = int(v)
                 elif o == "reverse":  # undocumented debug option
                     v = v.lower()
-                    if (v == "0") or "false".startswith(v) or "no".startswith(v):
+                    if (
+                        (v == "0")
+                        or "false".startswith(v)
+                        or "no".startswith(v)  # noqa E501
+                    ):  # noqa E501
                         v = False
-                    elif (v == "1") or "true".startswith(v) or "yes".startswith(v):
+                    elif (
+                        (v == "1")
+                        or "true".startswith(v)
+                        or "yes".startswith(v)  # noqa E501
+                    ):  # noqa E501
                         v = True
                     else:
                         return "must be 0/false/no or 1/true/yes"
                 else:
                     return "unknown option '%s'" % o
             except ValueError:
-                return "Cannot parse '%s' parameter value - given '%s'" % (o, v)
+                return "Cannot parse '%s' parameter value - given '%s'" % (
+                    o,
+                    v,
+                )  # noqa E501
             options[o] = v
         # foreach option
         return True
@@ -105,7 +108,9 @@ class Source_ucsc_ecr(loki_source.Source):
         remFiles = dict()
         for chm in self._chmList:
             for d, f in self._comparisons.items():
-                remFiles[path + "/" + d + ".chr" + chm + ".phastCons.txt.gz"] = (
+                remFiles[
+                    path + "/" + d + ".chr" + chm + ".phastCons.txt.gz"
+                ] = (  # noqa E501
                     "/goldenPath/hg19/phastCons46way/"
                     + d
                     + "/chr"
@@ -187,14 +192,16 @@ class Source_ucsc_ecr(loki_source.Source):
             for ch in self._chmList:
                 processThreads[ch].join()
 
-            self.addGroupRelationships(((ecr_gid, c, rel_id, 1) for c in chr_grp_ids))
+            self.addGroupRelationships(
+                ((ecr_gid, c, rel_id, 1) for c in chr_grp_ids)
+            )  # noqa E501
 
             self.log("processing ECRs for " + sp + " completed\n")
 
         # store source metadata
-        self.setSourceBuilds(
-            None, 19
-        )  # TODO: check for latest FTP path rather than hardcoded /goldenPath/hg19/phastCons46way/
+        self.setSourceBuilds(None, 19)
+        # TODO: check for latest FTP path rather than hardcoded
+        # /goldenPath/hg19/phastCons46way/
 
     # update()
 
@@ -220,7 +227,8 @@ class Source_ucsc_ecr(loki_source.Source):
         desc = "ECRs for " + sp + " on Chromosome " + ch
         chr_grp_ids.append(
             self.addTypedGroups(
-                ecr_group_typeid, [(subtypeID["-"], "ecr_%s_chr%s" % (sp, ch), desc)]
+                ecr_group_typeid,
+                [(subtypeID["-"], "ecr_%s_chr%s" % (sp, ch), desc)],  # noqa E501
             )[0]
         )
         self.addGroupNamespacedNames(
@@ -231,7 +239,11 @@ class Source_ucsc_ecr(loki_source.Source):
         for regions in self.getRegions(f, options):
             label = "ecr_%s_chr%s_band%d" % (sp, ch, curr_band)
             desc = (
-                "ECRs for " + sp + " on Chromosome " + ch + ", Band %d" % (curr_band,)
+                "ECRs for "
+                + sp
+                + " on Chromosome "
+                + ch
+                + ", Band %d" % (curr_band,)  # noqa E501
             )
             num_regions += len(regions)
 
@@ -240,40 +252,50 @@ class Source_ucsc_ecr(loki_source.Source):
 
             # Add the region itself
             reg_ids = self.addTypedBiopolymers(
-                ecr_typeid, ((self.getRegionName(sp, ch, r), "") for r in regions)
+                ecr_typeid,
+                ((self.getRegionName(sp, ch, r), "") for r in regions),  # noqa E501
             )
             # Add the name of the region
             self.addBiopolymerNamespacedNames(
-                ecr_ns, zip(reg_ids, (self.getRegionName(sp, ch, r) for r in regions))
+                ecr_ns,
+                zip(
+                    reg_ids, (self.getRegionName(sp, ch, r) for r in regions)
+                ),  # noqa E501
             )
             # Add the region Boundaries
-            # This gives a generator that yields [(region_id, (chrom_id, start, stop)) ... ]
+            # This gives a generator that yields
+            # [(region_id, (chrom_id, start, stop)) ... ]
             region_bound_gen = zip(
                 ((i,) for i in reg_ids), ((ch_id, r[0], r[1]) for r in regions)
             )
             self.addBiopolymerLDProfileRegions(
-                ecr_ldprofile_id, (tuple(itertools.chain(*c)) for c in region_bound_gen)
+                ecr_ldprofile_id,
+                (tuple(itertools.chain(*c)) for c in region_bound_gen),  # noqa E501
             )
 
             if regions:
                 grp_rid[band_grps[-1]] = reg_ids
-                # Add the region to the group
-                # self.addGroupBiopolymers(((band_gids[-1], r_id) for r_id in reg_ids))
 
             curr_band += 1
 
         band_gids = self.addTypedGroups(ecr_group_typeid, band_grps)
-        self.addGroupNamespacedNames(ecr_ns, zip(band_gids, (r[0] for r in band_grps)))
+        self.addGroupNamespacedNames(
+            ecr_ns, zip(band_gids, (r[0] for r in band_grps))
+        )  # noqa E501
         gid_rid = []
         for i in range(len(band_gids)):
-            gid_rid.extend(((band_gids[i], rid) for rid in grp_rid[band_grps[i]]))
+            gid_rid.extend(
+                ((band_gids[i], rid) for rid in grp_rid[band_grps[i]])
+            )  # noqa E501
 
         self.addGroupBiopolymers(gid_rid)
 
-        self.addGroupRelationships(((chr_grp_ids[-1], b, rel_id, 1) for b in band_gids))
+        self.addGroupRelationships(
+            ((chr_grp_ids[-1], b, rel_id, 1) for b in band_gids)
+        )  # noqa E501
 
         self.log(
-            "processing Chromosome %s completed (%d regions found in %d bands)\n"
+            "processing Chromosome %s completed (%d regions found in %d bands)\n"  # noqa E501
             % (ch, num_regions, curr_band - 1)
         )
 
@@ -283,7 +305,9 @@ class Source_ucsc_ecr(loki_source.Source):
         """
         Returns a string representation of the name
         """
-        return species + ":chr" + ch + ":" + str(region[0]) + "-" + str(region[1])
+        return (
+            species + ":chr" + ch + ":" + str(region[0]) + "-" + str(region[1])
+        )  # noqa E501
 
     # getRegionName()
 
@@ -309,15 +333,16 @@ class Source_ucsc_ecr(loki_source.Source):
         while not EOF:
             declaration = None
             try:
-                # parsing can be in one of four states, handled in rough order of frequency;
-                # we could cover all cases in one 'for line in f:' loop, but doing
-                # extra tests for things that don't change much is ~45% slower
+                # parsing can be in one of four states, handled in rough order
+                # of frequency; we could cover all cases in one 'for line in
+                # f:' loop, but doing extra tests for things that don't change
+                # much is ~45% slower
                 while True:
                     loopState = state
                     loopPos = pos
                     if (state is False) and (curCount > maxGap):
-                        # in a low segment that is already beyond the max gap length
-                        # (so we don't care about sum or count anymore)
+                        # in a low segment that is already beyond the max gap
+                        # length (so we don't care about sum or count anymore)
                         for line in f:
                             v = float(line)
                             if v >= minIdent:
@@ -326,7 +351,8 @@ class Source_ucsc_ecr(loki_source.Source):
                             pos += step
                         # for line in f
                     elif state is False:
-                        # in a low segment which is still within the max gap length
+                        # in a low segment which is still within the max gap
+                        # length
                         for line in f:
                             v = float(line)
                             if v >= minIdent:
@@ -350,8 +376,9 @@ class Source_ucsc_ecr(loki_source.Source):
                             pos += step
                         # for line in f
                     else:
-                        # starting a new segment at top of file or after a data gap
-                        # (we only have to read 1 value to see what kind of segment is starting)
+                        # starting a new segment at top of file or after a
+                        # data gap (we only have to read 1 value to see what
+                        # kind of segment is starting)
                         for line in f:
                             v = float(line)
                             state = v >= minIdent
@@ -359,9 +386,11 @@ class Source_ucsc_ecr(loki_source.Source):
                         # for line in f
                     # if
 
-                    # since all states have 'for line in f:' loops, we only land here for a few reasons
+                    # since all states have 'for line in f:' loops, we only
+                    # land here for a few reasons
                     if loopState != state:
-                        # we changed threshold state; store the segment, reset the counters and continue
+                        # we changed threshold state; store the segment, reset
+                        # the counters and continue
                         segments.append(
                             (curStart, pos - step, curSum, curCount, loopState)
                         )
@@ -370,50 +399,68 @@ class Source_ucsc_ecr(loki_source.Source):
                         curCount = 1
                         pos += step
                     elif loopPos == pos:
-                        # we hit EOF; store the segment and process the final batch
+                        # we hit EOF; store the segment and process the final
+                        # batch
                         segments.append(
                             (curStart, pos - step, curSum, curCount, loopState)
                         )
                         EOF = True
                         break
                     else:
-                        # we exceeded the max gap length in a low segment; process the batch
+                        # we exceeded the max gap length in a low segment;
+                        # process the batch
                         break
                     # if
                 # while True
             except ValueError:
                 declaration = dict(
-                    pair.split("=", 1) for pair in line.strip().split() if "=" in pair
+                    pair.split("=", 1)
+                    for pair in line.strip().split()
+                    if "=" in pair  # noqa E501
                 )
                 if ("start" not in declaration) or ("step" not in declaration):
-                    raise Exception("ERROR: invalid phastcons format: %s" % line)
+                    raise Exception(
+                        "ERROR: invalid phastcons format: %s" % line
+                    )  # noqa E501
                 # if the new band picks right up after the old one,
                 # ignore it since there was no actual gap in the data
                 if int(declaration["start"]) == pos:
                     step = int(declaration["step"])
                     continue
                 # store the segment
-                segments.append((curStart, pos - step, curSum, curCount, state))
+                segments.append(
+                    (curStart, pos - step, curSum, curCount, state)
+                )  # noqa E501
             # try/ValueError
 
             # invert segments if requested
             if reverse:
                 for s in range(0, len(segments)):
-                    segments[s] = (-segments[s][1], -segments[s][0]) + segments[s][2:]
+                    segments[s] = (
+                        -segments[s][1],
+                        -segments[s][0],
+                    ) + segments[  # noqa E501
+                        s
+                    ][  # noqa E501
+                        2:
+                    ]  # noqa E501
                 segments.reverse()
                 tmpregions = regions
                 regions = list()
 
-            # set min/max segment indecies to skip leading or trailing low or invalid segments
+            # set min/max segment indecies to skip leading or trailing low or
+            # invalid segments
             sn, sx = 0, len(segments) - 1
             while (sn <= sx) and (segments[sn][4] is not True):
                 sn += 1
             while (sn <= sx) and (segments[sx][4] is not True):
                 sx -= 1
-            # assert ((sn > sx) or ((sx-sn+1)%2)), "segment list size cannot be even (must be hi , hi-lo-hi , etc)"
+            # assert ((sn > sx) or ((sx-sn+1)%2)), "segment list size cannot
+            # be even (must be hi , hi-lo-hi , etc)"
 
             # merge applicable high segments according to some metric
-            if 0:  # running-average metric with minSize bugs (original algorithm)
+            # running-average metric with minSize bugs (original algorithm)
+            if 0:
                 while sn <= sx:
                     s0, s1 = sn, sn
                     while (s1 < sx) and (
@@ -507,14 +554,20 @@ class Source_ucsc_ecr(loki_source.Source):
                     ):
                         sw = [s1 - 1]
                         for s in range(s1 - 3, s0, -2):
-                            if (minIdent * segments[s][3] - segments[s][2] - 0.0001) > (
+                            if (
+                                minIdent * segments[s][3]
+                                - segments[s][2]
+                                - 0.0001  # noqa E501
+                            ) > (  # noqa E501
                                 minIdent * segments[sw[0]][3]
                                 - segments[sw[0]][2]
                                 + 0.0001
                             ):
                                 sw = [s]
                             elif (
-                                minIdent * segments[s][3] - segments[s][2] + 0.0001
+                                minIdent * segments[s][3]
+                                - segments[s][2]
+                                + 0.0001  # noqa E501
                             ) >= (
                                 minIdent * segments[sw[0]][3]
                                 - segments[sw[0]][2]
@@ -557,8 +610,3 @@ class Source_ucsc_ecr(loki_source.Source):
                 curSum = 0.0
                 curCount = 0
         # while not EOF
-
-    # getRegions()
-
-
-# Source_ucsc_ecr

@@ -1,8 +1,6 @@
-#!/usr/bin/env python
-
 import collections
 import re
-from loki import loki_source
+from loki_modules import loki_source
 
 
 class Source_entrez(loki_source.Source):
@@ -11,17 +9,13 @@ class Source_entrez(loki_source.Source):
     def getVersionString(cls):
         return "2.4 (2022-04-12)"
 
-    # getVersionString()
-
     @classmethod
     def getOptions(cls):
         return {
-            "locus-tags": "[yes|no]  --  include a gene's 'Locus Tag' as an alias (default: no)",
-            "favor-primary": "[yes|no]  --  reduce symbol ambiguity by favoring primary symbols (default: yes)",
-            "favor-hist": "[yes|no]  --  reduce symbol ambiguity by favoring primary symbols (default: yes)",
+            "locus-tags": "[yes|no]  --  include a gene's 'Locus Tag' as an alias (default: no)",  # noqa E501
+            "favor-primary": "[yes|no]  --  reduce symbol ambiguity by favoring primary symbols (default: yes)",  # noqa E501
+            "favor-hist": "[yes|no]  --  reduce symbol ambiguity by favoring primary symbols (default: yes)",  # noqa E501
         }
-
-    # getOptions()
 
     def validateOptions(self, options):
         for o, v in options.items():
@@ -38,40 +32,25 @@ class Source_entrez(loki_source.Source):
             options[o] = v
         return True
 
-    # validateOptions()
-
     def download(self, options, path):
-        # download the latest source files
-        # 		self.downloadFilesFromFTP('ftp.ncbi.nih.gov', {
-        # 			'Homo_sapiens.gene_info.gz':       '/gene/DATA/GENE_INFO/Mammalia/Homo_sapiens.gene_info.gz',
-        # 			'gene2refseq.gz':                  '/gene/DATA/gene2refseq.gz',
-        # 			'gene_history.gz':                 '/gene/DATA/gene_history.gz',
-        # 			'gene2ensembl.gz':                 '/gene/DATA/gene2ensembl.gz',
-        # 			'gene2unigene':                    '/gene/DATA/ARCHIVE/gene2unigene',
-        # 			'gene_refseq_uniprotkb_collab.gz': '/gene/DATA/gene_refseq_uniprotkb_collab.gz',
-        # 		})
-        # 		self.downloadFilesFromFTP('ftp.uniprot.org', {
-        # 			'HUMAN_9606_idmapping_selected.tab.gz': '/pub/databases/uniprot/current_release/knowledgebase/idmapping/by_organism/HUMAN_9606_idmapping_selected.tab.gz',
-        # 		})
-
         self.downloadFilesFromHTTP(
             "ftp.ncbi.nih.gov",
             {
                 path
-                + "/Homo_sapiens.gene_info.gz": "/gene/DATA/GENE_INFO/Mammalia/Homo_sapiens.gene_info.gz",
+                + "/Homo_sapiens.gene_info.gz": "/gene/DATA/GENE_INFO/Mammalia/Homo_sapiens.gene_info.gz",  # noqa E501
                 path + "/gene2refseq.gz": "/gene/DATA/gene2refseq.gz",
                 path + "/gene_history.gz": "/gene/DATA/gene_history.gz",
                 path + "/gene2ensembl.gz": "/gene/DATA/gene2ensembl.gz",
                 path + "/gene2unigene": "/gene/DATA/ARCHIVE/gene2unigene",
                 path
-                + "/gene_refseq_uniprotkb_collab.gz": "/gene/DATA/gene_refseq_uniprotkb_collab.gz",
+                + "/gene_refseq_uniprotkb_collab.gz": "/gene/DATA/gene_refseq_uniprotkb_collab.gz",  # noqa E501
             },
         )
         self.downloadFilesFromHTTP(
             "ftp.ebi.ac.uk",
             {
                 path
-                + "/HUMAN_9606_idmapping_selected.tab.gz": "/pub/databases/uniprot/current_release/knowledgebase/idmapping/by_organism/HUMAN_9606_idmapping_selected.tab.gz",
+                + "/HUMAN_9606_idmapping_selected.tab.gz": "/pub/databases/uniprot/current_release/knowledgebase/idmapping/by_organism/HUMAN_9606_idmapping_selected.tab.gz",  # noqa E501
             },
         )
 
@@ -84,8 +63,6 @@ class Source_entrez(loki_source.Source):
             path + "/gene_refseq_uniprotkb_collab.gz",
             path + "/HUMAN_9606_idmapping_selected.tab.gz",
         ]
-
-    # download()
 
     def update(self, options, path):
         # clear out all old data from this source
@@ -148,13 +125,16 @@ class Source_entrez(loki_source.Source):
             path + "/Homo_sapiens.gene_info.gz"
         )  # TODO:context manager,iterator
         for line in geneFile:
-            # quickly filter out all non-9606 (human) taxonomies before taking the time to split()
+            # quickly filter out all non-9606 taxo before taking time to split
             if line.startswith("9606\t"):
                 words = line.rstrip().split("\t")
                 entrezID = int(words[1])
                 symbol = words[2]
                 aliases = words[4].split("|") if words[4] != "-" else list()
-                if options.get("locus-tags", "no") == "yes" and words[3] != "-":
+                if (
+                    options.get("locus-tags", "no") == "yes"
+                    and words[3] != "-"  # noqa E501
+                ):
                     aliases.append(words[3])
                 xrefs = words[5].split("|") if words[5] != "-" else list()
                 chm = words[6]
@@ -188,7 +168,7 @@ class Source_entrez(loki_source.Source):
             # if taxonomy is 9606 (human)
         # foreach line in geneFile
 
-        # delete any symbol alias which is also the primary name of exactly one other gene
+        # del any symbol which is also the primary name of exactly 1 other gene
         if options.get("favor-primary", "yes") == "yes":
             dupe = set()
             for alias in nsNames["symbol"]:
@@ -196,7 +176,7 @@ class Source_entrez(loki_source.Source):
                 symbol = alias[1]
                 if (
                     (symbol in primaryEntrez)
-                    and (primaryEntrez[symbol] != False)
+                    and (primaryEntrez[symbol] is not False)
                     and (primaryEntrez[symbol] != entrezID)
                 ):
                     dupe.add(alias)
@@ -221,7 +201,9 @@ class Source_entrez(loki_source.Source):
         )
         entrezBID = dict(zip(listEntrez, listBID))
         numGenes = len(entrezBID)
-        self.log("writing genes to the database completed: %d genes\n" % (numGenes))
+        self.log(
+            "writing genes to the database completed: %d genes\n" % (numGenes)
+        )  # noqa E501
         entrezGene = None
 
         # translate target entrezID to biopolymer_id in nsNames
@@ -236,9 +218,9 @@ class Source_entrez(loki_source.Source):
 
         # process gene regions
         # Entrez sequences use 0-based closed intervals, according to:
-        #   http://www.ncbi.nlm.nih.gov/books/NBK3840/#genefaq.Representation_of_nucleotide_pos
-        # and comparison of web-reported boundary coordinates to gene length (len = end - start + 1).
-        # Since LOKI uses 1-based closed intervals, we add 1 to all coordinates.
+        #   http://www.ncbi.nlm.nih.gov/books/NBK3840/#genefaq.Representation_of_nucleotide_pos  # noqa E501
+        # and comparison of web-reported boundary coordinates to gene length (len = end - start + 1).  # noqa E501
+        # Since LOKI uses 1-based closed intervals, we add 1 to all coordinates.  # noqa E501
         self.log("processing gene regions ...\n")
         reBuild = re.compile("GRCh([0-9]+)")
         grcBuild = None
@@ -255,30 +237,38 @@ class Source_entrez(loki_source.Source):
         header = regionFile.__next__().rstrip()
         if not (
             header.startswith(
-                "#Format: tax_id GeneID status RNA_nucleotide_accession.version RNA_nucleotide_gi protein_accession.version protein_gi genomic_nucleotide_accession.version genomic_nucleotide_gi start_position_on_the_genomic_accession end_position_on_the_genomic_accession orientation assembly"
-            )  # "(tab is used as a separator, pound sign - start of a comment)"
+                "#Format: tax_id GeneID status RNA_nucleotide_accession.version RNA_nucleotide_gi protein_accession.version protein_gi genomic_nucleotide_accession.version genomic_nucleotide_gi start_position_on_the_genomic_accession end_position_on_the_genomic_accession orientation assembly"  # noqa E501
+            )  # "(tab is used as a separator, pound sign - start of a comment)"  # noqa E501
             or header.startswith(
-                "#tax_id	GeneID	status	RNA_nucleotide_accession.version	RNA_nucleotide_gi	protein_accession.version	protein_gi	genomic_nucleotide_accession.version	genomic_nucleotide_gi	start_position_on_the_genomic_accession	end_position_on_the_genomic_accession	orientation	assembly"
+                "#tax_id	GeneID	status	RNA_nucleotide_accession.version	RNA_nucleotide_gi	protein_accession.version	protein_gi	genomic_nucleotide_accession.version	genomic_nucleotide_gi	start_position_on_the_genomic_accession	end_position_on_the_genomic_accession	orientation	assembly"  # noqa E501
             )  # "	mature_peptide_accession.version	mature_peptide_gi	Symbol"
         ):
             self.log(" ERROR: unrecognized file header\n")
             self.log("%s\n" % header)
         else:
             for line in regionFile:
-                # skip non-9606 (human) taxonomies before taking the time to split()
+                # skip non-9606 taxo before taking the time to split()
                 if not line.startswith("9606\t"):
                     continue
 
                 # grab relevant columns
                 words = line.split("\t")
                 entrezID = int(words[1])
-                rnaAcc = words[3].rsplit(".", 1)[0] if words[3] != "-" else None
-                proAcc = words[5].rsplit(".", 1)[0] if words[5] != "-" else None
-                genAcc = words[7].rsplit(".", 1)[0] if words[7] != "-" else None
+                rnaAcc = (
+                    words[3].rsplit(".", 1)[0] if words[3] != "-" else None
+                )  # noqa E501
+                proAcc = (
+                    words[5].rsplit(".", 1)[0] if words[5] != "-" else None
+                )  # noqa E501
+                genAcc = (
+                    words[7].rsplit(".", 1)[0] if words[7] != "-" else None
+                )  # noqa E501
                 posMin = (int(words[9]) + 1) if words[9] != "-" else None
                 posMax = (int(words[10]) + 1) if words[10] != "-" else None
                 build = reBuild.search(
-                    words[12].rstrip() if (len(words) > 12 and words[12] != "-") else ""
+                    words[12].rstrip()
+                    if (len(words) > 12 and words[12] != "-")
+                    else ""  # noqa E501
                 )
 
                 # skip unrecognized IDs
@@ -295,7 +285,7 @@ class Source_entrez(loki_source.Source):
                     refseqBIDs[proAcc].add(entrezBID[entrezID])
 
                 # skip non-whole-chromosome regions
-                # (refseq accession types: http://www.ncbi.nlm.nih.gov/RefSeq/key.html)
+                # (refseq accession types: http://www.ncbi.nlm.nih.gov/RefSeq/key.html)  # noqa E501
                 if not (genAcc and genAcc.startswith("NC_")):
                     setBadNC.add(entrezID)
                     continue
@@ -315,11 +305,12 @@ class Source_entrez(loki_source.Source):
                     setBadChr.add(entrezID)
                     continue
                 elif (entrezID in entrezChm) and (
-                    self._loki.chr_name[chm] not in entrezChm[entrezID].split("|")
+                    self._loki.chr_name[chm]
+                    not in entrezChm[entrezID].split("|")  # noqa E501
                 ):
-                    # TODO: make sure we want to ignore any gene region with an ambiguous chromosome
-                    #       (i.e. gene_info says one thing, gene2refseq says another)
-                    # print "%s %s -> %s" % (entrezID,entrezChm[entrezID],self._loki.chr_name[chm])
+                    # TODO: make sure we want to ignore any gene region with an ambiguous chromosome  # noqa E501
+                    #       (i.e. gene_info says one thing, gene2refseq says another)  # noqa E501
+                    # print "%s %s -> %s" % (entrezID,entrezChm[entrezID],self._loki.chr_name[chm])  # noqa E501
                     # 100293744 X -> Y
                     # 100302657 3 -> 15
                     # 100418703 Y -> X
@@ -327,7 +318,7 @@ class Source_entrez(loki_source.Source):
                     setBadChr.add(entrezID)
                     continue
 
-                # store the region by build version number, so we can pick the majority build later
+                # store the region by build version number, so we can pick the majority build later  # noqa E501
                 buildGenes[build.group(1)].add(entrezID)
                 buildRegions[build.group(1)].add(
                     (entrezBID[entrezID], chm, posMin, posMax)
@@ -335,7 +326,9 @@ class Source_entrez(loki_source.Source):
             # foreach line in regionFile
 
             # identify majority build version
-            grcBuild = max(buildRegions, key=lambda build: len(buildRegions[build]))
+            grcBuild = max(
+                buildRegions, key=lambda build: len(buildRegions[build])
+            )  # noqa E501
             setBadVers = set()
             for build, genes in buildGenes.items():
                 if build != grcBuild:
@@ -344,7 +337,9 @@ class Source_entrez(loki_source.Source):
             # print stats
             setBadVers.difference_update(buildGenes[grcBuild])
             setBadChr.difference_update(buildGenes[grcBuild], setBadVers)
-            setBadBuild.difference_update(buildGenes[grcBuild], setBadVers, setBadChr)
+            setBadBuild.difference_update(
+                buildGenes[grcBuild], setBadVers, setBadChr
+            )  # noqa E501
             setBadNC.difference_update(
                 buildGenes[grcBuild], setBadVers, setBadChr, setBadNC
             )
@@ -353,13 +348,14 @@ class Source_entrez(loki_source.Source):
             numNames0 = numNames
             numNames = sum(len(nsNames[ns]) for ns in nsNames)
             self.log(
-                "processing gene regions completed: %d regions (%d genes), %d identifiers\n"
+                "processing gene regions completed: %d regions (%d genes), %d identifiers\n"  # noqa E501
                 % (numRegions, numGenes, numNames - numNames0)
             )
             self.logPush()
             if setOrphan:
                 self.log(
-                    "WARNING: %d regions for undefnied EntrezIDs\n" % (len(setOrphan))
+                    "WARNING: %d regions for undefnied EntrezIDs\n"
+                    % (len(setOrphan))  # noqa E501
                 )
             if setBadNC:
                 self.log(
@@ -373,22 +369,25 @@ class Source_entrez(loki_source.Source):
                 )
             if setBadVers:
                 self.log(
-                    "WARNING: %d genes mapped to GRCh build version other than %s\n"
+                    "WARNING: %d genes mapped to GRCh build version other than %s\n"  # noqa E501
                     % (len(setBadVers), grcBuild)
                 )
             if setBadChr:
                 self.log(
-                    "WARNING: %d genes on mismatching chromosome\n" % (len(setBadChr))
+                    "WARNING: %d genes on mismatching chromosome\n"
+                    % (len(setBadChr))  # noqa E501
                 )
             self.logPop()
             entrezChm = setOrphan = setBadNC = setBadBuild = setBadChr = setBadVers = (
                 buildGenes
-            ) = None
+            ) = None  # noqa E501  # noqa E501
 
             # store gene regions
             self.log("writing gene regions to the database ...\n")
             numRegions = len(buildRegions[grcBuild])
-            self.addBiopolymerLDProfileRegions(ldprofileID[""], buildRegions[grcBuild])
+            self.addBiopolymerLDProfileRegions(
+                ldprofileID[""], buildRegions[grcBuild]
+            )  # noqa E501
             self.log(
                 "writing gene regions to the database completed: %d regions\n"
                 % (numRegions)
@@ -406,17 +405,17 @@ class Source_entrez(loki_source.Source):
         header = histFile.__next__().rstrip()
         if not (
             header.startswith(
-                "#Format: tax_id GeneID Discontinued_GeneID Discontinued_Symbol"
-            )  # "Discontinue_Date (tab is used as a separator, pound sign - start of a comment)"
+                "#Format: tax_id GeneID Discontinued_GeneID Discontinued_Symbol"  # noqa E501
+            )  # "Discontinue_Date (tab is used as a separator, pound sign - start of a comment)"  # noqa E501
             or header.startswith(
                 "#tax_id	GeneID	Discontinued_GeneID	Discontinued_Symbol"
-            )  # 	"Discontinue_Date"
+            )  # "Discontinue_Date"
         ):
             self.log(" ERROR: unrecognized file header\n")
             self.log("%s\n" % header)
         else:
             for line in histFile:
-                # quickly filter out all non-9606 (human) taxonomies before taking the time to split()
+                # quickly filter out all non-9606 (human) taxonomies before taking the time to split()  # noqa E501
                 if line.startswith("9606\t"):
                     words = line.split("\t")
                     entrezID = int(words[1]) if words[1] != "-" else None
@@ -426,20 +425,24 @@ class Source_entrez(loki_source.Source):
                     if entrezID and entrezID in entrezBID:
                         if oldEntrez and oldEntrez != entrezID:
                             entrezUpdate[oldEntrez] = entrezID
-                            nsNames["entrez_gid"].add((entrezBID[entrezID], oldEntrez))
+                            nsNames["entrez_gid"].add(
+                                (entrezBID[entrezID], oldEntrez)
+                            )  # noqa E501
                         if oldName and (
                             oldName not in primaryEntrez
-                            or primaryEntrez[oldName] == False
+                            or primaryEntrez[oldName] is False
                         ):
                             if oldName not in historyEntrez:
                                 historyEntrez[oldName] = entrezID
                             elif historyEntrez[oldName] != entrezID:
                                 historyEntrez[oldName] = False
-                            nsNames["symbol"].add((entrezBID[entrezID], oldName))
+                            nsNames["symbol"].add(
+                                (entrezBID[entrezID], oldName)
+                            )  # noqa E501
                 # if taxonomy is 9606 (human)
             # foreach line in histFile
 
-            # delete any symbol alias which is also the historical name of exactly one other gene
+            # delete any symbol alias which is also the historical name of exactly one other gene  # noqa E501
             if options.get("favor-hist", "yes") == "yes":
                 dupe = set()
                 for alias in nsNames["symbol"]:
@@ -447,8 +450,8 @@ class Source_entrez(loki_source.Source):
                     symbol = alias[1]
                     if (
                         (symbol in historyEntrez)
-                        and (historyEntrez[symbol] != False)
-                        and (historyEntrez[symbol] != entrezID)
+                        and (historyEntrez[symbol] is not False)
+                        and (historyEntrez[symbol] is not entrezID)
                     ):
                         dupe.add(alias)
                 nsNames["symbol"] -= dupe
@@ -466,21 +469,23 @@ class Source_entrez(loki_source.Source):
 
         # process ensembl gene names
         self.log("processing ensembl gene names ...\n")
-        ensFile = self.zfile(path + "/gene2ensembl.gz")  # TODO:context manager,iterator
+        ensFile = self.zfile(
+            path + "/gene2ensembl.gz"
+        )  # TODO:context manager,iterator  # noqa E501
         header = ensFile.__next__().rstrip()
         if not (
             header.startswith(
-                "#Format: tax_id GeneID Ensembl_gene_identifier RNA_nucleotide_accession.version Ensembl_rna_identifier protein_accession.version Ensembl_protein_identifier"
-            )  # "(tab is used as a separator, pound sign - start of a comment)"
+                "#Format: tax_id GeneID Ensembl_gene_identifier RNA_nucleotide_accession.version Ensembl_rna_identifier protein_accession.version Ensembl_protein_identifier"  # noqa E501
+            )  # "(tab is used as a separator, pound sign - start of a comment)"  # noqa E501
             or header.startswith(
-                "#tax_id	GeneID	Ensembl_gene_identifier	RNA_nucleotide_accession.version	Ensembl_rna_identifier	protein_accession.version	Ensembl_protein_identifier"
+                "#tax_id	GeneID	Ensembl_gene_identifier	RNA_nucleotide_accession.version	Ensembl_rna_identifier	protein_accession.version	Ensembl_protein_identifier"  # noqa E501
             )
         ):
             self.log(" ERROR: unrecognized file header\n")
             self.log("%s\n" % header)
         else:
             for line in ensFile:
-                # quickly filter out all non-9606 (human) taxonomies before taking the time to split()
+                # quickly filter out all non-9606 (human) taxonomies before taking the time to split()  # noqa E501
                 if line.startswith("9606\t"):
                     words = line.split("\t")
                     entrezID = int(words[1])
@@ -524,7 +529,7 @@ class Source_entrez(loki_source.Source):
             if not (
                 header.startswith(
                     "#Format: GeneID UniGene_cluster"
-                )  # "(tab is used as a separator, pound sign - start of a comment)"
+                )  # "(tab is used as a separator, pound sign - start of a comment)"  # noqa E501
                 or header.startswith("#GeneID	UniGene_cluster")
             ):
                 self.log(" ERROR: unrecognized file header\n")
@@ -538,9 +543,11 @@ class Source_entrez(loki_source.Source):
                     while entrezID and (entrezID in entrezUpdate):
                         entrezID = entrezUpdate[entrezID]
 
-                    # there will be lots of extraneous mappings for genes of other species
+                    # there will be lots of extraneous mappings for genes of other species  # noqa E501
                     if entrezID and (entrezID in entrezBID) and unigeneID:
-                        nsNames["unigene_gid"].add((entrezBID[entrezID], unigeneID))
+                        nsNames["unigene_gid"].add(
+                            (entrezBID[entrezID], unigeneID)
+                        )  # noqa E501
                 # foreach line in ugFile
 
                 # print stats
@@ -562,8 +569,8 @@ class Source_entrez(loki_source.Source):
             header = upFile.__next__().rstrip()
             if not (
                 header.startswith(
-                    "#Format: NCBI_protein_accession UniProtKB_protein_accession"
-                )  # "(tab is used as a separator, pound sign - start of a comment)"
+                    "#Format: NCBI_protein_accession UniProtKB_protein_accession"  # noqa E501
+                )  # "(tab is used as a separator, pound sign - start of a comment)"  # noqa E501
                 or header.startswith(
                     "#NCBI_protein_accession	UniProtKB_protein_accession"
                 )
@@ -573,13 +580,21 @@ class Source_entrez(loki_source.Source):
             else:
                 for line in upFile:
                     words = line.split("\t")
-                    proteinAcc = words[0].rsplit(".", 1)[0] if words[0] != "-" else None
+                    proteinAcc = (
+                        words[0].rsplit(".", 1)[0] if words[0] != "-" else None
+                    )  # noqa E501
                     uniprotAcc = words[1] if words[1] != "-" else None
 
-                    # there will be tons of identifiers missing from refseqBIDs because they're non-human
-                    if proteinAcc and (proteinAcc in refseqBIDs) and uniprotAcc:
+                    # there will be tons of identifiers missing from refseqBIDs because they're non-human  # noqa E501
+                    if (
+                        proteinAcc
+                        and (proteinAcc in refseqBIDs)
+                        and uniprotAcc  # noqa E501
+                    ):  # noqa E501
                         for biopolymerID in refseqBIDs[proteinAcc]:
-                            nsNames["uniprot_pid"].add((biopolymerID, uniprotAcc))
+                            nsNames["uniprot_pid"].add(
+                                (biopolymerID, uniprotAcc)
+                            )  # noqa E501
                 # foreach line in upFile
 
                 # print stats
@@ -596,7 +611,7 @@ class Source_entrez(loki_source.Source):
             upFile = self.zfile(
                 path + "/HUMAN_9606_idmapping_selected.tab.gz"
             )  # TODO:context manager,iterator
-            """ /* ftp.uniprot.org/pub/databases/uniprot/current_release/knowledgebase/idmapping/README */
+            """ /* ftp.uniprot.org/pub/databases/uniprot/current_release/knowledgebase/idmapping/README */  # noqa E501
 1. UniProtKB-AC
 2. UniProtKB-ID
 3. GeneID (EntrezGene)
@@ -639,19 +654,37 @@ class Source_entrez(loki_source.Source):
                 # foreach entrezID mapping
                 if not found:
                     for word3 in words[3].split(";"):
-                        refseqID = word3.strip().split(".", 1)[0] if word3 else None
+                        refseqID = (
+                            word3.strip().split(".", 1)[0] if word3 else None
+                        )  # noqa E501
                         if refseqID:
                             nsNameNames["uniprot_pid"].add(
-                                (namespaceID["refseq_pid"], refseqID, uniprotAcc)
+                                (
+                                    namespaceID["refseq_pid"],
+                                    refseqID,
+                                    uniprotAcc,
+                                )  # noqa E501
                             )
                             nsNameNames["uniprot_pid"].add(
-                                (namespaceID["refseq_gid"], refseqID, uniprotAcc)
+                                (
+                                    namespaceID["refseq_gid"],
+                                    refseqID,
+                                    uniprotAcc,
+                                )  # noqa E501
                             )
                             nsNameNames["uniprot_gid"].add(
-                                (namespaceID["refseq_pid"], refseqID, uniprotID)
+                                (
+                                    namespaceID["refseq_pid"],
+                                    refseqID,
+                                    uniprotID,
+                                )  # noqa E501
                             )
                             nsNameNames["uniprot_gid"].add(
-                                (namespaceID["refseq_gid"], refseqID, uniprotID)
+                                (
+                                    namespaceID["refseq_gid"],
+                                    refseqID,
+                                    uniprotID,
+                                )  # noqa E501
                             )
                     # foreach refseq mapping
                     for word14 in words[14].split(";"):
@@ -668,40 +701,72 @@ class Source_entrez(loki_source.Source):
                         unigeneID = word15.strip() if word15 else None
                         if unigeneID:
                             nsNameNames["uniprot_pid"].add(
-                                (namespaceID["unigene_gid"], unigeneID, uniprotAcc)
+                                (
+                                    namespaceID["unigene_gid"],
+                                    unigeneID,
+                                    uniprotAcc,
+                                )  # noqa E501
                             )
                             nsNameNames["uniprot_gid"].add(
-                                (namespaceID["unigene_gid"], unigeneID, uniprotID)
+                                (
+                                    namespaceID["unigene_gid"],
+                                    unigeneID,
+                                    uniprotID,
+                                )  # noqa E501
                             )
                     # foreach mim mapping
                     for word19 in words[19].split(";"):
                         ensemblGID = word19.strip() if word19 else None
                         if ensemblGID:
                             nsNameNames["uniprot_pid"].add(
-                                (namespaceID["ensembl_gid"], ensemblGID, uniprotAcc)
+                                (
+                                    namespaceID["ensembl_gid"],
+                                    ensemblGID,
+                                    uniprotAcc,
+                                )  # noqa E501
                             )
                             nsNameNames["uniprot_gid"].add(
-                                (namespaceID["ensembl_gid"], ensemblGID, uniprotID)
+                                (
+                                    namespaceID["ensembl_gid"],
+                                    ensemblGID,
+                                    uniprotID,
+                                )  # noqa E501
                             )
                     # foreach ensG mapping
                     for word20 in words[20].split(";"):
                         ensemblTID = word20.strip() if word20 else None
                         if ensemblTID:
                             nsNameNames["uniprot_pid"].add(
-                                (namespaceID["ensembl_gid"], ensemblTID, uniprotAcc)
+                                (
+                                    namespaceID["ensembl_gid"],
+                                    ensemblTID,
+                                    uniprotAcc,
+                                )  # noqa E501
                             )
                             nsNameNames["uniprot_gid"].add(
-                                (namespaceID["ensembl_gid"], ensemblTID, uniprotID)
+                                (
+                                    namespaceID["ensembl_gid"],
+                                    ensemblTID,
+                                    uniprotID,
+                                )  # noqa E501
                             )
                     # foreach ensT mapping
                     for word21 in words[21].split(";"):
                         ensemblPID = word21.strip() if word21 else None
                         if ensemblPID:
                             nsNameNames["uniprot_pid"].add(
-                                (namespaceID["ensembl_pid"], ensemblPID, uniprotAcc)
+                                (
+                                    namespaceID["ensembl_pid"],
+                                    ensemblPID,
+                                    uniprotAcc,
+                                )  # noqa E501
                             )
                             nsNameNames["uniprot_gid"].add(
-                                (namespaceID["ensembl_pid"], ensemblPID, uniprotID)
+                                (
+                                    namespaceID["ensembl_pid"],
+                                    ensemblPID,
+                                    uniprotID,
+                                )  # noqa E501
                             )
                     # foreach ensP mapping
                 # if no entrezID match
@@ -717,7 +782,7 @@ class Source_entrez(loki_source.Source):
             numNameRefs0 = numNameRefs
             numNameRefs = sum(len(nsNameNames[ns]) for ns in nsNameNames)
             self.log(
-                "processing uniprot gene names completed: %d identifiers (%d references)\n"
+                "processing uniprot gene names completed: %d identifiers (%d references)\n"  # noqa E501
                 % (
                     numNames - numNames0 + numNameNames - numNameNames0,
                     numNameRefs - numNameRefs0,
@@ -726,29 +791,28 @@ class Source_entrez(loki_source.Source):
         # switch uniprot source
 
         # store gene names
-        self.log("writing gene identifiers to the database ...\n")
+        self.log("writing gene identifiers to the database ...\n")  # noqa E501
         numNames = 0
         for ns in nsNames:
             if nsNames[ns]:
                 numNames += len(nsNames[ns])
                 self.addBiopolymerNamespacedNames(namespaceID[ns], nsNames[ns])
         self.log(
-            "writing gene identifiers to the database completed: %d identifiers\n"
+            "writing gene identifiers to the database completed: %d identifiers\n"  # noqa E501
             % (numNames,)
         )
         nsNames = None
 
         # store gene names
         numNameNames = sum(len(nsNameNames[ns]) for ns in nsNameNames)
-        if numNameNames:
-            self.log("writing gene identifier references to the database ...\n")
+        if numNameNames:  # noqa E501
             for ns in nsNameNames:
                 if nsNameNames[ns]:
                     self.addBiopolymerTypedNameNamespacedNames(
                         typeID["gene"], namespaceID[ns], nsNameNames[ns]
                     )
             self.log(
-                "writing gene identifier references to the database completed: %d references\n"
+                "writing gene identifier references to the database completed: %d references\n"  # noqa E501
                 % (numNameNames,)
             )
             nsNameNames = None

@@ -1,9 +1,7 @@
-#!/usr/bin/env python
-
 import datetime
 import os
 import re
-from loki import loki_source
+from loki_modules import loki_source
 
 
 class Source_mint(loki_source.Source):
@@ -21,15 +19,15 @@ class Source_mint(loki_source.Source):
             match = reFile.match(filename)
             if match:
                 filedate = datetime.date(
-                    int(match.group(1)), int(match.group(2)), int(match.group(3))
+                    int(match.group(1)),
+                    int(match.group(2)),
+                    int(match.group(3)),  # noqa E501
                 )
                 if filedate > bestdate:
                     bestdate = filedate
                     bestfile = filename
         # foreach filename
         return bestfile
-
-    # _identifyLatestFilename()
 
     ##################################################
     # source interface
@@ -38,23 +36,16 @@ class Source_mint(loki_source.Source):
     def getVersionString(cls):
         return "2.2 (2018-02-20)"
 
-    # getVersionString()
-
     def download(self, options, path):
-        # self.downloadFilesFromHTTP('mint.bio.uniroma2.it', {
-        # 	'MINT_MiTab.txt': '/mitab/MINT_MiTab.txt',
-        # })
         self.downloadFilesFromHTTP(
             "www.ebi.ac.uk",
             {
                 path
-                + "/MINT_MiTab.txt": "/Tools/webservices/psicquic/mint/webservices/current/search/query/species:human",
+                + "/MINT_MiTab.txt": "/Tools/webservices/psicquic/mint/webservices/current/search/query/species:human",  # noqa E501
             },
         )
 
         return [path + "/MINT_MiTab.txt"]
-
-    # download()
 
     def update(self, options, path):
         # clear out all old data from this source
@@ -102,9 +93,9 @@ class Source_mint(loki_source.Source):
         numAssoc = numID = 0
         if os.path.exists(path + "/MINT_MiTab.txt"):
             with open(path + "/MINT_MiTab.txt", "r") as assocFile:
-                l = 0
+                lx = 0
                 for line in assocFile:
-                    l += 1
+                    lx += 1
                     words = line.split("\t")
 
                     # skip non-human records
@@ -115,8 +106,12 @@ class Source_mint(loki_source.Source):
                         continue
 
                     # extract relevant columns
-                    geneA = [w.strip() for w in words[0].split("|") if w != "-"]  # id A
-                    geneB = [w.strip() for w in words[1].split("|") if w != "-"]  # id B
+                    geneA = [
+                        w.strip() for w in words[0].split("|") if w != "-"
+                    ]  # id A  # noqa E501
+                    geneB = [
+                        w.strip() for w in words[1].split("|") if w != "-"
+                    ]  # id B  # noqa E501
                     geneA.extend(
                         w.strip() for w in words[2].split("|") if w != "-"
                     )  # alt id A
@@ -148,7 +143,7 @@ class Source_mint(loki_source.Source):
                     mintID = (
                         labels.get("mint")
                         or labels.get("intact")
-                        or ("MINT-unlabeled-%d" % (l,))
+                        or ("MINT-unlabeled-%d" % (lx,))
                     )
                     mintDesc[mintID] = ""
 
@@ -166,19 +161,27 @@ class Source_mint(loki_source.Source):
                                 name = name.split('"')[1]
 
                             if prefix == "entrezgene/locuslink":
-                                nsAssoc["entrez_gid"].add((mintID, numAssoc, name))
+                                nsAssoc["entrez_gid"].add(
+                                    (mintID, numAssoc, name)
+                                )  # noqa E501
                             elif prefix == "ensembl":
                                 namespace = (
                                     "ensembl_pid"
                                     if name.startswith("ENSP")
                                     else "ensembl_gid"
                                 )
-                                nsAssoc[namespace].add((mintID, numAssoc, name))
+                                nsAssoc[namespace].add(
+                                    (mintID, numAssoc, name)
+                                )  # noqa E501
                             elif prefix == "refseq":
                                 name = name.rsplit(".", 1)[0]
                                 name = name.rsplit(",", 1)[0]
-                                nsAssoc["refseq_gid"].add((mintID, numAssoc, name))
-                                nsAssoc["refseq_pid"].add((mintID, numAssoc, name))
+                                nsAssoc["refseq_gid"].add(
+                                    (mintID, numAssoc, name)
+                                )  # noqa E501
+                                nsAssoc["refseq_pid"].add(
+                                    (mintID, numAssoc, name)
+                                )  # noqa E501
                             elif prefix == "uniprotkb":
                                 if (suffix == "(gene name)") or (
                                     suffix == "(gene name synonym)"
@@ -187,7 +190,9 @@ class Source_mint(loki_source.Source):
                                 else:
                                     namespace = "uniprot_pid"
                                     name = name.rsplit("-", 1)[0]
-                                nsAssoc[namespace].add((mintID, numAssoc, name))
+                                nsAssoc[namespace].add(
+                                    (mintID, numAssoc, name)
+                                )  # noqa E501
                             else:
                                 numID -= 1
                             # if prefix/suffix
@@ -196,11 +201,13 @@ class Source_mint(loki_source.Source):
                 # foreach line in assocFile
             # with assocFile
         else:  # old FTP file
-            with open(self._identifyLatestFilename(os.listdir(path)), "r") as assocFile:
+            with open(
+                self._identifyLatestFilename(os.listdir(path)), "r"
+            ) as assocFile:  # noqa E501
                 header = assocFile.next().rstrip()
                 if not header.startswith(
-                    "ID interactors A (baits)\tID interactors B (preys)\tAlt. ID interactors A (baits)\tAlt. ID interactors B (preys)\tAlias(es) interactors A (baits)\tAlias(es) interactors B (preys)\tInteraction detection method(s)\tPublication 1st author(s)\tPublication Identifier(s)\tTaxid interactors A (baits)\tTaxid interactors B (preys)\tInteraction type(s)\tSource database(s)\tInteraction identifier(s)\t"
-                ):  # Confidence value(s)\texpansion\tbiological roles A (baits)\tbiological role B\texperimental roles A (baits)\texperimental roles B (preys)\tinteractor types A (baits)\tinteractor types B (preys)\txrefs A (baits)\txrefs B (preys)\txrefs Interaction\tAnnotations A (baits)\tAnnotations B (preys)\tInteraction Annotations\tHost organism taxid\tparameters Interaction\tdataset\tCaution Interaction\tbinding sites A (baits)\tbinding sites B (preys)\tptms A (baits)\tptms B (preys)\tmutations A (baits)\tmutations B (preys)\tnegative\tinference\tcuration depth":
+                    "ID interactors A (baits)\tID interactors B (preys)\tAlt. ID interactors A (baits)\tAlt. ID interactors B (preys)\tAlias(es) interactors A (baits)\tAlias(es) interactors B (preys)\tInteraction detection method(s)\tPublication 1st author(s)\tPublication Identifier(s)\tTaxid interactors A (baits)\tTaxid interactors B (preys)\tInteraction type(s)\tSource database(s)\tInteraction identifier(s)\t"  # noqa E501
+                ):  # Confidence value(s)\texpansion\tbiological roles A (baits)\tbiological role B\texperimental roles A (baits)\texperimental roles B (preys)\tinteractor types A (baits)\tinteractor types B (preys)\txrefs A (baits)\txrefs B (preys)\txrefs Interaction\tAnnotations A (baits)\tAnnotations B (preys)\tInteraction Annotations\tHost organism taxid\tparameters Interaction\tdataset\tCaution Interaction\tbinding sites A (baits)\tbinding sites B (preys)\tptms A (baits)\tptms B (preys)\tmutations A (baits)\tmutations B (preys)\tnegative\tinference\tcuration depth":  # noqa E501
                     self.log(" ERROR\n")
                     self.log("unrecognized file header: %s\n" % header)
                     return False
@@ -209,9 +216,9 @@ class Source_mint(loki_source.Source):
                     "refseq": ("refseq_gid", "refseq_pid"),
                     "uniprotkb": ("uniprot_pid",),
                 }
-                l = 0
+                lx = 0
                 for line in assocFile:
-                    l += 1
+                    lx += 1
                     words = line.split("\t")
                     genes = words[0].split(";")
                     genes.extend(words[1].split(";"))
@@ -228,14 +235,15 @@ class Source_mint(loki_source.Source):
                         if label.startswith("mint:"):
                             mint = label
                             break
-                    mint = mint or "MINT-unlabeled-%d" % l
+                    mint = mint or "MINT-unlabeled-%d" % lx
                     mintDesc[mint] = method
 
                     # identify interacting genes/proteins
                     for n in range(0, len(taxes)):
                         if taxes[n] == "taxid:9606(Homo sapiens)":
                             numAssoc += 1
-                            # the "gene" is a helpful database cross-reference with a label indicating its type
+                            # the "gene" is a helpful database cross-reference
+                            # with a label indicating its type
                             xrefDB, xrefID = genes[n].split(":", 1)
                             if xrefDB in xrefNS:
                                 numID += 1
@@ -245,9 +253,10 @@ class Source_mint(loki_source.Source):
                                     xrefID = xrefID.rsplit("-", 1)[0]
                                 for ns in xrefNS[xrefDB]:
                                     nsAssoc[ns].add((mint, numAssoc, xrefID))
-                            # but the "alias" could be of any type and isn't identified,
-                            # so we'll store copies under each possible type
-                            # and find out later which one matches something
+                            # but the "alias" could be of any type and isn't
+                            # identified, so we'll store copies under each
+                            # possible type and find out later which one
+                            # matches something
                             numID += 1
                             nsAssoc["symbol"].add((mint, numAssoc, aliases[n]))
                             nsAssoc["refseq_gid"].add(
@@ -265,7 +274,7 @@ class Source_mint(loki_source.Source):
             # with assocFile
         # if new/old file
         self.log(
-            "processing interaction groups completed: %d groups, %d associations (%d identifiers)\n"
+            "processing interaction groups completed: %d groups, %d associations (%d identifiers)\n"  # noqa E501
             % (len(mintDesc), numAssoc, numID)
         )
 
@@ -282,7 +291,8 @@ class Source_mint(loki_source.Source):
         # store interaction group names
         self.log("writing interaction group names to the database ...\n")
         self.addGroupNamespacedNames(
-            namespaceID["mint_id"], ((mintGID[mint], mint) for mint in listMint)
+            namespaceID["mint_id"],
+            ((mintGID[mint], mint) for mint in listMint),  # noqa E501
         )
         self.log("writing interaction group names to the database completed\n")
 
@@ -295,8 +305,3 @@ class Source_mint(loki_source.Source):
                 ((mintGID[a[0]], a[1], a[2]) for a in nsAssoc[ns]),
             )
         self.log("writing gene interactions to the database completed\n")
-
-    # update()
-
-
-# Source_mint

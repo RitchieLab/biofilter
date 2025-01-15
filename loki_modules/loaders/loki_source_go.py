@@ -1,8 +1,6 @@
-#!/usr/bin/env python
-
 import os
 import re
-from loki import loki_source
+from loki_modules import loki_source
 
 
 class Source_go(loki_source.Source):
@@ -24,8 +22,6 @@ class Source_go(loki_source.Source):
         )
 
         return [path + "/goa_human.gaf.gz", path + "/go.obo"]
-
-    # download()
 
     def update(self, options, path):
         # clear out all old data from this source
@@ -61,10 +57,10 @@ class Source_go(loki_source.Source):
 
         # process ontology terms
         self.log("processing ontology terms ...\n")
-        # file format specification: http://www.geneontology.org/GO.format.obo-1_2.shtml
-        # correctly handling all the possible escape sequences and special cases
+        # file format: http://www.geneontology.org/GO.format.obo-1_2.shtml
+        # correctly handling all the possible escape seq and special cases
         # in the OBO spec would be somewhat involved, but the previous version
-        # of biofilter used a much simpler approach which seemed to work okay in
+        # of biofilter used a much simpler approach which seemed to work ok in
         # practice, so we'll stick with that for now
         reTrailingEscape = re.compile("(?:^|[^\\\\])(?:\\\\\\\\)*\\\\$")
         empty = tuple()
@@ -73,8 +69,8 @@ class Source_go(loki_source.Source):
         goLinks = {}
         # goNS = {}
         # oboProps = {}
-        curStanza = curID = curAnon = curObs = curName = curNS = curDef = curLinks = (
-            None
+        curStanza = curID = curAnon = curObs = curName = curDef = curLinks = (
+            None  # noqa E501
         )
         with open(path + "/go.obo", "r") as oboFile:
             while True:
@@ -86,7 +82,7 @@ class Source_go(loki_source.Source):
                 except StopIteration:
                     line = False
 
-                if line == False or tag.startswith("["):
+                if line is False or tag.startswith("["):
                     if (
                         (curStanza == "Term")
                         and curID
@@ -96,18 +92,12 @@ class Source_go(loki_source.Source):
                         goName[curID] = curName
                         goDef[curID] = curDef
                         goLinks[curID] = curLinks or empty
-                    # 		goNS[curID] = curNS or (oboProps['default-namespace'][-1] if ('default-namespace' in oboProps) else None)
-                    if line == False:
+                    if line is False:
                         break
-                    curStanza = tag[1 : tag.index("]")]
-                    curID = curAnon = curObs = curName = curNS = curDef = curLinks = (
-                        None
+                    curStanza = tag[1 : tag.index("]")]  # noqa E203
+                    curID = curAnon = curObs = curName = curDef = curLinks = (
+                        None  # noqa E501
                     )
-                # elif not curStanza:
-                # 	# before the first stanza, tag-value pairs are global file properties
-                # 	if tag not in oboProps:
-                # 		oboProps[tag] = []
-                # 	oboProps[tag].append(val)
                 elif tag == "id":
                     curID = val
                 elif tag == "alt_id":
@@ -142,7 +132,9 @@ class Source_go(loki_source.Source):
                     curLinks = curLinks or set()
                     words = val.split()
                     if words[0] not in relationshipID:
-                        relationshipID[words[0]] = self.addRelationship(words[0])
+                        relationshipID[words[0]] = self.addRelationship(
+                            words[0]
+                        )  # noqa E501
                     if words[0] == "part_of":
                         contains = -1
                     elif words[0] in (
@@ -153,7 +145,9 @@ class Source_go(loki_source.Source):
                         contains = 0
                     else:
                         contains = None
-                    curLinks.add((words[1], relationshipID[words[0]], contains))
+                    curLinks.add(
+                        (words[1], relationshipID[words[0]], contains)
+                    )  # noqa E501
             # foreach line
         # with oboFile
         numTerms = len(goName)
@@ -179,7 +173,8 @@ class Source_go(loki_source.Source):
             namespaceID["go_id"], ((goGID[goID], goID) for goID in listGoID)
         )
         self.addGroupNamespacedNames(
-            namespaceID["ontology"], ((goGID[goID], goName[goID]) for goID in listGoID)
+            namespaceID["ontology"],
+            ((goGID[goID], goName[goID]) for goID in listGoID),  # noqa E501
         )
         self.log("writing ontology term names to the database completed\n")
 
@@ -189,9 +184,13 @@ class Source_go(loki_source.Source):
         for goID in goLinks:
             for link in goLinks[goID] or empty:
                 if link[0] in goGID:
-                    listLinks.append((goGID[goID], goGID[link[0]], link[1], link[2]))
+                    listLinks.append(
+                        (goGID[goID], goGID[link[0]], link[1], link[2])
+                    )  # noqa E501
         self.addGroupRelationships(listLinks)
-        self.log("writing ontology term relationships to the database completed\n")
+        self.log(
+            "writing ontology term relationships to the database completed\n"
+        )  # noqa E501
 
         # process gene associations
         self.log("processing gene associations ...\n")
@@ -242,13 +241,14 @@ class Source_go(loki_source.Source):
                 nsAssoc["symbol"].add((goGID[goID], numAssoc, gene))
                 for alias in aliases:
                     numID += 1
-                    # aliases might be either symbols or uniprot identifiers, so try them both ways
+                    # aliases might be either symbols or uniprot identifiers,
+                    # so try them both ways
                     nsAssoc["uniprot_pid"].add((goGID[goID], numAssoc, alias))
                     nsAssoc["symbol"].add((goGID[goID], numAssoc, alias))
             # if association is ok
         # foreach association
         self.log(
-            "processing gene associations completed: %d associations (%d identifiers)\n"
+            "processing gene associations completed: %d associations (%d identifiers)\n"  # noqa E501
             % (numAssoc, numID)
         )
 
@@ -259,8 +259,3 @@ class Source_go(loki_source.Source):
                 typeID["gene"], namespaceID[ns], nsAssoc[ns]
             )
         self.log("writing gene associations to the database completed\n")
-
-    # update()
-
-
-# Source_go

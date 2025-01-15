@@ -43,6 +43,23 @@
                 "--ucsc-build-version", "19"
             ],
             "console": "integratedTerminal"
+        },
+        {
+            "name": "LOKI-BUILD",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/loki_modules/loki-build.py",
+            "args": [
+                "--knowledge", "/Users/andrerico/Works/Sys/biofilter/loki_modules/loki.db",
+                "--update",
+                "--temp-directory", "/Users/andrerico/Works/Sys/biofilter/downloads",
+                // "--cache-only",
+                // "--list-sources", "biogrid",
+                // "--update-except", "entrez", "dbsnp", "pfam", "oreganno", "go", "mint", "pharmgkb", "ucsc_ecr", "gwas", "chainfiles", "reactome",
+                // "--update-except", "biogrid", "dbsnp", "pfam", "oreganno", "go", "mint", "pharmgkb", "ucsc_ecr", "gwas", "chainfiles", "reactome",
+                "--update-except", "biogrid", "entrez", "pfam", "oreganno", "go", "mint", "pharmgkb", "ucsc_ecr", "gwas", "chainfiles", "reactome",
+            ],
+            "console": "integratedTerminal"
         }
     ]
 }

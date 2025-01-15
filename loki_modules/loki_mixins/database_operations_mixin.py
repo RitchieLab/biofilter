@@ -1,5 +1,6 @@
 # database_operations_mixin.py
 
+
 class DatabaseOperationsMixin:
     """
     Mixin for data manipulation operations (CRUD).
@@ -10,20 +11,22 @@ class DatabaseOperationsMixin:
         Retrieves a specific setting value from the database.
 
         Args:
-                setting (str): The name of the setting to retrieve.
-                type (type, optional): The type to cast the setting value to. Defaults to None.
+            setting (str): The name of the setting to retrieve.
+            type (type, optional): The type to cast the setting value to.
+            Defaults to None.
 
         Returns:
-                The setting value, cast to the specified type if provided.
+            The setting value, cast to the specified type if provided.
         """
         value = None
         if self._dbFile:
             for row in self._db.cursor().execute(
-                "SELECT value FROM `db`.`setting` WHERE setting = ?", (setting,)
+                "SELECT value FROM `db`.`setting` WHERE setting = ?",
+                (setting,),  # noqa E501
             ):
                 value = row[0]
         if type:
-            value = type(value) if (value != None) else type()
+            value = type(value) if (value is not None) else type()
         return value
 
     # getDatabaseSetting()
@@ -33,14 +36,14 @@ class DatabaseOperationsMixin:
         Sets a specific setting value in the database.
 
         Args:
-                setting (str): The name of the setting to set.
-                value: The value to set for the specified setting.
+            setting (str): The name of the setting to set.
+            value: The value to set for the specified setting.
 
         Returns:
-                None
+            None
         """
         self._db.cursor().execute(
-            "INSERT OR REPLACE INTO `db`.`setting` (setting, value) VALUES (?, ?)",
+            "INSERT OR REPLACE INTO `db`.`setting` (setting, value) VALUES (?, ?)",  # noqa E501
             (setting, value),
         )
 
@@ -50,10 +53,11 @@ class DatabaseOperationsMixin:
         """
         Retrieves the source modules available for updating the database.
 
-        If the updater is not already initialized, it imports and initializes the updater module.
+        If the updater is not already initialized, it imports and initializes
+        the updater module.
 
         Returns:
-                list: A list of available source modules.
+            list: A list of available source modules.
         """
         if not self._updater:
             import loki_modules.loki_updater as loki_updater
@@ -67,13 +71,16 @@ class DatabaseOperationsMixin:
         """
         Retrieves the versions of the specified source modules.
 
-        If the updater is not already initialized, it imports and initializes the updater module.
+        If the updater is not already initialized, it imports and initializes
+        the updater module.
 
         Args:
-                sources (list, optional): A list of source modules to get versions for. Defaults to None, which retrieves versions for all modules.
+            sources (list, optional): A list of source modules to get
+            versions for. Defaults to None, which retrieves versions for all
+            modules.
 
         Returns:
-                dict: A dictionary mapping source modules to their versions.
+            dict: A dictionary mapping source modules to their versions.
         """
         if not self._updater:
             import loki_modules.loki_updater as loki_updater
@@ -87,13 +94,15 @@ class DatabaseOperationsMixin:
         """
         Retrieves the options for the specified source modules.
 
-        If the updater is not already initialized, it imports and initializes the updater module.
+        If the updater is not already initialized, it imports and initializes
+        the updater module.
 
         Args:
-                sources (list, optional): A list of source modules to get options for. Defaults to None, which retrieves options for all modules.
+            sources (list, optional): A list of source modules to get options
+            for. Defaults to None, which retrieves options for all modules.
 
         Returns:
-                dict: A dictionary mapping source modules to their options.
+            dict: A dictionary mapping source modules to their options.
         """
         if not self._updater:
             import loki_modules.loki_updater as loki_updater
@@ -104,24 +113,33 @@ class DatabaseOperationsMixin:
     # getSourceModuleOptions()
 
     def updateDatabase(
-        self, sources=None, sourceOptions=None, cacheOnly=False, forceUpdate=False
+        self,
+        sources=None,
+        sourceOptions=None,
+        cacheOnly=False,
+        forceUpdate=False,  # noqa E501
     ):
         """
         Updates the database using the specified source modules and options.
 
-        If the updater is not already initialized, it imports and initializes the updater module.
+        If the updater is not already initialized, it imports and initializes
+        the updater module.
 
         Args:
-                sources (list, optional): A list of source modules to update from. Defaults to None, which updates from all sources.
-                sourceOptions (dict, optional): A dictionary of options for the source modules. Defaults to None.
-                cacheOnly (bool, optional): If True, only updates the cache. Defaults to False.
-                forceUpdate (bool, optional): If True, forces the update even if not necessary. Defaults to False.
+            - sources (list, optional): A list of source modules to update
+            from. Defaults to None, which updates from all sources.
+            - sourceOptions (dict, optional): A dictionary of options for the
+            source modules. Defaults to None.
+            - cacheOnly (bool, optional): If True, only updates the cache.
+            Defaults to False.
+            - forceUpdate (bool, optional): If True, forces the update even if
+            not necessary. Defaults to False.
 
         Returns:
-                Any: The result of the update operation.
+            Any: The result of the update operation.
 
         Raises:
-                Exception: If the database is finalized and cannot be updated.
+            Exception: If the database is finalized and cannot be updated.
         """
         if self.getDatabaseSetting("finalized", int):
             raise Exception("ERROR: cannot update a finalized database")
@@ -142,13 +160,13 @@ class DatabaseOperationsMixin:
         If the database is finalized, it raises an exception.
 
         Args:
-                table (str): The name of the table to prepare for update.
+            table (str): The name of the table to prepare for update.
 
         Returns:
-                Any: The result of the preparation.
+            Any: The result of the preparation.
 
         Raises:
-                Exception: If the database is finalized and cannot be updated.
+            Exception: If the database is finalized and cannot be updated.
         """
         if self.getDatabaseSetting("finalized", int):
             raise Exception("ERROR: cannot update a finalized database")
@@ -163,10 +181,11 @@ class DatabaseOperationsMixin:
         Prepares a table for query by the updater.
 
         Args:
-                table (str): The name of the table to prepare for query.
+            table (str): The name of the table to prepare for query.
 
         Returns:
-                Any: The result of the preparation, or None if no updater is available.
+            Any: The result of the preparation, or None if no updater is
+            available.
         """
         if self._updater:
             return self._updater.prepareTableForQuery(table)
@@ -182,10 +201,11 @@ class DatabaseOperationsMixin:
         Generates GRCh values based on a given UCSC chain identifier.
 
         Args:
-                ucschg (str): The UCSC chain identifier.
+            ucschg (str): The UCSC chain identifier.
 
         Returns:
-                generator: A generator yielding GRCh values corresponding to the given UCSC chain identifier.
+            generator: A generator yielding GRCh values corresponding to
+            the given UCSC chain identifier.
         """
         return (
             row[0]
@@ -201,10 +221,11 @@ class DatabaseOperationsMixin:
         Retrieves the UCSC chain identifier for a given GRCh value.
 
         Args:
-                grch (str): The GRCh value.
+            grch (str): The GRCh value.
 
         Returns:
-                str: The UCSC chain identifier corresponding to the given GRCh value, or None if not found.
+            str: The UCSC chain identifier corresponding to the given GRCh
+            value, or None if not found.
         """
         ucschg = None
         for row in self._db.cursor().execute(
@@ -220,10 +241,10 @@ class DatabaseOperationsMixin:
         Retrieves the identifier for a given LD profile.
 
         Args:
-                ldprofile (str): The LD profile name.
+            ldprofile (str): The LD profile name.
 
         Returns:
-                int: The identifier of the LD profile, or None if not found.
+            int: The identifier of the LD profile, or None if not found.
         """
         return self.getLDProfileIDs([ldprofile])[ldprofile]
 
@@ -234,14 +255,15 @@ class DatabaseOperationsMixin:
         Retrieves the identifiers for a list of LD profiles.
 
         Args:
-                ldprofiles (list): A list of LD profile names.
+            ldprofiles (list): A list of LD profile names.
 
         Returns:
-                dict: A dictionary mapping LD profile names to their identifiers.
+            dict: A dictionary mapping LD profile names to their
+            identifiers.
         """
         if not self._dbFile:
-            return {l: None for l in ldprofiles}
-        sql = "SELECT i.ldprofile, l.ldprofile_id FROM (SELECT ? AS ldprofile) AS i LEFT JOIN `db`.`ldprofile` AS l ON LOWER(TRIM(l.ldprofile)) = LOWER(TRIM(i.ldprofile))"
+            return {lc: None for lc in ldprofiles}
+        sql = "SELECT i.ldprofile, l.ldprofile_id FROM (SELECT ? AS ldprofile) AS i LEFT JOIN `db`.`ldprofile` AS l ON LOWER(TRIM(l.ldprofile)) = LOWER(TRIM(i.ldprofile))"  # noqa E501
         with self._db:
             ret = {
                 row[0]: row[1]
@@ -256,23 +278,29 @@ class DatabaseOperationsMixin:
         Retrieves detailed information about LD profiles.
 
         Args:
-                ldprofiles (list, optional): A list of LD profile names. Defaults to None, which retrieves information for all profiles.
+            ldprofiles (list, optional): A list of LD profile names.
+            Defaults to None, which retrieves information for all profiles.
 
         Returns:
-                dict: A dictionary mapping LD profile names to a tuple containing their identifier, description, metric, and value.
+            dict: A dictionary mapping LD profile names to a tuple
+            containing their identifier, description, metric, and value.
         """
         if not self._dbFile:
-            return {l: None for l in (ldprofiles or list())}
+            return {lc: None for lc in (ldprofiles or list())}
         with self._db:
             if ldprofiles:
-                sql = "SELECT i.ldprofile, l.ldprofile_id, l.description, l.metric, l.value FROM (SELECT ? AS ldprofile) AS i LEFT JOIN `db`.`ldprofile` AS l ON LOWER(TRIM(l.ldprofile)) = LOWER(TRIM(i.ldprofile))"
+                sql = "SELECT i.ldprofile, l.ldprofile_id, l.description, l.metric, l.value FROM (SELECT ? AS ldprofile) AS i LEFT JOIN `db`.`ldprofile` AS l ON LOWER(TRIM(l.ldprofile)) = LOWER(TRIM(i.ldprofile))"  # noqa E501
                 ret = {
                     row[0]: row[1:]
-                    for row in self._db.cursor().executemany(sql, zip(ldprofiles))
+                    for row in self._db.cursor().executemany(
+                        sql, zip(ldprofiles)
+                    )  # noqa E501
                 }
             else:
-                sql = "SELECT l.ldprofile, l.ldprofile_id, l.description, l.metric, l.value FROM `db`.`ldprofile` AS l"
-                ret = {row[0]: row[1:] for row in self._db.cursor().execute(sql)}
+                sql = "SELECT l.ldprofile, l.ldprofile_id, l.description, l.metric, l.value FROM `db`.`ldprofile` AS l"  # noqa E501
+                ret = {
+                    row[0]: row[1:] for row in self._db.cursor().execute(sql)
+                }  # noqa E501
         return ret
 
     # getLDProfiles()
@@ -282,10 +310,10 @@ class DatabaseOperationsMixin:
         Retrieves the identifier for a given namespace.
 
         Args:
-                namespace (str): The namespace name.
+            namespace (str): The namespace name.
 
         Returns:
-                int: The identifier of the namespace, or None if not found.
+            int: The identifier of the namespace, or None if not found.
         """
         return self.getNamespaceIDs([namespace])[namespace]
 
@@ -296,14 +324,14 @@ class DatabaseOperationsMixin:
         Retrieves the identifiers for a list of namespaces.
 
         Args:
-                namespaces (list): A list of namespace names.
+            namespaces (list): A list of namespace names.
 
         Returns:
-                dict: A dictionary mapping namespace names to their identifiers.
+            dict: A dictionary mapping namespace names to their identifiers.
         """
         if not self._dbFile:
             return {n: None for n in namespaces}
-        sql = "SELECT i.namespace, n.namespace_id FROM (SELECT ? AS namespace) AS i LEFT JOIN `db`.`namespace` AS n ON n.namespace = LOWER(i.namespace)"
+        sql = "SELECT i.namespace, n.namespace_id FROM (SELECT ? AS namespace) AS i LEFT JOIN `db`.`namespace` AS n ON n.namespace = LOWER(i.namespace)"  # noqa E501
         with self._db:
             ret = {
                 row[0]: row[1]
@@ -332,18 +360,20 @@ class DatabaseOperationsMixin:
         Retrieves the identifiers for a list of relationships.
 
         Args:
-                relationships (list): A list of relationship names.
+            relationships (list): A list of relationship names.
 
         Returns:
-                dict: A dictionary mapping relationship names to their identifiers.
+            dict: A dictionary mapping relationship names to their identifiers.
         """
         if not self._dbFile:
             return {r: None for r in relationships}
-        sql = "SELECT i.relationship, r.relationship_id FROM (SELECT ? AS relationship) AS i LEFT JOIN `db`.`relationship` AS r ON r.relationship = LOWER(i.relationship)"
+        sql = "SELECT i.relationship, r.relationship_id FROM (SELECT ? AS relationship) AS i LEFT JOIN `db`.`relationship` AS r ON r.relationship = LOWER(i.relationship)"  # noqa E501
         with self._db:
             ret = {
                 row[0]: row[1]
-                for row in self._db.cursor().executemany(sql, zip(relationships))
+                for row in self._db.cursor().executemany(
+                    sql, zip(relationships)
+                )  # noqa E501
             }
         return ret
 
@@ -354,10 +384,10 @@ class DatabaseOperationsMixin:
         Retrieves the identifier for a given role.
 
         Args:
-                role (str): The role name.
+            role (str): The role name.
 
         Returns:
-                int: The identifier of the role, or None if not found.
+            int: The identifier of the role, or None if not found.
         """
         return self.getRoleIDs([role])[role]
 
@@ -368,17 +398,18 @@ class DatabaseOperationsMixin:
         Retrieves the identifiers for a list of roles.
 
         Args:
-                roles (list): A list of role names.
+            roles (list): A list of role names.
 
         Returns:
-                dict: A dictionary mapping role names to their identifiers.
+            dict: A dictionary mapping role names to their identifiers.
         """
         if not self._dbFile:
             return {r: None for r in roles}
-        sql = "SELECT i.role, role_id FROM (SELECT ? AS role) AS i LEFT JOIN `db`.`role` AS r ON r.role = LOWER(i.role)"
+        sql = "SELECT i.role, role_id FROM (SELECT ? AS role) AS i LEFT JOIN `db`.`role` AS r ON r.role = LOWER(i.role)"  # noqa E501
         with self._db:
             ret = {
-                row[0]: row[1] for row in self._db.cursor().executemany(sql, zip(roles))
+                row[0]: row[1]
+                for row in self._db.cursor().executemany(sql, zip(roles))  # noqa E501
             }
         return ret
 
@@ -389,10 +420,10 @@ class DatabaseOperationsMixin:
         Retrieves the identifier for a given data source.
 
         Args:
-                source (str): The name of the data source.
+            source (str): The name of the data source.
 
         Returns:
-                int: The identifier of the data source, or None if not found.
+            int: The identifier of the data source, or None if not found.
         """
         return self.getSourceIDs([source])[source]
 
@@ -403,15 +434,17 @@ class DatabaseOperationsMixin:
         Retrieves the identifiers for a list of data sources.
 
         Args:
-                sources (list, optional): A list of data source names. Defaults to None, which retrieves information for all sources.
+            sources (list, optional): A list of data source names.
+            Defaults to None, which retrieves information for all sources.
 
         Returns:
-                dict: A dictionary mapping data source names to their identifiers.
+            dict: A dictionary mapping data source names to their
+            identifiers.
         """
         if not self._dbFile:
             return {s: None for s in (sources or list())}
         if sources:
-            sql = "SELECT i.source, s.source_id FROM (SELECT ? AS source) AS i LEFT JOIN `db`.`source` AS s ON s.source = LOWER(i.source)"
+            sql = "SELECT i.source, s.source_id FROM (SELECT ? AS source) AS i LEFT JOIN `db`.`source` AS s ON s.source = LOWER(i.source)"  # noqa E501
             with self._db:
                 ret = {
                     row[0]: row[1]
@@ -420,7 +453,9 @@ class DatabaseOperationsMixin:
         else:
             sql = "SELECT source, source_id FROM `db`.`source`"
             with self._db:
-                ret = {row[0]: row[1] for row in self._db.cursor().execute(sql)}
+                ret = {
+                    row[0]: row[1] for row in self._db.cursor().execute(sql)
+                }  # noqa E501
         return ret
 
     # getSourceIDs()
@@ -446,18 +481,21 @@ class DatabaseOperationsMixin:
 
     def getSourceIDOptions(self, sourceID):
         """
-        Retrieves the options associated with a data source given its identifier.
+        Retrieves the options associated with a data source given its
+        identifier.
 
         Args:
-                sourceID (int): The identifier of the data source.
+            sourceID (int): The identifier of the data source.
 
         Returns:
-                dict: A dictionary mapping option names to their values for the given data source.
+            dict: A dictionary mapping option names to their values for the
+            given data source.
         """
-        sql = "SELECT option, value FROM `db`.`source_option` WHERE source_id = ?"
+        sql = "SELECT option, value FROM `db`.`source_option` WHERE source_id = ?"  # noqa E501
         with self._db:
             ret = {
-                row[0]: row[1] for row in self._db.cursor().execute(sql, (sourceID,))
+                row[0]: row[1]
+                for row in self._db.cursor().execute(sql, (sourceID,))  # noqa E501
             }
         return ret
 
@@ -465,15 +503,17 @@ class DatabaseOperationsMixin:
 
     def getSourceIDFiles(self, sourceID):
         """
-        Retrieves information about files associated with a data source given its identifier.
+        Retrieves information about files associated with a data source given
+        its identifier.
 
         Args:
-                sourceID (int): The identifier of the data source.
+            sourceID (int): The identifier of the data source.
 
         Returns:
-                dict: A dictionary mapping filenames to tuples containing their modified date, size, and md5 hash.
+            dict: A dictionary mapping filenames to tuples containing their
+            modified date, size, and md5 hash.
         """
-        sql = "SELECT filename, COALESCE(modified,''), COALESCE(size,''), COALESCE(md5,'') FROM `db`.`source_file` WHERE source_id = ?"
+        sql = "SELECT filename, COALESCE(modified,''), COALESCE(size,''), COALESCE(md5,'') FROM `db`.`source_file` WHERE source_id = ?"  # noqa E501
         with self._db:
             ret = {
                 row[0]: tuple(row[1:])
@@ -488,10 +528,10 @@ class DatabaseOperationsMixin:
         Retrieves the identifier for a given type.
 
         Args:
-                type (str): The name of the type.
+            type (str): The name of the type.
 
         Returns:
-                int: The identifier of the type, or None if not found.
+            int: The identifier of the type, or None if not found.
         """
         return self.getTypeIDs([type])[type]
 
@@ -509,10 +549,11 @@ class DatabaseOperationsMixin:
         """
         if not self._dbFile:
             return {t: None for t in types}
-        sql = "SELECT i.type, t.type_id FROM (SELECT ? AS type) AS i LEFT JOIN `db`.`type` AS t ON t.type = LOWER(i.type)"
+        sql = "SELECT i.type, t.type_id FROM (SELECT ? AS type) AS i LEFT JOIN `db`.`type` AS t ON t.type = LOWER(i.type)"  # noqa E501
         with self._db:
             ret = {
-                row[0]: row[1] for row in self._db.cursor().executemany(sql, zip(types))
+                row[0]: row[1]
+                for row in self._db.cursor().executemany(sql, zip(types))  # noqa E501
             }
         return ret
 
@@ -537,15 +578,17 @@ class DatabaseOperationsMixin:
         Retrieves subtype IDs for given subtype names from the database.
 
         Args:
-                subtypes (list): A list of subtype names.
+            subtypes (list): A list of subtype names.
 
         Returns:
-                dict: A dictionary where keys are subtype names and values are their corresponding subtype IDs.
-                                If a subtype is not found in the database, its value in the dictionary will be None.
+            dict: A dictionary where keys are subtype names and values are
+                their corresponding subtype IDs.
+                If a subtype is not found in the database, its value in the
+                dictionary will be None.
         """
         if not self._dbFile:
             return {t: None for t in subtypes}
-        sql = "SELECT i.subtype, t.subtype_id FROM (SELECT ? AS subtype) AS i LEFT JOIN `db`.`subtype` AS t ON t.subtype = LOWER(i.subtype)"
+        sql = "SELECT i.subtype, t.subtype_id FROM (SELECT ? AS subtype) AS i LEFT JOIN `db`.`subtype` AS t ON t.subtype = LOWER(i.subtype)"  # noqa E501
         with self._db:
             ret = {
                 row[0]: row[1]

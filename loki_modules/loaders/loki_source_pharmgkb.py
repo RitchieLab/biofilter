@@ -1,7 +1,5 @@
-#!/usr/bin/env python
-
 import zipfile
-from loki import loki_source
+from loki_modules import loki_source
 
 
 class Source_pharmgkb(loki_source.Source):
@@ -10,20 +8,17 @@ class Source_pharmgkb(loki_source.Source):
     def getVersionString(cls):
         return "2.3 (2018-10-30)"
 
-    # getVersionString()
-
     def download(self, options, path):
         self.downloadFilesFromHTTPS(
             "api.pharmgkb.org",
             {
                 path + "/genes.zip": "/v1/download/file/data/genes.zip",
-                path + "/pathways-tsv.zip": "/v1/download/file/data/pathways-tsv.zip",
+                path
+                + "/pathways-tsv.zip": "/v1/download/file/data/pathways-tsv.zip",  # noqa E501
             },
         )
 
         return [path + "/genes.zip", path + "/pathways-tsv.zip"]
-
-    # download()
 
     def update(self, options, path):
         # clear out all old data from this source
@@ -86,11 +81,11 @@ class Source_pharmgkb(loki_source.Source):
                     geneFile = geneZip.open(info, "r")
                     header = geneFile.__next__().rstrip()
                     if header.decode().startswith(
-                        "PharmGKB Accession Id	Entrez Id	Ensembl Id	Name	Symbol	Alternate Names	Alternate Symbols	Is VIP	Has Variant Annotation	Cross-references"
+                        "PharmGKB Accession Id	Entrez Id	Ensembl Id	Name	Symbol	Alternate Names	Alternate Symbols	Is VIP	Has Variant Annotation	Cross-references"  # noqa E501
                     ):
                         new2 = 0
                     elif header.decode().startswith(
-                        "PharmGKB Accession Id	NCBI Gene ID	HGNC ID	Ensembl Id	Name	Symbol	Alternate Names	Alternate Symbols	Is VIP	Has Variant Annotation	Cross-references"
+                        "PharmGKB Accession Id	NCBI Gene ID	HGNC ID	Ensembl Id	Name	Symbol	Alternate Names	Alternate Symbols	Is VIP	Has Variant Annotation	Cross-references"  # noqa E501
                     ):
                         new2 = 1
                     else:
@@ -116,7 +111,9 @@ class Source_pharmgkb(loki_source.Source):
                         )
 
                         if entrezID:
-                            setNames.add((namespaceID["entrez_gid"], entrezID, pgkbID))
+                            setNames.add(
+                                (namespaceID["entrez_gid"], entrezID, pgkbID)
+                            )  # noqa E501
                         if ensemblID:
                             setNames.add(
                                 (namespaceID["ensembl_gid"], ensemblID, pgkbID)
@@ -125,25 +122,25 @@ class Source_pharmgkb(loki_source.Source):
                                 (namespaceID["ensembl_pid"], ensemblID, pgkbID)
                             )
                         if symbol:
-                            setNames.add((namespaceID["symbol"], symbol, pgkbID))
-                        for alias in aliases:
-                            # line.decode('latin-1') should handle this above
-                            # setNames.add( (namespaceID['symbol'],unicode(alias.strip('" '),errors='ignore'),pgkbID) )
                             setNames.add(
-                                (namespaceID["symbol"], alias.strip('" '), pgkbID)
+                                (namespaceID["symbol"], symbol, pgkbID)
+                            )  # noqa E501
+                        for alias in aliases:
+                            setNames.add(
+                                (
+                                    namespaceID["symbol"],
+                                    alias.strip('" '),
+                                    pgkbID,
+                                )  # noqa E501
                             )
                         for xref in xrefs:
                             try:
                                 xrefDB, xrefID = xref.split(":", 1)
                                 if xrefDB in xrefNS:
                                     for ns in xrefNS[xrefDB]:
-                                        setNames.add((namespaceID[ns], xrefID, pgkbID))
-                                        # line.decode('latin-1') should handle this above
-                                        # try:
-                                        # 	xrefID.encode('ascii')
-                                        # 	setNames.add( (namespaceID[ns],xrefID.decode('utf8').encode('ascii'),pgkbID) )
-                                        # except:
-                                        # 	self.log("Cannot encode gene alias")
+                                        setNames.add(
+                                            (namespaceID[ns], xrefID, pgkbID)
+                                        )  # noqa E501
                             except ValueError:
                                 pass
                     # foreach line in geneFile
@@ -183,7 +180,8 @@ class Source_pharmgkb(loki_source.Source):
             self.log("processing pathways ...\n")
             for info in pathZip.infolist():
                 if info.filename == "pathways.tsv":
-                    # the old format had all pathways in one giant file, delimited by blank lines
+                    # the old format had all pathways in one giant file,
+                    # delimited by blank lines
                     pathFile = pathZip.open(path + "/" + info, "r")
                     curPath = None
                     lastline = ""
@@ -197,8 +195,6 @@ class Source_pharmgkb(loki_source.Source):
                                 curPath = words[0].strip()
                                 desc = words[1].strip().rsplit(" - ", 1)
                                 desc.append("")
-                                # line.decode('latin-1') should handle this above
-                                # pathDesc[curPath] = (unicode(desc[0].strip(),errors='ignore'),unicode(desc[1].strip(),errors='ignore'))
                                 pathDesc[curPath] = (
                                     desc[0].strip().replace("`", "'"),
                                     desc[1].strip().replace("`", "'"),
@@ -215,23 +211,28 @@ class Source_pharmgkb(loki_source.Source):
 
                                 numAssoc += 1
                                 numID += 2
-                                nsAssoc["pharmgkb_gid"].add((curPath, numAssoc, pgkbID))
-                                nsAssoc["symbol"].add((curPath, numAssoc, symbol))
+                                nsAssoc["pharmgkb_gid"].add(
+                                    (curPath, numAssoc, pgkbID)
+                                )  # noqa E501
+                                nsAssoc["symbol"].add(
+                                    (curPath, numAssoc, symbol)
+                                )  # noqa E501
                             # if assoc is Gene
                         lastline = line
                     # foreach line in pathFile
                     pathFile.close()
                 elif info.filename.endswith(".tsv"):
-                    # the new format has separate "PA###-***.tsv" files for each pathway
+                    # the new format has separate "PA###-***.tsv" files for
+                    # each pathway
                     pathFile = pathZip.open(info, "r")
                     header = next(pathFile)
                     if header.decode().startswith(
-                        "From	To	Reaction Type	Controller	Control Type	Cell Type	PubMed Id	Genes"
-                    ):  # 	Drugs	Diseases
+                        "From	To	Reaction Type	Controller	Control Type	Cell Type	PubMed Id	Genes"  # noqa E501
+                    ):  # Drugs	Diseases
                         pass
                     elif header.decode().startswith(
-                        "From	To	Reaction Type	Controller	Control Type	Cell Type	PMIDs	Genes"
-                    ):  # 	Drugs	Diseases
+                        "From	To	Reaction Type	Controller	Control Type	Cell Type	PMIDs	Genes"  # noqa E501
+                    ):  # Drugs	Diseases
                         pass
                     else:
                         raise Exception(
@@ -247,7 +248,9 @@ class Source_pharmgkb(loki_source.Source):
                         None,
                     )
                     for line in pathFile:
-                        for symbol in line.decode("latin-1").split("\t")[7].split(","):
+                        for symbol in (
+                            line.decode("latin-1").split("\t")[7].split(",")
+                        ):  # noqa E501
                             numAssoc += 1
                             numID += 1
                             nsAssoc["symbol"].add(
@@ -259,7 +262,7 @@ class Source_pharmgkb(loki_source.Source):
             # foreach file in pathZip
         # with pathZip
         self.log(
-            "processing pathways completed: %d pathways, %d associations (%d identifiers)\n"
+            "processing pathways completed: %d pathways, %d associations (%d identifiers)\n"  # noqa E501
             % (len(pathDesc), numAssoc, numID)
         )
 
@@ -275,7 +278,8 @@ class Source_pharmgkb(loki_source.Source):
         # store pathway names
         self.log("writing pathway names to the database ...\n")
         self.addGroupNamespacedNames(
-            namespaceID["pharmgkb_id"], ((pathGID[path], path) for path in listPath)
+            namespaceID["pharmgkb_id"],
+            ((pathGID[path], path) for path in listPath),  # noqa E501
         )
         self.addGroupNamespacedNames(
             namespaceID["pathway"],
@@ -294,8 +298,3 @@ class Source_pharmgkb(loki_source.Source):
         self.log("writing gene associations to the database completed\n")
 
         # TODO: eventually add diseases, drugs, relationships
-
-    # update()
-
-
-# Source_pharmgkb

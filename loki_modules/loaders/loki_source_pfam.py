@@ -1,7 +1,5 @@
-#!/usr/bin/env python
-
 import collections
-from loki import loki_source
+from loki_modules import loki_source
 
 
 class Source_pfam(loki_source.Source):
@@ -10,24 +8,16 @@ class Source_pfam(loki_source.Source):
     def getVersionString(cls):
         return "2.2 (2016-02-08)"
 
-    # getVersionString()
-
     def download(self, options, path):
-        # download the latest source files
-        # 		self.downloadFilesFromFTP('ftp.ebi.ac.uk', {
-        # 			'pfamA.txt.gz':                      '/pub/databases/Pfam/current_release/database_files/pfamA.txt.gz',
-        # 			'pfamA_reg_full_significant.txt.gz': '/pub/databases/Pfam/current_release/database_files/pfamA_reg_full_significant.txt.gz',
-        # 			'pfamseq.txt.gz':                    '/pub/databases/Pfam/current_release/database_files/pfamseq.txt.gz',
-        # 		})
         self.downloadFilesFromHTTP(
             "ftp.ebi.ac.uk",
             {
                 path
-                + "/pfamA.txt.gz": "/pub/databases/Pfam/current_release/database_files/pfamA.txt.gz",
+                + "/pfamA.txt.gz": "/pub/databases/Pfam/current_release/database_files/pfamA.txt.gz",  # noqa E501
                 path
-                + "/pfamA_reg_full_significant.txt.gz": "/pub/databases/Pfam/current_release/database_files/pfamA_reg_full_significant.txt.gz",
+                + "/pfamA_reg_full_significant.txt.gz": "/pub/databases/Pfam/current_release/database_files/pfamA_reg_full_significant.txt.gz",  # noqa E501
                 path
-                + "/pfamseq.txt.gz": "/pub/databases/Pfam/current_release/database_files/pfamseq.txt.gz",
+                + "/pfamseq.txt.gz": "/pub/databases/Pfam/current_release/database_files/pfamseq.txt.gz",  # noqa E501
             },
         )
 
@@ -36,8 +26,6 @@ class Source_pfam(loki_source.Source):
             path + "/pfamA_reg_full_significant.txt.gz",
             path + "/pfamseq.txt.gz",
         ]
-
-    # download()
 
     def update(self, options, path):
         # clear out all old data from this source
@@ -72,7 +60,8 @@ class Source_pfam(loki_source.Source):
 
         # process protein families
         self.log("processing protein families ...\n")
-        pfamFile = self.zfile(path + "/pfamA.txt.gz")  # TODO:context manager,iterator
+        # TODO:context manager,iterator
+        pfamFile = self.zfile(path + "/pfamA.txt.gz")
         groupFam = collections.defaultdict(set)
         famAcc = {}
         famID = {}
@@ -83,12 +72,16 @@ class Source_pfam(loki_source.Source):
             pfamNum = words[0].strip()
             if pfamNum.isdigit():
                 pfamNum = int(pfamNum)  # auto_pfamA = 1 , 2 , ...
-                pfamAcc = words[1].strip()  # pfamA_acc = PF00389 , PF00198 , ...
-                pfamID = words[2].strip()  # pfamA_id = 2-Hacid_dh , 2-oxoacid_dh , ...
+                pfamAcc = words[1].strip()  # pfamA_acc = PF00389 , PF00198
+                pfamID = words[
+                    2
+                ].strip()  # pfamA_id = 2-Hacid_dh , 2-oxoacid_dh  # noqa E501
                 name = words[
                     4
-                ].strip()  # description = D-isomer specific 2-hydroxyacid dehydrogenase, catalytic domain , ...
-                group = words[8].strip()  # type = Domain , Family , Motif , Repeat
+                ].strip()  # description = D-isomer specific 2-hydroxyacid dehydrogenase, catalytic domain   # noqa E501
+                group = words[
+                    8
+                ].strip()  # type = Domain , Family , Motif , Repeat  # noqa E501
                 desc = words[9].strip()  # comment = (long description)
             else:
                 # starting in release 28, all the "auto" columns were dropped
@@ -96,7 +89,7 @@ class Source_pfam(loki_source.Source):
                 pfamID = words[1].strip()  # 2-Hacid_dh , 2-oxoacid_dh , ...
                 name = words[
                     3
-                ].strip()  # D-isomer specific 2-hydroxyacid dehydrogenase, catalytic domain , ...
+                ].strip()  # D-isomer specific 2-hydroxyacid dehydrogenase, catalytic domain  # noqa E501
                 group = words[7].strip()  # Domain , Family , Motif , Repeat
                 desc = words[8].strip()  # (long description)
 
@@ -108,7 +101,7 @@ class Source_pfam(loki_source.Source):
         numGroup = len(groupFam)
         numFam = len(famName)
         self.log(
-            "processing protein families completed: %d categories, %d families\n"
+            "processing protein families completed: %d categories, %d families\n"  # noqa E501
             % (numGroup, numFam)
         )
 
@@ -131,13 +124,16 @@ class Source_pfam(loki_source.Source):
         # store protein family names
         self.log("writing protein family names to the database ...\n")
         self.addGroupNamespacedNames(
-            namespaceID["pfam_id"], ((groupGID[group], group) for group in listGroup)
+            namespaceID["pfam_id"],
+            ((groupGID[group], group) for group in listGroup),  # noqa E501
         )
         self.addGroupNamespacedNames(
-            namespaceID["pfam_id"], ((famGID[fam], famAcc[fam]) for fam in listFam)
+            namespaceID["pfam_id"],
+            ((famGID[fam], famAcc[fam]) for fam in listFam),  # noqa E501
         )
         self.addGroupNamespacedNames(
-            namespaceID["proteinfamily"], ((famGID[fam], famID[fam]) for fam in listFam)
+            namespaceID["proteinfamily"],
+            ((famGID[fam], famID[fam]) for fam in listFam),  # noqa E501
         )
         self.addGroupNamespacedNames(
             namespaceID["proteinfamily"],
@@ -158,34 +154,35 @@ class Source_pfam(loki_source.Source):
 
         # process protein identifiers
         self.log("processing protein identifiers ...\n")
-        seqFile = self.zfile(path + "/pfamseq.txt.gz")  # TODO:context manager,iterator
+        # TODO:context manager,iterator
+        seqFile = self.zfile(path + "/pfamseq.txt.gz")
         proNames = dict()
         for line in seqFile:
             words = line.split("\t", 10)
             proteinNum = words[0].strip()
             if proteinNum.isdigit():
-                proteinNum = int(proteinNum)  # auto_pfamseq = 1 , 2 , ...
-                uniprotID = words[1]  # pfamseq_id = 1433B_HUMAN , GATC_HUMAN , ...
-                uniprotAcc = words[2]  # pfamseq_acc = P31946 , O43716 , ...
+                proteinNum = int(proteinNum)  # auto_pfamseq = 1 , 2
+                uniprotID = words[1]  # pfamseq_id = 1433B_HUMAN ,GATC_HUMAN
+                uniprotAcc = words[2]  # pfamseq_acc = P31946 , O43716
                 species = words[9]  # species = Homo sapiens (Human)
             else:
                 # starting in release 28, all the "auto" columns were dropped
-                uniprotID = proteinNum  # pfamseq_id = 1433B_HUMAN , GATC_HUMAN , ...
-                uniprotAcc = words[1]  # pfamseq_acc = P31946 , O43716 , ...
+                uniprotID = proteinNum  # pfamseq_id = 1433B_HUMAN ,GATC_HUMAN
+                uniprotAcc = words[1]  # pfamseq_acc = P31946 , O43716
                 species = words[8]  # species = Homo sapiens (Human)
 
             if species == "Homo sapiens (Human)":
                 proNames[proteinNum] = (uniprotID, uniprotAcc)
         # foreach protein
         self.log(
-            "processing protein identifiers completed: %d proteins\n" % (len(proNames),)
+            "processing protein identifiers completed: %d proteins\n"
+            % (len(proNames),)  # noqa E501
         )
 
         # process associations
         self.log("processing protein associations ...\n")
-        assocFile = self.zfile(
-            path + "/pfamA_reg_full_significant.txt.gz"
-        )  # TODO:context manager,iterator
+        # TODO:context manager,iterator
+        assocFile = self.zfile(path + "/pfamA_reg_full_significant.txt.gz")
         setAssoc = set()
         numAssoc = numID = 0
         for line in assocFile:
@@ -209,7 +206,7 @@ class Source_pfam(loki_source.Source):
             # if association is ok
         # foreach association
         self.log(
-            "processing protein associations completed: %d associations (%d identifiers)\n"
+            "processing protein associations completed: %d associations (%d identifiers)\n"  # noqa E501
             % (numAssoc, numID)
         )
 
@@ -219,8 +216,3 @@ class Source_pfam(loki_source.Source):
             typeID["gene"], namespaceID["uniprot_pid"], setAssoc
         )
         self.log("writing gene associations to the database completed\n")
-
-    # update()
-
-
-# Source_pfam

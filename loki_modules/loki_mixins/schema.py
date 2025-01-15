@@ -25,7 +25,7 @@ class Schema:
             ##################################################
             # metadata tables
             "grch_ucschg": {
-                "table": """`
+                "table": """
                     (
                     grch INTEGER PRIMARY KEY,
                     ucschg INTEGER NOT NULL
@@ -132,16 +132,16 @@ class Schema:
                     """,
                 "index": {},
             },  # .db.type
-            # NOTE: NEW TABLE
-            "subtype": {
-                "table": """
-                    (
-                    subtype_id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-                    subtype VARCHAR(32) UNIQUE NOT NULL
-                    )
-                    """,
-                "index": {},
-            },  # .db.subtype
+            # # NOTE: NEW TABLE
+            # "subtype": {
+            #     "table": """
+            #         (
+            #         subtype_id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+            #         subtype VARCHAR(32) UNIQUE NOT NULL
+            #         )
+            #         """,
+            #     "index": {},
+            # },  # .db.subtype
             "warning": {
                 "table": """
                     (
@@ -296,7 +296,6 @@ class Schema:
                     (
                     group_id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
                     type_id TINYINT NOT NULL,
-                    subtype_id TINYINT NOT NULL,
                     label VARCHAR(64) NOT NULL,
                     description VARCHAR(256),
                     source_id TINYINT NOT NULL
@@ -304,7 +303,6 @@ class Schema:
                     """,
                 "index": {
                     "group__type": "(type_id)",
-                    "group__subtype": "(subtype_id)",
                     "group__label_type": "(label,type_id)",
                 },
             },  # .db.group

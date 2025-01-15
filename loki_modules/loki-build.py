@@ -30,7 +30,6 @@ Usage:
 --from-archive <file>
     Specify an input source data archive to reuse but not update.
 
-
 --to-archive <file>
     Specify an output source data archive to create or replace but not reuse.
 
@@ -150,6 +149,7 @@ if __name__ == "__main__":
     # 	parser.add_argument('-m', '--memory', type=str, metavar='size', default=None, #TODO  # noqa: E501
     # 			help="the target amount of system memory to use (not exact, allow some margin); default: ~1gb" # noqa: E501
     # 	)
+    # BUG: list-sources is overwritten in the code
     parser.add_argument(
         "-l",
         "--list-sources",
@@ -320,7 +320,7 @@ if __name__ == "__main__":
     userOptions = userOptions or None
 
     # parse requested update sources
-    srcSet = None
+    srcSet = None  # BUG: overwritten the srcSet variable
     if args.update is not None:
         srcSet = set()
         for srcList in args.update:

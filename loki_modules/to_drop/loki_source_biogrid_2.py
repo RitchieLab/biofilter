@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 import zipfile
 from loki_modules import loki_source
 
@@ -8,23 +10,24 @@ class Source_biogrid(loki_source.Source):
     def getVersionString(cls):
         return "2.1 (2022-04-13)"
 
-    def download(self, options, path):
+    # getVersionString()
+
+    def download(self, options):
         # download the latest source files
         self.downloadFilesFromHTTP(
             "downloads.thebiogrid.org",
             {
-                path
-                + "/BIOGRID-ORGANISM-LATEST.tab2.zip": "/Download/BioGRID/Latest-Release/BIOGRID-ORGANISM-LATEST.tab2.zip",  # noqa: E501
+                "BIOGRID-ORGANISM-LATEST.tab2.zip": "/Download/BioGRID/Latest-Release/BIOGRID-ORGANISM-LATEST.tab2.zip",
             },
         )
 
-        return [path + "/BIOGRID-ORGANISM-LATEST.tab2.zip"]
+    # download()
 
-    def update(self, options, path):
+    def update(self, options):
         # clear out all old data from this source
-        self.log("deleting old records from the database ...\n")
+        self.log("deleting old records from the database ...")
         self.deleteAll()
-        self.log("deleting old records from the database completed\n")
+        self.log(" OK\n")
 
         # get or create the required metadata records
         namespaceID = self.addNamespaces(
@@ -42,30 +45,27 @@ class Source_biogrid(loki_source.Source):
         )
 
         # process associations
-        self.log("verifying archive file ...\n")
+        self.log("verifying archive file ...")
         pairLabels = dict()
         empty = tuple()
-        with zipfile.ZipFile(
-            path + "/BIOGRID-ORGANISM-LATEST.tab2.zip", "r"
-        ) as assocZip:
+        with zipfile.ZipFile("BIOGRID-ORGANISM-LATEST.tab2.zip", "r") as assocZip:
             err = assocZip.testzip()
             if err:
                 self.log(" ERROR\n")
                 self.log("CRC failed for %s\n" % err)
                 return False
-            self.log("verifying archive file completed\n")
-            self.log("processing gene interactions ...\n")
+            self.log(" OK\n")
+            self.log("processing gene interactions ...")
             for info in assocZip.infolist():
                 if info.filename.find("Homo_sapiens") >= 0:
                     assocFile = assocZip.open(info, "r")
                     header = assocFile.__next__().rstrip()
                     observedHeaders = {
-                        "#BioGRID Interaction ID\tEntrez Gene Interactor A\tEntrez Gene Interactor B\tBioGRID ID Interactor A\tBioGRID ID Interactor B\tSystematic Name Interactor A\tSystematic Name Interactor B\tOfficial Symbol Interactor A\tOfficial Symbol Interactor B\tSynonymns Interactor A\tSynonyms Interactor B\tExperimental System\tExperimental System Type\tAuthor\tPubmed ID\tOrganism Interactor A\tOrganism Interactor B",  # "\tThroughput\tScore\tModification\tPhenotypes\tQualifications\tTags\tSource Database",  # noqa E501
-                        "#BioGRID Interaction ID\tEntrez Gene Interactor A\tEntrez Gene Interactor B\tBioGRID ID Interactor A\tBioGRID ID Interactor B\tSystematic Name Interactor A\tSystematic Name Interactor B\tOfficial Symbol Interactor A\tOfficial Symbol Interactor B\tSynonyms Interactor A\tSynonyms Interactor B\tExperimental System\tExperimental System Type\tAuthor\tPubmed ID\tOrganism Interactor A\tOrganism Interactor B",  # "\tThroughput\tScore\tModification\tPhenotypes\tQualifications\tTags\tSource Database",  # noqa E501
+                        "#BioGRID Interaction ID\tEntrez Gene Interactor A\tEntrez Gene Interactor B\tBioGRID ID Interactor A\tBioGRID ID Interactor B\tSystematic Name Interactor A\tSystematic Name Interactor B\tOfficial Symbol Interactor A\tOfficial Symbol Interactor B\tSynonymns Interactor A\tSynonyms Interactor B\tExperimental System\tExperimental System Type\tAuthor\tPubmed ID\tOrganism Interactor A\tOrganism Interactor B",  # "\tThroughput\tScore\tModification\tPhenotypes\tQualifications\tTags\tSource Database",
+                        "#BioGRID Interaction ID\tEntrez Gene Interactor A\tEntrez Gene Interactor B\tBioGRID ID Interactor A\tBioGRID ID Interactor B\tSystematic Name Interactor A\tSystematic Name Interactor B\tOfficial Symbol Interactor A\tOfficial Symbol Interactor B\tSynonyms Interactor A\tSynonyms Interactor B\tExperimental System\tExperimental System Type\tAuthor\tPubmed ID\tOrganism Interactor A\tOrganism Interactor B",  # "\tThroughput\tScore\tModification\tPhenotypes\tQualifications\tTags\tSource Database",
                     }
                     if not max(
-                        header.decode().startswith(obsHdr)
-                        for obsHdr in observedHeaders  # noqa: E501
+                        header.decode().startswith(obsHdr) for obsHdr in observedHeaders
                     ):
                         self.log(" ERROR\n")
                         self.log(
@@ -85,22 +85,14 @@ class Source_biogrid(loki_source.Source):
                         syst2 = words[6] if words[6] != "-" else None
                         gene1 = words[7]
                         gene2 = words[8]
-                        aliases1 = (
-                            words[9].split("|") if words[9] != "-" else empty
-                        )  # noqa E501
-                        aliases2 = (
-                            words[10].split("|") if words[10] != "-" else empty
-                        )  # noqa E501
+                        aliases1 = words[9].split("|") if words[9] != "-" else empty
+                        aliases2 = words[10].split("|") if words[10] != "-" else empty
                         tax1 = words[15]
                         tax2 = words[16]
 
                         if tax1 == "9606" and tax2 == "9606":
-                            member1 = (entrezID1, gene1, syst1) + tuple(
-                                aliases1
-                            )  # noqa E501
-                            member2 = (entrezID2, gene2, syst2) + tuple(
-                                aliases2
-                            )  # noqa E501
+                            member1 = (entrezID1, gene1, syst1) + tuple(aliases1)
+                            member2 = (entrezID2, gene2, syst2) + tuple(aliases2)
                             if member1 != member2:
                                 pair = (member1, member2)
                                 if pair not in pairLabels:
@@ -114,40 +106,34 @@ class Source_biogrid(loki_source.Source):
         # with assocZip
         numAssoc = len(pairLabels)
         numGene = len(
-            set(pair[0] for pair in pairLabels)
-            | set(pair[1] for pair in pairLabels)  # noqa E501
+            set(pair[0] for pair in pairLabels) | set(pair[1] for pair in pairLabels)
         )
         numName = sum(len(pairLabels[pair]) for pair in pairLabels)
         self.log(
-            "processing gene interactions completed: %d interactions (%d genes), %d pair identifiers\n"  # noqa E501
+            " OK: %d interactions (%d genes), %d pair identifiers\n"
             % (numAssoc, numGene, numName)
         )
 
         # store interaction groups
-        self.log("writing interaction pairs to the database ...\n")
+        self.log("writing interaction pairs to the database ...")
         listPair = pairLabels.keys()
         listGID = self.addTypedGroups(
             typeID["interaction"],
-            (
-                ("biogrid:%s" % min(pairLabels[pair]), None)
-                for pair in listPair  # noqa E501
-            ),
+            (("biogrid:%s" % min(pairLabels[pair]), None) for pair in listPair),
         )
         pairGID = dict(zip(listPair, listGID))
-        self.log("writing interaction pairs to the database completed\n")
+        self.log(" OK\n")
 
         # store interaction labels
         listLabels = []
         for pair in listPair:
-            listLabels.extend(
-                (pairGID[pair], label) for label in pairLabels[pair]
-            )  # noqa E501
-        self.log("writing interaction names to the database ...\n")
+            listLabels.extend((pairGID[pair], label) for label in pairLabels[pair])
+        self.log("writing interaction names to the database ...")
         self.addGroupNamespacedNames(namespaceID["biogrid_id"], listLabels)
-        self.log("writing interaction names to the database completed\n")
+        self.log(" OK\n")
 
         # store gene interactions
-        self.log("writing gene interactions to the database ...\n")
+        self.log("writing gene interactions to the database ...")
         nsAssoc = {
             "symbol": set(),
             "entrez_gid": set(),
@@ -167,25 +153,27 @@ class Source_biogrid(loki_source.Source):
             self.addGroupMemberTypedNamespacedNames(
                 typeID["gene"], namespaceID[ns], nsAssoc[ns]
             )
-        self.log("writing gene interactions to the database completed\n")
+        self.log(" OK\n")
+
+        # TODO: decide if there's any value in trying to identify pseudo-pathways
+        """
+			self.log("identifying implied networks ...")
+			geneAssoc = dict()
+			for pair in listPair:
+				if pair[0] not in geneAssoc:
+					geneAssoc[pair[0]] = set()
+				geneAssoc[pair[0]].add(pair[1])
+				if pair[1] not in geneAssoc:
+					geneAssoc[pair[1]] = set()
+				geneAssoc[pair[1]].add(pair[0])
+			listPath = self.findMaximalCliques(geneAssoc)
+			numAssoc = sum(len(path) for path in listPath)
+			numGene = len(geneAssoc)
+			numGroup = len(listPath)
+			self.log(" OK: %d associations (%d genes in %d groups)\n" % (numAssoc,numGene,numGroup))
+		"""
+
+    # update()
 
 
-# TODO: if there's any value in trying to identify pseudo-pathways
-"""
-self.log("identifying implied networks ...")
-geneAssoc = dict()
-for pair in listPair:
-    if pair[0] not in geneAssoc:
-        geneAssoc[pair[0]] = set()
-    geneAssoc[pair[0]].add(pair[1])
-    if pair[1] not in geneAssoc:
-        geneAssoc[pair[1]] = set()
-    geneAssoc[pair[1]].add(pair[0])
-listPath = self.findMaximalCliques(geneAssoc)
-numAssoc = sum(len(path) for path in listPath)
-numGene = len(geneAssoc)
-numGroup = len(listPath)
-self.log(
-" OK: %d associations (%d genes in %d groups)\n"
-% (numAssoc,numGene,numGroup))
-"""
+# Source_biogrid

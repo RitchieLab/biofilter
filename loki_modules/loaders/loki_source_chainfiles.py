@@ -1,11 +1,8 @@
-#!/usr/bin/env python
-
-import sys
 import itertools
 import os
 import re
 import urllib.request as urllib2
-from loki import loki_source
+from loki_modules import loki_source
 
 
 class Source_chainfiles(loki_source.Source):
@@ -17,7 +14,9 @@ class Source_chainfiles(loki_source.Source):
     # private class data
 
     # 	_reDir = re.compile('^hg[0-9]+$', re.IGNORECASE)
-    _reFile = re.compile(r"^hg([0-9]+)tohg([0-9]+)\.over\.chain\.gz$", re.IGNORECASE)
+    _reFile = re.compile(
+        r"^hg([0-9]+)tohg([0-9]+)\.over\.chain\.gz$", re.IGNORECASE
+    )  # noqa E501
     _reFileName = r"hg([0-9]+)ToHg([0-9]+)\.over\.chain\.gz"
 
     _reNum = ("4", "10", "11", "12", "13", "15", "16", "17", "18", "19", "38")
@@ -29,10 +28,8 @@ class Source_chainfiles(loki_source.Source):
     def getVersionString(cls):
         return "2.2 (2014-06-27)"
 
-    # getVersionString()
-
     def download(self, options, path):
-        # define a callback to search for all available hgX liftover chain files
+        # define callback to search for all available hgX liftover chain files
         # 		def remFilesCallback(ftp):
         # 			remFiles = {}
         # 			ftp.cwd('/goldenPath')
@@ -58,12 +55,9 @@ class Source_chainfiles(loki_source.Source):
                     remFiles[path + "/" + filenames] = (
                         "/goldenPath/hg" + i + "/liftOver/" + filenames
                     )
-        # 		self.downloadFilesFromFTP("hgdownload.cse.ucsc.edu", remFilesCallback)
         self.downloadFilesFromHTTP("hgdownload.cse.ucsc.edu", remFiles)
 
         return list(remFiles.keys())
-
-    # download()
 
     def update(self, options, path):
         """
@@ -81,7 +75,10 @@ class Source_chainfiles(loki_source.Source):
                 continue
             old_ucschg = int(match.group(1))
             new_ucschg = int(match.group(2))
-            self.log("parsing chains for hg%d -> hg%d ...\n" % (old_ucschg, new_ucschg))
+            self.log(
+                "parsing chains for hg%d -> hg%d ...\n"
+                % (old_ucschg, new_ucschg)  # noqa: E501
+            )  # noqa: E501
             f = self.zfile(path + "/" + fn)
 
             is_hdr = True
@@ -94,7 +91,7 @@ class Source_chainfiles(loki_source.Source):
                     if line:
                         try:
                             chain_hdrs.append(self._parseChain(line))
-                        except:
+                        except:  # noqa: E722
                             is_valid = False
                         is_hdr = False
                 elif line:
@@ -103,7 +100,9 @@ class Source_chainfiles(loki_source.Source):
                 else:
                     if is_valid:
                         chain_data.append(
-                            self._parseData(chain_hdrs[-1], "\n".join(curr_data))
+                            self._parseData(
+                                chain_hdrs[-1], "\n".join(curr_data)
+                            )  # noqa: E501
                         )
                     is_valid = True
                     curr_data = []
@@ -133,7 +132,7 @@ class Source_chainfiles(loki_source.Source):
         Parses the chain header to extract the information required
         for insertion into the database.
         UCSC chain files use 0-based half-open intervals according to:
-          https://genome.ucsc.edu/goldenPath/help/chain.html
+        https://genome.ucsc.edu/goldenPath/help/chain.html
         Since LOKI uses 1-based closed intervals, we add 1 to start positions.
         """
 
@@ -141,7 +140,8 @@ class Source_chainfiles(loki_source.Source):
         hdr = chain_hdr.strip().split("\n")[0].strip()
 
         # Parse the first line
-        # "chain" score oldChr oldSize oldDir oldStart oldEnd newChr newSize newDir newStart newEnd id
+        # "chain" score oldChr oldSize oldDir oldStart oldEnd newChr newSize
+        # newDir newStart newEnd id
         wds = hdr.split()
 
         if wds[0] != "chain":
@@ -181,26 +181,24 @@ class Source_chainfiles(loki_source.Source):
         form (the data of the chain is everything after the 1st line)
         """
         _data = [
-            tuple([int(v) for v in l.split()]) for l in chain_data.split("\n")[:-1]
+            tuple([int(v) for v in ln.split()])
+            for ln in chain_data.split("\n")[:-1]  # noqa: E501
         ]
 
         curr_pos = chain_tuple[2]
         new_pos = chain_tuple[5]
 
         _data_txform = []
-        for l in _data:
-            _data_txform.append((curr_pos, curr_pos + l[0] - 1, new_pos))
-            curr_pos = curr_pos + l[0] + l[1]
+        for ln in _data:
+            _data_txform.append((curr_pos, curr_pos + ln[0] - 1, new_pos))
+            curr_pos = curr_pos + ln[0] + ln[1]
             if chain_tuple[7]:
-                new_pos = new_pos + l[0] + l[2]
+                new_pos = new_pos + ln[0] + ln[2]
             else:
-                new_pos = new_pos - l[0] - l[2]
+                new_pos = new_pos - ln[0] - ln[2]
 
         _data_txform.append(
             (curr_pos, curr_pos + int(chain_data.split()[-1]) - 1, new_pos)
         )
 
         return _data_txform
-
-
-# class Source_chainfiles

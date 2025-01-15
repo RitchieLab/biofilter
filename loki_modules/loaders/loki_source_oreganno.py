@@ -1,7 +1,5 @@
-#!/usr/bin/env python
-
 import itertools
-from loki import loki_source
+from loki_modules import loki_source
 
 
 class Source_oreganno(loki_source.Source):
@@ -9,34 +7,33 @@ class Source_oreganno(loki_source.Source):
     _remHost = "hgdownload.cse.ucsc.edu"
     _remPath = "/goldenPath/hg19/database/"
 
-    _remFiles = ["oreganno.txt.gz", "oregannoAttr.txt.gz", "oregannoLink.txt.gz"]
+    _remFiles = [
+        "oreganno.txt.gz",
+        "oregannoAttr.txt.gz",
+        "oregannoLink.txt.gz",
+    ]  # noqa E501
 
     @classmethod
     def getVersionString(cls):
         return "2.1 (2016-09-19)"
 
-    # getVersionString()
-
-    def download(self, options, path):
+    def download(self, options):
         """
         Download OregAnno from UCSC
         """
-        # 		self.downloadFilesFromFTP(self._remHost, dict(((f, self._remPath + f) for f in self._remFiles)))
         self.downloadFilesFromHTTP(
             self._remHost,
-            dict(((path + "/" + f, self._remPath + f) for f in self._remFiles)),
+            dict(((f, self._remPath + f) for f in self._remFiles)),  # noqa E501
         )
 
-        return [(path + "/" + f) for f in self._remFiles]
-
-    def update(self, options, path):
+    def update(self, options):
         """
         Update the database with the OregAnno data from ucsc
         """
 
-        self.log("deleting old records from the database ...\n")
+        self.log("deleting old records from the database ...")
         self.deleteAll()
-        self.log("deleting old records from the database completed\n")
+        self.log(" OK\n")
 
         # Add the 'oreganno' namespace
         ns = self.addNamespace("oreganno")
@@ -52,11 +49,6 @@ class Source_oreganno(loki_source.Source):
 
         # Add the types of Regions
         typeids = self.addTypes([("regulatory_region",), ("tfbs",), ("gene",)])
-        subtypeID = self.addSubtypes(
-            [
-                ("-",),
-            ]
-        )
 
         # Add the types of groups
         group_typeid = self.addType("regulatory_group")
@@ -74,19 +66,19 @@ class Source_oreganno(loki_source.Source):
         oreg_gene = {}
         oreg_tfbs = {}
         oreg_snp = {}
-        link_f = self.zfile(path + "/oregannoLink.txt.gz")
+        link_f = self.zfile("oregannoLink.txt.gz")
         entrez_ns = external_ns["entrez_gid"]
         ensembl_ns = external_ns["ensembl_gid"]
         symbol_ns = external_ns["symbol"]
-        self.log("parsing external links ...\n")
-        for l in link_f:
-            fields = l.split()
+        self.log("parsing external links ...")
+        for lx in link_f:
+            fields = lx.split()
             if fields[1] == "Gene":
                 oreg_id = fields[0]
                 if fields[2] in ("EnsemblGene", "EnsemblId"):
                     gene_id = fields[3].split(",")[
                         -1
-                    ]  # used to be "Homo_sapiens,ENSG123" but now just "ENSG123"
+                    ]  # used to be "Homo_sapiens,ENSG123" but now just "ENSG123"  # noqa E501
                     oreg_gene.setdefault(oreg_id, {})[ensembl_ns] = gene_id
                 elif fields[2] in ("EntrezGene", "NCBIGene"):
                     gene_id = fields[3]
@@ -96,7 +88,7 @@ class Source_oreganno(loki_source.Source):
                 if fields[2] in ("EnsemblGene", "EnsemblId"):
                     gene_id = fields[3].split(",")[
                         -1
-                    ]  # used to be "Homo_sapiens,ENSG123" but now just "ENSG123"
+                    ]  # used to be "Homo_sapiens,ENSG123" but now just "ENSG123"  # noqa E501
                     oreg_tfbs.setdefault(oreg_id, {})[ensembl_ns] = gene_id
                 elif fields[2] in ("EntrezGene", "NCBIGene"):
                     gene_id = fields[3]
@@ -106,16 +98,16 @@ class Source_oreganno(loki_source.Source):
                 oreg_snp[fields[0]] = fields[3][2:]
         # for l
         self.log(
-            "parsing external links completed: %d genes, %d TFBs, %d SNPs\n"
+            "OK: %d genes, %d TFBs, %d SNPs\n"
             % (len(oreg_gene), len(oreg_tfbs), len(oreg_snp))
         )
 
         # Now, create a dict of oreganno id->type
         oreganno_type = {}
-        self.log("parsing region attributes ...\n")
-        attr_f = self.zfile(path + "/oregannoAttr.txt.gz")
-        for l in attr_f:
-            fields = l.split("\t")
+        self.log("parsing region attributes ... ")
+        attr_f = self.zfile("oregannoAttr.txt.gz")
+        for lx in attr_f:
+            fields = lx.split("\t")
             if fields[1] == "type":
                 oreganno_type[fields[0]] = fields[2]
             elif fields[1] == "Gene":
@@ -123,22 +115,19 @@ class Source_oreganno(loki_source.Source):
             elif fields[1] == "TFbs":
                 oreg_tfbs.setdefault(fields[0], {})[symbol_ns] = fields[2]
         # for l
-        self.log(
-            "parsing region attributes completed: %d genes, %d TFBs\n"
-            % (len(oreg_gene), len(oreg_tfbs))
-        )
+        self.log("OK: %d genes, %d TFBs\n" % (len(oreg_gene), len(oreg_tfbs)))
 
         # OK, now parse the actual regions themselves
-        region_f = self.zfile(path + "/oreganno.txt.gz")
+        region_f = self.zfile("oreganno.txt.gz")
         oreganno_roles = []
         oreganno_regions = []
         oreganno_bounds = []
         oreganno_groups = {}
         oreganno_types = {}
-        self.log("parsing regulatory regions ...\n")
+        self.log("parsing regulatory regions ... ")
         snps_unmapped = 0
-        for l in region_f:
-            fields = l.split()
+        for lx in region_f:
+            fields = lx.split()
             chrom = self._loki.chr_num.get(fields[1][3:])
             start = int(fields[2]) + 1
             stop = int(fields[3])
@@ -175,15 +164,19 @@ class Source_oreganno(loki_source.Source):
             # if chrom and oreg_type
         # for l
         self.log(
-            "parsing regulatory regions completed (%d regions found, %d SNPs found, %d SNPs unmapped)\n"
+            "OK (%d regions found, %d SNPs found, %d SNPs unmapped)\n"
             % (len(oreganno_regions), len(oreganno_roles), snps_unmapped)
         )
 
-        self.log("writing to database ...\n")
+        self.log("writing to database ... ")
         self.addSNPEntrezRoles(oreganno_roles)
         reg_ids = self.addBiopolymers(oreganno_regions)
         self.addBiopolymerNamespacedNames(
-            ns, ((reg_ids[i], oreganno_regions[i][1]) for i in range(len(reg_ids)))
+            ns,
+            (
+                (reg_ids[i], oreganno_regions[i][1])
+                for i in range(len(reg_ids))  # noqa E501
+            ),  # noqa E501
         )
         bound_gen = zip(((r,) for r in reg_ids), oreganno_bounds)
         self.addBiopolymerLDProfileRegions(
@@ -195,7 +188,7 @@ class Source_oreganno(loki_source.Source):
         oreg_gids = self.addTypedGroups(
             group_typeid,
             (
-                (subtypeID["-"], "regulatory_%s" % k, "OregAnno Regulation of %s" % k)
+                ("regulatory_%s" % k, "OregAnno Regulation of %s" % k)
                 for k in oreg_genes
             ),
         )
@@ -213,32 +206,41 @@ class Source_oreganno(loki_source.Source):
             for oreg_id in oreganno_groups[gene_key]:
                 member_num += 1
                 group_membership.append(
-                    (gid, member_num, oreganno_types.get(oreg_id, 0), ns, oreg_id)
+                    (
+                        gid,
+                        member_num,
+                        oreganno_types.get(oreg_id, 0),
+                        ns,
+                        oreg_id,
+                    )  # noqa E501
                 )
-                for external_nsid, external_val in oreg_gene.get(oreg_id, {}).items():
+                for external_nsid, external_val in oreg_gene.get(
+                    oreg_id, {}
+                ).items():  # noqa E501
                     gene_member.add(
                         (gid, 1, typeids["gene"], external_nsid, external_val)
                     )
 
                 member_num += 1
-                for external_nsid, external_val in oreg_tfbs.get(oreg_id, {}).items():
-                    tfbs_member.setdefault(external_nsid, {})[external_val] = member_num
+                for external_nsid, external_val in oreg_tfbs.get(
+                    oreg_id, {}
+                ).items():  # noqa E501
+                    tfbs_member.setdefault(external_nsid, {})[
+                        external_val
+                    ] = member_num  # noqa E501
 
             group_membership.extend(gene_member)
             for ext_ns, d in tfbs_member.items():
                 for sym, mn in d.items():
-                    group_membership.append((gid, mn, typeids["gene"], ext_ns, sym))
+                    group_membership.append(
+                        (gid, mn, typeids["gene"], ext_ns, sym)
+                    )  # noqa E501
 
         self.addGroupMemberNames(group_membership)
 
-        self.log("writing to database completed\n")
+        self.log("OK\n")
 
         # store source metadata
-        self.setSourceBuilds(
-            None, 19
-        )  # TODO: check for latest FTP path rather than hardcoded /goldenPath/hg19/database/
-
-    # update()
-
-
-# Source_oreganno
+        self.setSourceBuilds(None, 19)
+        # TODO: check for latest FTP path rather than hardcoded
+        # /goldenPath/hg19/database/
