@@ -9,9 +9,6 @@ from loki_modules import loki_source
 
 class Source_dbsnp(loki_source.Source):
 
-    ##################################################
-    # private class data
-
     _chmList = (
         "1",
         "2",
@@ -42,9 +39,6 @@ class Source_dbsnp(loki_source.Source):
     )
     _grcBuild = None
 
-    ##################################################
-    # private class data
-
     def _identifyLatestSNPContig(self, filenames):
         bestbuild = 0
         bestfile = list()
@@ -55,9 +49,6 @@ class Source_dbsnp(loki_source.Source):
                 bestfile.append(filename[1].split(".bcp.gz")[0])
                 bestbuild = int(filename[0])
         return bestfile
-
-    ##################################################
-    # source interface
 
     @classmethod
     def getVersionString(cls):
@@ -94,8 +85,6 @@ class Source_dbsnp(loki_source.Source):
             options[o] = v
         return True
 
-    # validateOptions()
-
     def download(self, options, path):
         # define a callback to identify the latest SNPContigLocusId file
         def remFilesCallback(ftp, path):
@@ -123,8 +112,6 @@ class Source_dbsnp(loki_source.Source):
 
             return remFiles
 
-        # remFilesCallback
-
         remFiles = dict()
         for chm in self._chmList:
             remFiles[path + "/chr_%s.txt.gz" % chm] = (
@@ -139,14 +126,22 @@ class Source_dbsnp(loki_source.Source):
                 "/snp/organisms/database/shared_data/SnpFunctionCode.bcp.gz"
             )
             urlfolderpath = "/snp/organisms/human_9606/database/organism_data"
-            urlpath = urllib2.urlopen("https://ftp.ncbi.nih.gov" + urlfolderpath)  # noqa E501
+            urlpath = urllib2.urlopen(
+                "https://ftp.ncbi.nih.gov" + urlfolderpath
+            )  # noqa E501
             string = urlpath.read().decode("utf-8")
             onlyfiles = list(
-                set(re.findall(r"b([0-9]+)_SNPContigLocusId_(.*)\.bcp\.gz", string))  # noqa E501
+                set(
+                    re.findall(r"b([0-9]+)_SNPContigLocusId_(.*)\.bcp\.gz", string)
+                )  # noqa E501
             )
             bestfile = self._identifyLatestSNPContig(onlyfiles)
             bestfilename = (
-                "b" + bestfile[0] + "_SNPContigLocusId_" + bestfile[1] + ".bcp.gz"  # noqa E501
+                "b"
+                + bestfile[0]
+                + "_SNPContigLocusId_"
+                + bestfile[1]
+                + ".bcp.gz"  # noqa E501
             )
             if bestfile:
                 remFiles[path + "/" + bestfilename] = "%s/%s" % (
@@ -155,7 +150,6 @@ class Source_dbsnp(loki_source.Source):
                 )
 
         # download the latest source files
-        # 		self.downloadFilesFromFTP('ftp.ncbi.nih.gov', remFilesCallback)
         self.downloadFilesFromHTTP("ftp.ncbi.nih.gov", remFiles)
 
         return list(remFiles.keys())
@@ -209,16 +203,21 @@ class Source_dbsnp(loki_source.Source):
                     self.log("writing SNP merge records to the database ...\n")
                     self.addSNPMerges(setMerge)
                     setMerge = set()
-                    self.log("writing SNP merge records to the database completed\n")  # noqa E501
+                    self.log(
+                        "writing SNP merge records to the database completed\n"
+                    )  # noqa E501
             # foreach line in mergeFile
             numMerge += len(setMerge)
             self.log(
-                "processing SNP merge records completed: ~%d merged RS#s\n" % numMerge  # noqa E501
+                "processing SNP merge records completed: ~%d merged RS#s\n"
+                % numMerge  # noqa E501
             )
             if setMerge:
                 self.log("writing SNP merge records to the database ...\n")
                 self.addSNPMerges(setMerge)
-                self.log("writing SNP merge records to the database completed\n")  # noqa E501
+                self.log(
+                    "writing SNP merge records to the database completed\n"
+                )  # noqa E501
             setMerge = None
         # if merges
 
@@ -247,12 +246,18 @@ class Source_dbsnp(loki_source.Source):
                 code = int(words[0])
                 name = words[1]
                 desc = words[2]
-                coding = int(words[5]) if (len(words) > 5 and words[5] != "") else None  # noqa E501
-                exon = int(words[6]) if (len(words) > 6 and words[6] != "") else None  # noqa E501
+                coding = (
+                    int(words[5]) if (len(words) > 5 and words[5] != "") else None
+                )  # noqa E501
+                exon = (
+                    int(words[6]) if (len(words) > 6 and words[6] != "") else None
+                )  # noqa E501
 
                 roleID[code] = self.addRole(name, desc, coding, exon)
             # foreach line in codeFile
-            self.log("processing SNP role codes completed: %d codes\n" % len(roleID))  # noqa E501
+            self.log(
+                "processing SNP role codes completed: %d codes\n" % len(roleID)
+            )  # noqa E501
 
             # process SNP roles
             """ /* from human_9606_table.sql.gz */
@@ -295,7 +300,9 @@ CREATE TABLE [b137_SNPContigLocusId]
             funcFile = self.zfile(
                 list(
                     filter(
-                        re.compile(r"b([0-9]+)_SNPContigLocusId_(.*)\.bcp\.gz").match,  # noqa E501
+                        re.compile(
+                            r"b([0-9]+)_SNPContigLocusId_(.*)\.bcp\.gz"
+                        ).match,  # noqa E501
                         os.listdir(path),
                     )
                 )[0]
@@ -332,7 +339,9 @@ CREATE TABLE [b137_SNPContigLocusId]
             roleID = None
             # foreach line in funcFile
             numRole += len(setRole)
-            self.log("processing SNP roles completed: ~%d roles\n" % (numRole,))  # noqa E501
+            self.log(
+                "processing SNP roles completed: ~%d roles\n" % (numRole,)
+            )  # noqa E501
             if setRole:
                 self.log("writing SNP roles to the database ...\n")
                 self.addSNPEntrezRoles(setRole)
@@ -407,11 +416,15 @@ CREATE TABLE [b137_SNPContigLocusId]
         if not header2.startswith(
             "rs#\tmap\tsnp\tchr\tctg\ttotal\tchr\tctg\tctg\tctg\tctg\tchr\tlocal\tavg\ts.e.\tmax\tvali-\tgeno-\tlink\torig\tupd"  # noqa E501
         ):
-            raise Exception("ERROR: unrecognized file subheader '%s'" % header2)  # noqa E501
+            raise Exception(
+                "ERROR: unrecognized file subheader '%s'" % header2
+            )  # noqa E501
         if not header3.startswith(
             "\twgt\ttype\thits\thits\thits\t\tacc\tver\tID\tpos\tpos\tloci\thet\thet\tprob\tdated\ttypes\touts\tbuild\tbuild"  # noqa E501
         ):
-            raise Exception("ERROR: unrecognized file subheader '%s'" % header3)  # noqa E501
+            raise Exception(
+                "ERROR: unrecognized file subheader '%s'" % header3
+            )  # noqa E501
             # process lines
         numPos = numPosBatch = 0
         listChrPos = collections.defaultdict(list)
@@ -464,10 +477,13 @@ CREATE TABLE [b137_SNPContigLocusId]
                         )
                         # store data
                         self.log(
-                            "writing chromosome %s SNPs to the database ...\n" % fileChm  # noqa E501
+                            "writing chromosome %s SNPs to the database ...\n"
+                            % fileChm  # noqa E501
                         )
                         for chm, listPos in listChrPos.items():
-                            self.addChromosomeSNPLoci(self._loki.chr_num[chm], listPos)  # noqa E501
+                            self.addChromosomeSNPLoci(
+                                self._loki.chr_num[chm], listPos
+                            )  # noqa E501
                         listChrPos = collections.defaultdict(list)
                         self.log(
                             "writing chromosome %s SNPs to the database completed\n"  # noqa E501
@@ -475,13 +491,19 @@ CREATE TABLE [b137_SNPContigLocusId]
                         )
                 # if rs/chm/pos provided
         # foreach line in chmFile
-        self.log("processing chromosome %s SNPs: %d SNP loci\n" % (fileChm, numPos))  # noqa E501
+        self.log(
+            "processing chromosome %s SNPs: %d SNP loci\n" % (fileChm, numPos)
+        )  # noqa E501
         # store data
         if listChrPos:
-            self.log("writing chromosome %s SNPs to the database ...\n" % fileChm)  # noqa E501
+            self.log(
+                "writing chromosome %s SNPs to the database ...\n" % fileChm
+            )  # noqa E501
             for chm, listPos in listChrPos.items():
                 self.addChromosomeSNPLoci(self._loki.chr_num[chm], listPos)
-            self.log("writing chromosome %s SNPs to the database completed\n" % fileChm)  # noqa E501
+            self.log(
+                "writing chromosome %s SNPs to the database completed\n" % fileChm
+            )  # noqa E501
 
         # print results
         numPos += numPosBatch
@@ -490,7 +512,8 @@ CREATE TABLE [b137_SNPContigLocusId]
         setBadBuild.difference_update(setBadChr, setBadFilter, setBadVers)
         if setBadBuild:
             self.log(
-                "WARNING: %d SNPs not mapped to any GRCh build\n" % (len(setBadBuild))  # noqa E501
+                "WARNING: %d SNPs not mapped to any GRCh build\n"
+                % (len(setBadBuild))  # noqa E501
             )
         if setBadVers:
             self.log(
@@ -503,5 +526,7 @@ CREATE TABLE [b137_SNPContigLocusId]
                 % (len(setBadFilter))
             )
         if setBadChr:
-            self.log("WARNING: %d SNPs on mismatching chromosome\n" % (len(setBadChr)))  # noqa E501
+            self.log(
+                "WARNING: %d SNPs on mismatching chromosome\n" % (len(setBadChr))
+            )  # noqa E501
         listChrPos = setBadBuild = setBadVers = setBadFilter = setBadChr = None
