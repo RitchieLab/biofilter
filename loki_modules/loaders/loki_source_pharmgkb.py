@@ -6,7 +6,7 @@ class Source_pharmgkb(loki_source.Source):
 
     @classmethod
     def getVersionString(cls):
-        return "2.3 (2018-10-30)"
+        return "3.0.0 (2025-01-01)"
 
     def download(self, options, path):
         self.downloadFilesFromHTTPS(

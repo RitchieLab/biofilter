@@ -34,7 +34,7 @@ class Source_mint(loki_source.Source):
 
     @classmethod
     def getVersionString(cls):
-        return "2.2 (2018-02-20)"
+        return "3.0.0 (2025-01-01)"
 
     def download(self, options, path):
         self.downloadFilesFromHTTP(

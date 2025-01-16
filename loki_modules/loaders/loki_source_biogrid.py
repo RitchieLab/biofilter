@@ -6,7 +6,7 @@ class Source_biogrid(loki_source.Source):
 
     @classmethod
     def getVersionString(cls):
-        return "2.1 (2022-04-13)"
+        return "3.0.0 (2025-01-01)"
 
     def download(self, options, path):
         # download the latest source files

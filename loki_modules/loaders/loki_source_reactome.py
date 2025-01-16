@@ -7,7 +7,7 @@ class Source_reactome(loki_source.Source):
 
     @classmethod
     def getVersionString(cls):
-        return "2.1 (2015-01-23)"
+        return "3.0.0 (2025-01-01)"
 
     def download(self, options):
         # download the latest source files

@@ -26,7 +26,7 @@ class Source_chainfiles(loki_source.Source):
 
     @classmethod
     def getVersionString(cls):
-        return "2.2 (2014-06-27)"
+        return "3.0.0 (2025-01-01)"
 
     def download(self, options, path):
         # define callback to search for all available hgX liftover chain files

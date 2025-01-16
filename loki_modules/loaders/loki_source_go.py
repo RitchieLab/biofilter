@@ -7,7 +7,7 @@ class Source_go(loki_source.Source):
 
     @classmethod
     def getVersionString(cls):
-        return "2.1 (2022-04-14)"
+        return "3.0.0 (2025-01-01)"
 
     # getVersionString()
 

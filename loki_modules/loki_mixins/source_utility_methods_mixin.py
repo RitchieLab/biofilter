@@ -8,7 +8,7 @@ import urllib
 import urllib.request as urllib2
 import zlib
 import wget
-from datetime import datetime
+from datetime import datetime, timezone
 
 
 class SourceUtilityMethods:
@@ -211,7 +211,7 @@ class SourceUtilityMethods:
             if os.path.exists(locPath):
                 stat = os.stat(locPath)
                 locSize[locPath] = int(stat.st_size)
-                locTime[locPath] = datetime.datetime.fromtimestamp(
+                locTime[locPath] = datetime.fromtimestamp(
                     stat.st_mtime
                 )  # noqa E501
 
@@ -220,7 +220,7 @@ class SourceUtilityMethods:
         # format, but most servers return "ls -l"-ish space-delimited columns
         # (permissions) (?) (user) (group) (size) (month) (day) (year-or-time)
         # (filename)
-        now = datetime.datetime.utcnow()
+        now = datetime.now(timezone.utc)
 
         def ftpDirCB(rem_dir, line):
             words = line.split()
@@ -229,15 +229,15 @@ class SourceUtilityMethods:
                 remSize[remFn] = int(words[4])
                 timestamp = " ".join(words[5:8])
                 try:
-                    time = datetime.datetime.strptime(timestamp, "%b %d %Y")
+                    time = datetime.strptime(timestamp, "%b %d %Y")
                 except ValueError:
                     try:
-                        time = datetime.datetime.strptime(
+                        time = datetime.strptime(
                             "%s %d" % (timestamp, now.year), "%b %d %H:%M %Y"
                         )
                     except ValueError:
                         try:
-                            time = datetime.datetime.strptime(
+                            time = datetime.strptime(
                                 "%s %d" % (timestamp, now.year - 1),
                                 "%b %d %H:%M %Y",  # noqa E501
                             )
@@ -342,7 +342,7 @@ class SourceUtilityMethods:
             if os.path.exists(locPath):
                 stat = os.stat(locPath)
                 locSize[locPath] = int(stat.st_size)
-                locTime[locPath] = datetime.datetime.fromtimestamp(
+                locTime[locPath] = datetime.fromtimestamp(
                     stat.st_mtime
                 )  # noqa E501
         # check remote file sizes and times
@@ -366,11 +366,11 @@ class SourceUtilityMethods:
                 last_modified = info.get("last-modified")
                 if last_modified:
                     try:
-                        remTime[locPath] = datetime.datetime.strptime(
+                        remTime[locPath] = datetime.strptime(
                             last_modified, "%a, %d %b %Y %H:%M:%S %Z"
                         )
                     except ValueError:
-                        remTime[locPath] = datetime.datetime.utcnow()
+                        remTime[locPath] = datetime.now(timezone.utc)
 
                 response.close()
             self.log(" OK\n")

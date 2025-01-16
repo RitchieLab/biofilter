@@ -48,7 +48,7 @@ class Source_ucsc_ecr(loki_source.Source):
 
     @classmethod
     def getVersionString(cls):
-        return "2.0.1 (2013-03-01)"
+        return "3.0.0 (2025-01-01)"
 
     @classmethod
     def getOptions(cls):

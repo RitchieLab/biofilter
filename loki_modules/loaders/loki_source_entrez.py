@@ -7,7 +7,7 @@ class Source_entrez(loki_source.Source):
 
     @classmethod
     def getVersionString(cls):
-        return "2.4 (2022-04-12)"
+        return "3.0.0 (2025-01-01)"
 
     @classmethod
     def getOptions(cls):
@@ -378,9 +378,9 @@ class Source_entrez(loki_source.Source):
                     % (len(setBadChr))  # noqa E501
                 )
             self.logPop()
-            entrezChm = setOrphan = setBadNC = setBadBuild = setBadChr = setBadVers = (
+            entrezChm = setOrphan = setBadNC = setBadBuild = setBadChr = setBadVers = (  # noqa E501
                 buildGenes
-            ) = None  # noqa E501  # noqa E501
+            ) = None  # noqa E501
 
             # store gene regions
             self.log("writing gene regions to the database ...\n")

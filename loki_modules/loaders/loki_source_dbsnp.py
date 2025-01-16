@@ -52,7 +52,7 @@ class Source_dbsnp(loki_source.Source):
 
     @classmethod
     def getVersionString(cls):
-        return "2.3 (2018-11-01)"
+        return "3.0.0 (2025-01-01)"
 
     @classmethod
     def getOptions(cls):
@@ -132,7 +132,7 @@ class Source_dbsnp(loki_source.Source):
             string = urlpath.read().decode("utf-8")
             onlyfiles = list(
                 set(
-                    re.findall(r"b([0-9]+)_SNPContigLocusId_(.*)\.bcp\.gz", string)
+                    re.findall(r"b([0-9]+)_SNPContigLocusId_(.*)\.bcp\.gz", string)  # noqa E501
                 )  # noqa E501
             )
             bestfile = self._identifyLatestSNPContig(onlyfiles)
@@ -247,10 +247,10 @@ class Source_dbsnp(loki_source.Source):
                 name = words[1]
                 desc = words[2]
                 coding = (
-                    int(words[5]) if (len(words) > 5 and words[5] != "") else None
+                    int(words[5]) if (len(words) > 5 and words[5] != "") else None  # noqa E501
                 )  # noqa E501
                 exon = (
-                    int(words[6]) if (len(words) > 6 and words[6] != "") else None
+                    int(words[6]) if (len(words) > 6 and words[6] != "") else None  # noqa E501
                 )  # noqa E501
 
                 roleID[code] = self.addRole(name, desc, coding, exon)
@@ -261,38 +261,38 @@ class Source_dbsnp(loki_source.Source):
 
             # process SNP roles
             """ /* from human_9606_table.sql.gz */
-CREATE TABLE [b137_SNPContigLocusId]
-(
-[snp_id] [int] NULL ,
-[contig_acc] [varchar](32) NOT NULL ,
-[contig_ver] [tinyint] NULL ,
-[asn_from] [int] NULL ,
-[asn_to] [int] NULL ,
-[locus_id] [int] NULL ,
-[locus_symbol] [varchar](64) NULL ,
-[mrna_acc] [varchar](32) NOT NULL ,
-[mrna_ver] [smallint] NOT NULL ,
-[protein_acc] [varchar](32) NULL ,
-[protein_ver] [smallint] NULL ,
-[fxn_class] [int] NULL ,
-[reading_frame] [int] NULL ,
-[allele] [varchar](255) NULL ,
-[residue] [varchar](1000) NULL ,
-[aa_position] [int] NULL ,
-[build_id] [varchar](4) NOT NULL ,
-[ctg_id] [int] NULL ,
-[mrna_start] [int] NULL ,
-[mrna_stop] [int] NULL ,
-[codon] [varchar](1000) NULL ,
-[protRes] [char](3) NULL ,
-[contig_gi] [int] NULL ,
-[mrna_gi] [int] NULL ,
-[mrna_orien] [tinyint] NULL ,
-[cp_mrna_ver] [int] NULL ,
-[cp_mrna_gi] [int] NULL ,
-[verComp] [int] NULL
-)
-"""
+            CREATE TABLE [b137_SNPContigLocusId]
+            (
+            [snp_id] [int] NULL ,
+            [contig_acc] [varchar](32) NOT NULL ,
+            [contig_ver] [tinyint] NULL ,
+            [asn_from] [int] NULL ,
+            [asn_to] [int] NULL ,
+            [locus_id] [int] NULL ,
+            [locus_symbol] [varchar](64) NULL ,
+            [mrna_acc] [varchar](32) NOT NULL ,
+            [mrna_ver] [smallint] NOT NULL ,
+            [protein_acc] [varchar](32) NULL ,
+            [protein_ver] [smallint] NULL ,
+            [fxn_class] [int] NULL ,
+            [reading_frame] [int] NULL ,
+            [allele] [varchar](255) NULL ,
+            [residue] [varchar](1000) NULL ,
+            [aa_position] [int] NULL ,
+            [build_id] [varchar](4) NOT NULL ,
+            [ctg_id] [int] NULL ,
+            [mrna_start] [int] NULL ,
+            [mrna_stop] [int] NULL ,
+            [codon] [varchar](1000) NULL ,
+            [protRes] [char](3) NULL ,
+            [contig_gi] [int] NULL ,
+            [mrna_gi] [int] NULL ,
+            [mrna_orien] [tinyint] NULL ,
+            [cp_mrna_ver] [int] NULL ,
+            [cp_mrna_gi] [int] NULL ,
+            [verComp] [int] NULL
+            )
+            """
             self.log("processing SNP roles ...\n")
             setRole = set()
             numRole = numOrphan = numInc = 0
@@ -502,7 +502,7 @@ CREATE TABLE [b137_SNPContigLocusId]
             for chm, listPos in listChrPos.items():
                 self.addChromosomeSNPLoci(self._loki.chr_num[chm], listPos)
             self.log(
-                "writing chromosome %s SNPs to the database completed\n" % fileChm
+                "writing chromosome %s SNPs to the database completed\n" % fileChm  # noqa E501
             )  # noqa E501
 
         # print results
@@ -527,6 +527,6 @@ CREATE TABLE [b137_SNPContigLocusId]
             )
         if setBadChr:
             self.log(
-                "WARNING: %d SNPs on mismatching chromosome\n" % (len(setBadChr))
+                "WARNING: %d SNPs on mismatching chromosome\n" % (len(setBadChr))  # noqa E501
             )  # noqa E501
         listChrPos = setBadBuild = setBadVers = setBadFilter = setBadChr = None

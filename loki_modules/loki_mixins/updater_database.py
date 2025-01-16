@@ -80,8 +80,12 @@ class UpdaterDatabaseMixin:
                 # temp for now but should replace options everywhere below
                 self._sourceOptions[srcName] = options
 
+            # ----------------------------------------------
+            # Start Parallel Download and Hashing
+
             downloadAndHashThreads = {}
             srcSetsToDownload = sorted(srcSet)
+            # Create buffer to run in parallel
             for srcName in srcSetsToDownload:
                 # download files into a local cache
                 if not cacheOnly:
@@ -95,9 +99,13 @@ class UpdaterDatabaseMixin:
                     )
                     downloadAndHashThreads[srcName].start()
 
+            # Wait for all download and hash threads to finish
             for srcName in downloadAndHashThreads.keys():
                 downloadAndHashThreads[srcName].join()
                 self.log(srcName + " rejoined main thread\n")
+
+            # Return the flow of the code to the main thread
+            # ----------------------------------------------
 
             for srcName in srcSetsToDownload:
                 srcObj = self._sourceObjects[srcName]

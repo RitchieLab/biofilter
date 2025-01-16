@@ -10,7 +10,7 @@ class Source_gwas(loki_source.Source):
 
     @classmethod
     def getVersionString(cls):
-        return "2.5 (2016-09-19)"
+        return "3.0.0 (2025-01-01)"
 
     def download(self, options, path):
         # download the latest source files
