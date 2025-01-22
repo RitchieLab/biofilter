@@ -2,3 +2,14 @@
 - Merged development branch to Main branch
 - Change development branch to 3.0.1 version
 - Comparacao entre o Schema do Biofilter 2.4.4 e 3.0.0 (nao vi diferencas)
+
+- Create package 3.0.1 
+
+Start version 3.0.2
+- TODO
+    - Create log file in loki-build
+    - Fix arg source problem
+    - Improve time
+    - Propose to read a read-db from cloud
+
+

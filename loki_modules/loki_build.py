@@ -77,6 +77,7 @@ import shutil
 import sys
 import tarfile
 import tempfile
+import logging
 
 from loki_modules import loki_db
 
@@ -247,32 +248,6 @@ def main():
 
     # parse arguments
     args = parser.parse_args()
-
-    # 	# parse memory allotment, if any
-    # 	memLimit = 64*1024*1024 # default 64mb for sqlite (+ ~1gb for updater itself) # noqa: E501
-    # 	if args.memory:
-    # 		m = args.memory.upper()
-    # 		if m.endswith('B'):
-    # 			m = m[:-1]
-    # 		if m.endswith('T'):
-    # 			m = float(m[:-1]) * 1024 * 1024 * 1024 * 1024
-    # 		elif m.endswith('G'):
-    # 			m = float(m[:-1]) * 1024 * 1024 * 1024
-    # 		elif m.endswith('M'):
-    # 			m = float(m[:-1]) * 1024 * 1024
-    # 		elif m.endswith('K'):
-    # 			m = float(m[:-1]) * 1024
-    # 		else:
-    # 			m = float(m)
-    # 		m = long(m)
-    # 		if m < 1024*1024*1024:
-    # 			print "WARNING: ignoring '%s' memory allotment, the updater requires ~1gb at minimum" % args.memory  # noqa: E501
-    # 		else:
-    # 			print "using ~%1.1fMB of memory" % (m / (1024 * 1024))
-    # 			memLimit = max(memLimit, m - 1024*1024*1024)
-    # 	#if args.memory
-
-    # set $TMPDIR so sqlite will use it for vacuum etc.
     if args.temp_directory:
         if not os.path.isdir(args.temp_directory):
             print("ERROR: '%s' is not a directory")
@@ -281,35 +256,61 @@ def main():
 
     # instantiate database object
     db = loki_db.Database(testing=args.test_data, updating=True)
+    db.log(
+        "-- STARTING LOKI BUILD SCRIPT --",
+        level=logging.CRITICAL,
+        indent=0
+        )  # noqa E501
+
     db.setVerbose(args.verbose or (not args.quiet))
     db.attachDatabaseFile(args.knowledge)
 
     # list sources?
+    srcSet = {}
     if args.list_sources is not None:
+        db.log("Data source selected manually:", level=logging.INFO, indent=0)
         srcSet = set()
         for srcList in args.list_sources:
             srcSet |= set(srcList)
         if (not srcSet) or ("+" in srcSet):
-            print("available source loaders:")
+            # print("available source loaders:")
             srcSet = set()
         else:
-            print("source loader options:")
+            pass
+            # print("source loader options:")
         moduleVersions = db.getSourceModuleVersions(srcSet)
         moduleOptions = db.getSourceModuleOptions(srcSet)
         for srcName in sorted(moduleOptions.keys()):
-            print("  %s : %s" % (srcName, moduleVersions[srcName]))
+            db.log(
+                "%s : %s" % (srcName, moduleVersions[srcName]),
+                level=logging.INFO,
+                indent=2
+            )  # noqa E501
             if moduleOptions[srcName]:
                 for srcOption in sorted(moduleOptions[srcName].keys()):
-                    print(
-                        "    %s = %s"
-                        % (srcOption, moduleOptions[srcName][srcOption])  # noqa: E501
-                    )
+                    db.log(
+                        "%s = %s"
+                        % (srcOption, moduleOptions[srcName][srcOption]),
+                        level=logging.INFO,
+                        indent=4
+                    )  # noqa E501
             elif srcSet:
-                print("    <no options>")
+                db.log("<no options>", level=logging.INFO, indent=4)
+    srcSet = srcSet or None
+
+    # Check if we are updating the database
+    if args.update is None and args.update_except is None:
+        db.log(
+            "Either '--update' or '--update-except' must be specified to update the knowledge database",  # noqa: E501
+            level=logging.WARNING,
+            indent=0
+        )
+        sys.exit(1)
 
     # pass options?
     userOptions = {}
     if args.option is not None:
+        db.log("Data source option:", level=logging.INFO, indent=0)
         for optList in args.option:
             srcName = optList[0]
             if srcName not in userOptions:
@@ -317,14 +318,20 @@ def main():
             for optString in optList[1].split(","):
                 opt, val = optString.split("=", 1)
                 userOptions[srcName][opt] = val
+                db.log(
+                    "%s" % userOptions[srcName][opt],
+                    level=logging.INFO,
+                    indent=2
+                    )  # noqa E501
     userOptions = userOptions or None
 
-    # parse requested update sources
-    srcSet = None  # BUG: overwritten the srcSet variable
+    # Process the update argument
     if args.update is not None:
-        srcSet = set()
+        srcSet = set(srcSet)
         for srcList in args.update:
             srcSet |= set(srcList)
+
+    # Process the update-except argument
     notSet = None
     if args.update_except is not None:
         notSet = set()
@@ -336,7 +343,11 @@ def main():
     if (srcSet is not None) or (notSet is not None):
         db.testDatabaseWriteable()
         if db.getDatabaseSetting("finalized", int):
-            print("ERROR: cannot update a finalized database")
+            db.log(
+                "Cannot update a finalized database",
+                level=logging.ERROR,
+                indent=0
+            )
             sys.exit(1)
         if srcSet and "+" in srcSet:
             srcSet = set()
@@ -352,17 +363,28 @@ def main():
             )  # noqa: E501
         )
         if args.temp_directory:
-            print("using temporary directory '%s'" % cacheDir)
+            db.log(
+                "Using temporary directory '%s'" % cacheDir,
+                level=logging.INFO,
+                indent=0
+            )
 
         # try/finally to make sure we clean up the cache dir at the end
         try:
             if fromArchive:
+                db.log(
+                    "Selected source data FROM archive",
+                    level=logging.INFO,
+                    indent=0
+                )
                 if os.path.exists(fromArchive) and tarfile.is_tarfile(
                     fromArchive
                 ):  # noqa: E501
-                    print(
-                        "unpacking archived source data files from '%s' ..."
-                        % fromArchive
+                    db.log(
+                        "Unpacking archived source data files from '%s' ..."
+                        % fromArchive,
+                        level=logging.INFO,
+                        indent=2
                     )
                     with tarfile.open(name=fromArchive, mode="r:*") as archive:
                         archive.errorlevel = 2
@@ -382,13 +404,18 @@ def main():
                                 continue
                             archive.extractall(cacheDir, [member])
                     # with archive
-                    print("... OK")
-                else:
-                    print(
-                        "source data archive '%s' not found, starting fresh"
-                        % fromArchive
+                    db.log(
+                        "... OK",
+                        level=logging.INFO,
+                        indent=2
                     )
-            # if fromArchive
+                else:
+                    db.log(
+                        "Source data archive '%s' not found, starting fresh"
+                        % fromArchive,
+                        level=logging.WARNING,
+                        indent=2
+                    )
 
             os.chdir(cacheDir)
             updateOK = db.updateDatabase(
@@ -398,22 +425,36 @@ def main():
 
             # create output archive, if requested
             if toArchive and not args.cache_only:
-                print("archiving source data files in '%s' ..." % toArchive)
+                db.log(
+                    "Selected source data TO archive",
+                    level=logging.INFO,
+                    indent=0
+                )
+                db.log(
+                    "Archiving source data files in '%s' ..." % toArchive,
+                    level=logging.INFO,
+                    indent=2
+                )
                 with tarfile.open(name=toArchive, mode="w:gz") as archive:
                     archive.errorlevel = 2
                     for filename in sorted(os.listdir(cacheDir)):
                         archive.add(
                             os.path.join(cacheDir, filename), arcname=filename
                         )  # noqa: E501
-                print("... OK")
+                db.log(
+                    "... OK",
+                    level=logging.INFO,
+                    indent=2
+                )
         finally:
             # clean up cache directory
             def rmtree_error(func, path, exc):
-                print(
-                    "WARNING: unable to remove temporary file '%s': %s\n"
-                    % (path, exc)  # noqa: E501
+                db.log(
+                    "Unable to remove temporary file '%s': %s"
+                    % (path, exc),
+                    level=logging.WARNING,
+                    indent=0
                 )
-
             shutil.rmtree(cacheDir, onerror=rmtree_error)
     # update
 
@@ -421,9 +462,10 @@ def main():
         # finalize?
         if args.finalize and (not db.getDatabaseSetting("finalized", int)):
             if not updateOK:
-                print(
-                    "WARNING: errors encountered during knowledge database"
-                    + "update; skipping finalization step"
+                db.log(
+                    "Errors encountered during knowledge database update",
+                    level=logging.ERROS,
+                    indent=0
                 )
             else:
                 db.testDatabaseWriteable()
@@ -434,14 +476,20 @@ def main():
             not db.getDatabaseSetting("optimized", int)
         ):  # noqa: E501
             if not updateOK:
-                print(
-                    "WARNING: errors encountered during knowledge database"
-                    + " update; skipping optimization step"
+                db.log(
+                    "Errors encountered during knowledge database update",
+                    level=logging.ERROR,
+                    indent=0
                 )
             else:
                 db.testDatabaseWriteable()
                 db.optimizeDatabase()
-    # if knowledge
+
+    db.log(
+        f"-- FINISHED LOKI BUILD SCRIPT --\nLog file: {db.get_log_file()}",
+        level=logging.CRITICAL,
+        indent=0
+    )
 
 
 if __name__ == "__main__":

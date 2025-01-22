@@ -1,6 +1,7 @@
 import os
 import importlib
 from threading import Lock
+import logging
 
 import loki_modules.loki_db as loki_db
 import loki_modules.loki_source as loki_source
@@ -41,14 +42,31 @@ class Updater(
     ##################################################
     # logging
 
-    def log(self, message=""):
-        return self._loki.log(message)
+    def log(self, message="", level=logging.INFO, indent=0):
+        """
+        Logs a message through the associated Database instance.
 
-    def logPush(self, message=None):
-        return self._loki.logPush(message)
+        Args:
+            message (str): The message to log.
+            level (int): Logging level (e.g., logging.INFO).
+            indent (int): Indentation level for the log.
+        """
+        return self._loki.log(message=message, level=level, indent=indent)
 
-    def logPop(self, message=None):
-        return self._loki.logPop(message)
+    def log_exception(self, error):
+        """
+        Logs an exception through the associated Database instance.
+
+        Args:
+            error (Exception): The exception to log.
+        """
+        return self._loki.log_exception(error)
+
+    # def logPush(self, message=None):
+    #     return self._loki.logPush(message)
+
+    # def logPop(self, message=None):
+    #     return self._loki.logPop(message)
 
     ##################################################
     # database update
@@ -94,7 +112,11 @@ class Updater(
         for srcName in set(sources) if sources else self._sourceLoaders.keys():
             if srcName not in self._sourceClasses:
                 if srcName not in self._sourceLoaders:
-                    self.log("WARNING: unknown source '%s'\n" % srcName)
+                    self.log(
+                        "WARNING: unknown source '%s'\n" % srcName,
+                        level=logging.WARNING,
+                        indent=0
+                    )
                     continue
                 # if module not available
                 srcModule = importlib.import_module(
@@ -103,7 +125,9 @@ class Updater(
                 srcClass = getattr(srcModule, "Source_%s" % srcName)
                 if not issubclass(srcClass, loki_source.Source):
                     self.log(
-                        "WARNING: invalid module for source '%s'\n" % srcName
+                        "WARNING: invalid module for source '%s'\n" % srcName,
+                        level=logging.WARNING,
+                        indent=0,
                     )  # noqa: E501
                     continue
                 self._sourceClasses[srcName] = srcClass

@@ -8,7 +8,9 @@ import urllib
 import urllib.request as urllib2
 import zlib
 import wget
+from tqdm import tqdm
 from datetime import datetime, timezone
+import logging
 
 
 class SourceUtilityMethods:
@@ -183,16 +185,19 @@ class SourceUtilityMethods:
         # remFiles=function(ftp) or
         # {'filename.ext':'/path/on/remote/host/to/filename.ext',...}
         # connect to source server
-        self.log("connecting to FTP server %s ..." % remHost)
+        self.log(
+            "connecting to FTP server %s ..." % remHost,
+            level=logging.INFO,
+            )  # noqa E501
         ftp = ftplib.FTP(remHost, timeout=21600)
         ftp.login()  # anonymous
-        self.log(" OK\n")
+        self.log(" OK\n", level=logging.INFO)
 
         # if remFiles is callable, let it identify the files it wants
         if hasattr(remFiles, "__call__"):
-            self.log("locating current files ...")
+            self.log("locating current files ...", level=logging.INFO)
             remFiles = remFiles(ftp)
-            self.log(" OK\n")
+            self.log(" OK\n", level=logging.INFO)
 
         # check local file sizes and times, and identify
         # all needed remote paths
@@ -211,9 +216,7 @@ class SourceUtilityMethods:
             if os.path.exists(locPath):
                 stat = os.stat(locPath)
                 locSize[locPath] = int(stat.st_size)
-                locTime[locPath] = datetime.fromtimestamp(
-                    stat.st_mtime
-                )  # noqa E501
+                locTime[locPath] = datetime.fromtimestamp(stat.st_mtime)  # noqa E501
 
         # define FTP directory list parser
         # unfortunately the FTP protocol doesn't specify an easily parse-able
@@ -258,15 +261,15 @@ class SourceUtilityMethods:
         self.log(" OK\n")
 
         # download files as needed
-        self.logPush("downloading changed files ...\n")
+        self.log("downloading changed files ...\n")
         for locPath in sorted(remFiles.keys()):
             if (
                 remSize[remFiles[locPath]] == locSize[locPath]
                 and remTime[remFiles[locPath]] <= locTime[locPath]
             ):
-                self.log("%s: up to date\n" % locPath)
+                self.log("%s: up to date\n" % locPath, level=logging.INFO, indent=1)  # noqa E501
             else:
-                self.log("%s: downloading ...\n" % locPath)
+                self.log("%s: downloading ...\n" % locPath, level=logging.INFO, indent=1)  # noqa E501
                 # TODO: download to temp file, then rename?
                 with open(locPath, "wb") as locFile:
                     # ftp.cwd(remFiles[locPath][0:remFiles[locPath].rfind('/')])
@@ -274,7 +277,7 @@ class SourceUtilityMethods:
 
                 # TODO: verify file size and retry a few times if necessary
 
-                self.log("... OK\n")
+                self.log("... OK\n", level=logging.INFO, indent=1)
 
             modTime = time.mktime(remTime[remFiles[locPath]].utctimetuple())
             os.utime(locPath, (modTime, modTime))
@@ -285,7 +288,11 @@ class SourceUtilityMethods:
         except Exception:
             ftp.close()
 
-        self.logPop("... OK\n")
+        self.log(
+            "... OK\n",
+            level=logging.INFO,
+            indent=0,
+            )
 
     def getHTTPHeaders(self, remHost, remURL, reqData=None, reqHeaders=None):
         class NoRedirection(urllib2.HTTPErrorProcessor):
@@ -326,9 +333,102 @@ class SourceUtilityMethods:
             "https", remHost, remFiles, reqHeaders, alwaysDownload
         )  # noqa E501
 
+    # def _downloadHTTP(
+    #     self, remProtocol, remHost, remFiles, reqHeaders, alwaysDownload
+    # ):  # noqa E501
+    #     # check local file sizes and times
+    #     remSize = {}
+    #     remTime = {}
+    #     locSize = {}
+    #     locTime = {}
+    #     for locPath in remFiles:
+    #         remSize[locPath] = None
+    #         remTime[locPath] = None
+    #         locSize[locPath] = None
+    #         locTime[locPath] = None
+    #         if os.path.exists(locPath):
+    #             stat = os.stat(locPath)
+    #             locSize[locPath] = int(stat.st_size)
+    #             locTime[locPath] = datetime.fromtimestamp(stat.st_mtime)  # noqa E501
+    #     # check remote file sizes and times
+    #     if not alwaysDownload:
+    #         self.log("identifying changed files ...", level=logging.INFO)
+    #         for locPath in remFiles:
+    #             request = urllib2.Request(
+    #                 remProtocol + "://" + remHost + remFiles[locPath]
+    #             )
+    #             request.get_method = lambda: "HEAD"
+    #             request.add_header("user-agent", "RitchieLab/LOKI")
+    #             for k, v in (reqHeaders or {}).items():
+    #                 request.add_header(k, v)
+    #             response = urllib2.urlopen(request)
+    #             info = response.info()
+
+    #             content_length = info.get("content-length")
+    #             if content_length:
+    #                 remSize[locPath] = int(content_length)
+
+    #             last_modified = info.get("last-modified")
+    #             if last_modified:
+    #                 try:
+    #                     remTime[locPath] = datetime.strptime(
+    #                         last_modified, "%a, %d %b %Y %H:%M:%S %Z"
+    #                     )
+    #                 except ValueError:
+    #                     remTime[locPath] = datetime.now(timezone.utc)
+
+    #             response.close()
+    #         self.log(" OK\n", level=logging.INFO)
+    #     # if not alwaysDownload
+
+    #     # download files as needed
+    #     self.log("downloading changed files ...\n", level=logging.INFO, indent=1)  # noqa E501
+    #     for locPath in sorted(remFiles.keys()):
+    #         if (
+    #             remSize[locPath]
+    #             and remSize[locPath] == locSize[locPath]
+    #             and remTime[locPath]
+    #             and remTime[locPath] <= locTime[locPath]
+    #         ):
+    #             self.log("%s: up to date\n" % locPath, level=logging.INFO)
+    #         else:
+    #             self.log("%s: downloading ..." % locPath, level=logging.INFO)
+    #             # TODO: download to temp file, then rename?
+    #             if remProtocol == "https":
+    #                 with open(locPath, "wb") as locFile:
+    #                     request = urllib2.Request(
+    #                         remProtocol + "://" + remHost + remFiles[locPath]
+    #                     )
+    #                     request.add_header("user-agent", "RitchieLab/LOKI")
+    #                     for k, v in (reqHeaders or {}).items():
+    #                         request.add_header(k, v)
+    #                     response = urllib2.urlopen(request)
+    #                     while True:
+    #                         data = response.read()
+    #                         if not data:
+    #                             break
+    #                         locFile.write(data)
+    #                     response.close()
+    #                 self.log(" OK\n", level=logging.INFO)
+    #                 continue
+
+    #             link = remProtocol + "://" + remHost + remFiles[locPath]
+    #             wget.download(link)
+    #             os.rename(remFiles[locPath].rsplit("/")[-1], locPath)
+
+    #             self.log(" OK\n", level=logging.INFO, indent=1)
+    #         if remTime[locPath]:
+    #             modTime = time.mktime(remTime[locPath].utctimetuple())
+    #             os.utime(locPath, (modTime, modTime))
+    #     self.log(
+    #         "... OK\n",
+    #         level=logging.INFO,
+    #         indent=0,
+    #         )
+
     def _downloadHTTP(
-        self, remProtocol, remHost, remFiles, reqHeaders, alwaysDownload
-    ):  # noqa E501
+            self, remProtocol, remHost, remFiles, reqHeaders, alwaysDownload
+            ):
         # check local file sizes and times
         remSize = {}
         remTime = {}
@@ -342,12 +442,11 @@ class SourceUtilityMethods:
             if os.path.exists(locPath):
                 stat = os.stat(locPath)
                 locSize[locPath] = int(stat.st_size)
-                locTime[locPath] = datetime.fromtimestamp(
-                    stat.st_mtime
-                )  # noqa E501
+                locTime[locPath] = datetime.fromtimestamp(stat.st_mtime)
+
         # check remote file sizes and times
         if not alwaysDownload:
-            self.log("identifying changed files ...")
+            self.log("identifying changed files ...", level=logging.INFO)
             for locPath in remFiles:
                 request = urllib2.Request(
                     remProtocol + "://" + remHost + remFiles[locPath]
@@ -373,11 +472,10 @@ class SourceUtilityMethods:
                         remTime[locPath] = datetime.now(timezone.utc)
 
                 response.close()
-            self.log(" OK\n")
-        # if not alwaysDownload
+            self.log(" OK\n", level=logging.INFO)
 
         # download files as needed
-        self.logPush("downloading changed files ...\n")
+        self.log("downloading changed files ...\n", level=logging.INFO, indent=1)
         for locPath in sorted(remFiles.keys()):
             if (
                 remSize[locPath]
@@ -385,34 +483,40 @@ class SourceUtilityMethods:
                 and remTime[locPath]
                 and remTime[locPath] <= locTime[locPath]
             ):
-                self.log("%s: up to date\n" % locPath)
+                self.log(f"{locPath}: up to date\n", level=logging.INFO)
             else:
-                self.log("%s: downloading ..." % locPath)
-                # TODO: download to temp file, then rename?
-                if remProtocol == "https":
-                    with open(locPath, "wb") as locFile:
-                        request = urllib2.Request(
-                            remProtocol + "://" + remHost + remFiles[locPath]
-                        )
-                        request.add_header("user-agent", "RitchieLab/LOKI")
-                        for k, v in (reqHeaders or {}).items():
-                            request.add_header(k, v)
-                        response = urllib2.urlopen(request)
+                self.log(f"{locPath}: downloading ...", level=logging.INFO)
+                link = f"{remProtocol}://{remHost}{remFiles[locPath]}"
+
+                with open(locPath, "wb") as locFile:
+                    request = urllib2.Request(link)
+                    request.add_header("user-agent", "RitchieLab/LOKI")
+                    for k, v in (reqHeaders or {}).items():
+                        request.add_header(k, v)
+
+                    # Download com barra de progresso
+                    response = urllib2.urlopen(request)
+                    total_size = remSize[locPath] or 0
+                    chunk_size = 1024
+                    with tqdm(
+                        total=total_size,
+                        unit="B",
+                        unit_scale=True,
+                        desc=f"Downloading {os.path.basename(locPath)}",
+                        dynamic_ncols=True,  # Ajusta automaticamente o tamanho da barra
+                        leave=True,  # Deixa a barra finalizada no console
+                    ) as progress:
                         while True:
-                            data = response.read()
+                            data = response.read(chunk_size)
                             if not data:
                                 break
                             locFile.write(data)
-                        response.close()
-                    self.log(" OK\n")
-                    continue
+                            progress.update(len(data))
+                    response.close()
 
-                link = remProtocol + "://" + remHost + remFiles[locPath]
-                wget.download(link)
-                os.rename(remFiles[locPath].rsplit("/")[-1], locPath)
+                self.log(" OK\n", level=logging.INFO)
 
-                self.log(" OK\n")
             if remTime[locPath]:
                 modTime = time.mktime(remTime[locPath].utctimetuple())
                 os.utime(locPath, (modTime, modTime))
-        self.logPop("... OK\n")
+        self.log("... OK\n", level=logging.INFO, indent=0)

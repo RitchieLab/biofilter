@@ -7,6 +7,7 @@ import sys
 import traceback
 import shutil
 from threading import Thread
+import logging
 
 
 class UpdaterDatabaseMixin:
@@ -24,16 +25,27 @@ class UpdaterDatabaseMixin:
             raise Exception("cannot update a finalized database")
 
         # check for extraneous options
-        self.logPush("preparing for update ...\n")
+        self.log(
+            "preparing for update ...\n",
+            level=logging.INFO,
+            indent=0
+            )
         srcSet = self.attachSourceModules(sources)
         srcOpts = sourceOptions or {}
         for srcName in srcOpts.keys():
             if srcName not in srcSet:
                 self.log(
                     "WARNING: not updating from source '%s' for which options were supplied\n"  # noqa: E501
-                    % srcName
+                    % srcName,
+                    level=logging.WARNING,
+                    indent=1,
                 )
-        logIndent = self.logPop("preparing for update completed\n")
+        self.log(
+            "preparing for update completed\n",
+            level=logging.INFO,
+            indent=0
+            )  # noqa: E501
+        logIndent = 1
 
         # update all specified sources
         iwd = os.path.abspath(os.getcwd())
@@ -58,7 +70,7 @@ class UpdaterDatabaseMixin:
                 options = srcOpts.get(srcName, prevOptions).copy()
                 optionsList = sorted(options)
                 if optionsList:
-                    self.logPush(
+                    self.log(
                         "%s %s options ...\n"
                         % (
                             (
@@ -67,7 +79,9 @@ class UpdaterDatabaseMixin:
                                 else "loading prior"
                             ),  # noqa: E501
                             srcName,
-                        )
+                            ),
+                        level=logging.INFO,
+                        indent=logIndent,
                     )
                 msg = srcObj.validateOptions(options)
                 if msg is not True:
@@ -75,7 +89,11 @@ class UpdaterDatabaseMixin:
                 if optionsList:
                     for opt in optionsList:
                         self.log("%s = %s\n" % (opt, options[opt]))
-                    self.logPop("... OK\n")
+                    self.log(
+                        "... OK\n",
+                        level=logging.INFO,
+                        indent=logIndent,
+                        )  # noqa: E501
 
                 # temp for now but should replace options everywhere below
                 self._sourceOptions[srcName] = options
@@ -102,7 +120,11 @@ class UpdaterDatabaseMixin:
             # Wait for all download and hash threads to finish
             for srcName in downloadAndHashThreads.keys():
                 downloadAndHashThreads[srcName].join()
-                self.log(srcName + " rejoined main thread\n")
+                self.log(
+                    srcName + " rejoined main thread\n",
+                    level=logging.INFO,
+                    indent=0,
+                )
 
             # Return the flow of the code to the main thread
             # ----------------------------------------------
@@ -178,7 +200,10 @@ class UpdaterDatabaseMixin:
                         )
                     else:
                         # process new files (or old files with a new loader)
-                        self.logPush("processing %s data ...\n" % srcName)
+                        self.log(
+                            "processing %s data ...\n" % srcName,
+                            level=logging.INFO,
+                            indent=1,)
 
                         cursor.execute(
                             """
@@ -226,24 +251,38 @@ class UpdaterDatabaseMixin:
                         )
                         cursor.executemany(sql, self._filehash.values())
 
-                        self.logPop("processing %s data completed\n" % srcName)
+                        self.log(
+                            "processing %s data completed\n" % srcName,
+                            level=logging.INFO,
+                            indent=1,
+                            )
                     # if skip
-                except:  # noqa: E722
+                except Exception as e:
                     srcErrors.add(srcName)
                     excType, excVal, excTrace = sys.exc_info()
-                    while self.logPop() > logIndent:
-                        pass
-                    self.logPush("ERROR: failed to update %s\n" % (srcName,))
+                    # while self.logPop() > logIndent:
+                    #     pass
+                    self.log(
+                        "ERROR: failed to update %s\n" % (srcName,),
+                        level=logging.ERROR,
+                        indent=logIndent,
+                        )
+                    self.log_exception(e)
                     if excTrace:
                         for line in traceback.format_list(
                             traceback.extract_tb(excTrace)[-1:]
                         ):
-                            self.log(line)
+                            self.log(
+                                line,
+                                level=logging.ERROR,
+                                indent=logIndent,)
                     for line in traceback.format_exception_only(
                         excType, excVal
                     ):  # noqa E501
-                        self.log(line)
-                    self.logPop()
+                        self.log(
+                            line,
+                            level=logging.ERROR,
+                            indent=logIndent,)
                     cursor.execute(
                         "ROLLBACK TRANSACTION TO SAVEPOINT 'updateDatabase_%s'"
                         % (srcName,)
@@ -263,7 +302,11 @@ class UpdaterDatabaseMixin:
             #   http://genome.ucsc.edu/goldenPath/releaseLog.html
             # TODO: find a better machine-readable source for this data
             if not cacheOnly:
-                self.log("updating GRCh:UCSChg genome build identities ...\n")
+                self.log(
+                    "updating GRCh:UCSChg genome build identities ...\n",
+                    level=logging.INFO,
+                    indent=0,
+                    )
                 import urllib.request as urllib2
                 import re
 
@@ -318,7 +361,9 @@ class UpdaterDatabaseMixin:
                         rowHuman = False
                 # foreach tablerow
                 self.log(
-                    "updating GRCh:UCSChg genome build identities completed\n"  # noqa: E501
+                    "updating GRCh:UCSChg genome build identities completed\n",
+                    level=logging.INFO,
+                    indent=0,  # noqa: E501
                 )
             # if not cacheOnly
 
@@ -355,12 +400,16 @@ class UpdaterDatabaseMixin:
             ):
                 self.log(
                     "WARNING: unrecognized genome build for '%s' (NCBI GRCh%s, UCSC hg%s)\n"  # noqa: E501
-                    % (row[0], (row[1] or "?"), (row[2] or "?"))
-                )
+                    % (row[0], (row[1] or "?"), (row[2] or "?")),
+                    level=logging.WARNING,
+                    indent=0,
+                    )
                 mismatch = True
             if mismatch:
                 self.log(
-                    "WARNING: database may contain incomparable genome positions!\n"  # noqa: E501
+                    "WARNING: database may contain incomparable genome positions!\n",  # noqa: E501
+                    level=logging.WARNING,
+                    indent=0,
                 )
 
             # check all sources' UCSChg build versions and set the latest as
@@ -376,7 +425,9 @@ class UpdaterDatabaseMixin:
                 targetHG = max(hgSources)
                 self.log(
                     "database genome build: GRCh%s / UCSChg%s\n"
-                    % (ucscGRC.get(targetHG, "?"), targetHG)
+                    % (ucscGRC.get(targetHG, "?"), targetHG),
+                    level=logging.INFO,
+                    indent=0,
                 )
                 targetUpdated = (
                     self._loki.getDatabaseSetting("ucschg", int) != targetHG
@@ -500,20 +551,38 @@ class UpdaterDatabaseMixin:
                 )  # noqa: E501
             if self._tablesUpdated:
                 self._loki.setDatabaseSetting("optimized", 0)
-            self.log("updating database completed\n")
-        except:  # noqa: E722
+            self.log(
+                "updating database completed\n",
+                level=logging.INFO,
+                indent=0,
+                )
+        except Exception as e:
+            self.log_exception(e)
             excType, excVal, excTrace = sys.exc_info()
-            while self.logPop() > logIndent:
-                pass
-            self.logPush("ERROR: failed to update the database\n")
+            # while self.logPop() > logIndent:
+            #     pass
+            self.log(
+                "ERROR: failed to update the database\n",
+                level=logging.ERROR,
+                indent=logIndent,
+                )
+
             if excTrace:
                 for line in traceback.format_list(
                     traceback.extract_tb(excTrace)[-1:]
                 ):  # noqa: E501
-                    self.log(line)
+                    self.log(
+                        line,
+                        level=logging.ERROR,
+                        indent=logIndent,
+                        )
             for line in traceback.format_exception_only(excType, excVal):
-                self.log(line)
-            self.logPop()
+                self.log(
+                    line,
+                    level=logging.ERROR,
+                    indent=logIndent,
+                    )
+            # self.logPop()
             cursor.execute(
                 "ROLLBACK TRANSACTION TO SAVEPOINT 'updateDatabase'"
             )  # noqa: E501
@@ -527,9 +596,16 @@ class UpdaterDatabaseMixin:
 
         # report and return
         if srcErrors:
-            self.logPush("WARNING: data from these sources was not updated:\n")
+            self.log(
+                "WARNING: data from these sources was not updated:\n",
+                level=logging.WARNING,
+                indent=0,
+                )
             for srcName in sorted(srcErrors):
-                self.log("%s\n" % srcName)
-            self.logPop()
+                self.log(
+                    "%s\n" % srcName,
+                    level=logging.WARNING,
+                    indent=1,
+                    )
             return False
         return True

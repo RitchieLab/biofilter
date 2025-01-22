@@ -378,9 +378,9 @@ class Source_entrez(loki_source.Source):
                     % (len(setBadChr))  # noqa E501
                 )
             self.logPop()
-            entrezChm = setOrphan = setBadNC = setBadBuild = setBadChr = setBadVers = (  # noqa E501
+            entrezChm = setOrphan = setBadNC = setBadBuild = setBadChr = setBadVers = (
                 buildGenes
-            ) = None  # noqa E501
+            ) = None  # noqa E501  # noqa E501
 
             # store gene regions
             self.log("writing gene regions to the database ...\n")

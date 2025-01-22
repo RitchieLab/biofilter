@@ -1,12 +1,15 @@
 # #################################################
 # UPDATER LIFTOVER MIXIN
 # #################################################
+import logging
 
 
 class UpdaterLiftOverMixin:
     def liftOverSNPLoci(self, oldHG, newHG, sourceIDs):
         self.log(
-            "lifting over SNP loci from hg%d to hg%d ..." % (oldHG, newHG)  # noqa E501
+            "lifting over SNP loci from hg%d to hg%d ..." % (oldHG, newHG),  # noqa E501
+            level=logging.INFO,
+            indent=0,
         )
         self.prepareTableForUpdate("snp_locus")
         cursor = self._db.cursor()
@@ -68,10 +71,18 @@ class UpdaterLiftOverMixin:
             maxRowID = minRowID + 2500000 - 1
         # foreach batch
 
-        self.log(" OK: %d loci lifted over, %d dropped\n" % (numLift, numNull))
+        self.log(
+            " OK: %d loci lifted over, %d dropped\n" % (numLift, numNull),
+            level=logging.INFO,
+            indent=0,
+            )
 
     def liftOverRegions(self, oldHG, newHG, sourceIDs):
-        self.log("lifting over regions from hg%d to hg%d ..." % (oldHG, newHG))
+        self.log(
+            "lifting over regions from hg%d to hg%d ..." % (oldHG, newHG),
+            level=logging.INFO,
+            indent=0,
+            )
         self.prepareTableForUpdate("biopolymer_region")
         cursor = self._db.cursor()
         numLift = numNull = 0
@@ -139,5 +150,7 @@ class UpdaterLiftOverMixin:
 
         self.log(
             " OK: %d regions lifted over, %d dropped\n"
-            % (numLift, numNull)  # noqa E501
+            % (numLift, numNull),
+            level=logging.INFO,
+            indent=0,
         )

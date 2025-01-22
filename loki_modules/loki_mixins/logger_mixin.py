@@ -1,25 +1,118 @@
 # #################################################
 # LOGING MIXIN
 # #################################################
-import datetime
+import os
+import traceback
+import logging
+from logging.handlers import RotatingFileHandler
+from colorama import Fore, Style
 
 
 class LoggerMixin:
-    def _checkTesting(self):
+    def init_logger(self, log_file="loki.log", log_level=logging.INFO):
         """
-        Checks and updates the testing setting in the database.
+        Initializes the logger.
+
+        Args:
+            log_file (str): Path to the log file.
+            log_level (int): Logging level (e.g., logging.INFO).
+        """
+        self._log_file = os.path.abspath(log_file)
+        self._logger = logging.getLogger(self.__class__.__name__)
+        if not self._logger.handlers:  # Avoid adding multiple handlers
+            # Set up file handler
+            file_handler = RotatingFileHandler(
+                log_file, maxBytes=5 * 1024 * 1024, backupCount=3
+            )
+            file_formatter = logging.Formatter(
+                "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+            )
+            file_handler.setFormatter(file_formatter)
+            self._logger.addHandler(file_handler)
+
+            # Set up console handler with colors
+            if self.getVerbose():
+                console_handler = logging.StreamHandler()
+                console_formatter = logging.Formatter(
+                    "%(asctime)s - %(name)s: %(message)s"
+                )
+                console_handler.setFormatter(
+                    self.ColoredFormatter(console_formatter)
+                    )  # noqa: E501
+                self._logger.addHandler(console_handler)
+
+            self._logger.setLevel(log_level)
+
+    def log(self, message="", level=logging.INFO, indent=0):
+        """
+        Logs a message with the specified level and indent.
+
+        Args:
+            message (str): The message to log.
+            level (int): Logging level (e.g., logging.INFO).
+            indent (int): Number of spaces to indent the log level.
+        """
+        if message:
+            indented_message = " " * indent + message
+            self._logger.log(level, indented_message)
+
+    class ColoredFormatter(logging.Formatter):
+        """
+        Custom formatter to add colors to log messages based on their level.
+        """
+
+        COLORS = {
+            logging.DEBUG: Fore.BLUE,
+            logging.INFO: Fore.LIGHTBLACK_EX,
+            logging.WARNING: Fore.YELLOW,
+            logging.ERROR: Fore.RED,
+            logging.CRITICAL: Fore.GREEN,
+        }
+
+        def __init__(self, formatter):
+            super().__init__()
+            self.formatter = formatter
+
+        def format(self, record):
+            color = self.COLORS.get(record.levelno, Fore.WHITE)
+            message = self.formatter.format(record)
+            return f"{color}{message}{Style.RESET_ALL}"
+
+    def log_exception(self, error):
+        """
+        Logs an exception with traceback.
+
+        Args:
+            error (Exception): The exception object to log.
+        """
+        if self._logger:
+            self._logger.error("Exception occurred: %s", str(error))
+            self._logger.error(traceback.format_exc())
+
+        """
+        How to usem this method:
+        << BEFORE >>
+        try:
+            # Code with error
+        except Exception as e:
+            print("Error:", e)
+
+        << NOW >>
+        try:
+            # Code with error
+        except Exception as e:
+            self.log_exception(e)
+            raise ...
+        """
+
+    def get_log_file(self):
+        """
+        Returns the absolute path to the log file.
 
         Returns:
-            bool: True if testing settings match, otherwise False.
+            str: Absolute path to the log file.
         """
-        now_test = self.getDatabaseSetting("testing")
-        if now_test is None or bool(int(now_test)) == bool(self._is_test):
-            self.setDatabaseSetting("testing", bool(self._is_test))
-            return True
-        else:
-            return False
-
-    # setTesting(is_test)
+        return self._log_file
 
     def getVerbose(self):
         """
@@ -30,8 +123,6 @@ class LoggerMixin:
         """
         return self._verbose
 
-    # getVerbose()
-
     def setVerbose(self, verbose=True):
         """
         Sets the verbosity setting.
@@ -41,100 +132,3 @@ class LoggerMixin:
             disable.
         """
         self._verbose = verbose
-
-    # setVerbose()
-
-    def setLogger(self, logger=None):
-        """
-        Sets the logger object.
-
-        Args:
-                logger (Logger, optional): The logger object.
-        """
-        self._logger = logger
-
-    def log(self, message=""):
-        """
-        Logs a message to the configured logger or standard output with
-        indentation.
-
-        Args:
-            message (str, optional): The message to log. Defaults to an empty
-            string.
-
-        Returns:
-            int: The current indentation level.
-
-        The function logs the message with appropriate indentation and handles
-        line breaks. If a logger is set, it uses the logger to log the message.
-        If verbose logging is enabled, it writes the message to the standard
-        output with indentation.
-        """
-        if message != "" and message != "\n":
-            logtime = datetime.datetime.now().strftime("%d.%b %Y %H:%M:%S")
-            message = logtime + " " + message
-
-        if self._logger:
-            return self._logger.log(message)
-        if self._verbose:
-            if (self._logIndent > 0) and (not self._logHanging):
-                self._logFile.write(self._logIndent * "  ")
-                self._logHanging = True
-            self._logFile.write(message)
-            if (message == "") or (message[-1] != "\n"):
-                self._logHanging = True
-                self._logFile.flush()
-            else:
-                self._logHanging = False
-        return self._logIndent
-
-    # log()
-
-    def logPush(self, message=None):
-        """
-        Logs a message and increases the indentation level.
-
-        Args:
-            message (str, optional): The message to log. Defaults to None.
-
-        Returns:
-            int: The new indentation level.
-
-        The function logs the message if provided and increases the
-        indentation level for subsequent logs. If a logger is set, it uses the
-        logger to log the message.
-        """
-
-        if self._logger:
-            return self._logger.logPush(message)
-        if message:
-            self.log(message)
-        if self._logHanging:
-            self.log("\n")
-        self._logIndent += 1
-        return self._logIndent
-
-    # logPush()
-
-    def logPop(self, message=None):
-        """
-        Decreases the indentation level and logs a message.
-
-        Args:
-            message (str, optional): The message to log. Defaults to None.
-
-        Returns:
-            int: The new indentation level.
-
-        The function decreases the indentation level and logs the message if
-        provided. If a logger is set, it uses the logger to log the message.
-        """
-
-        if self._logger:
-            return self._logger.logPop(message)
-        if self._logHanging:
-            self.log("\n")
-        self._logIndent = max(0, self._logIndent - 1)
-        if message:
-            self.log(message)
-        return self._logIndent

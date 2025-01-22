@@ -1,6 +1,7 @@
 import apsw
-import sys
 
+# import sys
+import logging
 
 from loki_mixins import (
     Schema,
@@ -93,19 +94,35 @@ class Database(
             tempMem (bool, optional): If True, uses memory for temporary
             storage.
         """
+
         # initialize instance properties
         self._is_test = testing
         self._updating = updating
         self._verbose = True
-        self._logger = None
-        self._logFile = sys.stderr
-        self._logIndent = 0
-        self._logHanging = False
         self._db = apsw.Connection("")
         self._dbFile = None
         self._dbNew = None
         self._updater = None
         self._liftOverCache = dict()  # { (from,to) : [] }
+
+        # set the verbosity level
+        # self.setVerbose(self._verbose)
+
+        # initialize logger
+        self.init_logger(
+            log_file="loki-build.log",
+            log_level=logging.DEBUG if testing else logging.INFO,
+        )
+
+        # initialize the database
+        self.log(
+            "DATABASE INSTANCE CREATED AND LOGGING SYSTEM INITIALIZED.",  # noqa: E501
+            level=logging.CRITICAL
+            )
+        self.log(
+            f"Log file: {self.get_log_file()}\n",  # noqa: E501
+            level=logging.CRITICAL
+            )
 
         self.configureDatabase(tempMem=tempMem)
         self.attachDatabaseFile(dbFile)

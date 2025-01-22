@@ -3,6 +3,7 @@
 # #################################################
 import hashlib
 import os
+import logging
 
 
 class UpdaterDownloadMixin:
@@ -13,19 +14,30 @@ class UpdaterDownloadMixin:
         options = self._sourceOptions[srcName]
 
         try:
-            self.log("downloading %s data ...\n" % srcName)
+            self.log(
+                "downloading %s data ...\n" % srcName,
+                level=logging.INFO,
+                indent=2,)
             # switch to a temp subdirectory for this source
             path = os.path.join(iwd, srcName)
             if not os.path.exists(path):
                 os.makedirs(path)
             downloadedFiles = srcObj.download(options, path)
-            self.log("downloading %s data completed\n" % srcName)
+            self.log(
+                "downloading %s data completed\n" % srcName,
+                level=logging.INFO,
+                indent=2,
+                )
 
             # calculate source file metadata
             # all timestamps are assumed to be in UTC, but if a source
             # provides file timestamps with no TZ (like via FTP) we use them
             # as-is and assume they're supposed to be UTC
-            self.log("analyzing %s data files ...\n" % srcName)
+            self.log(
+                "analyzing %s data files ...\n" % srcName,
+                level=logging.INFO,
+                indent=2,
+                )
             for filename in downloadedFiles:
                 stat = os.stat(filename)
                 md5 = hashlib.md5()
@@ -42,7 +54,12 @@ class UpdaterDownloadMixin:
                     md5.hexdigest(),
                 )
                 self.lock.release()
-            self.log("analyzing %s data files completed\n" % srcName)
-        except:  # noqa: E722
-            self.log("failed loading %s\n" % srcName)
+            self.log(
+                "analyzing %s data files completed\n" % srcName,
+                level=logging.INFO,
+                indent=2,
+                )
+        except Exception as e:
+            self.log_exception(e)
             # ToDo: determine how to handle failures
+            # raise

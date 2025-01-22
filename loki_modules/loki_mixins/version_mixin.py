@@ -67,3 +67,20 @@ class VersionMixin:
             str: The APSW library version.
         """
         return apsw.apswversion()
+
+    # Add these methods in own class
+    def _checkTesting(self):
+        """
+        Checks and updates the testing setting in the database.
+
+        Returns:
+            bool: True if testing settings match, otherwise False.
+        """
+        now_test = self.getDatabaseSetting("testing")
+        if now_test is None or bool(int(now_test)) == bool(self._is_test):
+            self.setDatabaseSetting("testing", bool(self._is_test))
+            return True
+        else:
+            return False
+
+    # setTesting(is_test)

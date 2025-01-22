@@ -2,6 +2,7 @@
 # DATABASE MANAGEMENT MIXIN
 # #################################################
 import apsw
+import logging
 
 
 class DatabaseConfigMixin:
@@ -56,42 +57,49 @@ class DatabaseConfigMixin:
         The function sets various PRAGMA settings to optimize performance for
         typical usage scenarios.
         """
-        cursor = self._db.cursor()
-        db = ("%s." % db) if db else ""
+        try:
+            self.log("Configuring the database...", level=logging.INFO)
+            cursor = self._db.cursor()
+            db = ("%s." % db) if db else ""
 
-        # linux VFS doesn't usually report actual disk cluster size,
-        # so sqlite ends up using 1KB pages by default; we prefer 4KB
-        cursor.execute("PRAGMA %spage_size = 4096" % (db,))
+            # linux VFS doesn't usually report actual disk cluster size,
+            # so sqlite ends up using 1KB pages by default; we prefer 4KB
+            cursor.execute("PRAGMA %spage_size = 4096" % (db,))
 
-        # cache_size is pages if positive, kibibytes if negative;
-        # seems to only affect write performance
-        cursor.execute("PRAGMA %scache_size = -65536" % (db,))
+            # cache_size is pages if positive, kibibytes if negative;
+            # seems to only affect write performance
+            cursor.execute("PRAGMA %scache_size = -65536" % (db,))
 
-        # for typical read-only usage, synchronization behavior is moot anyway,
-        # and while updating we're not that worried about a power failure
-        # corrupting the database file since the user could just start the
-        # update over from the beginning; so, we'll take the performance gain
-        cursor.execute("PRAGMA %ssynchronous = OFF" % (db,))
+            # for typical read-only usage, synchronization behavior is moot
+            # anyway, and while updating we're not that worried about a power
+            # failure corrupting the database file since the user could just
+            # start the update over from the beginning; so, we'll take the
+            # performance gain
+            cursor.execute("PRAGMA %ssynchronous = OFF" % (db,))
 
-        # the journal isn't that big, so keeping it in memory is faster; the
-        # cost is that a system crash will corrupt the database rather than
-        # leaving it recoverable with the on-disk journal (a program crash
-        # should be fine since sqlite rollback transactions before exiting)
-        cursor.execute("PRAGMA %sjournal_mode = MEMORY" % (db,))
+            # the journal isn't that big, so keeping it in memory is faster;
+            # cost is that a system crash will corrupt the database rather than
+            # leaving it recoverable with the on-disk journal (a program crash
+            # should be fine since sqlite rollback transactions before exiting)
+            cursor.execute("PRAGMA %sjournal_mode = MEMORY" % (db,))
 
-        # the temp store is used for all of sqlite's internal scratch space
-        # needs, such as the TEMP database, indexing, etc; keeping it in memory
-        # is much faster, but it can get quite large
-        if tempMem and not db:
-            cursor.execute("PRAGMA temp_store = MEMORY")
+            # the temp store is used for all of sqlite's internal scratch space
+            # needs, such as the TEMP database, indexing, etc; keeping it in
+            # memory is much faster, but it can get quite large
+            if tempMem and not db:
+                cursor.execute("PRAGMA temp_store = MEMORY")
 
-        # we want EXCLUSIVE while updating since the data shouldn't be read
-        # until ready and we want the performance gain; for normal read usage,
-        # NORMAL is better so multiple users can share a database file
-        cursor.execute(
-            "PRAGMA %slocking_mode = %s"
-            % (db, ("EXCLUSIVE" if self._updating else "NORMAL"))
-        )
+            # we want EXCLUSIVE while updating since the data shouldn't be read
+            # until ready and we want the performance gain; for normal read
+            # usage, NORMAL is better so multiple users can share a database
+            # file
+            cursor.execute(
+                "PRAGMA %slocking_mode = %s"
+                % (db, ("EXCLUSIVE" if self._updating else "NORMAL"))
+            )
+        except Exception as e:
+            self.log_exception(e)
+            raise
 
     def attachTempDatabase(self, db):
         """
@@ -134,7 +142,8 @@ class DatabaseConfigMixin:
         # detach the current db file, if any
         if self._dbFile and not quiet:
             self.log(
-                "unloading knowledge database file '%s' ..." % self._dbFile
+                "unloading knowledge database file '%s' ..." % self._dbFile,
+                level=logging.ERROR,
             )  # noqa E501
         try:
             cursor.execute("DETACH DATABASE `db`")
@@ -151,9 +160,12 @@ class DatabaseConfigMixin:
         # attach the new db file, if any
         if dbFile:
             if not quiet:
-                self.logPush(
-                    "loading knowledge database file '%s' ..." % dbFile
+                self.log(
+                    "loading knowledge database file '%s'" % dbFile,
+                    level=logging.WARNING,
+                    indent=1,
                 )  # noqa E501
+
             cursor.execute("ATTACH DATABASE ? AS `db`", (dbFile,))
             self._dbFile = dbFile
             self._dbNew = 0 == max(
@@ -183,13 +195,19 @@ class DatabaseConfigMixin:
 
             if ok:
                 if not quiet:
-                    self.logPop("loading knowledge database file completed\n")
+                    self.log(
+                        "loading knowledge database file completed\n",
+                        level=logging.CRITICAL,
+                        indent=1,
+                    )  # noqa E501
             else:
                 self._dbFile = None
                 self._dbNew = None
                 cursor.execute("DETACH DATABASE `db`")
                 if not quiet:
-                    self.logPop("... ERROR (" + err_msg + ")\n")
+                    self.log(
+                        "... ERROR (" + err_msg + ")\n", level=logging.ERROR, indent=1
+                    )  # noqa E501
 
     def detachDatabaseFile(self, quiet=False):
         """

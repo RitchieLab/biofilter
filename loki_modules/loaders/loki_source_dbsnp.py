@@ -132,7 +132,9 @@ class Source_dbsnp(loki_source.Source):
             string = urlpath.read().decode("utf-8")
             onlyfiles = list(
                 set(
-                    re.findall(r"b([0-9]+)_SNPContigLocusId_(.*)\.bcp\.gz", string)  # noqa E501
+                    re.findall(
+                        r"b([0-9]+)_SNPContigLocusId_(.*)\.bcp\.gz", string
+                    )  # noqa E501
                 )  # noqa E501
             )
             bestfile = self._identifyLatestSNPContig(onlyfiles)
@@ -247,10 +249,14 @@ class Source_dbsnp(loki_source.Source):
                 name = words[1]
                 desc = words[2]
                 coding = (
-                    int(words[5]) if (len(words) > 5 and words[5] != "") else None  # noqa E501
+                    int(words[5])
+                    if (len(words) > 5 and words[5] != "")
+                    else None  # noqa E501
                 )  # noqa E501
                 exon = (
-                    int(words[6]) if (len(words) > 6 and words[6] != "") else None  # noqa E501
+                    int(words[6])
+                    if (len(words) > 6 and words[6] != "")
+                    else None  # noqa E501
                 )  # noqa E501
 
                 roleID[code] = self.addRole(name, desc, coding, exon)
@@ -502,7 +508,8 @@ class Source_dbsnp(loki_source.Source):
             for chm, listPos in listChrPos.items():
                 self.addChromosomeSNPLoci(self._loki.chr_num[chm], listPos)
             self.log(
-                "writing chromosome %s SNPs to the database completed\n" % fileChm  # noqa E501
+                "writing chromosome %s SNPs to the database completed\n"
+                % fileChm  # noqa E501
             )  # noqa E501
 
         # print results
@@ -527,6 +534,7 @@ class Source_dbsnp(loki_source.Source):
             )
         if setBadChr:
             self.log(
-                "WARNING: %d SNPs on mismatching chromosome\n" % (len(setBadChr))  # noqa E501
+                "WARNING: %d SNPs on mismatching chromosome\n"
+                % (len(setBadChr))  # noqa E501
             )  # noqa E501
         listChrPos = setBadBuild = setBadVers = setBadFilter = setBadChr = None

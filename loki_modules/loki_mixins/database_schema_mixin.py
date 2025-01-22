@@ -2,6 +2,7 @@
 # DATABASE MANAGEMENT MIXIN
 # #################################################
 import apsw
+import logging
 
 
 class DatabaseSchemaMixin:
@@ -226,7 +227,11 @@ class DatabaseSchemaMixin:
         cursor = self._db.cursor()
 
         if self.getDatabaseSetting("schema", int) < 2:
-            self.logPush("updating database schema to version 2 ...\n")
+            self.log(
+                "updating database schema to version 2 ...\n",
+                level=logging.INFO,
+                indent=1,
+            )
             updateMap = {
                 "snp_merge": "rsMerged,rsCurrent,source_id",
                 "snp_locus": "rs,chr,pos,validated,source_id",
@@ -234,7 +239,7 @@ class DatabaseSchemaMixin:
                 "snp_biopolymer_role": "rs,biopolymer_id,role_id,source_id",
             }
             for tblName, tblColumns in updateMap.iteritems():
-                self.log("%s ..." % (tblName,))
+                self.log("%s ..." % (tblName,), level=logging.INFO)
                 cursor.execute(
                     "ALTER TABLE `db`.`%s` RENAME TO `___old_%s___`"
                     % (tblName, tblName)
@@ -246,18 +251,20 @@ class DatabaseSchemaMixin:
                 )
                 cursor.execute("DROP TABLE `db`.`___old_%s___`" % (tblName,))
                 self.createDatabaseIndices(None, "db", tblName)
-                self.log(" OK\n")
+                self.log(" OK\n", level=logging.INFO)
             self.setDatabaseSetting("schema", 2)
-            self.logPop("... OK\n")
+            self.log("... OK\n", level=logging.INFO)
         # schema<2
 
         if self.getDatabaseSetting("schema", int) < 3:
-            self.log("updating database schema to version 3 ...")
+            self.log(
+                "updating database schema to version 3 ...", level=logging.INFO
+            )  # noqa: E501
             self.setDatabaseSetting(
                 "optimized", self.getDatabaseSetting("finalized", int)
             )
             self.setDatabaseSetting("schema", 3)
-            self.log(" OK\n")
+            self.log(" OK\n", level=logging.INFO)
         # schema<3
 
     # updateDatabaseSchema()
@@ -370,35 +377,41 @@ class DatabaseSchemaMixin:
                     elif doRepair and tblEmpty[tblName]:
                         self.log(
                             "WARNING: table '%s' schema mismatch -- repairing ..."  # noqa: E501
-                            % tblName
+                            % tblName,
+                            level=logging.WARNING,
                         )
                         self.dropDatabaseTables(schema, dbName, tblName)
                         self.createDatabaseTables(schema, dbName, tblName)
                         current[tblName]["index"] = dict()
-                        self.log(" OK\n")
+                        self.log(" OK\n", level=logging.INFO)
                     elif doRepair:
                         self.log(
                             "ERROR: table '%s' schema mismatch -- cannot repair\n"  # noqa: E501
-                            % tblName
+                            % tblName,
+                            level=logging.ERROR,
                         )
                         ok = False
                     else:
                         self.log(
-                            "ERROR: table '%s' schema mismatch\n" % tblName
+                            "ERROR: table '%s' schema mismatch\n" % tblName,
+                            level=logging.ERROR,
                         )  # noqa: E501
                         ok = False
                     # if definition match
                 elif doRepair:
                     self.log(
                         "WARNING: table '%s' is missing -- repairing ..."
-                        % tblName  # noqa: E501
+                        % tblName,  # noqa: E501
+                        level=logging.WARNING,  # noqa: E501
                     )
                     self.createDatabaseTables(
                         schema, dbName, tblName, doIndecies
                     )  # noqa: E501
-                    self.log(" OK\n")
+                    self.log(" OK\n", level=logging.INFO)
                 else:
-                    self.log("ERROR: table '%s' is missing\n" % tblName)
+                    self.log(
+                        "ERROR: table '%s' is missing\n" % tblName, level=logging.ERROR
+                    )  # noqa: E501
                     ok = False
                 # if tblName in current
             # if doTables
@@ -409,7 +422,8 @@ class DatabaseSchemaMixin:
                     ):  # noqa: E501
                         self.log(
                             "ERROR: table '%s' is missing for index '%s'\n"
-                            % (tblName, idxName)
+                            % (tblName, idxName),
+                            level=logging.ERROR,
                         )
                         ok = False
                     elif (
@@ -432,7 +446,8 @@ class DatabaseSchemaMixin:
                         elif doRepair:
                             self.log(
                                 "WARNING: index '%s' on table '%s' schema mismatch -- repairing ..."  # noqa: E501
-                                % (idxName, tblName)
+                                % (idxName, tblName),
+                                level=logging.WARNING,
                             )
                             self.dropDatabaseIndices(
                                 schema, dbName, tblName, idxName
@@ -440,27 +455,30 @@ class DatabaseSchemaMixin:
                             self.createDatabaseIndices(
                                 schema, dbName, tblName, False, idxName
                             )
-                            self.log(" OK\n")
+                            self.log(" OK\n", level=logging.INFO)
                         else:
                             self.log(
                                 "ERROR: index '%s' on table '%s' schema mismatch\n"  # noqa: E501
-                                % (idxName, tblName)
+                                % (idxName, tblName),
+                                level=logging.ERROR,
                             )
                             ok = False
                         # if definition match
                     elif doRepair:
                         self.log(
                             "WARNING: index '%s' on table '%s' is missing -- repairing ..."  # noqa: E501
-                            % (idxName, tblName)
+                            % (idxName, tblName),
+                            level=logging.WARNING,
                         )
                         self.createDatabaseIndices(
                             schema, dbName, tblName, False, idxName
                         )
-                        self.log(" OK\n")
+                        self.log(" OK\n", level=logging.INFO)
                     else:
                         self.log(
                             "ERROR: index '%s' on table '%s' is missing\n"
-                            % (idxName, tblName)
+                            % (idxName, tblName),
+                            level=logging.ERROR,
                         )
                         ok = False
                     # if tblName,idxName in current
@@ -483,7 +501,7 @@ class DatabaseSchemaMixin:
         Returns:
                 None
         """
-        self.log("discarding intermediate data ...")
+        self.log("discarding intermediate data ...", level=logging.INFO)
         self.dropDatabaseTables(
             None,
             "db",
@@ -499,7 +517,7 @@ class DatabaseSchemaMixin:
             ("snp_entrez_role", "biopolymer_name_name", "group_member_name"),
             True,
         )
-        self.log(" OK\n")
+        self.log(" OK\n", level=logging.INFO)
         self.setDatabaseSetting("finalized", 1)
         self.setDatabaseSetting("optimized", 0)
 
@@ -517,10 +535,15 @@ class DatabaseSchemaMixin:
                 None
         """
         self._db.cursor().execute("ANALYZE `db`")
-        self.log("updating optimizer statistics completed\n")
+        self.log(
+            "updating optimizer statistics completed\n",
+            level=logging.CRITICAL,
+        )  # noqa: E501
         self.defragmentDatabase()
         self.setDatabaseSetting("optimized", 1)
-        self.log("compacting knowledge database file completed\n")
+        self.log(
+            "compacting knowledge database file completed\n", level=logging.CRITICAL
+        )  # noqa: E501
 
     # optimizeDatabase()
 

@@ -1,11 +1,12 @@
 # #################################################
 # UPDATER OPERATIONS MIXIN
 # #################################################
+import logging
 
 
 class UpdaterOperationsMixin:
     def cleanupSNPMerges(self):
-        self.log("verifying SNP merge records ...")
+        self.log("verifying SNP merge records ...", level=logging.INFO, indent=0)
         self.prepareTableForQuery("snp_merge")
         dbc = self._db.cursor()
 
@@ -23,10 +24,10 @@ class UpdaterOperationsMixin:
             dbc.executemany(
                 "DELETE FROM `db`.`snp_merge` WHERE _ROWID_ = ?", cull  # noqa E501
             )
-        self.log(" OK: %d duplicate merges\n" % (len(cull),))
+        self.log(" OK: %d duplicate merges\n" % (len(cull),), level=logging.INFO, indent=0)
 
     def updateMergedSNPLoci(self):
-        self.log("checking for merged SNP loci ...")
+        self.log("checking for merged SNP loci ...", level=logging.INFO, indent=0)
         self.prepareTableForQuery("snp_locus")
         self.prepareTableForQuery("snp_merge")
         dbc = self._db.cursor()
@@ -41,10 +42,10 @@ class UpdaterOperationsMixin:
         numCopied = self._db.changes()
         if numCopied:
             self.flagTableUpdate("snp_locus")
-        self.log(" OK: %d loci copied\n" % (numCopied,))
+        self.log(" OK: %d loci copied\n" % (numCopied,), level=logging.INFO, indent=0)
 
     def cleanupSNPLoci(self):
-        self.log("verifying SNP loci ...")
+        self.log("verifying SNP loci ...", level=logging.INFO, indent=0)
         self.prepareTableForQuery("snp_locus")
         dbc = self._db.cursor()
         # for each set of ROWIDs which constitute a duplicated snp-locus,
@@ -70,10 +71,10 @@ class UpdaterOperationsMixin:
             dbc.executemany(
                 "DELETE FROM `db`.`snp_locus` WHERE _ROWID_ = ?", cull  # noqa E501
             )
-        self.log(" OK: %d duplicate loci\n" % (len(cull),))
+        self.log(" OK: %d duplicate loci\n" % (len(cull),), level=logging.INFO, indent=0)
 
     def updateMergedSNPEntrezRoles(self):
-        self.log("checking for merged SNP roles ...")
+        self.log("checking for merged SNP roles ...", level=logging.INFO, indent=0)
         self.prepareTableForQuery("snp_entrez_role")
         self.prepareTableForQuery("snp_merge")
         dbc = self._db.cursor()
@@ -89,10 +90,10 @@ class UpdaterOperationsMixin:
         numCopied = self._db.changes()
         if numCopied:
             self.flagTableUpdate("snp_entrez_role")
-        self.log(" OK: %d roles copied\n" % (numCopied,))
+        self.log(" OK: %d roles copied\n" % (numCopied,), level=logging.INFO, indent=0)
 
     def cleanupSNPEntrezRoles(self):
-        self.log("verifying SNP roles ...")
+        self.log("verifying SNP roles ...", level=logging.INFO, indent=0)
         self.prepareTableForQuery("snp_entrez_role")
         dbc = self._db.cursor()
         cull = set()
@@ -108,10 +109,10 @@ class UpdaterOperationsMixin:
             dbc.executemany(
                 "DELETE FROM `db`.`snp_entrez_role` WHERE _ROWID_ = ?", cull
             )
-        self.log(" OK: %d duplicate roles\n" % (len(cull),))
+        self.log(" OK: %d duplicate roles\n" % (len(cull),), level=logging.INFO, indent=0)
 
     def updateMergedGWASAnnotations(self):
-        self.log("checking for merged GWAS annotated SNPs ...")
+        self.log("checking for merged GWAS annotated SNPs ...", level=logging.INFO, indent=0)
         self.prepareTableForQuery("gwas")
         self.prepareTableForQuery("snp_merge")
         dbc = self._db.cursor()
@@ -128,10 +129,10 @@ class UpdaterOperationsMixin:
         numCopied = self._db.changes()
         if numCopied:
             self.flagTableUpdate("gwas")
-        self.log(" OK: %d annotations copied\n" % (numCopied,))
+        self.log(" OK: %d annotations copied\n" % (numCopied,), level=logging.INFO, indent=0)
 
     def resolveBiopolymerNames(self):
-        self.log("resolving biopolymer names ...")
+        self.log("resolving biopolymer names ...", level=logging.INFO, indent=0)
         dbc = self._db.cursor()
 
         # calculate confidence scores for each possible name match
@@ -273,11 +274,10 @@ class UpdaterOperationsMixin:
         self.log(
             "Resolving biopolymer names completed: %d identifiers "
             "(%d ambiguous, %d unrecognized)\n"
-            % (numMatch, numAmbig, numUnrec)  # noqa E501
-        )
+            % (numMatch, numAmbig, numUnrec), level=logging.INFO, indent=0)  # noqa E501
 
     def resolveSNPBiopolymerRoles(self):
-        self.log("resolving SNP roles ...\n")
+        self.log("resolving SNP roles ...\n", level=logging.INFO, indent=0)
         dbc = self._db.cursor()
 
         typeID = self._loki.getTypeID("gene")
@@ -359,13 +359,13 @@ class UpdaterOperationsMixin:
             numGenes = row[2]
         self.log(
             "resolving SNP roles completed: %d roles (%d SNPs, %d genes; %d unrecognized)\n"  # noqa E501
-            % (numTotal, numSNPs, numGenes, numUnrec)
+            % (numTotal, numSNPs, numGenes, numUnrec), level=logging.INFO, indent=0
         )
 
     # resolveSNPBiopolymerRoles()
 
     def resolveGroupMembers(self):
-        self.log("resolving group members ...\n")
+        self.log("resolving group members ...\n", level=logging.INFO, indent=0)
         dbc = self._db.cursor()
 
         # calculate confidence scores for each possible name match
@@ -648,11 +648,12 @@ class UpdaterOperationsMixin:
         self.log(
             "Resolving group members completed: %d associations "
             "(%d explicit, %d definite, %d conditional, %d unrecognized)\n"
-            % (numTotal, numSourced, numMatch, numAmbig, numUnrec)
+            % (numTotal, numSourced, numMatch, numAmbig, numUnrec),
+            level=logging.INFO, indent=0
         )
 
     def updateBiopolymerZones(self):
-        self.log("calculating zone coverage ...")
+        self.log("calculating zone coverage ...", level=logging.INFO, indent=0)
         size = self._loki.getDatabaseSetting("zone_size", int)
         if not size:
             raise Exception(
@@ -714,5 +715,6 @@ class UpdaterOperationsMixin:
             numGenes = row[1]
         self.log(
             "calculating zone coverage completed: %d records (%d regions)\n"
-            % (numTotal, numGenes)
+            % (numTotal, numGenes),
+            level=logging.INFO, indent=0
         )
