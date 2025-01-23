@@ -1,19 +1,15 @@
 import itertools
+import psutil
+import time
 import os
 import re
+import logging
 import urllib.request as urllib2
 from loki_modules import loki_source
 
 
 class Source_chainfiles(loki_source.Source):
-    """
-    A loader that loads all of the chainfiles into LOKI
-    """
 
-    ##################################################
-    # private class data
-
-    # 	_reDir = re.compile('^hg[0-9]+$', re.IGNORECASE)
     _reFile = re.compile(
         r"^hg([0-9]+)tohg([0-9]+)\.over\.chain\.gz$", re.IGNORECASE
     )  # noqa E501
@@ -21,27 +17,11 @@ class Source_chainfiles(loki_source.Source):
 
     _reNum = ("4", "10", "11", "12", "13", "15", "16", "17", "18", "19", "38")
 
-    ##################################################
-    # source interface
-
     @classmethod
     def getVersionString(cls):
         return "3.0.0 (2025-01-01)"
 
     def download(self, options, path):
-        # define callback to search for all available hgX liftover chain files
-        # 		def remFilesCallback(ftp):
-        # 			remFiles = {}
-        # 			ftp.cwd('/goldenPath')
-        # 			for d in [ d for d in ftp.nlst() if self._reDir.match(d) ]:
-        # 				ftp.cwd('/goldenPath/%s' % d)
-        # 				if 'liftOver' in ftp.nlst():
-        # 					ftp.cwd('/goldenPath/%s/liftOver' % d)
-        # 					for f in [ f for f in ftp.nlst() if self._reFile.match(f) ]:
-        # 						remFiles[f] = '/goldenPath/%s/liftOver/%s' % (d,f)
-        # 			return remFiles
-        # remFilesCallback
-
         remFiles = {}
         for i in self._reNum:
             urlpath = urllib2.urlopen(
@@ -55,19 +35,36 @@ class Source_chainfiles(loki_source.Source):
                     remFiles[path + "/" + filenames] = (
                         "/goldenPath/hg" + i + "/liftOver/" + filenames
                     )
+
         self.downloadFilesFromHTTP("hgdownload.cse.ucsc.edu", remFiles)
+        # BUG: We need think how to haldle errors in downloadFilesFromHTTP!
+        # BUG: Now log error and runn process (deleteAll and update w/error)
 
         return list(remFiles.keys())
 
     def update(self, options, path):
-        """
-        Parse all of the chain files and insert them into the database
-        """
-
         # clear out all old data from this source
-        self.log("deleting old records from the database ...\n")
+        start_time = time.time()
+        process = psutil.Process()
+        memory_before = process.memory_info().rss / (1024 * 1024)  # in MB
+
+        self.log(
+            f"Chainfiles - Starting Data Ingestion (inicial memory {memory_before:.2f} MB) ...",  # noqa: E501
+            level=logging.INFO,
+            indent=2,
+        )
+
+        self.log(
+            "Chainfiles - Starting deletion of old records from the database ...",  # noqa: E501
+            level=logging.INFO,
+            indent=2,
+        )
         self.deleteAll()
-        self.log("deleting old records from the database completed\n")
+        self.log(
+            "Chainfiles - Old records deletion completed",
+            level=logging.INFO,
+            indent=2,
+        )
 
         for fn in os.listdir(path):
             match = self._reFile.match(fn)
@@ -76,9 +73,12 @@ class Source_chainfiles(loki_source.Source):
             old_ucschg = int(match.group(1))
             new_ucschg = int(match.group(2))
             self.log(
-                "parsing chains for hg%d -> hg%d ...\n"
-                % (old_ucschg, new_ucschg)  # noqa: E501
+                "Chainfiles - Parsing chains for hg%d -> hg%d ..."
+                % (old_ucschg, new_ucschg),  # noqa: E501
+                level=logging.INFO,
+                indent=2,
             )  # noqa: E501
+
             f = self.zfile(path + "/" + fn)
 
             is_hdr = True
@@ -122,8 +122,26 @@ class Source_chainfiles(loki_source.Source):
 
             self.addChainData(chain_data_itr)
 
-            self.log("parsing chains completed\n")
+            self.log(
+                "Chainfiles - Parsing chains completed",
+                level=logging.INFO,
+                indent=2,
+            )
         # for fn in dir
+
+        end_time = time.time()
+        elapsed_time_minutes = (end_time - start_time) / 60  # time in minutes
+        memory_after = process.memory_info().rss / (1024 * 1024)  # mem in MB
+        self.log(
+            f"Chainfiles - Final memory: {memory_after:.2f} MB. Alocated memory: {memory_after - memory_before:.2f} MB.",  # noqa: E501
+            level=logging.INFO,
+            indent=2,
+        )
+        self.log(
+            f"Chainfiles - Update completed in {elapsed_time_minutes:.2f} minutes.",  # noqa: E501
+            level=logging.CRITICAL,
+            indent=2,
+        )
 
     # update()
 

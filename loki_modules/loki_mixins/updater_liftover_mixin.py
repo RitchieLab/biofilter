@@ -75,14 +75,14 @@ class UpdaterLiftOverMixin:
             " OK: %d loci lifted over, %d dropped\n" % (numLift, numNull),
             level=logging.INFO,
             indent=0,
-            )
+        )
 
     def liftOverRegions(self, oldHG, newHG, sourceIDs):
         self.log(
             "lifting over regions from hg%d to hg%d ..." % (oldHG, newHG),
             level=logging.INFO,
             indent=0,
-            )
+        )
         self.prepareTableForUpdate("biopolymer_region")
         cursor = self._db.cursor()
         numLift = numNull = 0
@@ -149,8 +149,7 @@ class UpdaterLiftOverMixin:
         # foreach batch
 
         self.log(
-            " OK: %d regions lifted over, %d dropped\n"
-            % (numLift, numNull),
+            " OK: %d regions lifted over, %d dropped\n" % (numLift, numNull),
             level=logging.INFO,
             indent=0,
         )

@@ -257,10 +257,8 @@ def main():
     # instantiate database object
     db = loki_db.Database(testing=args.test_data, updating=True)
     db.log(
-        "-- STARTING LOKI BUILD SCRIPT --",
-        level=logging.CRITICAL,
-        indent=0
-        )  # noqa E501
+        "-- STARTING LOKI BUILD SCRIPT --", level=logging.CRITICAL, indent=0
+    )  # noqa E501
 
     db.setVerbose(args.verbose or (not args.quiet))
     db.attachDatabaseFile(args.knowledge)
@@ -284,18 +282,19 @@ def main():
             db.log(
                 "%s : %s" % (srcName, moduleVersions[srcName]),
                 level=logging.INFO,
-                indent=2
+                indent=2,
             )  # noqa E501
             if moduleOptions[srcName]:
                 for srcOption in sorted(moduleOptions[srcName].keys()):
                     db.log(
                         "%s = %s"
-                        % (srcOption, moduleOptions[srcName][srcOption]),
+                        % (srcOption, moduleOptions[srcName][srcOption]),  # noqa E501
                         level=logging.INFO,
-                        indent=4
+                        indent=4,
                     )  # noqa E501
             elif srcSet:
                 db.log("<no options>", level=logging.INFO, indent=4)
+        db.log("  ", level=logging.INFO, indent=0)
     srcSet = srcSet or None
 
     # Check if we are updating the database
@@ -303,7 +302,7 @@ def main():
         db.log(
             "Either '--update' or '--update-except' must be specified to update the knowledge database",  # noqa: E501
             level=logging.WARNING,
-            indent=0
+            indent=0,
         )
         sys.exit(1)
 
@@ -321,8 +320,8 @@ def main():
                 db.log(
                     "%s" % userOptions[srcName][opt],
                     level=logging.INFO,
-                    indent=2
-                    )  # noqa E501
+                    indent=2,  # noqa E501
+                )  # noqa E501
     userOptions = userOptions or None
 
     # Process the update argument
@@ -346,7 +345,7 @@ def main():
             db.log(
                 "Cannot update a finalized database",
                 level=logging.ERROR,
-                indent=0
+                indent=0,  # noqa E501
             )
             sys.exit(1)
         if srcSet and "+" in srcSet:
@@ -364,9 +363,9 @@ def main():
         )
         if args.temp_directory:
             db.log(
-                "Using temporary directory '%s'" % cacheDir,
+                "Using temporary directory '%s'\n" % cacheDir,
                 level=logging.INFO,
-                indent=0
+                indent=0,
             )
 
         # try/finally to make sure we clean up the cache dir at the end
@@ -375,7 +374,7 @@ def main():
                 db.log(
                     "Selected source data FROM archive",
                     level=logging.INFO,
-                    indent=0
+                    indent=0,  # noqa E501
                 )
                 if os.path.exists(fromArchive) and tarfile.is_tarfile(
                     fromArchive
@@ -384,7 +383,7 @@ def main():
                         "Unpacking archived source data files from '%s' ..."
                         % fromArchive,
                         level=logging.INFO,
-                        indent=2
+                        indent=2,
                     )
                     with tarfile.open(name=fromArchive, mode="r:*") as archive:
                         archive.errorlevel = 2
@@ -404,20 +403,18 @@ def main():
                                 continue
                             archive.extractall(cacheDir, [member])
                     # with archive
-                    db.log(
-                        "... OK",
-                        level=logging.INFO,
-                        indent=2
-                    )
+                    db.log("... OK", level=logging.INFO, indent=2)
                 else:
                     db.log(
                         "Source data archive '%s' not found, starting fresh"
                         % fromArchive,
                         level=logging.WARNING,
-                        indent=2
+                        indent=2,
                     )
 
             os.chdir(cacheDir)
+
+            # update database
             updateOK = db.updateDatabase(
                 srcSet, userOptions, args.cache_only, args.force_update
             )
@@ -426,14 +423,12 @@ def main():
             # create output archive, if requested
             if toArchive and not args.cache_only:
                 db.log(
-                    "Selected source data TO archive",
-                    level=logging.INFO,
-                    indent=0
-                )
+                    "Selected source data TO archive", level=logging.INFO, indent=0
+                )  # noqa: E501
                 db.log(
                     "Archiving source data files in '%s' ..." % toArchive,
                     level=logging.INFO,
-                    indent=2
+                    indent=2,
                 )
                 with tarfile.open(name=toArchive, mode="w:gz") as archive:
                     archive.errorlevel = 2
@@ -441,20 +436,16 @@ def main():
                         archive.add(
                             os.path.join(cacheDir, filename), arcname=filename
                         )  # noqa: E501
-                db.log(
-                    "... OK",
-                    level=logging.INFO,
-                    indent=2
-                )
+                db.log("... OK", level=logging.INFO, indent=2)
         finally:
             # clean up cache directory
             def rmtree_error(func, path, exc):
                 db.log(
-                    "Unable to remove temporary file '%s': %s"
-                    % (path, exc),
+                    "Unable to remove temporary file '%s': %s" % (path, exc),
                     level=logging.WARNING,
-                    indent=0
+                    indent=0,
                 )
+
             shutil.rmtree(cacheDir, onerror=rmtree_error)
     # update
 
@@ -465,7 +456,7 @@ def main():
                 db.log(
                     "Errors encountered during knowledge database update",
                     level=logging.ERROS,
-                    indent=0
+                    indent=0,
                 )
             else:
                 db.testDatabaseWriteable()
@@ -479,7 +470,7 @@ def main():
                 db.log(
                     "Errors encountered during knowledge database update",
                     level=logging.ERROR,
-                    indent=0
+                    indent=0,
                 )
             else:
                 db.testDatabaseWriteable()
@@ -488,7 +479,7 @@ def main():
     db.log(
         f"-- FINISHED LOKI BUILD SCRIPT --\nLog file: {db.get_log_file()}",
         level=logging.CRITICAL,
-        indent=0
+        indent=0,
     )
 
 

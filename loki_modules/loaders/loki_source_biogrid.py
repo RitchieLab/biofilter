@@ -1,5 +1,7 @@
 import zipfile
 import logging
+import psutil
+import time
 from loki_modules import loki_source
 
 
@@ -23,17 +25,26 @@ class Source_biogrid(loki_source.Source):
 
     def update(self, options, path):
         # clear out all old data from this source
+        start_time = time.time()
+        process = psutil.Process()
+        memory_before = process.memory_info().rss / (1024 * 1024)  # in MB
+
         self.log(
-            "deleting old records from the database ...\n",
+            f"BioGRID - Starting Data Ingestion (inicial memory {memory_before:.2f} MB) ...",  # noqa: E501
             level=logging.INFO,
-            indent=0,
-            )
+            indent=2,
+        )
+        self.log(
+            "BioGRID - Starting deletion of old records from the database ...",
+            level=logging.INFO,
+            indent=2,
+        )
         self.deleteAll()
         self.log(
-            "deleting old records from the database completed\n",
+            "BioGRID - Old records deletion completed",
             level=logging.INFO,
-            indent=0,
-            )
+            indent=2,
+        )
 
         # get or create the required metadata records
         namespaceID = self.addNamespaces(
@@ -52,32 +63,43 @@ class Source_biogrid(loki_source.Source):
 
         # process associations
         self.log(
-            "verifying archive file ...\n",
+            "BioGRID - Starting verification of archive file ...",
             level=logging.INFO,
-            indent=0,
-            )
+            indent=2,
+        )
         pairLabels = dict()
         empty = tuple()
         with zipfile.ZipFile(
             path + "/BIOGRID-ORGANISM-LATEST.tab2.zip", "r"
         ) as assocZip:
+            # verify the archive file
             err = assocZip.testzip()
             if err:
+                # if the archive file is corrupted stop processing
                 self.log(
-                    " ERROR\n",
+                    "BioGRID - CRC failed for %s" % err,
                     level=logging.ERROR,
-                    indent=0,)
+                    indent=2,
+                )
                 self.log(
-                    "CRC failed for %s\n" % err,
+                    "BioGRID - Archive file failed",
                     level=logging.ERROR,
-                    indent=1,
-                    )
+                    indent=2,
+                )
                 return False
-            self.log("verifying archive file completed\n", level=logging.INFO, indent=0)
-            self.log("processing gene interactions ...\n", level=logging.INFO, indent=0)
+            self.log("BioGRID - File is valid", level=logging.INFO, indent=2)
+
+            # process gene interactions
+            self.log(
+                "BioGRID - Starting the processing of gene interactions ...",
+                level=logging.INFO,
+                indent=2,
+            )  # noqa E501
             for info in assocZip.infolist():
                 if info.filename.find("Homo_sapiens") >= 0:
                     assocFile = assocZip.open(info, "r")
+
+                    # check file header
                     header = assocFile.__next__().rstrip()
                     observedHeaders = {
                         "#BioGRID Interaction ID\tEntrez Gene Interactor A\tEntrez Gene Interactor B\tBioGRID ID Interactor A\tBioGRID ID Interactor B\tSystematic Name Interactor A\tSystematic Name Interactor B\tOfficial Symbol Interactor A\tOfficial Symbol Interactor B\tSynonymns Interactor A\tSynonyms Interactor B\tExperimental System\tExperimental System Type\tAuthor\tPubmed ID\tOrganism Interactor A\tOrganism Interactor B",  # "\tThroughput\tScore\tModification\tPhenotypes\tQualifications\tTags\tSource Database",  # noqa E501
@@ -87,14 +109,20 @@ class Source_biogrid(loki_source.Source):
                         header.decode().startswith(obsHdr)
                         for obsHdr in observedHeaders  # noqa: E501
                     ):
-                        self.log(" ERROR\n", level=logging.EROOR, indent=0)
                         self.log(
-                            "unrecognized file header in '%s': %s\n"
+                            "BioGRID - Unrecognized file header in '%s': %s"
                             % (info.filename, header),
-                            level=logging.WARNING,
-                            indent=1,
+                            level=logging.ERROR,
+                            indent=2,
+                        )
+                        self.log(
+                            "BioGRID - Archive file failed",
+                            level=logging.ERROR,
+                            indent=2,
                         )
                         return False
+
+                    # Read the file data
                     for line in assocFile:
                         line = line.decode()
                         words = line.split("\t")
@@ -134,6 +162,8 @@ class Source_biogrid(loki_source.Source):
                 # if Homo_sapiens file
             # foreach file in assocZip
         # with assocZip
+
+        # show statistics
         numAssoc = len(pairLabels)
         numGene = len(
             set(pair[0] for pair in pairLabels)
@@ -141,12 +171,18 @@ class Source_biogrid(loki_source.Source):
         )
         numName = sum(len(pairLabels[pair]) for pair in pairLabels)
         self.log(
-            "processing gene interactions completed: %d interactions (%d genes), %d pair identifiers\n"  # noqa E501
-            % (numAssoc, numGene, numName), level=logging.INFO, indent=0
+            "BioGRID - Procesing gene interactions completed: %d interactions (%d genes), %d pair identifiers"  # noqa E501
+            % (numAssoc, numGene, numName),
+            level=logging.INFO,
+            indent=2,
         )
 
         # store interaction groups
-        self.log("writing interaction pairs to the database ...\n", level=logging.INFO, indent=0)
+        self.log(
+            "BioGRID - Starting the writing interaction pairs to the database ...",  # noqa E501
+            level=logging.INFO,
+            indent=2,
+        )
         listPair = pairLabels.keys()
         listGID = self.addTypedGroups(
             typeID["interaction"],
@@ -156,20 +192,36 @@ class Source_biogrid(loki_source.Source):
             ),
         )
         pairGID = dict(zip(listPair, listGID))
-        self.log("writing interaction pairs to the database completed\n", level=logging.INFO, indent=0)
+        self.log(
+            "BioGRID - Writing interaction pairs to the database completed",
+            level=logging.INFO,
+            indent=2,
+        )
 
         # store interaction labels
+        self.log(
+            "BioGRID - Starting the writing interaction names to the database ...",  # noqa E501
+            level=logging.INFO,
+            indent=2,
+        )
         listLabels = []
         for pair in listPair:
             listLabels.extend(
                 (pairGID[pair], label) for label in pairLabels[pair]
             )  # noqa E501
-        self.log("writing interaction names to the database ...\n", level=logging.INFO, indent=0)
         self.addGroupNamespacedNames(namespaceID["biogrid_id"], listLabels)
-        self.log("writing interaction names to the database completed\n", level=logging.INFO, indent=0)
+        self.log(
+            "BioGRID - Writing interaction names to the database completed",
+            level=logging.INFO,
+            indent=2,
+        )
 
         # store gene interactions
-        self.log("writing gene interactions to the database ...\n", level=logging.INFO, indent=0)
+        self.log(
+            "BioGRID - Starting the writing gene interactions to the database ...",  # noqa E501
+            level=logging.INFO,
+            indent=2,
+        )
         nsAssoc = {
             "symbol": set(),
             "entrez_gid": set(),
@@ -189,6 +241,22 @@ class Source_biogrid(loki_source.Source):
             self.addGroupMemberTypedNamespacedNames(
                 typeID["gene"], namespaceID[ns], nsAssoc[ns]
             )
-        self.log("writing gene interactions to the database completed\n", level=logging.INFO, indent=0)
+        self.log(
+            "BioGRID - Writing gene interactions to the database completed",
+            level=logging.INFO,
+            indent=2,
+        )
 
-
+        end_time = time.time()
+        elapsed_time_minutes = (end_time - start_time) / 60  # time in minutes
+        memory_after = process.memory_info().rss / (1024 * 1024)  # mem in MB
+        self.log(
+            f"BioGRID - Final memory: {memory_after:.2f} MB. Alocated memory: {memory_after - memory_before:.2f} MB.",  # noqa: E501
+            level=logging.INFO,
+            indent=2,
+        )
+        self.log(
+            f"BioGRID - Update completed in {elapsed_time_minutes:.2f} minutes.",  # noqa: E501
+            level=logging.CRITICAL,
+            indent=2,
+        )

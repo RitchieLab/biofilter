@@ -13,3 +13,64 @@ Start version 3.0.2
     - Propose to read a read-db from cloud
 
 
+BUG
+O sistema estava comparando o caminho do arquivo ingerido para comparar com os novos dados.
+como o caminho era sempre um temporario, o sistema entendia que era versoes diferentes e atualiza nomente
+                            n += 1
+                            # skip = (
+                            #     skip
+                            #     and (row[0] in self._filehash)
+                            #     and (row[1] == self._filehash[row[0]][1])
+                            #     and (row[2] == self._filehash[row[0]][3])
+                            # )
+
+                            # Get the file size and MD5 hash directly from _filehash
+                            file_size, file_md5 = row[1], row[2]
+                            
+                            # Check if there is any file in _filehash with the same parameters
+                            match_found = any(
+                                file_hash_data[1] == file_size and file_hash_data[3] == file_md5
+                                for file_hash_data in self._filehash.values()
+                            )
+                            
+                            # Update the state of `skip`
+                            skip = skip and match_found
+
+                        skip = skip and (n == len(self._filehash))
+
+
+BUG:
+Hoje com a logica atual nao temos como evitar realizar o download para verificar se o arquivo ja foi processado ou nao. 
+
+para resolver esse problema, foi criada um method addWarning para reportar o problema na tabela e adicionado,
+tb foi alterado uma variavel de controle para ser um atributo da classe Update, dessa forma podemos excluir o Source System
+com erro e nao realizar o processamento (uma vez que o processamento envolve eliminar todos os dados desse source)
+<<update_download_mixin.py>>
+    ...
+        except Exception as e:
+            # No raise exception to continue other sources
+            # Log the exception
+            self.log_exception(e)
+
+            # Remove the source from the list of sources to avoid run process
+            if srcName in self.srcSetsToDownload:
+                self.srcSetsToDownload.remove(srcName)
+
+            msn_error = f"Error downloading {srcName} data: {str(e)}"
+            self._loki.addWarning(srcObj._sourceID, msn_error)
+
+
+Melhoria:
+- nao temos um controle para saber quais sources deram erros e poder reprocessar eles.
+- nao temos um caminho para processar arquivos que ja estejam em pasta.
+
+
+
+Ja rodaram
+go
+gwas
+biogrid
+mint
+
+com Error
+chainfiles

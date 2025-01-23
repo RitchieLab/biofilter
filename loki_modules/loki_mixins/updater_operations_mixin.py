@@ -24,7 +24,9 @@ class UpdaterOperationsMixin:
             dbc.executemany(
                 "DELETE FROM `db`.`snp_merge` WHERE _ROWID_ = ?", cull  # noqa E501
             )
-        self.log(" OK: %d duplicate merges\n" % (len(cull),), level=logging.INFO, indent=0)
+        self.log(
+            " OK: %d duplicate merges\n" % (len(cull),), level=logging.INFO, indent=0
+        )
 
     def updateMergedSNPLoci(self):
         self.log("checking for merged SNP loci ...", level=logging.INFO, indent=0)
@@ -71,7 +73,9 @@ class UpdaterOperationsMixin:
             dbc.executemany(
                 "DELETE FROM `db`.`snp_locus` WHERE _ROWID_ = ?", cull  # noqa E501
             )
-        self.log(" OK: %d duplicate loci\n" % (len(cull),), level=logging.INFO, indent=0)
+        self.log(
+            " OK: %d duplicate loci\n" % (len(cull),), level=logging.INFO, indent=0
+        )
 
     def updateMergedSNPEntrezRoles(self):
         self.log("checking for merged SNP roles ...", level=logging.INFO, indent=0)
@@ -109,10 +113,14 @@ class UpdaterOperationsMixin:
             dbc.executemany(
                 "DELETE FROM `db`.`snp_entrez_role` WHERE _ROWID_ = ?", cull
             )
-        self.log(" OK: %d duplicate roles\n" % (len(cull),), level=logging.INFO, indent=0)
+        self.log(
+            " OK: %d duplicate roles\n" % (len(cull),), level=logging.INFO, indent=0
+        )
 
     def updateMergedGWASAnnotations(self):
-        self.log("checking for merged GWAS annotated SNPs ...", level=logging.INFO, indent=0)
+        self.log(
+            "checking for merged GWAS annotated SNPs ...", level=logging.INFO, indent=0
+        )
         self.prepareTableForQuery("gwas")
         self.prepareTableForQuery("snp_merge")
         dbc = self._db.cursor()
@@ -129,7 +137,9 @@ class UpdaterOperationsMixin:
         numCopied = self._db.changes()
         if numCopied:
             self.flagTableUpdate("gwas")
-        self.log(" OK: %d annotations copied\n" % (numCopied,), level=logging.INFO, indent=0)
+        self.log(
+            " OK: %d annotations copied\n" % (numCopied,), level=logging.INFO, indent=0
+        )
 
     def resolveBiopolymerNames(self):
         self.log("resolving biopolymer names ...", level=logging.INFO, indent=0)
@@ -273,8 +283,10 @@ class UpdaterOperationsMixin:
         # Record of the processing summary
         self.log(
             "Resolving biopolymer names completed: %d identifiers "
-            "(%d ambiguous, %d unrecognized)\n"
-            % (numMatch, numAmbig, numUnrec), level=logging.INFO, indent=0)  # noqa E501
+            "(%d ambiguous, %d unrecognized)\n" % (numMatch, numAmbig, numUnrec),
+            level=logging.INFO,
+            indent=0,
+        )  # noqa E501
 
     def resolveSNPBiopolymerRoles(self):
         self.log("resolving SNP roles ...\n", level=logging.INFO, indent=0)
@@ -359,7 +371,9 @@ class UpdaterOperationsMixin:
             numGenes = row[2]
         self.log(
             "resolving SNP roles completed: %d roles (%d SNPs, %d genes; %d unrecognized)\n"  # noqa E501
-            % (numTotal, numSNPs, numGenes, numUnrec), level=logging.INFO, indent=0
+            % (numTotal, numSNPs, numGenes, numUnrec),
+            level=logging.INFO,
+            indent=0,
         )
 
     # resolveSNPBiopolymerRoles()
@@ -649,7 +663,8 @@ class UpdaterOperationsMixin:
             "Resolving group members completed: %d associations "
             "(%d explicit, %d definite, %d conditional, %d unrecognized)\n"
             % (numTotal, numSourced, numMatch, numAmbig, numUnrec),
-            level=logging.INFO, indent=0
+            level=logging.INFO,
+            indent=0,
         )
 
     def updateBiopolymerZones(self):
@@ -716,5 +731,6 @@ class UpdaterOperationsMixin:
         self.log(
             "calculating zone coverage completed: %d records (%d regions)\n"
             % (numTotal, numGenes),
-            level=logging.INFO, indent=0
+            level=logging.INFO,
+            indent=0,
         )

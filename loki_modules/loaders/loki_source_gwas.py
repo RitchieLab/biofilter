@@ -1,22 +1,18 @@
 import os
 import re
+import logging
+import psutil
+import time
 from loki_modules import loki_source
 
 
 class Source_gwas(loki_source.Source):
-
-    ##################################################
-    # source interface
 
     @classmethod
     def getVersionString(cls):
         return "3.0.0 (2025-01-01)"
 
     def download(self, options, path):
-        # download the latest source files
-        # 	self.downloadFilesFromHTTP('www.genome.gov', {
-        # 		'gwascatalog.txt': '/admin/gwascatalog.txt',
-        # 	})
         self.downloadFilesFromHTTP(
             "www.ebi.ac.uk",
             {
@@ -30,14 +26,35 @@ class Source_gwas(loki_source.Source):
 
     def update(self, options, path):
         # clear out all old data from this source
-        self.log("deleting old records from the database ...\n")
+        start_time = time.time()
+        process = psutil.Process()
+        memory_before = process.memory_info().rss / (1024 * 1024)  # in MB
+
+        self.log(
+            f"GWAS - Starting Data Ingestion (inicial memory {memory_before:.2f} MB) ...",  # noqa: E501
+            level=logging.INFO,
+            indent=2,
+        )
+        self.log(
+            "GWAS - Starting deletion of old records from the database ...",
+            level=logging.INFO,
+            indent=2,
+        )
         self.deleteAll()
-        self.log("deleting old records from the database completed\n")
+        self.log(
+            "GWAS - Old records deletion completed",
+            level=logging.INFO,
+            indent=2,
+        )
 
         # process gwas cataog
         # the catalog uses dbSNP positions from b132,
         # which should already be 1-based
-        self.log("processing GWAS catalog annotations ...\n")
+        self.log(
+            "GWAS - Starting the processing of GWAS catalog annotations ...",
+            level=logging.INFO,
+            indent=2,
+        )  # noqa E501
         reRS = re.compile("rs([0-9]+)", re.I)
         # reChrPos = re.compile("(?:^|[^_])chr([0-9XYMT]+)[:_]([0-9]+)", re.I)
         reSNP = re.compile(
@@ -63,8 +80,11 @@ class Source_gwas(loki_source.Source):
                     colORBeta = cols.index("OR or BETA")
                     col95CI = cols.index("95% CI (TEXT)")
                 except ValueError as e:
-                    self.log(" ERROR\n")
+                    self.log_exception(e)
+                    msn_error = f"Error GWAS Header Processing: {str(e)}"
+                    self._loki.addWarning(self._sourceID, msn_error)
                     raise Exception("unrecognized file header: %s" % str(e))
+
                 lx = 1
                 for line in gwasFile:
                     lx += 1
@@ -197,8 +217,15 @@ class Source_gwas(loki_source.Source):
                 ):  # "Platform [SNPs passing QC]\tCNV"
                     pass
                 else:
-                    self.log(" ERROR\n")
+                    self.log(
+                        "GWAS - Error on GWAS catalog header: %s" % header,
+                        level=logging.ERROR,
+                        indent=2,
+                    )  # noqa E501
+                    msn_error = "Error GWAS unrecognized header"
+                    self._loki.addWarning(self._sourceID, msn_error)
                     raise Exception("unrecognized file header")
+
                 for line in gwasFile:
                     line = line.rstrip("\r\n")
                     words = list(
@@ -247,12 +274,34 @@ class Source_gwas(loki_source.Source):
             # with gwasFile
         # if path
         self.log(
-            "processing GWAS catalog annotations completed: %d entries (%d incomplete, %d invalid)\n"  # noqa E501
-            % (len(setGwas), numInc, numInvalid)
+            "GWAS - Processing GWAS catalog annotations completed: %d entries (%d incomplete, %d invalid)"  # noqa E501
+            % (len(setGwas), numInc, numInvalid),
+            level=logging.INFO,
+            indent=2,
         )
         if setGwas:
-            self.log("writing GWAS catalog annotations to the database ...\n")
+            self.log(
+                "GWAS - Starting the writing GWAS catalog annotations to the database ...",  # noqa E501
+                level=logging.INFO,
+                indent=2,
+            )  # noqa E501
             self.addGWASAnnotations(setGwas)
             self.log(
-                "writing GWAS catalog annotations to the database completed\n"
+                "Writing GWAS catalog annotations to the database completed",
+                level=logging.INFO,
+                indent=2,
             )  # noqa E501
+
+        end_time = time.time()
+        elapsed_time_minutes = (end_time - start_time) / 60  # time in minutes
+        memory_after = process.memory_info().rss / (1024 * 1024)  # mem in MB
+        self.log(
+            f"GWAS - Final memory: {memory_after:.2f} MB. Alocated memory: {memory_after - memory_before:.2f} MB.",  # noqa: E501
+            level=logging.INFO,
+            indent=2,
+        )
+        self.log(
+            f"GWAS - Update completed in {elapsed_time_minutes:.2f} minutes.",  # noqa: E501
+            level=logging.CRITICAL,
+            indent=2,
+        )

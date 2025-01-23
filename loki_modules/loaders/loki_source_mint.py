@@ -1,13 +1,13 @@
 import datetime
 import os
 import re
+import logging
+import psutil
+import time
 from loki_modules import loki_source
 
 
 class Source_mint(loki_source.Source):
-
-    ##################################################
-    # private class methods
 
     def _identifyLatestFilename(self, filenames):
         reFile = re.compile(
@@ -29,9 +29,6 @@ class Source_mint(loki_source.Source):
         # foreach filename
         return bestfile
 
-    ##################################################
-    # source interface
-
     @classmethod
     def getVersionString(cls):
         return "3.0.0 (2025-01-01)"
@@ -49,9 +46,26 @@ class Source_mint(loki_source.Source):
 
     def update(self, options, path):
         # clear out all old data from this source
-        self.log("deleting old records from the database ...\n")
+        start_time = time.time()
+        process = psutil.Process()
+        memory_before = process.memory_info().rss / (1024 * 1024)  # in MB
+
+        self.log(
+            f"MINT - Starting Data Ingestion (inicial memory {memory_before:.2f} MB) ...",  # noqa: E501
+            level=logging.INFO,
+            indent=2,
+        )
+        self.log(
+            "MINT - Starting deletion of old records from the database ...",
+            level=logging.INFO,
+            indent=2,
+        )
         self.deleteAll()
-        self.log("deleting old records from the database completed\n")
+        self.log(
+            "MINT - Old records deletion completed",
+            level=logging.INFO,
+            indent=2,
+        )
 
         # get or create the required metadata records
         namespaceID = self.addNamespaces(
@@ -72,14 +86,13 @@ class Source_mint(loki_source.Source):
                 ("gene",),
             ]
         )
-        subtypeID = self.addSubtypes(
-            [
-                ("-",),
-            ]
-        )
 
         # process interation groups
-        self.log("processing interaction groups ...\n")
+        self.log(
+            "MINT - Starting the processing interaction groups ...",
+            level=logging.INFO,
+            indent=2,
+        )  # noqa E501
         mintDesc = dict()
         nsAssoc = {
             "symbol": set(),
@@ -208,9 +221,15 @@ class Source_mint(loki_source.Source):
                 if not header.startswith(
                     "ID interactors A (baits)\tID interactors B (preys)\tAlt. ID interactors A (baits)\tAlt. ID interactors B (preys)\tAlias(es) interactors A (baits)\tAlias(es) interactors B (preys)\tInteraction detection method(s)\tPublication 1st author(s)\tPublication Identifier(s)\tTaxid interactors A (baits)\tTaxid interactors B (preys)\tInteraction type(s)\tSource database(s)\tInteraction identifier(s)\t"  # noqa E501
                 ):  # Confidence value(s)\texpansion\tbiological roles A (baits)\tbiological role B\texperimental roles A (baits)\texperimental roles B (preys)\tinteractor types A (baits)\tinteractor types B (preys)\txrefs A (baits)\txrefs B (preys)\txrefs Interaction\tAnnotations A (baits)\tAnnotations B (preys)\tInteraction Annotations\tHost organism taxid\tparameters Interaction\tdataset\tCaution Interaction\tbinding sites A (baits)\tbinding sites B (preys)\tptms A (baits)\tptms B (preys)\tmutations A (baits)\tmutations B (preys)\tnegative\tinference\tcuration depth":  # noqa E501
-                    self.log(" ERROR\n")
-                    self.log("unrecognized file header: %s\n" % header)
-                    return False
+                    self.log(
+                        "MINT - Error on GWAS catalog header: %s" % header,
+                        level=logging.ERROR,
+                        indent=2,
+                    )  # noqa E501
+                    msn_error = "Error MINT unrecognized header"
+                    self._loki.addWarning(self._sourceID, msn_error)
+                    raise Exception("unrecognized file header")
+
                 xrefNS = {
                     "entrezgene/locuslink": ("entrez_gid",),
                     "refseq": ("refseq_gid", "refseq_pid"),
@@ -274,34 +293,75 @@ class Source_mint(loki_source.Source):
             # with assocFile
         # if new/old file
         self.log(
-            "processing interaction groups completed: %d groups, %d associations (%d identifiers)\n"  # noqa E501
-            % (len(mintDesc), numAssoc, numID)
+            "MINT - Processing interaction groups completed: %d groups, %d associations (%d identifiers)"  # noqa E501
+            % (len(mintDesc), numAssoc, numID),
+            level=logging.INFO,
+            indent=2,
         )
 
         # store interaction groups
-        self.log("writing interaction groups to the database ...\n")
+        self.log(
+            "MINT - Starting the writing interaction groups to the database ...",  # noqa E501
+            level=logging.INFO,
+            indent=2,
+        )
+
         listMint = mintDesc.keys()
         listGID = self.addTypedGroups(
             typeID["interaction"],
-            ((subtypeID["-"], mint, mintDesc[mint]) for mint in listMint),
+            ((mint, mintDesc[mint]) for mint in listMint),
         )
         mintGID = dict(zip(listMint, listGID))
-        self.log("writing interaction groups to the database completed\n")
+        self.log(
+            "MINT - Writing interaction groups to the database completed",
+            level=logging.INFO,
+            indent=2,
+        )
 
         # store interaction group names
-        self.log("writing interaction group names to the database ...\n")
+        self.log(
+            "MINT - Sarting the writing interaction group names to the database ...",  # noqa E501
+            level=logging.INFO,
+            indent=2,
+        )
         self.addGroupNamespacedNames(
             namespaceID["mint_id"],
             ((mintGID[mint], mint) for mint in listMint),  # noqa E501
         )
-        self.log("writing interaction group names to the database completed\n")
+        self.log(
+            "MINT - Writing interaction group names to the database completed",
+            level=logging.INFO,
+            indent=2,
+        )
 
         # store gene interactions
-        self.log("writing gene interactions to the database ...\n")
+        self.log(
+            "MINT - Starting the writing gene interactions to the database ...",  # noqa E501
+            level=logging.INFO,
+            indent=2,
+        )
         for ns in nsAssoc:
             self.addGroupMemberTypedNamespacedNames(
                 typeID["gene"],
                 namespaceID[ns],
                 ((mintGID[a[0]], a[1], a[2]) for a in nsAssoc[ns]),
             )
-        self.log("writing gene interactions to the database completed\n")
+        self.log(
+            "MINT - Writing gene interactions to the database completed",
+            level=logging.INFO,
+            indent=2,
+        )
+
+        end_time = time.time()
+        elapsed_time_minutes = (end_time - start_time) / 60  # time in minutes
+        memory_after = process.memory_info().rss / (1024 * 1024)  # mem in MB
+        self.log(
+            f"MINT - Final memory: {memory_after:.2f} MB. Alocated memory: {memory_after - memory_before:.2f} MB.",  # noqa: E501
+            level=logging.INFO,
+            indent=2,
+        )
+        self.log(
+            f"MINT - Update completed in {elapsed_time_minutes:.2f} minutes.",  # noqa: E501
+            level=logging.CRITICAL,
+            indent=2,
+        )

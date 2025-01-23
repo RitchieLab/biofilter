@@ -27,6 +27,7 @@ wget = "^3.2"
 logging = "^0.4.9.6"
 colorama = "^0.4.6"
 tqdm = "^4.67.1"
+psutil = "^6.1.1"
 
 [tool.poetry.group.dev.dependencies]
 black = "^24.10.0"

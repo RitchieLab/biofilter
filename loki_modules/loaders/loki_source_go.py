@@ -1,5 +1,8 @@
 import os
 import re
+import logging
+import psutil
+import time
 from loki_modules import loki_source
 
 
@@ -8,8 +11,6 @@ class Source_go(loki_source.Source):
     @classmethod
     def getVersionString(cls):
         return "3.0.0 (2025-01-01)"
-
-    # getVersionString()
 
     def download(self, options, path):
         # download the latest source files
@@ -25,9 +26,26 @@ class Source_go(loki_source.Source):
 
     def update(self, options, path):
         # clear out all old data from this source
-        self.log("deleting old records from the database ...\n")
+        start_time = time.time()
+        process = psutil.Process()
+        memory_before = process.memory_info().rss / (1024 * 1024)  # in MB
+
+        self.log(
+            f"GO - Starting Data Ingestion (inicial memory {memory_before:.2f} MB) ...",  # noqa: E501
+            level=logging.INFO,
+            indent=2,
+        )
+        self.log(
+            "GO - Starting deletion of old records from the database ...",
+            level=logging.INFO,
+            indent=2,
+        )
         self.deleteAll()
-        self.log("deleting old records from the database completed\n")
+        self.log(
+            "GO - Old records deletion completed",
+            level=logging.INFO,
+            indent=2,
+        )
 
         # get or create the required metadata records
         namespaceID = self.addNamespaces(
@@ -49,14 +67,13 @@ class Source_go(loki_source.Source):
                 ("gene",),
             ]
         )
-        subtypeID = self.addSubtypes(
-            [
-                ("-",),
-            ]
-        )
 
         # process ontology terms
-        self.log("processing ontology terms ...\n")
+        self.log(
+            "GO - Starting the processing of ontology terms ...",
+            level=logging.INFO,
+            indent=2,
+        )  # noqa E501
         # file format: http://www.geneontology.org/GO.format.obo-1_2.shtml
         # correctly handling all the possible escape seq and special cases
         # in the OBO spec would be somewhat involved, but the previous version
@@ -153,22 +170,36 @@ class Source_go(loki_source.Source):
         numTerms = len(goName)
         numLinks = sum(len(goLinks[goID]) for goID in goLinks)
         self.log(
-            "processing ontology terms completed: %d terms, %d links\n"
-            % (numTerms, numLinks)
+            "GO - Processing ontology terms completed: %d terms, %d links"
+            % (numTerms, numLinks),
+            level=logging.INFO,
+            indent=2,
         )
 
         # store ontology terms
-        self.log("writing ontology terms to the database ...\n")
+        self.log(
+            "GO - Starting the writing ontology terms to the database ...",  # noqa E501
+            level=logging.INFO,
+            indent=2,
+        )
         listGoID = goName.keys()
         listGID = self.addTypedGroups(
             typeID["ontology"],
-            ((subtypeID["-"], goName[goID], goDef[goID]) for goID in listGoID),
+            ((goName[goID], goDef[goID]) for goID in listGoID),
         )
         goGID = dict(zip(listGoID, listGID))
-        self.log("writing ontology terms to the database completed\n")
+        self.log(
+            "GO - Writing ontology terms to the database completed",
+            level=logging.INFO,
+            indent=2,
+        )
 
         # store ontology term names
-        self.log("writing ontology term names to the database ...\n")
+        self.log(
+            "GO - Starting the writing ontology terms names to the database ...",  # noqa E501
+            level=logging.INFO,
+            indent=2,
+        )
         self.addGroupNamespacedNames(
             namespaceID["go_id"], ((goGID[goID], goID) for goID in listGoID)
         )
@@ -176,10 +207,18 @@ class Source_go(loki_source.Source):
             namespaceID["ontology"],
             ((goGID[goID], goName[goID]) for goID in listGoID),  # noqa E501
         )
-        self.log("writing ontology term names to the database completed\n")
+        self.log(
+            "GO - Writing ontology terms names to the database completed",
+            level=logging.INFO,
+            indent=2,
+        )
 
         # store ontology term links
-        self.log("writing ontology term relationships to the database ...\n")
+        self.log(
+            "GO - Starting the writing ontology terms relationships to the database ...",  # noqa E501
+            level=logging.INFO,
+            indent=2,
+        )
         listLinks = []
         for goID in goLinks:
             for link in goLinks[goID] or empty:
@@ -189,11 +228,17 @@ class Source_go(loki_source.Source):
                     )  # noqa E501
         self.addGroupRelationships(listLinks)
         self.log(
-            "writing ontology term relationships to the database completed\n"
-        )  # noqa E501
+            "GO - Writing ontology terms relationships to the database completed",  # noqa E501
+            level=logging.INFO,
+            indent=2,
+        )
 
         # process gene associations
-        self.log("processing gene associations ...\n")
+        self.log(
+            "GO - Starting the processing gene associations ...",  # noqa E501
+            level=logging.INFO,
+            indent=2,
+        )
         if os.path.isfile(
             path + "/gene_association.goa_human.gz"
         ) and not os.path.isfile(path + "/goa_human.gaf.gz"):
@@ -248,14 +293,38 @@ class Source_go(loki_source.Source):
             # if association is ok
         # foreach association
         self.log(
-            "processing gene associations completed: %d associations (%d identifiers)\n"  # noqa E501
-            % (numAssoc, numID)
+            "GO - Processing gene associations completed: %d associations (%d identifiers)"  # noqa E501
+            % (numAssoc, numID),
+            level=logging.INFO,
+            indent=2,
         )
 
         # store gene associations
-        self.log("writing gene associations to the database ...\n")
+        self.log(
+            "GO - Starting the writing gene associations to the database ...",  # noqa E501
+            level=logging.INFO,
+            indent=2,
+        )
         for ns in nsAssoc:
             self.addGroupMemberTypedNamespacedNames(
                 typeID["gene"], namespaceID[ns], nsAssoc[ns]
             )
-        self.log("writing gene associations to the database completed\n")
+        self.log(
+            "GO - Writing gene associations to the database completed",  # noqa E501
+            level=logging.INFO,
+            indent=2,
+        )
+
+        end_time = time.time()
+        elapsed_time_minutes = (end_time - start_time) / 60  # time in minutes
+        memory_after = process.memory_info().rss / (1024 * 1024)  # mem in MB
+        self.log(
+            f"GO - Final memory: {memory_after:.2f} MB. Alocated memory: {memory_after - memory_before:.2f} MB.",  # noqa: E501
+            level=logging.INFO,
+            indent=2,
+        )
+        self.log(
+            f"GO - Update completed in {elapsed_time_minutes:.2f} minutes.",  # noqa: E501
+            level=logging.CRITICAL,
+            indent=2,
+        )

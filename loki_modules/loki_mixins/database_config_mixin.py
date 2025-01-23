@@ -161,9 +161,9 @@ class DatabaseConfigMixin:
         if dbFile:
             if not quiet:
                 self.log(
-                    "loading knowledge database file '%s'" % dbFile,
+                    "Loading knowledge database file '%s'" % dbFile,
                     level=logging.WARNING,
-                    indent=1,
+                    indent=0,
                 )  # noqa E501
 
             cursor.execute("ATTACH DATABASE ? AS `db`", (dbFile,))
@@ -196,9 +196,9 @@ class DatabaseConfigMixin:
             if ok:
                 if not quiet:
                     self.log(
-                        "loading knowledge database file completed\n",
+                        "Loading knowledge database file completed\n",
                         level=logging.CRITICAL,
-                        indent=1,
+                        indent=0,
                     )  # noqa E501
             else:
                 self._dbFile = None
@@ -206,7 +206,7 @@ class DatabaseConfigMixin:
                 cursor.execute("DETACH DATABASE `db`")
                 if not quiet:
                     self.log(
-                        "... ERROR (" + err_msg + ")\n", level=logging.ERROR, indent=1
+                        "... ERROR (" + err_msg + ")\n", level=logging.ERROR, indent=0
                     )  # noqa E501
 
     def detachDatabaseFile(self, quiet=False):

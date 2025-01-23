@@ -38,6 +38,7 @@ class Updater(
         self._tablesUpdated = set()
         self._tablesDeindexed = set()
         self.lock = Lock()
+        self.srcSetsToDownload = {}
 
     ##################################################
     # logging
@@ -115,7 +116,7 @@ class Updater(
                     self.log(
                         "WARNING: unknown source '%s'\n" % srcName,
                         level=logging.WARNING,
-                        indent=0
+                        indent=0,
                     )
                     continue
                 # if module not available

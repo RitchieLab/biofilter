@@ -6,6 +6,19 @@ class DatabaseOperationsMixin:
     Mixin for data manipulation operations (CRUD).
     """
 
+    def addWarning(self, source_id, warning):
+        """
+
+        Args:
+
+        Returns:
+            None
+        """
+        self._db.cursor().execute(
+            "INSERT INTO `db`.warning (source_id, warning) VALUES (?, ?)",  # noqa E501
+            (source_id, warning),
+        )
+
     def getDatabaseSetting(self, setting, type=None):
         """
         Retrieves a specific setting value from the database.

@@ -113,16 +113,20 @@ class Database(
             log_file="loki-build.log",
             log_level=logging.DEBUG if testing else logging.INFO,
         )
+        # initialize the database
+        self.log(
+            "=========================================================",  # noqa: E501
+            level=logging.CRITICAL,
+        )
 
         # initialize the database
         self.log(
             "DATABASE INSTANCE CREATED AND LOGGING SYSTEM INITIALIZED.",  # noqa: E501
-            level=logging.CRITICAL
-            )
+            level=logging.CRITICAL,
+        )
         self.log(
-            f"Log file: {self.get_log_file()}\n",  # noqa: E501
-            level=logging.CRITICAL
-            )
+            f"Log file: {self.get_log_file()}\n", level=logging.CRITICAL  # noqa: E501
+        )
 
         self.configureDatabase(tempMem=tempMem)
         self.attachDatabaseFile(dbFile)

@@ -25,11 +25,7 @@ class UpdaterDatabaseMixin:
             raise Exception("cannot update a finalized database")
 
         # check for extraneous options
-        self.log(
-            "preparing for update ...\n",
-            level=logging.INFO,
-            indent=0
-            )
+        self.log("Preparing for update ...", level=logging.INFO, indent=0)
         srcSet = self.attachSourceModules(sources)
         srcOpts = sourceOptions or {}
         for srcName in srcOpts.keys():
@@ -38,14 +34,11 @@ class UpdaterDatabaseMixin:
                     "WARNING: not updating from source '%s' for which options were supplied\n"  # noqa: E501
                     % srcName,
                     level=logging.WARNING,
-                    indent=1,
+                    indent=2,
                 )
         self.log(
-            "preparing for update completed\n",
-            level=logging.INFO,
-            indent=0
-            )  # noqa: E501
-        logIndent = 1
+            "Preparing for update completed\n", level=logging.INFO, indent=0
+        )  # noqa: E501
 
         # update all specified sources
         iwd = os.path.abspath(os.getcwd())
@@ -56,6 +49,13 @@ class UpdaterDatabaseMixin:
         cursor = self._db.cursor()
         cursor.execute("SAVEPOINT 'updateDatabase'")
         try:
+
+            # prepare sources options from database
+            self.log(
+                "Preparing sources options from database ...",
+                level=logging.INFO,
+                indent=0,
+            )
             for srcName in sorted(srcSet):
                 srcObj = self._sourceObjects[srcName]
                 srcID = srcObj.getSourceID()
@@ -79,9 +79,9 @@ class UpdaterDatabaseMixin:
                                 else "loading prior"
                             ),  # noqa: E501
                             srcName,
-                            ),
+                        ),
                         level=logging.INFO,
-                        indent=logIndent,
+                        indent=2,
                     )
                 msg = srcObj.validateOptions(options)
                 if msg is not True:
@@ -90,21 +90,25 @@ class UpdaterDatabaseMixin:
                     for opt in optionsList:
                         self.log("%s = %s\n" % (opt, options[opt]))
                     self.log(
-                        "... OK\n",
+                        "Adding %s options completed\n" % srcName,
                         level=logging.INFO,
-                        indent=logIndent,
-                        )  # noqa: E501
-
+                        indent=2,
+                    )  # noqa: E501
                 # temp for now but should replace options everywhere below
                 self._sourceOptions[srcName] = options
+            self.log(
+                "Preparing sources options from database completed\n",
+                level=logging.INFO,
+                indent=0,
+            )
 
             # ----------------------------------------------
             # Start Parallel Download and Hashing
 
             downloadAndHashThreads = {}
-            srcSetsToDownload = sorted(srcSet)
+            self.srcSetsToDownload = sorted(srcSet)
             # Create buffer to run in parallel
-            for srcName in srcSetsToDownload:
+            for srcName in self.srcSetsToDownload:
                 # download files into a local cache
                 if not cacheOnly:
                     downloadAndHashThreads[srcName] = Thread(
@@ -129,19 +133,25 @@ class UpdaterDatabaseMixin:
             # Return the flow of the code to the main thread
             # ----------------------------------------------
 
-            for srcName in srcSetsToDownload:
+            for srcName in self.srcSetsToDownload:
                 srcObj = self._sourceObjects[srcName]
                 srcID = srcObj.getSourceID()
                 options = self._sourceOptions[srcName]
                 path = os.path.join(iwd, srcName)
 
                 cursor.execute("SAVEPOINT 'updateDatabase_%s'" % (srcName,))
+                self.log(
+                    "Savepoint for %s" % srcName,
+                    level=logging.INFO,
+                    indent=0,
+                )
 
                 try:
                     # compare current loader version, options and file
                     # metadata to the last update
                     skip = not forceUpdate
                     last = "?"
+                    # New Loader Version
                     if skip:
                         for row in cursor.execute(
                             """
@@ -157,6 +167,7 @@ class UpdaterDatabaseMixin:
                                 row[0] == srcObj.getVersionString()
                             )  # noqa: E501
                             last = row[1]
+                    # New Options
                     if skip:
                         n = 0
                         for row in cursor.execute(
@@ -173,6 +184,7 @@ class UpdaterDatabaseMixin:
                                 and (row[1] == options[row[0]])
                             )
                         skip = skip and (n == len(options))
+                    # New Files (Size and MD5 difference)
                     if skip:
                         n = 0
                         for row in cursor.execute(
@@ -183,27 +195,37 @@ class UpdaterDatabaseMixin:
                             (srcID,),
                         ):
                             n += 1
-                            skip = (
-                                skip
-                                and (row[0] in self._filehash)
-                                and (row[1] == self._filehash[row[0]][1])
-                                and (row[2] == self._filehash[row[0]][3])
+                            # Get the file size and MD5 hash directly from
+                            # _filehash
+                            file_size, file_md5 = row[1], row[2]
+                            # Check if there is any file in _filehash with the
+                            # same parameters
+                            match_found = any(
+                                file_hash_data[1] == file_size
+                                and file_hash_data[3] == file_md5  # noqa: E501
+                                for file_hash_data in self._filehash.values()
                             )
+                            # Update the state of `skip`
+                            skip = skip and match_found
+                        # Apply to multiple files
                         skip = skip and (n == len(self._filehash))
 
                     # skip the update if the current loader and all source
                     # file versions match the last update
                     if skip:
                         self.log(
-                            "skipping %s update, no data or software changes since %s\n"  # noqa: E501
-                            % (srcName, last)
+                            "Skipping %s update, no data or software changes since %s"  # noqa: E501
+                            % (srcName, last),
+                            level=logging.WARNING,
+                            indent=0,
                         )
                     else:
                         # process new files (or old files with a new loader)
                         self.log(
-                            "processing %s data ...\n" % srcName,
+                            "Starting the processing of %s data ..." % srcName,
                             level=logging.INFO,
-                            indent=1,)
+                            indent=0,
+                        )
 
                         cursor.execute(
                             """
@@ -212,7 +234,16 @@ class UpdaterDatabaseMixin:
                             """,
                             (srcID,),  # noqa: E501
                         )
+                        self.log(
+                            "Deleted warning table for %s data ..." % srcName,
+                            level=logging.INFO,
+                            indent=2,
+                        )
+
+                        # Call the update function of the source
                         srcObj.update(options, path)
+
+                        # update the source metadata
                         cursor.execute(
                             """
                             UPDATE `db`.`source`
@@ -250,23 +281,28 @@ class UpdaterDatabaseMixin:
                             "VALUES (%d,?,?,DATETIME(?,'unixepoch'),?)" % srcID
                         )
                         cursor.executemany(sql, self._filehash.values())
+                        self.log(
+                            "Metadata updated for %s" % srcName,
+                            level=logging.INFO,
+                            indent=0,
+                        )
 
                         self.log(
-                            "processing %s data completed\n" % srcName,
+                            "Processing %s data completed" % srcName,
                             level=logging.INFO,
-                            indent=1,
-                            )
+                            indent=0,
+                        )
                     # if skip
                 except Exception as e:
                     srcErrors.add(srcName)
                     excType, excVal, excTrace = sys.exc_info()
-                    # while self.logPop() > logIndent:
+                    # while self.logPop() > 1:
                     #     pass
                     self.log(
                         "ERROR: failed to update %s\n" % (srcName,),
                         level=logging.ERROR,
-                        indent=logIndent,
-                        )
+                        indent=1,
+                    )
                     self.log_exception(e)
                     if excTrace:
                         for line in traceback.format_list(
@@ -275,22 +311,34 @@ class UpdaterDatabaseMixin:
                             self.log(
                                 line,
                                 level=logging.ERROR,
-                                indent=logIndent,)
+                                indent=1,
+                            )
                     for line in traceback.format_exception_only(
                         excType, excVal
                     ):  # noqa E501
                         self.log(
                             line,
                             level=logging.ERROR,
-                            indent=logIndent,)
+                            indent=1,
+                        )
                     cursor.execute(
                         "ROLLBACK TRANSACTION TO SAVEPOINT 'updateDatabase_%s'"
                         % (srcName,)
+                    )
+                    self.log(
+                        "Rollback Savepoint for %s\n" % srcName,
+                        level=logging.WARNING,
+                        indent=0,
                     )
                 finally:
                     cursor.execute(
                         "RELEASE SAVEPOINT 'updateDatabase_%s'" % (srcName,)
                     )  # noqa: E501
+                    self.log(
+                        "Released Savepoint for %s\n" % srcName,
+                        level=logging.CRITICAL,
+                        indent=0,
+                    )
                 # try/except/finally
 
                 # remove subdirectory to free up some space
@@ -306,7 +354,7 @@ class UpdaterDatabaseMixin:
                     "updating GRCh:UCSChg genome build identities ...\n",
                     level=logging.INFO,
                     indent=0,
-                    )
+                )
                 import urllib.request as urllib2
                 import re
 
@@ -403,7 +451,7 @@ class UpdaterDatabaseMixin:
                     % (row[0], (row[1] or "?"), (row[2] or "?")),
                     level=logging.WARNING,
                     indent=0,
-                    )
+                )
                 mismatch = True
             if mismatch:
                 self.log(
@@ -555,17 +603,17 @@ class UpdaterDatabaseMixin:
                 "updating database completed\n",
                 level=logging.INFO,
                 indent=0,
-                )
+            )
         except Exception as e:
             self.log_exception(e)
             excType, excVal, excTrace = sys.exc_info()
-            # while self.logPop() > logIndent:
+            # while self.logPop() > 1:
             #     pass
             self.log(
                 "ERROR: failed to update the database\n",
                 level=logging.ERROR,
-                indent=logIndent,
-                )
+                indent=1,
+            )
 
             if excTrace:
                 for line in traceback.format_list(
@@ -574,14 +622,14 @@ class UpdaterDatabaseMixin:
                     self.log(
                         line,
                         level=logging.ERROR,
-                        indent=logIndent,
-                        )
+                        indent=1,
+                    )
             for line in traceback.format_exception_only(excType, excVal):
                 self.log(
                     line,
                     level=logging.ERROR,
-                    indent=logIndent,
-                    )
+                    indent=1,
+                )
             # self.logPop()
             cursor.execute(
                 "ROLLBACK TRANSACTION TO SAVEPOINT 'updateDatabase'"
@@ -600,12 +648,12 @@ class UpdaterDatabaseMixin:
                 "WARNING: data from these sources was not updated:\n",
                 level=logging.WARNING,
                 indent=0,
-                )
+            )
             for srcName in sorted(srcErrors):
                 self.log(
                     "%s\n" % srcName,
                     level=logging.WARNING,
                     indent=1,
-                    )
+                )
             return False
         return True

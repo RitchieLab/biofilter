@@ -38,7 +38,7 @@ class LoggerMixin:
                 )
                 console_handler.setFormatter(
                     self.ColoredFormatter(console_formatter)
-                    )  # noqa: E501
+                )  # noqa: E501
                 self._logger.addHandler(console_handler)
 
             self._logger.setLevel(log_level)

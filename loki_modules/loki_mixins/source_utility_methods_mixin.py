@@ -188,7 +188,7 @@ class SourceUtilityMethods:
         self.log(
             "connecting to FTP server %s ..." % remHost,
             level=logging.INFO,
-            )  # noqa E501
+        )  # noqa E501
         ftp = ftplib.FTP(remHost, timeout=21600)
         ftp.login()  # anonymous
         self.log(" OK\n", level=logging.INFO)
@@ -267,9 +267,13 @@ class SourceUtilityMethods:
                 remSize[remFiles[locPath]] == locSize[locPath]
                 and remTime[remFiles[locPath]] <= locTime[locPath]
             ):
-                self.log("%s: up to date\n" % locPath, level=logging.INFO, indent=1)  # noqa E501
+                self.log(
+                    "%s: up to date\n" % locPath, level=logging.INFO, indent=1
+                )  # noqa E501
             else:
-                self.log("%s: downloading ...\n" % locPath, level=logging.INFO, indent=1)  # noqa E501
+                self.log(
+                    "%s: downloading ...\n" % locPath, level=logging.INFO, indent=1
+                )  # noqa E501
                 # TODO: download to temp file, then rename?
                 with open(locPath, "wb") as locFile:
                     # ftp.cwd(remFiles[locPath][0:remFiles[locPath].rfind('/')])
@@ -292,7 +296,7 @@ class SourceUtilityMethods:
             "... OK\n",
             level=logging.INFO,
             indent=0,
-            )
+        )
 
     def getHTTPHeaders(self, remHost, remURL, reqData=None, reqHeaders=None):
         class NoRedirection(urllib2.HTTPErrorProcessor):
@@ -427,8 +431,9 @@ class SourceUtilityMethods:
     #         )
 
     def _downloadHTTP(
-            self, remProtocol, remHost, remFiles, reqHeaders, alwaysDownload
-            ):
+        self, remProtocol, remHost, remFiles, reqHeaders, alwaysDownload
+    ):  # noqa E501
+        _indent = 4
         # check local file sizes and times
         remSize = {}
         remTime = {}
@@ -444,9 +449,15 @@ class SourceUtilityMethods:
                 locSize[locPath] = int(stat.st_size)
                 locTime[locPath] = datetime.fromtimestamp(stat.st_mtime)
 
-        # check remote file sizes and times
+        # # check remote file sizes and times
+        # NOTE: O problema aqui eh que estamos sempre baixando os arquivos
+        # em pastas diferentes, entao nao tem como comparar os arquivos
         if not alwaysDownload:
-            self.log("identifying changed files ...", level=logging.INFO)
+            # self.log(
+            #     "Identifying changed files ...",
+            #     level=logging.INFO,
+            #     indent=_indent,
+            #     )
             for locPath in remFiles:
                 request = urllib2.Request(
                     remProtocol + "://" + remHost + remFiles[locPath]
@@ -472,10 +483,16 @@ class SourceUtilityMethods:
                         remTime[locPath] = datetime.now(timezone.utc)
 
                 response.close()
-            self.log(" OK\n", level=logging.INFO)
+            # self.log(
+            #     "ALWAYS_DOWNLOAD\n",
+            #     level=logging.WARNING,
+            #     indent=_indent,
+            #     )  # noqa E501
 
         # download files as needed
-        self.log("downloading changed files ...\n", level=logging.INFO, indent=1)
+        self.log(
+            "Starting download files ...", level=logging.INFO, indent=_indent
+        )  # noqa E501
         for locPath in sorted(remFiles.keys()):
             if (
                 remSize[locPath]
@@ -483,9 +500,11 @@ class SourceUtilityMethods:
                 and remTime[locPath]
                 and remTime[locPath] <= locTime[locPath]
             ):
-                self.log(f"{locPath}: up to date\n", level=logging.INFO)
+                # TODO: IMPLEMENT ROTINE TO CHECK IF FILE IS UP TO DATE
+                self.log(
+                    f"{locPath}: up to date", level=logging.WARNING, indent=_indent
+                )
             else:
-                self.log(f"{locPath}: downloading ...", level=logging.INFO)
                 link = f"{remProtocol}://{remHost}{remFiles[locPath]}"
 
                 with open(locPath, "wb") as locFile:
@@ -503,8 +522,8 @@ class SourceUtilityMethods:
                         unit="B",
                         unit_scale=True,
                         desc=f"Downloading {os.path.basename(locPath)}",
-                        dynamic_ncols=True,  # Ajusta automaticamente o tamanho da barra
-                        leave=True,  # Deixa a barra finalizada no console
+                        dynamic_ncols=True,
+                        leave=True,
                     ) as progress:
                         while True:
                             data = response.read(chunk_size)
@@ -514,9 +533,7 @@ class SourceUtilityMethods:
                             progress.update(len(data))
                     response.close()
 
-                self.log(" OK\n", level=logging.INFO)
-
             if remTime[locPath]:
                 modTime = time.mktime(remTime[locPath].utctimetuple())
                 os.utime(locPath, (modTime, modTime))
-        self.log("... OK\n", level=logging.INFO, indent=0)
+        self.log("Download completed", level=logging.INFO, indent=_indent)
