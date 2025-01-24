@@ -39,6 +39,9 @@ class Updater(
         self._tablesDeindexed = set()
         self.lock = Lock()
         self.srcSetsToDownload = {}
+        self.keepDownload = False
+        self.onlyDownload = False
+        self.skipDownload = False
 
     ##################################################
     # logging

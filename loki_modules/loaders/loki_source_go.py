@@ -315,6 +315,7 @@ class Source_go(loki_source.Source):
             indent=2,
         )
 
+        # Finalize the process
         end_time = time.time()
         elapsed_time_minutes = (end_time - start_time) / 60  # time in minutes
         memory_after = process.memory_info().rss / (1024 * 1024)  # mem in MB

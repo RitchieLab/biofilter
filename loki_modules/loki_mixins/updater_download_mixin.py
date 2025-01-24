@@ -8,6 +8,33 @@ import logging
 
 class UpdaterDownloadMixin:
 
+    def fileHash(self, filename):
+        """
+        Calculate file metadata (size, mtime, MD5 hash) for a given file.
+
+        Args:
+            filename (str): Path to the file.
+
+        Returns:
+            tuple: A tuple containing (filename, size, mtime, md5_hexdigest).
+        """
+        stat = os.stat(filename)
+        md5 = hashlib.md5()
+        with open(filename, "rb") as f:
+            chunk = f.read(8 * 1024 * 1024)
+            while chunk:
+                md5.update(chunk)
+                chunk = f.read(8 * 1024 * 1024)
+
+            self.lock.acquire()
+            self._filehash[filename] = (
+                filename,
+                int(stat.st_size),
+                int(stat.st_mtime),
+                md5.hexdigest(),
+            )
+            self.lock.release()
+
     def downloadAndHash(self, iwd, srcName, srcOptions):
         _intend = 2
 
@@ -41,21 +68,23 @@ class UpdaterDownloadMixin:
                 indent=_intend,
             )
             for filename in downloadedFiles:
-                stat = os.stat(filename)
-                md5 = hashlib.md5()
-                with open(filename, "rb") as f:
-                    chunk = f.read(8 * 1024 * 1024)
-                    while chunk:
-                        md5.update(chunk)
-                        chunk = f.read(8 * 1024 * 1024)
-                self.lock.acquire()
-                self._filehash[filename] = (
-                    filename,
-                    int(stat.st_size),
-                    int(stat.st_mtime),
-                    md5.hexdigest(),
-                )
-                self.lock.release()
+                self.fileHash(filename)
+                # stat = os.stat(filename)
+                # md5 = hashlib.md5()
+                # with open(filename, "rb") as f:
+                #     chunk = f.read(8 * 1024 * 1024)
+                #     while chunk:
+                #         md5.update(chunk)
+                #         chunk = f.read(8 * 1024 * 1024)
+                # self.lock.acquire()
+                # self._filehash[filename] = (
+                #     filename,
+                #     int(stat.st_size),
+                #     int(stat.st_mtime),
+                #     md5.hexdigest(),
+                # )
+                # self.lock.release()
+
             self.log(
                 "Thread - Analyzing %s data files completed" % srcName,
                 level=logging.INFO,

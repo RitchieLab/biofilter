@@ -130,7 +130,10 @@ class DatabaseOperationsMixin:
         sources=None,
         sourceOptions=None,
         cacheOnly=False,
-        forceUpdate=False,  # noqa E501
+        forceUpdate=False,
+        # keep_downloads=False,
+        # only_downloads=False,
+        # noqa E501
     ):
         """
         Updates the database using the specified source modules and options.
@@ -160,6 +163,8 @@ class DatabaseOperationsMixin:
             import loki_modules.loki_updater as loki_updater
 
             self._updater = loki_updater.Updater(self, self._is_test)
+
+        # self._updater.onlyDownload = only_downloads
         return self._updater.updateDatabase(
             sources, sourceOptions, cacheOnly, forceUpdate
         )

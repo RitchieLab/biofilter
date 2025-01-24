@@ -78,11 +78,14 @@ import sys
 import tarfile
 import tempfile
 import logging
+import psutil
+import time
 
 from loki_modules import loki_db
 
 
 def main():
+
     version = "LOKI version %s" % (loki_db.Database.getVersionString())
 
     # define arguments
@@ -211,6 +214,28 @@ def main():
         + " since the last update",
     )
     parser.add_argument(
+        "--keep-download",
+        action="store_true",
+        help=(
+            "Set this flag to retain the downloaded files; otherwise, the "
+            "files will be deleted after processing. Must be used with a "
+            "specified temp-directory to work."
+        ),
+    )
+    parser.add_argument(
+        "--only-download",
+        action="store_true",
+        help=("Set this flag to only download the files; do not process them."),
+    )
+    parser.add_argument(
+        "--skip-download",
+        action="store_true",
+        help=(
+            "Set this flag to skip downloading the files; only process them. "
+            "Must be used with a specified temp-directory to work."
+        ),
+    )
+    parser.add_argument(
         "-f",
         "--finalize",
         action="store_true",
@@ -248,20 +273,48 @@ def main():
 
     # parse arguments
     args = parser.parse_args()
-    if args.temp_directory:
-        if not os.path.isdir(args.temp_directory):
-            print("ERROR: '%s' is not a directory")
-            sys.exit(1)
-        os.environ["TMPDIR"] = os.path.abspath(args.temp_directory)
+
+    # Setting parameters for time and memory usage
+    start_time = time.time()
+    process = psutil.Process()
+    memory_before = process.memory_info().rss / (1024 * 1024)  # in MB
+
+    print("---- STARTING LOKI BUILD SCRIPT ----")
+    print("==== Inicial Memory {memory_before:.2f} MB)")
 
     # instantiate database object
     db = loki_db.Database(testing=args.test_data, updating=True)
-    db.log(
-        "-- STARTING LOKI BUILD SCRIPT --", level=logging.CRITICAL, indent=0
-    )  # noqa E501
 
     db.setVerbose(args.verbose or (not args.quiet))
     db.attachDatabaseFile(args.knowledge)
+
+    # directory for temporary files
+    # if a temp directory is specified, use it
+    if args.temp_directory:
+        if not os.path.isdir(args.temp_directory):
+            db.log(
+                f"ERROR: {args.temp_directory} is not a directory",
+                level=logging.ERROR,
+                indent=0,
+            )
+            sys.exit(1)
+        os.environ["TMPDIR"] = os.path.abspath(args.temp_directory)
+    # cacheDir = os.path.abspath(
+    #     tempfile.mkdtemp(
+    #         prefix="loki_update_cache.", dir=args.temp_directory
+    #     )  # noqa: E501
+    # )
+    cacheDir = os.environ["TMPDIR"]
+    db.log(
+        "Using temp directory: '%s'\n" % cacheDir,
+        level=logging.INFO,
+        indent=0,
+    )
+
+    # create temp directory and unpack input archive, if any
+    startDir = os.getcwd()
+    fromArchive = args.from_archive or args.archive
+    toArchive = args.to_archive or args.archive
 
     # list sources?
     srcSet = {}
@@ -294,7 +347,7 @@ def main():
                     )  # noqa E501
             elif srcSet:
                 db.log("<no options>", level=logging.INFO, indent=4)
-        db.log("  ", level=logging.INFO, indent=0)
+        print(" ")
     srcSet = srcSet or None
 
     # Check if we are updating the database
@@ -352,22 +405,6 @@ def main():
             srcSet = set()
         srcSet = (srcSet or set(db.getSourceModules())) - (notSet or set())
 
-        # create temp directory and unpack input archive, if any
-        startDir = os.getcwd()
-        fromArchive = args.from_archive or args.archive
-        toArchive = args.to_archive or args.archive
-        cacheDir = os.path.abspath(
-            tempfile.mkdtemp(
-                prefix="loki_update_cache.", dir=args.temp_directory
-            )  # noqa: E501
-        )
-        if args.temp_directory:
-            db.log(
-                "Using temporary directory '%s'\n" % cacheDir,
-                level=logging.INFO,
-                indent=0,
-            )
-
         # try/finally to make sure we clean up the cache dir at the end
         try:
             if fromArchive:
@@ -412,11 +449,54 @@ def main():
                         indent=2,
                     )
 
+            # Change to the cache directory
             os.chdir(cacheDir)
+
+            if args.skip_download and args.only_download:
+                # Conflict: It makes no sense to skip the download and at the same time try to download only
+                db.log(
+                    "Conflicting arguments: '--skip-download' and '--only-download' cannot be used together.",  # noqa: E501
+                    level=logging.WARNING,
+                    indent=1,
+                )
+                sys.exit(1)
+
+            if args.skip_download:
+                # Prior 'skip_download'
+                db._updater.skipDownload = args.skip_download
+                db._updater.onlyDownload = False
+                db.log(
+                    "Skipping downloads as '--skip-download' is set. Files must already be available locally.",  # noqa: E501
+                    level=logging.INFO,
+                    indent=0,
+                )
+            elif args.only_download:
+                # Prior 'only_download'
+                db._updater.onlyDownload = args.only_download
+                db._updater.skipDownload = False
+                db._updater.keepDownload = True
+                db.log(
+                    "Running in 'only download' mode. Files will be downloaded but not processed.",  # noqa: E501
+                    level=logging.INFO,
+                    indent=0,
+                )
+            if args.keep_download:
+                # Prior 'keep_download'
+                db._updater.keepDownload = args.keep_download
+                db.log(
+                    "Keeping downloaded files as '--keep-download' is set.",
+                    level=logging.INFO,
+                    indent=0,
+                )
 
             # update database
             updateOK = db.updateDatabase(
-                srcSet, userOptions, args.cache_only, args.force_update
+                srcSet,
+                userOptions,
+                args.cache_only,
+                args.force_update,
+                # args.keep_download,
+                # args.only_download,
             )
             os.chdir(startDir)
 
@@ -439,14 +519,17 @@ def main():
                 db.log("... OK", level=logging.INFO, indent=2)
         finally:
             # clean up cache directory
-            def rmtree_error(func, path, exc):
-                db.log(
-                    "Unable to remove temporary file '%s': %s" % (path, exc),
-                    level=logging.WARNING,
-                    indent=0,
-                )
+            # def rmtree_error(func, path, exc):
+            #     db.log(
+            #         "Unable to remove temporary file '%s': %s" % (path, exc),
+            #         level=logging.WARNING,
+            #         indent=0,
+            #     )
 
-            shutil.rmtree(cacheDir, onerror=rmtree_error)
+            # The folder is removed in the updateDatabase function
+            # TODO We really need to remove the folder here?
+            # shutil.rmtree(cacheDir, onerror=rmtree_error)
+            pass
     # update
 
     if args.knowledge:
@@ -475,6 +558,33 @@ def main():
             else:
                 db.testDatabaseWriteable()
                 db.optimizeDatabase()
+
+    # log user-provided arguments
+    arguments = vars(args)
+    formatted_args = "\n".join(f"{key}: {value}" for key, value in arguments.items())
+
+    db.log(
+        f"LOKI-BUILD - User-provided arguments:\n{formatted_args}",
+        level=logging.INFO,
+        indent=2,
+    )
+    print(" ")
+
+    # Time and memory usage
+    end_time = time.time()
+    elapsed_time_minutes = (end_time - start_time) / 60  # time in minutes
+    memory_after = process.memory_info().rss / (1024 * 1024)  # mem in MB
+
+    db.log(
+        f"LOKI-BUILD - Final memory: {memory_after:.2f} MB. Alocated memory: {memory_after - memory_before:.2f} MB.",  # noqa: E501
+        level=logging.INFO,
+        indent=2,
+    )
+    db.log(
+        f"LOKI-BUILD - Update completed in {elapsed_time_minutes:.2f} minutes.\n",  # noqa: E501
+        level=logging.CRITICAL,
+        indent=2,
+    )
 
     db.log(
         f"-- FINISHED LOKI BUILD SCRIPT --\nLog file: {db.get_log_file()}",

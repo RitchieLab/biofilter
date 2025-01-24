@@ -1,4 +1,7 @@
 import collections
+import logging
+import psutil
+import time
 from loki_modules import loki_source
 
 
@@ -29,9 +32,26 @@ class Source_pfam(loki_source.Source):
 
     def update(self, options, path):
         # clear out all old data from this source
-        self.log("deleting old records from the database ...\n")
+        start_time = time.time()
+        process = psutil.Process()
+        memory_before = process.memory_info().rss / (1024 * 1024)  # in MB
+
+        self.log(
+            f"Pfam - Starting Data Ingestion (inicial memory {memory_before:.2f} MB) ...",  # noqa: E501
+            level=logging.INFO,
+            indent=2,
+        )
+        self.log(
+            "Pfam - Starting deletion of old records from the database ...",
+            level=logging.INFO,
+            indent=2,
+        )
         self.deleteAll()
-        self.log("deleting old records from the database completed\n")
+        self.log(
+            "Pfam - Old records deletion completed",
+            level=logging.INFO,
+            indent=2,
+        )
 
         # get or create the required metadata records
         namespaceID = self.addNamespaces(
@@ -52,14 +72,13 @@ class Source_pfam(loki_source.Source):
                 ("gene",),
             ]
         )
-        subtypeID = self.addSubtypes(
-            [
-                ("-",),
-            ]
-        )
 
         # process protein families
-        self.log("processing protein families ...\n")
+        self.log(
+            "Pfam - Starting the processing protein families ...",
+            level=logging.INFO,
+            indent=2,
+        )  # noqa E501
         # TODO:context manager,iterator
         pfamFile = self.zfile(path + "/pfamA.txt.gz")
         groupFam = collections.defaultdict(set)
@@ -101,28 +120,42 @@ class Source_pfam(loki_source.Source):
         numGroup = len(groupFam)
         numFam = len(famName)
         self.log(
-            "processing protein families completed: %d categories, %d families\n"  # noqa E501
-            % (numGroup, numFam)
+            "Pfam - Processing protein families completed: %d categories, %d families"  # noqa E501
+            % (numGroup, numFam),
+            level=logging.INFO,
+            indent=2,
         )
 
         # store protein families
-        self.log("writing protein families to the database ...\n")
+        self.log(
+            "Pfam - Starting the writing protein families to the database ...",
+            level=logging.INFO,
+            indent=2,
+        )
         listGroup = groupFam.keys()
         listGID = self.addTypedGroups(
             typeID["proteinfamily"],
-            ((subtypeID["-"], group, "") for group in listGroup),
+            ((group, "") for group in listGroup),
         )
         groupGID = dict(zip(listGroup, listGID))
         listFam = famAcc.keys()
         listGID = self.addTypedGroups(
             typeID["proteinfamily"],
-            ((subtypeID["-"], famName[fam], famDesc[fam]) for fam in listFam),
+            ((famName[fam], famDesc[fam]) for fam in listFam),
         )
         famGID = dict(zip(listFam, listGID))
-        self.log("writing protein families to the database completed\n")
+        self.log(
+            "Pfam - Writing protein families to the database completed",
+            level=logging.INFO,
+            indent=2,
+        )  # noqa E501
 
         # store protein family names
-        self.log("writing protein family names to the database ...\n")
+        self.log(
+            "Pfam - Starting the writing protein family names to the database ...",  # noqa E501
+            level=logging.INFO,
+            indent=2,
+        )
         self.addGroupNamespacedNames(
             namespaceID["pfam_id"],
             ((groupGID[group], group) for group in listGroup),  # noqa E501
@@ -140,20 +173,36 @@ class Source_pfam(loki_source.Source):
             ((famGID[fam], famName[fam]) for fam in listFam),
         )
         famName = famDesc = None
-        self.log("writing protein family names to the database completed\n")
+        self.log(
+            "Pfam - Writing protein family names to the database completed",
+            level=logging.INFO,
+            indent=2,
+        )
 
         # store protein family meta-group links
-        self.log("writing protein family links to the database ...\n")
+        self.log(
+            "Pfam - Starting the writing protein family links to the database ...",  # noqa E501
+            level=logging.INFO,
+            indent=2,
+        )
         for group in groupFam:
             self.addGroupRelationships(
                 (famGID[fam], groupGID[group], relationshipID[""], None)
                 for fam in groupFam[group]
             )
         groupFam = None
-        self.log("writing protein family links to the database completed\n")
+        self.log(
+            "Pfam - Writing protein family links to the database completed",
+            level=logging.INFO,
+            indent=2,
+        )
 
         # process protein identifiers
-        self.log("processing protein identifiers ...\n")
+        self.log(
+            "Pfam - Starting the processing protein identifiers ...",
+            level=logging.INFO,
+            indent=2,
+        )
         # TODO:context manager,iterator
         seqFile = self.zfile(path + "/pfamseq.txt.gz")
         proNames = dict()
@@ -175,12 +224,18 @@ class Source_pfam(loki_source.Source):
                 proNames[proteinNum] = (uniprotID, uniprotAcc)
         # foreach protein
         self.log(
-            "processing protein identifiers completed: %d proteins\n"
-            % (len(proNames),)  # noqa E501
-        )
+            "Pfam - Processing protein identifiers completed: %d proteins"
+            % (len(proNames),),
+            level=logging.INFO,
+            indent=2,
+        )  # noqa E501
 
         # process associations
-        self.log("processing protein associations ...\n")
+        self.log(
+            "Pfam - Starting the processing protein associations ...",
+            level=logging.INFO,
+            indent=2,
+        )
         # TODO:context manager,iterator
         assocFile = self.zfile(path + "/pfamA_reg_full_significant.txt.gz")
         setAssoc = set()
@@ -206,13 +261,38 @@ class Source_pfam(loki_source.Source):
             # if association is ok
         # foreach association
         self.log(
-            "processing protein associations completed: %d associations (%d identifiers)\n"  # noqa E501
-            % (numAssoc, numID)
+            "Pfam - Processing protein associations completed: %d associations (%d identifiers)"  # noqa E501
+            % (numAssoc, numID),
+            level=logging.INFO,
+            indent=2,
         )
 
         # store gene associations
-        self.log("writing gene associations to the database ...\n")
+        self.log(
+            "Pfam - Starting the writing gene associations to the database ...",  # noqa E501
+            level=logging.INFO,
+            indent=2,
+        )
         self.addGroupMemberTypedNamespacedNames(
             typeID["gene"], namespaceID["uniprot_pid"], setAssoc
         )
-        self.log("writing gene associations to the database completed\n")
+        self.log(
+            "Pfam - Writing gene associations to the database completed",
+            level=logging.INFO,
+            indent=2,
+        )
+
+        # Finalize the process
+        end_time = time.time()
+        elapsed_time_minutes = (end_time - start_time) / 60  # time in minutes
+        memory_after = process.memory_info().rss / (1024 * 1024)  # mem in MB
+        self.log(
+            f"Pfam - Final memory: {memory_after:.2f} MB. Alocated memory: {memory_after - memory_before:.2f} MB.",  # noqa: E501
+            level=logging.INFO,
+            indent=2,
+        )
+        self.log(
+            f"Pfam - Update completed in {elapsed_time_minutes:.2f} minutes.",  # noqa: E501
+            level=logging.CRITICAL,
+            indent=2,
+        )

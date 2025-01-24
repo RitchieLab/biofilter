@@ -94,7 +94,8 @@ class Schema:
                     version VARCHAR(32),
                     grch INTEGER,
                     ucschg INTEGER,
-                    current_ucschg INTEGER
+                    current_ucschg INTEGER,
+                    last_status BOOLEAN DEFAULT 0
                     )
                     """,
                 "index": {},

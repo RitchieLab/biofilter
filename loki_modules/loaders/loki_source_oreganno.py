@@ -25,7 +25,9 @@ class Source_oreganno(loki_source.Source):
 
         self.downloadFilesFromHTTP(
             self._remHost,
-            dict(((path + "/" + f, self._remPath + f) for f in self._remFiles)),  # noqa E501
+            dict(
+                ((path + "/" + f, self._remPath + f) for f in self._remFiles)
+            ),  # noqa E501
         )
 
         return [os.path.join(path, f) for f in self._remFiles]
@@ -83,7 +85,7 @@ class Source_oreganno(loki_source.Source):
         oreg_gene = {}
         oreg_tfbs = {}
         oreg_snp = {}
-        link_f = self.zfile("oregannoLink.txt.gz") # NOTE Parei aqui. Vai dar erro
+        link_f = self.zfile("oregannoLink.txt.gz")
         entrez_ns = external_ns["entrez_gid"]
         ensembl_ns = external_ns["ensembl_gid"]
         symbol_ns = external_ns["symbol"]

@@ -1,5 +1,8 @@
 import itertools
 from threading import Thread
+import logging
+import psutil
+import time
 from loki_modules import loki_source
 
 
@@ -58,12 +61,7 @@ class Source_ucsc_ecr(loki_source.Source):
             "gap": "maximum gap length below the identity threshold (default: 50)",  # noqa E501
         }
 
-    # getOptions()
-
     def validateOptions(self, options):
-        """
-        Validate the options
-        """
         for o, v in options.items():
             try:
                 if o == "size":
@@ -102,9 +100,6 @@ class Source_ucsc_ecr(loki_source.Source):
     # validateOptions()
 
     def download(self, options, path):
-        """
-        Download the files
-        """
         remFiles = dict()
         for chm in self._chmList:
             for d, f in self._comparisons.items():
@@ -133,9 +128,26 @@ class Source_ucsc_ecr(loki_source.Source):
                 http://genome.ucsc.edu/goldenPath/help/phastCons.html
         Since this matches LOKI's convention, we can store them as-is.
         """
-        self.log("deleting old records from the database ...\n")
+        start_time = time.time()
+        process = psutil.Process()
+        memory_before = process.memory_info().rss / (1024 * 1024)  # in MB
+
+        self.log(
+            f"UCSC - Starting Data Ingestion (inicial memory {memory_before:.2f} MB) ...",  # noqa: E501
+            level=logging.INFO,
+            indent=2,
+        )
+        self.log(
+            "UCSC - Starting deletion of old records from the database ...",
+            level=logging.INFO,
+            indent=2,
+        )
         self.deleteAll()
-        self.log("deleting old records from the database completed\n")
+        self.log(
+            "UCSC - Old records deletion completed",
+            level=logging.INFO,
+            indent=2,
+        )
 
         # Add a namespace
         ecr_ns = self.addNamespace("ucsc_ecr")
@@ -145,11 +157,6 @@ class Source_ucsc_ecr(loki_source.Source):
 
         # Add a type of "ecr_group"
         ecr_group_typeid = self.addType("ecr_group")
-        subtypeID = self.addSubtypes(
-            [
-                ("-",),
-            ]
-        )
 
         # Make sure the '' ldprofile exists
         ecr_ldprofile_id = self.addLDProfile("", "no LD adjustment")
@@ -158,13 +165,17 @@ class Source_ucsc_ecr(loki_source.Source):
         rel_id = self.addRelationship("contains")
 
         for sp in self._comparisons:
-            self.log("processing ECRs for " + sp + " ...\n")
+            self.log(
+                "UCSC - Starting the processing ECRs for " + sp + " ...",
+                level=logging.INFO,
+                indent=2,
+                )
             desc = "ECRs for " + sp
             label = "ecr_" + sp
 
             # Add the group for this species (or comparison)
             ecr_gid = self.addTypedGroups(
-                ecr_group_typeid, [(subtypeID["-"], label, desc)]
+                ecr_group_typeid, [(label, desc)]
             )[0]
             self.addGroupNamespacedNames(ecr_ns, [(ecr_gid, label)])
 
@@ -178,7 +189,6 @@ class Source_ucsc_ecr(loki_source.Source):
                         ch,
                         chr_grp_ids,
                         ecr_group_typeid,
-                        subtypeID,
                         ecr_ns,
                         ecr_typeid,
                         ecr_ldprofile_id,
@@ -196,12 +206,31 @@ class Source_ucsc_ecr(loki_source.Source):
                 ((ecr_gid, c, rel_id, 1) for c in chr_grp_ids)
             )  # noqa E501
 
-            self.log("processing ECRs for " + sp + " completed\n")
+            self.log(
+                "UCSC - Processing ECRs for " + sp + " completed",
+                level=logging.INFO,
+                indent=2,
+                )
 
         # store source metadata
         self.setSourceBuilds(None, 19)
         # TODO: check for latest FTP path rather than hardcoded
         # /goldenPath/hg19/phastCons46way/
+
+        # Finalize the process
+        end_time = time.time()
+        elapsed_time_minutes = (end_time - start_time) / 60  # time in minutes
+        memory_after = process.memory_info().rss / (1024 * 1024)  # mem in MB
+        self.log(
+            f"UCSC - Final memory: {memory_after:.2f} MB. Alocated memory: {memory_after - memory_before:.2f} MB.",  # noqa: E501
+            level=logging.INFO,
+            indent=2,
+        )
+        self.log(
+            f"UCSC - Update completed in {elapsed_time_minutes:.2f} minutes.",  # noqa: E501
+            level=logging.CRITICAL,
+            indent=2,
+        )
 
     # update()
 
@@ -211,7 +240,6 @@ class Source_ucsc_ecr(loki_source.Source):
         ch,
         chr_grp_ids,
         ecr_group_typeid,
-        subtypeID,
         ecr_ns,
         ecr_typeid,
         ecr_ldprofile_id,
@@ -220,7 +248,11 @@ class Source_ucsc_ecr(loki_source.Source):
         path,
     ):
         ch_id = self._loki.chr_num[ch]
-        self.log("processing Chromosome " + ch + " ...\n")
+        self.log(
+            "UCSC/Thread - Starting the processing Chromosome " + ch + " ...",
+            level=logging.INFO,
+            indent=2,
+            )
         f = self.zfile(path + "/" + sp + ".chr" + ch + ".phastCons.txt.gz")
         curr_band = 1
         num_regions = 0
@@ -228,7 +260,7 @@ class Source_ucsc_ecr(loki_source.Source):
         chr_grp_ids.append(
             self.addTypedGroups(
                 ecr_group_typeid,
-                [(subtypeID["-"], "ecr_%s_chr%s" % (sp, ch), desc)],  # noqa E501
+                [("ecr_%s_chr%s" % (sp, ch), desc)],  # noqa E501
             )[0]
         )
         self.addGroupNamespacedNames(
@@ -248,7 +280,7 @@ class Source_ucsc_ecr(loki_source.Source):
             num_regions += len(regions)
 
             if regions:
-                band_grps.append((subtypeID["-"], label, desc))
+                band_grps.append((label, desc))
 
             # Add the region itself
             reg_ids = self.addTypedBiopolymers(
@@ -295,11 +327,11 @@ class Source_ucsc_ecr(loki_source.Source):
         )  # noqa E501
 
         self.log(
-            "processing Chromosome %s completed (%d regions found in %d bands)\n"  # noqa E501
-            % (ch, num_regions, curr_band - 1)
+            "UCSC/Thread - Processing Chromosome %s completed (%d regions found in %d bands)"  # noqa E501
+            % (ch, num_regions, curr_band - 1),
+            level=logging.INFO,
+            indent=2,
         )
-
-    # processECRs()
 
     def getRegionName(self, species, ch, region):
         """

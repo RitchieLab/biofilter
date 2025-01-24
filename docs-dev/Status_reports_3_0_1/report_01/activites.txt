@@ -60,9 +60,18 @@ com erro e nao realizar o processamento (uma vez que o processamento envolve eli
             self._loki.addWarning(srcObj._sourceID, msn_error)
 
 
+BUG: O LOADER Oreganno nao estava alinhado com as praticas das classes source e updater, nao 
+fazia a composicao do path, nao passava o path como argumento
+
+Adicionado campo na Source para controlar os loardes com sucesso e os com errors
+adcionado argumento para manter os arquivos baixados
+adicionadas rotinas para rodar somente o download, para manter, e para pular os downloads.
+
 Melhoria:
 - nao temos um controle para saber quais sources deram erros e poder reprocessar eles.
 - nao temos um caminho para processar arquivos que ja estejam em pasta.
+
+
 
 
 
@@ -71,6 +80,10 @@ go
 gwas
 biogrid
 mint
+pharmgkb
 
 com Error
-chainfiles
+chainfiles - Erro de Memoria
+dbSNP
+Oreganno - Erro de menoria
+Pfam - Erro no endereco de pagina

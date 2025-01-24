@@ -16,7 +16,8 @@ class UpdaterDatabaseMixin:
         sources=None,
         sourceOptions=None,
         cacheOnly=False,
-        forceUpdate=False,  # noqa E501
+        forceUpdate=False,
+        # keep_downloads=False,  # noqa E501
     ):
         if self._updating:
             raise Exception("_updating set before updateDatabase()")
@@ -105,30 +106,52 @@ class UpdaterDatabaseMixin:
             # ----------------------------------------------
             # Start Parallel Download and Hashing
 
-            downloadAndHashThreads = {}
-            self.srcSetsToDownload = sorted(srcSet)
-            # Create buffer to run in parallel
-            for srcName in self.srcSetsToDownload:
-                # download files into a local cache
-                if not cacheOnly:
-                    downloadAndHashThreads[srcName] = Thread(
-                        target=self.downloadAndHash,
-                        args=(
-                            iwd,
-                            srcName,
-                            self._sourceOptions[srcName],
-                        ),
-                    )
-                    downloadAndHashThreads[srcName].start()
-
-            # Wait for all download and hash threads to finish
-            for srcName in downloadAndHashThreads.keys():
-                downloadAndHashThreads[srcName].join()
+            if self.skipDownload:
                 self.log(
-                    srcName + " rejoined main thread\n",
-                    level=logging.INFO,
+                    "Set to skip download, skipping the download and hashing",
+                    level=logging.WARNING,
                     indent=0,
                 )
+                self.srcSetsToDownload = sorted(srcSet)
+                # Preciso ir nas pastas e calcular o hash dos arquivos
+
+            else:
+                downloadAndHashThreads = {}
+                self.srcSetsToDownload = sorted(srcSet)
+                # Create buffer to run in parallel
+                for srcName in self.srcSetsToDownload:
+                    # download files into a local cache
+                    if not cacheOnly:
+                        downloadAndHashThreads[srcName] = Thread(
+                            target=self.downloadAndHash,
+                            args=(
+                                iwd,
+                                srcName,
+                                self._sourceOptions[srcName],
+                            ),
+                        )
+                        downloadAndHashThreads[srcName].start()
+
+                # Wait for all download and hash threads to finish
+                for srcName in downloadAndHashThreads.keys():
+                    downloadAndHashThreads[srcName].join()
+                    self.log(
+                        srcName + " rejoined main thread",
+                        level=logging.INFO,
+                        indent=0,
+                    )
+
+            # ----------------------------------------------
+            # Check if only download is set
+            if self.onlyDownload:
+                self.log(
+                    "Set to only download, skipping the rest of the update",
+                    level=logging.WARNING,
+                    indent=0,
+                )
+                return True
+            # NOTE When --only_download is set, the code will return here
+            # NOTE Will keep all files independent of keep_downloads
 
             # Return the flow of the code to the main thread
             # ----------------------------------------------
@@ -200,6 +223,12 @@ class UpdaterDatabaseMixin:
                             file_size, file_md5 = row[1], row[2]
                             # Check if there is any file in _filehash with the
                             # same parameters
+
+                            # TODO : Analisar o que ocorre quando ha mais que
+                            # um arquivo no mesmo loader
+                            if self.skipDownload:
+                                self.fileHash(row[0])
+
                             match_found = any(
                                 file_hash_data[1] == file_size
                                 and file_hash_data[3] == file_md5  # noqa: E501
@@ -248,10 +277,15 @@ class UpdaterDatabaseMixin:
                             """
                             UPDATE `db`.`source`
                             SET updated = DATETIME('now'),
-                                version = ?
+                                version = ?,
+                                last_status = ?
                             WHERE source_id = ?
                             """,
-                            (srcObj.getVersionString(), srcID),
+                            (
+                                srcObj.getVersionString(),
+                                1,
+                                srcID,
+                            ),  # 1 = success / 0 = error
                         )
 
                         cursor.execute(
@@ -281,6 +315,7 @@ class UpdaterDatabaseMixin:
                             "VALUES (%d,?,?,DATETIME(?,'unixepoch'),?)" % srcID
                         )
                         cursor.executemany(sql, self._filehash.values())
+
                         self.log(
                             "Metadata updated for %s" % srcName,
                             level=logging.INFO,
@@ -330,6 +365,31 @@ class UpdaterDatabaseMixin:
                         level=logging.WARNING,
                         indent=0,
                     )
+
+                    # Add error status on Source and Warning Table
+                    cursor.execute(
+                        """
+                        UPDATE `db`.`source`
+                        SET last_status = ?
+                        WHERE source_id = ?
+                        """,
+                        (0, srcID),
+                    )
+                    cursor.execute(
+                        """
+                        INSERT INTO `db`.`warning`
+                        (source_id, message)
+                        VALUES (?, ?)
+                        """,
+                        (srcID, str(e)),
+                    )
+                    self.log(
+                        "Added error status on Source and Warning Table for %s\n"
+                        % srcName,
+                        level=logging.ERROR,
+                        indent=0,
+                    )
+
                 finally:
                     cursor.execute(
                         "RELEASE SAVEPOINT 'updateDatabase_%s'" % (srcName,)
@@ -342,7 +402,19 @@ class UpdaterDatabaseMixin:
                 # try/except/finally
 
                 # remove subdirectory to free up some space
-                shutil.rmtree(path)
+                if not self.keepDownload:
+                    shutil.rmtree(path)
+                    self.log(
+                        f"Removed {srcName} download directory",
+                        level=logging.INFO,
+                        indent=0,
+                    )
+                else:
+                    self.log(
+                        f"Kept {srcName} download directory",
+                        level=logging.INFO,
+                        indent=0,
+                    )
             # foreach source
 
             # pull the latest GRCh/UCSChg conversions

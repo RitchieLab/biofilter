@@ -447,17 +447,9 @@ class SourceUtilityMethods:
             if os.path.exists(locPath):
                 stat = os.stat(locPath)
                 locSize[locPath] = int(stat.st_size)
-                locTime[locPath] = datetime.fromtimestamp(stat.st_mtime)
 
-        # # check remote file sizes and times
-        # NOTE: O problema aqui eh que estamos sempre baixando os arquivos
-        # em pastas diferentes, entao nao tem como comparar os arquivos
+        # check remote file sizes
         if not alwaysDownload:
-            # self.log(
-            #     "Identifying changed files ...",
-            #     level=logging.INFO,
-            #     indent=_indent,
-            #     )
             for locPath in remFiles:
                 request = urllib2.Request(
                     remProtocol + "://" + remHost + remFiles[locPath]
@@ -466,45 +458,51 @@ class SourceUtilityMethods:
                 request.add_header("user-agent", "RitchieLab/LOKI")
                 for k, v in (reqHeaders or {}).items():
                     request.add_header(k, v)
+
                 response = urllib2.urlopen(request)
                 info = response.info()
 
-                content_length = info.get("content-length")
+                content_length = info.get("Content-Length")
                 if content_length:
                     remSize[locPath] = int(content_length)
-
-                last_modified = info.get("last-modified")
-                if last_modified:
-                    try:
-                        remTime[locPath] = datetime.strptime(
-                            last_modified, "%a, %d %b %Y %H:%M:%S %Z"
+                else:
+                    transfer_encoding = info.get("Transfer-Encoding")
+                    if (
+                        transfer_encoding and "chunked" in transfer_encoding.lower()
+                    ):  # noqa E501
+                        self.log(
+                            f"Transfer-Encoding is chunked for {remHost}. Skipping size check.",  # noqa E501
+                            level=logging.INFO,
+                            indent=_indent,
                         )
-                    except ValueError:
-                        remTime[locPath] = datetime.now(timezone.utc)
-
+                        remSize[locPath] = None
+                    else:
+                        self.log(
+                            f"Warning: No Content-Length or Transfer-Encoding for {remHost}. Proceeding without size validation.",  # noqa E501
+                            level=logging.WARNING,
+                            indent=_indent,
+                        )
+                    self.log(
+                        f"Unable to verify existing files; download will proceed and overwrite them.",  # noqa E501
+                        level=logging.INFO,
+                        indent=_indent,
+                    )
                 response.close()
-            # self.log(
-            #     "ALWAYS_DOWNLOAD\n",
-            #     level=logging.WARNING,
-            #     indent=_indent,
-            #     )  # noqa E501
 
         # download files as needed
-        self.log(
-            "Starting download files ...", level=logging.INFO, indent=_indent
-        )  # noqa E501
         for locPath in sorted(remFiles.keys()):
-            if (
-                remSize[locPath]
-                and remSize[locPath] == locSize[locPath]
-                and remTime[locPath]
-                and remTime[locPath] <= locTime[locPath]
-            ):
-                # TODO: IMPLEMENT ROTINE TO CHECK IF FILE IS UP TO DATE
+            if remSize[locPath] and remSize[locPath] == locSize[locPath]:
                 self.log(
-                    f"{locPath}: up to date", level=logging.WARNING, indent=_indent
+                    f"{locPath}: up to date",
+                    level=logging.WARNING,
+                    indent=_indent,
                 )
+
             else:
+                self.log(
+                    "Starting download files ...", level=logging.INFO, indent=_indent
+                )  # noqa E501
+
                 link = f"{remProtocol}://{remHost}{remFiles[locPath]}"
 
                 with open(locPath, "wb") as locFile:
@@ -536,4 +534,5 @@ class SourceUtilityMethods:
             if remTime[locPath]:
                 modTime = time.mktime(remTime[locPath].utctimetuple())
                 os.utime(locPath, (modTime, modTime))
+
         self.log("Download completed", level=logging.INFO, indent=_indent)

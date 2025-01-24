@@ -1,4 +1,7 @@
 import zipfile
+import logging
+import psutil
+import time
 from loki_modules import loki_source
 
 
@@ -22,9 +25,26 @@ class Source_pharmgkb(loki_source.Source):
 
     def update(self, options, path):
         # clear out all old data from this source
-        self.log("deleting old records from the database ...\n")
+        start_time = time.time()
+        process = psutil.Process()
+        memory_before = process.memory_info().rss / (1024 * 1024)  # in MB
+
+        self.log(
+            f"PharmGKB - Starting Data Ingestion (inicial memory {memory_before:.2f} MB) ...",  # noqa: E501
+            level=logging.INFO,
+            indent=2,
+        )
+        self.log(
+            "PharmGKB - Starting deletion of old records from the database ...",
+            level=logging.INFO,
+            indent=2,
+        )
         self.deleteAll()
-        self.log("deleting old records from the database completed\n")
+        self.log(
+            "PharmGKB - Old records deletion completed",
+            level=logging.INFO,
+            indent=2,
+        )
 
         # get or create the required metadata records
         namespaceID = self.addNamespaces(
@@ -49,24 +69,34 @@ class Source_pharmgkb(loki_source.Source):
                 ("pathway",),
             ]
         )
-        subtypeID = self.addSubtypes(
-            [
-                ("-",),
-            ]
-        )
 
         # process gene names
-        self.log("verifying gene name archive file ...\n")
+        self.log(
+            "PharmGKB - Starting the verifying gene name archive file ...",
+            level=logging.INFO,
+            indent=2,
+            )
         setNames = set()
         empty = tuple()
         with zipfile.ZipFile(path + "/genes.zip", "r") as geneZip:
             err = geneZip.testzip()
             if err:
-                self.log(" ERROR\n")
-                self.log("CRC failed for %s\n" % err)
+                self.log(
+                    "PharmGKB - CRC failed for %s" % err,
+                    level=logging.ERROR,
+                    indent=2,
+                    )
                 return False
-            self.log("verifying gene name archive file completed\n")
-            self.log("processing gene names ...\n")
+            self.log(
+                "PharmGKB - Verifying gene name archive file completed",
+                level=logging.INFO,
+                indent=2,
+                )
+            self.log(
+                "PharmGKB - Starting the processing gene names ...",
+                level=logging.INFO,
+                indent=2,
+                )
             xrefNS = {
                 "entrezGene": ("entrez_gid",),
                 "refSeqDna": ("refseq_gid",),
@@ -89,10 +119,17 @@ class Source_pharmgkb(loki_source.Source):
                     ):
                         new2 = 1
                     else:
+                        self.log(
+                            "PharmGKB - Unrecognized file header in '%s': %s"
+                            % (info.filename, header),
+                            level=logging.ERROR,
+                            indent=2,
+                        )
                         raise Exception(
                             "ERROR: unrecognized file header in '%s': %s"
                             % (info.filename, header)
                         )
+
                     for line in geneFile:
                         words = line.decode("latin-1").split("\t")
                         pgkbID = words[0]
@@ -150,20 +187,34 @@ class Source_pharmgkb(loki_source.Source):
         # with geneZip
         numIDs = len(set(n[2] for n in setNames))
         self.log(
-            "processing gene names completed: %d identifiers (%d references)\n"
-            % (numIDs, len(setNames))
+            "PharmGKB - Processing gene names completed: %d identifiers (%d references)"  # noqa E501
+            % (numIDs, len(setNames)),
+            level=logging.INFO,
+            indent=2,
         )
 
         # store gene names
-        self.log("writing gene names to the database ...\n")
+        self.log(
+            "PharmGKB - Starting the writing gene names to the database ...",
+            level=logging.INFO,
+            indent=2,
+            )
         self.addBiopolymerTypedNameNamespacedNames(
             typeID["gene"], namespaceID["pharmgkb_gid"], setNames
         )
-        self.log("writing gene names to the database completed\n")
+        self.log(
+            "PharmGKB - Writing gene names to the database completed",
+            level=logging.INFO,
+            indent=2,
+            )
         setNames = None
 
         # process pathways
-        self.log("verifying pathway archive file ...\n")
+        self.log(
+            "PharmGKB - Starting the verifying pathway archive file ...",
+            level=logging.INFO,
+            indent=2,
+            )
         pathDesc = {}
         nsAssoc = {
             "pharmgkb_gid": set(),
@@ -173,11 +224,24 @@ class Source_pharmgkb(loki_source.Source):
         with zipfile.ZipFile(path + "/pathways-tsv.zip", "r") as pathZip:
             err = pathZip.testzip()
             if err:
-                self.log(" ERROR\n")
-                self.log("CRC failed for %s\n" % err)
-                return False
-            self.log("verifying pathway archive file completed\n")
-            self.log("processing pathways ...\n")
+                self.log(
+                    "PharmGKB - CRC failed for %s\n" % err,
+                    level=logging.ERROR,
+                    indent=2,
+                    )
+                raise Exception("ERROR: CRC failed for %s" % err)
+                # return False
+
+            self.log(
+                "PharmGKB - Verifying pathway archive file completed",
+                level=logging.INFO,
+                indent=2,
+                )
+            self.log(
+                "PharmGKB - Starting the processing pathways ...",
+                level=logging.INFO,
+                indent=2,
+                )
             for info in pathZip.infolist():
                 if info.filename == "pathways.tsv":
                     # the old format had all pathways in one giant file,
@@ -235,6 +299,12 @@ class Source_pharmgkb(loki_source.Source):
                     ):  # Drugs	Diseases
                         pass
                     else:
+                        self.log(
+                            "ERROR: unrecognized file header in '%s': %s"
+                            % (info.filename, header),
+                            level=logging.ERROR,
+                            indent=2,
+                        )
                         raise Exception(
                             "ERROR: unrecognized file header in '%s': %s"
                             % (info.filename, header)
@@ -243,7 +313,6 @@ class Source_pharmgkb(loki_source.Source):
                     curPath = parts[0]
                     parts = parts[1].split(".")
                     pathDesc[curPath] = (
-                        subtypeID["-"],
                         parts[0].replace("_", " "),
                         None,
                     )
@@ -262,21 +331,35 @@ class Source_pharmgkb(loki_source.Source):
             # foreach file in pathZip
         # with pathZip
         self.log(
-            "processing pathways completed: %d pathways, %d associations (%d identifiers)\n"  # noqa E501
-            % (len(pathDesc), numAssoc, numID)
+            "PharmGKB - Processing pathways completed: %d pathways, %d associations (%d identifiers)"  # noqa E501
+            % (len(pathDesc), numAssoc, numID),
+            level=logging.INFO,
+            indent=2,
         )
 
         # store pathways
-        self.log("writing pathways to the database ...\n")
+        self.log(
+            "PharmGKB - Starting the writing pathways to the database ...",
+            level=logging.INFO,
+            indent=2,
+            )
         listPath = pathDesc.keys()
         listGID = self.addTypedGroups(
             typeID["pathway"], (pathDesc[path] for path in listPath)
         )
         pathGID = dict(zip(listPath, listGID))
-        self.log("writing pathways to the database completed\n")
+        self.log(
+            "PharmGKB - Writing pathways to the database completed",
+            level=logging.INFO,
+            indent=2,
+            )
 
         # store pathway names
-        self.log("writing pathway names to the database ...\n")
+        self.log(
+            "PharmGKB - Starting the writing pathway names to the database ...",  # noqa E501
+            level=logging.INFO,
+            indent=2,
+            )
         self.addGroupNamespacedNames(
             namespaceID["pharmgkb_id"],
             ((pathGID[path], path) for path in listPath),  # noqa E501
@@ -285,16 +368,43 @@ class Source_pharmgkb(loki_source.Source):
             namespaceID["pathway"],
             ((pathGID[path], pathDesc[path][0]) for path in listPath),
         )
-        self.log("writing pathway names to the database completed\n")
+        self.log(
+            "PharmGKB - Writing pathway names to the database completed",
+            level=logging.INFO,
+            indent=2,
+            )
 
         # store gene associations
-        self.log("writing gene associations to the database ...\n")
+        self.log(
+            "PharmGKB - Starting the writing gene associations to the database ...",
+            level=logging.INFO,
+            indent=2,
+            )
         for ns in nsAssoc:
             self.addGroupMemberTypedNamespacedNames(
                 typeID["gene"],
                 namespaceID[ns],
                 ((pathGID[a[0]], a[1], a[2]) for a in nsAssoc[ns]),
             )
-        self.log("writing gene associations to the database completed\n")
+        self.log(
+            "PharmGKB - Writing gene associations to the database completed",
+            level=logging.INFO,
+            indent=2,
+            )
+        
+        # Finalize the process
+        end_time = time.time()
+        elapsed_time_minutes = (end_time - start_time) / 60  # time in minutes
+        memory_after = process.memory_info().rss / (1024 * 1024)  # mem in MB
+        self.log(
+            f"PharmGKB - Final memory: {memory_after:.2f} MB. Alocated memory: {memory_after - memory_before:.2f} MB.",  # noqa: E501
+            level=logging.INFO,
+            indent=2,
+        )
+        self.log(
+            f"PharmGKB - Update completed in {elapsed_time_minutes:.2f} minutes.",  # noqa: E501
+            level=logging.CRITICAL,
+            indent=2,
+        )
 
         # TODO: eventually add diseases, drugs, relationships
