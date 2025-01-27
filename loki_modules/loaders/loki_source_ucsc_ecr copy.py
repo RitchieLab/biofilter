@@ -1,5 +1,5 @@
 import itertools
-from threading import Thread, Lock
+from threading import Thread
 import logging
 import psutil
 import time
@@ -48,17 +48,6 @@ class Source_ucsc_ecr(loki_source.Source):
         "primates": "primates.",
     }
     chr_grp_ids = []
-
-    # db_lock = Lock()  # Lock global para sincronizar acesso ao banco
-    table_locks = {
-        "typed_groups": Lock(),
-        "typed_biopolymers": Lock(),
-        "group_namespaced_names": Lock(),
-        "group_relationships": Lock(),
-        "group_biopolymers": Lock(),
-        "biopolymer_namespaced_names": Lock(),
-        "biopolymer_ldprofile": Lock(),
-    }
 
     @classmethod
     def getVersionString(cls):
@@ -175,7 +164,7 @@ class Source_ucsc_ecr(loki_source.Source):
 
         # Add a containment relationship
         rel_id = self.addRelationship("contains")
-        
+
         for sp in self._comparisons:
             self.log(
                 "UCSC - Starting the processing ECRs for " + sp + " ...",
@@ -259,35 +248,25 @@ class Source_ucsc_ecr(loki_source.Source):
         options,
         path,
     ):
-
         ch_id = self._loki.chr_num[ch]
-
         self.log(
             "UCSC/Thread - Starting the processing Chromosome " + ch + " ...",
             level=logging.INFO,
             indent=4,
-        )
-
+            )
         f = self.zfile(path + "/" + sp + ".chr" + ch + ".phastCons.txt.gz")
         curr_band = 1
         num_regions = 0
         desc = "ECRs for " + sp + " on Chromosome " + ch
-
-        # 🔒 Typed Group
-        with self.table_locks["typed_groups"]:
-            chr_grp_ids.append(
-                self.addTypedGroups(
-                    ecr_group_typeid,
-                    [("ecr_%s_chr%s" % (sp, ch), desc)],  # noqa E501
-                )[0]
-            )
-
-        # 🔒 Group Namespaced Names
-        with self.table_locks["group_namespaced_names"]:
-            self.addGroupNamespacedNames(
-                ecr_ns, [(chr_grp_ids[-1], "ecr_%s_chr%s" % (sp, ch))]
-            )
-
+        chr_grp_ids.append(
+            self.addTypedGroups(
+                ecr_group_typeid,
+                [("ecr_%s_chr%s" % (sp, ch), desc)],  # noqa E501
+            )[0]
+        )
+        self.addGroupNamespacedNames(
+            ecr_ns, [(chr_grp_ids[-1], "ecr_%s_chr%s" % (sp, ch))]
+        )
         band_grps = []
         grp_rid = {}
         for regions in self.getRegions(f, options):
@@ -304,66 +283,49 @@ class Source_ucsc_ecr(loki_source.Source):
             if regions:
                 band_grps.append((label, desc))
 
-            # 🔒 Type BioPolymers
             # Add the region itself
-            with self.table_locks["typed_biopolymers"]:
-                reg_ids = self.addTypedBiopolymers(
-                    ecr_typeid,
-                    ((self.getRegionName(sp, ch, r), "") for r in regions),  # noqa E501
-                )
-
-            # 🔒 Biopolymer Namespace Names
+            reg_ids = self.addTypedBiopolymers(
+                ecr_typeid,
+                ((self.getRegionName(sp, ch, r), "") for r in regions),  # noqa E501
+            )
             # Add the name of the region
-            with self.table_locks["biopolymer_namespaced_names"]:
-                self.addBiopolymerNamespacedNames(
-                    ecr_ns,
-                    zip(
-                        reg_ids, (self.getRegionName(sp, ch, r) for r in regions)
-                    ),  # noqa E501
-                )
-
-            # 🔒 Biopolymer LDProfileRegions
+            self.addBiopolymerNamespacedNames(
+                ecr_ns,
+                zip(
+                    reg_ids, (self.getRegionName(sp, ch, r) for r in regions)
+                ),  # noqa E501
+            )
             # Add the region Boundaries
             # This gives a generator that yields
             # [(region_id, (chrom_id, start, stop)) ... ]
             region_bound_gen = zip(
                 ((i,) for i in reg_ids), ((ch_id, r[0], r[1]) for r in regions)
             )
-            with self.table_locks["biopolymer_ldprofile"]:
-                self.addBiopolymerLDProfileRegions(
-                    ecr_ldprofile_id,
-                    (tuple(itertools.chain(*c)) for c in region_bound_gen),  # noqa E501
-                )
+            self.addBiopolymerLDProfileRegions(
+                ecr_ldprofile_id,
+                (tuple(itertools.chain(*c)) for c in region_bound_gen),  # noqa E501
+            )
 
             if regions:
                 grp_rid[band_grps[-1]] = reg_ids
 
             curr_band += 1
 
-        # 🔒 Typed Groups
-        with self.table_locks["typed_groups"]:
-            band_gids = self.addTypedGroups(ecr_group_typeid, band_grps)
-
-        # 🔒 Group Namespace Names
-        with self.table_locks["group_namespaced_names"]:
-            self.addGroupNamespacedNames(
-                ecr_ns, zip(band_gids, (r[0] for r in band_grps))
-            )  # noqa E501
-
-        # 🔒 Group Biopolymers
+        band_gids = self.addTypedGroups(ecr_group_typeid, band_grps)
+        self.addGroupNamespacedNames(
+            ecr_ns, zip(band_gids, (r[0] for r in band_grps))
+        )  # noqa E501
         gid_rid = []
         for i in range(len(band_gids)):
             gid_rid.extend(
                 ((band_gids[i], rid) for rid in grp_rid[band_grps[i]])
             )  # noqa E501
-        with self.table_locks["group_biopolymers"]:
-            self.addGroupBiopolymers(gid_rid)
 
-        # 🔒 Group Relationships
-        with self.table_locks["group_relationships"]:
-            self.addGroupRelationships(
-                ((chr_grp_ids[-1], b, rel_id, 1) for b in band_gids)
-            )  # noqa E501
+        self.addGroupBiopolymers(gid_rid)
+
+        self.addGroupRelationships(
+            ((chr_grp_ids[-1], b, rel_id, 1) for b in band_gids)
+        )  # noqa E501
 
         self.log(
             "UCSC/Thread - Processing Chromosome %s completed (%d regions found in %d bands)"  # noqa E501

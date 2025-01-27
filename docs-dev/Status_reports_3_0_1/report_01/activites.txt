@@ -67,9 +67,9 @@ Adicionado campo na Source para controlar os loardes com sucesso e os com errors
 adcionado argumento para manter os arquivos baixados
 adicionadas rotinas para rodar somente o download, para manter, e para pular os downloads.
 
-Melhoria:
-- nao temos um controle para saber quais sources deram erros e poder reprocessar eles.
-- nao temos um caminho para processar arquivos que ja estejam em pasta.
+Melhorias:
+- [Implementada] nao temos um controle para saber quais sources deram erros e poder reprocessar eles.
+- [Implementada] nao temos um caminho para processar arquivos que ja estejam em pasta.
 
 
 
@@ -87,3 +87,5 @@ chainfiles - Erro de Memoria
 dbSNP
 Oreganno - Erro de menoria
 Pfam - Erro no endereco de pagina
+
+

@@ -8,10 +8,9 @@ import urllib
 import urllib.request as urllib2
 import zlib
 import wget
-# from tqdm import tqdm
+from tqdm import tqdm
 from datetime import datetime, timezone
 import logging
-import gc
 
 
 class SourceUtilityMethods:
@@ -338,108 +337,203 @@ class SourceUtilityMethods:
             "https", remHost, remFiles, reqHeaders, alwaysDownload
         )  # noqa E501
 
-    def _downloadHTTP(
-            self,
-            remProtocol,
-            remHost,
-            remFiles,
-            reqHeaders,
-            alwaysDownload
-            ):  # noqa E501
-        _indent = 4
-        remSize = {}
-        locSize = {}
-        max_retries = 3  # max number of retries per file
-        retry_delay = 5  # delay between retries in seconds
+    # def _downloadHTTP(
+    #     self, remProtocol, remHost, remFiles, reqHeaders, alwaysDownload
+    # ):  # noqa E501
+    #     # check local file sizes and times
+    #     remSize = {}
+    #     remTime = {}
+    #     locSize = {}
+    #     locTime = {}
+    #     for locPath in remFiles:
+    #         remSize[locPath] = None
+    #         remTime[locPath] = None
+    #         locSize[locPath] = None
+    #         locTime[locPath] = None
+    #         if os.path.exists(locPath):
+    #             stat = os.stat(locPath)
+    #             locSize[locPath] = int(stat.st_size)
+    #             locTime[locPath] = datetime.fromtimestamp(stat.st_mtime)  # noqa E501
+    #     # check remote file sizes and times
+    #     if not alwaysDownload:
+    #         self.log("identifying changed files ...", level=logging.INFO)
+    #         for locPath in remFiles:
+    #             request = urllib2.Request(
+    #                 remProtocol + "://" + remHost + remFiles[locPath]
+    #             )
+    #             request.get_method = lambda: "HEAD"
+    #             request.add_header("user-agent", "RitchieLab/LOKI")
+    #             for k, v in (reqHeaders or {}).items():
+    #                 request.add_header(k, v)
+    #             response = urllib2.urlopen(request)
+    #             info = response.info()
 
-        # Check local file sizes
+    #             content_length = info.get("content-length")
+    #             if content_length:
+    #                 remSize[locPath] = int(content_length)
+
+    #             last_modified = info.get("last-modified")
+    #             if last_modified:
+    #                 try:
+    #                     remTime[locPath] = datetime.strptime(
+    #                         last_modified, "%a, %d %b %Y %H:%M:%S %Z"
+    #                     )
+    #                 except ValueError:
+    #                     remTime[locPath] = datetime.now(timezone.utc)
+
+    #             response.close()
+    #         self.log(" OK\n", level=logging.INFO)
+    #     # if not alwaysDownload
+
+    #     # download files as needed
+    #     self.log("downloading changed files ...\n", level=logging.INFO, indent=1)  # noqa E501
+    #     for locPath in sorted(remFiles.keys()):
+    #         if (
+    #             remSize[locPath]
+    #             and remSize[locPath] == locSize[locPath]
+    #             and remTime[locPath]
+    #             and remTime[locPath] <= locTime[locPath]
+    #         ):
+    #             self.log("%s: up to date\n" % locPath, level=logging.INFO)
+    #         else:
+    #             self.log("%s: downloading ..." % locPath, level=logging.INFO)
+    #             # TODO: download to temp file, then rename?
+    #             if remProtocol == "https":
+    #                 with open(locPath, "wb") as locFile:
+    #                     request = urllib2.Request(
+    #                         remProtocol + "://" + remHost + remFiles[locPath]
+    #                     )
+    #                     request.add_header("user-agent", "RitchieLab/LOKI")
+    #                     for k, v in (reqHeaders or {}).items():
+    #                         request.add_header(k, v)
+    #                     response = urllib2.urlopen(request)
+    #                     while True:
+    #                         data = response.read()
+    #                         if not data:
+    #                             break
+    #                         locFile.write(data)
+    #                     response.close()
+    #                 self.log(" OK\n", level=logging.INFO)
+    #                 continue
+
+    #             link = remProtocol + "://" + remHost + remFiles[locPath]
+    #             wget.download(link)
+    #             os.rename(remFiles[locPath].rsplit("/")[-1], locPath)
+
+    #             self.log(" OK\n", level=logging.INFO, indent=1)
+    #         if remTime[locPath]:
+    #             modTime = time.mktime(remTime[locPath].utctimetuple())
+    #             os.utime(locPath, (modTime, modTime))
+    #     self.log(
+    #         "... OK\n",
+    #         level=logging.INFO,
+    #         indent=0,
+    #         )
+
+    def _downloadHTTP(
+        self, remProtocol, remHost, remFiles, reqHeaders, alwaysDownload
+    ):  # noqa E501
+        _indent = 4
+        # check local file sizes and times
+        remSize = {}
+        remTime = {}
+        locSize = {}
+        locTime = {}
         for locPath in remFiles:
             remSize[locPath] = None
+            remTime[locPath] = None
             locSize[locPath] = None
+            locTime[locPath] = None
             if os.path.exists(locPath):
                 stat = os.stat(locPath)
                 locSize[locPath] = int(stat.st_size)
 
-        # Download files as needed
-        for locPath in sorted(remFiles.keys()):
-            retries = 0
-            success = False
+        # check remote file sizes
+        if not alwaysDownload:
+            for locPath in remFiles:
+                request = urllib2.Request(
+                    remProtocol + "://" + remHost + remFiles[locPath]
+                )
+                request.get_method = lambda: "HEAD"
+                request.add_header("user-agent", "RitchieLab/LOKI")
+                for k, v in (reqHeaders or {}).items():
+                    request.add_header(k, v)
 
-            while retries < max_retries and not success:
-                try:
-                    link = remProtocol + "://" + remHost + remFiles[locPath]
+                response = urllib2.urlopen(request)
+                info = response.info()
 
-                    self.log(
-                        # f"{locPath}: downloading (attempt {retries + 1}/{max_retries}) ...",  # noqa E501
-                        f"Downloading (attempt {retries + 1}/{max_retries}) from {link}",  # noqa E501
-                        level=logging.INFO,
-                        indent=_indent
-                    )
-
-                    if remProtocol == "https":
-                        with open(locPath, "wb") as locFile:
-                            request = urllib2.Request(link)
-                            request.add_header("user-agent", "RitchieLab/LOKI")
-                            for k, v in (reqHeaders or {}).items():
-                                request.add_header(k, v)
-
-                            # Perform the download
-                            response = urllib2.urlopen(request)
-                            chunk_size = 1024 * 1024  # 1 MB
-                            while True:
-                                data = response.read(chunk_size)
-                                if not data:
-                                    break
-                                locFile.write(data)
-                                del data  # free memory
-                                gc.collect()  # collect garbage
-                            response.close()
-                            # Progress bar showed only
-                            print('  ✅ Download complete.')
-
+                content_length = info.get("Content-Length")
+                if content_length:
+                    remSize[locPath] = int(content_length)
+                else:
+                    transfer_encoding = info.get("Transfer-Encoding")
+                    if (
+                        transfer_encoding and "chunked" in transfer_encoding.lower()
+                    ):  # noqa E501
+                        self.log(
+                            f"Transfer-Encoding is chunked for {remHost}. Skipping size check.",  # noqa E501
+                            level=logging.INFO,
+                            indent=_indent,
+                        )
+                        remSize[locPath] = None
                     else:
-                        # For non-HTTPS protocols, use wget as fallback
-                        wget.download(link)
-                        os.rename(remFiles[locPath].rsplit("/")[-1], locPath)
-                        print('  ✅ Download complete.')
-
-                    success = True
-
-                except Exception as e:
-                    retries += 1
-                    # print('❌ Error occurred during download.')
+                        self.log(
+                            f"Warning: No Content-Length or Transfer-Encoding for {remHost}. Proceeding without size validation.",  # noqa E501
+                            level=logging.WARNING,
+                            indent=_indent,
+                        )
                     self.log(
-                        f"Error downloading (attempt {retries}/{max_retries}): {str(e)}",  # noqa E501
-                        level=logging.ERROR,
+                        f"Unable to verify existing files; download will proceed and overwrite them.",  # noqa E501
+                        level=logging.INFO,
                         indent=_indent,
                     )
-                    if retries < max_retries:
-                        self.log(
-                            f"Retrying download in {retry_delay} seconds.",
-                            level=logging.WARNING,
-                            indent=_indent,
-                        )
-                        time.sleep(retry_delay)
-                    else:
-                        self.log(
-                            f"Max retries reached for {locPath}. Skipping this file.",  # noqa E501
-                            level=logging.WARNING,
-                            indent=_indent,
-                        )
+                response.close()
 
-            # If not successful after all attempts, log the final error
-            if not success:
+        # download files as needed
+        for locPath in sorted(remFiles.keys()):
+            if remSize[locPath] and remSize[locPath] == locSize[locPath]:
                 self.log(
-                    f"Failed to download {locPath} after {max_retries} attempts.",  # noqa E501
-                    level=logging.ERROR,
+                    f"{locPath}: up to date",
+                    level=logging.WARNING,
                     indent=_indent,
                 )
-                # Opcional: raise para interromper o processo completamente
-                # raise RuntimeError(f"Failed to download {locPath}")
-                continue
 
-        self.log(
-            "All downloads completed.",
-            level=logging.INFO,
-            indent=_indent
-        )
+            else:
+                self.log(
+                    "Starting download files ...", level=logging.INFO, indent=_indent
+                )  # noqa E501
+
+                link = f"{remProtocol}://{remHost}{remFiles[locPath]}"
+
+                with open(locPath, "wb") as locFile:
+                    request = urllib2.Request(link)
+                    request.add_header("user-agent", "RitchieLab/LOKI")
+                    for k, v in (reqHeaders or {}).items():
+                        request.add_header(k, v)
+
+                    # Download com barra de progresso
+                    response = urllib2.urlopen(request)
+                    total_size = remSize[locPath] or 0
+                    chunk_size = 1024 * 1024  # 1MB
+                    with tqdm(
+                        total=total_size,
+                        unit="B",
+                        unit_scale=True,
+                        desc=f"Downloading {os.path.basename(locPath)}",
+                        dynamic_ncols=True,
+                        leave=True,
+                    ) as progress:
+                        while True:
+                            data = response.read(chunk_size)
+                            if not data:
+                                break
+                            locFile.write(data)
+                            progress.update(len(data))
+                            del data
+                    response.close()
+
+            if remTime[locPath]:
+                modTime = time.mktime(remTime[locPath].utctimetuple())
+                os.utime(locPath, (modTime, modTime))
+
+        self.log("Download completed", level=logging.INFO, indent=_indent)

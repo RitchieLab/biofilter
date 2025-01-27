@@ -56,7 +56,7 @@
                 "--temp-directory", "/Users/andrerico/Works/Sys/biofilter/downloads",
                 // "--archive", "/Users/andrerico/Works/Sys/biofilter/downloads",
                 // "--cache-only",
-                "--list-sources", "pharmgkb", "go", "mint", "gwas", "biogrid",
+                "--list-sources", "ucsc_ecr",
                 "--keep-download",
                 "--skip-download",
                 // "--only-download",
