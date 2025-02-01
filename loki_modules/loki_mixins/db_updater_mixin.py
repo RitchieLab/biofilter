@@ -1,6 +1,6 @@
-# database_operations_mixin.py
+# database_mixin.py
 
-class DbOperationsUpdaterMixin:
+class DbUpdaterMixin:
 
     def updateDatabase(
         self,

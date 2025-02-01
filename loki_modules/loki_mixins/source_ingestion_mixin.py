@@ -1,10 +1,10 @@
 # #################################################
-# SOURCE DATABASE OPERATIONS
+# SOURCE INGESTION OPERATIONS MIXIN
 # #################################################
 import apsw
 
 
-class SourceDbOperations:
+class SourceIngestionMixin:
 
     ##################################################
     # metadata management

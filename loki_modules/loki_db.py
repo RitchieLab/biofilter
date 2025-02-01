@@ -11,7 +11,7 @@ from loki_mixins import (
     DbSchemaMaintenanceMixin,
     DbOperationsGetMixin,
     DbOperationsSetMixin,
-    DbOperationsUpdaterMixin,
+    DbUpdaterMixin,
     DbLiftOverMixin,
     DbQueryMixin,
 )
@@ -25,7 +25,7 @@ class Database(
     DbSchemaMaintenanceMixin,
     DbOperationsGetMixin,
     DbOperationsSetMixin,
-    DbOperationsUpdaterMixin,
+    DbUpdaterMixin,
     DbLiftOverMixin,
     DbQueryMixin,
 ):

@@ -18,32 +18,32 @@ from loki_mixins import SourceUtilMixin
 class Source_dbsnp(loki_source.Source):
 
     _chmList = (
-        "1",
-        "2",
-        "3",
-        "4",
-        "5",
-        "6",
-        "7",
-        "8",
-        "9",
-        "10",
-        "11",
-        "12",
-        "13",
-        "14",
-        "15",
-        "16",
-        "17",
-        "18",
-        "19",
-        "20",
-        "21",
-        "22",
-        "X",
+        # "1",
+        # "2",
+        # "3",
+        # "4",
+        # "5",
+        # "6",
+        # "7",
+        # "8",
+        # "9",
+        # "10",
+        # "11",
+        # "12",
+        # "13",
+        # "14",
+        # "15",
+        # "16",
+        # "17",
+        # "18",
+        # "19",
+        # "20",
+        # "21",
+        # "22",
+        # "X",
         "Y",
-        "PAR",
-        "MT",
+        # "PAR",
+        # "MT",
     )
     _grcBuild = None
 
@@ -125,10 +125,11 @@ class Source_dbsnp(loki_source.Source):
             remFiles[path + "/chr_%s.txt.gz" % chm] = (
                 "/snp/organisms/human_9606/chr_rpts/chr_%s.txt.gz" % chm
             )
-        if options["merges"] == "yes":
-            remFiles[path + "/RsMergeArch.bcp.gz"] = (
-                "/snp/organisms/human_9606/database/organism_data/RsMergeArch.bcp.gz"  # noqa E501
-            )
+            # FIXME: comentado temporariamente para evitar o download
+        # if options["merges"] == "yes":
+        #     remFiles[path + "/RsMergeArch.bcp.gz"] = (
+        #         "/snp/organisms/human_9606/database/organism_data/RsMergeArch.bcp.gz"  # noqa E501
+        #     )
         if options["roles"] == "yes":
             remFiles[path + "/SnpFunctionCode.bcp.gz"] = (
                 "/snp/organisms/database/shared_data/SnpFunctionCode.bcp.gz"

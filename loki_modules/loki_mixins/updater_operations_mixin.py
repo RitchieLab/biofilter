@@ -1,5 +1,6 @@
 # #################################################
 # UPDATER OPERATIONS MIXIN
+# Run operations on the database after an update.
 # #################################################
 import logging
 

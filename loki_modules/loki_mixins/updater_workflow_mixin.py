@@ -1,5 +1,5 @@
 # #################################################
-# UPDATER DATABASE MIXIN 
+# UPDATER WORKFLOW MIXIN
 # #################################################
 import collections
 import os
@@ -9,15 +9,33 @@ import shutil
 from threading import Thread
 import logging
 
+# Talvez aqui podemos ter um method principal que orquestra o fluxo de atualização
+# - 1. Preparar as opções dos sources
+# - 2. Baixar e calcular o hash dos arquivos
+# - 3. Roda o process e ingestion data
+# - 4. Atualiza o metadata do source
+# - 5. Remove os arquivos baixados
+# - 6. Operacoes post-processamento (nao sei ainda o que é)
 
-class UpdaterDatabaseMixin:
+
+class UpdaterWorkflowMixin:
+
+    def updaterWorkflow(self):
+
+        self._Preparation()
+        self._Download()
+        self._ProcessAndIngestData()
+        self._Metadata()
+        self._RemoveDownload()
+        self._PostProcessingOperations()
+
+
     def updateDatabase(
         self,
         sources=None,
         sourceOptions=None,
         cacheOnly=False,
         forceUpdate=False,
-        # keep_downloads=False,  # noqa E501
     ):
         if self._updating:
             raise Exception("_updating set before updateDatabase()")
@@ -269,9 +287,11 @@ class UpdaterDatabaseMixin:
                             indent=2,
                         )
 
+                        # 🚨 Start Update Method from Source System 
                         # Call the update function of the source
                         srcObj.update(options, path)
 
+                        # Stating Operations after the process and ingestion data
                         # update the source metadata
                         cursor.execute(
                             """
@@ -328,6 +348,8 @@ class UpdaterDatabaseMixin:
                             indent=0,
                         )
                     # if skip
+                    # 🚧 Preciso garantir que todos os Source Systems se derem erro vao vir para esse exeption e nao ter um raise
+
                 except Exception as e:
                     srcErrors.add(srcName)
                     excType, excVal, excTrace = sys.exc_info()
@@ -421,6 +443,11 @@ class UpdaterDatabaseMixin:
             #   http://genome.ucsc.edu/FAQ/FAQreleases.html
             #   http://genome.ucsc.edu/goldenPath/releaseLog.html
             # TODO: find a better machine-readable source for this data
+
+            # 🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨
+            # Eu preciso entender o que é isso e como funciona, pois realiza opreações no banco de dados
+            # apos a atualização dos dados e esta consumindo muita memoria e tempo. 
+
             if not cacheOnly:
                 self.log(
                     "updating GRCh:UCSChg genome build identities ...\n",
@@ -507,6 +534,7 @@ class UpdaterDatabaseMixin:
                     """,
                     (row[1], row[0]),
                 )
+
             cursor.execute(
                 "UPDATE `db`.`source` SET current_ucschg = ucschg "
                 "WHERE current_ucschg IS NULL"

@@ -5,10 +5,10 @@ import logging
 
 import loki_modules.loki_db as loki_db
 import loki_modules.loki_source as loki_source
-import loki_modules.loaders as loaders
+import loki_modules.source_systems as source_systems
 from loki_mixins import (
     UpdaterDownloadMixin,
-    UpdaterDatabaseMixin,
+    UpdaterWorkflowMixin,
     UpdaterLiftOverMixin,
     UpdaterOperationsMixin,
 )
@@ -16,7 +16,7 @@ from loki_mixins import (
 
 class Updater(
     UpdaterDownloadMixin,
-    UpdaterDatabaseMixin,
+    UpdaterWorkflowMixin,
     UpdaterLiftOverMixin,
     UpdaterOperationsMixin,
 ):
@@ -77,10 +77,10 @@ class Updater(
     def findSourceModules(self):
         if not self._sourceLoaders:
             self._sourceLoaders = {}
-            loader_path = loaders.__path__
+            loader_path = source_systems.__path__
             if self._is_test:
                 loader_path = [
-                    os.path.join(loader, "test") for loader in loaders.__path__
+                    os.path.join(loader, "test") for loader in source_systems.__path__
                 ]
             for path in loader_path:
                 for srcModuleName in os.listdir(path):
@@ -105,7 +105,7 @@ class Updater(
                     continue
                 # if module not available
                 srcModule = importlib.import_module(
-                    "%s.loki_source_%s" % (loaders.__name__, srcName)
+                    "%s.loki_source_%s" % (source_systems.__name__, srcName)
                 )
                 srcClass = getattr(srcModule, "Source_%s" % srcName)
                 if not issubclass(srcClass, loki_source.Source):

@@ -39,10 +39,10 @@ class Source_dbsnp(loki_source.Source):
         # "19",
         # "20",
         # "21",
-        "22",
+        # "22",
         # "X",
-        # "Y",
-        "PAR",
+        "Y",
+        # "PAR",
         # "MT",
     )
     _grcBuild = None
@@ -125,10 +125,11 @@ class Source_dbsnp(loki_source.Source):
             remFiles[path + "/chr_%s.txt.gz" % chm] = (
                 "/snp/organisms/human_9606/chr_rpts/chr_%s.txt.gz" % chm
             )
-        if options["merges"] == "yes":
-            remFiles[path + "/RsMergeArch.bcp.gz"] = (
-                "/snp/organisms/human_9606/database/organism_data/RsMergeArch.bcp.gz"  # noqa E501
-            )
+            # FIXME: Tirar o comentario em produção
+        # if options["merges"] == "yes":
+        #     remFiles[path + "/RsMergeArch.bcp.gz"] = (
+        #         "/snp/organisms/human_9606/database/organism_data/RsMergeArch.bcp.gz"  # noqa E501
+        #     )
         if options["roles"] == "yes":
             remFiles[path + "/SnpFunctionCode.bcp.gz"] = (
                 "/snp/organisms/database/shared_data/SnpFunctionCode.bcp.gz"
