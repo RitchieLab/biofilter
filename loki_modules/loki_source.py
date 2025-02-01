@@ -4,10 +4,10 @@ from datetime import datetime, timezone
 import logging
 
 import loki_modules.loki_db as loki_db
-from loki_mixins import SourceUtilityMethods, SourceDbOperations
+from loki_mixins import SourceUtilityMethods, SourceDbOperations, SourceUtilMixin
 
 
-class Source(SourceUtilityMethods, SourceDbOperations):  # noqa E501
+class Source(SourceUtilityMethods, SourceDbOperations, SourceUtilMixin):  # noqa E501
 
     def __init__(self, lokidb):
         assert isinstance(lokidb, loki_db.Database)
@@ -70,31 +70,12 @@ class Source(SourceUtilityMethods, SourceDbOperations):  # noqa E501
 
     ##################################################
     # logging
+    # TODO (3.0.2) check if this is still needed
     def log(self, message="", level=logging.INFO, indent=0):
-        """
-        Logs a message through the associated Database instance.
-
-        Args:
-            message (str): The message to log.
-            level (int): Logging level (e.g., logging.INFO).
-            indent (int): Indentation level for the log.
-        """
         return self._loki.log(message=message, level=level, indent=indent)
 
     def log_exception(self, error):
-        """
-        Logs an exception through the associated Database instance.
-
-        Args:
-            error (Exception): The exception to log.
-        """
         return self._loki.log_exception(error)
-
-    # def logPush(self, message=None):
-    #     return self._loki.logPush(message)
-
-    # def logPop(self, message=None):
-    #     return self._loki.logPop(message)
 
     ##################################################
     # database update

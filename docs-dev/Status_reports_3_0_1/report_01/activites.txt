@@ -70,10 +70,13 @@ adicionadas rotinas para rodar somente o download, para manter, e para pular os 
 Melhorias:
 - [Implementada] nao temos um controle para saber quais sources deram erros e poder reprocessar eles.
 - [Implementada] nao temos um caminho para processar arquivos que ja estejam em pasta.
-
-
-
-
+- Utilizar o getDatabaseMemoryUsage para mostrar a menoria da base alocada
+- Ver por que a conferencia dos arquivos se foi baixado nao esta sendo acionada
+- Implementar conceitos do BW como:
+        Source System
+        Source Data
+        Data Transfer Process (DTP)
+        Transformation Rules
 
 Ja rodaram
 go
@@ -81,11 +84,69 @@ gwas
 biogrid
 mint
 pharmgkb
+oreganno
+UCSC-ucsc_ecr
 
 com Error
 chainfiles - Erro de Memoria
 dbSNP
-Oreganno - Erro de menoria
 Pfam - Erro no endereco de pagina
 
 
+
+
+Saída .dot do Pyreverse:
+
+Gere a saída do Pyreverse em formato .dot:
+$ pyreverse -o dot -p biofilter_loki .
+Edite o Arquivo .dot:
+
+Adicione conexões manuais representando os mixins. No arquivo .dot, você pode adicionar algo como:
+"MixinName" -> "ParentClass" [label="Mixin"];
+Regenere o Diagrama com Graphviz:
+
+Após editar, gere o diagrama novamente:
+$ dot -Tpng classes.dot -o classes.png
+
+Added:
+"loki_modules.loki_mixins.db_config_mixin.DbConfigMixin" -> "loki_modules.loki_db.Database" [label="Config"];
+"loki_modules.loki_mixins.db_liftover_mixin.DbLiftOverMixin" -> "loki_modules.loki_db.Database" [label="LiftOver"];
+"loki_modules.loki_mixins.db_operations_mixin.DbOperationsMixin" -> "loki_modules.loki_db.Database" [label="Operations"];
+"loki_modules.loki_mixins.db_query_mixin.DbQueryMixin" -> "loki_modules.loki_db.Database" [label="Operations"];
+"loki_modules.loki_mixins.db_schema_mixin.DbSchemaMixin" -> "loki_modules.loki_db.Database" [label="Schema_Operations"];
+"loki_modules.loki_mixins.db_schema.DbSchema" -> "loki_modules.loki_db.Database" [label="Schema"];
+"loki_modules.loki_mixins.db_version_mixin.DbVersion" -> "loki_modules.loki_db.Database" [label="Version_Control"];
+
+"loki_modules.loki_mixins.updater_database.UpdaterDatabaseMixin" -> "loki_modules.loki_updater.Updater" [label="Update_Database"];
+"loki_modules.loki_mixins.updater_download_mixin.UpdaterDownloadMixin" -> "loki_modules.loki_updater.Updater" [label="Download"];
+"loki_modules.loki_mixins.updater_liftover_mixin.UpdaterLiftOverMixin" -> "loki_modules.loki_updater.Updater" [label="LiftOver"];
+"loki_modules.loki_mixins.updater_operations_mixin.UpdaterOperationsMixin" -> "loki_modules.loki_updater.Updater" [label="Operations"];
+
+"loki_modules.loki_mixins.source_db_operations_mixin.SourceDbOperations" -> "loki_modules.loki_source.Source" [label="Operations"];
+"loki_modules.loki_mixins.source_utility_methods_mixin.SourceUtilityMethods" -> "loki_modules.loki_source.Source" [label="Utility"];
+
+
+
+
+
+
+Novos inputs:
+- Aplicado o multiprocessamento do UCSC-ECr Source System
+      utilizado 12 cores em local laptop
+      Rodou em 30 minutos (sem considerar os downloads)
+      Base de dadps resultante: 477 Mb
+
+
+
+
+                "--knowledge", "/Users/andrerico/Works/Sys/biofilter/data/loki.db",
+                "--update",
+                "--temp-directory", "/Users/andrerico/Works/Sys/biofilter/downloads",
+                "--list-sources", "dbsnp",
+                "--keep-download",
+                "--skip-download",
+                // "--only-download",
+                "--force-update"
+                // "--update-except", "entrez", "dbsnp", "pfam", "oreganno", "go", "mint", "pharmgkb", "ucsc_ecr", "gwas", "chainfiles", "reactome",
+                // "--update-except", "biogrid", "dbsnp", "pfam", "oreganno", "go", "mint", "pharmgkb", "ucsc_ecr", "gwas", "chainfiles", "reactome",
+                // "--update-except", "biogrid", "entrez", "pfam", "oreganno", "go", "mint", "pharmgkb", "ucsc_ecr", "gwas", "chainfiles", "reactome",

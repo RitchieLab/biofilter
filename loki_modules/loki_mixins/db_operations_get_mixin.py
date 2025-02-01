@@ -1,23 +1,7 @@
-# database_operations_mixin.py
+# database_operations_get_mixin.py
 
 
-class DatabaseOperationsMixin:
-    """
-    Mixin for data manipulation operations (CRUD).
-    """
-
-    def addWarning(self, source_id, warning):
-        """
-
-        Args:
-
-        Returns:
-            None
-        """
-        self._db.cursor().execute(
-            "INSERT INTO `db`.warning (source_id, warning) VALUES (?, ?)",  # noqa E501
-            (source_id, warning),
-        )
+class DbOperationsGetMixin:
 
     def getDatabaseSetting(self, setting, type=None):
         """
@@ -42,26 +26,6 @@ class DatabaseOperationsMixin:
             value = type(value) if (value is not None) else type()
         return value
 
-    # getDatabaseSetting()
-
-    def setDatabaseSetting(self, setting, value):
-        """
-        Sets a specific setting value in the database.
-
-        Args:
-            setting (str): The name of the setting to set.
-            value: The value to set for the specified setting.
-
-        Returns:
-            None
-        """
-        self._db.cursor().execute(
-            "INSERT OR REPLACE INTO `db`.`setting` (setting, value) VALUES (?, ?)",  # noqa E501
-            (setting, value),
-        )
-
-    # setDatabaseSetting()
-
     def getSourceModules(self):
         """
         Retrieves the source modules available for updating the database.
@@ -77,8 +41,6 @@ class DatabaseOperationsMixin:
 
             self._updater = loki_updater.Updater(self, self._is_test)
         return self._updater.getSourceModules()
-
-    # getSourceModules()
 
     def getSourceModuleVersions(self, sources=None):
         """
@@ -101,8 +63,6 @@ class DatabaseOperationsMixin:
             self._updater = loki_updater.Updater(self, self._is_test)
         return self._updater.getSourceModuleVersions(sources)
 
-    # getSourceModuleVersions()
-
     def getSourceModuleOptions(self, sources=None):
         """
         Retrieves the options for the specified source modules.
@@ -123,97 +83,6 @@ class DatabaseOperationsMixin:
             self._updater = loki_updater.Updater(self, self._is_test)
         return self._updater.getSourceModuleOptions(sources)
 
-    # getSourceModuleOptions()
-
-    def updateDatabase(
-        self,
-        sources=None,
-        sourceOptions=None,
-        cacheOnly=False,
-        forceUpdate=False,
-        # keep_downloads=False,
-        # only_downloads=False,
-        # noqa E501
-    ):
-        """
-        Updates the database using the specified source modules and options.
-
-        If the updater is not already initialized, it imports and initializes
-        the updater module.
-
-        Args:
-            - sources (list, optional): A list of source modules to update
-            from. Defaults to None, which updates from all sources.
-            - sourceOptions (dict, optional): A dictionary of options for the
-            source modules. Defaults to None.
-            - cacheOnly (bool, optional): If True, only updates the cache.
-            Defaults to False.
-            - forceUpdate (bool, optional): If True, forces the update even if
-            not necessary. Defaults to False.
-
-        Returns:
-            Any: The result of the update operation.
-
-        Raises:
-            Exception: If the database is finalized and cannot be updated.
-        """
-        if self.getDatabaseSetting("finalized", int):
-            raise Exception("ERROR: cannot update a finalized database")
-        if not self._updater:
-            import loki_modules.loki_updater as loki_updater
-
-            self._updater = loki_updater.Updater(self, self._is_test)
-
-        # self._updater.onlyDownload = only_downloads
-        return self._updater.updateDatabase(
-            sources, sourceOptions, cacheOnly, forceUpdate
-        )
-
-    # updateDatabase()
-
-    def prepareTableForUpdate(self, table):
-        """
-        Prepares a table for update by the updater.
-
-        If the database is finalized, it raises an exception.
-
-        Args:
-            table (str): The name of the table to prepare for update.
-
-        Returns:
-            Any: The result of the preparation.
-
-        Raises:
-            Exception: If the database is finalized and cannot be updated.
-        """
-        if self.getDatabaseSetting("finalized", int):
-            raise Exception("ERROR: cannot update a finalized database")
-        if self._updater:
-            return self._updater.prepareTableForUpdate(table)
-        return None
-
-    # prepareTableForUpdate()
-
-    def prepareTableForQuery(self, table):
-        """
-        Prepares a table for query by the updater.
-
-        Args:
-            table (str): The name of the table to prepare for query.
-
-        Returns:
-            Any: The result of the preparation, or None if no updater is
-            available.
-        """
-        if self._updater:
-            return self._updater.prepareTableForQuery(table)
-        return None
-
-    # prepareTableForQuery()
-
-    ##################################################
-    # metadata retrieval
-
     def generateGRChByUCSChg(self, ucschg):
         """
         Generates GRCh values based on a given UCSC chain identifier.
@@ -231,8 +100,6 @@ class DatabaseOperationsMixin:
                 "SELECT grch FROM grch_ucschg WHERE ucschg = ?", (ucschg,)
             )
         )
-
-    # generateGRChByUCSChg()
 
     def getUCSChgByGRCh(self, grch):
         """
@@ -252,8 +119,6 @@ class DatabaseOperationsMixin:
             ucschg = row[0]
         return ucschg
 
-    # getUCSChgByGRCh()
-
     def getLDProfileID(self, ldprofile):
         """
         Retrieves the identifier for a given LD profile.
@@ -265,8 +130,6 @@ class DatabaseOperationsMixin:
             int: The identifier of the LD profile, or None if not found.
         """
         return self.getLDProfileIDs([ldprofile])[ldprofile]
-
-    # getLDProfileID()
 
     def getLDProfileIDs(self, ldprofiles):
         """
@@ -288,8 +151,6 @@ class DatabaseOperationsMixin:
                 for row in self._db.cursor().executemany(sql, zip(ldprofiles))
             }
         return ret
-
-    # getLDProfileIDs()
 
     def getLDProfiles(self, ldprofiles=None):
         """
@@ -321,8 +182,6 @@ class DatabaseOperationsMixin:
                 }  # noqa E501
         return ret
 
-    # getLDProfiles()
-
     def getNamespaceID(self, namespace):
         """
         Retrieves the identifier for a given namespace.
@@ -334,8 +193,6 @@ class DatabaseOperationsMixin:
             int: The identifier of the namespace, or None if not found.
         """
         return self.getNamespaceIDs([namespace])[namespace]
-
-    # getNamespaceID()
 
     def getNamespaceIDs(self, namespaces):
         """
@@ -357,8 +214,6 @@ class DatabaseOperationsMixin:
             }
         return ret
 
-    # getNamespaceIDs()
-
     def getRelationshipID(self, relationship):
         """
         Retrieves the identifier for a given relationship.
@@ -370,8 +225,6 @@ class DatabaseOperationsMixin:
                 int: The identifier of the relationship, or None if not found.
         """
         return self.getRelationshipIDs([relationship])[relationship]
-
-    # getRelationshipID()
 
     def getRelationshipIDs(self, relationships):
         """
@@ -395,8 +248,6 @@ class DatabaseOperationsMixin:
             }
         return ret
 
-    # getRelationshipIDs()
-
     def getRoleID(self, role):
         """
         Retrieves the identifier for a given role.
@@ -408,8 +259,6 @@ class DatabaseOperationsMixin:
             int: The identifier of the role, or None if not found.
         """
         return self.getRoleIDs([role])[role]
-
-    # getRoleID()
 
     def getRoleIDs(self, roles):
         """
@@ -431,8 +280,6 @@ class DatabaseOperationsMixin:
             }
         return ret
 
-    # getRoleIDs()
-
     def getSourceID(self, source):
         """
         Retrieves the identifier for a given data source.
@@ -444,8 +291,6 @@ class DatabaseOperationsMixin:
             int: The identifier of the data source, or None if not found.
         """
         return self.getSourceIDs([source])[source]
-
-    # getSourceID()
 
     def getSourceIDs(self, sources=None):
         """
@@ -476,8 +321,6 @@ class DatabaseOperationsMixin:
                 }  # noqa E501
         return ret
 
-    # getSourceIDs()
-
     def getSourceIDVersion(self, sourceID):
         """
         Retrieves the version of a data source given its identifier.
@@ -494,8 +337,6 @@ class DatabaseOperationsMixin:
             for row in self._db.cursor().execute(sql, (sourceID,)):
                 ret = row[0]
         return ret
-
-    # getSourceIDVersion()
 
     def getSourceIDOptions(self, sourceID):
         """
@@ -517,8 +358,6 @@ class DatabaseOperationsMixin:
             }
         return ret
 
-    # getSourceIDOptions()
-
     def getSourceIDFiles(self, sourceID):
         """
         Retrieves information about files associated with a data source given
@@ -539,8 +378,6 @@ class DatabaseOperationsMixin:
             }
         return ret
 
-    # getSourceIDFiles()
-
     def getTypeID(self, type):
         """
         Retrieves the identifier for a given type.
@@ -552,8 +389,6 @@ class DatabaseOperationsMixin:
             int: The identifier of the type, or None if not found.
         """
         return self.getTypeIDs([type])[type]
-
-    # getTypeID()
 
     def getTypeIDs(self, types):
         """
@@ -575,8 +410,6 @@ class DatabaseOperationsMixin:
             }
         return ret
 
-    # getTypeIDs()
-
     def getSubtypeID(self, subtype):
         """
         Retrieves the identifier for a given subtype.
@@ -588,8 +421,6 @@ class DatabaseOperationsMixin:
                 int: The identifier of the subtype, or None if not found.
         """
         return self.getSubtypeIDs([subtype])[subtype]
-
-    # getSubtypeID()
 
     def getSubtypeIDs(self, subtypes):
         """
@@ -613,5 +444,3 @@ class DatabaseOperationsMixin:
                 for row in self._db.cursor().executemany(sql, zip(subtypes))
             }
         return ret
-
-    # getSubtypeIDs()

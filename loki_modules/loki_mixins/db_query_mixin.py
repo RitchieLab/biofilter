@@ -2,7 +2,7 @@
 import itertools
 
 
-class DatabaseQueryMixin:
+class DbQueryMixin:
     """
     ...
     """

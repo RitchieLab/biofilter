@@ -5,7 +5,7 @@ import apsw
 import logging
 
 
-class DatabaseSchemaMixin:
+class DbSchemaMaintenanceMixin:
 
     def createDatabaseObjects(
         self,
@@ -79,11 +79,6 @@ class DatabaseSchemaMixin:
                 # foreach idxName in idxList
                 cursor.execute("ANALYZE `%s`.`%s`" % (dbName, tblName))
         # foreach tblName in tblList
-
-        # this shouldn't be necessary since we don't manually modify the
-        # sqlite_stat* tables
-        # if doIndecies:
-        # 	cursor.execute("ANALYZE `%s`.`sqlite_master`" % (dbName,))
 
     # createDatabaseObjects()
 
@@ -410,7 +405,8 @@ class DatabaseSchemaMixin:
                     self.log(" OK\n", level=logging.INFO)
                 else:
                     self.log(
-                        "ERROR: table '%s' is missing\n" % tblName, level=logging.ERROR
+                        "ERROR: table '%s' is missing\n" % tblName,  # noqa: E501
+                        level=logging.ERROR
                     )  # noqa: E501
                     ok = False
                 # if tblName in current
@@ -486,85 +482,3 @@ class DatabaseSchemaMixin:
             # if doIndecies
         # foreach tblName in tblList
         return ok
-
-    # auditDatabaseObjects()
-
-    def finalizeDatabase(self):
-        """
-        Finalizes the database by discarding intermediate data and setting
-            finalization flags.
-
-        The function drops intermediate tables, recreates them, and sets the
-            database settings to indicate that the database is finalized and
-            not optimized.
-
-        Returns:
-                None
-        """
-        self.log("discarding intermediate data ...", level=logging.INFO)
-        self.dropDatabaseTables(
-            None,
-            "db",
-            (
-                "snp_entrez_role",
-                "biopolymer_name_name",
-                "group_member_name",
-            ),  # noqa: E501
-        )
-        self.createDatabaseTables(
-            None,
-            "db",
-            ("snp_entrez_role", "biopolymer_name_name", "group_member_name"),
-            True,
-        )
-        self.log(" OK\n", level=logging.INFO)
-        self.setDatabaseSetting("finalized", 1)
-        self.setDatabaseSetting("optimized", 0)
-
-    # finalizeDatabase()
-
-    def optimizeDatabase(self):
-        """
-        Optimizes the database by updating optimizer statistics and compacting
-        the database file.
-
-        The function updates the database statistics for query optimization
-        and compacts the database to free up space.
-
-        Returns:
-                None
-        """
-        self._db.cursor().execute("ANALYZE `db`")
-        self.log(
-            "updating optimizer statistics completed\n",
-            level=logging.CRITICAL,
-        )  # noqa: E501
-        self.defragmentDatabase()
-        self.setDatabaseSetting("optimized", 1)
-        self.log(
-            "compacting knowledge database file completed\n", level=logging.CRITICAL
-        )  # noqa: E501
-
-    # optimizeDatabase()
-
-    def defragmentDatabase(self):
-        """
-        Defragments the database to compact it and free up space.
-
-        The function detaches the current database file, performs a VACUUM
-        operation to compact it, and then re-attaches the database file.
-
-        Returns:
-                None
-        """
-        # unfortunately sqlite's VACUUM doesn't work on attached databases,
-        # so we have to detach, make a new direct connection, then re-attach
-        if self._dbFile:
-            dbFile = self._dbFile
-            self.detachDatabaseFile(quiet=True)
-            db = apsw.Connection(dbFile)
-            db.cursor().execute("VACUUM")
-            db.close()
-            self.attachDatabaseFile(dbFile, quiet=True)
-
-    # defragmentDatabase()

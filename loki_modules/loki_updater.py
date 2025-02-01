@@ -44,33 +44,15 @@ class Updater(
         self.skipDownload = False
 
     ##################################################
-    # logging
+    # logging: pass through to loki_db (Database Class)
+    # TODO (Versin 3.0.2) Analise if it is possible to remove this method,
+    # check if all calls to log are made through the loki_db class
 
     def log(self, message="", level=logging.INFO, indent=0):
-        """
-        Logs a message through the associated Database instance.
-
-        Args:
-            message (str): The message to log.
-            level (int): Logging level (e.g., logging.INFO).
-            indent (int): Indentation level for the log.
-        """
         return self._loki.log(message=message, level=level, indent=indent)
 
     def log_exception(self, error):
-        """
-        Logs an exception through the associated Database instance.
-
-        Args:
-            error (Exception): The exception to log.
-        """
         return self._loki.log_exception(error)
-
-    # def logPush(self, message=None):
-    #     return self._loki.logPush(message)
-
-    # def logPop(self, message=None):
-    #     return self._loki.logPop(message)
 
     ##################################################
     # database update
@@ -82,7 +64,6 @@ class Updater(
         if self._updating:
             self.flagTableUpdate(table)
             if table not in self._tablesDeindexed:
-                # print "deindexing %s" % table #DEBUG
                 self._tablesDeindexed.add(table)
                 self._loki.dropDatabaseIndices(None, "db", table)
 

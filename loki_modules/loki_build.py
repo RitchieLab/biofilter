@@ -73,10 +73,10 @@ Usage:
 import argparse
 import os
 import posixpath
-import shutil
+# import shutil
 import sys
 import tarfile
-import tempfile
+# import tempfile
 import logging
 import psutil
 import time
@@ -280,7 +280,7 @@ def main():
     memory_before = process.memory_info().rss / (1024 * 1024)  # in MB
 
     print("---- STARTING LOKI BUILD SCRIPT ----")
-    print("==== Inicial Memory {memory_before:.2f} MB)")
+    print(f"==== Inicial Memory {memory_before:.2f} MB)")
 
     # instantiate database object
     db = loki_db.Database(testing=args.test_data, updating=True)

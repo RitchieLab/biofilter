@@ -1,5 +1,5 @@
 # #################################################
-# UPDATE DOWNLOAD MIXIN
+# UPDATE DOWNLOAD MIXIN 
 # #################################################
 import hashlib
 import os
@@ -69,21 +69,6 @@ class UpdaterDownloadMixin:
             )
             for filename in downloadedFiles:
                 self.fileHash(filename)
-                # stat = os.stat(filename)
-                # md5 = hashlib.md5()
-                # with open(filename, "rb") as f:
-                #     chunk = f.read(8 * 1024 * 1024)
-                #     while chunk:
-                #         md5.update(chunk)
-                #         chunk = f.read(8 * 1024 * 1024)
-                # self.lock.acquire()
-                # self._filehash[filename] = (
-                #     filename,
-                #     int(stat.st_size),
-                #     int(stat.st_mtime),
-                #     md5.hexdigest(),
-                # )
-                # self.lock.release()
 
             self.log(
                 "Thread - Analyzing %s data files completed" % srcName,

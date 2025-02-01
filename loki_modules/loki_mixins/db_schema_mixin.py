@@ -1,7 +1,7 @@
 # schema.py
 
 
-class Schema:
+class DbSchemaMixin:
     schema = {
         "db": {
             ##################################################

@@ -3,7 +3,7 @@ import bisect
 import sys
 
 
-class DatabaseLiftOverMixin:
+class DbLiftOverMixin:
     """
     ...
     """

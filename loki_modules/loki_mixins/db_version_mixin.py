@@ -1,7 +1,7 @@
 import apsw
 
 
-class VersionMixin:
+class DbVersionMixin:
     """
     Mixin to provide version and driver information for the LOKI.
     """

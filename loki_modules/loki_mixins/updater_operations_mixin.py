@@ -723,14 +723,14 @@ class UpdaterOperationsMixin:
         for row in dbc.execute(
             """
             SELECT COUNT(), COUNT(DISTINCT biopolymer_id)
-            FROM `db`.`biopolymer_zone`"
+            FROM `db`.`biopolymer_zone`
             """
         ):
             numTotal = row[0]
             numGenes = row[1]
-        self.log(
-            "calculating zone coverage completed: %d records (%d regions)\n"
-            % (numTotal, numGenes),
-            level=logging.INFO,
-            indent=0,
-        )
+            self.log(
+                "calculating zone coverage completed: %d records (%d regions)"
+                % (numTotal, numGenes),
+                level=logging.INFO,
+                indent=0,
+            )

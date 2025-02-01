@@ -4,26 +4,30 @@ import apsw
 import logging
 
 from loki_mixins import (
-    Schema,
-    VersionMixin,
     LoggerMixin,
-    DatabaseConfigMixin,
-    DatabaseSchemaMixin,
-    DatabaseOperationsMixin,
-    DatabaseLiftOverMixin,
-    DatabaseQueryMixin,
+    DbSchemaMixin,
+    DbVersionMixin,
+    DbConfigMixin,
+    DbSchemaMaintenanceMixin,
+    DbOperationsGetMixin,
+    DbOperationsSetMixin,
+    DbOperationsUpdaterMixin,
+    DbLiftOverMixin,
+    DbQueryMixin,
 )
 
 
 class Database(
-    Schema,
-    VersionMixin,
     LoggerMixin,
-    DatabaseConfigMixin,
-    DatabaseSchemaMixin,
-    DatabaseOperationsMixin,
-    DatabaseLiftOverMixin,
-    DatabaseQueryMixin,
+    DbVersionMixin,
+    DbConfigMixin,
+    DbSchemaMixin,
+    DbSchemaMaintenanceMixin,
+    DbOperationsGetMixin,
+    DbOperationsSetMixin,
+    DbOperationsUpdaterMixin,
+    DbLiftOverMixin,
+    DbQueryMixin,
 ):
     """
     A class to interact with a SQLite database using APSW.
@@ -34,7 +38,7 @@ class Database(
             _schema (dict): A dictionary containing the schema definition to DB
     """
 
-    _schema = Schema.schema
+    _schema = DbSchemaMixin.schema
 
     # hardcode translations between chromosome numbers and textual tags
     chr_num = {}
@@ -156,33 +160,3 @@ class Database(
             bool: True if no exception occurred, otherwise False.
         """
         return self._db.__exit__(excType, excVal, traceback)
-
-
-# TODO: find a better place for this liftover testing code
-"""
-if __name__ == "__main__":
-    inputFile = file(sys.argv[1])
-    loki = Database(sys.argv[2])
-    outputFile = file(sys.argv[3],'w')
-    unmapFile = file(sys.argv[4],'w')
-    oldHG = int(sys.argv[5]) if (len(sys.argv) > 5) else 18
-    newHG = int(sys.argv[6]) if (len(sys.argv) > 6) else 19
-
-    def generateInput():
-        for line in inputFile:
-            chrom,start,end = line.split()
-            if chrom[:3].upper() in ('CHM','CHR'):
-                chrom = chrom[3:]
-            yield (None, loki.chr_num.get(chrom,-1), int(start), int(end))
-
-    def errorCallback(region):
-        print >> unmapFile, "chr"+loki.chr_name.get(region[1],'?'),
-            region[2], region[3]
-
-    for region in loki.generateLiftOverRegions(
-        oldHG, newHG, generateInput(),
-        errorCallback=errorCallback
-        ):
-        print >> outputFile, "chr"+loki.chr_name.get(region[1],'?'),
-            region[2], region[3]`
-"""

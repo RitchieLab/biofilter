@@ -128,10 +128,10 @@ class Source_ucsc_ecr(loki_source.Source):
 
         start_time = time.time()
         process_memory = psutil.Process()
-        memory_bef = process_memory.memory_info().rss / (1024 * 1024)  # in MB
+        memory_before = process_memory.memory_info().rss / (1024 * 1024)  # in MB
 
         self.log(
-            f"UCSC - Inicial memory {memory_bef:.2f} MB) ...",  # noqa: E501
+            f"UCSC - Starting Data Ingestion (inicial memory {memory_before:.2f} MB) ...",  # noqa: E501
             level=logging.INFO,
             indent=2,
         )
@@ -155,95 +155,74 @@ class Source_ucsc_ecr(loki_source.Source):
         ecr_ldprofile_id = self.addLDProfile("", "no LD adjustment")
         rel_id = self.addRelationship("contains")
 
-        # Ensures that `multiprocessing` is safe even when called externally
+        # ✅ Garante que `multiprocessing` seja seguro mesmo quando chamado externamente
+        # if multiprocessing.get_start_method(allow_none=True) != "spawn":
         try:
             multiprocessing.set_start_method("spawn", force=True)
         except RuntimeError:
-            pass
+            pass  # Já foi definido anteriormente
 
-        # Define cores to use [TODO create a parameter]
-        num_workers = min(cpu_count() - 2, len(self._chmList))
-        self.log(
-            f"UCSC - Setup {num_workers} workers to process the data",
-            level=logging.INFO,
-            indent=2,
-        )
+        num_workers = min(
+            cpu_count() - 2, len(self._chmList)
+        )  # Define o número máximo de processos
+        print(f"🚀 Iniciando processamento com {num_workers} workers...")
 
+        # sp = 3 keys # ch = 25 keys
         for sp in self._comparisons:
-            indent_level = 4
             self.log(
-                f"UCSC - Starting the processing and ingestion for {sp}",
+                "UCSC - Starting the processing ECRs for " + sp + " ...",
                 level=logging.INFO,
                 indent=2,
             )
 
             # PROCESS FASE
             # ============
-            self.log(
-                f"UCSC/{sp} - Starting the processing fase",
-                level=logging.INFO,
-                indent=indent_level,
-            )
 
             # Variables for parallel processing
             list_n2 = []
             list_n3 = []
             list_n4 = []
 
-            # queue to store the results
+            # Fila para armazenar os resultados
+            # queue = Queue()
             manager = Manager()
             queue = manager.Queue()
 
-            # Run the processing inside a safe Executor
+            # Executar os processos dentro de um Executor seguro
             with ProcessPoolExecutor(max_workers=num_workers) as executor:
                 futures = [
                     executor.submit(
-                        run_processing_worker,  # Function to run
-                        # self,  # use log inside the workes
+                        run_processing_worker,
                         sp,
                         ch,
                         self._loki.chr_num[ch],
                         options,
                         path,
                         queue,
-                    )  #
+                    )
+                    # for sp in self._comparisons
                     for ch in self._chmList
                 ]
 
-                # Wait for all processes to finish
+                # Aguarda a finalização de todos os processos
                 for future in futures:
-                    future.result()
+                    future.result()  # Aguarda cada processo finalizar
 
-            # Collect the results from the queue
+            # Coletar os resultados dos processos
             for _ in self._chmList:
                 n2, n3, n4 = queue.get()
                 list_n2.extend(n2)
                 list_n3.extend(n3)
                 list_n4.extend(n4)
 
-            self.log(
-                f"UCSC/{sp} - Processing fase completed",
-                level=logging.INFO,
-                indent=indent_level,
-            )
+            print("🎉 Processamento concluído!")
 
             # INGESTIONS FASE
             # ===============
-            indent_ingestion_level = 6
-            self.log(
-                f"UCSC/{sp} - Starting the ingestion fase",
-                level=logging.INFO,
-                indent=indent_level,
-            )
 
             # N1 Ingestions: Comparisons Level
             # --------------------------------------------------------------------------------
             # Structure: ecr_{comparisons}
-            self.log(
-                f"UCSC/{sp} - Starting the ingestion in level N1",
-                level=logging.INFO,
-                indent=indent_ingestion_level,
-            )
             desc_n1 = "ECRs for " + sp
             label_n1 = "ecr_" + sp
             list_n1 = []  # [label, description]
@@ -254,20 +233,10 @@ class Source_ucsc_ecr(loki_source.Source):
 
             # GROUP_NAME TABLE: [group_id, namespace_id, name, source_id]
             self.addGroupNamespacedNames(ecr_ns, [(ecr_gid, list_n1[0][0])])
-            self.log(
-                f"UCSC/{sp} - Ingestion in level N1 completed",
-                level=logging.INFO,
-                indent=indent_ingestion_level,
-            )
 
             # N2 Ingestions: Chromosome Level
             # --------------------------------------------------------------------------------
             # Structure: ect_{comparisons}_chr{x}
-            self.log(
-                f"UCSC/{sp} - Starting the ingestion in level N2",
-                level=logging.INFO,
-                indent=indent_ingestion_level,
-            )
             # GROUP TABLE: [group_id, type_id, label, description, source_id]
             list_n2_grp_ids = []
             list_n2_grp_ids = self.addTypedGroups(ecr_group_typeid, list_n2)
@@ -288,20 +257,10 @@ class Source_ucsc_ecr(loki_source.Source):
             self.addGroupRelationships(
                 ((ecr_gid, row[0], rel_id, 1) for row in list_n2)
             )
-            self.log(
-                f"UCSC/{sp} - Ingestion in level N2 completed",
-                level=logging.INFO,
-                indent=indent_ingestion_level,
-            )
 
             # N3 Ingestions: Band Level
             # --------------------------------------------------------------------------------
             # Structure: ect_{comparisons}_chr{x}_band{y}
-            self.log(
-                f"UCSC/{sp} - Starting the ingestion in level N3",
-                level=logging.INFO,
-                indent=indent_ingestion_level,
-            )
             # GROUP N3: [group_id, type_id, label, descrition, source_id]
             # list_n3 [grp_n2_label, grp_label_n3, desc_n3]
 
@@ -345,20 +304,9 @@ class Source_ucsc_ecr(loki_source.Source):
                 ((row[0], row[2], rel_id, 1) for row in list_g2)
             )  # noqa E501
 
-            self.log(
-                f"UCSC/{sp} - Ingestion in level N3 completed",
-                level=logging.INFO,
-                indent=indent_ingestion_level,
-            )
-
             # N4 Ingestions: Biopolymer Level
             # --------------------------------------------------------------------------------
             # Structure: ect_{comparisons}_chr{x}_band{y}_{region}
-            self.log(
-                f"UCSC/{sp} - Starting the ingestion in level N4",
-                level=logging.INFO,
-                indent=indent_ingestion_level,
-            )
 
             # BIOPOLYMER TABLE:
             # [biopolymer_id, type_id, label, description, source_id]  # noqa E501
@@ -404,23 +352,11 @@ class Source_ucsc_ecr(loki_source.Source):
 
             self.addGroupBiopolymers(list_n4_grp_bio_ids)
 
-            self.log(
-                f"UCSC/{sp} - Ingestion in level N4 completed",
-                level=logging.INFO,
-                indent=indent_ingestion_level,
-            )
-
             del list_n2, list_n3, list_n4
             gc.collect()
 
             self.log(
-                f"UCSC/{sp} - Ingestion fase completed",
-                level=logging.INFO,
-                indent=indent_level,
-            )
-
-            self.log(
-                f"UCSC - Processing and ingestion for {sp} completed",
+                "UCSC - Processing ECRs for " + sp + " completed",
                 level=logging.INFO,
                 indent=2,
             )
@@ -431,9 +367,9 @@ class Source_ucsc_ecr(loki_source.Source):
         # Finalize the process
         end_time = time.time()
         elapsed_time_minutes = (end_time - start_time) / 60  # time in minutes
-        memory_after = process_memory.memory_info().rss / (1024 * 1024)  # MB
+        memory_after = process_memory.memory_info().rss / (1024 * 1024)  # mem in MB
         self.log(
-            f"UCSC - Final memory: {memory_after:.2f} MB. Alocated memory: {memory_after - memory_bef:.2f} MB.",  # noqa: E501
+            f"UCSC - Final memory: {memory_after:.2f} MB. Alocated memory: {memory_after - memory_before:.2f} MB.",  # noqa: E501
             level=logging.INFO,
             indent=2,
         )
@@ -445,26 +381,16 @@ class Source_ucsc_ecr(loki_source.Source):
 
 
 def run_processing_worker(sp, ch, ch_id, options, path, queue):
-    # log_lock = Lock()
-    # indent_level = 6
+    """
+    Função independente para rodar dentro de um processo separado.
+    """
+    print(f"✅ Worker iniciado: {sp}, Cromossomo {ch}")
 
-    # with log_lock:
-    #     logger.log(
-    #         f"🔹 Starting worker to: {sp}, chromosome {ch}",
-    #         level=logging.INFO,
-    #         indent=indent_level,
-    #     )
-
-    # Pass the task to the worker
+    # Aqui você pode rodar sua classe que faz o processamento
     worker = ProcessingWorker(sp, ch, ch_id, options, path, queue)
     worker.run()
 
-    # with log_lock:
-    #     logger.log(
-    #         f"🔹 Worker to: {sp}, chromosome {ch} completed",
-    #         level=logging.INFO,
-    #         indent=indent_level,
-    #     )
+    print(f"✅ Worker finalizado: {sp}, Cromossomo {ch}")
 
 
 # **🔹 Classe `ProcessingWorker`: cada processo chama `ProcessingThread`**
@@ -479,12 +405,9 @@ class ProcessingWorker(SourceUtilMixin):
         self.queue = queue  # A fila será usada para passar os resultados
 
     def run(self):
-
+        """Processa os dados de cada cromossomo e retorna os resultados via Queue."""
         try:
-            print(
-                f"                                          🚀 Starting Worker to chrom {self.ch}"
-            )
-
+            print(f"dentro do ProcessingTask para {self.sp}, {self.ch}")
             list_n2 = []
             list_n3 = []
             list_n4 = []
@@ -525,11 +448,9 @@ class ProcessingWorker(SourceUtilMixin):
                 f.close()
                 del f
             gc.collect()
-            # print(f"Process {self.ch}: clean up memory")
-            # print(f"Process {self.ch}: processed {num_regions} regions")
-            print(
-                f"                                          ✅ Worker to chrom: {self.ch} completed"
-            )
+            print(f"Process {self.ch}: clean up memory")
+
+            print(f"Process {self.ch}: processed {num_regions} regions")
 
         # Enviar os resultados para a fila
         # return self.list_n2, self.list_n3, self.list_n4

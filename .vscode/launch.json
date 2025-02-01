@@ -51,19 +51,11 @@
             "program": "${workspaceFolder}/loki_modules/loki_build.py",
             "args": [
                 "--knowledge", "/Users/andrerico/Works/Sys/biofilter/data/loki.db",
-                // "--update", "entrez",
                 "--update",
                 "--temp-directory", "/Users/andrerico/Works/Sys/biofilter/downloads",
-                // "--archive", "/Users/andrerico/Works/Sys/biofilter/downloads",
-                // "--cache-only",
-                "--list-sources", "ucsc_ecr",
+                "--list-sources", "dbsnp",
                 "--keep-download",
-                "--skip-download",
-                // "--only-download",
-                // "--force-update",
-                // "--update-except", "entrez", "dbsnp", "pfam", "oreganno", "go", "mint", "pharmgkb", "ucsc_ecr", "gwas", "chainfiles", "reactome",
-                // "--update-except", "biogrid", "dbsnp", "pfam", "oreganno", "go", "mint", "pharmgkb", "ucsc_ecr", "gwas", "chainfiles", "reactome",
-                // "--update-except", "biogrid", "entrez", "pfam", "oreganno", "go", "mint", "pharmgkb", "ucsc_ecr", "gwas", "chainfiles", "reactome",
+                "--force-update"
             ],
             "console": "integratedTerminal"
         }
