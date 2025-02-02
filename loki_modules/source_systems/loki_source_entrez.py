@@ -351,7 +351,7 @@ class Source_entrez(loki_source.Source):
                 "processing gene regions completed: %d regions (%d genes), %d identifiers\n"  # noqa E501
                 % (numRegions, numGenes, numNames - numNames0)
             )
-            self.logPush()
+            # self.logPush()
             if setOrphan:
                 self.log(
                     "WARNING: %d regions for undefnied EntrezIDs\n"
@@ -377,7 +377,7 @@ class Source_entrez(loki_source.Source):
                     "WARNING: %d genes on mismatching chromosome\n"
                     % (len(setBadChr))  # noqa E501
                 )
-            self.logPop()
+            # self.logPop()
             entrezChm = setOrphan = setBadNC = setBadBuild = setBadChr = setBadVers = (
                 buildGenes
             ) = None  # noqa E501  # noqa E501

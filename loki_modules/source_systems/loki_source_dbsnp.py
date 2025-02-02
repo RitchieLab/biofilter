@@ -125,11 +125,11 @@ class Source_dbsnp(loki_source.Source):
             remFiles[path + "/chr_%s.txt.gz" % chm] = (
                 "/snp/organisms/human_9606/chr_rpts/chr_%s.txt.gz" % chm
             )
-            # FIXME: Tirar o comentario em produção
-        # if options["merges"] == "yes":
-        #     remFiles[path + "/RsMergeArch.bcp.gz"] = (
-        #         "/snp/organisms/human_9606/database/organism_data/RsMergeArch.bcp.gz"  # noqa E501
-        #     )
+
+        if options["merges"] == "yes":
+            remFiles[path + "/RsMergeArch.bcp.gz"] = (
+                "/snp/organisms/human_9606/database/organism_data/RsMergeArch.bcp.gz"  # noqa E501
+            )
         if options["roles"] == "yes":
             remFiles[path + "/SnpFunctionCode.bcp.gz"] = (
                 "/snp/organisms/database/shared_data/SnpFunctionCode.bcp.gz"
@@ -192,8 +192,8 @@ class Source_dbsnp(loki_source.Source):
 
         # process merge report (no header!)
         # NOTE: Temp desativado pra deploment.
-        if 3 == 4:
-            # if options.get("merges", "yes") == "yes":
+        # if 3 == 4:
+        if options.get("merges", "yes") == "yes":
             """/* from human_9606_table.sql.gz */
             CREATE TABLE [RsMergeArch]
             (
@@ -247,7 +247,7 @@ class Source_dbsnp(loki_source.Source):
             )
             if setMerge:
                 self.log("writing SNP merge records to the database ...\n")
-                self.addSNPMerges(setMerge)
+                self.addSNPMerges(setMerge) # Talves nao reciar o indice aqui
                 self.log(
                     "writing SNP merge records to the database completed\n"
                 )  # noqa E501
@@ -422,7 +422,7 @@ class Source_dbsnp(loki_source.Source):
             indent=2,
         )
 
-        # PROCESS FASE
+        # PROCESS PHASE
         # ==========================
         # 📌 Process and save results in temp csv
 
@@ -470,7 +470,7 @@ class Source_dbsnp(loki_source.Source):
             indent=2,
         )
 
-        # INGESTION FASE
+        # INGESTION PHASE
         # ==========================
         ingestion_start = time.time()
         v_indent = 4

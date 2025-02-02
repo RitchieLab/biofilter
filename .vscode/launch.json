@@ -53,8 +53,9 @@
                 "--knowledge", "/Users/andrerico/Works/Sys/biofilter/data/loki.db",
                 "--update",
                 "--temp-directory", "/Users/andrerico/Works/Sys/biofilter/downloads",
-                "--list-sources", "dbsnp",
+                "--list-sources", "entrez",
                 "--keep-download",
+                "--skip-download",
                 "--force-update"
             ],
             "console": "integratedTerminal"

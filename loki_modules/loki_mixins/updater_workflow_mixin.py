@@ -9,26 +9,17 @@ import shutil
 from threading import Thread
 import logging
 
-# Talvez aqui podemos ter um method principal que orquestra o fluxo de atualização
-# - 1. Preparar as opções dos sources
-# - 2. Baixar e calcular o hash dos arquivos
-# - 3. Roda o process e ingestion data
-# - 4. Atualiza o metadata do source
-# - 5. Remove os arquivos baixados
-# - 6. Operacoes post-processamento (nao sei ainda o que é)
+# 🏗️ Improvements to this Mixin / Splitting the methods by PHASE
+# def updaterWorkflow(self):
+#     self._Preparation()
+#     self._Download()
+#     self._ProcessAndIngestData()
+#     self._Metadata()
+#     self._RemoveDownload()
+#     self._PostProcessingOperations()
 
 
 class UpdaterWorkflowMixin:
-
-    def updaterWorkflow(self):
-
-        self._Preparation()
-        self._Download()
-        self._ProcessAndIngestData()
-        self._Metadata()
-        self._RemoveDownload()
-        self._PostProcessingOperations()
-
 
     def updateDatabase(
         self,
@@ -42,6 +33,9 @@ class UpdaterWorkflowMixin:
         self._loki.testDatabaseWriteable()
         if self._loki.getDatabaseSetting("finalized", int):
             raise Exception("cannot update a finalized database")
+
+        # PREPARATION PHASE
+        # =====================================================================
 
         # check for extraneous options
         self.log("Preparing for update ...", level=logging.INFO, indent=0)
@@ -121,8 +115,9 @@ class UpdaterWorkflowMixin:
                 indent=0,
             )
 
-            # ----------------------------------------------
-            # Start Parallel Download and Hashing
+            # PREPARATION PHASE
+            # =====================================================================
+            # 📡 Start Parallel Download and Hashing
 
             if self.skipDownload:
                 self.log(
@@ -171,8 +166,9 @@ class UpdaterWorkflowMixin:
             # NOTE When --only_download is set, the code will return here
             # NOTE Will keep all files independent of keep_downloads
 
+            # PROCESSING PHASE
+            # =====================================================================
             # Return the flow of the code to the main thread
-            # ----------------------------------------------
 
             for srcName in self.srcSetsToDownload:
                 srcObj = self._sourceObjects[srcName]
@@ -287,12 +283,14 @@ class UpdaterWorkflowMixin:
                             indent=2,
                         )
 
-                        # 🚨 Start Update Method from Source System 
+                        # 🚨 Start Update Method from Source System
                         # Call the update function of the source
                         srcObj.update(options, path)
 
-                        # Stating Operations after the process and ingestion data
+                        # METADATA PHASE
+                        # =====================================================
                         # update the source metadata
+
                         cursor.execute(
                             """
                             UPDATE `db`.`source`
@@ -423,6 +421,9 @@ class UpdaterWorkflowMixin:
                     )
                 # try/except/finally
 
+                # REMOVE FILES PHASE
+                # =============================================================
+
                 # remove subdirectory to free up some space
                 if not self.keepDownload:
                     shutil.rmtree(path)
@@ -439,6 +440,9 @@ class UpdaterWorkflowMixin:
                     )
             # foreach source
 
+            # POS INGESTION DATA PHASE
+            # =====================================================================
+
             # pull the latest GRCh/UCSChg conversions
             #   http://genome.ucsc.edu/FAQ/FAQreleases.html
             #   http://genome.ucsc.edu/goldenPath/releaseLog.html
@@ -446,264 +450,301 @@ class UpdaterWorkflowMixin:
 
             # 🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨
             # Eu preciso entender o que é isso e como funciona, pois realiza opreações no banco de dados
-            # apos a atualização dos dados e esta consumindo muita memoria e tempo. 
+            # apos a atualização dos dados e esta consumindo muita memoria e tempo.
+            
+            pos_processamento = False
+            if pos_processamento:
+                # 📍INICIO DO BLOCLO 1: Objetivo eh verificar se temos campos nulos em grch e ucschg na table Source, e alinhar com o que esta em UCSC site
+                #  Step 1: baixar o site do UCSC e extrair as informações de grch e ucschg
+                #  Step 2: Atualizar a tabela grch_ucschg com as informações do UCSC
+                #  Step 3: Atualizar a tabela Source com as informações do UCSC
+                #  Step 4: Verificar se algum valor da tabela Source esta fora do range do UCSC
 
-            if not cacheOnly:
-                self.log(
-                    "updating GRCh:UCSChg genome build identities ...\n",
-                    level=logging.INFO,
-                    indent=0,
-                )
-                import urllib.request as urllib2
-                import re
-
-                response = urllib2.urlopen(
-                    "http://genome.ucsc.edu/FAQ/FAQreleases.html"
-                )
-                page = ""
-                while True:
-                    data = response.read()
-                    if not data:
-                        break
-                    page += data.decode()
-                rowHuman = False
-                for tablerow in re.finditer(
-                    r"<tr>.*?</tr>", page, re.IGNORECASE | re.DOTALL
-                ):
-                    cols = tuple(
-                        match.group()[4:-5].strip().lower()
-                        for match in re.finditer(
-                            r"<td>.*?</td>",
-                            tablerow.group(),
-                            re.IGNORECASE | re.DOTALL,  # noqa: E501
-                        )
+                if not cacheOnly:  # If False it WILL RUN  / Move to a other method
+                    self.log(
+                        "updating GRCh:UCSChg genome build identities ...",
+                        level=logging.INFO,
+                        indent=0,
                     )
-                    if cols and (
-                        (cols[0] == "human")
-                        or (rowHuman and (cols[0] in ("", "&nbsp;")))
+                    import urllib.request as urllib2
+                    import re
+
+                    response = urllib2.urlopen(
+                        "http://genome.ucsc.edu/FAQ/FAQreleases.html"
+                    )
+                    page = ""
+                    while True:
+                        data = response.read()
+                        if not data:
+                            break
+                        page += data.decode()
+                    rowHuman = False
+                    for tablerow in re.finditer(
+                        r"<tr>.*?</tr>", page, re.IGNORECASE | re.DOTALL
                     ):
-                        rowHuman = True
-                        grch = ucschg = None
-                        try:
-                            if cols[1].startswith("hg"):
-                                ucschg = int(cols[1][2:])
-                            if cols[3].startswith(
-                                "genome reference consortium grch"
-                            ):  # noqa: E501
-                                grch = int(cols[3][32:])
-                            if cols[3].startswith("ncbi build "):
-                                grch = int(cols[3][11:])
-                        except:  # noqa: E722
-                            pass
-                        if grch and ucschg:
-                            cursor.execute(
-                                """
-                                INSERT OR REPLACE INTO `db`.`grch_ucschg` (
-                                    grch, ucschg
-                                ) VALUES (?, ?)
-                                """,
-                                (grch, ucschg),
+                        cols = tuple(
+                            match.group()[4:-5].strip().lower()
+                            for match in re.finditer(
+                                r"<td>.*?</td>",
+                                tablerow.group(),
+                                re.IGNORECASE | re.DOTALL,  # noqa: E501
                             )
-                    else:
-                        rowHuman = False
-                # foreach tablerow
-                self.log(
-                    "updating GRCh:UCSChg genome build identities completed\n",
-                    level=logging.INFO,
-                    indent=0,  # noqa: E501
-                )
-            # if not cacheOnly
-
-            # cross-map GRCh/UCSChg build versions for all sources
-            ucscGRC = collections.defaultdict(int)
-            for row in self._db.cursor().execute(
-                "SELECT grch,ucschg FROM `db`.`grch_ucschg`"
-            ):
-                ucscGRC[row[1]] = max(row[0], ucscGRC[row[1]])
-                cursor.execute(
-                    """
-                    UPDATE `db`.`source` SET grch = ?
-                    WHERE grch IS NULL AND ucschg = ?
-                    """,
-                    (row[0], row[1]),
-                )
-                cursor.execute(
-                    """
-                    UPDATE `db`.`source` SET ucschg = ?
-                    WHERE ucschg IS NULL AND grch = ?
-                    """,
-                    (row[1], row[0]),
-                )
-
-            cursor.execute(
-                "UPDATE `db`.`source` SET current_ucschg = ucschg "
-                "WHERE current_ucschg IS NULL"
-            )
-
-            # check for any source with an unrecognized GRCh build
-            mismatch = False
-            for row in cursor.execute(
-                "SELECT source, grch, ucschg FROM `db`.`source` "
-                "WHERE (grch IS NULL) != (ucschg IS NULL)"
-            ):
-                self.log(
-                    "WARNING: unrecognized genome build for '%s' (NCBI GRCh%s, UCSC hg%s)\n"  # noqa: E501
-                    % (row[0], (row[1] or "?"), (row[2] or "?")),
-                    level=logging.WARNING,
-                    indent=0,
-                )
-                mismatch = True
-            if mismatch:
-                self.log(
-                    "WARNING: database may contain incomparable genome positions!\n",  # noqa: E501
-                    level=logging.WARNING,
-                    indent=0,
-                )
-
-            # check all sources' UCSChg build versions and set the latest as
-            # the target
-            hgSources = collections.defaultdict(set)
-            for row in cursor.execute(
-                "SELECT source_id, current_ucschg "
-                "FROM `db`.`source` "
-                "WHERE current_ucschg IS NOT NULL"
-            ):
-                hgSources[row[1]].add(row[0])
-            if hgSources:
-                targetHG = max(hgSources)
-                self.log(
-                    "database genome build: GRCh%s / UCSChg%s\n"
-                    % (ucscGRC.get(targetHG, "?"), targetHG),
-                    level=logging.INFO,
-                    indent=0,
-                )
-                targetUpdated = (
-                    self._loki.getDatabaseSetting("ucschg", int) != targetHG
-                )  # noqa: E501
-                self._loki.setDatabaseSetting("ucschg", targetHG)
-
-            # liftOver sources with old build versions, if there are any
-            if len(hgSources) > 1:
-                locusSources = set(
-                    row[0]
-                    for row in cursor.execute(
-                        "SELECT DISTINCT source_id FROM `db`.`snp_locus`"
-                    )
-                )
-                regionSources = set(
-                    row[0]
-                    for row in cursor.execute(
-                        """
-                        SELECT DISTINCT source_id
-                        FROM `db`.`biopolymer_region`
-                        """
-                    )  # noqa: E501
-                )
-                chainsUpdated = (
-                    "grch_ucschg" in self._tablesUpdated
-                    or "chain" in self._tablesUpdated
-                    or "chain_data" in self._tablesUpdated
-                )
-                for oldHG in sorted(hgSources):
-                    if oldHG == targetHG:
-                        continue
-                    if not self._loki.hasLiftOverChains(oldHG, targetHG):
-                        self.log(
-                            "ERROR: no chains available to lift hg%d to hg%d\n"
-                            % (oldHG, targetHG)
                         )
-                        continue
-
-                    if (
-                        targetUpdated
-                        or chainsUpdated
-                        or "snp_locus" in self._tablesUpdated
-                    ):
-                        sourceIDs = hgSources[oldHG] & locusSources
-                        if sourceIDs:
-                            self.liftOverSNPLoci(oldHG, targetHG, sourceIDs)
-                    if (
-                        targetUpdated
-                        or chainsUpdated
-                        or "biopolymer_region" in self._tablesUpdated
-                    ):
-                        sourceIDs = hgSources[oldHG] & regionSources
-                        if sourceIDs:
-                            self.liftOverRegions(oldHG, targetHG, sourceIDs)
-
-                    sql = (
-                        "UPDATE `db`.`source` SET current_ucschg = %d "
-                        "WHERE source_id = ?" % targetHG
+                        if cols and (
+                            (cols[0] == "human")
+                            or (rowHuman and (cols[0] in ("", "&nbsp;")))
+                        ):
+                            rowHuman = True
+                            grch = ucschg = None
+                            try:
+                                if cols[1].startswith("hg"):
+                                    ucschg = int(cols[1][2:])
+                                if cols[3].startswith(
+                                    "genome reference consortium grch"
+                                ):  # noqa: E501
+                                    grch = int(cols[3][32:])
+                                if cols[3].startswith("ncbi build "):
+                                    grch = int(cols[3][11:])
+                            except:  # noqa: E722
+                                pass
+                            if grch and ucschg:
+                                cursor.execute(
+                                    """
+                                    INSERT OR REPLACE INTO `db`.`grch_ucschg` (
+                                        grch, ucschg
+                                    ) VALUES (?, ?)
+                                    """,
+                                    (grch, ucschg),
+                                )
+                        else:
+                            rowHuman = False
+                    # foreach tablerow
+                    self.log(
+                        "updating GRCh:UCSChg genome build identities completed\n",
+                        level=logging.INFO,
+                        indent=0,  # noqa: E501
                     )
-                    cursor.executemany(
-                        sql, ((sourceID,) for sourceID in hgSources[oldHG])
+                # if not cacheOnly
+
+                # cross-map GRCh/UCSChg build versions for all sources
+                ucscGRC = collections.defaultdict(int)
+                for row in self._db.cursor().execute(
+                    "SELECT grch,ucschg FROM `db`.`grch_ucschg`"
+                ):
+                    ucscGRC[row[1]] = max(row[0], ucscGRC[row[1]])
+                    cursor.execute(
+                        """
+                        UPDATE `db`.`source` SET grch = ?
+                        WHERE grch IS NULL AND ucschg = ?
+                        """,
+                        (row[0], row[1]),
                     )
-                # foreach old build
-            # if any old builds
+                    cursor.execute(
+                        """
+                        UPDATE `db`.`source` SET ucschg = ?
+                        WHERE ucschg IS NULL AND grch = ?
+                        """,
+                        (row[1], row[0]),
+                    )
 
-            # post-process as needed
-            # self.log("MEMORY: %d bytes (%d peak)\n" % self._loki.getDatabaseMemoryUsage()) #DEBUG  # noqa: E501
-            if "snp_merge" in self._tablesUpdated:
-                self.cleanupSNPMerges()
-                # self.log("MEMORY: %d bytes (%d peak)\n" % self._loki.getDatabaseMemoryUsage()) #DEBUG  # noqa: E501
-            if (
-                "snp_merge" in self._tablesUpdated
-                or "snp_locus" in self._tablesUpdated  # noqa: E501
-            ):  # noqa: E501
-                self.updateMergedSNPLoci()
-                # self.log("MEMORY: %d bytes (%d peak)\n" % self._loki.getDatabaseMemoryUsage()) #DEBUG  # noqa: E501
-            if "snp_locus" in self._tablesUpdated:
-                self.cleanupSNPLoci()
-                # self.log("MEMORY: %d bytes (%d peak)\n" % self._loki.getDatabaseMemoryUsage()) #DEBUG  # noqa: E501
-            if (
-                "snp_merge" in self._tablesUpdated
-                or "snp_entrez_role" in self._tablesUpdated
-            ):
-                self.updateMergedSNPEntrezRoles()
-                # self.log("MEMORY: %d bytes (%d peak)\n" % self._loki.getDatabaseMemoryUsage()) #DEBUG  # noqa: E501
-            if "snp_entrez_role" in self._tablesUpdated:
-                self.cleanupSNPEntrezRoles()
-                # self.log("MEMORY: %d bytes (%d peak)\n" % self._loki.getDatabaseMemoryUsage()) #DEBUG  # noqa: E501
-            if (
-                "snp_merge" in self._tablesUpdated
-                or "gwas" in self._tablesUpdated  # noqa: E501
-            ):  # noqa: E501
-                self.updateMergedGWASAnnotations()
-                # self.log("MEMORY: %d bytes (%d peak)\n" % self._loki.getDatabaseMemoryUsage()) #DEBUG  # noqa: E501
-            if (
-                "biopolymer_name" in self._tablesUpdated
-                or "biopolymer_name_name" in self._tablesUpdated
-            ):
-                self.resolveBiopolymerNames()
-                # self.log("MEMORY: %d bytes (%d peak)\n" % self._loki.getDatabaseMemoryUsage()) #DEBUG  # noqa: E501
-            if (
-                "biopolymer_name" in self._tablesUpdated
-                or "snp_entrez_role" in self._tablesUpdated
-            ):
-                self.resolveSNPBiopolymerRoles()
-                # self.log("MEMORY: %d bytes (%d peak)\n" % self._loki.getDatabaseMemoryUsage()) #DEBUG  # noqa: E501
-            if (
-                "biopolymer_name" in self._tablesUpdated
-                or "group_member_name" in self._tablesUpdated
-            ):
-                self.resolveGroupMembers()
-                # self.log("MEMORY: %d bytes (%d peak)\n" % self._loki.getDatabaseMemoryUsage()) #DEBUG  # noqa: E501
-            if "biopolymer_region" in self._tablesUpdated:
-                self.updateBiopolymerZones()
-                # self.log("MEMORY: %d bytes (%d peak)\n" % self._loki.getDatabaseMemoryUsage()) #DEBUG  # noqa: E501
+                cursor.execute(
+                    "UPDATE `db`.`source` SET current_ucschg = ucschg "
+                    "WHERE current_ucschg IS NULL"
+                )
 
-            # reindex all remaining tables
-            if self._tablesDeindexed:
-                self._loki.createDatabaseIndices(
-                    None, "db", self._tablesDeindexed
-                )  # noqa: E501
-            if self._tablesUpdated:
-                self._loki.setDatabaseSetting("optimized", 0)
-            self.log(
-                "updating database completed\n",
-                level=logging.INFO,
-                indent=0,
-            )
+                # check for any source with an unrecognized GRCh build
+                mismatch = False
+                for row in cursor.execute(
+                    "SELECT source, grch, ucschg FROM `db`.`source` "
+                    "WHERE (grch IS NULL) != (ucschg IS NULL)"
+                ):
+                    self.log(
+                        "WARNING: unrecognized genome build for '%s' (NCBI GRCh%s, UCSC hg%s)\n"  # noqa: E501
+                        % (row[0], (row[1] or "?"), (row[2] or "?")),
+                        level=logging.WARNING,
+                        indent=0,
+                    )
+                    mismatch = True
+                if mismatch:
+                    self.log(
+                        "WARNING: database may contain incomparable genome positions!\n",  # noqa: E501
+                        level=logging.WARNING,
+                        indent=0,
+                    )
+
+                # 📍FIM DO BLOCLO 1
+
+
+                # 📍INICIO DO BLOCLO 2: Se algum Source for diferente do definito, realizar um liftover
+                # 🚨 Usa a Cahin table para isso (talvez ela deva ser a primeira a ser atualizada)
+
+                # check all sources' UCSChg build versions and set the latest as
+                # the target
+                hgSources = collections.defaultdict(set)
+                for row in cursor.execute(
+                    "SELECT source_id, current_ucschg "
+                    "FROM `db`.`source` "
+                    "WHERE current_ucschg IS NOT NULL"
+                ):
+                    hgSources[row[1]].add(row[0])
+                if hgSources:
+                    targetHG = max(hgSources)
+                    self.log(
+                        "database genome build: GRCh%s / UCSChg%s\n"
+                        % (ucscGRC.get(targetHG, "?"), targetHG),
+                        level=logging.INFO,
+                        indent=0,
+                    )
+                    targetUpdated = (
+                        self._loki.getDatabaseSetting("ucschg", int) != targetHG
+                    )  # noqa: E501
+                    self._loki.setDatabaseSetting("ucschg", targetHG)
+
+                # liftOver sources with old build versions, if there are any
+                if len(hgSources) > 1:
+                    locusSources = set(
+                        row[0]
+                        for row in cursor.execute(
+                            "SELECT DISTINCT source_id FROM `db`.`snp_locus`"
+                        )
+                    )
+                    regionSources = set(
+                        row[0]
+                        for row in cursor.execute(
+                            """
+                            SELECT DISTINCT source_id
+                            FROM `db`.`biopolymer_region`
+                            """
+                        )  # noqa: E501
+                    )
+                    chainsUpdated = (
+                        "grch_ucschg" in self._tablesUpdated
+                        or "chain" in self._tablesUpdated
+                        or "chain_data" in self._tablesUpdated
+                    )
+                    for oldHG in sorted(hgSources):
+                        if oldHG == targetHG:
+                            continue
+                        if not self._loki.hasLiftOverChains(oldHG, targetHG):
+                            self.log(
+                                "ERROR: no chains available to lift hg%d to hg%d\n"
+                                % (oldHG, targetHG)
+                            )
+                            continue
+
+                        if (
+                            targetUpdated
+                            or chainsUpdated
+                            or "snp_locus" in self._tablesUpdated
+                        ):
+                            sourceIDs = hgSources[oldHG] & locusSources
+                            if sourceIDs:
+                                self.liftOverSNPLoci(oldHG, targetHG, sourceIDs)
+                        if (
+                            targetUpdated
+                            or chainsUpdated
+                            or "biopolymer_region" in self._tablesUpdated
+                        ):
+                            sourceIDs = hgSources[oldHG] & regionSources
+                            if sourceIDs:
+                                self.liftOverRegions(oldHG, targetHG, sourceIDs)
+
+                        sql = (
+                            "UPDATE `db`.`source` SET current_ucschg = %d "
+                            "WHERE source_id = ?" % targetHG
+                        )
+                        cursor.executemany(
+                            sql, ((sourceID,) for sourceID in hgSources[oldHG])
+                        )
+                    # foreach old build
+                # if any old builds
+
+                # 📍FIM DO BLOCLO 2 (liftover)
+
+                # 📍INICIO DO BLOCO 3
+
+                # post-process as needed
+                # self.log("MEMORY: %d bytes (%d peak)\n" % self._loki.getDatabaseMemoryUsage()) #DEBUG  # noqa: E501
+                
+                # NOTE esse method elimina rsMerge repeatidos da snp_merge table
+                if "snp_merge" in self._tablesUpdated:
+                    self.cleanupSNPMerges()
+                    # self.log("MEMORY: %d bytes (%d peak)\n" % self._loki.getDatabaseMemoryUsage()) #DEBUG  # noqa: E501
+
+                # NOTE esse method olha na snp_merged e insere novos registros na snp_locus com base em snp da snp_locus que foram Merged
+                # Resumo, ele ira criar novos registros na snp_locus com base em snp da snp_merged
+                if (
+                    "snp_merge" in self._tablesUpdated
+                    or "snp_locus" in self._tablesUpdated  # noqa: E501
+                ):  # noqa: E501
+                    self.updateMergedSNPLoci()
+                    # self.log("MEMORY: %d bytes (%d peak)\n" % self._loki.getDatabaseMemoryUsage()) #DEBUG  # noqa: E501
+                
+                # NOTE Elimina registros da snp_locus (mantem apenas um para o grupo snp, chr e pos)
+                if "snp_locus" in self._tablesUpdated:
+                    self.cleanupSNPLoci()
+                    # self.log("MEMORY: %d bytes (%d peak)\n" % self._loki.getDatabaseMemoryUsage()) #DEBUG  # noqa: E501
+                
+                # NOTE MESMO PROCESSO DO ANTERIOR, POREM PARA A TABELA snp_entrez_role
+                if (
+                    "snp_merge" in self._tablesUpdated
+                    or "snp_entrez_role" in self._tablesUpdated
+                ):
+                    self.updateMergedSNPEntrezRoles()
+                    # self.log("MEMORY: %d bytes (%d peak)\n" % self._loki.getDatabaseMemoryUsage()) #DEBUG  # noqa: E501
+                
+                if "snp_entrez_role" in self._tablesUpdated:
+                    self.cleanupSNPEntrezRoles()
+                    # self.log("MEMORY: %d bytes (%d peak)\n" % self._loki.getDatabaseMemoryUsage()) #DEBUG  # noqa: E501
+                
+                # NOTE Duplica registro na GWAS (usando o rsMerge)
+                if (
+                    "snp_merge" in self._tablesUpdated
+                    or "gwas" in self._tablesUpdated  # noqa: E501
+                ):  # noqa: E501
+                    self.updateMergedGWASAnnotations()
+                    # self.log("MEMORY: %d bytes (%d peak)\n" % self._loki.getDatabaseMemoryUsage()) #DEBUG  # noqa: E501
+                
+                # NOTE PRocessamento para o Biopolymer
+                if (
+                    "biopolymer_name" in self._tablesUpdated
+                    or "biopolymer_name_name" in self._tablesUpdated
+                ):
+                    self.resolveBiopolymerNames()
+                    # self.log("MEMORY: %d bytes (%d peak)\n" % self._loki.getDatabaseMemoryUsage()) #DEBUG  # noqa: E501
+                
+                if (
+                    "biopolymer_name" in self._tablesUpdated
+                    or "snp_entrez_role" in self._tablesUpdated
+                ):
+                    self.resolveSNPBiopolymerRoles()
+                    # self.log("MEMORY: %d bytes (%d peak)\n" % self._loki.getDatabaseMemoryUsage()) #DEBUG  # noqa: E501
+                
+                if (
+                    "biopolymer_name" in self._tablesUpdated
+                    or "group_member_name" in self._tablesUpdated
+                ):
+                    self.resolveGroupMembers()
+                    # self.log("MEMORY: %d bytes (%d peak)\n" % self._loki.getDatabaseMemoryUsage()) #DEBUG  # noqa: E501
+                if "biopolymer_region" in self._tablesUpdated:
+                    self.updateBiopolymerZones()
+                    # self.log("MEMORY: %d bytes (%d peak)\n" % self._loki.getDatabaseMemoryUsage()) #DEBUG  # noqa: E501
+
+                # reindex all remaining tables
+                if self._tablesDeindexed:
+                    self._loki.createDatabaseIndices(
+                        None, "db", self._tablesDeindexed
+                    )  # noqa: E501
+                if self._tablesUpdated:
+                    self._loki.setDatabaseSetting("optimized", 0)
+                self.log(
+                    "updating database completed\n",
+                    level=logging.INFO,
+                    indent=0,
+                )
+
+        # FIM DO POS PROCESSAMENTO
+
         except Exception as e:
             self.log_exception(e)
             excType, excVal, excTrace = sys.exc_info()

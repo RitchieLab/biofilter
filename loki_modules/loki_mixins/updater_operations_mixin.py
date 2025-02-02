@@ -29,6 +29,84 @@ class UpdaterOperationsMixin:
             " OK: %d duplicate merges\n" % (len(cull),), level=logging.INFO, indent=0
         )
 
+    """
+    📌 O que essa query faz?
+        Elimina registros duplicados na tabela snp_merge considerando o campo rsMerged.
+    📌 Exemplo Prático
+        Tabelas Antes da Execução
+        Tabela snp_merge
+        rsMerged	rsCurrent
+        1001	2001
+        1001	2002
+        1002	2003
+        Após a Execução do DELETE
+        A query irá deletar os registros duplicados, mantendo apenas um por rsMerged:
+
+        Nova snp_merge após DELETE
+        rsMerged	rsCurrent
+        1001	2001
+        1002	2003
+    🔴 Problema Possível:
+        Nao vejo necessidades do campo Source_id na query, pois ele não é utilizado em nenhum momento. Apendas para eliminacao do source
+        sera que nao seria melhor transferir essa informacao para a snp_locus?
+    """
+    def cleanupSNPMerges_nova(self):
+        self.log("Verifying SNP merge records...", level=logging.INFO, indent=0)
+        self.prepareTableForUpdate("snp_merge")  # DROP INDEX
+        dbc = self._db.cursor()
+
+        # self.flagTableUpdate("snp_merge") # Ja temos isso no prepareTableForUpdate
+
+        # Remover o índice antes da exclusão
+        # dbc.execute("DROP INDEX IF EXISTS snp_merge__merge_current;")
+
+        # Deletar os registros duplicados, mantendo apenas um por rsMerged
+        dbc.execute(
+            """
+            DELETE FROM snp_merge
+            WHERE _ROWID_ NOT IN (
+                SELECT MIN(_ROWID_) FROM snp_merge GROUP BY rsMerged
+            );
+            """
+        )
+
+        # Recriar o índice após a exclusão
+        # dbc.execute("CREATE INDEX snp_merge__merge_current ON snp_merge(rsMerged, rsCurrent);")
+        self.prepareTableForQuery("snp_merge")  # RECREATE INDEX
+
+        deleted_count = dbc.rowcount  # Conta quantos registros foram removidos
+        self.log(
+            f"OK: {deleted_count} duplicate SNP merges removed\n", level=logging.INFO, indent=0
+        )
+
+    
+    """
+    📌 O que essa query faz?
+        Ela insere dados na tabela snp_locus.
+        Os valores a serem inseridos vêm de uma consulta (SELECT) na mesma tabela snp_locus (sl), combinada (JOIN) com snp_merge (sm).
+        Ela pega todos os SNPs (rsMerged) que foram mesclados (snp_merge) e insere um novo registro para rsCurrent.
+    📌 Exemplo Prático
+        Tabelas Antes da Execução
+        Tabela snp_locus
+        rs	chr	pos	validated	source_id
+        1001	1	1234	1	10
+        1002	2	5678	0	20
+        Tabela snp_merge
+        rsMerged	rsCurrent
+        1001	2001
+        1002	2002
+        Após a Execução do INSERT
+        A query irá inserir novos registros na snp_locus, substituindo os SNPs antigos (rsMerged) pelos novos (rsCurrent):
+
+        Nova snp_locus após INSERT
+        rs	chr	pos	validated	source_id
+        1001	1	1234	1	10
+        1002	2	5678	0	20
+        2001	1	1234	1	10
+        2002	2	5678	0	20
+    🔴 Problema Possível: Duplicação de Dados
+        Esse INSERT não remove os registros antigos, apenas adiciona novas entradas com rsCurrent. Isso pode causar duplicação de dados, como no exemplo acima.
+    """
     def updateMergedSNPLoci(self):
         self.log("checking for merged SNP loci ...", level=logging.INFO, indent=0)
         self.prepareTableForQuery("snp_locus")
@@ -47,6 +125,10 @@ class UpdaterOperationsMixin:
             self.flagTableUpdate("snp_locus")
         self.log(" OK: %d loci copied\n" % (numCopied,), level=logging.INFO, indent=0)
 
+    """
+    Muito estranho esse metodo, pois eh rodado apos o updateMergedSNPLoci, que copia os registros da snp_locus para a snp_merge.
+    Para mim nao faz sentido esse methodo aqui.
+    """
     def cleanupSNPLoci(self):
         self.log("verifying SNP loci ...", level=logging.INFO, indent=0)
         self.prepareTableForQuery("snp_locus")
@@ -78,6 +160,10 @@ class UpdaterOperationsMixin:
             " OK: %d duplicate loci\n" % (len(cull),), level=logging.INFO, indent=0
         )
 
+
+    """
+    
+    """
     def updateMergedSNPEntrezRoles(self):
         self.log("checking for merged SNP roles ...", level=logging.INFO, indent=0)
         self.prepareTableForQuery("snp_entrez_role")

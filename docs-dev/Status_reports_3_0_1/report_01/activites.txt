@@ -86,12 +86,14 @@ mint
 pharmgkb
 oreganno
 UCSC-ucsc_ecr
-
-com Error
-chainfiles - Erro de Memoria
+chainfiles
 dbSNP
-Pfam - Erro no endereco de pagina
 
+
+com Error ou falltam
+entrez
+Pfam - Erro no endereco de pagina
+reactome
 
 
 
@@ -150,3 +152,18 @@ Novos inputs:
                 // "--update-except", "entrez", "dbsnp", "pfam", "oreganno", "go", "mint", "pharmgkb", "ucsc_ecr", "gwas", "chainfiles", "reactome",
                 // "--update-except", "biogrid", "dbsnp", "pfam", "oreganno", "go", "mint", "pharmgkb", "ucsc_ecr", "gwas", "chainfiles", "reactome",
                 // "--update-except", "biogrid", "entrez", "pfam", "oreganno", "go", "mint", "pharmgkb", "ucsc_ecr", "gwas", "chainfiles", "reactome",
+
+
+BUG: no Workflow ha no bloco 2 de pos processamento um liftover caso o hg seja diferente do definido na base. Isso usa a table Chain, talvez teremos que carregar essa tabela primeiro
+
+
+
+
+
+
+para segunda
+- ver com a Van para analisar os novos caminhos para o Pfam
+    ftp.ebi.ac.uk/pub/databases/Pfam/current_release/database_files/pfamA.txt.gz
+    ftp.ebi.ac.uk/pub/databases/Pfam/current_release/database_files/pfamA_reg_full_significant.txt.gz
+    ftp.ebi.ac.uk/pub/databases/Pfam/current_release/database_files/pfamseq.txt.gz
+

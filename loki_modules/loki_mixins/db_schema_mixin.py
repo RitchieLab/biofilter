@@ -157,6 +157,7 @@ class DbSchemaMixin:
             },  # .db.warning
             ##################################################
             # snp tables
+            # 🚧 TODO Revisar se vamos manter indice composto ou simples.
             "snp_merge": {
                 "table": """
                     (

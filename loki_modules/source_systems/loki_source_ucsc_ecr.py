@@ -177,7 +177,7 @@ class Source_ucsc_ecr(loki_source.Source):
                 indent=2,
             )
 
-            # PROCESS FASE
+            # PROCESS PHASE
             # ============
             self.log(
                 f"UCSC/{sp} - Starting the processing fase",
@@ -227,7 +227,7 @@ class Source_ucsc_ecr(loki_source.Source):
                 indent=indent_level,
             )
 
-            # INGESTIONS FASE
+            # INGESTIONS PHASE
             # ===============
             indent_ingestion_level = 6
             self.log(
