@@ -153,6 +153,7 @@ Novos inputs:
                 // "--update-except", "biogrid", "dbsnp", "pfam", "oreganno", "go", "mint", "pharmgkb", "ucsc_ecr", "gwas", "chainfiles", "reactome",
                 // "--update-except", "biogrid", "entrez", "pfam", "oreganno", "go", "mint", "pharmgkb", "ucsc_ecr", "gwas", "chainfiles", "reactome",
 
+"--list-sources", "biogrid", "entrez", "oreganno", "go", "mint", "pharmgkb", "ucsc_ecr", "gwas", "chainfiles", "reactome", "dbsnp"
 
 BUG: no Workflow ha no bloco 2 de pos processamento um liftover caso o hg seja diferente do definido na base. Isso usa a table Chain, talvez teremos que carregar essa tabela primeiro
 

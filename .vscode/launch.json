@@ -53,10 +53,8 @@
                 "--knowledge", "/Users/andrerico/Works/Sys/biofilter/data/loki.db",
                 "--update",
                 "--temp-directory", "/Users/andrerico/Works/Sys/biofilter/downloads",
-                "--list-sources", "entrez",
+                "--list-sources", "biogrid", "entrez", "oreganno", "go", "mint", "pharmgkb", "ucsc_ecr", "gwas", "chainfiles", "reactome", "dbsnp",
                 "--keep-download",
-                "--skip-download",
-                "--force-update"
             ],
             "console": "integratedTerminal"
         }
