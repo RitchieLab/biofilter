@@ -12,7 +12,7 @@ import logging
 # 🏗️ Improvements to this Mixin / Splitting the methods by PHASE
 # def updaterWorkflow(self):
 #     self._Preparation()
-#     self._Download()
+#     self._Download(x)
 #     self._ProcessAndIngestData()
 #     self._Metadata()
 #     self._RemoveDownload()
@@ -452,7 +452,7 @@ class UpdaterWorkflowMixin:
             # Eu preciso entender o que é isso e como funciona, pois realiza opreações no banco de dados
             # apos a atualização dos dados e esta consumindo muita memoria e tempo.
             
-            pos_processamento = True
+            pos_processamento = False
             if pos_processamento:
                 # 📍INICIO DO BLOCLO 1: Objetivo eh verificar se temos campos nulos em grch e ucschg na table Source, e alinhar com o que esta em UCSC site
                 #  Step 1: baixar o site do UCSC e extrair as informações de grch e ucschg

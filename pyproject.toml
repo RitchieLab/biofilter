@@ -8,12 +8,14 @@ homepage = "https://ritchielab.org"
 readme = "README.md"
 packages = [
     { include = "biofilter_modules" },
-    { include = "loki_modules" }
+    { include = "loki_modules" },
+    { include = "omics_modules" }
 ]
 
 [tool.poetry.scripts]
 biofilter = "biofilter_modules.biofilter:main"
 loki-build = "loki_modules.loki_build:main"
+omics-init = "omics_modules.init_db:init_db"
 
 [tool.poetry.dependencies]
 python = "^3.10"
@@ -28,6 +30,8 @@ logging = "^0.4.9.6"
 colorama = "^0.4.6"
 tqdm = "^4.67.1"
 psutil = "^6.1.1"
+sqlalchemy = "^2.0.37"
+aiosqlite = "^0.21.0"
 
 [tool.poetry.group.dev.dependencies]
 black = "^24.10.0"

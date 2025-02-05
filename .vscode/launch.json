@@ -50,13 +50,24 @@
             "request": "launch",
             "program": "${workspaceFolder}/loki_modules/loki_build.py",
             "args": [
-                "--knowledge", "/Users/andrerico/Works/Sys/biofilter/data/loki.db",
+                "--knowledge", "/Users/andrerico/Works/Sys/biofilter/data/loki_dbSNP.db",
                 "--update",
                 "--temp-directory", "/Users/andrerico/Works/Sys/biofilter/downloads",
-                "--list-sources", "biogrid", "entrez", "oreganno", "go", "mint", "pharmgkb", "ucsc_ecr", "gwas", "chainfiles", "reactome", "dbsnp",
+                "--list-sources", "dbsnp",
                 "--keep-download",
             ],
             "console": "integratedTerminal"
+        },
+        {
+            "name": "BUILD-OMICS",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/omics_modules/test_omicsdb.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}", 
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            }
         }
     ]
 }

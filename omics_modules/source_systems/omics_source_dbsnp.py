@@ -10,40 +10,40 @@ import urllib.request as urllib2
 from multiprocessing import cpu_count, Manager
 import multiprocessing
 from concurrent.futures import ProcessPoolExecutor
-from loki_modules import loki_source
-from loki_mixins import SourceUtilMixin
+from omics_modules import omics_source
+from omics_mixins import SourceUtilMixin
 
 
 # Classe principal que inicia o multiprocessamento
-class Source_dbsnp(loki_source.Source):
+class Source_dbsnp(omics_source.Source):
 
     _chmList = (
-        "1",
-        "2",
-        "3",
-        "4",
-        "5",
-        "6",
-        "7",
-        "8",
-        "9",
-        "10",
-        "11",
-        "12",
-        "13",
-        "14",
-        "15",
-        "16",
-        "17",
-        "18",
-        "19",
-        "20",
-        "21",
-        "22",
-        "X",
+        # "1",
+        # "2",
+        # "3",
+        # "4",
+        # "5",
+        # "6",
+        # "7",
+        # "8",
+        # "9",
+        # "10",
+        # "11",
+        # "12",
+        # "13",
+        # "14",
+        # "15",
+        # "16",
+        # "17",
+        # "18",
+        # "19",
+        # "20",
+        # "21",
+        # "22",
+        # "X",
         "Y",
-        "PAR",
-        "MT",
+        # "PAR",
+        # "MT",
     )
     _grcBuild = None
 
@@ -173,22 +173,22 @@ class Source_dbsnp(loki_source.Source):
         process_memory = psutil.Process()
         memory_bef = process_memory.memory_info().rss / (1024 * 1024)  # in MB
 
-        self.log(
-            f"dbSNP - Inicial memory {memory_bef:.2f} MB) ...",  # noqa: E501
-            level=logging.INFO,
-            indent=2,
-        )
-        self.log(
-            "dbSNP - Starting deletion of old records from the database ...",
-            level=logging.INFO,
-            indent=2,
-        )
+        # self.log(
+        #     f"dbSNP - Inicial memory {memory_bef:.2f} MB) ...",  # noqa: E501
+        #     level=logging.INFO,
+        #     indent=2,
+        # )
+        # self.log(
+        #     "dbSNP - Starting deletion of old records from the database ...",
+        #     level=logging.INFO,
+        #     indent=2,
+        # )
         self.deleteAll()  # will drop by Source ID
-        self.log(
-            "dbSNP - Old records deletion completed",
-            level=logging.INFO,
-            indent=2,
-        )
+        # self.log(
+        #     "dbSNP - Old records deletion completed",
+        #     level=logging.INFO,
+        #     indent=2,
+        # )
 
         # process merge report (no header!)
         # NOTE: Temp desativado pra deploment.
@@ -208,7 +208,7 @@ class Source_dbsnp(loki_source.Source):
             [comment] [varchar](255) NULL
             )
             """
-            self.log("processing SNP merge records ...\n")
+            # self.log("processing SNP merge records ...\n")
             mergeFile = self.zfile(
                 path + "/RsMergeArch.bcp.gz"
             )  # TODO:context manager,iterator
@@ -228,29 +228,29 @@ class Source_dbsnp(loki_source.Source):
                 # to keep memory usage down
                 if len(setMerge) >= 2500000:
                     numMerge += len(setMerge)
-                    self.log(
-                        "processing SNP merge records: ~%1.1f million so far\n"
-                        % (numMerge / 1000000.0)
-                    )  # TODO: time estimate
-                    self.log("writing SNP merge records to the database ...\n")
+                    # self.log(
+                    #     "processing SNP merge records: ~%1.1f million so far\n"
+                    #     % (numMerge / 1000000.0)
+                    # )  # TODO: time estimate
+                    # self.log("writing SNP merge records to the database ...\n")
                     # SNP_MERGE TABLE: [reMerged, rsCurrent, source_id]
                     self.addSNPMerges(setMerge)
                     setMerge = set()
-                    self.log(
-                        "writing SNP merge records to the database completed\n"
-                    )  # noqa E501
+                    # self.log(
+                    #     "writing SNP merge records to the database completed\n"
+                    # )  # noqa E501
             # foreach line in mergeFile
             numMerge += len(setMerge)
-            self.log(
-                "processing SNP merge records completed: ~%d merged RS#s\n"
-                % numMerge  # noqa E501
-            )
+            # self.log(
+            #     "processing SNP merge records completed: ~%d merged RS#s\n"
+            #     % numMerge  # noqa E501
+            # )
             if setMerge:
-                self.log("writing SNP merge records to the database ...\n")
+                # self.log("writing SNP merge records to the database ...\n")
                 self.addSNPMerges(setMerge) # Talves nao reciar o indice aqui
-                self.log(
-                    "writing SNP merge records to the database completed\n"
-                )  # noqa E501
+                # self.log(
+                #     "writing SNP merge records to the database completed\n"
+                # )  # noqa E501
             setMerge = None
         # if merges
 
@@ -273,7 +273,7 @@ class Source_dbsnp(loki_source.Source):
             [SO_id] [varchar](32) NULL
             )
             """
-            self.log("processing SNP role codes ...\n")
+            # self.log("processing SNP role codes ...\n")
             roleID = dict()
             codeFile = self.zfile(path + "/SnpFunctionCode.bcp.gz")
             for line in codeFile:
@@ -294,9 +294,9 @@ class Source_dbsnp(loki_source.Source):
 
                 roleID[code] = self.addRole(name, desc, coding, exon)
             # foreach line in codeFile
-            self.log(
-                "processing SNP role codes completed: %d codes\n" % len(roleID)
-            )  # noqa E501
+            # self.log(
+            #     "processing SNP role codes completed: %d codes\n" % len(roleID)
+            # )  # noqa E501
 
             # process SNP roles
             """ /* from human_9606_table.sql.gz */
@@ -332,7 +332,7 @@ class Source_dbsnp(loki_source.Source):
             [verComp] [int] NULL
             )
             """
-            self.log("processing SNP roles ...\n")
+            # self.log("processing SNP roles ...\n")
             setRole = set()
             numRole = numOrphan = numInc = 0
             setOrphan = set()
@@ -366,35 +366,37 @@ class Source_dbsnp(loki_source.Source):
                 # to keep memory usage down
                 if len(setRole) >= 2500000:
                     numRole += len(setRole)
-                    self.log(
-                        "processing SNP roles: ~%1.1f million so far\n"
-                        % (numRole / 1000000.0)
-                    )  # TODO: time estimate
-                    self.log("writing SNP roles to the database ...\n")
+                    # self.log(
+                    #     "processing SNP roles: ~%1.1f million so far\n"
+                    #     % (numRole / 1000000.0)
+                    # )  # TODO: time estimate
+                    # self.log("writing SNP roles to the database ...\n")
                     self.addSNPEntrezRoles(setRole)
                     setRole = set()
-                    self.log("writing SNP roles to the database completed\n")
+                    # self.log("writing SNP roles to the database completed\n")
 
             roleID = None
             # foreach line in funcFile
             numRole += len(setRole)
-            self.log(
-                "processing SNP roles completed: ~%d roles\n" % (numRole,)
-            )  # noqa E501
+            # self.log(
+            #     "processing SNP roles completed: ~%d roles\n" % (numRole,)
+            # )  # noqa E501
             if setRole:
-                self.log("writing SNP roles to the database ...\n")
+                # self.log("writing SNP roles to the database ...\n")
                 self.addSNPEntrezRoles(setRole)
-                self.log("writing SNP roles to the database completed\n")
+                # self.log("writing SNP roles to the database completed\n")
             setRole = None
 
             # warn about orphans
             if setOrphan:
-                self.log(
-                    "WARNING: %d roles (%d codes) unrecognized\n"
-                    % (numOrphan, len(setOrphan))
-                )
+                # self.log(
+                #     "WARNING: %d roles (%d codes) unrecognized\n"
+                #     % (numOrphan, len(setOrphan))
+                # )
+                pass
             if numInc:
-                self.log("WARNING: %d roles incomplete\n" % (numInc,))
+                # self.log("WARNING: %d roles incomplete\n" % (numInc,))
+                pass
             setOrphan = None
         # if roles
 
@@ -416,11 +418,11 @@ class Source_dbsnp(loki_source.Source):
 
         # Define cores to use [TODO create a parameter]
         num_workers = min(cpu_count() - 2, len(self._chmList))
-        self.log(
-            f"dbSNP - Setup {num_workers} workers to process the data",
-            level=logging.INFO,
-            indent=2,
-        )
+        # self.log(
+        #     f"dbSNP - Setup {num_workers} workers to process the data",
+        #     level=logging.INFO,
+        #     indent=2,
+        # )
 
         # PROCESS PHASE
         # ==========================
@@ -431,11 +433,11 @@ class Source_dbsnp(loki_source.Source):
         processed_files = {}
         result = {}
 
-        self.log(
-            "dbSNP - Starting workers in Multiprocessing mode",
-            level=logging.INFO,
-            indent=2,
-        )
+        # self.log(
+        #     "dbSNP - Starting workers in Multiprocessing mode",
+        #     level=logging.INFO,
+        #     indent=2,
+        # )
 
         # Run the processing inside a safe Executor
         with ProcessPoolExecutor(max_workers=num_workers) as executor:
@@ -464,35 +466,35 @@ class Source_dbsnp(loki_source.Source):
 
         process_time = time.time()
         process_finish = (process_time - start_time) / 60  # time in minutes
-        self.log(
-            f"dbSNP - Workers completed the processing in {process_finish:.2f} minutes.",  # noqa: E501
-            level=logging.INFO,
-            indent=2,
-        )
+        # self.log(
+        #     f"dbSNP - Workers completed the processing in {process_finish:.2f} minutes.",  # noqa: E501
+        #     level=logging.INFO,
+        #     indent=2,
+        # )
 
         # INGESTION PHASE
         # ==========================
         ingestion_start = time.time()
         v_indent = 4
-        self.log(
-            "dbSNP - Starting ingestion data fase",
-            level=logging.INFO,
-            indent=2,
-        )
+        # self.log(
+        #     "dbSNP - Starting ingestion data fase",
+        #     level=logging.INFO,
+        #     indent=2,
+        # )
 
-        self.log(
-            "dbSNP - Setup batch size to 1M records",
-            level=logging.INFO,
-            indent=2,
-        )
+        # self.log(
+        #     "dbSNP - Setup batch size to 1M records",
+        #     level=logging.INFO,
+        #     indent=2,
+        # )
         batch_size = 1000000  # TODO create a parameter to set batch size
 
         for key, (output_file, msn) in processed_files.items():
-            self.log(
-                f"dbSNP - Starting the ingesting to chromosome {key}",
-                level=logging.INFO,
-                indent=v_indent,
-            )
+            # self.log(
+            #     f"dbSNP - Starting the ingesting to chromosome {key}",
+            #     level=logging.INFO,
+            #     indent=v_indent,
+            # )
 
             with open(output_file, mode="r") as f:
                 reader = csv.reader(f)
@@ -527,18 +529,18 @@ class Source_dbsnp(loki_source.Source):
             buffer.clear()
             os.remove(output_file)  # 🔥 Drop temp csv files
 
-            self.log(
-                f"dbSNP - Removed temp files to {key} chromosome data",
-                level=logging.INFO,
-                indent=v_indent,
-            )
+            # self.log(
+            #     f"dbSNP - Removed temp files to {key} chromosome data",
+            #     level=logging.INFO,
+            #     indent=v_indent,
+            # )
             end_time = time.time()
             ingestion_stop = (end_time - ingestion_start) / 60
-            self.log(
-                f"dbSNP - 🎯 Ingestion for chromosome {key} completed in {ingestion_stop:.2f} minutes.",  # noqa E501
-                level=logging.INFO,
-                indent=v_indent,
-            )
+            # self.log(
+            #     f"dbSNP - 🎯 Ingestion for chromosome {key} completed in {ingestion_stop:.2f} minutes.",  # noqa E501
+            #     level=logging.INFO,
+            #     indent=v_indent,
+            # )
 
         # store source metadata
         self.setSourceBuilds(self._grcBuild, None)
@@ -547,16 +549,16 @@ class Source_dbsnp(loki_source.Source):
         end_time = time.time()
         elapsed_time_minutes = (end_time - start_time) / 60  # time in minutes
         memory_after = process_memory.memory_info().rss / (1024 * 1024)  # MB
-        self.log(
-            f"dbSNP - Final memory: {memory_after:.2f} MB. Alocated memory: {memory_after - memory_bef:.2f} MB.",  # noqa: E501
-            level=logging.INFO,
-            indent=2,
-        )
-        self.log(
-            f"dbSNP - Update completed in {elapsed_time_minutes:.2f} minutes.",  # noqa: E501
-            level=logging.CRITICAL,
-            indent=2,
-        )
+        # self.log(
+        #     f"dbSNP - Final memory: {memory_after:.2f} MB. Alocated memory: {memory_after - memory_bef:.2f} MB.",  # noqa: E501
+        #     level=logging.INFO,
+        #     indent=2,
+        # )
+        # self.log(
+        #     f"dbSNP - Update completed in {elapsed_time_minutes:.2f} minutes.",  # noqa: E501
+        #     level=logging.CRITICAL,
+        #     indent=2,
+        # )
 
     # update(🎯)
 
