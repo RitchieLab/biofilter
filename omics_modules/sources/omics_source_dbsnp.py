@@ -11,7 +11,7 @@ from multiprocessing import cpu_count, Manager
 import multiprocessing
 from concurrent.futures import ProcessPoolExecutor
 from omics_modules import omics_source
-from omics_mixins import SourceUtilMixin
+from mixins import SourceUtilMixin
 
 
 # Classe principal que inicia o multiprocessamento

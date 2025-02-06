@@ -1,8 +1,8 @@
-from omics_modules.omics_logger import OmicsLogger
-from omics_modules.omics_mixins import OmicsDBConfigMixin
+from logger import Logger
+from mixins import DBConfigMixin
 
 
-class Database(OmicsDBConfigMixin):
+class Database(DBConfigMixin):
     """
     Manages database connection and applies performance optimizations.
     """
@@ -26,9 +26,11 @@ class Database(OmicsDBConfigMixin):
         self._temp_mem = temp_mem
         self._verbose = True
         self._dbFile = dbFile
+        if isinstance(dbFile, tuple) or isinstance(dbFile, list):
+            self._dbFile = dbFile[0]
         self._updater = None
         self._dbURL = f"sqlite:///{self._dbFile}"
-        self.logger = OmicsLogger()
+        self.logger = Logger()
 
         # Ensure database exists and is valid
         self.initialize_database()

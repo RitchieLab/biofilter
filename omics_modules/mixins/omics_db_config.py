@@ -1,13 +1,14 @@
-from sqlalchemy import text, create_engine, inspect
-from sqlalchemy.orm import sessionmaker
 import os
 import logging
-from omics_modules.models import Base  # Importando Base corretamente
+from sqlalchemy import text, create_engine, inspect
+from sqlalchemy.orm import sessionmaker
+from models import Base
 
 
-class OmicsDBConfigMixin:
+class DBConfigMixin:
     """
-    Mixin for managing database initialization, integrity checks, and performance settings.
+    Mixin for managing database initialization, integrity checks, and
+    performance settings.
     """
 
     def initialize_database(self):
@@ -79,19 +80,20 @@ class OmicsDBConfigMixin:
                 conn.execute(text("PRAGMA cache_size = -65536"))
                 conn.execute(text("PRAGMA synchronous = OFF"))
 
-                journal_mode = "MEMORY" if updating else "WAL"
-                conn.execute(text(f"PRAGMA journal_mode = {journal_mode}"))
+                # NOTE / TODO Rever essa configuração
+                # journal_mode = "MEMORY" if updating else "WAL"
+                # conn.execute(text(f"PRAGMA journal_mode = {journal_mode}"))
 
-                if temp_mem:
-                    conn.execute(text("PRAGMA temp_store = MEMORY"))
+                # if temp_mem:
+                #     conn.execute(text("PRAGMA temp_store = MEMORY"))
 
-                locking_mode = "EXCLUSIVE" if updating else "NORMAL"
-                conn.execute(text(f"PRAGMA locking_mode = {locking_mode}"))
+                # locking_mode = "EXCLUSIVE" if updating else "NORMAL"
+                # conn.execute(text(f"PRAGMA locking_mode = {locking_mode}"))
 
             self.logger.log("[INFO] Database configured successfully!")
 
         except Exception as e:
-            self.logger.log(f"[ERROR] Database configuration failed: {e}", logging.ERROR)
+            self.logger.log(f"[ERROR] Database configuration failed: {e}")
             raise
 
     def drop_indexes(self):

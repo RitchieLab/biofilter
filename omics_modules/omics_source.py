@@ -1,9 +1,10 @@
 import apsw
-from omics_modules.omics_logger import OmicsLogger
-from omics_modules.omics_mixins.omics_source_ingestion import OmicsIngestionMixin
+from omics_modules.logger import Logger
+from omics_modules.mixins.omics_source_ingestion import OmicsIngestionMixin
+from omics_modules.mixins.omics_source_download import SourceConnectorMixin
 
 
-class Source(OmicsIngestionMixin):
+class Source(OmicsIngestionMixin, SourceConnectorMixin):
     """
     Base class for data sources, providing APSW connection and utility methods.
     """
@@ -15,7 +16,8 @@ class Source(OmicsIngestionMixin):
         Args:
             db (OmicsDB): The OmicsDB instance containing database configuration.
         """
-        self.logger = OmicsLogger()
+        self.datasource_id = None
+        self.logger = Logger()
         self._alchemy_db = db  # SQLAlchemy connection object
         self._dbFile = self._alchemy_db._dbFile  # Extract database file path
         self._apsw_db = apsw.Connection(self._dbFile)  # APSW connection

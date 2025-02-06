@@ -59,10 +59,10 @@
             "console": "integratedTerminal"
         },
         {
-            "name": "BUILD-OMICS",
+            "name": "OMICS: BUILDER",
             "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceFolder}/omics_modules/test_omicsdb.py",
+            "program": "${workspaceFolder}/omics_modules/builder.py",
             "console": "integratedTerminal",
             "cwd": "${workspaceFolder}", 
             "env": {

@@ -20,10 +20,10 @@ class SourceConnectorMixin:
         # remFiles=function(ftp) or
         # {'filename.ext':'/path/on/remote/host/to/filename.ext',...}
         # connect to source server
-        self.log(
-            "connecting to FTP server %s ..." % remHost,
-            level=logging.INFO,
-        )  # noqa E501
+        # self.log(
+        #     "connecting to FTP server %s ..." % remHost,
+        #     level=logging.INFO,
+        # )  # noqa E501
         ftp = ftplib.FTP(remHost, timeout=21600)
         ftp.login()  # anonymous
         self.log(" OK\n", level=logging.INFO)
@@ -97,13 +97,14 @@ class SourceConnectorMixin:
                 remSize[remFiles[locPath]] == locSize[locPath]
                 and remTime[remFiles[locPath]] <= locTime[locPath]
             ):
-                self.log(
-                    "%s: up to date\n" % locPath, level=logging.INFO, indent=1
-                )  # noqa E501
+                # self.log(
+                #     "%s: up to date\n" % locPath, level=logging.INFO, indent=1
+                # )  # noqa E501
+                pass
             else:
-                self.log(
-                    "%s: downloading ...\n" % locPath, level=logging.INFO
-                )  # noqa E501
+                # self.log(
+                #     "%s: downloading ...\n" % locPath, level=logging.INFO
+                # )  # noqa E501
                 # TODO: download to temp file, then rename?
                 with open(locPath, "wb") as locFile:
                     # ftp.cwd(remFiles[locPath][0:remFiles[locPath].rfind('/')])
@@ -111,7 +112,7 @@ class SourceConnectorMixin:
 
                 # TODO: verify file size and retry a few times if necessary
 
-                self.log("... OK\n", level=logging.INFO, indent=1)
+                # self.log("... OK\n", level=logging.INFO, indent=1)
 
             modTime = time.mktime(remTime[remFiles[locPath]].utctimetuple())
             os.utime(locPath, (modTime, modTime))
@@ -122,11 +123,11 @@ class SourceConnectorMixin:
         except Exception:
             ftp.close()
 
-        self.log(
-            "... OK\n",
-            level=logging.INFO,
-            indent=0,
-        )
+        # self.log(
+        #     "... OK\n",
+        #     level=logging.INFO,
+        #     indent=0,
+        # )
 
     def getHTTPHeaders(self, remHost, remURL, reqData=None, reqHeaders=None):
         class NoRedirection(urllib2.HTTPErrorProcessor):
@@ -198,11 +199,11 @@ class SourceConnectorMixin:
                 try:
                     link = remProtocol + "://" + remHost + remFiles[locPath]
 
-                    self.log(
+                    self.logger.log(
                         # f"{locPath}: downloading (attempt {retries + 1}/{max_retries}) ...",  # noqa E501
                         f"Downloading (attempt {retries + 1}/{max_retries}) from {link}",  # noqa E501
-                        level=logging.INFO,
-                        indent=_indent
+                        # level=logging.INFO,
+                        # indent=_indent
                     )
 
                     if remProtocol == "https":
@@ -237,38 +238,38 @@ class SourceConnectorMixin:
                 except Exception as e:
                     retries += 1
                     # print('❌ Error occurred during download.')
-                    self.log(
-                        f"Error downloading (attempt {retries}/{max_retries}): {str(e)}",  # noqa E501
-                        level=logging.ERROR,
-                        indent=_indent,
-                    )
+                    # self.log(
+                    #     f"Error downloading (attempt {retries}/{max_retries}): {str(e)}",  # noqa E501
+                    #     level=logging.ERROR,
+                    #     indent=_indent,
+                    # )
                     if retries < max_retries:
-                        self.log(
-                            f"Retrying download in {retry_delay} seconds.",
-                            level=logging.WARNING,
-                            indent=_indent,
-                        )
+                        # self.log(
+                        #     f"Retrying download in {retry_delay} seconds.",
+                        #     level=logging.WARNING,
+                        #     indent=_indent,
+                        # )
                         time.sleep(retry_delay)
-                    else:
-                        self.log(
-                            f"Max retries reached for {locPath}. Skipping this file.",  # noqa E501
-                            level=logging.WARNING,
-                            indent=_indent,
-                        )
+                    # else:
+                    #     self.log(
+                    #         f"Max retries reached for {locPath}. Skipping this file.",  # noqa E501
+                    #         level=logging.WARNING,
+                    #         indent=_indent,
+                    #     )
 
             # If not successful after all attempts, log the final error
             if not success:
-                self.log(
-                    f"Failed to download {locPath} after {max_retries} attempts.",  # noqa E501
-                    level=logging.ERROR,
-                    indent=_indent,
-                )
+                # self.log(
+                #     f"Failed to download {locPath} after {max_retries} attempts.",  # noqa E501
+                #     level=logging.ERROR,
+                #     indent=_indent,
+                # )
                 # Opcional: raise para interromper o processo completamente
                 # raise RuntimeError(f"Failed to download {locPath}")
                 continue
 
-        self.log(
-            "All downloads completed.",
-            level=logging.INFO,
-            indent=_indent
-        )
+        # self.log(
+        #     "All downloads completed.",
+        #     level=logging.INFO,
+        #     indent=_indent
+        # )

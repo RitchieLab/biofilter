@@ -22,8 +22,8 @@ class DataSource(Base):
     last_update = Column(DateTime, nullable=True)  # Data da última atualização bem-sucedida
     last_status = Column(String, nullable=False, default="pending")  # "success", "failed", "running"
     active = Column(Boolean, default=True)  # Indica se o data source está ativo
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.datetime.now(datetime.timezone.utc))
+    updated_at = Column(DateTime, default=lambda: datetime.datetime.now(datetime.timezone.utc), onupdate=lambda: datetime.datetime.now(datetime.timezone.utc))
 
 
 class WorkProcess(Base):

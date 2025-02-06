@@ -3,13 +3,13 @@ import os
 from colorama import init, Fore, Style
 
 
-class OmicsLogger:
+class Logger:
     """
     Singleton class to manage logs in a centralized way with colors in the
     terminal.
     """
 
-    _instance = None  # Armazena a instância única
+    _instance = None  # Stores the singleton instance
 
     LOG_LEVELS = {
         "DEBUG": logging.DEBUG,
@@ -19,33 +19,33 @@ class OmicsLogger:
         "CRITICAL": logging.CRITICAL,
     }
 
-    def __new__(cls, log_file="omics.log", log_level=logging.INFO):
+    def __new__(cls, log_file="omics.log", log_level="INFO"):
         if cls._instance is None:
-            cls._instance = super(OmicsLogger, cls).__new__(cls)
+            cls._instance = super(Logger, cls).__new__(cls)
             cls._instance._initialize(log_file, log_level)
         return cls._instance
 
     def _initialize(self, log_file, log_level):
-        """Inicializa a configuração do logger."""
-        init(autoreset=True)  # Ativa cores no terminal
+        """Initializes the logger configuration."""
+        init(autoreset=True)  # Enables color formatting in terminal
 
         self.logger = logging.getLogger("OmicsLogger")
-        self.logger.setLevel(log_level)
+        self.logger.setLevel(self.LOG_LEVELS.get(log_level.upper(), logging.INFO))
 
-        # Criando handler para arquivo de log
-        log_path = os.path.join(os.getcwd(), log_file)
-        file_handler = logging.FileHandler(log_path)
-        file_handler.setFormatter(
-            logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
-            )  # noqa E501
+        # ✅ Prevent duplicate handlers
+        if not self.logger.hasHandlers():
+            # Creating file handler
+            log_path = os.path.join(os.getcwd(), log_file)
+            file_handler = logging.FileHandler(log_path)
+            file_handler.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(message)s"))
 
-        # Criando handler para console com cores
-        console_handler = logging.StreamHandler()
-        console_handler.setFormatter(self.ColoredFormatter())
+            # Creating console handler with color formatting
+            console_handler = logging.StreamHandler()
+            console_handler.setFormatter(self.ColoredFormatter())
 
-        # Adiciona os handlers ao logger
-        self.logger.addHandler(file_handler)
-        self.logger.addHandler(console_handler)
+            # Adding handlers only if not already added
+            self.logger.addHandler(file_handler)
+            self.logger.addHandler(console_handler)
 
     def log(self, message, level="INFO"):
         """
@@ -55,19 +55,17 @@ class OmicsLogger:
             message (str): The message to be logged.
             level (str): Log level (DEBUG, INFO, WARNING, ERROR, CRITICAL).
         """
-        level = self.LOG_LEVELS.get(level.upper(), logging.INFO)  # Convert string to logging level
-        if self.logger:
-            self.logger.log(level, message)
+        log_level = self.LOG_LEVELS.get(level.upper(), logging.INFO)
+        self.logger.log(log_level, message)
 
     def set_log_level(self, log_level):
-        """Permite mudar dinamicamente o nível de log."""
-        # self.logger.setLevel(self.LOG_LEVELS.get(log_level.upper(), logging.INFO))
+        """Allows changing the log level dynamically."""
         level = self.LOG_LEVELS.get(log_level.upper(), logging.INFO)
         self.logger.setLevel(level)
-        print(f"[DEBUG] Logger level set to {log_level.upper()}")  # Debugging the logger level
+        self.log(f"Logger level set to {log_level.upper()}", "DEBUG")
 
     class ColoredFormatter(logging.Formatter):
-        """Formatter para adicionar cores ao console."""
+        """Formatter that adds colors to console output."""
         COLORS = {
             logging.DEBUG: Fore.CYAN,
             logging.INFO: Fore.GREEN,
@@ -78,7 +76,8 @@ class OmicsLogger:
 
         def format(self, record):
             log_color = self.COLORS.get(record.levelno, Fore.WHITE)
-            return f"{log_color}[{record.levelname}] {record.msg}{Style.RESET_ALL}"  # noqa E501
+            return f"{log_color}[{record.levelname}] {record.msg}{Style.RESET_ALL}"
+
 
 # 🛠️ HOW TO USE IT:
 # from omics_modules.logger import OmicsLogger

@@ -6,6 +6,31 @@ class OmicsIngestionMixin:
     Mixin for fast data ingestion using APSW.
     """
 
+    def deleteAll(self):
+        """
+        Deletes all records for the current dataset_id from the specified tables.
+        """
+        tables = [
+            "snpmerges",
+            "snps",
+        ]
+
+        try:
+            with self._apsw_db:
+                cursor = self._apsw_db.cursor()
+
+                for table in tables:
+                    sql = f"DELETE FROM {table} WHERE source = ?"
+                    cursor.execute(sql, (self.dataset_id,))  # Passa dataset_id corretamente como tuple
+                
+            self.logger.log("[INFO] All related records deleted successfully.")
+
+        except apsw.ConstraintError as e:
+            self.logger.log(f"[WARNING] Constraint error: {e}", level="WARNING")
+        except Exception as e:
+            self.logger.log(f"[ERROR] Deletion failed: {e}", level="ERROR")
+
+
     def add_snps(self, load_data):
         sql = (
             "INSERT OR IGNORE INTO snps "
