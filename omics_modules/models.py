@@ -82,12 +82,12 @@ class SNP(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     rs_source = Column(Integer, nullable=True, index=True)  # Ex: 9411893
-    rs_current = Column(Integer, index=True, nullable=False)  # Ex: 3007669
+    # rs_current = Column(Integer, index=True, nullable=False)  # Ex: 3007669
     chromosome = Column(SmallInteger, nullable=False)  # Ex: 1-22, 23 (X), 24 (Y), 25 (MT)
     position = Column(Integer, nullable=False)  # SNP position in the chromosome
-    reference_allele = Column(String, nullable=False)  # Ref Allele (ex: "A", "GTC", "")
-    alternate_allele = Column(String, nullable=False)  # Alt Allele (ex: "G", "", "TCG")
-    variation_type = Column(String, nullable=False)  # "SNP", "Insertion", "Deletion"
+    reference_allele = Column(String, nullable=True)  # Ref Allele (ex: "A", "GTC", "")
+    alternate_allele = Column(String, nullable=True)  # Alt Allele (ex: "G", "", "TCG")
+    variation_type = Column(String, nullable=True)  # "SNP", "Insertion", "Deletion"
     build_source = Column(String, nullable=True)  # Ex: "GRCh38"
     valid = Column(Boolean, default=True)  # Indication if this SNP is currently valid
     source = Column(String, nullable=True)  # Ex: "dbSNP", "1000 Genomes"

@@ -17,8 +17,8 @@ from .omics_updater_download import UpdaterDownloadMixin
 
 # omics_source.Source
 from .omics_source_download import SourceConnectorMixin
-# from .omics_source_ingestion import
-from .omics_source_utils import SourceUtilMixin
+from .omics_source_ingestion import SourceIngestionMixin
+from .omics_source_utils import SourceUtilsMixin
 
 __all__ = [
     "DBConfigMixin",
@@ -27,6 +27,7 @@ __all__ = [
     "UpdaterDownloadMixin",
     "UpdaterLiftOverMixin",
     "UpdaterOperationsMixin",
-    "SourceUtilMixin",
+    "SourceUtilsMixin",
+    "SourceIngestionMixin",
     "SourceConnectorMixin",
 ]

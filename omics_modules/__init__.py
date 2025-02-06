@@ -9,12 +9,13 @@ from builder import main  # noqa E402
 from mixins import (  # noqa E402
     DBConfigMixin,
     UpdaterWorkflowMixin,
+    UpdaterSourceMixin,
     UpdaterDownloadMixin,
     UpdaterLiftOverMixin,
     UpdaterOperationsMixin,
-    SourceUtilMixin,
+    SourceUtilsMixin,
     SourceConnectorMixin,
-    UpdaterSourceMixin,
+    SourceIngestionMixin,
 )
 
 __all__ = [
@@ -26,7 +27,8 @@ __all__ = [
     "UpdaterDownloadMixin",
     "UpdaterLiftOverMixin",
     "UpdaterOperationsMixin",
-    "SourceUtilMixin",
+    "SourceUtilsMixin",
     "SourceConnectorMixin",
+    "SourceIngestionMixin",
     "UpdaterSourceMixin",
 ]

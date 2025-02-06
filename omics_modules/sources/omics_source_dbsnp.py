@@ -3,7 +3,7 @@ import os
 import re
 import gc
 import csv
-import logging
+# import logging
 import psutil
 import time
 import urllib.request as urllib2
@@ -11,7 +11,7 @@ from multiprocessing import cpu_count, Manager
 import multiprocessing
 from concurrent.futures import ProcessPoolExecutor
 from omics_modules import omics_source
-from mixins import SourceUtilMixin
+from mixins import SourceUtilsMixin
 
 
 # Classe principal que inicia o multiprocessamento
@@ -65,13 +65,20 @@ class Source_dbsnp(omics_source.Source):
     @classmethod
     def getOptions(cls):
         return {
-            "unvalidated": "[yes|no]  --  store SNP loci which have not been validated (default: yes)",  # noqa E501
-            "suspect": "[yes|no]  --  store SNP loci which are suspect (default: no)",  # http://www.ncbi.nlm.nih.gov/projects/SNP/docs/rs_attributes.html#suspect  # noqa E501
-            "withdrawn": "[yes|no]  --  store SNP loci which have been withdrawn (default: no)",  # noqa E501
-            "loci": "[all|validated]  --  store all or only validated SNP loci (default: validat`dddded)",  # noqa E501
-            "merges": "[yes|no]  --  process and store RS# merge history (default: yes)",  # noqa E501
-            "roles": "[yes|no]  --  process and store SNP roles (default: no)",  # noqa E501
+            "unvalidated": "yes",
+            "suspect": "no",
+            "withdrawn": "no",
+            "merges": "no",
+            "roles": "no",
         }
+        # return {
+        #     "unvalidated": "[yes|no]  --  store SNP loci which have not been validated (default: yes)",  # noqa E501
+        #     "suspect": "[yes|no]  --  store SNP loci which are suspect (default: no)",  # http://www.ncbi.nlm.nih.gov/projects/SNP/docs/rs_attributes.html#suspect  # noqa E501
+        #     "withdrawn": "[yes|no]  --  store SNP loci which have been withdrawn (default: no)",  # noqa E501
+        #     "loci": "[all|validated]  --  store all or only validated SNP loci (default: validat`dddded)",  # noqa E501
+        #     "merges": "[yes|no]  --  process and store RS# merge history (default: yes)",  # noqa E501
+        #     "roles": "[yes|no]  --  process and store SNP roles (default: no)",  # noqa E501
+        # }
 
     def validateOptions(self, options):
         options.setdefault("unvalidated", "yes")
@@ -95,30 +102,30 @@ class Source_dbsnp(omics_source.Source):
 
     def download(self, options, path):
         # define a callback to identify the latest SNPContigLocusId file
-        def remFilesCallback(ftp, path):
-            remFiles = dict()
-            for chm in self._chmList:
-                remFiles[path + "/chr_" + chm + ".txt.gz"] = (
-                    "/snp/organisms/human_9606/chr_rpts/chr_%s.txt.gz" % chm
-                )
+        # def remFilesCallback(ftp, path):
+        #     remFiles = dict()
+        #     for chm in self._chmList:
+        #         remFiles[path + "/chr_" + chm + ".txt.gz"] = (
+        #             "/snp/organisms/human_9606/chr_rpts/chr_%s.txt.gz" % chm
+        #         )
 
-            if options["merges"] == "yes":
-                remFiles[path + "/RsMergeArch.bcp.gz"] = (
-                    "/snp/organisms/human_9606/database/organism_data/RsMergeArch.bcp.gz"  # noqa E501
-                )
+        #     if options["merges"] == "yes":
+        #         remFiles[path + "/RsMergeArch.bcp.gz"] = (
+        #             "/snp/organisms/human_9606/database/organism_data/RsMergeArch.bcp.gz"  # noqa E501
+        #         )
 
-            if options.get["roles"] == "yes":
-                remFiles[path + "/SnpFunctionCode.bcp.gz"] = (
-                    "/snp/organisms/database/shared_data/SnpFunctionCode.bcp.gz"  # noqa E501
-                )
-                urlpath = "/snp/organisms/human_9606/database/organism_data"
-                ftp.cwd(urlpath)
-                bestfile = self._identifyLatestSNPContig(ftp.nlst())
+        #     if options.get["roles"] == "yes":
+        #         remFiles[path + "/SnpFunctionCode.bcp.gz"] = (
+        #             "/snp/organisms/database/shared_data/SnpFunctionCode.bcp.gz"  # noqa E501
+        #         )
+        #         urlpath = "/snp/organisms/human_9606/database/organism_data"
+        #         ftp.cwd(urlpath)
+        #         bestfile = self._identifyLatestSNPContig(ftp.nlst())
 
-                if bestfile:
-                    remFiles[bestfile] = "%s/%s" % (urlpath, bestfile)
+        #         if bestfile:
+        #             remFiles[bestfile] = "%s/%s" % (urlpath, bestfile)
 
-            return remFiles
+        #     return remFiles
 
         remFiles = dict()
         for chm in self._chmList:
@@ -175,24 +182,14 @@ class Source_dbsnp(omics_source.Source):
 
         # self.log(
         #     f"dbSNP - Inicial memory {memory_bef:.2f} MB) ...",  # noqa: E501
-        #     level=logging.INFO,
-        #     indent=2,
         # )
         # self.log(
         #     "dbSNP - Starting deletion of old records from the database ...",
-        #     level=logging.INFO,
-        #     indent=2,
         # )
         self.deleteAll()  # will drop by Source ID
-        # self.log(
-        #     "dbSNP - Old records deletion completed",
-        #     level=logging.INFO,
-        #     indent=2,
-        # )
+
 
         # process merge report (no header!)
-        # NOTE: Temp desativado pra deploment.
-        # if 3 == 4:
         if options.get("merges", "yes") == "yes":
             """/* from human_9606_table.sql.gz */
             CREATE TABLE [RsMergeArch]
@@ -211,7 +208,7 @@ class Source_dbsnp(omics_source.Source):
             # self.log("processing SNP merge records ...\n")
             mergeFile = self.zfile(
                 path + "/RsMergeArch.bcp.gz"
-            )  # TODO:context manager,iterator
+            ) 
             numMerge = 0
             setMerge = set()
             for line in mergeFile:
@@ -222,7 +219,7 @@ class Source_dbsnp(omics_source.Source):
                 # rsNew = int(words[1])
                 rsCur = int(words[6])
 
-                setMerge.add((rsOld, rsCur))
+                setMerge.add((rsOld, rsCur, self.datasource_id))
 
                 # write to the database after each 2.5 million,
                 # to keep memory usage down
@@ -234,7 +231,7 @@ class Source_dbsnp(omics_source.Source):
                     # )  # TODO: time estimate
                     # self.log("writing SNP merge records to the database ...\n")
                     # SNP_MERGE TABLE: [reMerged, rsCurrent, source_id]
-                    self.addSNPMerges(setMerge)
+                    self.add_snpmerges(setMerge)
                     setMerge = set()
                     # self.log(
                     #     "writing SNP merge records to the database completed\n"
@@ -247,7 +244,7 @@ class Source_dbsnp(omics_source.Source):
             # )
             if setMerge:
                 # self.log("writing SNP merge records to the database ...\n")
-                self.addSNPMerges(setMerge) # Talves nao reciar o indice aqui
+                self.add_snpmerges(setMerge) # Talves nao reciar o indice aqui
                 # self.log(
                 #     "writing SNP merge records to the database completed\n"
                 # )  # noqa E501
@@ -255,9 +252,7 @@ class Source_dbsnp(omics_source.Source):
         # if merges
 
         # process SNP role function codes
-        # NOTE: Temp desativado pra deploment.
-        if 3 == 4:
-            # if options.get("roles", "no") == "yes":
+        if options.get("roles", "no") == "yes":
             """/* from dbSNP_main_table.sql.gz */
             CREATE TABLE [SnpFunctionCode]
             (
@@ -452,6 +447,7 @@ class Source_dbsnp(omics_source.Source):
                     path,
                     queue,
                     self._grcBuild,
+                    self.datasource_id,
                 )  #
                 for chromosome in self._chmList
             ]
@@ -511,20 +507,24 @@ class Source_dbsnp(omics_source.Source):
                         elif row[0] == "Y":
                             buffer_Y.append(row[1:])
                     if buffer_X:
-                        self.addChromosomeSNPLoci(self._loki.chr_num["X"], buffer_X)  # noqa E501
+                        # self.addChromosomeSNPLoci(self._loki.chr_num["X"], buffer_X)  # noqa E501
+                        self.add_snps("X", buffer_X)  # noqa E501
                     if buffer_Y:
-                        self.addChromosomeSNPLoci(self._loki.chr_num["Y"], buffer_Y)  # noqa E501
+                        # self.addChromosomeSNPLoci(self._loki.chr_num["Y"], buffer_Y)  # noqa E501
+                        self.add_snps("Y", buffer_Y)  # noqa E501
                 # Other files different from PAR
                 else:
                     for row in reader:
                         buffer.append(row)
 
                         if len(buffer) >= batch_size:
-                            self.addChromosomeSNPLoci(self._loki.chr_num[key], buffer)  # noqa E501
+                            # self.addChromosomeSNPLoci(self._loki.chr_num[key], buffer)  # noqa E501
+                            self.add_snps(buffer)  # noqa E501
                             buffer.clear()
 
                     if buffer:
-                        self.addChromosomeSNPLoci(self._loki.chr_num[key], buffer)  # noqa E501
+                        # self.addChromosomeSNPLoci(self._loki.chr_num[key], buffer)  # noqa E501
+                        self.add_snps(buffer)  # noqa E501
 
             buffer.clear()
             os.remove(output_file)  # 🔥 Drop temp csv files
@@ -534,8 +534,8 @@ class Source_dbsnp(omics_source.Source):
             #     level=logging.INFO,
             #     indent=v_indent,
             # )
-            end_time = time.time()
-            ingestion_stop = (end_time - ingestion_start) / 60
+            # end_time = time.time()
+            # ingestion_stop = (end_time - ingestion_start) / 60
             # self.log(
             #     f"dbSNP - 🎯 Ingestion for chromosome {key} completed in {ingestion_stop:.2f} minutes.",  # noqa E501
             #     level=logging.INFO,
@@ -543,12 +543,12 @@ class Source_dbsnp(omics_source.Source):
             # )
 
         # store source metadata
-        self.setSourceBuilds(self._grcBuild, None)
+        # self.setSourceBuilds(self._grcBuild, None)
 
-        # Finalize the process
-        end_time = time.time()
-        elapsed_time_minutes = (end_time - start_time) / 60  # time in minutes
-        memory_after = process_memory.memory_info().rss / (1024 * 1024)  # MB
+        # # Finalize the process
+        # end_time = time.time()
+        # elapsed_time_minutes = (end_time - start_time) / 60  # time in minutes
+        # memory_after = process_memory.memory_info().rss / (1024 * 1024)  # MB
         # self.log(
         #     f"dbSNP - Final memory: {memory_after:.2f} MB. Alocated memory: {memory_after - memory_bef:.2f} MB.",  # noqa: E501
         #     level=logging.INFO,
@@ -573,6 +573,7 @@ def run_processing_worker(
     path,
     queue,
     grcBuild,
+    source_id,
 ):
 
     # Pass the task to the worker
@@ -585,12 +586,13 @@ def run_processing_worker(
         path,
         queue,
         grcBuild,
+        source_id,
     )
     worker.run()
 
 
 # Worker que processa cada cromossomo
-class ProcessingWorker(SourceUtilMixin):
+class ProcessingWorker(SourceUtilsMixin):
     def __init__(
         self,
         chromosome,
@@ -601,6 +603,7 @@ class ProcessingWorker(SourceUtilMixin):
         path,
         queue,
         grcBuild,
+        source_id,
     ):
         super().__init__()
         self.chrom = chromosome
@@ -611,6 +614,7 @@ class ProcessingWorker(SourceUtilMixin):
         self.path = path
         self.queue = queue
         self._grcBuild = grcBuild
+        self._source_id = source_id
 
     def run(self):
         v_msn = "n/a"
@@ -658,9 +662,9 @@ class ProcessingWorker(SourceUtilMixin):
             with open(output_file, mode="w", newline="") as csvfile:
                 writer = csv.writer(csvfile)
                 if self.chrom == "PAR":
-                    writer.writerow(["chrom", "rs", "position", "validated"])
+                    writer.writerow(["chrom", "rs", "position", "validated", "source_id"])
                 else:
-                    writer.writerow(["rs", "position", "validated"])
+                    writer.writerow(["chrom", "rs", "position", "validated", "source_id"])
 
                 for line in chmFile:
                     words = line.split("\t")
@@ -691,9 +695,9 @@ class ProcessingWorker(SourceUtilMixin):
                         setBadChr.add(rs)
                     else:
                         if self.chrom == "PAR":
-                            data_buffer.append([chm, rs, pos, validated])
+                            data_buffer.append([chm, rs, pos, validated, self._source_id])  # noqa E501
                         else:
-                            data_buffer.append([rs, pos, validated])
+                            data_buffer.append([chm, rs, pos, validated, self._source_id])  # noqa E501
 
                     if len(data_buffer) >= batch_size:
                         interations += 1

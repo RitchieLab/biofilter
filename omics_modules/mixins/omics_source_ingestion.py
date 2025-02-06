@@ -1,14 +1,15 @@
 import apsw
 
 
-class OmicsIngestionMixin:
+class SourceIngestionMixin:
     """
     Mixin for fast data ingestion using APSW.
     """
 
     def deleteAll(self):
         """
-        Deletes all records for the current dataset_id from the specified tables.
+        Deletes all records for the current dataset_id from the specified
+        tables.
         """
         tables = [
             "snpmerges",
@@ -21,22 +22,44 @@ class OmicsIngestionMixin:
 
                 for table in tables:
                     sql = f"DELETE FROM {table} WHERE source = ?"
-                    cursor.execute(sql, (self.dataset_id,))  # Passa dataset_id corretamente como tuple
-                
+                    cursor.execute(sql, (self.datasource_id,))
+
             self.logger.log("[INFO] All related records deleted successfully.")
 
         except apsw.ConstraintError as e:
-            self.logger.log(f"[WARNING] Constraint error: {e}", level="WARNING")
+            self.logger.log(
+                f"[WARNING] Constraint error: {e}", level="WARNING"
+            )  # noqa E501
         except Exception as e:
             self.logger.log(f"[ERROR] Deletion failed: {e}", level="ERROR")
 
+    # Add records to the snpmerges table
+    def add_snpmerges(self, load_data):
+        sql = (
+            "INSERT OR IGNORE INTO snpmerges "
+            "(rs_source, rs_current, valid, source) "
+            "VALUES (?, ?, ?, ?)"
+        )
+        try:
+            with self._apsw_db:
+                cursor = self._apsw_db.cursor()
+                cursor.executemany(sql, load_data)  # Bulk insert
 
+            self.logger.log(f"[INFO] Inserted {len(load_data)} SNP records.")
+
+        except apsw.ConstraintError as e:
+            self.logger.log(
+                f"[WARNING] Constraint error: {e}", level="WARNING"
+            )  # noqa E501
+        except Exception as e:
+            self.logger.log(f"[ERROR] Insert failed: {e}", level="ERROR")
+
+    # Add records to the snps table
     def add_snps(self, load_data):
         sql = (
             "INSERT OR IGNORE INTO snps "
-            "(rs_source, rs_current, chromosome, position, reference_allele, "
-            "alternate_allele, variation_type, build_source, valid, source) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+            "(chromosome, rs_source, position, valid, source) "
+            "VALUES (?, ?, ?, ?, ?)"
         )
         try:
             with self._apsw_db:

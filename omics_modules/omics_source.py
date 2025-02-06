@@ -1,10 +1,11 @@
 import apsw
 from omics_modules.logger import Logger
-from omics_modules.mixins.omics_source_ingestion import OmicsIngestionMixin
+from omics_modules.mixins.omics_source_ingestion import SourceIngestionMixin
 from omics_modules.mixins.omics_source_download import SourceConnectorMixin
+from omics_modules.mixins.omics_source_utils import SourceUtilsMixin
 
 
-class Source(OmicsIngestionMixin, SourceConnectorMixin):
+class Source(SourceIngestionMixin, SourceConnectorMixin, SourceUtilsMixin):
     """
     Base class for data sources, providing APSW connection and utility methods.
     """

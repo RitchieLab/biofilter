@@ -5,7 +5,7 @@
 import zlib
 
 
-class SourceUtilMixin:
+class SourceUtilsMixin:
 
     def zfile(self, fileName, splitChar="\n", chunkSize=1 * 1024 * 1024):
         # autodetect gzip or zlib header
