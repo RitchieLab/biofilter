@@ -88,10 +88,10 @@ oreganno
 UCSC-ucsc_ecr
 chainfiles
 dbSNP
+entrez
 
 
 com Error ou falltam
-entrez
 Pfam - Erro no endereco de pagina
 reactome
 

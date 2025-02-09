@@ -18,32 +18,32 @@ from mixins import SourceUtilsMixin
 class Source_dbsnp(omics_source.Source):
 
     _chmList = (
-        # "1",
-        # "2",
-        # "3",
-        # "4",
-        # "5",
-        # "6",
-        # "7",
-        # "8",
-        # "9",
-        # "10",
-        # "11",
-        # "12",
-        # "13",
-        # "14",
-        # "15",
-        # "16",
-        # "17",
-        # "18",
-        # "19",
-        # "20",
-        # "21",
-        # "22",
-        # "X",
+        "1",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6",
+        "7",
+        "8",
+        "9",
+        "10",
+        "11",
+        "12",
+        "13",
+        "14",
+        "15",
+        "16",
+        "17",
+        "18",
+        "19",
+        "20",
+        "21",
+        "22",
+        "X",
         "Y",
-        # "PAR",
-        # "MT",
+        "PAR",
+        "MT",
     )
     _grcBuild = None
 
@@ -497,34 +497,35 @@ class Source_dbsnp(omics_source.Source):
                 next(reader)  # Pular cabeçalho
 
                 buffer = []
-                if key == "PAR":
-                    buffer_X = []
-                    buffer_Y = []
-                    for row in reader:
-                        # buffer.append(row)
-                        if row[0] == "X":
-                            buffer_X.append(row[1:])
-                        elif row[0] == "Y":
-                            buffer_Y.append(row[1:])
-                    if buffer_X:
-                        # self.addChromosomeSNPLoci(self._loki.chr_num["X"], buffer_X)  # noqa E501
-                        self.add_snps("X", buffer_X)  # noqa E501
-                    if buffer_Y:
-                        # self.addChromosomeSNPLoci(self._loki.chr_num["Y"], buffer_Y)  # noqa E501
-                        self.add_snps("Y", buffer_Y)  # noqa E501
-                # Other files different from PAR
-                else:
-                    for row in reader:
-                        buffer.append(row)
+                # if key == "PAR":
+                #     buffer_X = []
+                #     buffer_Y = []
+                #     for row in reader:
+                #         # buffer.append(row)
+                #         if row[0] == "X":
+                #             buffer_X.append(row[1:])
+                #         elif row[0] == "Y":
+                #             buffer_Y.append(row[1:])
+                #     if buffer_X:
+                #         # self.addChromosomeSNPLoci(self._loki.chr_num["X"], buffer_X)  # noqa E501
+                #         self.add_snps("X", buffer_X)  # noqa E501
+                #     if buffer_Y:
+                #         # self.addChromosomeSNPLoci(self._loki.chr_num["Y"], buffer_Y)  # noqa E501
+                #         self.add_snps("Y", buffer_Y)  # noqa E501
+                # # Other files different from PAR
+                # else:
+                for row in reader:
+                    buffer.append(row)
 
-                        if len(buffer) >= batch_size:
-                            # self.addChromosomeSNPLoci(self._loki.chr_num[key], buffer)  # noqa E501
-                            self.add_snps(buffer)  # noqa E501
-                            buffer.clear()
-
-                    if buffer:
+                    if len(buffer) >= batch_size:
                         # self.addChromosomeSNPLoci(self._loki.chr_num[key], buffer)  # noqa E501
+                        print(f"Adding {len(buffer)} SNPs to chromosome {key}")
                         self.add_snps(buffer)  # noqa E501
+                        buffer.clear()
+
+                if buffer:
+                    # self.addChromosomeSNPLoci(self._loki.chr_num[key], buffer)  # noqa E501
+                    self.add_snps(buffer)  # noqa E501
 
             buffer.clear()
             os.remove(output_file)  # 🔥 Drop temp csv files
@@ -646,7 +647,8 @@ class ProcessingWorker(SourceUtilsMixin):
                 v_msn = f"File {self.filename} is empty or corrupted."
                 return
 
-            setBadBuild, setBadVers, setBadFilter, setBadChr = (
+            setBadBuild, setBadVers, setBadFilter, setBadChr, setNoValidated = (
+                set(),
                 set(),
                 set(),
                 set(),
@@ -679,6 +681,8 @@ class ProcessingWorker(SourceUtilsMixin):
                     except (ValueError, IndexError):
                         continue  # Ignorar linhas malformadas
 
+                    # NOTE: Melhorar a lógica das variaveis de controle (ex. includeUnvalidated)
+
                     if not build:
                         setBadBuild.add(rs)
                     elif self._grcBuild and self._grcBuild != build.group(1):
@@ -693,11 +697,13 @@ class ProcessingWorker(SourceUtilsMixin):
                         setBadChr.add(rs)
                     elif self.chrom == "PAR" and chm not in {"X", "Y"}:
                         setBadChr.add(rs)
+                    elif validated == 0:
+                        setNoValidated.add(rs)
                     else:
-                        if self.chrom == "PAR":
-                            data_buffer.append([chm, rs, pos, validated, self._source_id])  # noqa E501
-                        else:
-                            data_buffer.append([chm, rs, pos, validated, self._source_id])  # noqa E501
+                        # if self.chrom == "PAR":
+                        #     data_buffer.append([chm, rs, pos, validated, self._source_id])  # noqa E501
+                        # else:
+                        data_buffer.append([chm, rs, pos, validated, self._source_id])  # noqa E501
 
                     if len(data_buffer) >= batch_size:
                         interations += 1
@@ -737,6 +743,10 @@ class ProcessingWorker(SourceUtilsMixin):
             if setBadChr:
                 print(
                     f"{v_indent}  ⚠️ WARNING: {len(setBadChr)} SNPs on mismatching chromosome"  # noqa E501
+                )  # noqa E501
+            if setNoValidated:
+                print(
+                    f"{v_indent}  ⚠️ WARNING: {len(setNoValidated)} SNPs no validated"  # noqa E501
                 )  # noqa E501
 
             print(f"{v_indent}🎯 Worker {self.chrom} completed.")

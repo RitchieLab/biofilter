@@ -43,6 +43,9 @@ def main():
     print("✅ [SUCCESS] Updater instance created successfully!")
 
     # Run Updater.workprocess() with sources
+
+    updater.skip_download = True
+
     updater.workflow()
     print("✅ [SUCCESS] Updater.workprocess() executed successfully!")
 

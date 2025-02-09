@@ -45,15 +45,34 @@
             "console": "integratedTerminal"
         },
         {
+            "name": "Biofilter - CDK1",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/biofilter_modules/biofilter.py",
+            "args": [
+                "--verbose",
+                "--knowledge", "/Users/andrerico/Works/Sys/BIOFILTER/data/loki-20220926.db",
+                "--gene-file", "/Users/andrerico/Works/Sys/BIOFILTER/tests/issues/cdk1/data-in/cdk1-test.csv",
+                "--source", "kegg", "reactome", "go",
+                "--annotate", "gene", "group", "group_description",
+                "--report-invalid-input",
+                "--report-configuration",
+                "--overwrite",
+                "--prefix", "/Users/andrerico/Works/Sys/BIOFILTER/tests/issues/cdk1/data-out/outcomes",
+                "--ucsc-build-version", "19"
+            ],
+            "console": "integratedTerminal"
+        },
+        {
             "name": "LOKI-BUILD",
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/loki_modules/loki_build.py",
             "args": [
-                "--knowledge", "/Users/andrerico/Works/Sys/biofilter/data/loki_dbSNP.db",
+                "--knowledge", "/Users/andrerico/Works/Sys/biofilter/data/loki_entrez.db",
                 "--update",
                 "--temp-directory", "/Users/andrerico/Works/Sys/biofilter/downloads",
-                "--list-sources", "dbsnp",
+                "--list-sources", "entrez",
                 "--keep-download",
             ],
             "console": "integratedTerminal"

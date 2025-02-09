@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Boolean, SmallInteger
+from sqlalchemy import Column, Text, Integer, String, DateTime, ForeignKey, Boolean, SmallInteger
 from sqlalchemy.orm import relationship
 import datetime
 from sqlalchemy.orm import declarative_base
@@ -66,6 +66,28 @@ WorkProcess.extracted_files = relationship("ExtractedFile", back_populates="work
 
 # ===================================================================================================
 # TABLES FOR OMICS DATA
+
+
+class Assembly(Base):
+    """
+    Master table for genomic assemblies, including reference genome versions 
+    and patch levels.
+    """
+    __tablename__ = "assemblies"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    code = Column(String, unique=True, nullable=False, index=True)  # Ex: GRCh38, GRCh37, T2T-CHM13
+    description = Column(Text, nullable=True)  # Full name or extra details
+    genome_build = Column(String, nullable=False, index=True)  # Ex: hg38, hg19, b37
+    patch = Column(String, nullable=True)  # Patch version (e.g., "p13" for GRCh38.p13)
+    source = Column(String, nullable=False)  # Source of the assembly (e.g., GENCODE, UCSC, Ensembl)
+    active = Column(Boolean, default=True)  # Indicates if the assembly is currently in use
+    created_at = Column(DateTime, default=lambda: datetime.datetime.now(datetime.timezone.utc))
+    updated_at = Column(DateTime, default=lambda: datetime.datetime.now(datetime.timezone.utc), onupdate=datetime.datetime.now(datetime.timezone.utc))
+    datasource_id = Column(Integer, nullable=True)  # Data source ID
+
+    def __repr__(self):
+        return f"<Assembly(code='{self.code}', genome_build='{self.genome_build}', patch='{self.patch}', active={self.active})>"
 
 
 class SNPMerge(Base):

@@ -185,7 +185,7 @@ class Biofilter(
 
         # initialize instance database
         self._loki = loki_db.Database()
-        self._loki.setLogger(self)
+        # self._loki.setLogger(self)
         for db in self._schema:
             if db != "main":
                 # in SQLite 'main' is implicit, but the others must be attached as temp stores  # noqa: E501
