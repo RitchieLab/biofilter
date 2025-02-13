@@ -1,3 +1,4 @@
 Biofilter Version 3.0
 ======================
-https://ritchielab.readthedocs.io/en/latest/
+
+We are working on a new and improved version of Biofilter that incorporates the latest advancements. Previous releases are for archival purposes only and should not be used.
