@@ -1,6 +1,6 @@
 {
     "python.testing.unittestEnabled": false,
-    "python.testing.pytestEnabled": false,
+    "python.testing.pytestEnabled": true,
     "python.autoComplete.extraPaths": [
         "/Users/andrerico/Works/Sys/biofilter"
     ],
@@ -9,5 +9,5 @@
         "tests/"
     ],
     "python.testing.autoTestDiscoverOnSaveEnabled": true,
-    "pythonTestExplorer.testFramework": "pytest" // replace pytest from python plugin (no works for more than 8 tests)
+    // "pythonTestExplorer.testFramework": "pytest" // replace pytest from python plugin (no works for more than 8 tests)
 }

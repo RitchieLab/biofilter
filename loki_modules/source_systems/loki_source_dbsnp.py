@@ -18,32 +18,32 @@ from loki_mixins import SourceUtilMixin
 class Source_dbsnp(loki_source.Source):
 
     _chmList = (
-        "1",
-        "2",
-        "3",
-        "4",
-        "5",
-        "6",
-        "7",
-        "8",
-        "9",
-        "10",
-        "11",
-        "12",
-        "13",
-        "14",
-        "15",
-        "16",
-        "17",
-        "18",
-        "19",
-        "20",
-        "21",
+        # "1",
+        # "2",
+        # "3",
+        # "4",
+        # "5",
+        # "6",
+        # "7",
+        # "8",
+        # "9",
+        # "10",
+        # "11",
+        # "12",
+        # "13",
+        # "14",
+        # "15",
+        # "16",
+        # "17",
+        # "18",
+        # "19",
+        # "20",
+        # "21",
         "22",
-        "X",
-        "Y",
-        "PAR",
-        "MT",
+        # "X",
+        # "Y",
+        # "PAR",
+        # "MT",
     )
     _grcBuild = None
 
@@ -256,8 +256,8 @@ class Source_dbsnp(loki_source.Source):
 
         # process SNP role function codes
         # NOTE: Temp desativado pra deploment.
-        if 3 == 4:
-            # if options.get("roles", "no") == "yes":
+        # if 3 == 4:
+        if options.get("roles", "no") == "yes":
             """/* from dbSNP_main_table.sql.gz */
             CREATE TABLE [SnpFunctionCode]
             (

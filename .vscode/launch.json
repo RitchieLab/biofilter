@@ -69,10 +69,10 @@
             "request": "launch",
             "program": "${workspaceFolder}/loki_modules/loki_build.py",
             "args": [
-                "--knowledge", "/Users/andrerico/Works/Sys/biofilter/data/loki_entrez.db",
+                "--knowledge", "/Users/andrerico/Works/Sys/biofilter/data/dbsnp.db",
                 "--update",
                 "--temp-directory", "/Users/andrerico/Works/Sys/biofilter/downloads",
-                "--list-sources", "entrez",
+                "--list-sources", "dbsnp",
                 "--keep-download",
             ],
             "console": "integratedTerminal"
