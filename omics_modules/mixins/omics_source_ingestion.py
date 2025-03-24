@@ -73,6 +73,7 @@ class SourceIngestionMixin:
         except Exception as e:
             self.logger.log(f"[ERROR] Insert failed: {e}", level="ERROR")
 
+
 #     __tablename__ = "snps"
 #     id = Column(Integer, primary_key=True, autoincrement=True)
 #     rs_source = Column(Integer, nullable=True, index=True)  # Ex: 9411893
@@ -85,4 +86,3 @@ class SourceIngestionMixin:
 #     build_source = Column(String, nullable=True)  # Ex: "GRCh38"
 #     valid = Column(Boolean, default=True)  # Indication if this SNP is currently valid
 #     source = Column(String, nullable=True)  # Ex: "dbSNP", "1000 Genomes"
-

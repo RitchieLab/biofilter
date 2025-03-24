@@ -451,7 +451,7 @@ class UpdaterWorkflowMixin:
             # 🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨
             # Eu preciso entender o que é isso e como funciona, pois realiza opreações no banco de dados
             # apos a atualização dos dados e esta consumindo muita memoria e tempo.
-            
+
             pos_processamento = False
             if pos_processamento:
                 # 📍INICIO DO BLOCLO 1: Objetivo eh verificar se temos campos nulos em grch e ucschg na table Source, e alinhar com o que esta em UCSC site
@@ -574,7 +574,6 @@ class UpdaterWorkflowMixin:
 
                 # 📍FIM DO BLOCLO 1
 
-
                 # 📍INICIO DO BLOCLO 2: Se algum Source for diferente do definito, realizar um liftover
                 # 🚨 Usa a Cahin table para isso (talvez ela deva ser a primeira a ser atualizada)
 
@@ -665,7 +664,7 @@ class UpdaterWorkflowMixin:
 
                 # post-process as needed
                 # self.log("MEMORY: %d bytes (%d peak)\n" % self._loki.getDatabaseMemoryUsage()) #DEBUG  # noqa: E501
-                
+
                 # NOTE esse method elimina rsMerge repeatidos da snp_merge table
                 if "snp_merge" in self._tablesUpdated:
                     self.cleanupSNPMerges()
@@ -679,12 +678,12 @@ class UpdaterWorkflowMixin:
                 ):  # noqa: E501
                     self.updateMergedSNPLoci()
                     # self.log("MEMORY: %d bytes (%d peak)\n" % self._loki.getDatabaseMemoryUsage()) #DEBUG  # noqa: E501
-                
+
                 # NOTE Elimina registros da snp_locus (mantem apenas um para o grupo snp, chr e pos)
                 if "snp_locus" in self._tablesUpdated:
                     self.cleanupSNPLoci()
                     # self.log("MEMORY: %d bytes (%d peak)\n" % self._loki.getDatabaseMemoryUsage()) #DEBUG  # noqa: E501
-                
+
                 # NOTE MESMO PROCESSO DO ANTERIOR, POREM PARA A TABELA snp_entrez_role
                 if (
                     "snp_merge" in self._tablesUpdated
@@ -692,11 +691,11 @@ class UpdaterWorkflowMixin:
                 ):
                     self.updateMergedSNPEntrezRoles()
                     # self.log("MEMORY: %d bytes (%d peak)\n" % self._loki.getDatabaseMemoryUsage()) #DEBUG  # noqa: E501
-                
+
                 if "snp_entrez_role" in self._tablesUpdated:
                     self.cleanupSNPEntrezRoles()
                     # self.log("MEMORY: %d bytes (%d peak)\n" % self._loki.getDatabaseMemoryUsage()) #DEBUG  # noqa: E501
-                
+
                 # NOTE Duplica registro na GWAS (usando o rsMerge)
                 if (
                     "snp_merge" in self._tablesUpdated
@@ -704,7 +703,7 @@ class UpdaterWorkflowMixin:
                 ):  # noqa: E501
                     self.updateMergedGWASAnnotations()
                     # self.log("MEMORY: %d bytes (%d peak)\n" % self._loki.getDatabaseMemoryUsage()) #DEBUG  # noqa: E501
-                
+
                 # NOTE PRocessamento para o Biopolymer
                 if (
                     "biopolymer_name" in self._tablesUpdated
@@ -712,14 +711,14 @@ class UpdaterWorkflowMixin:
                 ):
                     self.resolveBiopolymerNames()
                     # self.log("MEMORY: %d bytes (%d peak)\n" % self._loki.getDatabaseMemoryUsage()) #DEBUG  # noqa: E501
-                
+
                 if (
                     "biopolymer_name" in self._tablesUpdated
                     or "snp_entrez_role" in self._tablesUpdated
                 ):
                     self.resolveSNPBiopolymerRoles()
                     # self.log("MEMORY: %d bytes (%d peak)\n" % self._loki.getDatabaseMemoryUsage()) #DEBUG  # noqa: E501
-                
+
                 if (
                     "biopolymer_name" in self._tablesUpdated
                     or "group_member_name" in self._tablesUpdated

@@ -40,12 +40,14 @@ class UpdaterWorkflowMixin:
             qryset_datasource = session.scalars(
                 select(DataSource).where(
                     DataSource.name.in_(list(self._sourceObjects.keys())),
-                    DataSource.active == True
+                    DataSource.active == True,
                 )
             ).all()
 
         if not qryset_datasource:
-            self.logger.log("No valid data sources found in the database!", level="ERROR")
+            self.logger.log(
+                "No valid data sources found in the database!", level="ERROR"
+            )
             return
 
         # 3️⃣ DOWNLOAD PHASE
@@ -57,7 +59,7 @@ class UpdaterWorkflowMixin:
             successful_sources = [ds.name for ds in qryset_datasource]
         else:
             downloadStatus = {}  # Stores download results (True/False)
-        
+
             def execute_download(data_source):
                 """Executes download for a single data source and updates its status."""
                 srcName = data_source.name
@@ -65,9 +67,7 @@ class UpdaterWorkflowMixin:
                 self.set_datasource_status(qryset_datasource, srcName, "downloading")
 
                 success, error_message = self.workflow_download(
-                    self.dir_download, 
-                    srcName, 
-                    self._sourceOptions.get(srcName, {})
+                    self.dir_download, srcName, self._sourceOptions.get(srcName, {})
                 )
 
                 downloadStatus[srcName] = success
@@ -83,11 +83,15 @@ class UpdaterWorkflowMixin:
             # =====================================================================
             for srcName, success in downloadStatus.items():
                 new_status = "downloaded" if success else "failed_download"
-                self.set_datasource_status(qryset_datasource, srcName, new_status)  # noqa E501
+                self.set_datasource_status(
+                    qryset_datasource, srcName, new_status
+                )  # noqa E501
 
             # Keep only the successful sources for processing
             successful_sources = [
-                ds.name for ds in qryset_datasource if downloadStatus.get(ds.name, False)  # noqa E501
+                ds.name
+                for ds in qryset_datasource
+                if downloadStatus.get(ds.name, False)  # noqa E501
             ]
 
         # 5️⃣ PROCESSING PHASE
@@ -96,12 +100,16 @@ class UpdaterWorkflowMixin:
 
         for srcName in successful_sources:
             # TODO We can check if the source is already downloaded!
-            self.set_datasource_status(qryset_datasource, srcName, "processing")  # noqa E501
+            self.set_datasource_status(
+                qryset_datasource, srcName, "processing"
+            )  # noqa E501
 
             try:
                 # Setting up the work process
                 srcObj = self._sourceObjects[srcName]
-                srcID = next((ds.id for ds in qryset_datasource if ds.name == srcName), None)  # noqa E501
+                srcID = next(
+                    (ds.id for ds in qryset_datasource if ds.name == srcName), None
+                )  # noqa E501
                 srcObj.datasource_id = srcID
                 options = self._sourceOptions.get(srcName, {})
                 path = os.path.join(self.dir_download, srcName)
@@ -142,7 +150,9 @@ class UpdaterWorkflowMixin:
                         .values(
                             status=status,
                             error_message=error,
-                            end_time=datetime.datetime.now(datetime.timezone.utc) # noqa E501
+                            end_time=datetime.datetime.now(
+                                datetime.timezone.utc
+                            ),  # noqa E501
                         )
                     )
                     session.commit()

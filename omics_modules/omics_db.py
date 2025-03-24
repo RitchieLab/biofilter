@@ -7,12 +7,7 @@ class Database(DBConfigMixin):
     Manages database connection and applies performance optimizations.
     """
 
-    def __init__(
-            self,
-            dbFile=None,
-            updating=False,
-            temp_mem=False
-    ):  # noqa: E501
+    def __init__(self, dbFile=None, updating=False, temp_mem=False):  # noqa: E501
         """
         Initializes the db connection, integrity check, and optimizations.
 

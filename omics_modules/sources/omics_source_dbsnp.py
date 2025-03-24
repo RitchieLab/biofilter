@@ -3,6 +3,7 @@ import os
 import re
 import gc
 import csv
+
 # import logging
 import psutil
 import time
@@ -188,7 +189,6 @@ class Source_dbsnp(omics_source.Source):
         # )
         self.deleteAll()  # will drop by Source ID
 
-
         # process merge report (no header!)
         if options.get("merges", "yes") == "yes":
             """/* from human_9606_table.sql.gz */
@@ -206,9 +206,7 @@ class Source_dbsnp(omics_source.Source):
             )
             """
             # self.log("processing SNP merge records ...\n")
-            mergeFile = self.zfile(
-                path + "/RsMergeArch.bcp.gz"
-            ) 
+            mergeFile = self.zfile(path + "/RsMergeArch.bcp.gz")
             numMerge = 0
             setMerge = set()
             for line in mergeFile:
@@ -244,7 +242,7 @@ class Source_dbsnp(omics_source.Source):
             # )
             if setMerge:
                 # self.log("writing SNP merge records to the database ...\n")
-                self.add_snpmerges(setMerge) # Talves nao reciar o indice aqui
+                self.add_snpmerges(setMerge)  # Talves nao reciar o indice aqui
                 # self.log(
                 #     "writing SNP merge records to the database completed\n"
                 # )  # noqa E501
@@ -664,9 +662,13 @@ class ProcessingWorker(SourceUtilsMixin):
             with open(output_file, mode="w", newline="") as csvfile:
                 writer = csv.writer(csvfile)
                 if self.chrom == "PAR":
-                    writer.writerow(["chrom", "rs", "position", "validated", "source_id"])
+                    writer.writerow(
+                        ["chrom", "rs", "position", "validated", "source_id"]
+                    )
                 else:
-                    writer.writerow(["chrom", "rs", "position", "validated", "source_id"])
+                    writer.writerow(
+                        ["chrom", "rs", "position", "validated", "source_id"]
+                    )
 
                 for line in chmFile:
                     words = line.split("\t")
@@ -703,7 +705,9 @@ class ProcessingWorker(SourceUtilsMixin):
                         # if self.chrom == "PAR":
                         #     data_buffer.append([chm, rs, pos, validated, self._source_id])  # noqa E501
                         # else:
-                        data_buffer.append([chm, rs, pos, validated, self._source_id])  # noqa E501
+                        data_buffer.append(
+                            [chm, rs, pos, validated, self._source_id]
+                        )  # noqa E501
 
                     if len(data_buffer) >= batch_size:
                         interations += 1

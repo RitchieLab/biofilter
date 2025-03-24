@@ -509,20 +509,28 @@ class Source_dbsnp(loki_source.Source):
                         elif row[0] == "Y":
                             buffer_Y.append(row[1:])
                     if buffer_X:
-                        self.addChromosomeSNPLoci(self._loki.chr_num["X"], buffer_X)  # noqa E501
+                        self.addChromosomeSNPLoci(
+                            self._loki.chr_num["X"], buffer_X
+                        )  # noqa E501
                     if buffer_Y:
-                        self.addChromosomeSNPLoci(self._loki.chr_num["Y"], buffer_Y)  # noqa E501
+                        self.addChromosomeSNPLoci(
+                            self._loki.chr_num["Y"], buffer_Y
+                        )  # noqa E501
                 # Other files different from PAR
                 else:
                     for row in reader:
                         buffer.append(row)
 
                         if len(buffer) >= batch_size:
-                            self.addChromosomeSNPLoci(self._loki.chr_num[key], buffer)  # noqa E501
+                            self.addChromosomeSNPLoci(
+                                self._loki.chr_num[key], buffer
+                            )  # noqa E501
                             buffer.clear()
 
                     if buffer:
-                        self.addChromosomeSNPLoci(self._loki.chr_num[key], buffer)  # noqa E501
+                        self.addChromosomeSNPLoci(
+                            self._loki.chr_num[key], buffer
+                        )  # noqa E501
 
             buffer.clear()
             os.remove(output_file)  # 🔥 Drop temp csv files

@@ -17,9 +17,7 @@ from loki_modules.loki_mixins import (  # noqa E402
     DbLiftOverMixin,
     DbQueryMixin,
     SourceUtilityMethods,
-
     SourceIngestionMixin,
-
     SourceUtilMixin,
     SourceDownloadMixin,
     UpdaterDownloadMixin,

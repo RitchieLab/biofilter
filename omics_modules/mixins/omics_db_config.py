@@ -22,27 +22,28 @@ class DBConfigMixin:
             self.logger.log("[INFO] Database found. Checking integrity...")
             # Initialize engine and session
             if not self._check_database_integrity():
-                self.logger.log("[ERROR] Database is corrupted or incompatible!", level="ERROR")
+                self.logger.log(
+                    "[ERROR] Database is corrupted or incompatible!", level="ERROR"
+                )
                 raise Exception("Database corrupted or incompatible with models.")
             # Define autoflush dynamically based on updating mode
             self.autoflush = not self._updating  # True:SelectMode, False:InsertMode
             self.SessionLocal = sessionmaker(
-                autocommit=False,
-                autoflush=self.autoflush,
-                bind=self.engine
+                autocommit=False, autoflush=self.autoflush, bind=self.engine
             )  # noqa: E501
 
             # Apply performance settings
             self.configure_database(
-                updating=self._updating,
-                temp_mem=self._temp_mem
+                updating=self._updating, temp_mem=self._temp_mem
             )  # noqa: E501
 
     def _create_database(self):
         """
         Creates a new database file and its tables.
         """
-        self.engine = create_engine(self._dbURL, connect_args={"check_same_thread": False})
+        self.engine = create_engine(
+            self._dbURL, connect_args={"check_same_thread": False}
+        )
         Base.metadata.create_all(self.engine)
         self.logger.log("[INFO] Database created successfully!")
 
@@ -51,7 +52,9 @@ class DBConfigMixin:
         Verifies if all expected tables exist in the database.
         Returns True if integrity is valid, False otherwise.
         """
-        self.engine = create_engine(self._dbURL, connect_args={"check_same_thread": False})
+        self.engine = create_engine(
+            self._dbURL, connect_args={"check_same_thread": False}
+        )
         inspector = inspect(self.engine)
         expected_tables = Base.metadata.tables.keys()
         existing_tables = inspector.get_table_names()
@@ -122,9 +125,19 @@ class DBConfigMixin:
             self.logger.log("[INFO] Recreating database indexes...")
 
             with self.engine.connect() as conn:
-                conn.execute(text("CREATE INDEX IF NOT EXISTS idx_snp_rs_current ON snps (rs_current)"))
-                conn.execute(text("CREATE INDEX IF NOT EXISTS idx_gene_symbol ON genes (symbol)"))
-                conn.execute(text("CREATE INDEX IF NOT EXISTS idx_protein_uniprot_id ON proteins (uniprot_id)"))
+                conn.execute(
+                    text(
+                        "CREATE INDEX IF NOT EXISTS idx_snp_rs_current ON snps (rs_current)"
+                    )
+                )
+                conn.execute(
+                    text("CREATE INDEX IF NOT EXISTS idx_gene_symbol ON genes (symbol)")
+                )
+                conn.execute(
+                    text(
+                        "CREATE INDEX IF NOT EXISTS idx_protein_uniprot_id ON proteins (uniprot_id)"
+                    )
+                )
 
             self.logger.log("[INFO] Indexes recreated successfully!")
 

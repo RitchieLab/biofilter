@@ -14,8 +14,8 @@ def main():
     # Step 3: Run Updater.workprocess() with source
 
     # ARGUMENTS
-    DATABASE_FILE = "/Users/andrerico/Works/Sys/biofilter/data/omic.db",
-    SOURCES_LIST = ['dbsnp']
+    DATABASE_FILE = ("/Users/andrerico/Works/Sys/biofilter/data/omic.db",)
+    SOURCES_LIST = ["dbsnp"]
     DOWNLOAD_FOLDER = "/Users/andrerico/Works/Sys/biofilter/data/downloads"
     UPDATER_PROCESS = True
     ONLY_DOWNLOAD = False
@@ -24,10 +24,7 @@ def main():
 
     # try:
     # Initialize the OmicsDB instance
-    db = Database(
-        dbFile=DATABASE_FILE,
-        updating=UPDATER_PROCESS
-    )
+    db = Database(dbFile=DATABASE_FILE, updating=UPDATER_PROCESS)
     print("✅ [SUCCESS] OmicsDB instance created successfully!")
 
     # Initialize the Updater instance
@@ -48,7 +45,6 @@ def main():
 
     updater.workflow()
     print("✅ [SUCCESS] Updater.workprocess() executed successfully!")
-
 
     # Testing session creation
     # with db.get_session() as session:

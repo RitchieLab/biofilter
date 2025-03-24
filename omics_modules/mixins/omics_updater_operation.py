@@ -23,7 +23,9 @@ class UpdaterOperationsMixin:
 
         with Session(self._engine) as session:
             # Fetch all existing data sources from the database
-            existing_sources = {ds.name: ds for ds in session.scalars(select(DataSource)).all()}
+            existing_sources = {
+                ds.name: ds for ds in session.scalars(select(DataSource)).all()
+            }
             detected_sources = set(self._sourceSystems.keys())
 
             # Insert new data sources in bulk
@@ -35,8 +37,9 @@ class UpdaterOperationsMixin:
                     format="UNKNOWN",
                     dtp_version="1.0",
                     last_status="pending",
-                    active=True
-                ) for source_name in new_sources
+                    active=True,
+                )
+                for source_name in new_sources
             ]
 
             if new_entries:
@@ -51,7 +54,9 @@ class UpdaterOperationsMixin:
                     .where(DataSource.name.in_(missing_sources))
                     .values(active=False, updated_at=datetime.datetime.utcnow())
                 )
-                self.logger.log(f"[WARNING] Deactivated {len(missing_sources)} missing data sources.")
+                self.logger.log(
+                    f"[WARNING] Deactivated {len(missing_sources)} missing data sources."
+                )
 
             # Commit all changes in a single transaction
             session.commit()
@@ -75,7 +80,11 @@ class UpdaterOperationsMixin:
             )
 
             if result.rowcount > 0:
-                self.logger.log(f"[INFO] Updated DataSource '{source_name}' to status '{new_status}'.")
+                self.logger.log(
+                    f"[INFO] Updated DataSource '{source_name}' to status '{new_status}'."
+                )
                 session.commit()
             else:
-                self.logger.log(f"[WARNING] DataSource '{source_name}' not found in database.")
+                self.logger.log(
+                    f"[WARNING] DataSource '{source_name}' not found in database."
+                )

@@ -406,7 +406,7 @@ class DbSchemaMaintenanceMixin:
                 else:
                     self.log(
                         "ERROR: table '%s' is missing\n" % tblName,  # noqa: E501
-                        level=logging.ERROR
+                        level=logging.ERROR,
                     )  # noqa: E501
                     ok = False
                 # if tblName in current

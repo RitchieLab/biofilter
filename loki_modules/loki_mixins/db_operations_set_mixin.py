@@ -1,5 +1,6 @@
 # database_operations_set_mixin.py
 
+
 class DbOperationsSetMixin:
 
     def addWarning(self, source_id, warning):

@@ -27,9 +27,6 @@ class Source(SourceIngestionMixin, SourceConnectorMixin, SourceUtilsMixin):
             f"[INFO] Source initialized with APSW for database: {self._dbFile}."
         )
 
-
-
-
     # def __init__(self, lokidb):
     #     assert isinstance(lokidb, loki_db.Database)
     #     assert self.__class__.__name__.startswith("Source_")

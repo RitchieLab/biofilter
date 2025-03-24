@@ -1,5 +1,6 @@
 # database_mixin.py
 
+
 class DbUpdaterMixin:
 
     def updateDatabase(

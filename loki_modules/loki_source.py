@@ -4,10 +4,17 @@ from datetime import datetime, timezone
 import logging
 
 import loki_modules.loki_db as loki_db
-from loki_mixins import SourceUtilityMethods, SourceIngestionMixin, SourceUtilMixin, SourceDownloadMixin
+from loki_mixins import (
+    SourceUtilityMethods,
+    SourceIngestionMixin,
+    SourceUtilMixin,
+    SourceDownloadMixin,
+)
 
 
-class Source(SourceUtilityMethods, SourceIngestionMixin, SourceUtilMixin, SourceDownloadMixin):  # noqa E501
+class Source(
+    SourceUtilityMethods, SourceIngestionMixin, SourceUtilMixin, SourceDownloadMixin
+):  # noqa E501
 
     def __init__(self, lokidb):
         assert isinstance(lokidb, loki_db.Database)

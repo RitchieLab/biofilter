@@ -50,6 +50,7 @@ class UpdaterOperationsMixin:
         Nao vejo necessidades do campo Source_id na query, pois ele não é utilizado em nenhum momento. Apendas para eliminacao do source
         sera que nao seria melhor transferir essa informacao para a snp_locus?
     """
+
     def cleanupSNPMerges_nova(self):
         self.log("Verifying SNP merge records...", level=logging.INFO, indent=0)
         self.prepareTableForUpdate("snp_merge")  # DROP INDEX
@@ -76,10 +77,11 @@ class UpdaterOperationsMixin:
 
         deleted_count = dbc.rowcount  # Conta quantos registros foram removidos
         self.log(
-            f"OK: {deleted_count} duplicate SNP merges removed\n", level=logging.INFO, indent=0
+            f"OK: {deleted_count} duplicate SNP merges removed\n",
+            level=logging.INFO,
+            indent=0,
         )
 
-    
     """
     📌 O que essa query faz?
         Ela insere dados na tabela snp_locus.
@@ -107,6 +109,7 @@ class UpdaterOperationsMixin:
     🔴 Problema Possível: Duplicação de Dados
         Esse INSERT não remove os registros antigos, apenas adiciona novas entradas com rsCurrent. Isso pode causar duplicação de dados, como no exemplo acima.
     """
+
     def updateMergedSNPLoci(self):
         self.log("checking for merged SNP loci ...", level=logging.INFO, indent=0)
         self.prepareTableForQuery("snp_locus")
@@ -129,6 +132,7 @@ class UpdaterOperationsMixin:
     Muito estranho esse metodo, pois eh rodado apos o updateMergedSNPLoci, que copia os registros da snp_locus para a snp_merge.
     Para mim nao faz sentido esse methodo aqui.
     """
+
     def cleanupSNPLoci(self):
         self.log("verifying SNP loci ...", level=logging.INFO, indent=0)
         self.prepareTableForQuery("snp_locus")
@@ -160,10 +164,10 @@ class UpdaterOperationsMixin:
             " OK: %d duplicate loci\n" % (len(cull),), level=logging.INFO, indent=0
         )
 
-
     """
     
     """
+
     def updateMergedSNPEntrezRoles(self):
         self.log("checking for merged SNP roles ...", level=logging.INFO, indent=0)
         self.prepareTableForQuery("snp_entrez_role")

@@ -1,5 +1,5 @@
 # #################################################
-# UPDATE DOWNLOAD MIXIN 
+# UPDATE DOWNLOAD MIXIN
 # #################################################
 import hashlib
 import os
@@ -45,19 +45,19 @@ class UpdaterDownloadMixin:
             path = os.path.join(iwd, srcName)
             if not os.path.exists(path):
                 os.makedirs(path)
-            downloadedFiles = srcObj.download(options, path) # TODO: podemos colocar os retornos na tabela
+            downloadedFiles = srcObj.download(
+                options, path
+            )  # TODO: podemos colocar os retornos na tabela
 
             # calculate source file metadata
             # all timestamps are assumed to be in UTC, but if a source
             # provides file timestamps with no TZ (like via FTP) we use them
             # as-is and assume they're supposed to be UTC
 
-            
             # for filename in downloadedFiles:
             #     self.fileHash(filename)
 
             return True, None  # ✅ Download successful
-
 
         except Exception as e:
             # No raise exception to continue other sources
@@ -70,4 +70,3 @@ class UpdaterDownloadMixin:
             # self._loki.addWarning(srcObj._sourceID, msn_error)
 
             return False, msn_error  # ❌ Download failed
-

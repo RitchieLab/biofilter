@@ -173,13 +173,8 @@ class SourceDownloadMixin:
         )  # noqa E501
 
     def _downloadHTTP(
-            self,
-            remProtocol,
-            remHost,
-            remFiles,
-            reqHeaders,
-            alwaysDownload
-            ):  # noqa E501
+        self, remProtocol, remHost, remFiles, reqHeaders, alwaysDownload
+    ):  # noqa E501
         _indent = 4
         remSize = {}
         locSize = {}
@@ -207,7 +202,7 @@ class SourceDownloadMixin:
                         # f"{locPath}: downloading (attempt {retries + 1}/{max_retries}) ...",  # noqa E501
                         f"Downloading (attempt {retries + 1}/{max_retries}) from {link}",  # noqa E501
                         level=logging.INFO,
-                        indent=_indent
+                        indent=_indent,
                     )
 
                     if remProtocol == "https":
@@ -229,13 +224,13 @@ class SourceDownloadMixin:
                                 gc.collect()  # collect garbage
                             response.close()
                             # Progress bar showed only
-                            print('  ✅ Download complete.')
+                            print("  ✅ Download complete.")
 
                     else:
                         # For non-HTTPS protocols, use wget as fallback
                         wget.download(link)
                         os.rename(remFiles[locPath].rsplit("/")[-1], locPath)
-                        print('  ✅ Download complete.')
+                        print("  ✅ Download complete.")
 
                     success = True
 
@@ -272,8 +267,4 @@ class SourceDownloadMixin:
                 # raise RuntimeError(f"Failed to download {locPath}")
                 continue
 
-        self.log(
-            "All downloads completed.",
-            level=logging.INFO,
-            indent=_indent
-        )
+        self.log("All downloads completed.", level=logging.INFO, indent=_indent)

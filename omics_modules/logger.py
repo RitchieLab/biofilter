@@ -37,7 +37,9 @@ class Logger:
             # Creating file handler
             log_path = os.path.join(os.getcwd(), log_file)
             file_handler = logging.FileHandler(log_path)
-            file_handler.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(message)s"))
+            file_handler.setFormatter(
+                logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
+            )
 
             # Creating console handler with color formatting
             console_handler = logging.StreamHandler()
@@ -66,6 +68,7 @@ class Logger:
 
     class ColoredFormatter(logging.Formatter):
         """Formatter that adds colors to console output."""
+
         COLORS = {
             logging.DEBUG: Fore.CYAN,
             logging.INFO: Fore.GREEN,

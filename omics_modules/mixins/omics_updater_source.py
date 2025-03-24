@@ -52,14 +52,18 @@ class UpdaterSourceMixin:
                     srcClass = getattr(srcModule, f"Source_{srcName}")
 
                     if not issubclass(srcClass, omics_source.Source):
-                        self.logger.log(f"[WARNING] Invalid module for source: {srcName}")
+                        self.logger.log(
+                            f"[WARNING] Invalid module for source: {srcName}"
+                        )
                         continue
 
                     self._sourceClasses[srcName] = srcClass
                     self.logger.log(f"[INFO] Loaded source module: {srcName}")
 
                 except Exception as e:
-                    self.logger.log(f"[ERROR] Failed to load source module {srcName}: {e}")
+                    self.logger.log(
+                        f"[ERROR] Failed to load source module {srcName}: {e}"
+                    )
                     continue
 
             srcSet.add(srcName)
@@ -81,9 +85,15 @@ class UpdaterSourceMixin:
         for srcName in sources_to_load:
             if srcName not in self._sourceObjects:
                 if srcName not in self._sourceClasses:
-                    raise Exception(f"[ERROR] loadSourceModules() reported false positive for '{srcName}'")
+                    raise Exception(
+                        f"[ERROR] loadSourceModules() reported false positive for '{srcName}'"
+                    )
 
                 # Instantiate source class
-                self._sourceObjects[srcName] = self._sourceClasses[srcName](self._database)
+                self._sourceObjects[srcName] = self._sourceClasses[srcName](
+                    self._database
+                )
                 self._sourceOptions[srcName] = self._sourceObjects[srcName].getOptions()
-                self._sourceVersions[srcName] = self._sourceObjects[srcName].getVersionString()
+                self._sourceVersions[srcName] = self._sourceObjects[
+                    srcName
+                ].getVersionString()

@@ -208,7 +208,7 @@ class DbConfigMixin:
                     self.log(
                         "... ERROR (" + err_msg + ")\n",  # noqa E501
                         level=logging.ERROR,
-                        indent=0
+                        indent=0,
                     )  # noqa E501
 
     def detachDatabaseFile(self, quiet=False):
@@ -306,7 +306,7 @@ class DbConfigMixin:
         self.setDatabaseSetting("optimized", 1)
         self.log(
             "compacting knowledge database file completed\n",
-            level=logging.CRITICAL  # noqa: E501
+            level=logging.CRITICAL,  # noqa: E501
         )  # noqa: E501
 
     # optimizeDatabase()
