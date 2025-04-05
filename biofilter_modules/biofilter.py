@@ -505,7 +505,8 @@ def main():
             )
             outfile.write(
                 encodeLine(
-                    "#   LOKI version %s" % loki_biofilter.db.Database.getVersionString()
+                    "#   LOKI version %s"
+                    % loki_biofilter.db.Database.getVersionString()
                 )  # noqa E501
             )
             outfile.write(encodeLine(""))

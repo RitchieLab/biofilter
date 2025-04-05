@@ -2,10 +2,9 @@ import os
 import json
 import requests
 import pandas as pd
+
 # from utils.logger import Logger
 # from etl.base import BaseETL
-
-
 
 
 class DTP:
@@ -41,7 +40,6 @@ class DTP:
 
         self.logger.log(f"✅ HGNC raw data saved at {raw_json_file}", "INFO")
         return True
-
 
     def transform(self, download_path, processed_path):
         # Caminhos

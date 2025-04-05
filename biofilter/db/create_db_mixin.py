@@ -36,13 +36,22 @@ class CreateDBMixin:
         )
 
         self._seed_from_json(
-            "seed/initial_sourcesystems.json", "etl_models", "SourceSystem", key="source_systems"
+            "seed/initial_sourcesystems.json",
+            "etl_models",
+            "SourceSystem",
+            key="source_systems",
         )
         self._seed_from_json(
-            "seed/initial_datasources.json", "etl_models", "DataSource", key="data_sources"
+            "seed/initial_datasources.json",
+            "etl_models",
+            "DataSource",
+            key="data_sources",
         )
         self._seed_from_json(
-            "seed/initial_etlprocesses.json", "etl_models", "ETLProcess", key="etl_processes"
+            "seed/initial_etlprocesses.json",
+            "etl_models",
+            "ETLProcess",
+            key="etl_processes",
         )
 
     def _seed_from_json(self, file, module_name, model_name, key=None):

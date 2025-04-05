@@ -12,11 +12,7 @@ class MasterEntityLoader:
         name_clean = name.strip().upper()
 
         # Verifica se já existe um EntityName com esse nome
-        existing = (
-            self.session.query(EntityName)
-            .filter_by(name=name_clean)
-            .first()
-        )
+        existing = self.session.query(EntityName).filter_by(name=name_clean).first()
 
         if existing:
             return existing.entity_id, False
@@ -42,7 +38,9 @@ class MasterEntityLoader:
 
         try:
             self.session.commit()
-            self.logger.log(f"✅ Entity created: {name_clean} -> ID {new_entity.id}", "INFO")
+            self.logger.log(
+                f"✅ Entity created: {name_clean} -> ID {new_entity.id}", "INFO"
+            )
             return new_entity.id, True
         except IntegrityError:
             self.session.rollback()
@@ -72,9 +70,14 @@ class MasterEntityLoader:
         self.session.add(alt)
         try:
             self.session.commit()
-            self.logger.log(f"➕ Added alias '{name_clean}' to Entity ID {entity_id}", "DEBUG")
+            self.logger.log(
+                f"➕ Added alias '{name_clean}' to Entity ID {entity_id}", "DEBUG"
+            )
             return True
         except IntegrityError:
             self.session.rollback()
-            self.logger.log(f"⚠️ Could not add alias '{name_clean}' to Entity ID {entity_id}", "WARNING")
+            self.logger.log(
+                f"⚠️ Could not add alias '{name_clean}' to Entity ID {entity_id}",
+                "WARNING",
+            )
             return False

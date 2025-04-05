@@ -1,26 +1,26 @@
-# # tests/conftest.py
-# import sys
-# import os
+# tests/conftest.py
 
-# sys.path.insert(
-#     0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../biofilter"))
-# )
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from biofilter.db.base import Base  # sua declarative base
 from sqlalchemy.pool import StaticPool
+from biofilter.db.base import Base
+
+# 👇 Força o carregamento dos modelos
+import biofilter.db.models  # noqa: F401
 
 
 @pytest.fixture(scope="function")
 def db_session():
-    # SQLite em memória
     engine = create_engine(
         "sqlite:///:memory:",
         connect_args={"check_same_thread": False},
         poolclass=StaticPool,
     )
+
+    # As tabelas só serão criadas se os modelos forem carregados
     Base.metadata.create_all(engine)
+
     Session = sessionmaker(bind=engine)
     session = Session()
 

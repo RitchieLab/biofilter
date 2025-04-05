@@ -58,7 +58,7 @@ class Biofilter:
             source_system=source_system,
             download_path=self.settings.get("download_path"),
             processed_path=self.settings.get("processed_path"),
-            )
+        )
 
         self.logger.log("ETL update process finished.", "INFO")
 

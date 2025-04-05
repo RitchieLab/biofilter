@@ -1,4 +1,3 @@
-
 import pytest
 from biofilter.biofilter import Biofilter
 
@@ -21,7 +20,7 @@ def test_biofilter_init_without_db():
 def test_connect_to_invalid_database_raises_error():
     invalid_path = "tests/nonexistent/fake_database.sqlite"
     with pytest.raises(ValueError) as exc_info:
-        bf = Biofilter(invalid_path) # noqa F841
+        bf = Biofilter(invalid_path)  # noqa F841
     assert "Database not found" in str(exc_info.value)
 
 
@@ -30,7 +29,6 @@ def test_biofilter_connect_db(tmp_sqlite_uri):
     bf.connect_db(tmp_sqlite_uri)
     assert bf.db is not None
     assert bf.db_uri == tmp_sqlite_uri  # NOTE get error in future
-
 
 
 # def test_biofilter_settings_access(tmp_sqlite_uri):

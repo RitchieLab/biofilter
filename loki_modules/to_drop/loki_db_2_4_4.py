@@ -772,7 +772,9 @@ class Database(object):
                 raise Exception("ERROR: knowledge database file cannot be modified")
         except AttributeError:  # apsw.Connection.readonly() added in 3.7.11
             try:
-                self._biofilter.db.cursor().execute("UPDATE `db`.`setting` SET value = value")
+                self._biofilter.db.cursor().execute(
+                    "UPDATE `db`.`setting` SET value = value"
+                )
             except apsw.ReadOnlyError:
                 raise Exception("ERROR: knowledge database file cannot be modified")
         return True
@@ -1234,11 +1236,15 @@ class Database(object):
                 sql = "SELECT i.ldprofile, l.ldprofile_id, l.description, l.metric, l.value FROM (SELECT ? AS ldprofile) AS i LEFT JOIN `db`.`ldprofile` AS l ON LOWER(TRIM(l.ldprofile)) = LOWER(TRIM(i.ldprofile))"
                 ret = {
                     row[0]: row[1:]
-                    for row in self._biofilter.db.cursor().executemany(sql, zip(ldprofiles))
+                    for row in self._biofilter.db.cursor().executemany(
+                        sql, zip(ldprofiles)
+                    )
                 }
             else:
                 sql = "SELECT l.ldprofile, l.ldprofile_id, l.description, l.metric, l.value FROM `db`.`ldprofile` AS l"
-                ret = {row[0]: row[1:] for row in self._biofilter.db.cursor().execute(sql)}
+                ret = {
+                    row[0]: row[1:] for row in self._biofilter.db.cursor().execute(sql)
+                }
         return ret
 
     # getLDProfiles()
@@ -1273,7 +1279,9 @@ class Database(object):
         with self._db:
             ret = {
                 row[0]: row[1]
-                for row in self._biofilter.db.cursor().executemany(sql, zip(relationships))
+                for row in self._biofilter.db.cursor().executemany(
+                    sql, zip(relationships)
+                )
             }
         return ret
 
@@ -1290,7 +1298,8 @@ class Database(object):
         sql = "SELECT i.role, role_id FROM (SELECT ? AS role) AS i LEFT JOIN `db`.`role` AS r ON r.role = LOWER(i.role)"
         with self._db:
             ret = {
-                row[0]: row[1] for row in self._biofilter.db.cursor().executemany(sql, zip(roles))
+                row[0]: row[1]
+                for row in self._biofilter.db.cursor().executemany(sql, zip(roles))
             }
         return ret
 
@@ -1309,12 +1318,16 @@ class Database(object):
             with self._db:
                 ret = {
                     row[0]: row[1]
-                    for row in self._biofilter.db.cursor().executemany(sql, zip(sources))
+                    for row in self._biofilter.db.cursor().executemany(
+                        sql, zip(sources)
+                    )
                 }
         else:
             sql = "SELECT source, source_id FROM `db`.`source`"
             with self._db:
-                ret = {row[0]: row[1] for row in self._biofilter.db.cursor().execute(sql)}
+                ret = {
+                    row[0]: row[1] for row in self._biofilter.db.cursor().execute(sql)
+                }
         return ret
 
     # getSourceIDs()
@@ -1333,7 +1346,8 @@ class Database(object):
         sql = "SELECT option, value FROM `db`.`source_option` WHERE source_id = ?"
         with self._db:
             ret = {
-                row[0]: row[1] for row in self._biofilter.db.cursor().execute(sql, (sourceID,))
+                row[0]: row[1]
+                for row in self._biofilter.db.cursor().execute(sql, (sourceID,))
             }
         return ret
 
@@ -1398,7 +1412,8 @@ class Database(object):
         sql = "SELECT i.type, t.type_id FROM (SELECT ? AS type) AS i LEFT JOIN `db`.`type` AS t ON t.type = LOWER(i.type)"
         with self._db:
             ret = {
-                row[0]: row[1] for row in self._biofilter.db.cursor().executemany(sql, zip(types))
+                row[0]: row[1]
+                for row in self._biofilter.db.cursor().executemany(sql, zip(types))
             }
         return ret
 
@@ -1504,7 +1519,8 @@ ORDER BY sl.chr, sl.pos
         n = numZero = numOne = numMany = 0
         with self._db:
             for row in itertools.chain(
-                self._biofilter.db.cursor().executemany(sql, rses), [(None, None, None, None)]
+                self._biofilter.db.cursor().executemany(sql, rses),
+                [(None, None, None, None)],
             ):
                 if tag != row[0:2]:
                     if tag:
@@ -2044,7 +2060,9 @@ GROUP BY namespace_id
         genoma, essencial para operações de "LiftOver" em dados genômicos.
         """
         sql = "SELECT COUNT() FROM `db`.`chain` WHERE old_ucschg = ? AND new_ucschg = ?"
-        return max(row[0] for row in self._biofilter.db.cursor().execute(sql, (oldHG, newHG)))
+        return max(
+            row[0] for row in self._biofilter.db.cursor().execute(sql, (oldHG, newHG))
+        )
 
     # hasLiftOverChains()
 

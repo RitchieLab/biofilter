@@ -374,7 +374,8 @@ if __name__ == "__main__":
         old, new, generateInputs(f), errorCallback=errorCallback
     ):
         print(
-            "chr%s\t%s\t%d\t%d" % (biofilter.db.chr_name.get(r[1], r[1]), r[0], r[2], r[3]),
+            "chr%s\t%s\t%d\t%d"
+            % (biofilter.db.chr_name.get(r[1], r[1]), r[0], r[2], r[3]),
             end="",
             file=m,
         )

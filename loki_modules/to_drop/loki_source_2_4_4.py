@@ -336,7 +336,9 @@ class Source(object):
 
     def setSourceBuilds(self, grch=None, ucschg=None):
         sql = "UPDATE `db`.`source` SET grch = ?, ucschg = ?, current_ucschg = ? WHERE source_id = ?"
-        self._biofilter.db.cursor().execute(sql, (grch, ucschg, ucschg, self.getSourceID()))
+        self._biofilter.db.cursor().execute(
+            sql, (grch, ucschg, ucschg, self.getSourceID())
+        )
 
     # setSourceBuilds()
 
@@ -404,7 +406,9 @@ class Source(object):
             "INSERT INTO `db`.`biopolymer` (type_id,label,description,source_id) VALUES (?,?,?,%d); SELECT last_insert_rowid()"
             % (self.getSourceID(),)
         )
-        return [row[0] for row in self._biofilter.db.cursor().executemany(sql, biopolymers)]
+        return [
+            row[0] for row in self._biofilter.db.cursor().executemany(sql, biopolymers)
+        ]
 
     # addBiopolymers()
 
@@ -418,7 +422,9 @@ class Source(object):
                 self.getSourceID(),
             )
         )
-        return [row[0] for row in self._biofilter.db.cursor().executemany(sql, biopolymers)]
+        return [
+            row[0] for row in self._biofilter.db.cursor().executemany(sql, biopolymers)
+        ]
 
     # addTypedBiopolymers()
 
@@ -659,7 +665,9 @@ class Source(object):
             new_ucschg,
             self.getSourceID(),
         )
-        return [row[0] for row in self._biofilter.db.cursor().executemany(sql, chain_list)]
+        return [
+            row[0] for row in self._biofilter.db.cursor().executemany(sql, chain_list)
+        ]
 
     # addChains()
 

@@ -12,26 +12,30 @@ class ETLManager:
         self.logger = Logger()
 
     def start_process(
-            self,
-            dtp_script: str = None,
-            source_system: list = None,
-            download_path: str = None,
-            processed_path: str = None,
-        ) -> None:
+        self,
+        dtp_script: str = None,
+        source_system: list = None,
+        download_path: str = None,
+        processed_path: str = None,
+    ) -> None:
         """
         Inicia o(s) processo(s) ETL para todos os DataSources ativos.
         - Se source_systems for fornecido, filtra pelos nomes especificados.
         - Caso contrário, executa para todos os DataSources ativos.
         """
         if source_system is not None:
-            if isinstance(source_system, str) or not isinstance(source_system, Iterable):
+            if isinstance(source_system, str) or not isinstance(
+                source_system, Iterable
+            ):
                 source_system = [source_system]
 
         query = self.session.query(DataSource).filter_by(active=True)
 
         if source_system:
             # filtrar os SourceSystems da lista
-            query = query.join(SourceSystem).filter(SourceSystem.name.in_(source_system))
+            query = query.join(SourceSystem).filter(
+                SourceSystem.name.in_(source_system)
+            )
 
         data_sources = query.all()
 
@@ -43,27 +47,27 @@ class ETLManager:
             process = self._init_or_restart_etl(ds, dtp_script or ds.dtp_version)
 
             try:
-                script_module = importlib.import_module(f"etl.sources.{ds.dtp_version.lower()}")
+                script_module = importlib.import_module(
+                    f"etl.sources.{ds.dtp_version.lower()}"
+                )
 
                 dtp_instance = script_module.DTP(
                     logger=self.logger,
                     datasource=ds,
                     etl_process=process,
                     session=self.session,
-                    
                 )
 
                 # RUN EXTRACT FASE
                 self.logger.log(f"Running extract() for {ds.name}", "INFO")
                 extract_result = dtp_instance.extract(
                     download_path,
-                    )
+                )
 
                 # RUN TRANSFORM FASE
                 self.logger.log(f"Running transform() for {ds.name}", "INFO")
                 transform_df, transform_status = dtp_instance.transform(
-                    download_path,
-                    processed_path
+                    download_path, processed_path
                 )
 
                 # RUN LOAD FASE
@@ -75,18 +79,16 @@ class ETLManager:
                     process,
                     status="completed",
                     records_processed=records,
-                    tables_updated=ds.data_type  # ou outra info mais específica
+                    tables_updated=ds.data_type,  # ou outra info mais específica
                 )
 
             except Exception as e:
-                self.finish_process(
-                    process,
-                    status="failed",
-                    error_message=str(e)
-                )
+                self.finish_process(process, status="failed", error_message=str(e))
                 self.logger.log(f"❌ ETL failed for {ds.name}: {e}", "ERROR")
 
-    def _init_or_restart_etl(self, data_source: DataSource, dtp_script: str) -> ETLProcess:
+    def _init_or_restart_etl(
+        self, data_source: DataSource, dtp_script: str
+    ) -> ETLProcess:
         """
         Cria ou reinicia o processo ETL associado a um único DataSource.
         """
@@ -147,15 +149,6 @@ class ETLManager:
         self.logger.log(
             f"ETLProcess {process.id} finished with status: {status}", "INFO"
         )
-
-
-
-
-
-
-
-
-
 
 
 # # etl/etl_manager.py

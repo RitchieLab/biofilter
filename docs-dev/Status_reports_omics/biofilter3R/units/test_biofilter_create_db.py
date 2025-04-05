@@ -2,6 +2,7 @@ import os
 from pathlib import Path
 import pytest
 from sqlalchemy import inspect
+
 # from biofilter.biofilter.db.database import Database
 from biofilter.biofilter import Biofilter
 
@@ -18,7 +19,6 @@ def test_create_db(temp_db_path):
     bf = Biofilter()
     created = bf.create_db(uri, overwrite=True)
     assert created is True
-
 
     # # Criação da base
     # # created = biofilter.db.create_db(overwrite=True)

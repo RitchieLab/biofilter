@@ -38,7 +38,7 @@
 
 #     bf = Biofilter()
 #     created = bf.create_db(db_path=str(uri))
-    
+
 #     # Para SQLite, checar se arquivo foi criado
 #     if uri.startswith("sqlite:///"):
 #         assert (tmp_path / "biofilter.sqlite").exists()

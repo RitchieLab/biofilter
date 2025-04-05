@@ -308,10 +308,10 @@ class BiopolymerRegion(Base):
             "biopolymer_id", "ldprofile_id", "chr", "posMin", "posMax"
         ),
         Index(
-            "biopolymer_region__ldprofile_chr_min", "ldprofile_id", "chr", "posMin"
+            "biopolymer_region__ldprofile_chr_min", "ldprofile_id", "chr", "posMin"  # noqa E501
         ),  # noqa E501
         Index(
-            "biopolymer_region__ldprofile_chr_max", "ldprofile_id", "chr", "posMax"
+            "biopolymer_region__ldprofile_chr_max", "ldprofile_id", "chr", "posMax"  # noqa E501
         ),  # noqa E501
     )
 
@@ -367,7 +367,7 @@ class GroupName(Base):
     __table_args__ = (
         PrimaryKeyConstraint("group_id", "namespace_id", "name"),
         Index(
-            "group_name__name_namespace_group", "name", "namespace_id", "group_id"
+            "group_name__name_namespace_group", "name", "namespace_id", "group_id"  # noqa E501
         ),  # noqa E501
         Index("group_name__source_name", "source_id", "name"),
     )
@@ -505,3 +505,44 @@ class ChainData(Base):
 
     def __repr__(self):
         return f"<ChainData(chain_id={self.chain_id}, old_start={self.old_start}, old_end={self.old_end})>"  # noqa E501
+
+
+"""
+================================================================================
+Developer Note  Transitional Models from LOKI (APSW) to Biofilter 3R
+================================================================================
+
+This module contains **temporary models** that mirror the legacy structure of
+the original LOKI system, which used APSW (SQLite wrapper) for direct SQL
+access.
+
+Purpose:
+- These SQLAlchemy-based models were introduced to support the transitional
+    development phase of Biofilter version 3R (Refactor, Replace, Rebuild).
+- They allow for consistent interaction with legacy data while the new 3R
+    models and architecture are being finalized.
+
+Key Characteristics:
+- Models reflect the original structure and naming conventions from LOKI.
+- Foreign keys, constraints, and advanced relationships have been omitted for
+    performance and compatibility with the legacy flat schema.
+- Data ingestion routines, lookups, and analyses can still reference these
+    models during migration and testing stages.
+
+Deprecation Notice:
+- These models will be deprecated/removed after the release of Biofilter 3R.
+- All data and functionality will be fully ported to the new canonical schema,
+    which provides typed relationships, entity normalization, and data lineage
+    tracking.
+
+Migration Strategy:
+- Developers are encouraged to begin transitioning all ETL logic and downstream
+    processing to use the new models in `biofilter/models/entity/`, `source/`,
+    and `ontology/`.
+- During the interim, these models will serve as a compatibility bridge only.
+
+================================================================================
+    Author: Andre Garon - Biofilter 3R
+    Date: 2025-04
+================================================================================
+"""

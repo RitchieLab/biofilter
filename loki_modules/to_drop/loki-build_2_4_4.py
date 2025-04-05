@@ -335,7 +335,9 @@ if __name__ == "__main__":
                 biofilter.db.finalizeDatabase()
 
         # optimize?
-        if (not args.no_optimize) and (not biofilter.db.getDatabaseSetting("optimized", int)):
+        if (not args.no_optimize) and (
+            not biofilter.db.getDatabaseSetting("optimized", int)
+        ):
             if not updateOK:
                 print(
                     "WARNING: errors encountered during knowledge database update; skipping optimization step"

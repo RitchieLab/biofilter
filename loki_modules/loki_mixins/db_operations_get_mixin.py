@@ -276,7 +276,9 @@ class DbOperationsGetMixin:
         with self._db:
             ret = {
                 row[0]: row[1]
-                for row in self._biofilter.db.cursor().executemany(sql, zip(roles))  # noqa E501
+                for row in self._biofilter.db.cursor().executemany(
+                    sql, zip(roles)
+                )  # noqa E501
             }
         return ret
 
@@ -311,7 +313,9 @@ class DbOperationsGetMixin:
             with self._db:
                 ret = {
                     row[0]: row[1]
-                    for row in self._biofilter.db.cursor().executemany(sql, zip(sources))
+                    for row in self._biofilter.db.cursor().executemany(
+                        sql, zip(sources)
+                    )
                 }
         else:
             sql = "SELECT source, source_id FROM `db`.`source`"
@@ -354,7 +358,9 @@ class DbOperationsGetMixin:
         with self._db:
             ret = {
                 row[0]: row[1]
-                for row in self._biofilter.db.cursor().execute(sql, (sourceID,))  # noqa E501
+                for row in self._biofilter.db.cursor().execute(
+                    sql, (sourceID,)
+                )  # noqa E501
             }
         return ret
 
@@ -406,7 +412,9 @@ class DbOperationsGetMixin:
         with self._db:
             ret = {
                 row[0]: row[1]
-                for row in self._biofilter.db.cursor().executemany(sql, zip(types))  # noqa E501
+                for row in self._biofilter.db.cursor().executemany(
+                    sql, zip(types)
+                )  # noqa E501
             }
         return ret
 

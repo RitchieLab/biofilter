@@ -224,7 +224,9 @@ class SourceIngestionMixin:
         )
         return [
             row[0]
-            for row in self._biofilter.db.cursor().executemany(sql, biopolymers)  # noqa E501
+            for row in self._biofilter.db.cursor().executemany(
+                sql, biopolymers
+            )  # noqa E501
         ]
 
     def addTypedBiopolymers(self, typeID, biopolymers):
@@ -240,7 +242,9 @@ class SourceIngestionMixin:
         )
         return [
             row[0]
-            for row in self._biofilter.db.cursor().executemany(sql, biopolymers)  # noqa E501
+            for row in self._biofilter.db.cursor().executemany(
+                sql, biopolymers
+            )  # noqa E501
         ]
 
     def addBiopolymerNames(self, biopolymerNames):

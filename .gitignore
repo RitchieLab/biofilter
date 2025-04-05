@@ -137,3 +137,13 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+# Bases de dados
+*.sqlite3
+*.db
+*.sql
+
+# Arquivos grandes em geral
+*.zip
+*.tar.gz
+*.parquet
