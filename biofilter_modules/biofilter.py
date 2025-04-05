@@ -376,13 +376,13 @@ def main():
                 )  # noqa E501
             )
         if options.verify_loki_version and (
-            options.verify_loki_version != loki_db.Database.getVersionString()
+            options.verify_loki_version != loki_biofilter.db.Database.getVersionString()
         ):
             sys.exit(
                 "ERROR: configuration requires LOKI version %s, but this is version %s\n"  # noqa E501
                 % (
                     options.verify_loki_version,
-                    loki_db.Database.getVersionString(),
+                    loki_biofilter.db.Database.getVersionString(),
                 )  # noqa E501
             )
         for source in sorted(sourceVerify):
@@ -505,7 +505,7 @@ def main():
             )
             outfile.write(
                 encodeLine(
-                    "#   LOKI version %s" % loki_db.Database.getVersionString()
+                    "#   LOKI version %s" % loki_biofilter.db.Database.getVersionString()
                 )  # noqa E501
             )
             outfile.write(encodeLine(""))
@@ -524,7 +524,7 @@ def main():
                         '%-35s "%s"'
                         % (
                             "VERIFY_LOKI_VERSION",
-                            loki_db.Database.getVersionString(),
+                            loki_biofilter.db.Database.getVersionString(),
                         )
                     )
                 )

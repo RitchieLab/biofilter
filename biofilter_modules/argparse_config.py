@@ -200,11 +200,11 @@ def get_parser(version):
         """
         % (
             "LOKI",
-            loki_db.Database.getVersionString(),
-            loki_db.Database.getDatabaseDriverName(),
-            loki_db.Database.getDatabaseDriverVersion(),
-            loki_db.Database.getDatabaseInterfaceName(),
-            loki_db.Database.getDatabaseInterfaceVersion(),
+            loki_biofilter.db.Database.getVersionString(),
+            loki_biofilter.db.Database.getDatabaseDriverName(),
+            loki_biofilter.db.Database.getDatabaseDriverVersion(),
+            loki_biofilter.db.Database.getDatabaseInterfaceName(),
+            loki_biofilter.db.Database.getDatabaseInterfaceVersion(),
         ),
     )
     group.add_argument(

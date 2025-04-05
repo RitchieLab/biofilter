@@ -20,7 +20,7 @@ class liftOver(object):
 
     Attributes:
     -----------
-    _db : loki_db.Database
+    _db : loki_biofilter.db.Database
             Instance of the LOKI database used for storing chain data.
     _old_ucschg : int
             Version of the old assembly (e.g., 19).
@@ -60,7 +60,7 @@ class liftOver(object):
 
         Parameters:
         -----------
-        db : loki_db.Database
+        db : loki_biofilter.db.Database
                 Instance of the LOKI database containing chain data.
         old_ucschg : int
                 Version of the old assembly (e.g., 19).
@@ -69,7 +69,7 @@ class liftOver(object):
         cached : bool, optional
                 Flag indicating whether to use cached chain data (default is False).
         """
-        # db is a loki_db.Database object
+        # db is a loki_biofilter.db.Database object
         self._db = db
         self._old_ucschg = old_ucschg
         self._new_ucschg = new_ucschg
@@ -87,11 +87,11 @@ class liftOver(object):
         This method constructs a cached representation of chain data for
         optimized region mapping.
         """
-        for row in self._db._db.cursor().execute(
+        for row in self._biofilter.db._biofilter.db.cursor().execute(
             "SELECT chain_id, old_chr, score, chain.old_start, "
             + "chain.old_end, chain.new_start, is_fwd, new_chr, "
             + "chain_data.old_start, chain_data.old_end, chain_data.new_start "
-            + "FROM db.chain INNER JOIN db.chain_data USING (chain_id) "
+            + "FROM biofilter.db.chain INNER JOIN biofilter.db.chain_data USING (chain_id) "
             + "WHERE old_ucschg=? AND new_ucschg=?"
             + "ORDER BY old_chr, score DESC, chain_data.old_start",
             (self._old_ucschg, self._new_ucschg),
@@ -138,7 +138,7 @@ class liftOver(object):
         segments that overlap with the specified region.
         """
         if not self._cached:
-            for row in self._db._db.cursor().execute(
+            for row in self._biofilter.db._biofilter.db.cursor().execute(
                 "SELECT chain.chain_id, chain_data.old_start, chain_data.old_end, chain_data.new_start, is_fwd, new_chr "
                 + "FROM chain INNER JOIN chain_data ON chain.chain_id = chain_data.chain_id "
                 + "WHERE old_ucschg=? AND new_ucschg=? AND old_chr=? AND chain.old_end>=? AND chain.old_start<? AND chain_data.old_end>=? AND chain_data.old_start<? "
@@ -312,7 +312,7 @@ if __name__ == "__main__":
         )
         sys.exit(2)
 
-    db = loki_db.Database(sys.argv[2])
+    db = loki_biofilter.db.Database(sys.argv[2])
 
     old = int(sys.argv[5]) if (len(sys.argv) > 5) else 19
     new = int(sys.argv[6]) if (len(sys.argv) > 6) else 38
@@ -348,7 +348,7 @@ if __name__ == "__main__":
                 wds[0] = wds[0][3:]
             yield (
                 l.strip().replace(" ", ":").replace("\t", ":"),
-                db.chr_num.get(wds[0], -1),
+                biofilter.db.chr_num.get(wds[0], -1),
                 int(wds[1]),
                 int(wds[2]),
                 None,
@@ -370,11 +370,11 @@ if __name__ == "__main__":
         """
         print("\t".join(str(c) for c in r), end="", file=u)
 
-    for r in db.generateLiftOverRegions(
+    for r in biofilter.db.generateLiftOverRegions(
         old, new, generateInputs(f), errorCallback=errorCallback
     ):
         print(
-            "chr%s\t%s\t%d\t%d" % (db.chr_name.get(r[1], r[1]), r[0], r[2], r[3]),
+            "chr%s\t%s\t%d\t%d" % (biofilter.db.chr_name.get(r[1], r[1]), r[0], r[2], r[3]),
             end="",
             file=m,
         )

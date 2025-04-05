@@ -17,10 +17,10 @@ class Source(
 ):  # noqa E501
 
     def __init__(self, lokidb):
-        assert isinstance(lokidb, loki_db.Database)
+        assert isinstance(lokidb, loki_biofilter.db.Database)
         assert self.__class__.__name__.startswith("Source_")
         self._loki = lokidb
-        self._db = lokidb._db
+        self._db = lokibiofilter.db._db
         self._sourceID = self.addSource(self.getSourceName())
         assert self._sourceID > 0
 
@@ -93,7 +93,7 @@ class Source(
         return self._loki.prepareTableForQuery(table)
 
     def deleteAll(self):
-        dbc = self._db.cursor()
+        dbc = self._biofilter.db.cursor()
         tables = [
             "snp_merge",
             "snp_locus",

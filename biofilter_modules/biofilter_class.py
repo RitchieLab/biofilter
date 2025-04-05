@@ -168,13 +168,13 @@ class Biofilter(
 
         # verify loki_db version 'extra' input support in generateLiftOver*()
         minLoki = (2, 2, 1, "a", 2)
-        if loki_db.Database.getVersionTuple() < minLoki:
+        if loki_biofilter.db.Database.getVersionTuple() < minLoki:
             # sys.exit(
             #     "ERROR: LOKI version %d.%d.%d%s%s later required; found %s"
             #     % minLoki  # noqa: E501
-            #     + (loki_db.Database.getVersionString(),)
+            #     + (loki_biofilter.db.Database.getVersionString(),)
             # )
-            found_version = loki_db.Database.getVersionString()
+            found_version = loki_biofilter.db.Database.getVersionString()
             sys.exit(
                 "ERROR: LOKI version %d.%d.%d%s%s or later required; found %s"
                 % (
@@ -184,7 +184,7 @@ class Biofilter(
             )
 
         # initialize instance database
-        self._loki = loki_db.Database()
+        self._loki = loki_biofilter.db.Database()
         # self._loki.setLogger(self)
         for db in self._schema:
             if db != "main":

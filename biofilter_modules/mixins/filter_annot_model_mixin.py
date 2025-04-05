@@ -354,8 +354,8 @@ class FilterAnnotModelMixin:
         self.prepareTablesForQuery(queryA)
 
         # generate filtered results and annotate each of them
-        cursorF = self._loki._db.cursor()
-        cursorA = self._loki._db.cursor()
+        cursorF = self._loki._biofilter.db.cursor()
+        cursorA = self._loki._biofilter.db.cursor()
         if self._options.debug_query:
             self.warn("========== annotation : filter step ==========\n")
             self.warn(sqlF + "\n")
@@ -450,7 +450,7 @@ class FilterAnnotModelMixin:
             candidates.
         - Logs progress to report the count of identified candidates.
         """
-        cursor = self._loki._db.cursor()
+        cursor = self._loki._biofilter.db.cursor()
 
         # reset candidate tables
         self._inputFilters["cand"]["main_biopolymer"] = 0
@@ -555,7 +555,7 @@ class FilterAnnotModelMixin:
             groups.
         """
         self.log("identifying candidiate model groups ...")
-        cursor = self._loki._db.cursor()
+        cursor = self._loki._biofilter.db.cursor()
 
         # reset candidate table
         self._inputFilters["cand"]["group"] = 0
@@ -816,7 +816,7 @@ class FilterAnnotModelMixin:
             enabled, to assist with debugging and viewing SQL execution plans.
         """
         # TODO user knowledge
-        cursor = self._loki._db.cursor()
+        cursor = self._loki._biofilter.db.cursor()
         limit = max(0, self._options.maximum_model_count)
 
         # if we'll need baseline gene models, generate them first

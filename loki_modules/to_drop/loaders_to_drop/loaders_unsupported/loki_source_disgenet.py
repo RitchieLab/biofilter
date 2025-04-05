@@ -20,7 +20,7 @@ class Source_disgenet(loki_source.Source):
         self.downloadFilesFromHTTP(
             "disgenet.org",
             {
-                "disgenet_2020.db.gz": "/static/disgenet_ap1/files/sqlite_downloads/current/disgenet_2020.db.gz",
+                "disgenet_2020.biofilter.db.gz": "/static/disgenet_ap1/files/sqlite_downloads/current/disgenet_2020.biofilter.db.gz",
             },
         )
 
@@ -50,7 +50,7 @@ class Source_disgenet(loki_source.Source):
 
         # process disgenet sqlite file
         self.log("processing diseases ...")
-        gunzip("disgenet_2020.db.gz")
+        gunzip("disgenet_2020.biofilter.db.gz")
         diseases = {}
         diseaseClass = {}
         con = apsw.Connection("disgenet_2020.db")

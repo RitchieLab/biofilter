@@ -21,7 +21,7 @@ class DbSchemaMixin:
                     ("finalized", "0"),
                 ],
                 "index": {},
-            },  # .db.setting
+            },  # .biofilter.db.setting
             ##################################################
             # metadata tables
             "grch_ucschg": {
@@ -41,7 +41,7 @@ class DbSchemaMixin:
                     (38, 38),
                 ],
                 "index": {},
-            },  # .db.grch_ucschg
+            },  # .biofilter.db.grch_ucschg
             "ldprofile": {
                 "table": """
                     (
@@ -53,7 +53,7 @@ class DbSchemaMixin:
                     )
                     """,
                 "index": {},
-            },  # .db.ldprofile
+            },  # .biofilter.db.ldprofile
             "namespace": {
                 "table": """
                     (
@@ -63,7 +63,7 @@ class DbSchemaMixin:
                     )
                     """,
                 "index": {},
-            },  # .db.namespace
+            },  # .biofilter.db.namespace
             "relationship": {
                 "table": """
                     (
@@ -72,7 +72,7 @@ class DbSchemaMixin:
                     )
                     """,
                 "index": {},
-            },  # .db.relationship
+            },  # .biofilter.db.relationship
             "role": {
                 "table": """
                     (
@@ -84,7 +84,7 @@ class DbSchemaMixin:
                     )
                     """,
                 "index": {},
-            },  # .db.role
+            },  # .biofilter.db.role
             "source": {
                 "table": """
                     (
@@ -99,7 +99,7 @@ class DbSchemaMixin:
                     )
                     """,
                 "index": {},
-            },  # .db.source
+            },  # .biofilter.db.source
             "source_option": {
                 "table": """
                     (
@@ -110,7 +110,7 @@ class DbSchemaMixin:
                     )
                     """,
                 "index": {},
-            },  # .db.source_option
+            },  # .biofilter.db.source_option
             "source_file": {
                 "table": """
                     (
@@ -123,7 +123,7 @@ class DbSchemaMixin:
                     )
                     """,
                 "index": {},
-            },  # .db.source_file
+            },  # .biofilter.db.source_file
             "type": {
                 "table": """
                     (
@@ -132,7 +132,7 @@ class DbSchemaMixin:
                     )
                     """,
                 "index": {},
-            },  # .db.type
+            },  # .biofilter.db.type
             # # NOTE: NEW TABLE
             # "subtype": {
             #     "table": """
@@ -142,7 +142,7 @@ class DbSchemaMixin:
             #         )
             #         """,
             #     "index": {},
-            # },  # .db.subtype
+            # },  # .biofilter.db.subtype
             "warning": {
                 "table": """
                     (
@@ -154,7 +154,7 @@ class DbSchemaMixin:
                 "index": {
                     "warning__source": "(source_id)",
                 },
-            },  # .db.warning
+            },  # .biofilter.db.warning
             ##################################################
             # snp tables
             # 🚧 TODO Revisar se vamos manter indice composto ou simples.
@@ -169,7 +169,7 @@ class DbSchemaMixin:
                 "index": {
                     "snp_merge__merge_current": "(rsMerged,rsCurrent)",
                 },
-            },  # .db.snp_merge
+            },  # .biofilter.db.snp_merge
             "snp_locus": {  # all coord in LOKI are 1-based closed intervals
                 "table": """
                     (
@@ -187,7 +187,7 @@ class DbSchemaMixin:
                     # file size 'snp_locus__valid_chr_pos_rs':
                     # '(validated,chr,pos,rs)',
                 },
-            },  # .db.snp_locus
+            },  # .biofilter.db.snp_locus
             "snp_entrez_role": {
                 "table": """
                     (
@@ -200,7 +200,7 @@ class DbSchemaMixin:
                 "index": {
                     "snp_entrez_role__rs_entrez_role": "(rs,entrez_id,role_id)",  # noqa E501
                 },
-            },  # .db.snp_entrez_role
+            },  # .biofilter.db.snp_entrez_role
             "snp_biopolymer_role": {
                 "table": """
                     (
@@ -214,7 +214,7 @@ class DbSchemaMixin:
                     "snp_biopolymer_role__rs_biopolymer_role": "(rs,biopolymer_id,role_id)",  # noqa E501
                     "snp_biopolymer_role__biopolymer_rs_role": "(biopolymer_id,rs,role_id)",  # noqa E501
                 },
-            },  # .db.snp_biopolymer_role
+            },  # .biofilter.db.snp_biopolymer_role
             ##################################################
             # biopolymer tables
             "biopolymer": {
@@ -231,7 +231,7 @@ class DbSchemaMixin:
                     "biopolymer__type": "(type_id)",
                     "biopolymer__label_type": "(label,type_id)",
                 },
-            },  # .db.biopolymer
+            },  # .biofilter.db.biopolymer
             "biopolymer_name": {
                 "table": """
                     (
@@ -245,7 +245,7 @@ class DbSchemaMixin:
                 "index": {
                     "biopolymer_name__name_namespace_biopolymer": "(name,namespace_id,biopolymer_id)",  # noqa E501
                 },
-            },  # .db.biopolymer_name
+            },  # .biofilter.db.biopolymer_name
             "biopolymer_name_name": {
                 # PRIMARY KEY column order satisfies the need to GROUP BY new_namespace_id, new_name  # noqa E501
                 "table": """
@@ -260,7 +260,7 @@ class DbSchemaMixin:
                     )
                     """,
                 "index": {},
-            },  # .db.biopolymer_name_name
+            },  # .biofilter.db.biopolymer_name_name
             "biopolymer_region": {  # all coordinates in LOKI are 1-based closed intervals  # noqa E501
                 "table": """
                     (
@@ -277,7 +277,7 @@ class DbSchemaMixin:
                     "biopolymer_region__ldprofile_chr_min": "(ldprofile_id,chr,posMin)",  # noqa E501
                     "biopolymer_region__ldprofile_chr_max": "(ldprofile_id,chr,posMax)",  # noqa E501
                 },
-            },  # .db.biopolymer_region
+            },  # .biofilter.db.biopolymer_region
             "biopolymer_zone": {
                 "table": """
                     (
@@ -290,7 +290,7 @@ class DbSchemaMixin:
                 "index": {
                     "biopolymer_zone__zone": "(chr,zone,biopolymer_id)",
                 },
-            },  # .db.biopolymer_zone
+            },  # .biofilter.db.biopolymer_zone
             ##################################################
             # group tables
             "group": {
@@ -307,7 +307,7 @@ class DbSchemaMixin:
                     "group__type": "(type_id)",
                     "group__label_type": "(label,type_id)",
                 },
-            },  # .db.group
+            },  # .biofilter.db.group
             "group_name": {
                 "table": """
                     (
@@ -322,7 +322,7 @@ class DbSchemaMixin:
                     "group_name__name_namespace_group": "(name,namespace_id,group_id)",  # noqa E501
                     "group_name__source_name": "(source_id,name)",
                 },
-            },  # .db.group_name
+            },  # .biofilter.db.group_name
             "group_group": {
                 "table": """
                     (
@@ -338,7 +338,7 @@ class DbSchemaMixin:
                 "index": {
                     "group_group__related": "(related_group_id,group_id)",
                 },
-            },  # .db.group_group
+            },  # .biofilter.db.group_group
             "group_biopolymer": {
                 "table": """
                     (
@@ -354,7 +354,7 @@ class DbSchemaMixin:
                 "index": {
                     "group_biopolymer__biopolymer": "(biopolymer_id,group_id)",
                 },
-            },  # .db.group_biopolymer
+            },  # .biofilter.db.group_biopolymer
             "group_member_name": {
                 "table": """
                     (
@@ -368,7 +368,7 @@ class DbSchemaMixin:
                     )
                     """,
                 "index": {},
-            },  # .db.group_member_name
+            },  # .biofilter.db.group_member_name
             ##################################################
             # gwas tables
             "gwas": {  # all coordinates in LOKI are 1-based closed intervals
@@ -391,7 +391,7 @@ class DbSchemaMixin:
                     "gwas__rs": "(rs)",
                     "gwas__chr_pos": "(chr,pos)",
                 },
-            },  # .db.gwas
+            },  # .biofilter.db.gwas
             ##################################################
             # liftover tables
             "chain": {  # all coordinates in LOKI are 1-based closed intervals
@@ -414,7 +414,7 @@ class DbSchemaMixin:
                 "index": {
                     "chain__oldhg_newhg_chr": "(old_ucschg,new_ucschg,old_chr)",  # noqa E501
                 },
-            },  # .db.chain
+            },  # .biofilter.db.chain
             "chain_data": {  # all coordi in LOKI are 1-based closed intervals
                 "table": """
                     (
@@ -429,6 +429,6 @@ class DbSchemaMixin:
                 "index": {
                     "chain_data__end": "(chain_id,old_end)",
                 },
-            },  # .db.chain_data
+            },  # .biofilter.db.chain_data
         },  # .db
     }  # _schema{}

@@ -35,7 +35,7 @@ class DbSchemaMaintenanceMixin:
         The function creates the specified tables and indices, inserting
             initial data if provided in the schema.
         """
-        cursor = self._db.cursor()
+        cursor = self._biofilter.db.cursor()
         schema = schema or self._schema[dbName]
         dbType = "TEMP " if (dbName == "temp") else ""
         if tblList and isinstance(tblList, str):
@@ -151,7 +151,7 @@ class DbSchemaMaintenanceMixin:
 
         The function drops the specified tables and indices from the database.
         """
-        cursor = self._db.cursor()
+        cursor = self._biofilter.db.cursor()
         schema = schema or self._schema[dbName]
         if tblList and isinstance(tblList, str):
             tblList = (tblList,)
@@ -219,7 +219,7 @@ class DbSchemaMaintenanceMixin:
         Raises:
             Exception: If an error occurs during the schema update process.
         """
-        cursor = self._db.cursor()
+        cursor = self._biofilter.db.cursor()
 
         if self.getDatabaseSetting("schema", int) < 2:
             self.log(
@@ -302,7 +302,7 @@ class DbSchemaMaintenanceMixin:
         It logs warnings and errors for mismatches and repairs.
         """
         # fetch current schema
-        cursor = self._db.cursor()
+        cursor = self._biofilter.db.cursor()
         current = dict()
         dbMaster = (
             "`sqlite_temp_master`"

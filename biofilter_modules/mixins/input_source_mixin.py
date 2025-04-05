@@ -53,7 +53,7 @@ class SourceInputMixin:
         """
         # names=[ name, ... ]
         self.logPush("adding to %s source filter ...\n" % db)
-        cursor = self._loki._db.cursor()
+        cursor = self._loki._biofilter.db.cursor()
 
         self.prepareTableForUpdate(db, "source")
         sql = (
@@ -126,7 +126,7 @@ class SourceInputMixin:
         if not self._inputFilters[db]["source"]:
             return self.unionInputSources(db, names, errorCallback)
         self.logPush("reducing %s source filter ...\n" % db)
-        cursor = self._loki._db.cursor()
+        cursor = self._loki._biofilter.db.cursor()
 
         self.prepareTableForQuery(db, "source")
         cursor.execute("UPDATE `%s`.`source` SET flag = 0" % db)

@@ -161,7 +161,7 @@ class ParisMixin:
         statistical context of identified features.
         """
         self.logPush("running PARIS ...\n")
-        cursor = self._loki._db.cursor()
+        cursor = self._loki._biofilter.db.cursor()
 
         if not self._inputFilters["main"]["region"]:
             raise Exception("PARIS requires input feature regions")

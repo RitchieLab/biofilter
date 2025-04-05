@@ -25,10 +25,10 @@ class Updater(
     # constructor
 
     def __init__(self, lokidb, is_test=False):
-        assert isinstance(lokidb, loki_db.Database)
+        assert isinstance(lokidb, loki_biofilter.db.Database)
         self._is_test = is_test
         self._loki = lokidb
-        self._db = lokidb._db
+        self._db = lokibiofilter.db._db
         self._sourceLoaders = {}
         self._sourceClasses = dict()
         self._sourceObjects = dict()

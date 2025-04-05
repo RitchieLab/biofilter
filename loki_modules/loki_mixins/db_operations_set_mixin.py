@@ -11,7 +11,7 @@ class DbOperationsSetMixin:
         Returns:
             None
         """
-        self._db.cursor().execute(
+        self._biofilter.db.cursor().execute(
             "INSERT INTO `db`.warning (source_id, warning) VALUES (?, ?)",  # noqa E501
             (source_id, warning),
         )
@@ -27,7 +27,7 @@ class DbOperationsSetMixin:
         Returns:
             None
         """
-        self._db.cursor().execute(
+        self._biofilter.db.cursor().execute(
             "INSERT OR REPLACE INTO `db`.`setting` (setting, value) VALUES (?, ?)",  # noqa E501
             (setting, value),
         )

@@ -17,7 +17,7 @@ class DbOperationsGetMixin:
         """
         value = None
         if self._dbFile:
-            for row in self._db.cursor().execute(
+            for row in self._biofilter.db.cursor().execute(
                 "SELECT value FROM `db`.`setting` WHERE setting = ?",
                 (setting,),  # noqa E501
             ):
@@ -96,7 +96,7 @@ class DbOperationsGetMixin:
         """
         return (
             row[0]
-            for row in self._db.cursor().execute(
+            for row in self._biofilter.db.cursor().execute(
                 "SELECT grch FROM grch_ucschg WHERE ucschg = ?", (ucschg,)
             )
         )
@@ -113,7 +113,7 @@ class DbOperationsGetMixin:
             value, or None if not found.
         """
         ucschg = None
-        for row in self._db.cursor().execute(
+        for row in self._biofilter.db.cursor().execute(
             "SELECT ucschg FROM grch_ucschg WHERE grch = ?", (grch,)
         ):
             ucschg = row[0]
@@ -148,7 +148,7 @@ class DbOperationsGetMixin:
         with self._db:
             ret = {
                 row[0]: row[1]
-                for row in self._db.cursor().executemany(sql, zip(ldprofiles))
+                for row in self._biofilter.db.cursor().executemany(sql, zip(ldprofiles))
             }
         return ret
 
@@ -171,14 +171,14 @@ class DbOperationsGetMixin:
                 sql = "SELECT i.ldprofile, l.ldprofile_id, l.description, l.metric, l.value FROM (SELECT ? AS ldprofile) AS i LEFT JOIN `db`.`ldprofile` AS l ON LOWER(TRIM(l.ldprofile)) = LOWER(TRIM(i.ldprofile))"  # noqa E501
                 ret = {
                     row[0]: row[1:]
-                    for row in self._db.cursor().executemany(
+                    for row in self._biofilter.db.cursor().executemany(
                         sql, zip(ldprofiles)
                     )  # noqa E501
                 }
             else:
                 sql = "SELECT l.ldprofile, l.ldprofile_id, l.description, l.metric, l.value FROM `db`.`ldprofile` AS l"  # noqa E501
                 ret = {
-                    row[0]: row[1:] for row in self._db.cursor().execute(sql)
+                    row[0]: row[1:] for row in self._biofilter.db.cursor().execute(sql)
                 }  # noqa E501
         return ret
 
@@ -210,7 +210,7 @@ class DbOperationsGetMixin:
         with self._db:
             ret = {
                 row[0]: row[1]
-                for row in self._db.cursor().executemany(sql, zip(namespaces))
+                for row in self._biofilter.db.cursor().executemany(sql, zip(namespaces))
             }
         return ret
 
@@ -242,7 +242,7 @@ class DbOperationsGetMixin:
         with self._db:
             ret = {
                 row[0]: row[1]
-                for row in self._db.cursor().executemany(
+                for row in self._biofilter.db.cursor().executemany(
                     sql, zip(relationships)
                 )  # noqa E501
             }
@@ -276,7 +276,7 @@ class DbOperationsGetMixin:
         with self._db:
             ret = {
                 row[0]: row[1]
-                for row in self._db.cursor().executemany(sql, zip(roles))  # noqa E501
+                for row in self._biofilter.db.cursor().executemany(sql, zip(roles))  # noqa E501
             }
         return ret
 
@@ -311,13 +311,13 @@ class DbOperationsGetMixin:
             with self._db:
                 ret = {
                     row[0]: row[1]
-                    for row in self._db.cursor().executemany(sql, zip(sources))
+                    for row in self._biofilter.db.cursor().executemany(sql, zip(sources))
                 }
         else:
             sql = "SELECT source, source_id FROM `db`.`source`"
             with self._db:
                 ret = {
-                    row[0]: row[1] for row in self._db.cursor().execute(sql)
+                    row[0]: row[1] for row in self._biofilter.db.cursor().execute(sql)
                 }  # noqa E501
         return ret
 
@@ -334,7 +334,7 @@ class DbOperationsGetMixin:
         sql = "SELECT version FROM `db`.`source` WHERE source_id = ?"
         ret = None
         with self._db:
-            for row in self._db.cursor().execute(sql, (sourceID,)):
+            for row in self._biofilter.db.cursor().execute(sql, (sourceID,)):
                 ret = row[0]
         return ret
 
@@ -354,7 +354,7 @@ class DbOperationsGetMixin:
         with self._db:
             ret = {
                 row[0]: row[1]
-                for row in self._db.cursor().execute(sql, (sourceID,))  # noqa E501
+                for row in self._biofilter.db.cursor().execute(sql, (sourceID,))  # noqa E501
             }
         return ret
 
@@ -374,7 +374,7 @@ class DbOperationsGetMixin:
         with self._db:
             ret = {
                 row[0]: tuple(row[1:])
-                for row in self._db.cursor().execute(sql, (sourceID,))
+                for row in self._biofilter.db.cursor().execute(sql, (sourceID,))
             }
         return ret
 
@@ -406,7 +406,7 @@ class DbOperationsGetMixin:
         with self._db:
             ret = {
                 row[0]: row[1]
-                for row in self._db.cursor().executemany(sql, zip(types))  # noqa E501
+                for row in self._biofilter.db.cursor().executemany(sql, zip(types))  # noqa E501
             }
         return ret
 
@@ -441,6 +441,6 @@ class DbOperationsGetMixin:
         with self._db:
             ret = {
                 row[0]: row[1]
-                for row in self._db.cursor().executemany(sql, zip(subtypes))
+                for row in self._biofilter.db.cursor().executemany(sql, zip(subtypes))
             }
         return ret

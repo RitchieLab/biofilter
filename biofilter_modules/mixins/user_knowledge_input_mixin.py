@@ -60,7 +60,7 @@ class UserKnowledgeInputMixin:
         self.log("adding user-defined source '%s' ..." % (label,))
         self._inputFilters["user"]["source"] += 1
         usourceID = -self._inputFilters["user"]["source"]
-        cursor = self._loki._db.cursor()
+        cursor = self._loki._biofilter.db.cursor()
         cursor.execute(
             "INSERT INTO `user`.`source` (source_id,source,description) VALUES (?,?,?)",  # noqa: E501
             (usourceID, label, description),
@@ -104,7 +104,7 @@ class UserKnowledgeInputMixin:
         self.log("adding user-defined group '%s' ..." % (label,))
         self._inputFilters["user"]["group"] += 1
         ugroupID = -self._inputFilters["user"]["group"]
-        cursor = self._loki._db.cursor()
+        cursor = self._loki._biofilter.db.cursor()
         cursor.execute(
             "INSERT INTO `user`.`group` (group_id,label,description,source_id) VALUES (?,?,?,?)",  # noqa: E501
             (ugroupID, label, description, usourceID),
@@ -155,7 +155,7 @@ class UserKnowledgeInputMixin:
         # TODO: apply ambiguity settings and heuristics?
         # namesets=[ [ (ns,name,extra), ...], ... ]
         self.logPush("adding genes to user-defined group ...\n")
-        cursor = self._loki._db.cursor()
+        cursor = self._loki._biofilter.db.cursor()
 
         sql = (
             "INSERT OR IGNORE INTO `user`.`group_biopolymer` (group_id,biopolymer_id) VALUES (%d,?4)"  # noqa: E501
@@ -214,7 +214,7 @@ class UserKnowledgeInputMixin:
             `user.group_biopolymer`, including:
                 - Distinct user-defined groups from `user.group`.
                 - Biopolymer groups (`group_biopolymer`) mapped within the
-                database (`db.group_biopolymer`).
+                database (`biofilter.db.group_biopolymer`).
             - After insertion, counts and logs the number of groups added to
             `main.group`.
             - Increments the filter counter for `main.group`.
@@ -224,7 +224,7 @@ class UserKnowledgeInputMixin:
             - Inserts data into the `main.gene` table from
             `user.group_biopolymer`, including:
                 - Genes associated with biopolymers in `user.group_biopolymer`
-                mapped within the database `db.biopolymer`.
+                mapped within the database `biofilter.db.biopolymer`.
             - After insertion, counts and logs the number of genes added to
             `main.gene`.
             - Increments the filter counter for `main.gene`.
@@ -240,7 +240,7 @@ class UserKnowledgeInputMixin:
         or gene filters.
         """
 
-        cursor = self._loki._db.cursor()
+        cursor = self._loki._biofilter.db.cursor()
         if grouplevel:
             self.logPush(
                 "applying user-defined knowledge to main group filter ...\n"

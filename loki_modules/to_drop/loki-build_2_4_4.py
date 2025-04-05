@@ -12,7 +12,7 @@ from loki_modules import loki_db
 
 
 if __name__ == "__main__":
-    version = "LOKI version %s" % (loki_db.Database.getVersionString())
+    version = "LOKI version %s" % (loki_biofilter.db.Database.getVersionString())
 
     # define arguments
     parser = argparse.ArgumentParser(
@@ -25,10 +25,10 @@ if __name__ == "__main__":
         version=version
         + "\n%s version %s\n%s version %s"
         % (
-            loki_db.Database.getDatabaseDriverName(),
-            loki_db.Database.getDatabaseDriverVersion(),
-            loki_db.Database.getDatabaseInterfaceName(),
-            loki_db.Database.getDatabaseInterfaceVersion(),
+            loki_biofilter.db.Database.getDatabaseDriverName(),
+            loki_biofilter.db.Database.getDatabaseDriverVersion(),
+            loki_biofilter.db.Database.getDatabaseInterfaceName(),
+            loki_biofilter.db.Database.getDatabaseInterfaceVersion(),
         ),
     )
     parser.add_argument(
@@ -198,9 +198,9 @@ if __name__ == "__main__":
         os.environ["TMPDIR"] = os.path.abspath(args.temp_directory)
 
     # instantiate database object
-    db = loki_db.Database(testing=args.test_data, updating=True)
-    db.setVerbose(args.verbose or (not args.quiet))
-    db.attachDatabaseFile(args.knowledge)
+    db = loki_biofilter.db.Database(testing=args.test_data, updating=True)
+    biofilter.db.setVerbose(args.verbose or (not args.quiet))
+    biofilter.db.attachDatabaseFile(args.knowledge)
 
     # list sources?
     if args.list_sources != None:
@@ -212,8 +212,8 @@ if __name__ == "__main__":
             srcSet = set()
         else:
             print("source loader options:")
-        moduleVersions = db.getSourceModuleVersions(srcSet)
-        moduleOptions = db.getSourceModuleOptions(srcSet)
+        moduleVersions = biofilter.db.getSourceModuleVersions(srcSet)
+        moduleOptions = biofilter.db.getSourceModuleOptions(srcSet)
         for srcName in sorted(moduleOptions.keys()):
             print("  %s : %s" % (srcName, moduleVersions[srcName]))
             if moduleOptions[srcName]:
@@ -251,13 +251,13 @@ if __name__ == "__main__":
     # update?
     updateOK = True
     if (srcSet != None) or (notSet != None):
-        db.testDatabaseWriteable()
-        if db.getDatabaseSetting("finalized", int):
+        biofilter.db.testDatabaseWriteable()
+        if biofilter.db.getDatabaseSetting("finalized", int):
             print("ERROR: cannot update a finalized database")
             sys.exit(1)
         if srcSet and "+" in srcSet:
             srcSet = set()
-        srcSet = (srcSet or set(db.getSourceModules())) - (notSet or set())
+        srcSet = (srcSet or set(biofilter.db.getSourceModules())) - (notSet or set())
 
         # create temp directory and unpack input archive, if any
         startDir = os.getcwd()
@@ -300,7 +300,7 @@ if __name__ == "__main__":
             # if fromArchive
 
             os.chdir(cacheDir)
-            updateOK = db.updateDatabase(
+            updateOK = biofilter.db.updateDatabase(
                 srcSet, userOptions, args.cache_only, args.force_update
             )
             os.chdir(startDir)
@@ -325,23 +325,23 @@ if __name__ == "__main__":
 
     if args.knowledge:
         # finalize?
-        if args.finalize and (not db.getDatabaseSetting("finalized", int)):
+        if args.finalize and (not biofilter.db.getDatabaseSetting("finalized", int)):
             if not updateOK:
                 print(
                     "WARNING: errors encountered during knowledge database update; skipping finalization step"
                 )
             else:
-                db.testDatabaseWriteable()
-                db.finalizeDatabase()
+                biofilter.db.testDatabaseWriteable()
+                biofilter.db.finalizeDatabase()
 
         # optimize?
-        if (not args.no_optimize) and (not db.getDatabaseSetting("optimized", int)):
+        if (not args.no_optimize) and (not biofilter.db.getDatabaseSetting("optimized", int)):
             if not updateOK:
                 print(
                     "WARNING: errors encountered during knowledge database update; skipping optimization step"
                 )
             else:
-                db.testDatabaseWriteable()
-                db.optimizeDatabase()
+                biofilter.db.testDatabaseWriteable()
+                biofilter.db.optimizeDatabase()
     # if knowledge
 # __main__

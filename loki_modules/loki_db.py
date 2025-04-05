@@ -145,7 +145,7 @@ class Database(
         Returns:
             Connection: The APSW connection object.
         """
-        return self._db.__enter__()
+        return self._biofilter.db.__enter__()
 
     def __exit__(self, excType, excVal, traceback):
         """
@@ -159,4 +159,4 @@ class Database(
         Returns:
             bool: True if no exception occurred, otherwise False.
         """
-        return self._db.__exit__(excType, excVal, traceback)
+        return self._biofilter.db.__exit__(excType, excVal, traceback)

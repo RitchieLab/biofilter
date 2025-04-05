@@ -18,7 +18,7 @@ class SourceIngestionMixin:
     # Use ABORT to avoid wasting autoincrements on existing rows,
     # and execute() to avoid stopping executemany() due to ABORT
     def addLDProfiles(self, ldprofiles):
-        dbc = self._db.cursor()
+        dbc = self._biofilter.db.cursor()
         ret = {}
         insert_query = (
             "INSERT OR ABORT INTO `db`.`ldprofile` "
@@ -40,7 +40,7 @@ class SourceIngestionMixin:
         return self.addNamespaces([(namespace, polygenic)])[namespace]
 
     def addNamespaces(self, namespaces):
-        dbc = self._db.cursor()
+        dbc = self._biofilter.db.cursor()
         ret = {}
         insert_query = (
             "INSERT OR ABORT INTO `db`.`namespace` "
@@ -61,7 +61,7 @@ class SourceIngestionMixin:
         return self.addRelationships([(relationship,)])[relationship]
 
     def addRelationships(self, relationships):
-        dbc = self._db.cursor()
+        dbc = self._biofilter.db.cursor()
         ret = {}
         insert_query = (
             "INSERT OR ABORT INTO `db`.`relationship` (relationship) "
@@ -84,7 +84,7 @@ class SourceIngestionMixin:
         return self.addRoles([(role, description, coding, exon)])[role]
 
     def addRoles(self, roles):
-        dbc = self._db.cursor()
+        dbc = self._biofilter.db.cursor()
         ret = {}
         insert_query = (
             "INSERT OR ABORT INTO `db`.`role` "
@@ -108,7 +108,7 @@ class SourceIngestionMixin:
         return self.addSources([(source,)])[source]
 
     def addSources(self, sources):
-        dbc = self._db.cursor()
+        dbc = self._biofilter.db.cursor()
         ret = {}
         insert_query = (
             "INSERT OR ABORT INTO `db`.`source` (source) "
@@ -130,7 +130,7 @@ class SourceIngestionMixin:
         return self.addTypes([(type,)])[type]
 
     def addTypes(self, types):
-        dbc = self._db.cursor()
+        dbc = self._biofilter.db.cursor()
         ret = {}
         insert_query = (
             "INSERT OR ABORT INTO `db`.`type` (type) "
@@ -163,7 +163,7 @@ class SourceIngestionMixin:
             "current_ucschg = ?  WHERE source_id = ?"
         )
         params = (grch, ucschg, ucschg, self.getSourceID())
-        self._db.cursor().execute(sql, params)
+        self._biofilter.db.cursor().execute(sql, params)
 
     ##################################################
     # snp data management
@@ -176,7 +176,7 @@ class SourceIngestionMixin:
             "VALUES (?,?,%d)" % (self.getSourceID(),)
         )
         with self._db:
-            self._db.cursor().executemany(sql, snpMerges)
+            self._biofilter.db.cursor().executemany(sql, snpMerges)
 
     def addSNPLoci(self, snpLoci):
         self.prepareTableForUpdate("snp_locus")
@@ -186,7 +186,7 @@ class SourceIngestionMixin:
             % (self.getSourceID(),)
         )
         with self._db:
-            self._db.cursor().executemany(sql, snpLoci)
+            self._biofilter.db.cursor().executemany(sql, snpLoci)
 
     def addChromosomeSNPLoci(self, chromosome, snpLoci):
         self.prepareTableForUpdate("snp_locus")
@@ -199,7 +199,7 @@ class SourceIngestionMixin:
             )
         )
         with self._db:
-            self._db.cursor().executemany(sql, snpLoci)
+            self._biofilter.db.cursor().executemany(sql, snpLoci)
 
     def addSNPEntrezRoles(self, snpRoles):
         self.prepareTableForUpdate("snp_entrez_role")
@@ -209,7 +209,7 @@ class SourceIngestionMixin:
             "VALUES (?,?,?,%d)" % (self.getSourceID(),)
         )
         with self._db:
-            self._db.cursor().executemany(sql, snpRoles)
+            self._biofilter.db.cursor().executemany(sql, snpRoles)
 
     ##################################################
     # biopolymer data management
@@ -224,7 +224,7 @@ class SourceIngestionMixin:
         )
         return [
             row[0]
-            for row in self._db.cursor().executemany(sql, biopolymers)  # noqa E501
+            for row in self._biofilter.db.cursor().executemany(sql, biopolymers)  # noqa E501
         ]
 
     def addTypedBiopolymers(self, typeID, biopolymers):
@@ -240,7 +240,7 @@ class SourceIngestionMixin:
         )
         return [
             row[0]
-            for row in self._db.cursor().executemany(sql, biopolymers)  # noqa E501
+            for row in self._biofilter.db.cursor().executemany(sql, biopolymers)  # noqa E501
         ]
 
     def addBiopolymerNames(self, biopolymerNames):
@@ -250,7 +250,7 @@ class SourceIngestionMixin:
             "(biopolymer_id,namespace_id,name,source_id) VALUES (?,?,?,%d)"
             % (self.getSourceID(),)
         )
-        self._db.cursor().executemany(sql, biopolymerNames)
+        self._biofilter.db.cursor().executemany(sql, biopolymerNames)
 
     def addBiopolymerNamespacedNames(self, namespaceID, biopolymerNames):
         self.prepareTableForUpdate("biopolymer_name")
@@ -262,7 +262,7 @@ class SourceIngestionMixin:
                 self.getSourceID(),
             )
         )
-        self._db.cursor().executemany(sql, biopolymerNames)
+        self._biofilter.db.cursor().executemany(sql, biopolymerNames)
 
     def addBiopolymerNameNames(self, biopolymerNameNames):
         self.prepareTableForUpdate("biopolymer_name_name")
@@ -271,7 +271,7 @@ class SourceIngestionMixin:
             "(namespace_id,name,type_id,new_namespace_id,new_name,source_id) "
             "VALUES (?,?,?,?,?,%d)" % (self.getSourceID(),)
         )
-        self._db.cursor().executemany(sql, biopolymerNameNames)
+        self._biofilter.db.cursor().executemany(sql, biopolymerNameNames)
 
     def addBiopolymerTypedNameNamespacedNames(
         self, oldTypeID, newNamespaceID, biopolymerNameNames
@@ -287,7 +287,7 @@ class SourceIngestionMixin:
                 self.getSourceID(),
             )
         )
-        self._db.cursor().executemany(sql, biopolymerNameNames)
+        self._biofilter.db.cursor().executemany(sql, biopolymerNameNames)
 
     def addBiopolymerRegions(self, biopolymerRegions):
         self.prepareTableForUpdate("biopolymer_region")
@@ -296,7 +296,7 @@ class SourceIngestionMixin:
             "(biopolymer_id,ldprofile_id,chr,posMin,posMax,source_id) "
             "VALUES (?,?,?,?,?,%d)" % (self.getSourceID(),)
         )
-        self._db.cursor().executemany(sql, biopolymerRegions)
+        self._biofilter.db.cursor().executemany(sql, biopolymerRegions)
 
     def addBiopolymerLDProfileRegions(self, ldprofileID, biopolymerRegions):
         self.prepareTableForUpdate("biopolymer_region")
@@ -309,7 +309,7 @@ class SourceIngestionMixin:
                 self.getSourceID(),
             )
         )
-        self._db.cursor().executemany(sql, biopolymerRegions)
+        self._biofilter.db.cursor().executemany(sql, biopolymerRegions)
 
     ##################################################
     # group data management
@@ -321,7 +321,7 @@ class SourceIngestionMixin:
             "VALUES (?,?,?,%d); SELECT last_insert_rowid()"
             % (self.getSourceID(),)  # noqa E501
         )
-        return [row[0] for row in self._db.cursor().executemany(sql, groups)]
+        return [row[0] for row in self._biofilter.db.cursor().executemany(sql, groups)]
 
     def addTypedGroups(self, typeID, groups):
         self.prepareTableForUpdate("group")
@@ -333,7 +333,7 @@ class SourceIngestionMixin:
                 self.getSourceID(),
             )
         )
-        return [row[0] for row in self._db.cursor().executemany(sql, groups)]
+        return [row[0] for row in self._biofilter.db.cursor().executemany(sql, groups)]
 
     def addGroupNames(self, groupNames):
         self.prepareTableForUpdate("group_name")
@@ -342,7 +342,7 @@ class SourceIngestionMixin:
             "(group_id,namespace_id,name,source_id) VALUES (?,?,?,%d)"
             % (self.getSourceID(),)
         )
-        self._db.cursor().executemany(sql, groupNames)
+        self._biofilter.db.cursor().executemany(sql, groupNames)
 
     def addGroupNamespacedNames(self, namespaceID, groupNames):
         self.prepareTableForUpdate("group_name")
@@ -354,7 +354,7 @@ class SourceIngestionMixin:
                 self.getSourceID(),
             )
         )
-        self._db.cursor().executemany(sql, groupNames)
+        self._biofilter.db.cursor().executemany(sql, groupNames)
 
     def addGroupRelationships(self, groupRels):
         self.prepareTableForUpdate("group_group")
@@ -377,7 +377,7 @@ class SourceIngestionMixin:
             % self.getSourceID()
         )
         sql = f"{base_sql} {case_expr_1}; {base_sql} {case_expr_2}"
-        self._db.cursor().executemany(sql, (2 * gr for gr in groupRels))
+        self._biofilter.db.cursor().executemany(sql, (2 * gr for gr in groupRels))
 
     def addGroupParentRelationships(self, groupRels):
         self.prepareTableForUpdate("group_group")
@@ -389,7 +389,7 @@ class SourceIngestionMixin:
         forward_relation = "(?1, ?2, ?3, 1, 1, %d)" % self.getSourceID()
         reverse_relation = "(?2, ?1, ?3, -1, -1, %d)" % self.getSourceID()
         sql = f"{base_sql} {forward_relation}; {base_sql} {reverse_relation}"
-        self._db.cursor().executemany(sql, (2 * gr for gr in groupRels))
+        self._biofilter.db.cursor().executemany(sql, (2 * gr for gr in groupRels))
 
     def addGroupChildRelationships(self, groupRels):
         self.prepareTableForUpdate("group_group")
@@ -401,7 +401,7 @@ class SourceIngestionMixin:
         forward_relation = "(?1, ?2, ?3, 1, -1, %d)" % self.getSourceID()
         reverse_relation = "(?2, ?1, ?3, -1, 1, %d)" % self.getSourceID()
         sql = f"{base_sql} {forward_relation}; {base_sql} {reverse_relation}"
-        self._db.cursor().executemany(sql, (2 * gr for gr in groupRels))
+        self._biofilter.db.cursor().executemany(sql, (2 * gr for gr in groupRels))
 
     def addGroupSiblingRelationships(self, groupRels):
         self.prepareTableForUpdate("group_group")
@@ -413,7 +413,7 @@ class SourceIngestionMixin:
         forward_relation = "(?1, ?2, ?3, 1, 0, %d)" % self.getSourceID()
         reverse_relation = "(?2, ?1, ?3, -1, 0, %d)" % self.getSourceID()
         sql = f"{base_sql} {forward_relation}; {base_sql} {reverse_relation}"
-        self._db.cursor().executemany(sql, (2 * gr for gr in groupRels))
+        self._biofilter.db.cursor().executemany(sql, (2 * gr for gr in groupRels))
 
     def addGroupBiopolymers(self, groupBiopolymers):
         self.prepareTableForUpdate("group_biopolymer")
@@ -423,7 +423,7 @@ class SourceIngestionMixin:
             "quality, source_id) "
             "VALUES (?, ?, 100, 100, 100, %d)" % self.getSourceID()
         )
-        self._db.cursor().executemany(sql, groupBiopolymers)
+        self._biofilter.db.cursor().executemany(sql, groupBiopolymers)
 
     def addGroupMemberNames(self, groupMemberNames):
         self.prepareTableForUpdate("group_member_name")
@@ -432,7 +432,7 @@ class SourceIngestionMixin:
             "(group_id,member,type_id,namespace_id,name,source_id) "
             "VALUES (?,?,?,?,?,%d)" % (self.getSourceID(),)
         )
-        self._db.cursor().executemany(sql, groupMemberNames)
+        self._biofilter.db.cursor().executemany(sql, groupMemberNames)
 
     def addGroupMemberTypedNamespacedNames(
         self, typeID, namespaceID, groupMemberNames
@@ -448,7 +448,7 @@ class SourceIngestionMixin:
                 self.getSourceID(),
             )  # noqa E501
         )
-        self._db.cursor().executemany(sql, groupMemberNames)
+        self._biofilter.db.cursor().executemany(sql, groupMemberNames)
 
     ##################################################
     # liftover data management
@@ -469,7 +469,7 @@ class SourceIngestionMixin:
             % (old_ucschg, new_ucschg, self.getSourceID())  # noqa E501
         )
         return [
-            row[0] for row in self._db.cursor().executemany(sql, chain_list)
+            row[0] for row in self._biofilter.db.cursor().executemany(sql, chain_list)
         ]  # noqa E501
 
     def addChainData(self, chain_data_list):
@@ -482,7 +482,7 @@ class SourceIngestionMixin:
             "(chain_id,old_start,old_end,new_start,source_id) "
             "VALUES (?,?,?,?,%d)" % (self.getSourceID(),)
         )
-        self._db.cursor().executemany(sql, chain_data_list)
+        self._biofilter.db.cursor().executemany(sql, chain_data_list)
 
     ##################################################
     # gwas data management
@@ -495,4 +495,4 @@ class SourceIngestionMixin:
             "riskAfreq,pubmed_id,source_id) "
             "VALUES (?,?,?,?,?,?,?,?,?,%d)" % (self.getSourceID(),)
         )
-        self._db.cursor().executemany(sql, gwasAnnotations)
+        self._biofilter.db.cursor().executemany(sql, gwasAnnotations)

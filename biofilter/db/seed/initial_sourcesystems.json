@@ -1,0 +1,17 @@
+{
+    "source_systems": [
+        {
+            "name": "HGNC",
+            "description": "HUGO Gene Nomenclature Committee",
+            "homepage": "https://www.genenames.org/",
+            "active": true
+        },
+        {
+            "name": "Ensembl",
+            "description": "Genome browser for vertebrate genomes",
+            "homepage": "https://www.ensembl.org/",
+            "active": true
+        }
+
+    ]
+}

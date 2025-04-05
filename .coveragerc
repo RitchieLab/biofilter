@@ -1,8 +1,12 @@
 [run]
 omit =
     */tests/*
+branch = True
+source = biofilter
 
 [report]
 exclude_lines =
     # Adicione outras regras para excluir linhas, se necessário
     if __name__ == "__main__"
+show_missing = True
+skip_covered = True

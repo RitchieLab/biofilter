@@ -393,7 +393,7 @@ class InternalQueryBuilderMixin:
             ("m_l", "rowid", "m_l.label"),
             ("d_sl", "_ROWID_", "'rs'||d_sl.rs"),
         ],
-        "position_chr": [  # TODO: find a way to avoid repeating the conversions already in loki_db.chr_name  # noqa E501
+        "position_chr": [  # TODO: find a way to avoid repeating the conversions already in loki_biofilter.db.chr_name  # noqa E501
             (
                 "a_l",
                 "rowid",
@@ -435,7 +435,7 @@ class InternalQueryBuilderMixin:
             ("m_r", "rowid", "m_r.label"),
             ("d_b", "biopolymer_id", "d_b.label"),
         ],
-        "region_chr": [  # TODO: find a way to avoid repeating the conversions already in loki_db.chr_name   # noqa E501
+        "region_chr": [  # TODO: find a way to avoid repeating the conversions already in loki_biofilter.db.chr_name   # noqa E501
             (
                 "a_r",
                 "rowid",
@@ -528,7 +528,7 @@ class InternalQueryBuilderMixin:
                 "(SELECT GROUP_CONCAT(namespace||':'||name,'|') FROM `db`.`biopolymer_name` AS d_bn JOIN `db`.`namespace` AS d_n USING (namespace_id) WHERE d_bn.biopolymer_id = d_b.biopolymer_id)",  # noqa E501
             ),
         ],
-        "biopolymer_chr": [  # TODO: find a way to avoid repeating the conversions already in loki_db.chr_name  # noqa E501
+        "biopolymer_chr": [  # TODO: find a way to avoid repeating the conversions already in loki_biofilter.db.chr_name  # noqa E501
             (
                 "d_br",
                 "_ROWID_",
@@ -1858,7 +1858,7 @@ class InternalQueryBuilderMixin:
         """
 
         # execute the query and yield the results
-        cursor = self._loki._db.cursor()
+        cursor = self._loki._biofilter.db.cursor()
         sql = self.getQueryText(query)
         sql2 = self.getQueryText(query2) if query2 else None
         if self._options.debug_query:

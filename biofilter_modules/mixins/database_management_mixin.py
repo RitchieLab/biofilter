@@ -150,7 +150,7 @@ class DatabaseManagementMixin:
         return (
             sum(
                 row[0]
-                for row in self._loki._db.cursor().execute(
+                for row in self._loki._biofilter.db.cursor().execute(
                     "SELECT 1 FROM `%s`.`%s` LIMIT 1" % (db, table)
                 )
             )
@@ -197,7 +197,7 @@ class DatabaseManagementMixin:
             and "region_zone" in self._schema[db]
         )
         self.log("calculating %s region zone coverage ..." % db)
-        cursor = self._loki._db.cursor()
+        cursor = self._loki._biofilter.db.cursor()
 
         size = self._loki.getDatabaseSetting("zone_size")
         if not size:
@@ -228,7 +228,7 @@ class DatabaseManagementMixin:
             % db,
             _zones(
                 size,
-                self._loki._db.cursor().execute(
+                self._loki._biofilter.db.cursor().execute(
                     "SELECT rowid,chr,posMin,posMax FROM `%s`.`region`" % db
                 ),
             ),

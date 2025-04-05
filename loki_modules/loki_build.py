@@ -88,7 +88,7 @@ from loki_modules import loki_db
 
 def main():
 
-    version = "LOKI version %s" % (loki_db.Database.getVersionString())
+    version = "LOKI version %s" % (loki_biofilter.db.Database.getVersionString())
 
     # define arguments
     parser = argparse.ArgumentParser(
@@ -101,10 +101,10 @@ def main():
         version=version
         + "\n%s version %s\n%s version %s"
         % (
-            loki_db.Database.getDatabaseDriverName(),
-            loki_db.Database.getDatabaseDriverVersion(),
-            loki_db.Database.getDatabaseInterfaceName(),
-            loki_db.Database.getDatabaseInterfaceVersion(),
+            loki_biofilter.db.Database.getDatabaseDriverName(),
+            loki_biofilter.db.Database.getDatabaseDriverVersion(),
+            loki_biofilter.db.Database.getDatabaseInterfaceName(),
+            loki_biofilter.db.Database.getDatabaseInterfaceVersion(),
         ),
     )
     parser.add_argument(
@@ -285,16 +285,16 @@ def main():
     print(f"==== Inicial Memory {memory_before:.2f} MB)")
 
     # instantiate database object
-    db = loki_db.Database(testing=args.test_data, updating=True)
+    db = loki_biofilter.db.Database(testing=args.test_data, updating=True)
 
-    db.setVerbose(args.verbose or (not args.quiet))
-    db.attachDatabaseFile(args.knowledge)
+    biofilter.db.setVerbose(args.verbose or (not args.quiet))
+    biofilter.db.attachDatabaseFile(args.knowledge)
 
     # directory for temporary files
     # if a temp directory is specified, use it
     if args.temp_directory:
         if not os.path.isdir(args.temp_directory):
-            db.log(
+            biofilter.db.log(
                 f"ERROR: {args.temp_directory} is not a directory",
                 level=logging.ERROR,
                 indent=0,
@@ -307,7 +307,7 @@ def main():
     #     )  # noqa: E501
     # )
     cacheDir = os.environ["TMPDIR"]
-    db.log(
+    biofilter.db.log(
         "Using temp directory: '%s'\n" % cacheDir,
         level=logging.INFO,
         indent=0,
@@ -321,7 +321,7 @@ def main():
     # list sources?
     srcSet = {}
     if args.list_sources is not None:
-        db.log("Data source selected manually:", level=logging.INFO, indent=0)
+        biofilter.db.log("Data source selected manually:", level=logging.INFO, indent=0)
         srcSet = set()
         for srcList in args.list_sources:
             srcSet |= set(srcList)
@@ -331,30 +331,30 @@ def main():
         else:
             pass
             # print("source loader options:")
-        moduleVersions = db.getSourceModuleVersions(srcSet)
-        moduleOptions = db.getSourceModuleOptions(srcSet)
+        moduleVersions = biofilter.db.getSourceModuleVersions(srcSet)
+        moduleOptions = biofilter.db.getSourceModuleOptions(srcSet)
         for srcName in sorted(moduleOptions.keys()):
-            db.log(
+            biofilter.db.log(
                 "%s : %s" % (srcName, moduleVersions[srcName]),
                 level=logging.INFO,
                 indent=2,
             )  # noqa E501
             if moduleOptions[srcName]:
                 for srcOption in sorted(moduleOptions[srcName].keys()):
-                    db.log(
+                    biofilter.db.log(
                         "%s = %s"
                         % (srcOption, moduleOptions[srcName][srcOption]),  # noqa E501
                         level=logging.INFO,
                         indent=4,
                     )  # noqa E501
             elif srcSet:
-                db.log("<no options>", level=logging.INFO, indent=4)
+                biofilter.db.log("<no options>", level=logging.INFO, indent=4)
         print(" ")
     srcSet = srcSet or None
 
     # Check if we are updating the database
     if args.update is None and args.update_except is None:
-        db.log(
+        biofilter.db.log(
             "Either '--update' or '--update-except' must be specified to update the knowledge database",  # noqa: E501
             level=logging.WARNING,
             indent=0,
@@ -364,7 +364,7 @@ def main():
     # pass options?
     userOptions = {}
     if args.option is not None:
-        db.log("Data source option:", level=logging.INFO, indent=0)
+        biofilter.db.log("Data source option:", level=logging.INFO, indent=0)
         for optList in args.option:
             srcName = optList[0]
             if srcName not in userOptions:
@@ -372,7 +372,7 @@ def main():
             for optString in optList[1].split(","):
                 opt, val = optString.split("=", 1)
                 userOptions[srcName][opt] = val
-                db.log(
+                biofilter.db.log(
                     "%s" % userOptions[srcName][opt],
                     level=logging.INFO,
                     indent=2,  # noqa E501
@@ -395,9 +395,9 @@ def main():
     # update?
     updateOK = True
     if (srcSet is not None) or (notSet is not None):
-        db.testDatabaseWriteable()
-        if db.getDatabaseSetting("finalized", int):
-            db.log(
+        biofilter.db.testDatabaseWriteable()
+        if biofilter.db.getDatabaseSetting("finalized", int):
+            biofilter.db.log(
                 "Cannot update a finalized database",
                 level=logging.ERROR,
                 indent=0,  # noqa E501
@@ -405,12 +405,12 @@ def main():
             sys.exit(1)
         if srcSet and "+" in srcSet:
             srcSet = set()
-        srcSet = (srcSet or set(db.getSourceModules())) - (notSet or set())
+        srcSet = (srcSet or set(biofilter.db.getSourceModules())) - (notSet or set())
 
         # try/finally to make sure we clean up the cache dir at the end
         try:
             if fromArchive:
-                db.log(
+                biofilter.db.log(
                     "Selected source data FROM archive",
                     level=logging.INFO,
                     indent=0,  # noqa E501
@@ -418,7 +418,7 @@ def main():
                 if os.path.exists(fromArchive) and tarfile.is_tarfile(
                     fromArchive
                 ):  # noqa: E501
-                    db.log(
+                    biofilter.db.log(
                         "Unpacking archived source data files from '%s' ..."
                         % fromArchive,
                         level=logging.INFO,
@@ -442,9 +442,9 @@ def main():
                                 continue
                             archive.extractall(cacheDir, [member])
                     # with archive
-                    db.log("... OK", level=logging.INFO, indent=2)
+                    biofilter.db.log("... OK", level=logging.INFO, indent=2)
                 else:
-                    db.log(
+                    biofilter.db.log(
                         "Source data archive '%s' not found, starting fresh"
                         % fromArchive,
                         level=logging.WARNING,
@@ -456,7 +456,7 @@ def main():
 
             if args.skip_download and args.only_download:
                 # Conflict: It makes no sense to skip the download and at the same time try to download only
-                db.log(
+                biofilter.db.log(
                     "Conflicting arguments: '--skip-download' and '--only-download' cannot be used together.",  # noqa: E501
                     level=logging.WARNING,
                     indent=1,
@@ -465,34 +465,34 @@ def main():
 
             if args.skip_download:
                 # Prior 'skip_download'
-                db._updater.skipDownload = args.skip_download
-                db._updater.onlyDownload = False
-                db.log(
+                biofilter.db._updater.skipDownload = args.skip_download
+                biofilter.db._updater.onlyDownload = False
+                biofilter.db.log(
                     "Skipping downloads as '--skip-download' is set. Files must already be available locally.",  # noqa: E501
                     level=logging.INFO,
                     indent=0,
                 )
             elif args.only_download:
                 # Prior 'only_download'
-                db._updater.onlyDownload = args.only_download
-                db._updater.skipDownload = False
-                db._updater.keepDownload = True
-                db.log(
+                biofilter.db._updater.onlyDownload = args.only_download
+                biofilter.db._updater.skipDownload = False
+                biofilter.db._updater.keepDownload = True
+                biofilter.db.log(
                     "Running in 'only download' mode. Files will be downloaded but not processed.",  # noqa: E501
                     level=logging.INFO,
                     indent=0,
                 )
             if args.keep_download:
                 # Prior 'keep_download'
-                db._updater.keepDownload = args.keep_download
-                db.log(
+                biofilter.db._updater.keepDownload = args.keep_download
+                biofilter.db.log(
                     "Keeping downloaded files as '--keep-download' is set.",
                     level=logging.INFO,
                     indent=0,
                 )
 
             # update database
-            updateOK = db.updateDatabase(
+            updateOK = biofilter.db.updateDatabase(
                 srcSet,
                 userOptions,
                 args.cache_only,
@@ -504,10 +504,10 @@ def main():
 
             # create output archive, if requested
             if toArchive and not args.cache_only:
-                db.log(
+                biofilter.db.log(
                     "Selected source data TO archive", level=logging.INFO, indent=0
                 )  # noqa: E501
-                db.log(
+                biofilter.db.log(
                     "Archiving source data files in '%s' ..." % toArchive,
                     level=logging.INFO,
                     indent=2,
@@ -518,11 +518,11 @@ def main():
                         archive.add(
                             os.path.join(cacheDir, filename), arcname=filename
                         )  # noqa: E501
-                db.log("... OK", level=logging.INFO, indent=2)
+                biofilter.db.log("... OK", level=logging.INFO, indent=2)
         finally:
             # clean up cache directory
             # def rmtree_error(func, path, exc):
-            #     db.log(
+            #     biofilter.db.log(
             #         "Unable to remove temporary file '%s': %s" % (path, exc),
             #         level=logging.WARNING,
             #         indent=0,
@@ -536,36 +536,36 @@ def main():
 
     if args.knowledge:
         # finalize?
-        if args.finalize and (not db.getDatabaseSetting("finalized", int)):
+        if args.finalize and (not biofilter.db.getDatabaseSetting("finalized", int)):
             if not updateOK:
-                db.log(
+                biofilter.db.log(
                     "Errors encountered during knowledge database update",
                     level=logging.ERROS,
                     indent=0,
                 )
             else:
-                db.testDatabaseWriteable()
-                db.finalizeDatabase()
+                biofilter.db.testDatabaseWriteable()
+                biofilter.db.finalizeDatabase()
 
         # optimize?
         if (not args.no_optimize) and (
-            not db.getDatabaseSetting("optimized", int)
+            not biofilter.db.getDatabaseSetting("optimized", int)
         ):  # noqa: E501
             if not updateOK:
-                db.log(
+                biofilter.db.log(
                     "Errors encountered during knowledge database update",
                     level=logging.ERROR,
                     indent=0,
                 )
             else:
-                db.testDatabaseWriteable()
-                db.optimizeDatabase()
+                biofilter.db.testDatabaseWriteable()
+                biofilter.db.optimizeDatabase()
 
     # log user-provided arguments
     arguments = vars(args)
     formatted_args = "\n".join(f"{key}: {value}" for key, value in arguments.items())
 
-    db.log(
+    biofilter.db.log(
         f"LOKI-BUILD - User-provided arguments:\n{formatted_args}",
         level=logging.INFO,
         indent=2,
@@ -577,19 +577,19 @@ def main():
     elapsed_time_minutes = (end_time - start_time) / 60  # time in minutes
     memory_after = process.memory_info().rss / (1024 * 1024)  # mem in MB
 
-    db.log(
+    biofilter.db.log(
         f"LOKI-BUILD - Final memory: {memory_after:.2f} MB. Alocated memory: {memory_after - memory_before:.2f} MB.",  # noqa: E501
         level=logging.INFO,
         indent=2,
     )
-    db.log(
+    biofilter.db.log(
         f"LOKI-BUILD - Update completed in {elapsed_time_minutes:.2f} minutes.\n",  # noqa: E501
         level=logging.CRITICAL,
         indent=2,
     )
 
-    db.log(
-        f"-- FINISHED LOKI BUILD SCRIPT --\nLog file: {db.get_log_file()}",
+    biofilter.db.log(
+        f"-- FINISHED LOKI BUILD SCRIPT --\nLog file: {biofilter.db.get_log_file()}",
         level=logging.CRITICAL,
         indent=0,
     )

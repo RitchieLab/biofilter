@@ -32,6 +32,7 @@ tqdm = "^4.67.1"
 psutil = "^6.1.1"
 sqlalchemy = "^2.0.37"
 aiosqlite = "^0.21.0"
+pandas = "^2.2.3"
 
 [tool.poetry.group.dev.dependencies]
 black = "^24.10.0"

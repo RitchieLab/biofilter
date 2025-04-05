@@ -60,7 +60,7 @@ class RegionInputMixin:
         """
         # regions=[ (label,chr,posMin,posMax,extra), ... ]
         self.logPush("adding to %s region filter ...\n" % db)
-        cursor = self._loki._db.cursor()
+        cursor = self._loki._biofilter.db.cursor()
 
         # use OR IGNORE to continue on data error, i.e. missing chr or pos
         self.prepareTableForUpdate(db, "region")
@@ -135,7 +135,7 @@ class RegionInputMixin:
         if not self._inputFilters[db]["region"]:
             return self.unionInputRegions(db, regions, errorCallback)
         self.logPush("reducing %s region filter ...\n" % db)
-        cursor = self._loki._db.cursor()
+        cursor = self._loki._biofilter.db.cursor()
 
         self.prepareTableForQuery(db, "region")
         cursor.execute("UPDATE `%s`.`region` SET flag = 0" % db)

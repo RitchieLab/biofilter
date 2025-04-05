@@ -67,7 +67,7 @@ class LocusPositionInputMixin:
         """
         # loci=[ (label,chr,pos,extra), ... ]
         self.logPush("adding to %s position filter ...\n" % db)
-        cursor = self._loki._db.cursor()
+        cursor = self._loki._biofilter.db.cursor()
 
         # use OR IGNORE to continue on data error, i.e. missing chr or pos
         self.prepareTableForUpdate(db, "locus")
@@ -139,7 +139,7 @@ class LocusPositionInputMixin:
         if not self._inputFilters[db]["locus"]:
             return self.unionInputLoci(db, loci, errorCallback)
         self.logPush("reducing %s position filter ...\n" % db)
-        cursor = self._loki._db.cursor()
+        cursor = self._loki._biofilter.db.cursor()
 
         self.prepareTableForQuery(db, "locus")
         cursor.execute("UPDATE `%s`.`locus` SET flag = 0" % db)
@@ -150,7 +150,7 @@ class LocusPositionInputMixin:
         )
         cursor.executemany(sql, loci)
         cursor.execute("DELETE FROM `%s`.`locus` WHERE flag = 0" % db)
-        numDrop = self._loki._db.changes()
+        numDrop = self._loki._biofilter.db.changes()
         self.logPop(
             "... OK: kept %d positions (%d dropped)\n"
             % (numBefore - numDrop, numDrop)  # noqa E501

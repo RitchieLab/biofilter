@@ -28,7 +28,7 @@ class DbLiftOverMixin:
         """
         sql = "SELECT COUNT() FROM `db`.`chain` WHERE old_ucschg = ? AND new_ucschg = ?"  # noqa E501
         return max(
-            row[0] for row in self._db.cursor().execute(sql, (oldHG, newHG))
+            row[0] for row in self._biofilter.db.cursor().execute(sql, (oldHG, newHG))
         )  # noqa E501
 
     # hasLiftOverChains()
@@ -72,7 +72,7 @@ class DbLiftOverMixin:
                 WHERE c.old_ucschg=? AND c.new_ucschg=?
                 ORDER BY c.old_chr, score DESC, cd.old_start
                 """
-            for row in self._db.cursor().execute(sql, conv):
+            for row in self._biofilter.db.cursor().execute(sql, conv):
                 chain = (
                     row[2],
                     row[3],

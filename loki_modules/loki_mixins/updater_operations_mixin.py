@@ -9,7 +9,7 @@ class UpdaterOperationsMixin:
     def cleanupSNPMerges(self):
         self.log("verifying SNP merge records ...", level=logging.INFO, indent=0)
         self.prepareTableForQuery("snp_merge")
-        dbc = self._db.cursor()
+        dbc = self._biofilter.db.cursor()
 
         # for each set of ROWIDs which constitute a duplicated snp merge,
         # cull all but one
@@ -54,7 +54,7 @@ class UpdaterOperationsMixin:
     def cleanupSNPMerges_nova(self):
         self.log("Verifying SNP merge records...", level=logging.INFO, indent=0)
         self.prepareTableForUpdate("snp_merge")  # DROP INDEX
-        dbc = self._db.cursor()
+        dbc = self._biofilter.db.cursor()
 
         # self.flagTableUpdate("snp_merge") # Ja temos isso no prepareTableForUpdate
 
@@ -114,7 +114,7 @@ class UpdaterOperationsMixin:
         self.log("checking for merged SNP loci ...", level=logging.INFO, indent=0)
         self.prepareTableForQuery("snp_locus")
         self.prepareTableForQuery("snp_merge")
-        dbc = self._db.cursor()
+        dbc = self._biofilter.db.cursor()
         sql = (
             "INSERT INTO `db`.`snp_locus` (rs, chr, pos, validated, source_id) "  # noqa E501
             "SELECT sm.rsCurrent, sl.chr, sl.pos, sl.validated, sl.source_id "
@@ -123,7 +123,7 @@ class UpdaterOperationsMixin:
             "ON sm.rsMerged = sl.rs "
         )
         dbc.execute(sql)
-        numCopied = self._db.changes()
+        numCopied = self._biofilter.db.changes()
         if numCopied:
             self.flagTableUpdate("snp_locus")
         self.log(" OK: %d loci copied\n" % (numCopied,), level=logging.INFO, indent=0)
@@ -136,7 +136,7 @@ class UpdaterOperationsMixin:
     def cleanupSNPLoci(self):
         self.log("verifying SNP loci ...", level=logging.INFO, indent=0)
         self.prepareTableForQuery("snp_locus")
-        dbc = self._db.cursor()
+        dbc = self._biofilter.db.cursor()
         # for each set of ROWIDs which constitute a duplicated snp-locus,
         # cull all but one but, make sure that if any of the originals were
         # validated, the remaining one is also
@@ -172,7 +172,7 @@ class UpdaterOperationsMixin:
         self.log("checking for merged SNP roles ...", level=logging.INFO, indent=0)
         self.prepareTableForQuery("snp_entrez_role")
         self.prepareTableForQuery("snp_merge")
-        dbc = self._db.cursor()
+        dbc = self._biofilter.db.cursor()
         sql = (
             "INSERT OR IGNORE INTO `db`.`snp_entrez_role` "
             "(rs, entrez_id, role_id, source_id) "
@@ -182,7 +182,7 @@ class UpdaterOperationsMixin:
             "ON sm.rsMerged = ser.rs "
         )
         dbc.execute(sql)
-        numCopied = self._db.changes()
+        numCopied = self._biofilter.db.changes()
         if numCopied:
             self.flagTableUpdate("snp_entrez_role")
         self.log(" OK: %d roles copied\n" % (numCopied,), level=logging.INFO, indent=0)
@@ -190,7 +190,7 @@ class UpdaterOperationsMixin:
     def cleanupSNPEntrezRoles(self):
         self.log("verifying SNP roles ...", level=logging.INFO, indent=0)
         self.prepareTableForQuery("snp_entrez_role")
-        dbc = self._db.cursor()
+        dbc = self._biofilter.db.cursor()
         cull = set()
         sql = (
             "SELECT GROUP_CONCAT(_ROWID_) "
@@ -214,7 +214,7 @@ class UpdaterOperationsMixin:
         )
         self.prepareTableForQuery("gwas")
         self.prepareTableForQuery("snp_merge")
-        dbc = self._db.cursor()
+        dbc = self._biofilter.db.cursor()
         sql = (
             "INSERT INTO `db`.`gwas` "
             "(rs, chr, pos, trait, snps, orbeta, allele95ci, riskAfreq, pubmed_id, source_id) "  # noqa E501
@@ -225,7 +225,7 @@ class UpdaterOperationsMixin:
             "  ON sm.rsMerged = w.rs "
         )
         dbc.execute(sql)
-        numCopied = self._db.changes()
+        numCopied = self._biofilter.db.changes()
         if numCopied:
             self.flagTableUpdate("gwas")
         self.log(
@@ -234,7 +234,7 @@ class UpdaterOperationsMixin:
 
     def resolveBiopolymerNames(self):
         self.log("resolving biopolymer names ...", level=logging.INFO, indent=0)
-        dbc = self._db.cursor()
+        dbc = self._biofilter.db.cursor()
 
         # calculate confidence scores for each possible name match
         dbc.execute(
@@ -381,7 +381,7 @@ class UpdaterOperationsMixin:
 
     def resolveSNPBiopolymerRoles(self):
         self.log("resolving SNP roles ...\n", level=logging.INFO, indent=0)
-        dbc = self._db.cursor()
+        dbc = self._biofilter.db.cursor()
 
         typeID = self._loki.getTypeID("gene")
         namespaceID = self._loki.getNamespaceID("entrez_gid")
@@ -471,7 +471,7 @@ class UpdaterOperationsMixin:
 
     def resolveGroupMembers(self):
         self.log("resolving group members ...\n", level=logging.INFO, indent=0)
-        dbc = self._db.cursor()
+        dbc = self._biofilter.db.cursor()
 
         # calculate confidence scores for each possible name match
         dbc.execute(
@@ -765,7 +765,7 @@ class UpdaterOperationsMixin:
             raise Exception(
                 "ERROR: could not determine database setting 'zone_size'"
             )  # noqa E501
-        dbc = self._db.cursor()
+        dbc = self._biofilter.db.cursor()
 
         # make sure all regions are correctly oriented
         dbc.execute(
@@ -795,7 +795,7 @@ class UpdaterOperationsMixin:
             """,
             _zones(
                 size,
-                self._db.cursor().execute(
+                self._biofilter.db.cursor().execute(
                     """
                     SELECT
                         biopolymer_id,

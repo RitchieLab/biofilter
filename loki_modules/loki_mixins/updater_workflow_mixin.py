@@ -59,7 +59,7 @@ class UpdaterWorkflowMixin:
         self._tablesUpdated = set()
         self._tablesDeindexed = set()
         srcErrors = set()
-        cursor = self._db.cursor()
+        cursor = self._biofilter.db.cursor()
         cursor.execute("SAVEPOINT 'updateDatabase'")
         try:
 
@@ -528,7 +528,7 @@ class UpdaterWorkflowMixin:
 
                 # cross-map GRCh/UCSChg build versions for all sources
                 ucscGRC = collections.defaultdict(int)
-                for row in self._db.cursor().execute(
+                for row in self._biofilter.db.cursor().execute(
                     "SELECT grch,ucschg FROM `db`.`grch_ucschg`"
                 ):
                     ucscGRC[row[1]] = max(row[0], ucscGRC[row[1]])

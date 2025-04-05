@@ -1,4 +1,0 @@
-# This is a comment
-option1 value1
-option2 value2
-include /Users/andrerico/Works/Sys/biofilter/tests/units/data/temp_config.txt

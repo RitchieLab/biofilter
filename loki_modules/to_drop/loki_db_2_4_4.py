@@ -121,7 +121,7 @@ class Database(object):
                     ("finalized", "0"),
                 ],
                 "index": {},
-            },  # .db.setting
+            },  # .biofilter.db.setting
             ##################################################
             # metadata tables
             "grch_ucschg": {
@@ -141,7 +141,7 @@ class Database(object):
                     (38, 38),
                 ],
                 "index": {},
-            },  # .db.grch_ucschg
+            },  # .biofilter.db.grch_ucschg
             "ldprofile": {
                 "table": """
 (
@@ -153,7 +153,7 @@ class Database(object):
 )
 """,
                 "index": {},
-            },  # .db.ldprofile
+            },  # .biofilter.db.ldprofile
             "namespace": {
                 "table": """
 (
@@ -163,7 +163,7 @@ class Database(object):
 )
 """,
                 "index": {},
-            },  # .db.namespace
+            },  # .biofilter.db.namespace
             "relationship": {
                 "table": """
 (
@@ -172,7 +172,7 @@ class Database(object):
 )
 """,
                 "index": {},
-            },  # .db.relationship
+            },  # .biofilter.db.relationship
             "role": {
                 "table": """
 (
@@ -184,7 +184,7 @@ class Database(object):
 )
 """,
                 "index": {},
-            },  # .db.role
+            },  # .biofilter.db.role
             "source": {
                 "table": """
 (
@@ -198,7 +198,7 @@ class Database(object):
 )
 """,
                 "index": {},
-            },  # .db.source
+            },  # .biofilter.db.source
             "source_option": {
                 "table": """
 (
@@ -209,7 +209,7 @@ class Database(object):
 )
 """,
                 "index": {},
-            },  # .db.source_option
+            },  # .biofilter.db.source_option
             "source_file": {
                 "table": """
 (
@@ -222,7 +222,7 @@ class Database(object):
 )
 """,
                 "index": {},
-            },  # .db.source_file
+            },  # .biofilter.db.source_file
             "type": {
                 "table": """
 (
@@ -231,7 +231,7 @@ class Database(object):
 )
 """,
                 "index": {},
-            },  # .db.type
+            },  # .biofilter.db.type
             "warning": {
                 "table": """
 (
@@ -243,7 +243,7 @@ class Database(object):
                 "index": {
                     "warning__source": "(source_id)",
                 },
-            },  # .db.warning
+            },  # .biofilter.db.warning
             ##################################################
             # snp tables
             "snp_merge": {
@@ -257,7 +257,7 @@ class Database(object):
                 "index": {
                     "snp_merge__merge_current": "(rsMerged,rsCurrent)",
                 },
-            },  # .db.snp_merge
+            },  # .biofilter.db.snp_merge
             "snp_locus": {  # all coordinates in LOKI are 1-based closed intervals
                 "table": """
 (
@@ -274,7 +274,7 @@ class Database(object):
                     # a (validated,...) index would be nice but adds >1GB to the file size :/
                     #'snp_locus__valid_chr_pos_rs': '(validated,chr,pos,rs)',
                 },
-            },  # .db.snp_locus
+            },  # .biofilter.db.snp_locus
             "snp_entrez_role": {
                 "table": """
 (
@@ -287,7 +287,7 @@ class Database(object):
                 "index": {
                     "snp_entrez_role__rs_entrez_role": "(rs,entrez_id,role_id)",
                 },
-            },  # .db.snp_entrez_role
+            },  # .biofilter.db.snp_entrez_role
             "snp_biopolymer_role": {
                 "table": """
 (
@@ -301,7 +301,7 @@ class Database(object):
                     "snp_biopolymer_role__rs_biopolymer_role": "(rs,biopolymer_id,role_id)",
                     "snp_biopolymer_role__biopolymer_rs_role": "(biopolymer_id,rs,role_id)",
                 },
-            },  # .db.snp_biopolymer_role
+            },  # .biofilter.db.snp_biopolymer_role
             ##################################################
             # biopolymer tables
             "biopolymer": {
@@ -318,7 +318,7 @@ class Database(object):
                     "biopolymer__type": "(type_id)",
                     "biopolymer__label_type": "(label,type_id)",
                 },
-            },  # .db.biopolymer
+            },  # .biofilter.db.biopolymer
             "biopolymer_name": {
                 "table": """
 (
@@ -332,7 +332,7 @@ class Database(object):
                 "index": {
                     "biopolymer_name__name_namespace_biopolymer": "(name,namespace_id,biopolymer_id)",
                 },
-            },  # .db.biopolymer_name
+            },  # .biofilter.db.biopolymer_name
             "biopolymer_name_name": {
                 # PRIMARY KEY column order satisfies the need to GROUP BY new_namespace_id, new_name
                 "table": """
@@ -347,7 +347,7 @@ class Database(object):
 )
 """,
                 "index": {},
-            },  # .db.biopolymer_name_name
+            },  # .biofilter.db.biopolymer_name_name
             "biopolymer_region": {  # all coordinates in LOKI are 1-based closed intervals
                 "table": """
 (
@@ -364,7 +364,7 @@ class Database(object):
                     "biopolymer_region__ldprofile_chr_min": "(ldprofile_id,chr,posMin)",
                     "biopolymer_region__ldprofile_chr_max": "(ldprofile_id,chr,posMax)",
                 },
-            },  # .db.biopolymer_region
+            },  # .biofilter.db.biopolymer_region
             "biopolymer_zone": {
                 "table": """
 (
@@ -377,7 +377,7 @@ class Database(object):
                 "index": {
                     "biopolymer_zone__zone": "(chr,zone,biopolymer_id)",
                 },
-            },  # .db.biopolymer_zone
+            },  # .biofilter.db.biopolymer_zone
             ##################################################
             # group tables
             "group": {
@@ -394,7 +394,7 @@ class Database(object):
                     "group__type": "(type_id)",
                     "group__label_type": "(label,type_id)",
                 },
-            },  # .db.group
+            },  # .biofilter.db.group
             "group_name": {
                 "table": """
 (
@@ -409,7 +409,7 @@ class Database(object):
                     "group_name__name_namespace_group": "(name,namespace_id,group_id)",
                     "group_name__source_name": "(source_id,name)",
                 },
-            },  # .db.group_name
+            },  # .biofilter.db.group_name
             "group_group": {
                 "table": """
 (
@@ -425,7 +425,7 @@ class Database(object):
                 "index": {
                     "group_group__related": "(related_group_id,group_id)",
                 },
-            },  # .db.group_group
+            },  # .biofilter.db.group_group
             "group_biopolymer": {
                 "table": """
 (
@@ -441,7 +441,7 @@ class Database(object):
                 "index": {
                     "group_biopolymer__biopolymer": "(biopolymer_id,group_id)",
                 },
-            },  # .db.group_biopolymer
+            },  # .biofilter.db.group_biopolymer
             "group_member_name": {
                 "table": """
 (
@@ -455,7 +455,7 @@ class Database(object):
 )
 """,
                 "index": {},
-            },  # .db.group_member_name
+            },  # .biofilter.db.group_member_name
             ##################################################
             # gwas tables
             "gwas": {  # all coordinates in LOKI are 1-based closed intervals
@@ -478,7 +478,7 @@ class Database(object):
                     "gwas__rs": "(rs)",
                     "gwas__chr_pos": "(chr,pos)",
                 },
-            },  # .db.gwas
+            },  # .biofilter.db.gwas
             ##################################################
             # liftover tables
             "chain": {  # all coordinates in LOKI are 1-based closed intervals
@@ -501,7 +501,7 @@ class Database(object):
                 "index": {
                     "chain__oldhg_newhg_chr": "(old_ucschg,new_ucschg,old_chr)",
                 },
-            },  # .db.chain
+            },  # .biofilter.db.chain
             "chain_data": {  # all coordinates in LOKI are 1-based closed intervals
                 "table": """
 (
@@ -516,7 +516,7 @@ class Database(object):
                 "index": {
                     "chain_data__end": "(chain_id,old_end)",
                 },
-            },  # .db.chain_data
+            },  # .biofilter.db.chain_data
         },  # .db
     }  # _schema{}
 
@@ -547,12 +547,12 @@ class Database(object):
     # context manager
 
     def __enter__(self):
-        return self._db.__enter__()
+        return self._biofilter.db.__enter__()
 
     # __enter__()
 
     def __exit__(self, excType, excVal, traceback):
-        return self._db.__exit__(excType, excVal, traceback)
+        return self._biofilter.db.__exit__(excType, excVal, traceback)
 
     # __exit__()
 
@@ -644,7 +644,7 @@ class Database(object):
     # setDatabaseMemoryLimit()
 
     def configureDatabase(self, db=None, tempMem=False):
-        cursor = self._db.cursor()
+        cursor = self._biofilter.db.cursor()
         db = ("%s." % db) if db else ""
 
         # linux VFS doesn't usually report actual disk cluster size,
@@ -684,7 +684,7 @@ class Database(object):
     # configureDatabase()
 
     def attachTempDatabase(self, db):
-        cursor = self._db.cursor()
+        cursor = self._biofilter.db.cursor()
 
         # detach the current db, if any
         try:
@@ -700,7 +700,7 @@ class Database(object):
     # attachTempDatabase()
 
     def attachDatabaseFile(self, dbFile, quiet=False):
-        cursor = self._db.cursor()
+        cursor = self._biofilter.db.cursor()
 
         # detach the current db file, if any
         if self._dbFile and not quiet:
@@ -768,11 +768,11 @@ class Database(object):
         if self._dbFile == None:
             raise Exception("ERROR: no knowledge database file is loaded")
         try:
-            if self._db.readonly("db"):
+            if self._biofilter.db.readonly("db"):
                 raise Exception("ERROR: knowledge database file cannot be modified")
         except AttributeError:  # apsw.Connection.readonly() added in 3.7.11
             try:
-                self._db.cursor().execute("UPDATE `db`.`setting` SET value = value")
+                self._biofilter.db.cursor().execute("UPDATE `db`.`setting` SET value = value")
             except apsw.ReadOnlyError:
                 raise Exception("ERROR: knowledge database file cannot be modified")
         return True
@@ -782,7 +782,7 @@ class Database(object):
     def createDatabaseObjects(
         self, schema, dbName, tblList=None, doTables=True, idxList=None, doIndecies=True
     ):
-        cursor = self._db.cursor()
+        cursor = self._biofilter.db.cursor()
         schema = schema or self._schema[dbName]
         dbType = "TEMP " if (dbName == "temp") else ""
         if tblList and isinstance(tblList, str):
@@ -846,7 +846,7 @@ class Database(object):
     def dropDatabaseObjects(
         self, schema, dbName, tblList=None, doTables=True, idxList=None, doIndecies=True
     ):
-        cursor = self._db.cursor()
+        cursor = self._biofilter.db.cursor()
         schema = schema or self._schema[dbName]
         if tblList and isinstance(tblList, str):
             tblList = (tblList,)
@@ -874,7 +874,7 @@ class Database(object):
     # dropDatabaseIndecies()
 
     def updateDatabaseSchema(self):
-        cursor = self._db.cursor()
+        cursor = self._biofilter.db.cursor()
 
         if self.getDatabaseSetting("schema", int) < 2:
             self.logPush("updating database schema to version 2 ...\n")
@@ -924,7 +924,7 @@ class Database(object):
         doRepair=True,
     ):
         # fetch current schema
-        cursor = self._db.cursor()
+        cursor = self._biofilter.db.cursor()
         current = dict()
         dbMaster = (
             "`sqlite_temp_master`"
@@ -1084,7 +1084,7 @@ class Database(object):
 
     def optimizeDatabase(self):
         self.log("updating optimizer statistics ...")
-        self._db.cursor().execute("ANALYZE `db`")
+        self._biofilter.db.cursor().execute("ANALYZE `db`")
         self.log(" OK\n")
         self.log("compacting knowledge database file ...")
         self.defragmentDatabase()
@@ -1100,8 +1100,8 @@ class Database(object):
             dbFile = self._dbFile
             self.detachDatabaseFile(quiet=True)
             db = apsw.Connection(dbFile)
-            db.cursor().execute("VACUUM")
-            db.close()
+            biofilter.db.cursor().execute("VACUUM")
+            biofilter.db.close()
             self.attachDatabaseFile(dbFile, quiet=True)
 
     # defragmentDatabase()
@@ -1109,7 +1109,7 @@ class Database(object):
     def getDatabaseSetting(self, setting, type=None):
         value = None
         if self._dbFile:
-            for row in self._db.cursor().execute(
+            for row in self._biofilter.db.cursor().execute(
                 "SELECT value FROM `db`.`setting` WHERE setting = ?", (setting,)
             ):
                 value = row[0]
@@ -1120,7 +1120,7 @@ class Database(object):
     # getDatabaseSetting()
 
     def setDatabaseSetting(self, setting, value):
-        self._db.cursor().execute(
+        self._biofilter.db.cursor().execute(
             "INSERT OR REPLACE INTO `db`.`setting` (setting, value) VALUES (?, ?)",
             (setting, value),
         )
@@ -1191,7 +1191,7 @@ class Database(object):
     def generateGRChByUCSChg(self, ucschg):
         return (
             row[0]
-            for row in self._db.cursor().execute(
+            for row in self._biofilter.db.cursor().execute(
                 "SELECT grch FROM grch_ucschg WHERE ucschg = ?", (ucschg,)
             )
         )
@@ -1200,7 +1200,7 @@ class Database(object):
 
     def getUCSChgByGRCh(self, grch):
         ucschg = None
-        for row in self._db.cursor().execute(
+        for row in self._biofilter.db.cursor().execute(
             "SELECT ucschg FROM grch_ucschg WHERE grch = ?", (grch,)
         ):
             ucschg = row[0]
@@ -1220,7 +1220,7 @@ class Database(object):
         with self._db:
             ret = {
                 row[0]: row[1]
-                for row in self._db.cursor().executemany(sql, zip(ldprofiles))
+                for row in self._biofilter.db.cursor().executemany(sql, zip(ldprofiles))
             }
         return ret
 
@@ -1234,11 +1234,11 @@ class Database(object):
                 sql = "SELECT i.ldprofile, l.ldprofile_id, l.description, l.metric, l.value FROM (SELECT ? AS ldprofile) AS i LEFT JOIN `db`.`ldprofile` AS l ON LOWER(TRIM(l.ldprofile)) = LOWER(TRIM(i.ldprofile))"
                 ret = {
                     row[0]: row[1:]
-                    for row in self._db.cursor().executemany(sql, zip(ldprofiles))
+                    for row in self._biofilter.db.cursor().executemany(sql, zip(ldprofiles))
                 }
             else:
                 sql = "SELECT l.ldprofile, l.ldprofile_id, l.description, l.metric, l.value FROM `db`.`ldprofile` AS l"
-                ret = {row[0]: row[1:] for row in self._db.cursor().execute(sql)}
+                ret = {row[0]: row[1:] for row in self._biofilter.db.cursor().execute(sql)}
         return ret
 
     # getLDProfiles()
@@ -1255,7 +1255,7 @@ class Database(object):
         with self._db:
             ret = {
                 row[0]: row[1]
-                for row in self._db.cursor().executemany(sql, zip(namespaces))
+                for row in self._biofilter.db.cursor().executemany(sql, zip(namespaces))
             }
         return ret
 
@@ -1273,7 +1273,7 @@ class Database(object):
         with self._db:
             ret = {
                 row[0]: row[1]
-                for row in self._db.cursor().executemany(sql, zip(relationships))
+                for row in self._biofilter.db.cursor().executemany(sql, zip(relationships))
             }
         return ret
 
@@ -1290,7 +1290,7 @@ class Database(object):
         sql = "SELECT i.role, role_id FROM (SELECT ? AS role) AS i LEFT JOIN `db`.`role` AS r ON r.role = LOWER(i.role)"
         with self._db:
             ret = {
-                row[0]: row[1] for row in self._db.cursor().executemany(sql, zip(roles))
+                row[0]: row[1] for row in self._biofilter.db.cursor().executemany(sql, zip(roles))
             }
         return ret
 
@@ -1309,12 +1309,12 @@ class Database(object):
             with self._db:
                 ret = {
                     row[0]: row[1]
-                    for row in self._db.cursor().executemany(sql, zip(sources))
+                    for row in self._biofilter.db.cursor().executemany(sql, zip(sources))
                 }
         else:
             sql = "SELECT source, source_id FROM `db`.`source`"
             with self._db:
-                ret = {row[0]: row[1] for row in self._db.cursor().execute(sql)}
+                ret = {row[0]: row[1] for row in self._biofilter.db.cursor().execute(sql)}
         return ret
 
     # getSourceIDs()
@@ -1323,7 +1323,7 @@ class Database(object):
         sql = "SELECT version FROM `db`.`source` WHERE source_id = ?"
         ret = None
         with self._db:
-            for row in self._db.cursor().execute(sql, (sourceID,)):
+            for row in self._biofilter.db.cursor().execute(sql, (sourceID,)):
                 ret = row[0]
         return ret
 
@@ -1333,7 +1333,7 @@ class Database(object):
         sql = "SELECT option, value FROM `db`.`source_option` WHERE source_id = ?"
         with self._db:
             ret = {
-                row[0]: row[1] for row in self._db.cursor().execute(sql, (sourceID,))
+                row[0]: row[1] for row in self._biofilter.db.cursor().execute(sql, (sourceID,))
             }
         return ret
 
@@ -1344,7 +1344,7 @@ class Database(object):
         with self._db:
             ret = {
                 row[0]: tuple(row[1:])
-                for row in self._db.cursor().execute(sql, (sourceID,))
+                for row in self._biofilter.db.cursor().execute(sql, (sourceID,))
             }
         return ret
 
@@ -1382,7 +1382,7 @@ class Database(object):
         - Verifica se `_dbFile` está definido; se não, retorna um dicionário com cada tipo mapeado para `None`.
         - Caso `_dbFile` esteja definido, prepara uma consulta SQL que:
                 - Utiliza `executemany` para executar uma consulta com cada tipo na lista `types`.
-                - Faz uma junção à esquerda (`LEFT JOIN`) na tabela `db.type`, associando cada tipo ao seu `type_id` (ou `None` se não houver correspondência).
+                - Faz uma junção à esquerda (`LEFT JOIN`) na tabela `biofilter.db.type`, associando cada tipo ao seu `type_id` (ou `None` se não houver correspondência).
         - Constrói e retorna um dicionário (`ret`) onde cada tipo em `types` é mapeado para o `type_id` correspondente,
         conforme encontrado na tabela `type`.
 
@@ -1398,7 +1398,7 @@ class Database(object):
         sql = "SELECT i.type, t.type_id FROM (SELECT ? AS type) AS i LEFT JOIN `db`.`type` AS t ON t.type = LOWER(i.type)"
         with self._db:
             ret = {
-                row[0]: row[1] for row in self._db.cursor().executemany(sql, zip(types))
+                row[0]: row[1] for row in self._biofilter.db.cursor().executemany(sql, zip(types))
             }
         return ret
 
@@ -1436,7 +1436,7 @@ LEFT JOIN `db`.`snp_merge` AS sm USING (rsMerged)
         with self._db:
             if tally != None:
                 numMerge = numMatch = 0
-                for row in self._db.cursor().executemany(sql, rses):
+                for row in self._biofilter.db.cursor().executemany(sql, rses):
                     if row[2] != row[0]:
                         numMerge += 1
                     else:
@@ -1445,7 +1445,7 @@ LEFT JOIN `db`.`snp_merge` AS sm USING (rsMerged)
                 tally["merge"] = numMerge
                 tally["match"] = numMatch
             else:
-                for row in self._db.cursor().executemany(sql, rses):
+                for row in self._biofilter.db.cursor().executemany(sql, rses):
                     yield row
 
     # generateCurrentRSesByRSes()
@@ -1504,7 +1504,7 @@ ORDER BY sl.chr, sl.pos
         n = numZero = numOne = numMany = 0
         with self._db:
             for row in itertools.chain(
-                self._db.cursor().executemany(sql, rses), [(None, None, None, None)]
+                self._biofilter.db.cursor().executemany(sql, rses), [(None, None, None, None)]
             ):
                 if tag != row[0:2]:
                     if tag:
@@ -1552,7 +1552,7 @@ ORDER BY sl.chr, sl.pos
         # ids=[ (id,extra), ... ]
         # yield:[ (id,extra,type_id,label,description), ... ]
         sql = "SELECT biopolymer_id, ?2 AS extra, type_id, label, description FROM `db`.`biopolymer` WHERE biopolymer_id = ?1"
-        return self._db.cursor().executemany(sql, ids)
+        return self._biofilter.db.cursor().executemany(sql, ids)
 
     # generateBiopolymersByIDs()
 
@@ -1635,7 +1635,7 @@ LEFT JOIN `db`.`biopolymer` AS bName
         n = numZero = numOne = numMany = 0
         with self._db:
             for row in itertools.chain(
-                self._db.cursor().executemany(sql, identifiers),
+                self._biofilter.db.cursor().executemany(sql, identifiers),
                 [(None, None, None, None)],
             ):
                 if tag != row[0:3]:
@@ -1751,7 +1751,7 @@ WHERE
 GROUP BY b.biopolymer_id
 """
 
-        return self._db.cursor().executemany(sql, texts)
+        return self._biofilter.db.cursor().executemany(sql, texts)
 
     # _searchBiopolymerIDs()
 
@@ -1803,7 +1803,7 @@ JOIN `db`.`namespace` AS n USING (namespace_id)
 GROUP BY namespace_id
 """
 
-        for row in self._db.cursor().execute(sql):
+        for row in self._biofilter.db.cursor().execute(sql):
             yield row
 
     # generateBiopolymerNameStats()
@@ -1815,7 +1815,7 @@ GROUP BY namespace_id
         # ids=[ (id,extra), ... ]
         # yield:[ (id,extra,type_id,label,description), ... ]
         sql = "SELECT group_id, ?2 AS extra, type_id, label, description FROM `db`.`group` WHERE group_id = ?1"
-        return self._db.cursor().executemany(sql, ids)
+        return self._biofilter.db.cursor().executemany(sql, ids)
 
     # generateGroupsByIDs()
 
@@ -1863,7 +1863,7 @@ LEFT JOIN `db`.`group` AS gName
         n = numZero = numOne = numMany = 0
         with self._db:
             for row in itertools.chain(
-                self._db.cursor().executemany(sql, identifiers),
+                self._biofilter.db.cursor().executemany(sql, identifiers),
                 [(None, None, None, None)],
             ):
                 if tag != row[0:3]:
@@ -1960,7 +1960,7 @@ WHERE
 GROUP BY g.group_id
 """
 
-        return self._db.cursor().executemany(sql, texts)
+        return self._biofilter.db.cursor().executemany(sql, texts)
 
     # _searchGroupIDs()
 
@@ -2012,7 +2012,7 @@ JOIN `db`.`namespace` AS n USING (namespace_id)
 GROUP BY namespace_id
 """
 
-        for row in self._db.cursor().execute(sql):
+        for row in self._biofilter.db.cursor().execute(sql):
             yield row
 
     # generateGroupNameStats()
@@ -2034,7 +2034,7 @@ GROUP BY namespace_id
         - newHG: Versão do genoma UCSC de destino (como uma string).
 
         Operação:
-        - Executa uma consulta SQL para contar as cadeias de mapeamento (`chain`) na tabela `db.chain`
+        - Executa uma consulta SQL para contar as cadeias de mapeamento (`chain`) na tabela `biofilter.db.chain`
                 que correspondem à transição de `oldHG` para `newHG`.
 
         Retorna:
@@ -2044,7 +2044,7 @@ GROUP BY namespace_id
         genoma, essencial para operações de "LiftOver" em dados genômicos.
         """
         sql = "SELECT COUNT() FROM `db`.`chain` WHERE old_ucschg = ? AND new_ucschg = ?"
-        return max(row[0] for row in self._db.cursor().execute(sql, (oldHG, newHG)))
+        return max(row[0] for row in self._biofilter.db.cursor().execute(sql, (oldHG, newHG)))
 
     # hasLiftOverChains()
 
@@ -2097,7 +2097,7 @@ JOIN `db`.`chain_data` AS cd USING (chain_id)
 WHERE c.old_ucschg=? AND c.new_ucschg=?
 ORDER BY c.old_chr, score DESC, cd.old_start
 """
-            for row in self._db.cursor().execute(sql, conv):
+            for row in self._biofilter.db.cursor().execute(sql, conv):
                 chain = (row[2], row[3], row[4], row[5], row[6], row[7], row[0])
                 chr = row[1]
 

@@ -12,7 +12,7 @@ class UpdaterLiftOverMixin:
             indent=0,
         )
         self.prepareTableForUpdate("snp_locus")
-        cursor = self._db.cursor()
+        cursor = self._biofilter.db.cursor()
         numLift = numNull = 0
         tally = dict()
         trash = set()
@@ -84,7 +84,7 @@ class UpdaterLiftOverMixin:
             indent=0,
         )
         self.prepareTableForUpdate("biopolymer_region")
-        cursor = self._db.cursor()
+        cursor = self._biofilter.db.cursor()
         numLift = numNull = 0
         tally = dict()
         trash = set()

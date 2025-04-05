@@ -1,0 +1,16 @@
+{
+    "data_sources": [
+        {
+            "source_system_id": 1,
+            "name": "hgnc_genes",
+            "data_type": "Gene",
+            "source_url": "https://rest.genenames.org/fetch/all",
+            "format": "JSON",
+            "grch_version": "GRCh38",
+            "ucschg_version": "hg38",
+            "dtp_version": "v1.0",
+            "last_status": "pending",
+            "active": true
+        }
+    ]
+} 

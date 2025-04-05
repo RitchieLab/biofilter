@@ -21,10 +21,10 @@ class Updater(object):
     # constructor
 
     def __init__(self, lokidb, is_test=False):
-        assert isinstance(lokidb, loki_db.Database)
+        assert isinstance(lokidb, loki_biofilter.db.Database)
         self._is_test = is_test
         self._loki = lokidb
-        self._db = lokidb._db
+        self._db = lokibiofilter.db._db
         self._sourceLoaders = {}
         self._sourceClasses = dict()
         self._sourceObjects = dict()
@@ -230,7 +230,7 @@ class Updater(object):
         self._tablesUpdated = set()
         self._tablesDeindexed = set()
         srcErrors = set()
-        cursor = self._db.cursor()
+        cursor = self._biofilter.db.cursor()
         cursor.execute("SAVEPOINT 'updateDatabase'")
         try:
             for srcName in sorted(srcSet):
@@ -454,7 +454,7 @@ class Updater(object):
 
             # cross-map GRCh/UCSChg build versions for all sources
             ucscGRC = collections.defaultdict(int)
-            for row in self._db.cursor().execute(
+            for row in self._biofilter.db.cursor().execute(
                 "SELECT grch,ucschg FROM `db`.`grch_ucschg`"
             ):
                 ucscGRC[row[1]] = max(row[0], ucscGRC[row[1]])
@@ -641,7 +641,7 @@ class Updater(object):
     def liftOverSNPLoci(self, oldHG, newHG, sourceIDs):
         self.log("lifting over SNP loci from hg%d to hg%d ..." % (oldHG, newHG))
         self.prepareTableForUpdate("snp_locus")
-        cursor = self._db.cursor()
+        cursor = self._biofilter.db.cursor()
         numLift = numNull = 0
         tally = dict()
         trash = set()
@@ -695,7 +695,7 @@ class Updater(object):
     def liftOverRegions(self, oldHG, newHG, sourceIDs):
         self.log("lifting over regions from hg%d to hg%d ..." % (oldHG, newHG))
         self.prepareTableForUpdate("biopolymer_region")
-        cursor = self._db.cursor()
+        cursor = self._biofilter.db.cursor()
         numLift = numNull = 0
         tally = dict()
         trash = set()
@@ -754,7 +754,7 @@ class Updater(object):
     def cleanupSNPMerges(self):
         self.log("verifying SNP merge records ...")
         self.prepareTableForQuery("snp_merge")
-        dbc = self._db.cursor()
+        dbc = self._biofilter.db.cursor()
 
         # for each set of ROWIDs which constitute a duplicated snp merge, cull all but one
         cull = set()
@@ -779,7 +779,7 @@ class Updater(object):
         self.log("checking for merged SNP loci ...")
         self.prepareTableForQuery("snp_locus")
         self.prepareTableForQuery("snp_merge")
-        dbc = self._db.cursor()
+        dbc = self._biofilter.db.cursor()
         sql = """
 INSERT INTO `db`.`snp_locus` (rs, chr, pos, validated, source_id)
 SELECT sm.rsCurrent, sl.chr, sl.pos, sl.validated, sl.source_id
@@ -790,7 +790,7 @@ JOIN `db`.`snp_merge` AS sm
         # for row in dbc.execute("EXPLAIN QUERY PLAN "+sql): #DEBUG
         # 	print row
         dbc.execute(sql)
-        numCopied = self._db.changes()
+        numCopied = self._biofilter.db.changes()
         if numCopied:
             self.flagTableUpdate("snp_locus")
         self.log(" OK: %d loci copied\n" % (numCopied,))
@@ -800,7 +800,7 @@ JOIN `db`.`snp_merge` AS sm
     def cleanupSNPLoci(self):
         self.log("verifying SNP loci ...")
         self.prepareTableForQuery("snp_locus")
-        dbc = self._db.cursor()
+        dbc = self._biofilter.db.cursor()
         # for each set of ROWIDs which constitute a duplicated snp-locus, cull all but one
         # but, make sure that if any of the originals were validated, the remaining one is also
         valid = set()
@@ -836,7 +836,7 @@ JOIN `db`.`snp_merge` AS sm
         self.log("checking for merged SNP roles ...")
         self.prepareTableForQuery("snp_entrez_role")
         self.prepareTableForQuery("snp_merge")
-        dbc = self._db.cursor()
+        dbc = self._biofilter.db.cursor()
         sql = """
 INSERT OR IGNORE INTO `db`.`snp_entrez_role` (rs, entrez_id, role_id, source_id)
 SELECT sm.rsCurrent, ser.entrez_id, ser.role_id, ser.source_id
@@ -847,7 +847,7 @@ JOIN `db`.`snp_merge` AS sm
         # for row in dbc.execute("EXPLAIN QUERY PLAN "+sql): #DEBUG
         # 	print row
         dbc.execute(sql)
-        numCopied = self._db.changes()
+        numCopied = self._biofilter.db.changes()
         if numCopied:
             self.flagTableUpdate("snp_entrez_role")
         self.log(" OK: %d roles copied\n" % (numCopied,))
@@ -857,7 +857,7 @@ JOIN `db`.`snp_merge` AS sm
     def cleanupSNPEntrezRoles(self):
         self.log("verifying SNP roles ...")
         self.prepareTableForQuery("snp_entrez_role")
-        dbc = self._db.cursor()
+        dbc = self._biofilter.db.cursor()
         cull = set()
         sql = "SELECT GROUP_CONCAT(_ROWID_) FROM `db`.`snp_entrez_role` GROUP BY rs, entrez_id, role_id HAVING COUNT() > 1"
         # for row in dbc.execute("EXPLAIN QUERY PLAN "+sql): #DEBUG
@@ -882,7 +882,7 @@ JOIN `db`.`snp_merge` AS sm
         self.log("checking for merged GWAS annotated SNPs ...")
         self.prepareTableForQuery("gwas")
         self.prepareTableForQuery("snp_merge")
-        dbc = self._db.cursor()
+        dbc = self._biofilter.db.cursor()
         sql = """
 INSERT INTO `db`.`gwas` (rs, chr, pos, trait, snps, orbeta, allele95ci, riskAfreq, pubmed_id, source_id)
 SELECT sm.rsCurrent, w.chr, w.pos, w.trait, w.snps, w.orbeta, w.allele95ci, w.riskAfreq, w.pubmed_id, w.source_id
@@ -893,7 +893,7 @@ JOIN `db`.`snp_merge` AS sm
         # for row in dbc.execute("EXPLAIN QUERY PLAN "+sql): #DEBUG
         # 	print row
         dbc.execute(sql)
-        numCopied = self._db.changes()
+        numCopied = self._biofilter.db.changes()
         if numCopied:
             self.flagTableUpdate("gwas")
         self.log(" OK: %d annotations copied\n" % (numCopied,))
@@ -903,7 +903,7 @@ JOIN `db`.`snp_merge` AS sm
     def resolveBiopolymerNames(self):
         # TODO: iterative?
         self.log("resolving biopolymer names ...")
-        dbc = self._db.cursor()
+        dbc = self._biofilter.db.cursor()
 
         # calculate confidence scores for each possible name match
         dbc.execute(
@@ -1027,7 +1027,7 @@ FROM (
 
     def resolveSNPBiopolymerRoles(self):
         self.log("resolving SNP roles ...\n")
-        dbc = self._db.cursor()
+        dbc = self._biofilter.db.cursor()
 
         typeID = self._loki.getTypeID("gene")
         namespaceID = self._loki.getNamespaceID("entrez_gid")
@@ -1105,7 +1105,7 @@ HAVING MAX(b.biopolymer_id) IS NULL
 
     def resolveGroupMembers(self):
         self.log("resolving group members ...\n")
-        dbc = self._db.cursor()
+        dbc = self._biofilter.db.cursor()
 
         # calculate confidence scores for each possible name match
         dbc.execute(
@@ -1312,7 +1312,7 @@ FROM `db`.`group_biopolymer`
         size = self._loki.getDatabaseSetting("zone_size", int)
         if not size:
             raise Exception("ERROR: could not determine database setting 'zone_size'")
-        dbc = self._db.cursor()
+        dbc = self._biofilter.db.cursor()
 
         # make sure all regions are correctly oriented
         dbc.execute(
@@ -1337,7 +1337,7 @@ FROM `db`.`group_biopolymer`
             "INSERT OR IGNORE INTO `db`.`biopolymer_zone` (biopolymer_id,chr,zone) VALUES (?,?,?)",
             _zones(
                 size,
-                self._db.cursor().execute(
+                self._biofilter.db.cursor().execute(
                     "SELECT biopolymer_id,chr,MIN(posMin),MAX(posMax) FROM `db`.`biopolymer_region` GROUP BY biopolymer_id, chr"
                 ),
             ),

@@ -1,13 +1,13 @@
 {
     "python.testing.unittestEnabled": false,
     "python.testing.pytestEnabled": true,
-    "python.autoComplete.extraPaths": [
-        "/Users/andrerico/Works/Sys/biofilter"
-    ],
     "python.testing.pytestArgs": [
         "--maxfail=1",
         "tests/"
     ],
+    "python.envFile": "${workspaceFolder}/.env",
     "python.testing.autoTestDiscoverOnSaveEnabled": true,
-    // "pythonTestExplorer.testFramework": "pytest" // replace pytest from python plugin (no works for more than 8 tests)
+    "python.analysis.extraPaths": [
+        "./biofilter"
+    ]
 }

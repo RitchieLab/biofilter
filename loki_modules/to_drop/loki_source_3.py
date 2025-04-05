@@ -20,10 +20,10 @@ class Source(object):
     # constructor
 
     def __init__(self, lokidb):
-        assert isinstance(lokidb, loki_db.Database)
+        assert isinstance(lokidb, loki_biofilter.db.Database)
         assert self.__class__.__name__.startswith("Source_")
         self._loki = lokidb
-        self._db = lokidb._db
+        self._db = lokibiofilter.db._db
         self._sourceID = self.addSource(self.getSourceName())
         assert self._sourceID > 0
 
@@ -134,7 +134,7 @@ class Source(object):
 
     def addLDProfiles(self, ldprofiles):
         # ldprofiles=[ (ldprofile,description,metric,value), ... ]
-        dbc = self._db.cursor()
+        dbc = self._biofilter.db.cursor()
         ret = {}
         # use ABORT to avoid wasting autoincrements on existing rows,
         # and execute() to avoid bailing out of executemany() due to ABORT
@@ -162,7 +162,7 @@ class Source(object):
 
     def addNamespaces(self, namespaces):
         # namespaces=[ (namespace,polygenic), ... ]
-        dbc = self._db.cursor()
+        dbc = self._biofilter.db.cursor()
         ret = {}
         # use ABORT to avoid wasting autoincrements on existing rows,
         # and execute() to avoid bailing out of executemany() due to ABORT
@@ -190,7 +190,7 @@ class Source(object):
 
     def addRelationships(self, relationships):
         # relationships=[ (relationship,), ... ]
-        dbc = self._db.cursor()
+        dbc = self._biofilter.db.cursor()
         ret = {}
         # use ABORT to avoid wasting autoincrements on existing rows,
         # and execute() to avoid bailing out of executemany() due to ABORT
@@ -218,7 +218,7 @@ class Source(object):
 
     def addRoles(self, roles):
         # roles=[ (role,description,coding,exon), ... ]
-        dbc = self._db.cursor()
+        dbc = self._biofilter.db.cursor()
         ret = {}
         # use ABORT to avoid wasting autoincrements on existing rows,
         # and execute() to avoid bailing out of executemany() due to ABORT
@@ -245,7 +245,7 @@ class Source(object):
 
     def addSources(self, sources):
         # sources=[ (source,), ... ]
-        dbc = self._db.cursor()
+        dbc = self._biofilter.db.cursor()
         ret = {}
         # use ABORT to avoid wasting autoincrements on existing rows,
         # and execute() to avoid bailing out of executemany() due to ABORT
@@ -273,7 +273,7 @@ class Source(object):
 
     def addTypes(self, types):
         # types=[ (type,), ... ]
-        dbc = self._db.cursor()
+        dbc = self._biofilter.db.cursor()
         ret = {}
         # use ABORT to avoid wasting autoincrements on existing rows,
         # and execute() to avoid bailing out of executemany() due to ABORT
@@ -295,7 +295,7 @@ class Source(object):
 
     def addSubtypes(self, subtypes):
         # types=[ (type,), ... ]
-        dbc = self._db.cursor()
+        dbc = self._biofilter.db.cursor()
         ret = {}
         # use ABORT to avoid wasting autoincrements on existing rows,
         # and execute() to avoid bailing out of executemany() due to ABORT
@@ -317,7 +317,7 @@ class Source(object):
     # addTypes()
 
     def deleteAll(self):
-        dbc = self._db.cursor()
+        dbc = self._biofilter.db.cursor()
         tables = [
             "snp_merge",
             "snp_locus",
@@ -358,7 +358,7 @@ class Source(object):
 
     def setSourceBuilds(self, grch=None, ucschg=None):
         sql = "UPDATE `db`.`source` SET grch = ?, ucschg = ?, current_ucschg = ? WHERE source_id = ?"
-        self._db.cursor().execute(sql, (grch, ucschg, ucschg, self.getSourceID()))
+        self._biofilter.db.cursor().execute(sql, (grch, ucschg, ucschg, self.getSourceID()))
 
     # setSourceBuilds()
 
@@ -373,7 +373,7 @@ class Source(object):
             % (self.getSourceID(),)
         )
         with self._db:
-            self._db.cursor().executemany(sql, snpMerges)
+            self._biofilter.db.cursor().executemany(sql, snpMerges)
 
     # addSNPMerges()
 
@@ -385,7 +385,7 @@ class Source(object):
             % (self.getSourceID(),)
         )
         with self._db:  # type: ignore
-            self._db.cursor().executemany(sql, snpLoci)
+            self._biofilter.db.cursor().executemany(sql, snpLoci)
 
     # addSNPLoci()
 
@@ -400,7 +400,7 @@ class Source(object):
             )
         )
         # with self._db:
-        self._db.cursor().executemany(sql, snpLoci)
+        self._biofilter.db.cursor().executemany(sql, snpLoci)
 
     # addChromosomeSNPLoci()
 
@@ -412,7 +412,7 @@ class Source(object):
             % (self.getSourceID(),)
         )
         with self._db:  # type: ignore
-            self._db.cursor().executemany(sql, snpRoles)
+            self._biofilter.db.cursor().executemany(sql, snpRoles)
 
     # addSNPEntrezRoles()
 
@@ -426,7 +426,7 @@ class Source(object):
             "INSERT INTO `db`.`biopolymer` (type_id,label,description,source_id) VALUES (?,?,?,%d); SELECT last_insert_rowid()"
             % (self.getSourceID(),)
         )
-        return [row[0] for row in self._db.cursor().executemany(sql, biopolymers)]
+        return [row[0] for row in self._biofilter.db.cursor().executemany(sql, biopolymers)]
 
     # addBiopolymers()
 
@@ -440,7 +440,7 @@ class Source(object):
                 self.getSourceID(),
             )
         )
-        return [row[0] for row in self._db.cursor().executemany(sql, biopolymers)]
+        return [row[0] for row in self._biofilter.db.cursor().executemany(sql, biopolymers)]
 
     # addTypedBiopolymers()
 
@@ -451,7 +451,7 @@ class Source(object):
             "INSERT OR IGNORE INTO `db`.`biopolymer_name` (biopolymer_id,namespace_id,name,source_id) VALUES (?,?,?,%d)"
             % (self.getSourceID(),)
         )
-        self._db.cursor().executemany(sql, biopolymerNames)
+        self._biofilter.db.cursor().executemany(sql, biopolymerNames)
 
     # addBiopolymerNames()
 
@@ -465,7 +465,7 @@ class Source(object):
                 self.getSourceID(),
             )
         )
-        self._db.cursor().executemany(sql, biopolymerNames)
+        self._biofilter.db.cursor().executemany(sql, biopolymerNames)
 
     # addBiopolymerNamespacedNames()
 
@@ -476,7 +476,7 @@ class Source(object):
             "INSERT OR IGNORE INTO `db`.`biopolymer_name_name` (namespace_id,name,type_id,new_namespace_id,new_name,source_id) VALUES (?,?,?,?,?,%d)"
             % (self.getSourceID(),)
         )
-        self._db.cursor().executemany(sql, biopolymerNameNames)
+        self._biofilter.db.cursor().executemany(sql, biopolymerNameNames)
 
     # addBiopolymerNameNames()
 
@@ -493,7 +493,7 @@ class Source(object):
                 self.getSourceID(),
             )
         )
-        self._db.cursor().executemany(sql, biopolymerNameNames)
+        self._biofilter.db.cursor().executemany(sql, biopolymerNameNames)
 
     # addBiopolymerTypedNameNamespacedNames()
 
@@ -504,7 +504,7 @@ class Source(object):
             "INSERT OR IGNORE INTO `db`.`biopolymer_region` (biopolymer_id,ldprofile_id,chr,posMin,posMax,source_id) VALUES (?,?,?,?,?,%d)"
             % (self.getSourceID(),)
         )
-        self._db.cursor().executemany(sql, biopolymerRegions)
+        self._biofilter.db.cursor().executemany(sql, biopolymerRegions)
 
     # addBiopolymerRegions()
 
@@ -518,7 +518,7 @@ class Source(object):
                 self.getSourceID(),
             )
         )
-        self._db.cursor().executemany(sql, biopolymerRegions)
+        self._biofilter.db.cursor().executemany(sql, biopolymerRegions)
 
     # addBiopolymerLDProfileRegions()
 
@@ -532,7 +532,7 @@ class Source(object):
             "INSERT INTO `db`.`group` (type_id,subtype_id,label,description,source_id) VALUES (?,?,?,?,%d); SELECT last_insert_rowid()"
             % (self.getSourceID(),)
         )
-        return [row[0] for row in self._db.cursor().executemany(sql, groups)]
+        return [row[0] for row in self._biofilter.db.cursor().executemany(sql, groups)]
 
     # addGroups()
 
@@ -546,7 +546,7 @@ class Source(object):
                 self.getSourceID(),
             )
         )
-        return [row[0] for row in self._db.cursor().executemany(sql, groups)]
+        return [row[0] for row in self._biofilter.db.cursor().executemany(sql, groups)]
 
     # addTypedGroups()
 
@@ -557,7 +557,7 @@ class Source(object):
             "INSERT OR IGNORE INTO `db`.`group_name` (group_id,namespace_id,name,source_id) VALUES (?,?,?,%d)"
             % (self.getSourceID(),)
         )
-        self._db.cursor().executemany(sql, groupNames)
+        self._biofilter.db.cursor().executemany(sql, groupNames)
 
     # addGroupNames()
 
@@ -571,7 +571,7 @@ class Source(object):
                 self.getSourceID(),
             )
         )
-        self._db.cursor().executemany(sql, groupNames)
+        self._biofilter.db.cursor().executemany(sql, groupNames)
 
     # addGroupNamespacedNames()
 
@@ -590,7 +590,7 @@ class Source(object):
             " VALUES (?2,?1,?3,-1,(CASE WHEN ?4 IS NULL THEN NULL WHEN ?4 > 0 THEN -1 WHEN ?4 < 0 THEN 1 ELSE 0 END),%d)"
             % (self.getSourceID(),)
         )
-        self._db.cursor().executemany(sql, (2 * gr for gr in groupRels))  # type: ignore
+        self._biofilter.db.cursor().executemany(sql, (2 * gr for gr in groupRels))  # type: ignore
 
     # addGroupRelationships()
 
@@ -601,7 +601,7 @@ class Source(object):
         sql += " VALUES (?1,?2,?3,1,1,%d)" % (self.getSourceID(),)
         sql += ";INSERT OR IGNORE INTO `db`.`group_group` (group_id,related_group_id,relationship_id,direction,contains,source_id)"
         sql += " VALUES (?2,?1,?3,-1,-1,%d)" % (self.getSourceID(),)
-        self._db.cursor().executemany(sql, (2 * gr for gr in groupRels))  # type: ignore
+        self._biofilter.db.cursor().executemany(sql, (2 * gr for gr in groupRels))  # type: ignore
 
     # addGroupParentRelationships()
 
@@ -612,7 +612,7 @@ class Source(object):
         sql += " VALUES (?1,?2,?3,1,-1,%d)" % (self.getSourceID(),)
         sql += ";INSERT OR IGNORE INTO `db`.`group_group` (group_id,related_group_id,relationship_id,direction,contains,source_id)"
         sql += " VALUES (?2,?1,?3,-1,1,%d)" % (self.getSourceID(),)
-        self._db.cursor().executemany(sql, (2 * gr for gr in groupRels))  # type: ignore
+        self._biofilter.db.cursor().executemany(sql, (2 * gr for gr in groupRels))  # type: ignore
 
     # addGroupChildRelationships()
 
@@ -623,7 +623,7 @@ class Source(object):
         sql += " VALUES (?1,?2,?3,1,0,%d)" % (self.getSourceID(),)
         sql += ";INSERT OR IGNORE INTO `db`.`group_group` (group_id,related_group_id,relationship_id,direction,contains,source_id)"
         sql += " VALUES (?2,?1,?3,-1,0,%d)" % (self.getSourceID(),)
-        self._db.cursor().executemany(sql, (2 * gr for gr in groupRels))  # type: ignore
+        self._biofilter.db.cursor().executemany(sql, (2 * gr for gr in groupRels))  # type: ignore
 
     # addGroupSiblingRelationships()
 
@@ -634,7 +634,7 @@ class Source(object):
             "INSERT OR IGNORE INTO `db`.`group_biopolymer` (group_id,biopolymer_id,specificity,implication,quality,source_id) VALUES (?,?,100,100,100,%d)"
             % (self.getSourceID(),)
         )
-        self._db.cursor().executemany(sql, groupBiopolymers)
+        self._biofilter.db.cursor().executemany(sql, groupBiopolymers)
 
     # addGroupBiopolymers()
 
@@ -645,7 +645,7 @@ class Source(object):
             "INSERT OR IGNORE INTO `db`.`group_member_name` (group_id,member,type_id,namespace_id,name,source_id) VALUES (?,?,?,?,?,%d)"
             % (self.getSourceID(),)
         )
-        self._db.cursor().executemany(sql, groupMemberNames)
+        self._biofilter.db.cursor().executemany(sql, groupMemberNames)
 
     # addGroupMemberNames()
 
@@ -660,7 +660,7 @@ class Source(object):
                 self.getSourceID(),
             )
         )
-        self._db.cursor().executemany(sql, groupMemberNames)
+        self._biofilter.db.cursor().executemany(sql, groupMemberNames)
 
     # addGroupMemberTypedNamespacedNames()
 
@@ -681,7 +681,7 @@ class Source(object):
             new_ucschg,
             self.getSourceID(),
         )
-        return [row[0] for row in self._db.cursor().executemany(sql, chain_list)]
+        return [row[0] for row in self._biofilter.db.cursor().executemany(sql, chain_list)]
 
     # addChains()
 
@@ -694,7 +694,7 @@ class Source(object):
             "INSERT INTO `db`.`chain_data` (chain_id,old_start,old_end,new_start,source_id) VALUES (?,?,?,?,%d)"
             % (self.getSourceID(),)
         )
-        self._db.cursor().executemany(sql, chain_data_list)
+        self._biofilter.db.cursor().executemany(sql, chain_data_list)
 
     # addChainData()
 
@@ -708,7 +708,7 @@ class Source(object):
             "INSERT OR IGNORE INTO `db`.`gwas` (rs,chr,pos,trait,snps,orbeta,allele95ci,riskAfreq,pubmed_id,source_id) VALUES (?,?,?,?,?,?,?,?,?,%d)"
             % (self.getSourceID(),)
         )
-        self._db.cursor().executemany(sql, gwasAnnotations)
+        self._biofilter.db.cursor().executemany(sql, gwasAnnotations)
 
     # addGWASAnnotations()
 

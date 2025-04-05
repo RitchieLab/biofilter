@@ -72,7 +72,7 @@ class GeneInputMixin:
 
         # names=[ (namespace,name,extra), ... ]
         self.logPush("adding to %s gene filter ...\n" % db)
-        cursor = self._loki._db.cursor()
+        cursor = self._loki._biofilter.db.cursor()
         self.prepareTableForUpdate(db, "gene")
         sql = (
             "INSERT INTO `%s`.`gene` (label,extra,biopolymer_id) VALUES (?2,?3,?4); SELECT 1"  # noqa E501
@@ -161,7 +161,7 @@ class GeneInputMixin:
         if not self._inputFilters[db]["gene"]:
             return self.unionInputGenes(db, names, errorCallback)
         self.logPush("reducing %s gene filter ...\n" % db)
-        cursor = self._loki._db.cursor()
+        cursor = self._loki._biofilter.db.cursor()
 
         self.prepareTableForQuery(db, "gene")
         cursor.execute("UPDATE `%s`.`gene` SET flag = 0" % db)
@@ -241,7 +241,7 @@ class GeneInputMixin:
         """
         # texts=[ (text,extra), ... ]
         self.logPush("adding to %s gene filter by text search ...\n" % db)
-        cursor = self._loki._db.cursor()
+        cursor = self._loki._biofilter.db.cursor()
 
         typeID = self.getOptionTypeID("gene")
 
@@ -305,7 +305,7 @@ class GeneInputMixin:
         if not self._inputFilters[db]["gene"]:
             return self.unionInputGeneSearch(db, texts)
         self.logPush("reducing %s gene filter by text search ...\n" % db)
-        cursor = self._loki._db.cursor()
+        cursor = self._loki._biofilter.db.cursor()
 
         typeID = self.getOptionTypeID("gene")
 

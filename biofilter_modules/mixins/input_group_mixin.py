@@ -69,7 +69,7 @@ class GroupInputMixin:
         """
         # names=[ (namespace,name,extra), ... ]
         self.logPush("adding to %s group filter ...\n" % (db,))
-        cursor = self._loki._db.cursor()
+        cursor = self._loki._biofilter.db.cursor()
 
         self.prepareTableForUpdate(db, "group")
         sql = (
@@ -158,7 +158,7 @@ class GroupInputMixin:
         if not self._inputFilters[db]["group"]:
             return self.unionInputGroups(db, names, errorCallback)
         self.logPush("reducing %s group filter ...\n" % (db,))
-        cursor = self._loki._db.cursor()
+        cursor = self._loki._biofilter.db.cursor()
 
         self.prepareTableForQuery(db, "group")
         cursor.execute("UPDATE `%s`.`group` SET flag = 0" % db)
@@ -238,7 +238,7 @@ class GroupInputMixin:
         """
         # texts=[ (text,extra), ... ]
         self.logPush("adding to %s group filter by text search ...\n" % (db,))
-        cursor = self._loki._db.cursor()
+        cursor = self._loki._biofilter.db.cursor()
 
         self.prepareTableForUpdate(db, "group")
         sql = (
@@ -298,7 +298,7 @@ class GroupInputMixin:
         if not self._inputFilters[db]["group"]:
             return self.unionInputGroupSearch(db, texts)
         self.logPush("reducing %s group filter by text search ...\n" % (db,))
-        cursor = self._loki._db.cursor()
+        cursor = self._loki._biofilter.db.cursor()
 
         self.prepareTableForQuery(db, "group")
         cursor.execute("UPDATE `%s`.`group` SET flag = 0" % db)

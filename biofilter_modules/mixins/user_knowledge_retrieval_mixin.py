@@ -69,7 +69,7 @@ class UserKnowledgeRetrievalMixin:
         supporting both targeted lookups and full retrievals.
         """
 
-        cursor = self._loki._db.cursor()
+        cursor = self._loki._biofilter.db.cursor()
         if sources:
             sql = "SELECT i.source, s.source_id FROM (SELECT ? AS source) AS i LEFT JOIN `user`.`source` AS s ON LOWER(s.source) = LOWER(i.source)"  # noqa E501
             # ret = {

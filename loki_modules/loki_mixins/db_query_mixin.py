@@ -35,7 +35,7 @@ class DbQueryMixin:
         with self._db:
             if tally is not None:
                 numMerge = numMatch = 0
-                for row in self._db.cursor().executemany(sql, rses):
+                for row in self._biofilter.db.cursor().executemany(sql, rses):
                     if row[2] != row[0]:
                         numMerge += 1
                     else:
@@ -44,7 +44,7 @@ class DbQueryMixin:
                 tally["merge"] = numMerge
                 tally["match"] = numMatch
             else:
-                for row in self._db.cursor().executemany(sql, rses):
+                for row in self._biofilter.db.cursor().executemany(sql, rses):
                     yield row
 
     # generateCurrentRSesByRSes()
@@ -97,7 +97,7 @@ class DbQueryMixin:
         n = numZero = numOne = numMany = 0
         with self._db:
             for row in itertools.chain(
-                self._db.cursor().executemany(sql, rses),
+                self._biofilter.db.cursor().executemany(sql, rses),
                 [(None, None, None, None)],  # noqa E501
             ):
                 if tag != row[0:2]:
@@ -161,7 +161,7 @@ class DbQueryMixin:
         # ids=[ (id,extra), ... ]
         # yield:[ (id,extra,type_id,label,description), ... ]
         sql = "SELECT biopolymer_id, ?2 AS extra, type_id, label, description FROM `db`.`biopolymer` WHERE biopolymer_id = ?1"  # noqa E501
-        return self._db.cursor().executemany(sql, ids)
+        return self._biofilter.db.cursor().executemany(sql, ids)
 
     # generateBiopolymersByIDs()
 
@@ -237,7 +237,7 @@ class DbQueryMixin:
         n = numZero = numOne = numMany = 0
         with self._db:
             for row in itertools.chain(
-                self._db.cursor().executemany(sql, identifiers),
+                self._biofilter.db.cursor().executemany(sql, identifiers),
                 [(None, None, None, None)],
             ):
                 if tag != row[0:3]:
@@ -403,7 +403,7 @@ class DbQueryMixin:
             GROUP BY b.biopolymer_id
             """
 
-        return self._db.cursor().executemany(sql, texts)
+        return self._biofilter.db.cursor().executemany(sql, texts)
 
     # _searchBiopolymerIDs()
 
@@ -504,7 +504,7 @@ class DbQueryMixin:
             GROUP BY namespace_id
             """
 
-        for row in self._db.cursor().execute(sql):
+        for row in self._biofilter.db.cursor().execute(sql):
             yield row
 
     # generateBiopolymerNameStats()
@@ -529,7 +529,7 @@ class DbQueryMixin:
         # ids=[ (id,extra), ... ]
         # yield:[ (id,extra,type_id,subtype_id,label,description), ... ]
         sql = "SELECT group_id, ?2 AS extra, type_id, subtype_id, label, description FROM `db`.`group` WHERE group_id = ?1"  # noqa E501
-        return self._db.cursor().executemany(sql, ids)
+        return self._biofilter.db.cursor().executemany(sql, ids)
 
     # generateGroupsByIDs()
 
@@ -606,7 +606,7 @@ class DbQueryMixin:
         n = numZero = numOne = numMany = 0
         with self._db:
             for row in itertools.chain(
-                self._db.cursor().executemany(sql, identifiers),
+                self._biofilter.db.cursor().executemany(sql, identifiers),
                 [(None, None, None, None)],
             ):
                 if tag != row[0:3]:
@@ -770,7 +770,7 @@ class DbQueryMixin:
             GROUP BY g.group_id
             """
 
-        return self._db.cursor().executemany(sql, texts)
+        return self._biofilter.db.cursor().executemany(sql, texts)
 
     # _searchGroupIDs()
 
@@ -866,7 +866,7 @@ class DbQueryMixin:
             GROUP BY namespace_id
             """
 
-        for row in self._db.cursor().execute(sql):
+        for row in self._biofilter.db.cursor().execute(sql):
             yield row
 
     # generateGroupNameStats()

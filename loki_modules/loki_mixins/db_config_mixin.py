@@ -59,7 +59,7 @@ class DbConfigMixin:
         """
         try:
             self.log("Configuring the database...", level=logging.INFO)
-            cursor = self._db.cursor()
+            cursor = self._biofilter.db.cursor()
             db = ("%s." % db) if db else ""
 
             # linux VFS doesn't usually report actual disk cluster size,
@@ -111,7 +111,7 @@ class DbConfigMixin:
         The function first detaches any existing temporary database with the
         same name, then attaches a new one.
         """
-        cursor = self._db.cursor()
+        cursor = self._biofilter.db.cursor()
 
         # detach the current db, if any
         try:
@@ -137,7 +137,7 @@ class DbConfigMixin:
         attaches the new one and configures it. It also establishes or audits
         the database schema.
         """
-        cursor = self._db.cursor()
+        cursor = self._biofilter.db.cursor()
 
         # detach the current db file, if any
         if self._dbFile and not quiet:
@@ -237,13 +237,13 @@ class DbConfigMixin:
         if self._dbFile is None:
             raise Exception("ERROR: no knowledge database file is loaded")
         try:
-            if self._db.readonly("db"):
+            if self._biofilter.db.readonly("db"):
                 raise Exception(
                     "ERROR: knowledge database file cannot be modified"
                 )  # noqa E501
         except AttributeError:  # apsw.Connection.readonly() added in 3.7.11
             try:
-                self._db.cursor().execute(
+                self._biofilter.db.cursor().execute(
                     "UPDATE `db`.`setting` SET value = value"
                 )  # noqa E501
             except apsw.ReadOnlyError:
@@ -297,7 +297,7 @@ class DbConfigMixin:
         Returns:
                 None
         """
-        self._db.cursor().execute("ANALYZE `db`")
+        self._biofilter.db.cursor().execute("ANALYZE `db`")
         self.log(
             "updating optimizer statistics completed\n",
             level=logging.CRITICAL,
@@ -327,8 +327,8 @@ class DbConfigMixin:
             dbFile = self._dbFile
             self.detachDatabaseFile(quiet=True)
             db = apsw.Connection(dbFile)
-            db.cursor().execute("VACUUM")
-            db.close()
+            biofilter.db.cursor().execute("VACUUM")
+            biofilter.db.close()
             self.attachDatabaseFile(dbFile, quiet=True)
 
     # defragmentDatabase()

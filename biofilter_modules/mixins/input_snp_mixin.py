@@ -57,7 +57,7 @@ class SNPInputMixin:
         """
         # snps=[ (rs,extra), ... ]
         self.logPush("adding to %s SNP filter ...\n" % db)
-        cursor = self._loki._db.cursor()
+        cursor = self._loki._biofilter.db.cursor()
 
         self.prepareTableForUpdate(db, "snp")
         sql = (
@@ -129,7 +129,7 @@ class SNPInputMixin:
         if not self._inputFilters[db]["snp"]:
             return self.unionInputSNPs(db, snps, errorCallback)
         self.logPush("reducing %s SNP filter ...\n" % db)
-        cursor = self._loki._db.cursor()
+        cursor = self._loki._biofilter.db.cursor()
 
         self.prepareTableForQuery(db, "snp")
         cursor.execute("UPDATE `%s`.`snp` SET flag = 0" % db)
