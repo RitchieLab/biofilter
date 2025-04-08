@@ -2,91 +2,18 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Python Debugger: Current File",
+            "name": "Bio 3R - Create Project",
             "type": "debugpy",
             "request": "launch",
-            "program": "${file}",
+            "program": "${workspaceFolder}/scripts/Start_Project.py",
             "console": "integratedTerminal"
         },
         {
-            "name": "Biofilter Debugger",
+            "name": "Bio 3R - Run ETLManager",
             "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceFolder}/biofilter_modules/biofilter.py",
-            "args": [
-                "--verbose",
-                "--knowledge", "/Users/andrerico/Works/Sys/BIOFILTER/loki_modules/loki-20220926.db",
-                "--position-file", "/Users/andrerico/Works/Sys/BIOFILTER/data_test/input_filename",
-                "--annotate", "position_label", "snp", "position", "gene", "upstream", "downstream",
-                "--report-invalid-input",
-                "--overwrite",
-                "--prefix", "output_prefix",
-                "--ucsc-build-version", "38"
-            ],
+            "program": "${workspaceFolder}/scripts/Run_ETLManager.py",
             "console": "integratedTerminal"
-        },
-        {
-            "name": "Biofilter Builds",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "${workspaceFolder}/biofilter_modules/biofilter.py",
-            "args": [
-                "--verbose",
-                "--knowledge", "/Users/andrerico/Works/Sys/BIOFILTER/loki_modules/loki-20220926.db",
-                "--position-file", "/Users/andrerico/Works/Sys/BIOFILTER/tests/issues/l16_build_37_loki/data-in/input_filename",
-                "--source", "kegg", "reactome", "go",
-                "--annotate", "position_label", "snp", "position", "gene", "upstream", "downstream",
-                "--report-invalid-input",
-                "--report-configuration",
-                "--overwrite",
-                "--prefix", "/Users/andrerico/Works/Sys/BIOFILTER/tests/issues/l16_build_37_loki/data-out/outcomes",
-                "--ucsc-build-version", "19"
-            ],
-            "console": "integratedTerminal"
-        },
-        {
-            "name": "Biofilter - CDK1",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "${workspaceFolder}/biofilter_modules/biofilter.py",
-            "args": [
-                "--verbose",
-                "--knowledge", "/Users/andrerico/Works/Sys/BIOFILTER/data/loki-20220926.db",
-                "--gene-file", "/Users/andrerico/Works/Sys/BIOFILTER/tests/issues/cdk1/data-in/cdk1-test.csv",
-                "--source", "kegg", "reactome", "go",
-                "--annotate", "gene", "group", "group_description",
-                "--report-invalid-input",
-                "--report-configuration",
-                "--overwrite",
-                "--prefix", "/Users/andrerico/Works/Sys/BIOFILTER/tests/issues/cdk1/data-out/outcomes",
-                "--ucsc-build-version", "19"
-            ],
-            "console": "integratedTerminal"
-        },
-        {
-            "name": "LOKI-BUILD",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "${workspaceFolder}/loki_modules/loki_build.py",
-            "args": [
-                "--knowledge", "/Users/andrerico/Works/Sys/biofilter/data/dbsnp.db",
-                "--update",
-                "--temp-directory", "/Users/andrerico/Works/Sys/biofilter/downloads",
-                "--list-sources", "dbsnp",
-                "--keep-download",
-            ],
-            "console": "integratedTerminal"
-        },
-        {
-            "name": "OMICS: BUILDER",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "${workspaceFolder}/omics_modules/builder.py",
-            "console": "integratedTerminal",
-            "cwd": "${workspaceFolder}", 
-            "env": {
-                "PYTHONPATH": "${workspaceFolder}"
-            }
         }
     ]
 }

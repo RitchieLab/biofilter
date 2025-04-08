@@ -8,7 +8,7 @@
             "format": "JSON",
             "grch_version": "GRCh38",
             "ucschg_version": "hg38",
-            "dtp_version": "v1.0",
+            "dtp_version": "dtp_hgnc",
             "last_status": "pending",
             "active": true
         }

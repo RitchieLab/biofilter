@@ -1,4 +1,5 @@
 from sqlalchemy import Column, Integer, String
+
 # from sqlalchemy.orm import relationship
 from biofilter.db.base import Base
 import datetime
@@ -27,10 +28,10 @@ class Gene(Base):
     entrez_id = Column(String, nullable=True)
     ensembl_id = Column(String, nullable=True)
 
-    chromosome = Column(String, nullable=True)   # Ex: "1", "X", "MT"
+    chromosome = Column(String, nullable=True)  # Ex: "1", "X", "MT"
     start = Column(Integer, nullable=True)
     end = Column(Integer, nullable=True)
-    strand = Column(String, nullable=True)       # "+", "-"
+    strand = Column(String, nullable=True)  # "+", "-"
 
     locus_group = Column(String, nullable=True)
     locus_type = Column(String, nullable=True)

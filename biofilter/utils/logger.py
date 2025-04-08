@@ -25,29 +25,57 @@ class Logger:
             cls._instance._initialize(log_file, log_level)
         return cls._instance
 
+    # NOTE: DELETE this block of code when the logger is working
+    # def _initialize(self, log_file, log_level):
+    #     """Initializes the logger configuration."""
+    #     init(autoreset=True)  # Enables color formatting in terminal
+
+    #     self.logger = logging.getLogger("BiofilterLogger")
+    #     self.logger.setLevel(self.LOG_LEVELS.get(log_level.upper(), logging.INFO))  # noqa E501
+
+    #     # ✅ Prevent duplicate handlers
+    #     if not self.logger.hasHandlers():
+    #         # Creating file handler
+    #         # log_path = os.path.join(os.getcwd(), log_file)
+    #         log_path = os.path.abspath(log_file)
+    #         file_handler = logging.FileHandler(log_path)
+    #         file_handler.setFormatter(
+    #             logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")  # noqa E501
+    #         )
+
+    #         # Creating console handler with color formatting
+    #         console_handler = logging.StreamHandler()
+    #         console_handler.setFormatter(self.ColoredFormatter())
+
+    #         # Adding handlers only if not already added
+    #         self.logger.addHandler(file_handler)
+    #         self.logger.addHandler(console_handler)
     def _initialize(self, log_file, log_level):
-        """Initializes the logger configuration."""
-        init(autoreset=True)  # Enables color formatting in terminal
+        if getattr(self, "_configured", False):
+            return  # Already configured, exit early
+
+        init(autoreset=True)
 
         self.logger = logging.getLogger("BiofilterLogger")
-        self.logger.setLevel(self.LOG_LEVELS.get(log_level.upper(), logging.INFO))
+        self.logger.setLevel(
+            self.LOG_LEVELS.get(log_level.upper(), logging.INFO)
+        )  # noqa E501
 
-        # ✅ Prevent duplicate handlers
-        if not self.logger.hasHandlers():
-            # Creating file handler
-            log_path = os.path.join(os.getcwd(), log_file)
-            file_handler = logging.FileHandler(log_path)
-            file_handler.setFormatter(
-                logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
-            )
+        # File handler
+        log_path = os.path.abspath(log_file)
+        file_handler = logging.FileHandler(log_path)
+        file_handler.setFormatter(
+            logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
+        )
 
-            # Creating console handler with color formatting
-            console_handler = logging.StreamHandler()
-            console_handler.setFormatter(self.ColoredFormatter())
+        # Console handler
+        console_handler = logging.StreamHandler()
+        console_handler.setFormatter(self.ColoredFormatter())
 
-            # Adding handlers only if not already added
-            self.logger.addHandler(file_handler)
-            self.logger.addHandler(console_handler)
+        self.logger.addHandler(file_handler)
+        self.logger.addHandler(console_handler)
+
+        self._configured = True  # Check if the logger is already configured
 
     def log(self, message, level="INFO"):
         """
@@ -79,18 +107,64 @@ class Logger:
 
         def format(self, record):
             log_color = self.COLORS.get(record.levelno, Fore.WHITE)
-            return f"{log_color}[{record.levelname}] {record.msg}{Style.RESET_ALL}"
+            return f"{log_color}[{record.levelname}] {record.msg}{Style.RESET_ALL}"  # noqa E501
 
 
-# 🛠️ HOW TO USE IT:
-# from omics_modules.logger import OmicsLogger
+"""
+================================================================================
+Developer Note - Logger Utility
+================================================================================
 
-# # Create a new instance of the logger
-# logger = OmicsLogger()
+This module provides a centralized, singleton-based logger for the Biofilter
+system, designed to be reused across all components and services.
 
-# # Logs with different levels
-# logger.log("This is a DEBUG", logging.DEBUG)
-# logger.log("This is a INFO", logging.INFO)
-# logger.log("This is a WARNING", logging.WARNING)
-# logger.log("This is an ERROR", logging.ERROR)
-# logger.log("This is a CRITICAL", logging.CRITICAL)
+Key Features:
+
+- Singleton pattern:
+    Ensures consistent logging behavior and configuration across the entire
+    system.
+    Only one instance of the logger will ever exist, regardless of how many
+    times it is imported or instantiated.
+
+- Colored terminal output:
+    Uses `colorama` to differentiate log levels visually, improving CLI
+    readability.
+
+- File and console logging:
+    Simultaneously logs to both console and file, with independent formatters
+    (color for console, plain for file).
+
+- Dynamic reconfiguration:
+    Supports setting log level dynamically at runtime via `set_log_level()`.
+
+- Test-friendly architecture:
+    The singleton can be reset for testing by clearing the `_instance`
+    attribute and manually clearing handlers from
+    `logging.getLogger("BiofilterLogger")`.
+
+Design Notes:
+
+- To avoid unintended reconfiguration or duplicate handlers, the class uses an
+    internal `_configured` flag in combination with direct handler inspection
+    to guard the initialization block.
+
+- Log messages use a consistent format with timestamp, level, and message
+    content, Example:
+        `2025-04-05 22:15:34,112 - INFO - Data ingestion completed`
+
+- Developers should avoid reusing `logging.getLogger(...)` directly in modules.
+    Always use `Logger().log(...)` for consistency.
+
+# HOW TO USE IT:
+
+from biofilter.utils.logger import Logger
+
+logger = Logger()
+logger.log("System initialized", "INFO")
+logger.set_log_level("DEBUG")
+logger.log("This is a DEBUG", logging.DEBUG)
+logger.log("This is a INFO", logging.INFO)
+logger.log("This is a WARNING", logging.WARNING)
+logger.log("This is an ERROR", logging.ERROR)
+logger.log("This is a CRITICAL", logging.CRITICAL)
+"""

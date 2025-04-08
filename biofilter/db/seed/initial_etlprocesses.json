@@ -2,20 +2,17 @@
     "etl_processes": [
         {
             "data_source_id": 1,
-            "start_time": "2025-04-01T10:00:00Z",
-            "end_time": "2025-04-01T10:15:00Z",
-            "status": "completed",
-            "extract_start": "2025-04-01T10:00:00Z",
-            "extract_end": "2025-04-01T10:05:00Z",
-            "extract_status": "success",
-            "transform_start": "2025-04-01T10:05:00Z",
-            "transform_end": "2025-04-01T10:10:00Z",
-            "transform_status": "success",
-            "load_start": "2025-04-01T10:10:00Z",
-            "load_end": "2025-04-01T10:15:00Z",
-            "load_status": "success",
-            "dtp_script": "HGNC",
-            "file_stamp": "hgnc_data.json::2025-04-01"
+            "global_status": "pending",
+            "extract_start": "2025-04-01T10:00:00",
+            "extract_end": "2025-04-01T10:05:00",
+            "extract_status": "pending",
+            "transform_start": "2025-04-01T10:05:00",
+            "transform_end": "2025-04-01T10:10:00",
+            "transform_status": "pending",
+            "load_start": "2025-04-01T10:10:00",
+            "load_end": "2025-04-01T10:15:00",
+            "load_status": "pending",
+            "dtp_script": "dtp_hgnc"
         }
     ]
 }

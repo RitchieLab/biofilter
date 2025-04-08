@@ -308,10 +308,16 @@ class BiopolymerRegion(Base):
             "biopolymer_id", "ldprofile_id", "chr", "posMin", "posMax"
         ),
         Index(
-            "biopolymer_region__ldprofile_chr_min", "ldprofile_id", "chr", "posMin"  # noqa E501
+            "biopolymer_region__ldprofile_chr_min",
+            "ldprofile_id",
+            "chr",
+            "posMin",  # noqa E501
         ),  # noqa E501
         Index(
-            "biopolymer_region__ldprofile_chr_max", "ldprofile_id", "chr", "posMax"  # noqa E501
+            "biopolymer_region__ldprofile_chr_max",
+            "ldprofile_id",
+            "chr",
+            "posMax",  # noqa E501
         ),  # noqa E501
     )
 
@@ -367,7 +373,10 @@ class GroupName(Base):
     __table_args__ = (
         PrimaryKeyConstraint("group_id", "namespace_id", "name"),
         Index(
-            "group_name__name_namespace_group", "name", "namespace_id", "group_id"  # noqa E501
+            "group_name__name_namespace_group",
+            "name",
+            "namespace_id",
+            "group_id",  # noqa E501
         ),  # noqa E501
         Index("group_name__source_name", "source_id", "name"),
     )

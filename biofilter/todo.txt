@@ -1,9 +1,0 @@
-O que fazer::::
-
-
-- Melhorar o conteudo das tables DataSources e ETLRunner??
-- Adciionar os logs
-- Criar uma interface de configuracao.
-
-
-'sqlite:////private/var/folders/06/f05rc_9x21nfs2142bf0fmcr0000gn/T/pytest-of-andrerico/pytest-2/test_create_db0/test_biofilter.sqlite'

@@ -3,7 +3,6 @@
 from sqlalchemy import create_engine, inspect
 import pandas as pd
 from biofilter.db.models import (
-    Base,
     Setting,
     GrchUcschg,
     LdProfile,

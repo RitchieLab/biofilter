@@ -4,10 +4,11 @@ from sqlalchemy.exc import IntegrityError
 from biofilter.db.base import Base
 from importlib import import_module
 from biofilter.utils.db_loader import load_all_models  # ✅ novo import
+from datetime import datetime
 
 
 class CreateDBMixin:
-    def create_db(self, overwrite=False):
+    def create_db(self, overwrite=False, seed_dir="seed"):
         if self.exists_db() and not overwrite:
             msn = f"Database already exists at {self.db_uri}"
             self.logger.log(msn, "WARNING")
@@ -22,7 +23,7 @@ class CreateDBMixin:
         self._create_tables()
 
         self.logger.log("Seeding initial data...", "INFO")
-        self._seed_all()
+        self._seed_all(seed_dir)
 
         self.logger.log(f"Database created at {self.db_uri}", "INFO")
         return True
@@ -30,25 +31,25 @@ class CreateDBMixin:
     def _create_tables(self):
         Base.metadata.create_all(self.engine)
 
-    def _seed_all(self):
+    def _seed_all(self, seed_dir):
         self._seed_from_json(
-            "seed/initial_config.json", "config_models", "SystemConfig"
+            f"{seed_dir}/initial_config.json", "config_models", "SystemConfig"
         )
 
         self._seed_from_json(
-            "seed/initial_sourcesystems.json",
+            f"{seed_dir}/initial_sourcesystems.json",
             "etl_models",
             "SourceSystem",
             key="source_systems",
         )
         self._seed_from_json(
-            "seed/initial_datasources.json",
+            f"{seed_dir}/initial_datasources.json",
             "etl_models",
             "DataSource",
             key="data_sources",
         )
         self._seed_from_json(
-            "seed/initial_etlprocesses.json",
+            f"{seed_dir}/initial_etlprocesses.json",
             "etl_models",
             "ETLProcess",
             key="etl_processes",
@@ -69,6 +70,17 @@ class CreateDBMixin:
             records = data.get(key, data) if key else data
 
             for item in records:
+                # Converter campos datetime (se existirem e forem string)
+                for key, value in item.items():
+                    if key.endswith("_start") or key.endswith("_end"):
+                        if isinstance(value, str):
+                            try:
+                                item[key] = datetime.fromisoformat(value)
+                            except ValueError:
+                                self.logger.log(
+                                    f"Invalid datetime format in key {key}: {value}",
+                                    "WARNING",
+                                )  # noqa: E501
                 session.add(model_class(**item))
             try:
                 session.commit()

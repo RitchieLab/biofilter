@@ -44,11 +44,13 @@ class ETLManager:
             return
 
         for ds in data_sources:
-            process = self._init_or_restart_etl(ds, dtp_script or ds.dtp_version)
+            process = self._init_or_restart_etl(
+                ds, dtp_script or ds.dtp_version
+            )  # noqa: E501
 
             try:
                 script_module = importlib.import_module(
-                    f"etl.sources.{ds.dtp_version.lower()}"
+                    f"biofilter.etl.sources.{ds.dtp_version.lower()}"
                 )
 
                 dtp_instance = script_module.DTP(
@@ -58,17 +60,34 @@ class ETLManager:
                     session=self.session,
                 )
 
-                # RUN EXTRACT FASE
-                self.logger.log(f"Running extract() for {ds.name}", "INFO")
-                extract_result = dtp_instance.extract(
-                    download_path,
-                )
+                # NOTE: Pensar em como pular etapas se já foram feitas
+                # # RUN EXTRACT FASE
+                # self.logger.log(f"Running extract() for {ds.name}", "INFO")
+                # extract_status = dtp_instance.extract(
+                #     download_path,
+                # )
+
+                # # if ERROR, go to next DataSource
+                # if not extract_status:
+                #     continue
 
                 # RUN TRANSFORM FASE
                 self.logger.log(f"Running transform() for {ds.name}", "INFO")
                 transform_df, transform_status = dtp_instance.transform(
                     download_path, processed_path
                 )
+
+                # if ERROR, go to next DataSource
+                if not transform_status:
+                    continue
+
+                # Check if the DataFrame is empty
+                if transform_df is None or transform_df.empty:
+                    self.logger.log(
+                        f"❌ Transform returned an empty DataFrame for {ds.name}",
+                        "ERROR",
+                    )
+                    continue
 
                 # RUN LOAD FASE
                 self.logger.log(f"Running load() for {ds.name}", "INFO")
@@ -98,26 +117,43 @@ class ETLManager:
             .first()
         )
 
-        now = datetime.now()
+        # now = datetime.now()
 
         if process:
             self.logger.log(f"🔄 Updating ETLProcess for {data_source.name}", "INFO")
-            process.start_time = now
-            process.end_time = None
-            process.status = "running"
-            process.extract_status = None
-            process.transform_status = None
-            process.load_status = None
-            process.error_message = None
-            process.records_processed = 0
-            process.tables_updated = None
+            process.global_status = "running"
+
+            process.extract_start = None
+            process.extract_end = None
+            process.extract_status = "pending"
+
+            process.transform_start = None
+            process.transform_end = None
+            process.transform_status = "pending"
+
+            process.load_start = None
+            process.load_end = None
+            process.load_status = "pending"
+
             process.dtp_script = dtp_script
         else:
             self.logger.log(f"🚀 Creating ETLProcess for {data_source.name}", "INFO")
             process = ETLProcess(
                 data_source_id=data_source.id,
-                start_time=now,
-                status="running",
+                global_status="running",
+
+                extract_start=None,
+                extract_end=None,
+                extract_status="pending",
+
+                transform_start=None,
+                transform_end=None,
+                transform_status="pending",
+
+                load_start=None,
+                load_end=None,
+                load_status="pending",
+
                 dtp_script=dtp_script,
             )
             self.session.add(process)
@@ -149,63 +185,3 @@ class ETLManager:
         self.logger.log(
             f"ETLProcess {process.id} finished with status: {status}", "INFO"
         )
-
-
-# # etl/etl_manager.py
-
-# from biofilter.db.models.etl_models import ETLProcess, DataSource
-# from sqlalchemy.orm import Session
-# from utils.logger import Logger
-# from datetime import datetime
-
-
-# class ETLManager:
-#     def __init__(self, db_session: Session):
-#         self.session = db_session
-#         self.logger = Logger()
-
-#     def start_process(self, data_source_id: int, dtp_script: str) -> ETLProcess:
-#         """
-#         Cria um novo ETLProcess com status "running" e salva no banco.
-#         """
-#         process = ETLProcess(
-#             data_source_id=data_source_id,
-#             status="running",
-#             dtp_script=dtp_script,
-#             start_time=datetime.now()
-#         )
-#         self.session.add(process)
-#         self.session.commit()
-#         self.logger.log(f"🔁 ETLProcess iniciado para DataSource {data_source_id}.", "INFO")
-#         return process
-
-#     def update_status(self, process: ETLProcess, step: str, status: str):
-#         """
-#         Atualiza o status de um passo (extract, transform, load)
-#         """
-#         if step == "extract":
-#             process.extract_status = status
-#         elif step == "transform":
-#             process.transform_status = status
-#         elif step == "load":
-#             process.load_status = status
-#         else:
-#             raise ValueError(f"Passo ETL desconhecido: {step}")
-
-#         self.session.commit()
-#         self.logger.log(f"🔄 ETL step '{step}' atualizado para '{status}'.", "DEBUG")
-
-#     def complete_process(self, process: ETLProcess, records_processed: int, tables: list[str]):
-#         process.end_time = datetime.now()
-#         process.status = "completed"
-#         process.records_processed = records_processed
-#         process.tables_updated = ", ".join(tables)
-#         self.session.commit()
-#         self.logger.log(f"✅ ETLProcess {process.id} finalizado.", "INFO")
-
-#     def fail_process(self, process: ETLProcess, message: str):
-#         process.end_time = datetime.now()
-#         process.status = "failed"
-#         process.error_message = message
-#         self.session.commit()
-#         self.logger.log(f"❌ ETLProcess {process.id} falhou: {message}", "ERROR")

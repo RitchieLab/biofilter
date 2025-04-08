@@ -29,8 +29,8 @@ class Database(CreateDBMixin):
 
         Args:
             new_uri (str): Optionally provide a new database URI.
-            check_exists (bool): If True, raises error if database does not exist.
-                                Set to False during DB creation.
+            check_exists (bool): If True, raises error if database does not
+            exist. Set to False during DB creation.
         """
         """
         Connect to the specified database.
@@ -69,88 +69,40 @@ class Database(CreateDBMixin):
             return None
         return self.session()
 
-    # def create_db(self, overwrite: bool = False) -> bool:
-    #     if self.exists_db() and not overwrite:
-    #         print(f"🛑 Database already exists at {self.uri}")
-    #         return False
-
-    #     self.connect()
-
-    #     import biofilter.db.models.config_models
-    #     import biofilter.db.models.etl_models
-    #     import biofilter.db.models.loki_models
-    #     import biofilter.db.models.omics_models
-    #     import biofilter.db.models.relationship_models
-
-    #     self.connect()
-    #     Base.metadata.create_all(self.engine)
-
-    #     self.seed_all()
-
-    #     print(f"✅ Database created at {self.uri}")
-    #     return True
-
-    # def seed_all(self):
-    #     self.seed_initial_data()
-    #     self.seed_settings()
-
-    # def seed_settings(self, json_path=None):
-    #     import os
-    #     import json
-    #     from biofilter.db.models.config_models import SystemConfig
-    #     from sqlalchemy.exc import IntegrityError
-
-    #     # Resolve path dinamicamente
-    #     if json_path is None:
-    #         current_dir = os.path.dirname(os.path.abspath(__file__))
-    #         json_path = os.path.join(current_dir, "seed", "initial_config.json")
-
-    #     if not self.engine:
-    #         raise RuntimeError("Database not connected")
-
-    #     with self.get_session() as session:
-    #         with open(json_path, "r") as f:
-    #             data = json.load(f)
-
-    #         for setting in data:
-    #             session.add(SystemConfig(**setting))
-
-    #         try:
-    #             session.commit()
-    #             print("✅ Initial data seeded.")
-    #         except IntegrityError:
-    #             session.rollback()
-    #             print("⚠️ Initial data already exists. Skipping.")
-
-    # # def seed_initial_data(self, json_path="db/seed/initial_data.json"):
-    # def seed_initial_data(self, json_path=None):
-    #     from biofilter.db.models.etl_models import DataSource
-    #     from sqlalchemy.exc import IntegrityError
-
-    #     # Resolve path dinamicamente
-    #     if json_path is None:
-    #         current_dir = os.path.dirname(os.path.abspath(__file__))
-    #         json_path = os.path.join(current_dir, "seed", "initial_data.json")
-
-    #     if not self.engine:
-    #         raise RuntimeError("Database not connected")
-
-    #     with self.get_session() as session:
-    #         with open(json_path, "r") as f:
-    #             data = json.load(f)
-
-    #         for ds in data.get("data_sources", []):
-    #             session.add(DataSource(**ds))
-
-    #         try:
-    #             session.commit()
-    #             print("✅ Initial data seeded.")
-    #         except IntegrityError:
-    #             session.rollback()
-    #             print("⚠️ Initial data already exists. Skipping.")
-
 
 """
+===============================================================================
+Developer Note - Database Class
+================================================================================
+This class manages the core database connection logic and session management
+for the Biofilter system. It supports both SQLite and other
+SQLAlchemy-compatible backends.
+
+Key Responsibilities:
+- Normalize and store the database URI
+- Create SQLAlchemy Engine and Session factory
+- Check if the database exists (only implemented for SQLite for now)
+- Provide sessions via `get_session()`
+- Integrate with CreateDBMixin to support schema creation and seeding
+
+Usage:
+>>> db = Database("sqlite:///biofilter.sqlite")
+>>> with db.get_session() as session:
+...     session.query(...)
+
+types:
 uri to SQLlite: "sqlite:///biofilter.sqlite"
 uri to Postgres: "postgresql://user:pass@localhost/dbname""
+
+Notes:
+- Ensure all models are loaded before `create_all()`
+- When adding support for Postgres or others, update `exists_db()`
+- `connect(check_exists=True)` raises if the DB does not exist
+
+See also: biofilter.db.create_db_mixin.CreateDBMixin
+
+================================================================================
+    Author: Andre Garon - Biofilter 3R
+    Date: 2025-04
+================================================================================
 """

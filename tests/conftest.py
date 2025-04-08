@@ -5,6 +5,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 from biofilter.db.base import Base
+from biofilter.biofilter import Biofilter
 
 # 👇 Força o carregamento dos modelos
 import biofilter.db.models  # noqa: F401
@@ -28,3 +29,18 @@ def db_session():
 
     session.close()
     Base.metadata.drop_all(engine)
+
+
+@pytest.fixture(scope="function")
+def biofilter_instance(tmp_path):
+    """
+    Cria uma instância do Biofilter com banco SQLite temporário
+    e base totalmente criada com dados iniciais.
+    """
+    db_file = tmp_path / "test_biofilter.sqlite"
+    db_uri = f"sqlite:///{db_file}"
+
+    bf = Biofilter()
+    bf.create_new_project(db_uri=db_uri, overwrite=True)
+
+    return bf

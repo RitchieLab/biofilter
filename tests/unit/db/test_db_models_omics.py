@@ -4,13 +4,14 @@ from biofilter.db.models import Gene, GeneGroup
 
 def test_create_gene_group(db_session):
     group = GeneGroup(
-        name="Protein-Coding Genes",
-        description="Main coding genes"
+        name="Protein-Coding Genes", description="Main coding genes"
     )  # noqa: E501
     db_session.add(group)
     db_session.commit()
 
-    result = db_session.query(GeneGroup).filter_by(name="Protein-Coding Genes").first()  # noqa: E501
+    result = (
+        db_session.query(GeneGroup).filter_by(name="Protein-Coding Genes").first()
+    )  # noqa: E501
     assert result is not None
     assert result.name == "Protein-Coding Genes"
     assert result.description == "Main coding genes"
@@ -54,11 +55,7 @@ def test_unique_hgnc_id_constraint(db_session):
 
 
 def test_gene_without_locus_data(db_session):
-    gene = Gene(
-        entity_id=3,
-        hgnc_id="HGNC:3000",
-        ensembl_id="ENSG000003000"
-    )
+    gene = Gene(entity_id=3, hgnc_id="HGNC:3000", ensembl_id="ENSG000003000")
     db_session.add(gene)
     db_session.commit()
 

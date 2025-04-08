@@ -2,19 +2,20 @@ import os
 import json
 import requests
 import pandas as pd
-
-# from utils.logger import Logger
-# from etl.base import BaseETL
+from biofilter.etl.base.master_entity_loader import MasterEntityLoader  # Novo mixin
 
 
-class DTP:
-    def __init__(self, logger=None, datasource=None, etl_process=None, session=None):
+class DTP(MasterEntityLoader):
+    def __init__(self, logger=None, datasource=None, etl_process=None, session=None):  # noqa: E501
         self.logger = logger
         self.datasource = datasource
         self.etl_process = etl_process
         self.session = session
 
-    HGNC_API_URL = "https://rest.genenames.org/fetch/all"
+        self.HGNC_API_URL = "https://rest.genenames.org/fetch/all"
+        self.file_name = "hgnc_data.json"
+        self.gene_group = 1  # Exemplo: grupo para Gene
+        self.gene_category = 1  # Exemplo: categoria para Gene
 
     def extract(self, download_path):
 
@@ -23,104 +24,166 @@ class DTP:
         # dos arquivos que estão no banco de dados. Adicionar melhores
         # controles e flow inteligentes.
 
-        raw_json_file = os.path.join(download_path, "hgnc", "hgnc_data.json")
-        os.makedirs(os.path.dirname(raw_json_file), exist_ok=True)
+        try:
+            raw_file = os.path.join(download_path, "hgnc", self.file_name)
+            os.makedirs(os.path.dirname(raw_file), exist_ok=True)
 
-        self.etl_process.extract_status = "started"
-        self.session.commit()
+            # Log e status
+            self.etl_process.extract_status = "running"
+            self.etl_process.extract_start = pd.Timestamp.now()
+            self.session.commit()
 
-        headers = {"Accept": "application/json"}
-        response = requests.get(self.HGNC_API_URL, headers=headers)
+            headers = {"Accept": "application/json"}
+            response = requests.get(self.HGNC_API_URL, headers=headers)
 
-        if response.status_code != 200:
-            raise Exception(f"Failed to fetch data from HGNC: {response.status_code}")
+            if response.status_code != 200:
+                msn = f"Failed to fetch data from HGNC: {response.status_code}"
+                raise Exception(msn)
 
-        with open(raw_json_file, "w") as f:
-            f.write(response.text)
+            with open(raw_file, "w") as f:
+                f.write(response.text)
 
-        self.logger.log(f"✅ HGNC raw data saved at {raw_json_file}", "INFO")
-        return True
+            # Log e status
+            self.logger.log(f"✅ HGNC raw data saved at {raw_file}", "INFO")  # noqa: E501
+            self.etl_process.extract_status = "completed"
+            self.etl_process.extract_end = pd.Timestamp.now()
+            self.session.commit()
 
-    def transform(self, download_path, processed_path):
-        # Caminhos
-        json_file = os.path.join(download_path, "hgnc", "hgnc_data.json")
-        csv_file = os.path.join(processed_path, "hgnc", "hgnc_data.csv")
+            return True
 
-        # Verifica se o JSON existe
-        if not os.path.exists(json_file):
-            msn = f"File not found: {json_file}"
+        except Exception as e:
+            msn = f"❌ Error during extraction: {e}"
             self.logger.log(msn, "ERROR")
-            self.etl_process.transform_status = "ERROR: Download file not found"
+            self.etl_process.extract_status = "failed"
+            self.etl_process.extract_end = pd.Timestamp.now()
             self.session.commit()
             return False
 
-        # Cria diretório de saída, se não existir
-        os.makedirs(os.path.dirname(csv_file), exist_ok=True)
+    def transform(self, raw_path, processed_path):
+        try:
+            # Log e status
+            self.etl_process.transform_status = "running"
+            self.etl_process.transform_start = pd.Timestamp.now()
+            self.session.commit()
 
-        # Remove CSV anterior (se existir)
-        if os.path.exists(csv_file):
-            os.remove(csv_file)
-            self.logger.log(f"⚠️ Previous CSV file deleted: {csv_file}", "DEBUG")
+            # Paths
+            json_file = os.path.join(raw_path, "hgnc", "hgnc_data.json")
+            csv_file = os.path.join(processed_path, "hgnc", "hgnc_data.csv")
 
-        # Carrega JSON
-        with open(json_file, "r") as f:
-            data = json.load(f)
+            # Check if the JSON file exists
+            if not os.path.exists(json_file):
+                msn = f"File not found: {json_file}"
+                raise Exception(msn)
 
-        df = pd.DataFrame(data["response"]["docs"])
+            # Cria diretório de saída, se não existir
+            os.makedirs(os.path.dirname(csv_file), exist_ok=True)
 
-        # Salva CSV
-        df.to_csv(csv_file, index=False)
+            # Remove CSV anterior (se existir)
+            if os.path.exists(csv_file):
+                os.remove(csv_file)
+                self.logger.log(f"⚠️ Previous CSV file deleted: {csv_file}", "DEBUG")  # noqa: E501
 
-        # Log e status
-        self.logger.log(f"✅ HGNC data transformed and saved at {csv_file}", "INFO")
-        self.etl_process.transform_status = "completed"
-        self.session.commit()
+            # LOAD JSON
+            with open(json_file, "r") as f:
+                data = json.load(f)
 
-        return df, True
+            df = pd.DataFrame(data["response"]["docs"])
+
+            # Save DataFrame to CSV
+            df.to_csv(csv_file, index=False)
+
+            # Log e status
+            self.logger.log(f"✅ HGNC data transformed and saved at {csv_file}", "INFO")  # noqa: E501
+            self.etl_process.transform_status = "completed"
+            self.etl_process.transform_end = pd.Timestamp.now()
+            self.session.commit()
+
+            return df, True
+
+        except Exception as e:
+            msn = f"❌ Error during transformation: {e}"
+            self.logger.log(msn, "ERROR")
+            self.etl_process.transform_status = "failed"
+            self.etl_process.transform_end = pd.Timestamp.now()
+            self.session.commit()
+            return None, False
 
     def load(self, df=None, processed_path=None):
-        if df is None:
-            # Fallback: carregar do CSV
-            csv_file = os.path.join(processed_path, "hgnc_data.csv")
-            if not os.path.exists(csv_file):
-                msn = f"❌ CSV not found at {csv_file}"
-                self.logger.log(msn, "ERROR")
-                self.etl_process.load_status = "ERROR: CSV not found"
-                self.session.commit()
-                return 0
-            df = pd.read_csv(csv_file)
+        from biofilter.db.models.omics_models import Gene
 
-        # Aqui segue a lógica de inserção no banco
-        self.logger.log(f"📥 Loading {len(df)} rows into database", "INFO")
+        total = 0
 
-        # TODO: mapear para o modelo correto e inserir
-        # exemplo fictício:
-        # for row in df.itertuples():
-        #     self.session.add(Gene(**row._asdict()))
-        # self.session.commit()
+        # Log e status
+        self.etl_process.load_status = "running"
+        self.etl_process.load_start = pd.Timestamp.now()
+        self.session.commit()
 
-        return len(df)
+        for _, row in df.iterrows():
 
-    # def load(df, data_source, etl_process, session):
-    #     from biofilter.db.models.omics_models import Gene
+            symbol = row.get("symbol")
+            if not symbol:
+                self.logger.log("⚠️ Linha ignorada: símbolo vazio", "WARNING")
+                continue
 
-    #     records = 0
-    #     for _, row in df.iterrows():
-    #         if "hgnc_id" not in row:
-    #             continue
+            # 🧪 Extrai aliases de várias colunas
+            aliases = []
 
-    #         gene = Gene(
-    #             hgnc_id=row.get("hgnc_id"),
-    #             symbol=row.get("symbol"),
-    #             entrez_id=row.get("entrez_id"),
-    #             ensembl_id=row.get("ensembl_gene_id"),
-    #             name=row.get("name"),
-    #             alias_symbols=",".join(row.get("alias_symbol", [])) if isinstance(row.get("alias_symbol"), list) else None,
-    #             data_source_id=data_source.id,
-    #         )
-    #         session.add(gene)
-    #         records += 1
+            # Aliases explícitos (ex: "['ABC', 'XYZ']")
+            # TODO : Ajustar os nomes de Genes
+            for key in ["alias_symbol", "prev_symbol", "alias_name", "prev_name", "name", "ucsc_id", "hgnc_id", "ensembl_gene_id", "symbol"]:
+                val = row.get(key)
+                if val:
+                    if isinstance(val, str):
+                        try:
+                            val_list = json.loads(val)
+                        except json.JSONDecodeError:
+                            val_list = [val]
+                    elif isinstance(val, list):
+                        val_list = val
+                    else:
+                        val_list = [val]
+                    aliases.extend(val_list)
 
-    #     session.commit()
-    #     logger.log(f"📥 {records} genes loaded into database.", "INFO")
-    #     return records
+            # ⚙️ Normaliza e filtra
+            aliases = list({
+                alias.strip().upper()
+                for alias in aliases
+                if alias and alias.strip().upper() != symbol.strip().upper()
+            })
+
+            entity_id, _ = self.get_or_create_entity(
+                name=symbol,
+                group_id=self.gene_group,
+                category_id=self.gene_category,
+                aliases=[]  # tratamento abaixo
+            )
+
+            # Adiciona aliases
+            for alias in aliases:
+                if alias.strip().upper() != symbol.strip().upper():
+                    self.add_entity_name(entity_id, alias)
+
+            gene = Gene(
+                entity_id=entity_id,
+                hgnc_id=row.get("hgnc_id"),
+                entrez_id=row.get("entrez_id"),
+                ensembl_id=row.get("ensembl_gene_id"),
+
+                chromosome=row.get("location_sortable"),  # ou "location" se preferir
+                strand=row.get("strand"),  # precisa existir na base
+                start=row.get("start"),    # idem
+                end=row.get("end"),        # idem
+
+                locus_group=row.get("locus_group"),
+                locus_type=row.get("locus_type"),
+
+                gene_group_id=self.gene_group,  # ou row.get("gene_group_id")
+                data_source_id=self.data_source.id if hasattr(self, "data_source") else None,
+            )
+            self.session.add(gene)
+            total += 1
+
+        self.session.commit()
+        self.logger.log(f"✅ Loaded {total} genes into database", "INFO")
+        return total
+
