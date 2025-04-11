@@ -1,66 +1,111 @@
 import pytest
-from biofilter.db.models import Gene, GeneGroup
+from sqlalchemy.exc import IntegrityError
+from biofilter.db.models.omics_models import (
+    Gene,
+    GeneGroup,
+    LocusGroup,
+    LocusType,
+    GeneGroupMembership,
+    GeneLocation,
+    GenomicRegion,
+)
 
 
-def test_create_gene_group(db_session):
-    group = GeneGroup(
-        name="Protein-Coding Genes", description="Main coding genes"
-    )  # noqa: E501
-    db_session.add(group)
-    db_session.commit()
-
-    result = (
-        db_session.query(GeneGroup).filter_by(name="Protein-Coding Genes").first()
-    )  # noqa: E501
-    assert result is not None
-    assert result.name == "Protein-Coding Genes"
-    assert result.description == "Main coding genes"
-
-
-def test_create_gene_with_location(db_session):
-    gene = Gene(
-        entity_id=1,
-        hgnc_id="HGNC:1100",
-        entrez_id="1234",
-        ensembl_id="ENSG000001234",
-        chromosome="17",
-        start=43044295,
-        end=43125483,
-        strand="+",
-        locus_group="protein-coding",
-        locus_type="gene with protein product",
-        gene_group_id=None,
-        data_source_id=1,
-    )
+def test_create_gene_basic(db_session):
+    gene = Gene(entity_id=1, hgnc_id="HGNC:1")
     db_session.add(gene)
     db_session.commit()
 
-    result = db_session.query(Gene).filter_by(hgnc_id="HGNC:1100").first()
+    assert gene.id is not None
+    assert gene.hgnc_id == "HGNC:1"
+
+
+def test_gene_with_locus_group_and_type(db_session):
+    locus_group = LocusGroup(name="protein-coding gene")
+    locus_type = LocusType(name="gene with protein product")
+
+    gene = Gene(
+        entity_id=1, hgnc_id="HGNC:2", locus_group=locus_group, locus_type=locus_type
+    )  # noqa E501
+    db_session.add(gene)
+    db_session.commit()
+
+    assert gene.locus_group.name == "protein-coding gene"
+    assert gene.locus_type.name == "gene with protein product"
+
+
+def test_gene_group_membership(db_session):
+    group = GeneGroup(name="RNA-binding")
+    gene = Gene(entity_id=1, hgnc_id="HGNC:3")
+    group.genes.append(gene)
+
+    db_session.commit()
+
+    assert gene.groups[0].name == "RNA-binding"
+    assert group.genes[0].hgnc_id == "HGNC:3"
+
+
+def test_gene_group_membership_direct(db_session):
+    group = GeneGroup(name="Immunoglobulin Family")
+    gene = Gene(entity_id=1, hgnc_id="HGNC:6")
+    db_session.add_all([group, gene])
+    db_session.commit()
+
+    # Cria explicitamente o vínculo via GeneGroupMembership
+    link = GeneGroupMembership(gene_id=gene.id, group_id=group.id)
+    db_session.add(link)
+    db_session.commit()
+
+    # Confirma existência do vínculo
+    result = (
+        db_session.query(GeneGroupMembership)
+        .filter_by(gene_id=gene.id, group_id=group.id)
+        .first()
+    )
     assert result is not None
-    assert result.chromosome == "17"
-    assert result.strand == "+"
-    assert result.start < result.end
 
 
-def test_unique_hgnc_id_constraint(db_session):
-    gene1 = Gene(entity_id=1, hgnc_id="HGNC:9999")
-    gene2 = Gene(entity_id=2, hgnc_id="HGNC:9999")  # Same HGNC ID
+def test_gene_group_membership_uniqueness(db_session):
+    group = GeneGroup(name="Transporters")
+    gene = Gene(entity_id=1, hgnc_id="HGNC:7")
+    db_session.add_all([group, gene])
+    db_session.commit()
+
+    link1 = GeneGroupMembership(gene_id=gene.id, group_id=group.id)
+    link2 = GeneGroupMembership(gene_id=gene.id, group_id=group.id)
+
+    db_session.add(link1)
+    db_session.commit()
+
+    db_session.add(link2)
+    with pytest.raises(IntegrityError):
+        db_session.commit()
+
+
+def test_gene_location_with_region(db_session):
+    region = GenomicRegion(
+        label="12p13.31", chromosome="12", start=1000, end=5000
+    )  # noqa E501
+    gene = Gene(entity_id=1, hgnc_id="HGNC:4")
+
+    location = GeneLocation(
+        gene=gene, chromosome="12", start=1200, end=1300, strand="+", region=region
+    )
+
+    db_session.add(location)
+    db_session.commit()
+
+    assert location.region.label == "12p13.31"
+    assert location.gene.hgnc_id == "HGNC:4"
+
+
+def test_gene_hgnc_id_uniqueness(db_session):
+    gene1 = Gene(entity_id=1, hgnc_id="HGNC:5")
+    gene2 = Gene(entity_id=2, hgnc_id="HGNC:5")  # mesma HGNC
 
     db_session.add(gene1)
     db_session.commit()
 
     db_session.add(gene2)
-    with pytest.raises(Exception):
+    with pytest.raises(IntegrityError):
         db_session.commit()
-
-
-def test_gene_without_locus_data(db_session):
-    gene = Gene(entity_id=3, hgnc_id="HGNC:3000", ensembl_id="ENSG000003000")
-    db_session.add(gene)
-    db_session.commit()
-
-    result = db_session.query(Gene).filter_by(entity_id=3).first()
-    assert result is not None
-    assert result.chromosome is None
-    assert result.start is None
-    assert result.end is None

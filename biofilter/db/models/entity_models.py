@@ -9,6 +9,9 @@ def utcnow():
     return datetime.datetime.now(datetime.timezone.utc)
 
 
+# =============================================================================
+# ENTITY CORE MODELS
+# =============================================================================
 class EntityGroup(Base):
     __tablename__ = "entity_groups"
 
@@ -30,6 +33,8 @@ class Entity(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     group_id = Column(Integer, nullable=True)
+    has_conflict = Column(Boolean, nullable=True, default=None)
+
     # category_id = Column(Integer, nullable=True)
     # description = Column(String)
     # active = Column(Boolean, default=True)

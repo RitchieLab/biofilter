@@ -54,6 +54,12 @@ class CreateDBMixin:
             "ETLProcess",
             key="etl_processes",
         )
+        self._seed_from_json(
+            f"{seed_dir}/initial_entity_group.json",
+            "entity_models",
+            "EntityGroup",
+            key="entity_groups",
+        )
 
     def _seed_from_json(self, file, module_name, model_name, key=None):
         model_module = import_module(f"biofilter.db.models.{module_name}")

@@ -9,6 +9,12 @@ from .entity_models import (
     RelationshipType,
     EntityRelationship,
 )
+from .curation_models import (
+    ConflictStatus,
+    ConflictResolution,
+    CurationConflict,
+)
+
 
 # from .loki_models import (
 #     Setting,
@@ -58,6 +64,10 @@ __all__ = [
     "EntityName",
     "RelationshipType",
     "EntityRelationship",
+    # CURATION MODELS
+    "ConflictStatus",
+    "ConflictResolution",
+    "CurationConflict",
     # # LOKI-LEGACY
     # "Setting",
     # "GrchUcschg",

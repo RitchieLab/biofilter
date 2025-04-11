@@ -1,0 +1,34 @@
+{
+    "entity_groups": [
+        {
+            "id": 1,
+            "name": "Genomics",
+            "description": "Genetic elements such as genes, SNPs, and sequences"
+        },
+        {
+            "id": 2,
+            "name": "Transcriptomics",
+            "description": "Transcripts and RNA expression data"
+        },
+        {
+            "id": 3,
+            "name": "Proteomics",
+            "description": "Proteins and peptides"
+        },
+        {
+            "id": 4,
+            "name": "Metabolomics",
+            "description": "Metabolites and small molecules"
+        },
+        {
+            "id": 5,
+            "name": "Diseases",
+            "description": "Disease classifications and annotations"
+        },
+        {
+            "id": 6,
+            "name": "Pathways",
+            "description": "Biological pathways and interactions"
+        }
+    ]
+}

@@ -11,7 +11,8 @@ def test_load_all_models_calls_expected_modules():
             "biofilter.db.models.etl_models",
             "biofilter.db.models.entity_models",
             "biofilter.db.models.omics_models",
-            "biofilter.db.models.loki_models",
+            "biofilter.db.models.curation_models",
+            # "biofilter.db.models.loki_models",
         ]
 
         actual_calls = [call.args[0] for call in mock_import.call_args_list]

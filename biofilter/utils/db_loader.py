@@ -11,6 +11,7 @@ def load_all_models():
     import_module("biofilter.db.models.etl_models")
     import_module("biofilter.db.models.entity_models")
     import_module("biofilter.db.models.omics_models")
+    import_module("biofilter.db.models.curation_models")
 
     # NOTE: Will be removed in the future
-    import_module("biofilter.db.models.loki_models")
+    # import_module("biofilter.db.models.loki_models")

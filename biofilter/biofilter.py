@@ -72,3 +72,29 @@ class Biofilter:
 
     def __repr__(self):
         return f"<Biofilter(db_uri={self.db_uri})>"
+
+    def restart_etl(self, data_source: list[str]):
+        """
+        Reinicia os processos ETL para uma ou mais fontes de dados.
+
+        Exemplo:
+            bf.restart_etl(["HGNC", "KEGG"])
+        """
+        if not self.db:
+            msg = "Database not connected. Use connect_db() first."
+            self.logger.log(msg, "ERROR")
+            raise RuntimeError(msg)
+
+        self.logger.log("🔄 Reiniciando ETL process(es)...", "INFO")
+
+        manager = ETLManager(self.db.get_session())
+        for name in data_source:
+            # Get the DataSource from SourceSystem
+
+            success = manager.restart_etl_process(name)
+            if success:
+                self.logger.log(f"✅ Restarted ETL for {name}", "INFO")
+            else:
+                self.logger.log(f"⚠️ Could not restart ETL for {name}", "WARNING")
+
+        return True

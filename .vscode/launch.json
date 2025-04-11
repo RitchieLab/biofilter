@@ -14,6 +14,13 @@
             "request": "launch",
             "program": "${workspaceFolder}/scripts/Run_ETLManager.py",
             "console": "integratedTerminal"
+        },
+        {
+            "name": "Bio 3R - Reset ETLManager",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/scripts/Run_ETLManager_reset.py",
+            "console": "integratedTerminal"
         }
     ]
 }
