@@ -55,6 +55,8 @@ class CurationConflict(Base):
     description = Column(Text, nullable=True)
     # Ex: "Conflicting entrez_id=122526782 and ensembl_id=ENSG00000229280 with HGNC:58098"
 
+    entity_id = Column(Integer, nullable=True)
+
     notes = Column(Text, nullable=True)
 
 

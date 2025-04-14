@@ -33,7 +33,22 @@ class Entity(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     group_id = Column(Integer, nullable=True)
-    has_conflict = Column(Boolean, nullable=True, default=None)
+    has_conflict = Column(Boolean, nullable=True, default=None)  # ⚠️ Indica conflito conhecido
+    is_deactive = Column(Boolean, nullable=True, default=None)   # 🚫 Indica se foi desativada
+
+    """
+    📘 Interpretação no sistema:
+    Situação	                    has_conflict	is_deactive	Ação esperada
+    Entidade normal	                None ou False	None	    Usar normalmente
+    Conflito pendente	            True	        None	    Marcar, mas pode usar com cautela
+    Conflito resolvido com delete	True	        True	    Ignorar nas consultas e ingestões
+    Conflito resolvido com merge	True	        True	    Transferir aliases e ignorar essa entidade
+    Entidade obsoleta (manual)	    None	        True	    Desativada por curadoria
+
+    # Exemplo de filtro seguro
+    session.query(Entity).filter(Entity.is_deactive.is_(None))  
+
+    """
 
     # category_id = Column(Integer, nullable=True)
     # description = Column(String)

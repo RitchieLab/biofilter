@@ -19,7 +19,7 @@ def utcnow():
 
 
 class SourceSystem(Base):
-    __tablename__ = "source_systems"
+    __tablename__ = "etl_source_systems"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     name = Column(
@@ -36,13 +36,13 @@ class SourceSystem(Base):
 
 
 class DataSource(Base):
-    __tablename__ = "data_sources"
+    __tablename__ = "etl_data_sources"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     name = Column(String, unique=True, nullable=False)  # Ex: dbSNP, Ensembl
     source_system_id = Column(
         Integer,
-        ForeignKey("source_systems.id", ondelete="CASCADE"),
+        ForeignKey("etl_source_systems.id", ondelete="CASCADE"),
         nullable=False,  # noqa: E501
     )
     data_type = Column(String, nullable=False)  # Ex: SNP, Gene, Protein
@@ -50,7 +50,8 @@ class DataSource(Base):
     format = Column(String, nullable=False)  # CSV, JSON, API, SQL Dump
     grch_version = Column(String, nullable=True)  # Ex: GRCh38, GRCh37
     ucschg_version = Column(String, nullable=True)  # Ex: hg19, hg38
-    dtp_version = Column(String, nullable=False)
+    # dtp_version = Column(String, nullable=False)
+    dtp_script = Column(String, nullable=False)
     last_update = Column(
         DateTime, nullable=True
     )  # Last successful update date and time
@@ -124,6 +125,9 @@ class ETLProcess(Base):
     )
 
     dtp_script = Column(String, nullable=False)
+
+    raw_data_hash = Column(String, nullable=True)
+    process_data_hash = Column(String, nullable=True)
 
     # Relationships
     # data_source = relationship("DataSource", back_populates="etl_processes")

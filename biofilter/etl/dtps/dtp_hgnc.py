@@ -3,6 +3,7 @@ import ast
 import json
 import requests
 import pandas as pd
+from biofilter.utils.file_hash import compute_file_hash
 from biofilter.etl.base.entity_query_mixin import EntityQueryMixin
 from biofilter.etl.base.gene_query_mixin import GeneQueryMixin
 from biofilter.db.models.entity_models import EntityGroup
@@ -23,24 +24,18 @@ class DTP(EntityQueryMixin, GeneQueryMixin):
 
         self.HGNC_API_URL = "https://rest.genenames.org/fetch/all"
         self.file_name = "hgnc_data.json"
-        # self.gene_group = 1  # Exemplo: grupo para Gene
-        # self.gene_category = 1  # Exemplo: categoria para Gene
 
     def extract(self, download_path):
+        """
+        Extracts data from the HGNC API and stores it locally.
+        Also computes a file hash to track content versioning.
+        """
 
-        # NOTE DEV: Vou manter os nomes dos arquivos como hardcoded para
-        # facilitar o desenvolvimento, mas depois podemos usar os nomes
-        # dos arquivos que estão no banco de dados. Adicionar melhores
-        # controles e flow inteligentes.
+        message = ""
 
         try:
             raw_file = os.path.join(download_path, "hgnc", self.file_name)
             os.makedirs(os.path.dirname(raw_file), exist_ok=True)
-
-            # Log e status
-            self.etl_process.extract_status = "running"
-            self.etl_process.extract_start = pd.Timestamp.now()
-            self.session.commit()
 
             headers = {"Accept": "application/json"}
             response = requests.get(self.HGNC_API_URL, headers=headers)
@@ -52,31 +47,20 @@ class DTP(EntityQueryMixin, GeneQueryMixin):
             with open(raw_file, "w") as f:
                 f.write(response.text)
 
-            # Log e status
-            self.logger.log(
-                f"✅ HGNC raw data saved at {raw_file}", "INFO"
-            )  # noqa: E501
-            self.etl_process.extract_status = "completed"
-            self.etl_process.extract_end = pd.Timestamp.now()
-            self.session.commit()
+            message = f"HGNC data extracted and saved at {raw_file}"
 
-            return True
+            file_hash = compute_file_hash(raw_file)
+
+            return True, message, file_hash
 
         except Exception as e:
-            msg = f"❌ Error during extraction: {e}"
-            self.logger.log(msg, "ERROR")
-            self.etl_process.extract_status = "failed"
-            self.etl_process.extract_end = pd.Timestamp.now()
-            self.session.commit()
-            return False
+            message = f"❌ Error during extraction: {e}"
+
+            return False, message, None
 
     def transform(self, raw_path, processed_path):
+        message = ""
         try:
-            # Log e status
-            self.etl_process.transform_status = "running"
-            self.etl_process.transform_start = pd.Timestamp.now()
-            self.session.commit()
-
             # Paths
             json_file = os.path.join(raw_path, "hgnc", "hgnc_data.json")
             csv_file = os.path.join(processed_path, "hgnc", "hgnc_data.csv")
@@ -86,10 +70,10 @@ class DTP(EntityQueryMixin, GeneQueryMixin):
                 msg = f"File not found: {json_file}"
                 raise Exception(msg)
 
-            # Cria diretório de saída, se não existir
+            # Create output directory if it doesn't exist
             os.makedirs(os.path.dirname(csv_file), exist_ok=True)
 
-            # Remove CSV anterior (se existir)
+            # Remove CSV file if it exists
             if os.path.exists(csv_file):
                 os.remove(csv_file)
                 self.logger.log(
@@ -105,29 +89,22 @@ class DTP(EntityQueryMixin, GeneQueryMixin):
             # Save DataFrame to CSV
             df.to_csv(csv_file, index=False)
 
-            # Log e status
             self.logger.log(
                 f"✅ HGNC data transformed and saved at {csv_file}", "INFO"
             )  # noqa: E501
-            self.etl_process.transform_status = "completed"
-            self.etl_process.transform_end = pd.Timestamp.now()
-            self.session.commit()
 
-            return df, True
+            return df, True, message
 
         except Exception as e:
-            msg = f"❌ Error during transformation: {e}"
-            self.logger.log(msg, "ERROR")
-            self.etl_process.transform_status = "failed"
-            self.etl_process.transform_end = pd.Timestamp.now()
-            self.session.commit()
-            return None, False
+            message = f"❌ Error during transformation: {e}"
+            return None, False, message
 
     def load(self, df=None, processed_path=None):
-        total_gene = 0
+        total_gene = 0  # not considered conflict genes
         load_status = False
+        message = ""
 
-        # Table that will be used to store the data
+        # Models that will be used to store the data
         # - Entity
         # - EntityName
         # - LocusGroup
@@ -148,18 +125,13 @@ class DTP(EntityQueryMixin, GeneQueryMixin):
                 # raise ValueError(msg)
             msg = f"Loading data from {processed_path}"
             self.logger.log(msg, "INFO")
-            # TODO: Ajustar o caminho do arquivo CSV
+            # TODO: Fix the path to processed_path (avoid hardcode now)
             processed_path = processed_path + "/hgnc/hgnc_data.csv"
             df = pd.read_csv(processed_path)
 
-        # Change Process Status
-        self.etl_process.load_status = "running"
-        self.etl_process.load_start = pd.Timestamp.now()
-        self.session.commit()
-
         # Get Entity Group ID
         if not hasattr(self, "entity_group") or self.entity_group is None:
-            group = self.session.query(EntityGroup).filter_by(name="Genomics").first()
+            group = self.session.query(EntityGroup).filter_by(name="Genomics").first()      # noqa: E501
             if not group:
                 msg = "EntityGroup 'Genomics' not found in the database."
                 self.logger.log(msg, "ERROR")
@@ -169,15 +141,15 @@ class DTP(EntityQueryMixin, GeneQueryMixin):
             msg = f"EntityGroup ID for 'Genomics' is {self.entity_group}"
             self.logger.log(msg, "DEBUG")
 
-        # Pré-carrega os HGNC IDs com conflitos resolvidos
+        # Preload the HGNC IDs with resolved conflicts
         resolved_genes = {
             c.identifier
             for c in self.session.query(CurationConflict)
             .filter_by(entity_type="gene", status=ConflictStatus.resolved)
         }
 
-        # Armazena os genes com conflitos resolvidos para processar depois
-        genes_com_conflito_resolvido = []
+        # Gene List with resolved conflicts to be processed later
+        genes_with_solved_conflict = []
 
         # Interaction to each Gene
         for _, row in df.iterrows():
@@ -195,10 +167,10 @@ class DTP(EntityQueryMixin, GeneQueryMixin):
             # Skip genes with resolved conflicts in lote
             if gene_master in resolved_genes:
                 self.logger.log(
-                    f"⏭️ Gene '{gene_master}' skipped - conflict already resolved",
+                    f"Gene '{gene_master}' skipped, conflict already resolved",
                     "DEBUG"
                 )
-                genes_com_conflito_resolvido.append(row)
+                genes_with_solved_conflict.append(row)
                 continue
 
             # Collect Genes Aliases
@@ -314,19 +286,14 @@ class DTP(EntityQueryMixin, GeneQueryMixin):
                 msg = f"Failed to create Location for gene {gene_master}"
                 self.logger.log(msg, "WARNING")
 
+        # post-processing the resolved conflicts
+        for row in genes_with_solved_conflict:
+            msg = f"Check and apply conflict rules to  {row.get('hgnc_id')}"
+            self.logger.log(msg, "INFO")
 
-        # Pós-processamento dos conflitos resolvidos
-        for row in genes_com_conflito_resolvido:
-            # Aqui você aplica a regra (merge, delete, etc.)
-            self.logger.log(
-                f"🔁 Pós-processando gene com conflito resolvido: {row.get('hgnc_id')}",
-                "INFO"
-            )
-            self.apply_resolution(row)  # ou outro nome/método específico
+            # Apply conflict resolution
+            self.apply_resolution(row)
 
-
-        self.session.commit()
-        msg = f"Loaded {total_gene} genes into database"
+        message = f"Loaded {total_gene} genes into database"
         self.logger.log(msg, "INFO")
-        load_status = True
-        return total_gene, load_status
+        return total_gene, True, message
