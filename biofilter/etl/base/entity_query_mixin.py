@@ -23,7 +23,9 @@ class EntityQueryMixin:
         # NOTE: With this approach, we can switch to a
         #       different Gene Master (HUGO, ENSEMBL, etc)
         existing = (
-            self.session.query(EntityName).filter_by(name=clean_gene_name).first()   # noqa: E501
+            self.session.query(EntityName)
+            .filter_by(name=clean_gene_name)
+            .first()  # noqa: E501
         )  # noqa: E501
 
         if existing:

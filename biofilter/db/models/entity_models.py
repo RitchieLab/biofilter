@@ -33,8 +33,12 @@ class Entity(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     group_id = Column(Integer, nullable=True)
-    has_conflict = Column(Boolean, nullable=True, default=None)  # ⚠️ Indica conflito conhecido
-    is_deactive = Column(Boolean, nullable=True, default=None)   # 🚫 Indica se foi desativada
+    has_conflict = Column(
+        Boolean, nullable=True, default=None
+    )  # ⚠️ Indica conflito conhecido
+    is_deactive = Column(
+        Boolean, nullable=True, default=None
+    )  # 🚫 Indica se foi desativada
 
     """
     📘 Interpretação no sistema:

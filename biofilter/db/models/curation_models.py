@@ -1,4 +1,5 @@
 from sqlalchemy import Column, Integer, String, Enum, Text
+
 # from sqlalchemy.orm import declarative_base
 
 # from sqlalchemy.sql import func
@@ -14,9 +15,9 @@ class ConflictStatus(enum.Enum):
 
 
 class ConflictResolution(enum.Enum):
-    keep_both = "keep_both"     # Ira manter os dois registro
-    merge = "merge"             # Ira mesclar os dois registro      
-    delete = "delete"           # Ira deletar o novo registro
+    keep_both = "keep_both"  # Ira manter os dois registro
+    merge = "merge"  # Ira mesclar os dois registro
+    delete = "delete"  # Ira deletar o novo registro
 
 
 # class CurationConflict(Base):
@@ -45,9 +46,9 @@ class CurationConflict(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
 
-    entity_type = Column(String, nullable=False)            # Ex: "gene"
-    identifier = Column(String, nullable=False)             # Ex: "HGNC:40594"
-    existing_identifier = Column(String, nullable=False)    # Ex: "HGNC:58098"
+    entity_type = Column(String, nullable=False)  # Ex: "gene"
+    identifier = Column(String, nullable=False)  # Ex: "HGNC:40594"
+    existing_identifier = Column(String, nullable=False)  # Ex: "HGNC:58098"
 
     status = Column(Enum(ConflictStatus), default=ConflictStatus.pending)
     resolution = Column(Enum(ConflictResolution), nullable=True)

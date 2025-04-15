@@ -7,10 +7,7 @@ from biofilter.utils.file_hash import compute_file_hash
 from biofilter.etl.base.entity_query_mixin import EntityQueryMixin
 from biofilter.etl.base.gene_query_mixin import GeneQueryMixin
 from biofilter.db.models.entity_models import EntityGroup
-from biofilter.db.models.curation_models import (
-    CurationConflict,
-    ConflictStatus
-)
+from biofilter.db.models.curation_models import CurationConflict, ConflictStatus
 
 
 class DTP(EntityQueryMixin, GeneQueryMixin):
@@ -131,7 +128,9 @@ class DTP(EntityQueryMixin, GeneQueryMixin):
 
         # Get Entity Group ID
         if not hasattr(self, "entity_group") or self.entity_group is None:
-            group = self.session.query(EntityGroup).filter_by(name="Genomics").first()      # noqa: E501
+            group = (
+                self.session.query(EntityGroup).filter_by(name="Genomics").first()
+            )  # noqa: E501
             if not group:
                 msg = "EntityGroup 'Genomics' not found in the database."
                 self.logger.log(msg, "ERROR")
@@ -144,8 +143,9 @@ class DTP(EntityQueryMixin, GeneQueryMixin):
         # Preload the HGNC IDs with resolved conflicts
         resolved_genes = {
             c.identifier
-            for c in self.session.query(CurationConflict)
-            .filter_by(entity_type="gene", status=ConflictStatus.resolved)
+            for c in self.session.query(CurationConflict).filter_by(
+                entity_type="gene", status=ConflictStatus.resolved
+            )
         }
 
         # Gene List with resolved conflicts to be processed later
@@ -167,8 +167,7 @@ class DTP(EntityQueryMixin, GeneQueryMixin):
             # Skip genes with resolved conflicts in lote
             if gene_master in resolved_genes:
                 self.logger.log(
-                    f"Gene '{gene_master}' skipped, conflict already resolved",
-                    "DEBUG"
+                    f"Gene '{gene_master}' skipped, conflict already resolved", "DEBUG"
                 )
                 genes_with_solved_conflict.append(row)
                 continue

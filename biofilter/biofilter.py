@@ -73,28 +73,34 @@ class Biofilter:
     def __repr__(self):
         return f"<Biofilter(db_uri={self.db_uri})>"
 
-    def restart_etl(self, data_source: list[str]):
+    # TODO: Change Method name to Resetting ETL Process?
+    def restart_etl(
+        self,
+        data_source: list[str] = None,
+        source_system: list[str] = None,
+        delete_files: bool = True,
+    ):
         """
-        Reinicia os processos ETL para uma ou mais fontes de dados.
-
-        Exemplo:
-            bf.restart_etl(["HGNC", "KEGG"])
+        Restart ETL processes for the specified DataSources or SourceSystems.
+        Args:
+            data_source (list[str], optional): List of DataSources to restart.
+            source_system (list[str], opt): List of SourceSystems to restart.
+            delete_files (bool, optional): Whether to delete files after
+                processing. Defaults to True.
         """
         if not self.db:
             msg = "Database not connected. Use connect_db() first."
             self.logger.log(msg, "ERROR")
             raise RuntimeError(msg)
 
-        self.logger.log("🔄 Reiniciando ETL process(es)...", "INFO")
+        self.logger.log("🔄 Resetting the ETL Process", "INFO")
 
         manager = ETLManager(self.db.get_session())
-        for name in data_source:
-            # Get the DataSource from SourceSystem
 
-            success = manager.restart_etl_process(name)
-            if success:
-                self.logger.log(f"✅ Restarted ETL for {name}", "INFO")
-            else:
-                self.logger.log(f"⚠️ Could not restart ETL for {name}", "WARNING")
-
-        return True
+        return manager.restart_etl_process(
+            data_source=data_source,
+            source_system=source_system,
+            download_path=self.settings.get("download_path"),
+            processed_path=self.settings.get("processed_path"),
+            delete_files=delete_files,
+        )
