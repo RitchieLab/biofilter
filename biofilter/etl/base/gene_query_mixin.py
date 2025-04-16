@@ -1,7 +1,6 @@
 import re
 import ast
 import pandas as pd
-from sqlalchemy import or_
 from biofilter.db.models.omics_models import (
     Gene,
     GeneGroup,
@@ -11,28 +10,10 @@ from biofilter.db.models.omics_models import (
     GenomicRegion,
     GeneLocation,
 )  # noqa: E501
-from biofilter.db.models.curation_models import (
-    CurationConflict,
-    ConflictStatus,
-    ConflictResolution,
-)  # noqa: E501
-from biofilter.db.models.entity_models import Entity, EntityName
+from biofilter.etl.base.conflict_handler_mixin import ConflictHandlerMixin
 
 
-class GeneQueryMixin:
-
-    def is_conflict_resolved(self, identifier_type: str, identifier: str) -> bool:
-        return (
-            self.session.query(CurationConflict)
-            .filter_by(
-                entity_type="gene",
-                identifier_type=identifier_type,
-                identifier_value=identifier,
-                status=ConflictStatus.resolved,
-            )
-            .first()
-            is not None
-        )
+class GeneQueryMixin(ConflictHandlerMixin):
 
     def get_or_create_locus_group(self, name: str):
         """
@@ -114,7 +95,7 @@ class GeneQueryMixin:
             return None
 
         region = (
-            self.session.query(GenomicRegion).filter_by(label=label_clean).first()
+            self.session.query(GenomicRegion).filter_by(label=label_clean).first()              # noqa: E501
         )  # noqa: E501
         if region:
             return region
@@ -158,126 +139,41 @@ class GeneQueryMixin:
             self.logger.log(msg, "WARNING")
             return None
 
-        # # Normalize data
-        # entrez_id = str(entrez_id).strip().upper() if entrez_id else None
-        # hgnc_id = str(hgnc_id).strip().upper() if hgnc_id else None
-        # ensembl_id = str(ensembl_id).strip().upper() if ensembl_id else None
+        # Normaliza os IDs
+        hgnc_id, entrez_id, ensembl_id = self.normalize_gene_identifiers(
+            hgnc_id, entrez_id, ensembl_id
+        )
 
-        # existing_gene = (
-        #     self.session.query(Gene)
-        #     .filter(
-        #         or_(
-        #             Gene.hgnc_id == hgnc_id,
-        #             Gene.entrez_id == entrez_id,
-        #             Gene.ensembl_id == ensembl_id,
-        #             Gene.entity_id == entity_id,
-        #         )
-        #     )
-        #     .first()
-        # )
+        # Check Conflict
+        result = self.detect_gene_conflict(
+            hgnc_id=hgnc_id,
+            entrez_id=entrez_id,
+            ensembl_id=ensembl_id,
+            entity_id=entity_id,
+            symbol=symbol,
+        )
 
-        # Limpeza dos campos
-        def clean_id(val):
-            val = str(val).strip().upper() if val else None
-            return val if val and val != "NAN" else None
+        if result == "CONFLICT":
+            return None
 
-        entrez_id = clean_id(entrez_id)
-        ensembl_id = clean_id(ensembl_id)
-        hgnc_id = clean_id(hgnc_id)
+        if result:  # Gene is already registered
+            return result
 
-        filters = []
-
-        if hgnc_id:
-            filters.append(Gene.hgnc_id == hgnc_id)
-        if entrez_id:
-            filters.append(Gene.entrez_id == entrez_id)
-        if ensembl_id:
-            filters.append(Gene.ensembl_id == ensembl_id)
-        if entity_id:
-            filters.append(Gene.entity_id == entity_id)
-
-        existing_gene = self.session.query(Gene).filter(or_(*filters)).first()
-
-        if existing_gene:
-            conflicts = []
-
-            if (
-                entrez_id
-                and existing_gene.entrez_id == entrez_id
-                and existing_gene.hgnc_id != hgnc_id
-            ):
-                conflicts.append(f"entrez_id={entrez_id}")
-
-            if (
-                ensembl_id
-                and existing_gene.ensembl_id == ensembl_id
-                and existing_gene.hgnc_id != hgnc_id
-            ):
-                conflicts.append(f"ensembl_id={ensembl_id}")
-
-            if conflicts:
-                # Cria descrição detalhada
-                conflict_description = (
-                    f"Gene {hgnc_id} conflicts with existing gene {existing_gene.hgnc_id}, "
-                    f"both share same identifier(s): {', '.join(conflicts)}"
-                )
-
-                # Verifica se já existe um conflito registrado com essa combinação
-                already_logged = (
-                    self.session.query(CurationConflict)
-                    .filter_by(
-                        entity_type="gene",
-                        identifier=hgnc_id,
-                        existing_identifier=existing_gene.hgnc_id,
-                        status=ConflictStatus.pending,
-                    )
-                    .first()
-                )
-
-                if not already_logged:
-                    conflict = CurationConflict(
-                        entity_type="gene",
-                        identifier=hgnc_id,
-                        existing_identifier=existing_gene.hgnc_id,
-                        status=ConflictStatus.pending,
-                        description=conflict_description,
-                        entity_id=entity_id,
-                    )
-                    self.session.add(conflict)
-
-                # Marca a entidade como com conflito
-                entity = self.session.query(Entity).filter_by(id=entity_id).first()
-                if entity:
-                    entity.has_conflict = 1
-
-                self.session.commit()
-                msg = (
-                    f"🚫 Conflict detected for Gene '{symbol}' - submitted for curation"
-                )
-                self.logger.log(msg, "WARNING")
-                return None
-
-            else:
-                msg = f"♻️ Gene already exists: {symbol}"
-                self.logger.log(msg, "INFO")
-                return existing_gene
-
-        else:
-            gene = Gene(
-                # symbol=symbol,
-                hgnc_status=hgnc_status,
-                entity_id=entity_id,
-                hgnc_id=hgnc_id,
-                entrez_id=entrez_id,
-                ensembl_id=ensembl_id,
-                data_source_id=data_source_id,
-                locus_group=locus_group,
-                locus_type=locus_type,
-            )
-            self.session.add(gene)
-            self.session.flush()
-            msg = f"🧬 New Gene '{symbol}' created"
-            self.logger.log(msg, "INFO")
+        gene = Gene(
+            # symbol=symbol,
+            hgnc_status=hgnc_status,
+            entity_id=entity_id,
+            hgnc_id=hgnc_id,
+            entrez_id=entrez_id,
+            ensembl_id=ensembl_id,
+            data_source_id=data_source_id,
+            locus_group=locus_group,
+            locus_type=locus_type,
+        )
+        self.session.add(gene)
+        self.session.flush()
+        msg = f"🧬 New Gene '{symbol}' created"
+        self.logger.log(msg, "INFO")
 
         # Association with GeneGroup
         group_objs = []
@@ -298,24 +194,22 @@ class GeneQueryMixin:
                     self.logger.log(msg, "DEBUG")
                 group_objs.append(group)
 
-        # Vincula Gene aos grupos (GeneGroupMembership)
+        # Link Genes and Groups
         existing_links = {
             g.group_id
-            for g in self.session.query(GeneGroupMembership).filter_by(gene_id=gene.id)
+            for g in self.session.query(GeneGroupMembership).filter_by(gene_id=gene.id)                     # noqa: E501
         }
 
         new_links = 0
         for group in group_objs:
             if group.id not in existing_links:
-                membership = GeneGroupMembership(gene_id=gene.id, group_id=group.id)
+                membership = GeneGroupMembership(gene_id=gene.id, group_id=group.id)                        # noqa: E501
                 self.session.add(membership)
                 new_links += 1
 
         self.session.commit()
-        self.logger.log(
-            f"✅ Gene '{symbol}' salvo com {len(group_objs)} grupo(s), {new_links} vínculos adicionados",
-            "INFO",
-        )
+        msg = f"Gene '{symbol}' linked with {len(group_objs)} group(s), {new_links} new links added"        # noqa: E501
+        self.logger.log(msg, "INFO")
 
         return gene
 
@@ -331,20 +225,10 @@ class GeneQueryMixin:
         data_source_id: int = None,
     ):
         """
-        Cria uma entrada de localização para o Gene associado.
-
-        Args:
-            gene (Gene): Objeto Gene já existente.
-            chromosome (str): Cromossomo (ex: "12").
-            start (int): Posição inicial.
-            end (int): Posição final.
-            strand (str): Fita ("+" ou "-").
-            region (GenomicRegion): Instância opcional da região genômica.
-            assembly (str): Versão do genoma. Default = GRCh38.
-            data_source_id (int): ID da fonte de dados.
+        Create a location entry for the associated Gene.
 
         Returns:
-            GeneLocation: Instância criada.
+            GeneLocation instance
         """
         if not gene:
             msg = "⚠️ Gene Location invalid: Gene not provided"
@@ -365,224 +249,62 @@ class GeneQueryMixin:
         self.session.add(location)
         self.session.commit()
 
-        self.logger.log(
-            f"📌 GeneLocation criada para Gene '{gene.id}' no cromossomo {chromosome}",
-            "DEBUG",
-        )
+        msg = f"📌 GeneLocation created for Gene '{gene.id}' on chromosome {chromosome}"  # noqa E501
+        self.logger.log(msg, "DEBUG")
 
         return location
 
     def parse_gene_groups(self, group_data) -> list:
         """
-        Normaliza o campo gene_group para uma lista de strings.
+        Normalization of the gene_group field to a list of strings.
 
         Args:
-            group_data: Pode ser uma string (lista em texto ou valor único), lista real, ou None.
+            group_data: Can be a string (literal list or single value), a real
+                        list, None, or missing values like pd.NA.
 
         Returns:
-            Lista de nomes de grupos.
+            List of group names as cleaned strings.
         """
-        if pd.isna(group_data) or not group_data:
+
+        # First, if it's None directly
+        if group_data is None:
             return []
 
+        # Treatment of missing values
+        if isinstance(group_data, list):
+            return [g.strip() for g in group_data if isinstance(g, str) and g.strip()]                      # noqa: E501
+
+        # Treatment of clearly null or empty values
+        if group_data is None or pd.isna(group_data):
+            return []
+
+        # Treatment of empty string
+        if isinstance(group_data, str) and group_data.strip() == "":
+            return []
+
+        # Treatment of string that repres a list (ex: "['GroupA', 'GroupB']")
         if isinstance(group_data, str):
+            if group_data.strip() == "":
+                return []
             try:
                 parsed = ast.literal_eval(group_data)
                 return parsed if isinstance(parsed, list) else [parsed]
             except (ValueError, SyntaxError):
-                return [group_data.strip()]
+                clean = group_data.strip()
+                return [clean] if clean else []
 
+        # Treatment of lists
         if isinstance(group_data, list):
-            return [g.strip() for g in group_data if g]
+            return [g.strip() for g in group_data if isinstance(g, str) and g.strip()]                      # noqa: E501
 
+        # Converts other types to string
         return [str(group_data).strip()]
 
     def extract_chromosome(self, location_sortable):
-        if not location_sortable or pd.isna(location_sortable):
+        if pd.isna(location_sortable) or not location_sortable:
             return None
 
         match = re.match(r"^([0-9XYMT]+)", str(location_sortable).upper())
         if match:
             return match.group(1)
         return None
-
-    def apply_resolution(self, row):
-        """
-        Applies a curation resolution rule to a gene with previously resolved conflict.
-
-        Parameters:
-        - row: the current row being processed (pandas Series)
-        """
-        hgnc_id = row.get("hgnc_id")
-        symbol = row.get("symbol")  # NOTE: 'symbol' is not used in the function
-
-        # Busca o conflito resolvido associado a esse gene
-        conflict = (
-            self.session.query(CurationConflict)
-            .filter_by(
-                entity_type="gene", identifier=hgnc_id, status=ConflictStatus.resolved
-            )
-            .first()
-        )
-
-        if not conflict:
-            self.logger.log(f"❌ No resolved conflict found for {hgnc_id}", "ERROR")
-            return False
-
-        resolution = conflict.resolution
-
-        # DELETE BLOCO
-        if resolution == ConflictResolution.delete:
-            self.logger.log(f"🗑️ Applying DELETE resolution for Gene {hgnc_id}", "INFO")
-
-            # 🔒 Marca a Entity como desativada e com conflito
-            entity = self.session.query(Entity).filter_by(id=conflict.entity_id).first()
-            if entity:
-                entity.has_conflict = True
-                entity.is_deactive = True
-                self.logger.log(
-                    f"🔒 Entity {entity.id} marked as inactive due to conflict resolution (delete)",
-                    "DEBUG",
-                )
-            else:
-                self.logger.log(
-                    f"⚠️ Entity ID {conflict.entity_id} not found. Cannot mark as inactive.",
-                    "WARNING",
-                )
-
-            # ❌ Remove o Gene associado ao hgnc_id
-            gene = self.session.query(Gene).filter_by(hgnc_id=hgnc_id).first()
-            if gene:
-                self.session.delete(gene)
-                self.logger.log(f"✅ Gene {hgnc_id} deleted from database", "INFO")
-            else:
-                self.logger.log(
-                    f"⚠️ Gene {hgnc_id} not found during delete resolution", "WARNING"
-                )
-
-            self.session.commit()
-            return False
-
-            """
-            IMPORTANTE: A gente desativou a Entity e deletou o Gene caso esse exista,
-            porem os aliases permaneceram apontando para a entity dessativada!!!!!
-            """
-
-        # MERGE BLOCO
-        elif resolution == ConflictResolution.merge:
-            """
-            A resolução do tipo MERGE envolve:
-            1. Desativar a entidade antiga (source_entity)
-            2. Migrar todos os aliases (EntityName) da source_entity para a target_entity
-            3. Marcar o Gene da source_entity como "merged"
-            """
-
-            self.logger.log(
-                f"🔀 Applying MERGE resolution: {hgnc_id} → {conflict.existing_identifier}",
-                "INFO",
-            )
-
-            # 1. Carrega Gene destino
-            target_gene = (
-                self.session.query(Gene)
-                .filter_by(hgnc_id=conflict.existing_identifier)
-                .first()
-            )
-            if not target_gene:
-                self.logger.log(
-                    f"❌ Target gene '{conflict.existing_identifier}' not found for merge",
-                    "ERROR",
-                )
-                return False
-
-            # 2. Marca a Entity antiga como inativa
-            source_entity = (
-                self.session.query(Entity).filter_by(id=conflict.entity_id).first()
-            )
-            if source_entity:
-                source_entity.has_conflict = True
-                source_entity.is_deactive = True
-                self.logger.log(
-                    f"🔒 Entity {source_entity.id} marked as inactive (merged)", "DEBUG"
-                )
-            else:
-                self.logger.log(
-                    f"⚠️ Source entity ID {conflict.entity_id} not found", "WARNING"
-                )
-
-            # 3. Migrar os EntityNames da entidade antiga
-            # NOTE: Estamos mantendo o Codigo antigo como is_primary, resultando em dois nomes
-            # primeiros para a mesma entity (isso é intencional por encanto
-            migrated = 0
-            for name_obj in (
-                self.session.query(EntityName)
-                .filter_by(entity_id=source_entity.id)
-                .all()
-            ):
-                exists = (
-                    self.session.query(EntityName)
-                    .filter_by(entity_id=target_gene.entity_id, name=name_obj.name)
-                    .first()
-                )
-                if exists:
-                    self.session.delete(name_obj)
-                else:
-                    name_obj.entity_id = target_gene.entity_id
-                    migrated += 1
-
-            self.logger.log(
-                f"🔁 Migrated {migrated} aliases to Entity {target_gene.entity_id}",
-                "DEBUG",
-            )
-
-            # 4. Marcar Gene antigo como "merged"
-            # NOTE: Nao exite o Gene antigo, uma vez que nao criamos eles no banco! Pensar se vamos ter esse omic??
-            source_gene = self.session.query(Gene).filter_by(hgnc_id=hgnc_id).first()
-            if source_gene:
-                source_gene.hgnc_status = (
-                    "merged"  # ou um campo próprio, como merged_into
-                )
-                # source_gene.merged_into = target_gene.id
-                self.logger.log(f"📎 Gene '{hgnc_id}' marked as merged", "DEBUG")
-
-            self.session.commit()
-            return False
-
-        # KEEP_BOTH BLOCO
-        elif resolution == ConflictResolution.keep_both:
-            """
-            A resolução do tipo KEEP_BOTH mantém os dois genes no sistema, mesmo com conflito em IDs.
-            A entidade dominante (item_exist) será usada em casos ambíguos para relacionamentos e anotações.
-            """
-
-            self.logger.log(
-                f"⚖️ Applying KEEP_BOTH resolution: {hgnc_id} and {conflict.item_exist}",
-                "INFO",
-            )
-
-            # 1. Marca a Entity como tendo conflito (mas não desativa!)
-            entity = self.session.query(Entity).filter_by(id=conflict.entity_id).first()
-            if entity:
-                entity.has_conflict = True
-                self.logger.log(
-                    f"⚠️ Entity {entity.id} marked with conflict (keep_both)", "DEBUG"
-                )
-            else:
-                self.logger.log(
-                    f"⚠️ Entity not found for ID {conflict.entity_id}", "WARNING"
-                )
-
-            # 2. Log para rastreabilidade
-            self.logger.log(
-                f"✔️ Both genes '{hgnc_id}' and '{conflict.item_exist}' kept — shared ID resolution will favor '{conflict.item_exist}'",
-                "INFO",
-            )
-
-            # TODO: Precisamos criar o Gene aqui.
-
-            # 3. Nenhuma alteração estrutural adicional é necessária — o sistema de resolução (em consultas downstream)
-            # precisará estar ciente das regras de dominância, usando o campo `item_exist` como referência.
-
-            self.session.commit()
-
-            return False  # Não processar mais esse gene

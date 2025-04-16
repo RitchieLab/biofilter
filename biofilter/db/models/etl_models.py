@@ -103,25 +103,33 @@ class ETLProcess(Base):
     data_source_id = Column(Integer, nullable=False)
 
     global_status = Column(
-        get_etl_status_enum("global_status_enum"), default="running", nullable=False                      # noqa: E501
+        get_etl_status_enum("global_status_enum"),
+        default="running",
+        nullable=False,  # noqa: E501
     )
 
     extract_start = Column(DateTime, nullable=True)
     extract_end = Column(DateTime, nullable=True)
     extract_status = Column(
-        get_etl_status_enum("extract_status_enum"), default="running", nullable=True                        # noqa: E501
+        get_etl_status_enum("extract_status_enum"),
+        default="running",
+        nullable=True,  # noqa: E501
     )
 
     transform_start = Column(DateTime, nullable=True)
     transform_end = Column(DateTime, nullable=True)
     transform_status = Column(
-        get_etl_status_enum("transform_status_enum"), default="running", nullable=True                      # noqa: E501
+        get_etl_status_enum("transform_status_enum"),
+        default="running",
+        nullable=True,  # noqa: E501
     )
 
     load_start = Column(DateTime, nullable=True)
     load_end = Column(DateTime, nullable=True)
     load_status = Column(
-        get_etl_status_enum("load_status_enum"), default="running", nullable=True                           # noqa: E501
+        get_etl_status_enum("load_status_enum"),
+        default="running",
+        nullable=True,  # noqa: E501
     )
 
     dtp_script = Column(String, nullable=False)

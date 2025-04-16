@@ -27,8 +27,8 @@ def test_create_new_project_creates_db(tmp_path):
     inspector = inspect(bf.db.engine)
     tables = inspector.get_table_names()
     assert "system_config" in tables
-    assert "data_sources" in tables
-    assert "source_systems" in tables
+    assert "etl_data_sources" in tables
+    assert "etl_source_systems" in tables
 
     # Check if the database was seeded
     with bf.db.get_session() as session:

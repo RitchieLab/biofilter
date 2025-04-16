@@ -6,11 +6,12 @@ import pandas as pd
 from biofilter.utils.file_hash import compute_file_hash
 from biofilter.etl.base.entity_query_mixin import EntityQueryMixin
 from biofilter.etl.base.gene_query_mixin import GeneQueryMixin
+from biofilter.etl.base.conflict_resolution_mixin import ConflictResolutionMixin
 from biofilter.db.models.entity_models import EntityGroup
 from biofilter.db.models.curation_models import CurationConflict, ConflictStatus
 
 
-class DTP(EntityQueryMixin, GeneQueryMixin):
+class DTP(EntityQueryMixin, GeneQueryMixin, ConflictResolutionMixin):
     def __init__(
         self, logger=None, datasource=None, etl_process=None, session=None
     ):  # noqa: E501

@@ -78,7 +78,9 @@ class ETLManager:
 
         for ds in data_sources:
             process = (
-                self.session.query(ETLProcess).filter_by(data_source_id=ds.id).first()                  # noqa: E501
+                self.session.query(ETLProcess)
+                .filter_by(data_source_id=ds.id)
+                .first()  # noqa: E501
             )
 
             if not process:
@@ -94,7 +96,7 @@ class ETLManager:
                     dtp_script=ds.dtp_script,
                 )
                 self.session.add(process)
-
+                self.session.commit()
             else:
                 msg = f"🔄 Restarting ETLProcess for '{ds.name}'"
                 self.logger.log(msg, "INFO")

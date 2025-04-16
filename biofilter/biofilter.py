@@ -73,7 +73,6 @@ class Biofilter:
     def __repr__(self):
         return f"<Biofilter(db_uri={self.db_uri})>"
 
-    # TODO: Change Method name to Resetting ETL Process?
     def restart_etl(
         self,
         data_source: list[str] = None,

@@ -12,7 +12,7 @@ def setup_sources(db_session):
     ds = DataSource(
         name="HGNC",
         active=True,
-        dtp_version="hgnc",
+        dtp_script="hgnc",
         data_type="master",
         format="csv",
         source_system_id=source_system.id,
@@ -29,7 +29,9 @@ def test_restart_etl_creates_process(db_session, setup_sources):
     assert result is True
 
     process = (
-        db_session.query(ETLProcess).filter_by(data_source_id=setup_sources.id).first()
+        db_session.query(ETLProcess)
+        .filter_by(data_source_id=setup_sources.id)
+        .first()  # noqa: E501
     )
 
     assert process is not None
@@ -57,7 +59,9 @@ def test_restart_etl_updates_existing_process(db_session, setup_sources):
     assert result is True
 
     updated = (
-        db_session.query(ETLProcess).filter_by(data_source_id=setup_sources.id).first()
+        db_session.query(ETLProcess)
+        .filter_by(data_source_id=setup_sources.id)
+        .first()  # noqa: E501
     )
 
     assert updated.global_status == "pending"

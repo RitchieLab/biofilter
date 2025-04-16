@@ -34,7 +34,7 @@ def test_create_data_source(db_session):
         format="GTF",
         grch_version="GRCh38",
         ucschg_version="hg38",
-        dtp_version="v102",
+        dtp_script="v102",
         last_status="pending",
         active=True,
     )
@@ -62,7 +62,7 @@ def test_create_etl_process(db_session):
         format="BED",
         grch_version="GRCh37",
         ucschg_version="hg19",
-        dtp_version="2025.04",
+        dtp_script="2025.04",
         last_status="pending",
         active=True,
     )
