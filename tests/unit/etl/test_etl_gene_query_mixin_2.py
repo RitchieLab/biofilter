@@ -1,8 +1,15 @@
 # import pytest
 from biofilter.etl.base.gene_query_mixin import GeneQueryMixin
-from biofilter.db.models.omics_models import Gene, GeneGroupMembership, GenomicRegion     # noqa: E501
+from biofilter.db.models.omics_models import (
+    Gene,
+    GeneGroupMembership,
+    GenomicRegion,
+)  # noqa: E501
 from biofilter.db.models.entity_models import Entity
-from biofilter.db.models.curation_models import CurationConflict, ConflictStatus          # noqa: E501
+from biofilter.db.models.curation_models import (
+    CurationConflict,
+    ConflictStatus,
+)  # noqa: E501
 
 
 class DummyLogger:
@@ -147,11 +154,15 @@ def test_create_gene_with_conflict_entrez(db_session):
     assert gene2 is None
 
     # Must have a CurationConflict registered
-    conflict = db_session.query(CurationConflict).filter_by(
-        identifier="HGNC:002",
-        existing_identifier="HGNC:001",
-        status=ConflictStatus.pending,
-    ).first()
+    conflict = (
+        db_session.query(CurationConflict)
+        .filter_by(
+            identifier="HGNC:002",
+            existing_identifier="HGNC:001",
+            status=ConflictStatus.pending,
+        )
+        .first()
+    )
     assert conflict is not None
     assert "entrez_id=123" in conflict.description
 
@@ -240,7 +251,9 @@ def test_gene_group_association(db_session):
     assert "Pathway1" in group_names
     assert "Pathway2" in group_names
 
-    memberships = db_session.query(GeneGroupMembership).filter_by(gene_id=gene.id).all()            # noqa: E501
+    memberships = (
+        db_session.query(GeneGroupMembership).filter_by(gene_id=gene.id).all()
+    )  # noqa: E501
     assert len(memberships) == 2
 
 
@@ -253,7 +266,9 @@ def test_create_gene_location_success(db_session):
     gene = Gene(entity_id=1)
     db_session.add(gene)
 
-    region = GenomicRegion(label="Region1", chromosome="12", start=1000, end=2000)                  # noqa: E501
+    region = GenomicRegion(
+        label="Region1", chromosome="12", start=1000, end=2000
+    )  # noqa: E501
     db_session.add(region)
     db_session.commit()
 

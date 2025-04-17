@@ -13,6 +13,9 @@ def test_update_runs_successfully(biofilter_instance, mock_etl_manager):
         source_system=["HGNC"],
         download_path=bf.settings.get("download_path"),
         processed_path=bf.settings.get("processed_path"),
+        run_steps=None,
+        force_steps=None,
+        use_conflict_csv=False,
     )
 
 

@@ -6,22 +6,40 @@ import pandas as pd
 from biofilter.utils.file_hash import compute_file_hash
 from biofilter.etl.base.entity_query_mixin import EntityQueryMixin
 from biofilter.etl.base.gene_query_mixin import GeneQueryMixin
-from biofilter.etl.base.conflict_resolution_mixin import ConflictResolutionMixin
+# from biofilter.etl.base.conflict_resolution_mixin import (
+#     ConflictResolutionMixin,
+# )  # noqa E501
 from biofilter.db.models.entity_models import EntityGroup
-from biofilter.db.models.curation_models import CurationConflict, ConflictStatus
+from biofilter.db.models.curation_models import (
+    CurationConflict,
+    ConflictStatus,
+)  # noqa E501
+from biofilter.etl.conflict_manager import ConflictManager
 
 
-class DTP(EntityQueryMixin, GeneQueryMixin, ConflictResolutionMixin):
+# class DTP(EntityQueryMixin, GeneQueryMixin, ConflictResolutionMixin):
+class DTP(EntityQueryMixin, GeneQueryMixin):
     def __init__(
-        self, logger=None, datasource=None, etl_process=None, session=None
+        self,
+        logger=None,
+        datasource=None,
+        etl_process=None,
+        session=None,
+        use_conflict_csv=False,
     ):  # noqa: E501
         self.logger = logger
         self.datasource = datasource
         self.etl_process = etl_process
         self.session = session
+        self.use_conflict_csv = use_conflict_csv
 
         self.HGNC_API_URL = "https://rest.genenames.org/fetch/all"
         self.file_name = "hgnc_data.json"
+
+        self.conflict_mgr = ConflictManager(session, logger)
+
+
+
 
     def extract(self, download_path):
         """
@@ -124,13 +142,26 @@ class DTP(EntityQueryMixin, GeneQueryMixin, ConflictResolutionMixin):
             msg = f"Loading data from {processed_path}"
             self.logger.log(msg, "INFO")
             # TODO: Fix the path to processed_path (avoid hardcode now)
-            processed_path = processed_path + "/hgnc/hgnc_data.csv"
+            conflict_path = processed_path + "hgnc/hgnc_data_conflict.csv"
+            processed_path = processed_path + "hgnc/hgnc_data.csv"
+
+            # Switch to Conflict Mode
+            if self.use_conflict_csv:
+                processed_path = conflict_path
+
+            if not os.path.exists(processed_path):
+                msg = f"File not found: {processed_path}"
+                self.logger.log(msg, "ERROR")
+                return total_gene, load_status, msg
+
             df = pd.read_csv(processed_path)
 
         # Get Entity Group ID
         if not hasattr(self, "entity_group") or self.entity_group is None:
             group = (
-                self.session.query(EntityGroup).filter_by(name="Genomics").first()
+                self.session.query(EntityGroup)
+                .filter_by(name="Genomics")
+                .first()  # noqa: E501
             )  # noqa: E501
             if not group:
                 msg = "EntityGroup 'Genomics' not found in the database."
@@ -152,6 +183,9 @@ class DTP(EntityQueryMixin, GeneQueryMixin, ConflictResolutionMixin):
         # Gene List with resolved conflicts to be processed later
         genes_with_solved_conflict = []
 
+        # Gene List with pending conflicts (to be processed later)
+        genes_with_pending_conflict = []
+
         # Interaction to each Gene
         for _, row in df.iterrows():
 
@@ -168,7 +202,8 @@ class DTP(EntityQueryMixin, GeneQueryMixin, ConflictResolutionMixin):
             # Skip genes with resolved conflicts in lote
             if gene_master in resolved_genes:
                 self.logger.log(
-                    f"Gene '{gene_master}' skipped, conflict already resolved", "DEBUG"
+                    f"Gene '{gene_master}' skipped, conflict already resolved",
+                    "DEBUG",  # noqa E501
                 )
                 genes_with_solved_conflict.append(row)
                 continue
@@ -268,7 +303,14 @@ class DTP(EntityQueryMixin, GeneQueryMixin, ConflictResolutionMixin):
                 gene_group_names=group_names_list,
             )
 
-            if gene:
+            if gene == "CONFLICT":
+                msg = f"Gene '{gene_master}' has conflicts"
+                self.logger.log(msg, "WARNING")
+                # Add to the list of genes with resolved conflicts
+                genes_with_pending_conflict.append(row)
+                continue
+
+            if gene is not None:
                 total_gene += 1
 
                 location = self.create_gene_location(
@@ -286,13 +328,34 @@ class DTP(EntityQueryMixin, GeneQueryMixin, ConflictResolutionMixin):
                 msg = f"Failed to create Location for gene {gene_master}"
                 self.logger.log(msg, "WARNING")
 
+        # Process the pending conflicts
+        if genes_with_pending_conflict:
+            conflict_df = pd.DataFrame(genes_with_pending_conflict)
+
+            # Se o arquivo já existir, vamos sobrescrevê-lo
+            if os.path.exists(conflict_path):
+                msg = f"⚠️ Overwriting existing conflict file: {conflict_path}"  # noqa: E501
+                self.logger.log(msg, "WARNING")
+
+            conflict_df.to_csv(conflict_path, index=False)
+            msg = f"✅ Saved {len(conflict_df)} gene conflicts to {conflict_path}"  # noqa: E501
+            self.logger.log(msg, "INFO")
+
+            # TODO: 🧠 Sugestão adicional (opcional)
+            # Generalizar esse comportamento em um helper como
+            # save_pending_conflicts(entity_type: str, rows: List[Dict],
+            # path: str) para facilitar reutilização em SNPs, Proteins etc.
+
         # post-processing the resolved conflicts
         for row in genes_with_solved_conflict:
             msg = f"Check and apply conflict rules to  {row.get('hgnc_id')}"
             self.logger.log(msg, "INFO")
 
             # Apply conflict resolution
-            self.apply_resolution(row)
+            # self.apply_resolution(row)
+            self.conflict_mgr.apply_resolution(row)
+
+        # TODO: Apagar o arquivo de conflictos, para evitar ser reprocessado.
 
         message = f"Loaded {total_gene} genes into database"
         self.logger.log(msg, "INFO")

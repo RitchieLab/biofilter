@@ -1,6 +1,9 @@
 from biofilter.db.models.omics_models import Gene
 from biofilter.db.models.entity_models import Entity
-from biofilter.db.models.curation_models import CurationConflict, ConflictStatus  # noqa: E501
+from biofilter.db.models.curation_models import (
+    CurationConflict,
+    ConflictStatus,
+)  # noqa: E501
 from biofilter.etl.base.conflict_handler_mixin import ConflictHandlerMixin
 from biofilter.utils.logger import Logger
 from unittest.mock import MagicMock
@@ -25,7 +28,7 @@ def test_detect_gene_conflict_creates_conflict_record(db_session):
         hgnc_id="HGNC:12345",
         entrez_id="54321",
         ensembl_id="ENSG000001234",
-        entity_id=entity.id
+        entity_id=entity.id,
     )
     db_session.add(gene)
     db_session.commit()
@@ -41,7 +44,7 @@ def test_detect_gene_conflict_creates_conflict_record(db_session):
         entrez_id="54321",  # same entrez_id
         ensembl_id=None,
         entity_id=new_entity.id,
-        symbol="NEWGENE"
+        symbol="NEWGENE",
     )
 
     # Chacks if the conflict was logged
@@ -53,7 +56,9 @@ def test_detect_gene_conflict_creates_conflict_record(db_session):
     assert conflict.existing_identifier == "HGNC:12345"
     assert "entrez_id=54321" in conflict.description
 
-    updated_entity = db_session.query(Entity).filter_by(id=new_entity.id).first()   # noqa: E501
+    updated_entity = (
+        db_session.query(Entity).filter_by(id=new_entity.id).first()
+    )  # noqa: E501
     assert updated_entity.has_conflict is True
 
 
@@ -69,7 +74,7 @@ def test_detect_gene_conflict_returns_existing_when_no_conflict(db_session):
         hgnc_id="HGNC:12345",
         entrez_id="54321",
         ensembl_id="ENSG000001234",
-        entity_id=entity.id
+        entity_id=entity.id,
     )
     db_session.add(gene)
     db_session.commit()
@@ -80,7 +85,7 @@ def test_detect_gene_conflict_returns_existing_when_no_conflict(db_session):
         entrez_id="54321",
         ensembl_id=None,
         entity_id=entity.id,
-        symbol="GENE_A"
+        symbol="GENE_A",
     )
 
     assert result == gene
@@ -125,7 +130,7 @@ def test_detect_gene_conflict_does_not_duplicate_conflict(db_session):
         entrez_id="111",  # same entrez_id
         ensembl_id=None,
         entity_id=new_entity.id,
-        symbol="DUPLICATE"
+        symbol="DUPLICATE",
     )
 
     assert result == "CONFLICT"

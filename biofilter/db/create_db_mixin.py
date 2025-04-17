@@ -29,6 +29,7 @@ class CreateDBMixin:
         return True
 
     def _create_tables(self):
+        load_all_models()
         Base.metadata.create_all(self.engine)
 
     def _seed_all(self, seed_dir):

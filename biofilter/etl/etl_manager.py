@@ -195,6 +195,9 @@ class ETLManager:
         source_system: list = None,
         download_path: str = None,
         processed_path: str = None,
+        run_steps: list = None,
+        force_steps: list = None,
+        use_conflict_csv: bool = False,
     ) -> None:
         """
         Runs ETL pipeline Extract→Transform→Load for all active data sources.
@@ -203,12 +206,21 @@ class ETLManager:
         - source_system (str or list[str], optional): Filter by source system.
         - download_path (str, optional): Path for raw file downloads.
         - processed_path (str, optional): Path for processed CSV files.
+        - run_steps (list[str], optional): Specify which steps to run.
+            Options: ["extract", "transform", "load"]. Defaults to all steps.
+        - force_steps (list[str], optional): Specify which steps to force.
+            Options: ["extract", "transform", "load"]. Defaults to None.
+        - use_conflict_csv (bool, optional): Use conflict CSV for loading.
+            Defaults to False.
 
         Notes:
         - Only active DataSources are processed.
         - Each stage is skipped if the previous one fails.
         - Status updates and errors are recorded in the database.
         """
+
+        if run_steps is None:
+            run_steps = ["extract", "transform", "load"]
 
         # Prepare DTPs to process
         query = self.session.query(DataSource).filter_by(active=True)
@@ -244,6 +256,7 @@ class ETLManager:
                     datasource=ds,
                     etl_process=process,
                     session=self.session,
+                    use_conflict_csv=use_conflict_csv,
                 )
 
                 # Open df to hosting data after transformation
@@ -253,10 +266,9 @@ class ETLManager:
 
                 # EXTRACT PHASE
                 # if process.extract_status == "pending":
-                if process.extract_status in (
-                    "pending",
-                    "completed",
-                    "failed",
+                if "extract" in run_steps and (
+                    process.extract_status in ("pending", "completed", "failed")
+                    or "extract" in force_steps
                 ):  # noqa E501
                     process.extract_start = datetime.now()
                     process.extract_status = "running"
@@ -311,9 +323,10 @@ class ETLManager:
                         continue  # Leving the process to "failed" for now
 
                 # TRANSFORM PHASE
-                if (
+                if "transform" in run_steps and (
                     process.transform_status == "pending"
                     and process.extract_status == "completed"
+                    or "transform" in force_steps
                 ):  # noqa E501
                     process.transform_start = datetime.now()
                     process.transform_status = "running"
@@ -350,9 +363,10 @@ class ETLManager:
                         continue  # Leving the process to "failed" for now
 
                 # LOAD PHASE
-                if (
+                if "load" in run_steps and (
                     process.load_status == "pending"
                     and process.transform_status == "completed"
+                    or "load" in force_steps
                 ):  # noqa E501
                     process.load_start = datetime.now()
                     process.load_status = "running"

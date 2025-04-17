@@ -6,7 +6,7 @@ from biofilter.db.models.omics_models import (
     LocusType,
     GenomicRegion,
     Gene,
-    GeneLocation
+    GeneLocation,
 )  # noqa: E501
 
 
@@ -73,7 +73,7 @@ def test_get_or_create_genomic_region(db_session):
         chromosome="12",
         start=56370000,
         end=56420000,
-        description="test region"
+        description="test region",
     )  # noqa: E501
     assert isinstance(region, GenomicRegion)
     assert region.label == "12q13.2"
@@ -132,17 +132,20 @@ def test_create_gene_location(db_session):
     assert result is None
 
 
-@pytest.mark.parametrize("input_value,expected_output", [
-    ("1:1000-2000", "1"),
-    ("X:100-200", "X"),
-    ("MT:400-500", "MT"),
-    ("Y:1000", "Y"),
-    ("chr12:300-500", None),
-    ("abc:100-200", None),
-    ("", None),
-    (None, None),
-    (pd.NA, None),
-])
+@pytest.mark.parametrize(
+    "input_value,expected_output",
+    [
+        ("1:1000-2000", "1"),
+        ("X:100-200", "X"),
+        ("MT:400-500", "MT"),
+        ("Y:1000", "Y"),
+        ("chr12:300-500", None),
+        ("abc:100-200", None),
+        ("", None),
+        (None, None),
+        (pd.NA, None),
+    ],
+)
 def test_extract_chromosome(input_value, expected_output):
     mixin = DummyGeneMixin()
     result = mixin.extract_chromosome(input_value)

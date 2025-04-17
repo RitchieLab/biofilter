@@ -28,6 +28,7 @@ class ConflictHandlerMixin:
         ensembl_id: str,
         entity_id: int,
         symbol: str,
+        data_source_id,
     ) -> Optional[Gene]:
         """
         Returns existing Gene if safe, or logs a conflict and returns None.
@@ -77,7 +78,7 @@ class ConflictHandlerMixin:
 
         # Log conflict
         description = (
-            f"Gene {hgnc_id} conflicts with existing gene {existing_gene.hgnc_id}, "    # noqa: E501
+            f"Gene {hgnc_id} conflicts with existing gene {existing_gene.hgnc_id}, "  # noqa: E501
             f"both share same identifier(s): {', '.join(conflicts)}"
         )
 
@@ -100,6 +101,7 @@ class ConflictHandlerMixin:
                 status=ConflictStatus.pending,
                 description=description,
                 entity_id=entity_id,
+                data_source_id=data_source_id,
             )
             self.session.add(conflict)
 
@@ -109,7 +111,7 @@ class ConflictHandlerMixin:
 
         self.session.commit()
         self.logger.log(
-            f"🚫 Conflict detected for Gene '{symbol}' - submitted for curation",       # noqa E501
+            f"🚫 Conflict detected for Gene '{symbol}' - submitted for curation",  # noqa E501
             "WARNING",
         )
         return "CONFLICT"

@@ -1,6 +1,10 @@
 from sqlalchemy import Column, Integer, String, Enum, Text
+from sqlalchemy import ForeignKey
 
 # from sqlalchemy.orm import declarative_base
+from sqlalchemy.orm import relationship
+
+# from biofilter.db.models.etl_models import DataSource  # ou o caminho correto
 
 # from sqlalchemy.sql import func
 import enum
@@ -20,44 +24,21 @@ class ConflictResolution(enum.Enum):
     delete = "delete"  # Ira deletar o novo registro
 
 
-# class CurationConflict(Base):
-#     __tablename__ = "curation_conflicts"
-
-#     id = Column(Integer, primary_key=True, autoincrement=True)
-
-#     entity_type = Column(String, nullable=False)  # Ex: "gene"
-#     identifier_type = Column(String, nullable=False)  # Ex: "entrez_id"
-#     identifier_value = Column(String, nullable=False)  # Ex: "12345"
-
-#     item_exist = Column(String, nullable=False)  # Ex: "HGNC:A1BG"
-#     item_new = Column(String, nullable=False)  # Ex: "HGNC:A1BG-AS1"
-
-#     status = Column(Enum(ConflictStatus), default=ConflictStatus.pending)
-#     resolution = Column(Enum(ConflictResolution), nullable=True)
-
-#     notes = Column(Text, nullable=True)
-
-#     # created_at = Column(DateTime(timezone=True), server_default=func.now())
-#     # updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-
-
 class CurationConflict(Base):
     __tablename__ = "curation_conflicts"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-
+    data_source_id = Column(
+        Integer, ForeignKey("etl_data_sources.id"), nullable=True
+    )  # noqa E501
+    data_source = relationship("DataSource")
     entity_type = Column(String, nullable=False)  # Ex: "gene"
+    entity_id = Column(Integer, nullable=True)
     identifier = Column(String, nullable=False)  # Ex: "HGNC:40594"
     existing_identifier = Column(String, nullable=False)  # Ex: "HGNC:58098"
-
     status = Column(Enum(ConflictStatus), default=ConflictStatus.pending)
     resolution = Column(Enum(ConflictResolution), nullable=True)
-
     description = Column(Text, nullable=True)
-    # Ex: "Conflicting entrez_id=122526782 and ensembl_id=ENSG00000229280 with HGNC:58098"
-
-    entity_id = Column(Integer, nullable=True)
-
     notes = Column(Text, nullable=True)
 
 

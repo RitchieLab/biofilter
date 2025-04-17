@@ -21,6 +21,20 @@
             "request": "launch",
             "program": "${workspaceFolder}/scripts/Run_ETLManager_reset.py",
             "console": "integratedTerminal"
+        },
+        {
+            "name": "Bio 3R - Conflict_Manager",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/scripts/Run_ConflictManager.py",
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "Bio 3R - Conflict_ETL_LOAD",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/scripts/Run_ETLManager_conflict.py",
+            "console": "integratedTerminal"
         }
     ]
 }

@@ -3,6 +3,7 @@ from biofilter.db.database import Database
 from biofilter.core.settings_manager import SettingsManager
 from biofilter.utils.logger import Logger
 from biofilter.etl.etl_manager import ETLManager
+from biofilter.etl.conflict_manager import ConflictManager
 
 
 class Biofilter:
@@ -51,22 +52,62 @@ class Biofilter:
             self.db_uri = new_uri
         self.db = Database(self.db_uri)
 
-    def update(self, source_system: list = None):
-        if not self.db:
-            msn = "Database not connected. Use connect_db() first."
-            self.logger.log(msn, "ERROR")
-            raise RuntimeError(msn)
+    def update(
+        self,
+        source_system: list = None,
+        run_steps: list = None,
+        force_steps: list = None,
+    ):  # noqa: E501
+        """
+        Starts the ETL process for the selected systems with step control.
 
-        self.logger.log("Starting ETL update process...", "INFO")
+        Parameters:
+        - source_system: list of source systems to be processed.
+        - run_steps: list of steps to execute ("extract", "transform", "load").
+        - force_steps: list of steps to be forced, ignoring previous status.
+        """
+
+        if not self.db:
+            msg = "Database not connected. Use connect_db() first."
+            self.logger.log(msg, "ERROR")
+            raise RuntimeError(msg)
+
+        self.logger.log("🚀 Starting ETL update process...", "INFO")
 
         manager = ETLManager(self.db.get_session())
+
         manager.start_process(
             source_system=source_system,
             download_path=self.settings.get("download_path"),
             processed_path=self.settings.get("processed_path"),
+            run_steps=run_steps,
+            force_steps=force_steps,
+            use_conflict_csv=False,
         )
 
-        self.logger.log("ETL update process finished.", "INFO")
+        self.logger.log("✅ ETL update process finished.", "INFO")
+        return True
+
+    def update_conflicts(self, source_system: list = None):  # noqa: E501
+        if not self.db:
+            msg = "Database not connected. Use connect_db() first."
+            self.logger.log(msg, "ERROR")
+            raise RuntimeError(msg)
+
+        self.logger.log("Starting ETL conflict resolution process...", "INFO")
+
+        manager = ETLManager(self.db.get_session())
+
+        manager.start_process(
+            source_system=source_system,
+            download_path=self.settings.get("download_path"),
+            processed_path=self.settings.get("processed_path"),
+            run_steps=["load"],
+            force_steps=["load"],
+            use_conflict_csv=True,
+        )
+
+        self.logger.log("ETL conflict resolution process finished.", "INFO")
 
         return True
 
@@ -103,3 +144,28 @@ class Biofilter:
             processed_path=self.settings.get("processed_path"),
             delete_files=delete_files,
         )
+
+    def export_conflicts_to_excel(self, output_path: str = "curation_conflicts.xlsx"):
+        """
+        Exporta os conflitos de curadoria para um arquivo Excel.
+        """
+        if not self.db:
+            msg = "Database not connected. Use connect_db() first."
+            self.logger.log(msg, "ERROR")
+            raise RuntimeError(msg)
+
+        self.logger.log("🔄 Resetting the ETL Process", "INFO")
+
+        manager = ConflictManager(session=self.db.get_session(), logger=self.logger)
+        return manager.export_conflicts_to_excel(output_path)
+
+    def import_conflicts_from_excel(
+        self, input_path="curation_conflicts_template.xlsx"
+    ):
+        if not self.db:
+            msg = "Database not connected. Use connect_db() first."
+            self.logger.log(msg, "ERROR")
+            raise RuntimeError(msg)
+
+        manager = ConflictManager(self.db.get_session(), self.logger)
+        return manager.import_conflicts_from_excel(input_path)

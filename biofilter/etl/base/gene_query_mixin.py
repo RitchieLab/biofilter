@@ -95,7 +95,9 @@ class GeneQueryMixin(ConflictHandlerMixin):
             return None
 
         region = (
-            self.session.query(GenomicRegion).filter_by(label=label_clean).first()              # noqa: E501
+            self.session.query(GenomicRegion)
+            .filter_by(label=label_clean)
+            .first()  # noqa: E501
         )  # noqa: E501
         if region:
             return region
@@ -151,10 +153,11 @@ class GeneQueryMixin(ConflictHandlerMixin):
             ensembl_id=ensembl_id,
             entity_id=entity_id,
             symbol=symbol,
+            data_source_id=data_source_id,
         )
 
         if result == "CONFLICT":
-            return None
+            return "CONFLICT"
 
         if result:  # Gene is already registered
             return result
@@ -197,18 +200,22 @@ class GeneQueryMixin(ConflictHandlerMixin):
         # Link Genes and Groups
         existing_links = {
             g.group_id
-            for g in self.session.query(GeneGroupMembership).filter_by(gene_id=gene.id)                     # noqa: E501
+            for g in self.session.query(GeneGroupMembership).filter_by(
+                gene_id=gene.id
+            )  # noqa: E501
         }
 
         new_links = 0
         for group in group_objs:
             if group.id not in existing_links:
-                membership = GeneGroupMembership(gene_id=gene.id, group_id=group.id)                        # noqa: E501
+                membership = GeneGroupMembership(
+                    gene_id=gene.id, group_id=group.id
+                )  # noqa: E501
                 self.session.add(membership)
                 new_links += 1
 
         self.session.commit()
-        msg = f"Gene '{symbol}' linked with {len(group_objs)} group(s), {new_links} new links added"        # noqa: E501
+        msg = f"Gene '{symbol}' linked with {len(group_objs)} group(s), {new_links} new links added"  # noqa: E501
         self.logger.log(msg, "INFO")
 
         return gene
@@ -235,7 +242,7 @@ class GeneQueryMixin(ConflictHandlerMixin):
             self.logger.log(msg, "WARNING")
             return None
 
-        location = GeneLocation(
+        location = GeneLocation(  # BUG: GeneLocation should be created only once         # noqa: E501
             gene_id=gene.id,
             chromosome=chromosome,
             start=start,
@@ -272,7 +279,11 @@ class GeneQueryMixin(ConflictHandlerMixin):
 
         # Treatment of missing values
         if isinstance(group_data, list):
-            return [g.strip() for g in group_data if isinstance(g, str) and g.strip()]                      # noqa: E501
+            return [
+                g.strip()
+                for g in group_data
+                if isinstance(g, str) and g.strip()  # noqa: E501
+            ]  # noqa: E501
 
         # Treatment of clearly null or empty values
         if group_data is None or pd.isna(group_data):
@@ -295,7 +306,11 @@ class GeneQueryMixin(ConflictHandlerMixin):
 
         # Treatment of lists
         if isinstance(group_data, list):
-            return [g.strip() for g in group_data if isinstance(g, str) and g.strip()]                      # noqa: E501
+            return [
+                g.strip()
+                for g in group_data
+                if isinstance(g, str) and g.strip()  # noqa: E501
+            ]  # noqa: E501
 
         # Converts other types to string
         return [str(group_data).strip()]

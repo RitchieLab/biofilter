@@ -5,7 +5,7 @@ db_uri = "sqlite:///dev_biofilter.db"
 bf = Biofilter(db_uri)
 
 # bf.update(source_system=["HGNC"])
-bf.update(source_system=["HGNC"], run_steps=["load"], force_steps=["load"])
+bf.update_conflicts(source_system=["HGNC"])
 
 print("Database updated successfully.")
 

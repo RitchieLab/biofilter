@@ -62,7 +62,9 @@ def test_entity_creation_integrity_error(entity_query):
 
     # Jump the commit simulating an error on the second attempt
     with patch.object(
-        entity_query.session, "commit", side_effect=IntegrityError("Mocked", None, None)
+        entity_query.session,
+        "commit",
+        side_effect=IntegrityError("Mocked", None, None),  # noqa: E501
     ):  # noqa: E501
         entity_id, created = entity_query.get_or_create_entity(name, group_id)
         assert created is False
