@@ -61,6 +61,12 @@ class CreateDBMixin:
             "EntityGroup",
             key="entity_groups",
         )
+        self._seed_from_json(
+            f"{seed_dir}/initial_omic_status.json",
+            "omics_models",
+            "OmicStatus",
+            key="omic_status",
+        )
 
     def _seed_from_json(self, file, module_name, model_name, key=None):
         model_module = import_module(f"biofilter.db.models.{module_name}")

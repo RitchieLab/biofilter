@@ -2,15 +2,22 @@ import pandas as pd
 from openpyxl import Workbook
 from openpyxl.styles import Protection
 from openpyxl.worksheet.datavalidation import DataValidation
+from sqlalchemy import or_
+from typing import Optional
 
 from biofilter.utils.logger import Logger
 from biofilter.db.models.entity_models import Entity, EntityName
-from biofilter.db.models.omics_models import Gene
+from biofilter.db.models.omics_models import Gene, OmicStatus
 from biofilter.db.models.curation_models import (
     CurationConflict,
     ConflictStatus,
     ConflictResolution,
 )  # noqa E501
+
+"""
+No futuro podemos criar uma estrutura em que essa classe sera generica e
+teremos Mixin para expandir as funcionalidades de cada tipo omico
+"""
 
 
 # class ConflictManager(ConflictResolutionMixin):
@@ -217,9 +224,7 @@ class ConflictManager:
         conflict = (
             self.session.query(CurationConflict)
             .filter_by(
-                entity_type="gene",
-                identifier=hgnc_id,
-                status=ConflictStatus.resolved
+                entity_type="gene", identifier=hgnc_id, status=ConflictStatus.resolved
             )  # noqa: E501
             .first()
         )
@@ -238,7 +243,9 @@ class ConflictManager:
 
             # 🔒 Mark the Entity as deacticated and conflict
             entity = (
-                self.session.query(Entity).filter_by(id=conflict.entity_id).first()             # noqa: E501
+                self.session.query(Entity)
+                .filter_by(id=conflict.entity_id)
+                .first()  # noqa: E501
             )  # noqa: E501
             if entity:
                 entity.has_conflict = True
@@ -324,19 +331,22 @@ class ConflictManager:
                     self.session.delete(name_obj)
                 else:
                     name_obj.entity_id = target_gene.entity_id
+                    name_obj.is_primary = False
                     migrated += 1
 
             msg = f"🔁 Migrated {migrated} aliases to Entity {target_gene.entity_id}"  # noqa: E501
             self.logger.log(msg, "DEBUG")
 
-            # Mark the source gene as MERGED
-            # NOTE: We are not creating the source gene in the database, so we don't have it here.  # noqa: E501
-
+            # Alterar o status do Gene para "merged"
             source_gene = (
                 self.session.query(Gene).filter_by(hgnc_id=hgnc_id).first()
             )  # noqa: E501
+            omic_status = (
+                self.session.query(OmicStatus).filter_by(name="merged").first()
+            )
             if source_gene:
-                source_gene.hgnc_status = "merged"  # TODO: Create a new Field to hosting the Target Gene ID              # noqa: E501
+                source_gene.omic_status_id = omic_status.id
+                # source_gene.hgnc_status = "merged"  # TODO: Create a new Field to hosting the Target Gene ID              # noqa: E501
                 # source_gene.merged_into = target_gene.id
                 msg = f"📎 Gene '{hgnc_id}' marked as merged into {target_gene.hgnc_id}"  # noqa: E501
                 self.logger.log(msg, "DEBUG")
@@ -374,3 +384,109 @@ class ConflictManager:
             self.session.commit()
 
             return False
+
+    def normalize_gene_identifiers(self, hgnc_id, entrez_id, ensembl_id):
+        def clean_id(val):
+            val = str(val).strip().upper() if val else None
+            return val if val and val != "NAN" else None
+
+        return (
+            clean_id(hgnc_id),
+            clean_id(entrez_id),
+            clean_id(ensembl_id),
+        )
+
+    def detect_gene_conflict(
+        self,
+        hgnc_id: str,
+        entrez_id: str,
+        ensembl_id: str,
+        entity_id: int,
+        symbol: str,
+        data_source_id,
+    ) -> Optional[Gene]:
+        """
+        Returns existing Gene if safe, or logs a conflict and returns None.
+        """
+        filters = []
+        if hgnc_id:
+            filters.append(Gene.hgnc_id == hgnc_id)
+        if entrez_id:
+            filters.append(Gene.entrez_id == entrez_id)
+        if ensembl_id:
+            filters.append(Gene.ensembl_id == ensembl_id)
+        if entity_id:
+            filters.append(Gene.entity_id == entity_id)
+
+        existing_gene = self.session.query(Gene).filter(or_(*filters)).first()
+        if not existing_gene:
+            return None
+
+        # Same Gene!
+        if (
+            existing_gene.hgnc_id == hgnc_id
+            and existing_gene.entrez_id == entrez_id
+            and existing_gene.ensembl_id == ensembl_id
+            and existing_gene.entity_id == entity_id
+        ):
+            msg = f"♻️ Gene already exists (identical): {symbol}"
+            self.logger.log(msg, "DEBUG")
+            return existing_gene
+
+        conflicts = []
+        if (
+            entrez_id
+            and existing_gene.entrez_id == entrez_id
+            and existing_gene.hgnc_id != hgnc_id
+        ):
+            conflicts.append(f"entrez_id={entrez_id}")
+        if (
+            ensembl_id
+            and existing_gene.ensembl_id == ensembl_id
+            and existing_gene.hgnc_id != hgnc_id
+        ):
+            conflicts.append(f"ensembl_id={ensembl_id}")
+
+        if not conflicts:
+            self.logger.log(f"♻️ Gene already exists: {symbol}", "INFO")
+            return existing_gene
+
+        # Log conflict
+        description = (
+            f"Gene {hgnc_id} conflicts with existing gene {existing_gene.hgnc_id}, "  # noqa: E501
+            f"both share same identifier(s): {', '.join(conflicts)}"
+        )
+
+        already_logged = (
+            self.session.query(CurationConflict)
+            .filter_by(
+                entity_type="gene",
+                identifier=hgnc_id,
+                existing_identifier=existing_gene.hgnc_id,
+                status=ConflictStatus.pending,
+            )
+            .first()
+        )
+
+        if not already_logged:
+            conflict = CurationConflict(
+                entity_type="gene",
+                identifier=hgnc_id,
+                existing_identifier=existing_gene.hgnc_id,
+                status=ConflictStatus.pending,
+                description=description,
+                entity_id=entity_id,
+                data_source_id=data_source_id,
+            )
+            self.session.add(conflict)
+
+        entity = self.session.query(Entity).filter_by(id=entity_id).first()
+        if entity:
+            entity.has_conflict = 1
+
+        self.session.commit()
+        self.logger.log(
+            f"🚫 Conflict detected for Gene '{symbol}' - submitted for curation",  # noqa E501
+            "WARNING",
+        )
+        return "CONFLICT"

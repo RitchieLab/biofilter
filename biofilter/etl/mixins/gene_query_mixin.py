@@ -9,11 +9,11 @@ from biofilter.db.models.omics_models import (
     LocusType,
     GenomicRegion,
     GeneLocation,
+    OmicStatus,
 )  # noqa: E501
-from biofilter.etl.base.conflict_handler_mixin import ConflictHandlerMixin
 
 
-class GeneQueryMixin(ConflictHandlerMixin):
+class GeneQueryMixin:
 
     def get_or_create_locus_group(self, name: str):
         """
@@ -118,6 +118,12 @@ class GeneQueryMixin(ConflictHandlerMixin):
     def get_or_create_gene_location(self):
         pass
 
+    def get_status_id(self, name: str) -> int:
+        status = self.session.query(OmicStatus).filter_by(name=name).first()
+        if not status:
+            raise ValueError(f"OmicStatus '{name}' not found.")
+        return status.id
+
     def get_or_create_gene(
         self,
         symbol: str,
@@ -136,18 +142,23 @@ class GeneQueryMixin(ConflictHandlerMixin):
         entrez_id or entity_id). Also manages linking with GeneGroup and
         Memberships.
         """
+
+        conflict_flag = False
+
         if not symbol:
             msg = f"⚠️ Gene {hgnc_id} ignored: empty symbol"
             self.logger.log(msg, "WARNING")
             return None
 
         # Normaliza os IDs
-        hgnc_id, entrez_id, ensembl_id = self.normalize_gene_identifiers(
-            hgnc_id, entrez_id, ensembl_id
+        hgnc_id, entrez_id, ensembl_id = (
+            self.conflict_mgr.normalize_gene_identifiers(  # noqa: E501
+                hgnc_id, entrez_id, ensembl_id
+            )
         )
 
         # Check Conflict
-        result = self.detect_gene_conflict(
+        result = self.conflict_mgr.detect_gene_conflict(
             hgnc_id=hgnc_id,
             entrez_id=entrez_id,
             ensembl_id=ensembl_id,
@@ -156,14 +167,22 @@ class GeneQueryMixin(ConflictHandlerMixin):
             data_source_id=data_source_id,
         )
 
+        # Gene in conflict
         if result == "CONFLICT":
-            return "CONFLICT"
+            conflict_flag = True
+            status_id = self.get_status_id("conflict")
 
-        if result:  # Gene is already registered
-            return result
+        # Gene already exists
+        elif result:
+            return result, conflict_flag
+
+        # New gene
+        else:
+            status_id = self.get_status_id("active")
 
         gene = Gene(
             # symbol=symbol,
+            omic_status_id=status_id,
             hgnc_status=hgnc_status,
             entity_id=entity_id,
             hgnc_id=hgnc_id,
@@ -218,7 +237,7 @@ class GeneQueryMixin(ConflictHandlerMixin):
         msg = f"Gene '{symbol}' linked with {len(group_objs)} group(s), {new_links} new links added"  # noqa: E501
         self.logger.log(msg, "INFO")
 
-        return gene
+        return gene, conflict_flag
 
     def create_gene_location(
         self,

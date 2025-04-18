@@ -80,10 +80,22 @@ class GenomicRegion(Base):
 # =============================================================================
 
 
+class OmicStatus(Base):
+    __tablename__ = "omic_status"
+    id = Column(Integer, primary_key=True)
+    name = Column(String, unique=True, nullable=False)
+    description = Column(String, nullable=True)
+
+
 class Gene(Base):
     __tablename__ = "genes"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
+    omic_status_id = Column(
+        Integer, ForeignKey("omic_status.id"), nullable=True
+    )  # noqa E501
+    omic_status = relationship("OmicStatus")
+
     entity_id = Column(Integer, nullable=False)
 
     # NOTE / TODO: Improve this field to save space and standardize with other sources

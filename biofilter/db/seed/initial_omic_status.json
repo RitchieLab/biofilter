@@ -1,0 +1,24 @@
+{
+    "omic_status": [
+        {
+            "id": 1,
+            "name": "active",
+            "description": "Entity is active and usable in analyses"
+        },
+        {
+            "id": 2,
+            "name": "merged",
+            "description": "Entity was merged into another one"
+        },
+        {
+            "id": 3,
+            "name": "deleted",
+            "description": "Entity was removed or invalidated"
+        },
+        {
+            "id": 4,
+            "name": "conflict",
+            "description": "Entity is under curation due to conflicting data"
+        }
+    ]
+}

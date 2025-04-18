@@ -4,7 +4,7 @@ from biofilter.db.models.curation_models import (
     CurationConflict,
     ConflictStatus,
 )  # noqa: E501
-from biofilter.etl.base.conflict_handler_mixin import ConflictHandlerMixin
+from biofilter.etl.mixins.conflict_handler_mixin import ConflictHandlerMixin
 from biofilter.utils.logger import Logger
 from unittest.mock import MagicMock
 

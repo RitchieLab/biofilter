@@ -4,11 +4,8 @@ import json
 import requests
 import pandas as pd
 from biofilter.utils.file_hash import compute_file_hash
-from biofilter.etl.base.entity_query_mixin import EntityQueryMixin
-from biofilter.etl.base.gene_query_mixin import GeneQueryMixin
-# from biofilter.etl.base.conflict_resolution_mixin import (
-#     ConflictResolutionMixin,
-# )  # noqa E501
+from biofilter.etl.mixins.entity_query_mixin import EntityQueryMixin
+from biofilter.etl.mixins.gene_query_mixin import GeneQueryMixin
 from biofilter.db.models.entity_models import EntityGroup
 from biofilter.db.models.curation_models import (
     CurationConflict,
@@ -17,7 +14,6 @@ from biofilter.db.models.curation_models import (
 from biofilter.etl.conflict_manager import ConflictManager
 
 
-# class DTP(EntityQueryMixin, GeneQueryMixin, ConflictResolutionMixin):
 class DTP(EntityQueryMixin, GeneQueryMixin):
     def __init__(
         self,
@@ -37,9 +33,6 @@ class DTP(EntityQueryMixin, GeneQueryMixin):
         self.file_name = "hgnc_data.json"
 
         self.conflict_mgr = ConflictManager(session, logger)
-
-
-
 
     def extract(self, download_path):
         """
@@ -290,7 +283,7 @@ class DTP(EntityQueryMixin, GeneQueryMixin):
 
             group_names_list = self.parse_gene_groups(row.get("gene_group"))
 
-            gene = self.get_or_create_gene(
+            gene, conflict_flag = self.get_or_create_gene(
                 symbol=row.get("symbol"),
                 hgnc_status=row.get("status"),
                 hgnc_id=row.get("hgnc_id"),
@@ -303,12 +296,11 @@ class DTP(EntityQueryMixin, GeneQueryMixin):
                 gene_group_names=group_names_list,
             )
 
-            if gene == "CONFLICT":
+            if conflict_flag:
                 msg = f"Gene '{gene_master}' has conflicts"
                 self.logger.log(msg, "WARNING")
                 # Add to the list of genes with resolved conflicts
                 genes_with_pending_conflict.append(row)
-                continue
 
             if gene is not None:
                 total_gene += 1
@@ -352,10 +344,7 @@ class DTP(EntityQueryMixin, GeneQueryMixin):
             self.logger.log(msg, "INFO")
 
             # Apply conflict resolution
-            # self.apply_resolution(row)
             self.conflict_mgr.apply_resolution(row)
-
-        # TODO: Apagar o arquivo de conflictos, para evitar ser reprocessado.
 
         message = f"Loaded {total_gene} genes into database"
         self.logger.log(msg, "INFO")
