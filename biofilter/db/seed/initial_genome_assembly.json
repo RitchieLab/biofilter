@@ -1,0 +1,9 @@
+{
+    "genome_assembly": [
+        {
+            "id": 1,
+            "name": "GRCh38",
+            "description": "Genome Reference Consortium Human Build 38"
+        }
+    ]
+} 
