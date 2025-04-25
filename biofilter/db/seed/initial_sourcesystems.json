@@ -11,7 +11,12 @@
             "description": "Genome browser for vertebrate genomes",
             "homepage": "https://www.ensembl.org/",
             "active": true
+        },
+        {
+            "name": "dbSNP",
+            "description": "NCBI Single Nucleotide Polymorphism Database",
+            "homepage": "https://www.ncbi.nlm.nih.gov/snp",
+            "active": true
         }
-
     ]
 }

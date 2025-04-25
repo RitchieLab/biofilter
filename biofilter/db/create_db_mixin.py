@@ -94,7 +94,38 @@ class CreateDBMixin:
                                     f"Invalid datetime format in key {key}: {value}",
                                     "WARNING",
                                 )  # noqa: E501
-                session.add(model_class(**item))
+
+                # Search FK ID from Names
+                if "source_system" in item:
+                    fk_name = item.pop("source_system")
+                    fk_qry = session.query(
+                        import_module("biofilter.db.models.etl_models").SourceSystem
+                    ).filter_by(name=fk_name).first()
+
+                    if not fk_qry:
+                        self.logger.log(
+                            f"Source System not found for name: {fk_name}", "WARNING"
+                        )
+                        continue
+                    item["source_system_id"] = fk_qry.id
+
+                if "data_source" in item:
+                    fk_name = item.pop("data_source")
+                    fk_qry = session.query(
+                        import_module("biofilter.db.models.etl_models").DataSource
+                    ).filter_by(name=fk_name).first()
+
+                    if not fk_qry:
+                        self.logger.log(
+                            f"Data Source not found for name: {fk_name}", "WARNING"
+                        )
+                        continue
+                    item["data_source_id"] = fk_qry.id
+
+                try:
+                    session.add(model_class(**item))
+                except Exception as e:
+                    self.logger.log(f"Failed to add {item}: {e}", "ERROR")
             try:
                 session.commit()
                 self.logger.log(f"Seeded: {model_name}", "INFO")

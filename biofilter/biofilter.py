@@ -55,6 +55,7 @@ class Biofilter:
     def update(
         self,
         source_system: list = None,
+        data_sources: list = None,
         run_steps: list = None,
         force_steps: list = None,
     ):  # noqa: E501
@@ -78,6 +79,7 @@ class Biofilter:
 
         manager.start_process(
             source_system=source_system,
+            data_sources=data_sources,
             download_path=self.settings.get("download_path"),
             processed_path=self.settings.get("processed_path"),
             run_steps=run_steps,

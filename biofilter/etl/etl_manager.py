@@ -4,7 +4,7 @@ import glob
 import importlib
 from typing import Union, List
 from datetime import datetime
-from collections.abc import Iterable
+# from collections.abc import Iterable
 from sqlalchemy.orm import Session
 from biofilter.utils.logger import Logger
 from biofilter.db.models.etl_models import (
@@ -193,6 +193,7 @@ class ETLManager:
     def start_process(
         self,
         source_system: list = None,
+        data_sources: list = None,
         download_path: str = None,
         processed_path: str = None,
         run_steps: list = None,
@@ -200,18 +201,16 @@ class ETLManager:
         use_conflict_csv: bool = False,
     ) -> None:
         """
-        Runs ETL pipeline Extract→Transform→Load for all active data sources.
+        Runs ETL pipeline Extract→Transform→Load for specified data sources.
 
         Parameters:
         - source_system (str or list[str], optional): Filter by source system.
+        - data_sources (str or list[str], optional): Filter by specific ds.
         - download_path (str, optional): Path for raw file downloads.
-        - processed_path (str, optional): Path for processed CSV files.
-        - run_steps (list[str], optional): Specify which steps to run.
-            Options: ["extract", "transform", "load"]. Defaults to all steps.
-        - force_steps (list[str], optional): Specify which steps to force.
-            Options: ["extract", "transform", "load"]. Defaults to None.
-        - use_conflict_csv (bool, optional): Use conflict CSV for loading.
-            Defaults to False.
+        - processed_path (str, optional): Path for processed files.
+        - run_steps (list[str], optional): Which steps to run. Default: all.
+        - force_steps (list[str], optional): Steps to force rerun.
+        - use_conflict_csv (bool, optional): Use conflict CSV during load.
 
         Notes:
         - Only active DataSources are processed.
@@ -222,22 +221,32 @@ class ETLManager:
         if run_steps is None:
             run_steps = ["extract", "transform", "load"]
 
-        # Prepare DTPs to process
+        # Normalize inputs
+        if isinstance(source_system, str):
+            source_system = [source_system]
+        if isinstance(data_sources, str):
+            data_sources = [data_sources]
+
+        # Validate input
+        if not source_system and not data_sources:
+            msg = "❌ No source_system or data_sources provided. Aborting."
+            self.logger.log(msg, "ERROR")
+            return
+
+        # Build base query
         query = self.session.query(DataSource).filter_by(active=True)
-        if source_system is not None:
-            if isinstance(source_system, str) or not isinstance(
-                source_system, Iterable
-            ):  # noqa E501
-                source_system = [source_system]
+
         if source_system:
-            query = query.join(SourceSystem).filter(
-                SourceSystem.name.in_(source_system)
-            )  # noqa E501
+            query = query.join(SourceSystem).filter(SourceSystem.name.in_(source_system))       # noqa: E501
+
+        if data_sources:
+            query = query.filter(DataSource.name.in_(data_sources))
+
         datasources_to_process = query.all()
 
         # Finish if no DataSources are found
         if not datasources_to_process:
-            self.logger.log("⚠️ No active DataSources found.", "WARNING")
+            self.logger.log("⚠️ No matching active DataSources found.", "WARNING")              # noqa: E501
             return
 
         for ds in datasources_to_process:
@@ -267,7 +276,7 @@ class ETLManager:
                 # EXTRACT PHASE
                 # if process.extract_status == "pending":
                 if "extract" in run_steps and (
-                    process.extract_status in ("pending", "completed", "failed")
+                    process.extract_status in ("pending", "completed", "failed")                # noqa E501
                     or "extract" in force_steps
                 ):  # noqa E501
                     process.extract_start = datetime.now()
@@ -277,7 +286,9 @@ class ETLManager:
                         f"📦 [Extract] Running for {ds.name}", "INFO"
                     )  # noqa E501
                     status, message, file_hash = dtp_instance.extract(
-                        download_path
+                        raw_dir=download_path,
+                        source_url=ds.source_url,
+                        last_hash=process.raw_data_hash,
                     )  # noqa E501
                     process.extract_end = datetime.now()
 
@@ -289,9 +300,9 @@ class ETLManager:
                             process.extract_status = "completed"
                             process.transform_status = "pending"
                             process.load_status = "pending"
-                            msg = f"Data changed for {ds.name}, reprocessing transform/load steps"  # noqa E501
+                            msg = f"Data changed for {ds.name}, reprocessing transform/load steps"              # noqa E501
                         else:
-                            # No change detected, set transform/load phases to completed                    # noqa E501
+                            # No change detected, set transform/load phases to completed                        # noqa E501
                             process.extract_status = "completed"
                             process.transform_status = "completed"
                             process.load_status = "completed"

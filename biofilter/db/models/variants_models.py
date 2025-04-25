@@ -23,7 +23,7 @@ class Variant(Base):
     entity_id = Column(Integer, ForeignKey("entities.id"), unique=True, nullable=False)
     rs_id = Column(String, nullable=True, index=True)
     variant_type = Column(String, nullable=False)  # SNP, InDel, SV, MNV, etc.
-    hgvs = Column(String, nullable=True)  # ex: NM_001301717.2:c.123A>G
+    # hgvs = Column(String, nullable=True)  # ex: NM_001301717.2:c.123A>G
     source = Column(String, nullable=True)  # dbSNP, ClinVar, Ensembl, etc.
     length = Column(Integer, nullable=True)
 
@@ -58,6 +58,19 @@ class VariantAnnotation(Base):
     source = Column(String, nullable=True)  # ClinVar, gnomAD, etc.
     phenotype = Column(String, nullable=True)  # doença associada, se houver
     consequence = Column(String, nullable=True)  # ex: splice_acceptor_variant
+
+
+class VariantHGVS(Base):
+    __tablename__ = "variant_hgvs"
+
+    id = Column(Integer, primary_key=True)
+    variant_id = Column(Integer, ForeignKey("variants.id"), nullable=False)
+    notation = Column(String, nullable=False)  # ex: NC_000017.10:g.41223094G>A
+    level = Column(String, nullable=True)  # "g", "c", "p"
+    reference = Column(String, nullable=True)  # ex: NM_000237, NP_000228
+    version = Column(String, nullable=True)  # ex: 11, 3
+
+    variant = relationship("Variant", backref="hgvs_notations")
 
 
 class VariantLink(Base):

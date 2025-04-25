@@ -10,7 +10,7 @@ from sqlalchemy import (
     Enum,
 )
 
-# from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship
 import datetime
 
 
@@ -32,7 +32,7 @@ class SourceSystem(Base):
     updated_at = Column(DateTime, default=utcnow, onupdate=utcnow)
 
     # Relationship
-    # data_sources = relationship("DataSource", back_populates="source_system")
+    data_sources = relationship("DataSource", back_populates="source_system")
 
 
 class DataSource(Base):
@@ -63,7 +63,7 @@ class DataSource(Base):
     updated_at = Column(DateTime, default=utcnow, onupdate=utcnow)
 
     # Relationships
-    # source_system = relationship("SourceSystem", back_populates="data_sources")  # noqa: E501
+    source_system = relationship("SourceSystem", back_populates="data_sources")  # noqa: E501
     # etl_processes = relationship(
     #     "ETLProcess", back_populates="data_source", cascade="all, delete-orphan"  # noqa: E501
     # )

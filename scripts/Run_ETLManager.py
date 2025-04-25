@@ -4,8 +4,11 @@ db_uri = "sqlite:///dev_biofilter.db"
 
 bf = Biofilter(db_uri)
 
-# bf.update(source_system=["HGNC"])
-bf.update(source_system=["HGNC"], run_steps=["load"], force_steps=["load"])
+bf.update(source_system=["HGNC"])
+# bf.update(source_system=["HGNC"], run_steps=["load"], force_steps=["load"])
+# bf.update(data_sources=["dbSNP_chrX"], run_steps=["extract"], force_steps=["extract"])
+# bf.update(source_system=["dbSNP"], run_steps=["extract"], force_steps=["extract"])
+# bf.update(source_system=["dbSNP"], run_steps=["transform"], force_steps=["transform"])
 
 print("Database updated successfully.")
 

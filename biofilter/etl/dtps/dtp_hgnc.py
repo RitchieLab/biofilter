@@ -12,9 +12,10 @@ from biofilter.db.models.curation_models import (
     ConflictStatus,
 )  # noqa E501
 from biofilter.etl.conflict_manager import ConflictManager
+from biofilter.etl.mixins.base_dtp import DTPBase
 
 
-class DTP(EntityQueryMixin, GeneQueryMixin):
+class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
     def __init__(
         self,
         logger=None,
@@ -34,7 +35,8 @@ class DTP(EntityQueryMixin, GeneQueryMixin):
 
         self.conflict_mgr = ConflictManager(session, logger)
 
-    def extract(self, download_path):
+    # def extract(self, download_path):
+    def extract(self, raw_dir: str, source_url: str, last_hash: str):    
         """
         Extracts data from the HGNC API and stores it locally.
         Also computes a file hash to track content versioning.
@@ -43,7 +45,7 @@ class DTP(EntityQueryMixin, GeneQueryMixin):
         message = ""
 
         try:
-            raw_file = os.path.join(download_path, "hgnc", self.file_name)
+            raw_file = os.path.join(raw_dir, "hgnc", self.file_name)
             os.makedirs(os.path.dirname(raw_file), exist_ok=True)
 
             headers = {"Accept": "application/json"}

@@ -34,6 +34,7 @@ sqlalchemy = "^2.0.37"
 aiosqlite = "^0.21.0"
 pandas = "^2.2.3"
 openpyxl = "^3.1.5"
+pyarrow = "^19.0.1"
 
 [tool.poetry.group.dev.dependencies]
 black = "^24.10.0"

@@ -1,7 +1,7 @@
 {
     "etl_processes": [
         {
-            "data_source_id": 1,
+            "data_source": "hgnc_genes",
             "global_status": "pending",
             "extract_start": "2025-04-01T10:00:00",
             "extract_end": "2025-04-01T10:05:00",
@@ -13,6 +13,217 @@
             "load_end": "2025-04-01T10:15:00",
             "load_status": "pending",
             "dtp_script": "dtp_hgnc"
+        },
+        {
+            "data_source": "dbSNP_chr1",
+            "global_status": "pending",
+            "extract_status": "pending",
+            "transform_status": "pending",
+            "load_status": "pending",
+            "dtp_script": "dtp_dbsnp"
+        },
+        {
+            "data_source": "dbSNP_chr2",
+            "global_status": "pending",
+            "extract_status": "pending",
+            "transform_status": "pending",
+            "load_status": "pending",
+            "dtp_script": "dtp_dbsnp"
+        },
+        {
+            "data_source": "dbSNP_chr3",
+            "global_status": "pending",
+            "extract_status": "pending",
+            "transform_status": "pending",
+            "load_status": "pending",
+            "dtp_script": "dtp_dbsnp"
+        },
+        {
+            "data_source": "dbSNP_chr4",
+            "global_status": "pending",
+            "extract_status": "pending",
+            "transform_status": "pending",
+            "load_status": "pending",
+            "dtp_script": "dtp_dbsnp"
+        },
+        {
+            "data_source": "dbSNP_chr5",
+            "global_status": "pending",
+            "extract_status": "pending",
+            "transform_status": "pending",
+            "load_status": "pending",
+            "dtp_script": "dtp_dbsnp"
+        },
+        {
+            "data_source": "dbSNP_chr6",
+            "global_status": "pending",
+            "extract_status": "pending",
+            "transform_status": "pending",
+            "load_status": "pending",
+            "dtp_script": "dtp_dbsnp"
+        },
+        {
+            "data_source": "dbSNP_chr7",
+            "global_status": "pending",
+            "extract_status": "pending",
+            "transform_status": "pending",
+            "load_status": "pending",
+            "dtp_script": "dtp_dbsnp"
+        },
+        {
+            "data_source": "dbSNP_chr8",
+            "global_status": "pending",
+            "extract_status": "pending",
+            "transform_status": "pending",
+            "load_status": "pending",
+            "dtp_script": "dtp_dbsnp"
+        },
+        {
+            "data_source": "dbSNP_chr9",
+            "global_status": "pending",
+            "extract_status": "pending",
+            "transform_status": "pending",
+            "load_status": "pending",
+            "dtp_script": "dtp_dbsnp"
+        },
+        {
+            "data_source": "dbSNP_chr10",
+            "global_status": "pending",
+            "extract_status": "pending",
+            "transform_status": "pending",
+            "load_status": "pending",
+            "dtp_script": "dtp_dbsnp"
+        },
+        {
+            "data_source": "dbSNP_chr11",
+            "global_status": "pending",
+            "extract_status": "pending",
+            "transform_status": "pending",
+            "load_status": "pending",
+            "dtp_script": "dtp_dbsnp"
+        },
+        {
+            "data_source": "dbSNP_chr12",
+            "global_status": "pending",
+            "extract_status": "pending",
+            "transform_status": "pending",
+            "load_status": "pending",
+            "dtp_script": "dtp_dbsnp"
         }
+        ,
+        {
+            "data_source": "dbSNP_chr13",
+            "global_status": "pending",
+            "extract_status": "pending",
+            "transform_status": "pending",
+            "load_status": "pending",
+            "dtp_script": "dtp_dbsnp"
+        },
+        {
+            "data_source": "dbSNP_chr14",
+            "global_status": "pending",
+            "extract_status": "pending",
+            "transform_status": "pending",
+            "load_status": "pending",
+            "dtp_script": "dtp_dbsnp"
+        },
+        {
+            "data_source": "dbSNP_chr15",
+            "global_status": "pending",
+            "extract_status": "pending",
+            "transform_status": "pending",
+            "load_status": "pending",
+            "dtp_script": "dtp_dbsnp"
+        },
+        {
+            "data_source": "dbSNP_chr16",
+            "global_status": "pending",
+            "extract_status": "pending",
+            "transform_status": "pending",
+            "load_status": "pending",
+            "dtp_script": "dtp_dbsnp"
+        },
+        {
+            "data_source": "dbSNP_chr17",
+            "global_status": "pending",
+            "extract_status": "pending",
+            "transform_status": "pending",
+            "load_status": "pending",
+            "dtp_script": "dtp_dbsnp"
+        },
+        {
+            "data_source": "dbSNP_chr18",
+            "global_status": "pending",
+            "extract_status": "pending",
+            "transform_status": "pending",
+            "load_status": "pending",
+            "dtp_script": "dtp_dbsnp"
+        },
+        {
+            "data_source": "dbSNP_chr19",
+            "global_status": "pending",
+            "extract_status": "pending",
+            "transform_status": "pending",
+            "load_status": "pending",
+            "dtp_script": "dtp_dbsnp"
+        },
+        {
+            "data_source": "dbSNP_chr20",
+            "global_status": "pending",
+            "extract_status": "pending",
+            "transform_status": "pending",
+            "load_status": "pending",
+            "dtp_script": "dtp_dbsnp"
+        },
+        {
+            "data_source": "dbSNP_chr21",
+            "global_status": "pending",
+            "extract_status": "pending",
+            "transform_status": "pending",
+            "load_status": "pending",
+            "dtp_script": "dtp_dbsnp"
+        },
+        {
+            "data_source": "dbSNP_chr22",
+            "global_status": "pending",
+            "extract_status": "pending",
+            "transform_status": "pending",
+            "load_status": "pending",
+            "dtp_script": "dtp_dbsnp"
+        }
+        ,
+        {
+            "data_source": "dbSNP_chrX",
+            "global_status": "pending",
+            "extract_status": "pending",
+            "transform_status": "pending",
+            "load_status": "pending",
+            "dtp_script": "dtp_dbsnp"
+        },
+        {
+            "data_source": "dbSNP_chrY",
+            "global_status": "pending",
+            "extract_status": "pending",
+            "transform_status": "pending",
+            "load_status": "pending",
+            "dtp_script": "dtp_dbsnp"
+        },
+        {
+            "data_source": "dbSNP_chrMT",
+            "global_status": "pending",
+            "extract_status": "pending",
+            "transform_status": "pending",
+            "load_status": "pending",
+            "dtp_script": "dtp_dbsnp"
+        },
+        {
+            "data_source": "dbSNP_SAMPLE",
+            "global_status": "pending",
+            "extract_status": "pending",
+            "transform_status": "pending",
+            "load_status": "pending",
+            "dtp_script": "dtp_dbsnp"
+        }
+
     ]
 }
