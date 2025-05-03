@@ -67,6 +67,24 @@ class CreateDBMixin:
             "OmicStatus",
             key="omic_status",
         )
+        self._seed_from_json(
+            f"{seed_dir}/initial_genome_assemblies.json",
+            "variants_models",
+            "GenomeAssembly",
+            key="genome_assemblies",
+        )
+        self._seed_from_json(
+            f"{seed_dir}/initial_variant_types.json",
+            "variants_models",
+            "VariantType",
+            key="variant_types",
+        )
+        self._seed_from_json(
+            f"{seed_dir}/initial_allele_types.json",
+            "variants_models",
+            "AlleleType",
+            key="allele_types",
+        )
 
     def _seed_from_json(self, file, module_name, model_name, key=None):
         model_module = import_module(f"biofilter.db.models.{module_name}")
@@ -98,9 +116,13 @@ class CreateDBMixin:
                 # Search FK ID from Names
                 if "source_system" in item:
                     fk_name = item.pop("source_system")
-                    fk_qry = session.query(
-                        import_module("biofilter.db.models.etl_models").SourceSystem
-                    ).filter_by(name=fk_name).first()
+                    fk_qry = (
+                        session.query(
+                            import_module("biofilter.db.models.etl_models").SourceSystem
+                        )
+                        .filter_by(name=fk_name)
+                        .first()
+                    )
 
                     if not fk_qry:
                         self.logger.log(
@@ -111,9 +133,13 @@ class CreateDBMixin:
 
                 if "data_source" in item:
                     fk_name = item.pop("data_source")
-                    fk_qry = session.query(
-                        import_module("biofilter.db.models.etl_models").DataSource
-                    ).filter_by(name=fk_name).first()
+                    fk_qry = (
+                        session.query(
+                            import_module("biofilter.db.models.etl_models").DataSource
+                        )
+                        .filter_by(name=fk_name)
+                        .first()
+                    )
 
                     if not fk_qry:
                         self.logger.log(

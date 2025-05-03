@@ -418,75 +418,158 @@ class ConflictManager:
         if entity_id:
             filters.append(Gene.entity_id == entity_id)
 
-        existing_gene = self.session.query(Gene).filter(or_(*filters)).first()
-        if not existing_gene:
+        candidates = self.session.query(Gene).filter(or_(*filters)).all()
+
+        if not candidates:
             return None
 
-        # Same Gene!
-        if (
-            existing_gene.hgnc_id == hgnc_id
-            and existing_gene.entrez_id == entrez_id
-            and existing_gene.ensembl_id == ensembl_id
-            and existing_gene.entity_id == entity_id
-        ):
-            msg = f"♻️ Gene already exists (identical): {symbol}"
-            self.logger.log(msg, "DEBUG")
-            return existing_gene
+        # Check for identical gene
+        for g in candidates:
+            if (
+                g.hgnc_id == hgnc_id
+                and g.entrez_id == entrez_id
+                and g.ensembl_id == ensembl_id
+                and g.entity_id == entity_id
+            ):
+                msg = f"♻️ Gene already exists (identical): {symbol}"
+                self.logger.log(msg, "DEBUG")
+                return g
 
-        conflicts = []
-        if (
-            entrez_id
-            and existing_gene.entrez_id == entrez_id
-            and existing_gene.hgnc_id != hgnc_id
-        ):
-            conflicts.append(f"entrez_id={entrez_id}")
-        if (
-            ensembl_id
-            and existing_gene.ensembl_id == ensembl_id
-            and existing_gene.hgnc_id != hgnc_id
-        ):
-            conflicts.append(f"ensembl_id={ensembl_id}")
+        # Check for conflicts
+        for g in candidates:
 
-        if not conflicts:
-            self.logger.log(f"♻️ Gene already exists: {symbol}", "INFO")
-            return existing_gene
+            conflicts = []
+            if (
+                entrez_id
+                and g.entrez_id == entrez_id
+                and g.hgnc_id != hgnc_id
+            ):
+                conflicts.append(f"entrez_id={entrez_id}")
+            if (
+                ensembl_id
+                and g.ensembl_id == ensembl_id
+                and g.hgnc_id != hgnc_id
+            ):
+                conflicts.append(f"ensembl_id={ensembl_id}")
 
-        # Log conflict
-        description = (
-            f"Gene {hgnc_id} conflicts with existing gene {existing_gene.hgnc_id}, "  # noqa: E501
-            f"both share same identifier(s): {', '.join(conflicts)}"
-        )
+            if not conflicts:
+                msg = f"♻️ System found record conflict, but couldn't analysis it: {symbol}"  # noqa: E501
+                self.logger.log(msg, "INFO")
+                return g
 
-        already_logged = (
-            self.session.query(CurationConflict)
-            .filter_by(
-                entity_type="gene",
-                identifier=hgnc_id,
-                existing_identifier=existing_gene.hgnc_id,
-                status=ConflictStatus.pending,
+            # Log conflict
+            description = (
+                f"Gene {hgnc_id} conflicts with existing gene {g.hgnc_id}, "  # noqa: E501
+                f"both share same identifier(s): {', '.join(conflicts)}"
             )
-            .first()
-        )
 
-        if not already_logged:
-            conflict = CurationConflict(
-                entity_type="gene",
-                identifier=hgnc_id,
-                existing_identifier=existing_gene.hgnc_id,
-                status=ConflictStatus.pending,
-                description=description,
-                entity_id=entity_id,
-                data_source_id=data_source_id,
+            already_logged = (
+                self.session.query(CurationConflict)
+                .filter_by(
+                    entity_type="gene",
+                    identifier=hgnc_id,
+                    existing_identifier=g.hgnc_id,
+                    status=ConflictStatus.pending,
+                )
+                .first()
             )
-            self.session.add(conflict)
 
-        entity = self.session.query(Entity).filter_by(id=entity_id).first()
-        if entity:
-            entity.has_conflict = 1
+            if not already_logged:
+                conflict = CurationConflict(
+                    entity_type="gene",
+                    identifier=hgnc_id,
+                    existing_identifier=g.hgnc_id,
+                    status=ConflictStatus.pending,
+                    description=description,
+                    entity_id=entity_id,
+                    data_source_id=data_source_id,
+                )
+                self.session.add(conflict)
 
-        self.session.commit()
-        self.logger.log(
-            f"🚫 Conflict detected for Gene '{symbol}' - submitted for curation",  # noqa E501
-            "WARNING",
-        )
-        return "CONFLICT"
+            entity = self.session.query(Entity).filter_by(id=entity_id).first()
+            if entity:
+                entity.has_conflict = 1
+
+            self.session.commit()
+            self.logger.log(
+                f"🚫 Conflict detected for Gene '{symbol}' - submitted for curation",  # noqa E501
+                "WARNING",
+            )
+            
+            return "CONFLICT" 
+        
+        
+        # # Check for existing gene with same identifiers
+
+        # existing_gene = self.session.query(Gene).filter(or_(*filters)).first()
+        # if not existing_gene:
+        #     return None
+
+        # # Same Gene!
+        # if (
+        #     existing_gene.hgnc_id == hgnc_id
+        #     and existing_gene.entrez_id == entrez_id
+        #     and existing_gene.ensembl_id == ensembl_id
+        #     and existing_gene.entity_id == entity_id
+        # ):
+        #     msg = f"♻️ Gene already exists (identical): {symbol}"
+        #     self.logger.log(msg, "DEBUG")
+        #     return existing_gene
+
+        # conflicts = []
+        # if (
+        #     entrez_id
+        #     and existing_gene.entrez_id == entrez_id
+        #     and existing_gene.hgnc_id != hgnc_id
+        # ):
+        #     conflicts.append(f"entrez_id={entrez_id}")
+        # if (
+        #     ensembl_id
+        #     and existing_gene.ensembl_id == ensembl_id
+        #     and existing_gene.hgnc_id != hgnc_id
+        # ):
+        #     conflicts.append(f"ensembl_id={ensembl_id}")
+
+        # if not conflicts:
+        #     self.logger.log(f"♻️ Gene already exists: {symbol}", "INFO")
+        #     return existing_gene
+
+        # # Log conflict
+        # description = (
+        #     f"Gene {hgnc_id} conflicts with existing gene {existing_gene.hgnc_id}, "  # noqa: E501
+        #     f"both share same identifier(s): {', '.join(conflicts)}"
+        # )
+
+        # already_logged = (
+        #     self.session.query(CurationConflict)
+        #     .filter_by(
+        #         entity_type="gene",
+        #         identifier=hgnc_id,
+        #         existing_identifier=existing_gene.hgnc_id,
+        #         status=ConflictStatus.pending,
+        #     )
+        #     .first()
+        # )
+
+        # if not already_logged:
+        #     conflict = CurationConflict(
+        #         entity_type="gene",
+        #         identifier=hgnc_id,
+        #         existing_identifier=existing_gene.hgnc_id,
+        #         status=ConflictStatus.pending,
+        #         description=description,
+        #         entity_id=entity_id,
+        #         data_source_id=data_source_id,
+        #     )
+        #     self.session.add(conflict)
+
+        # entity = self.session.query(Entity).filter_by(id=entity_id).first()
+        # if entity:
+        #     entity.has_conflict = 1
+
+        # self.session.commit()
+        # self.logger.log(
+        #     f"🚫 Conflict detected for Gene '{symbol}' - submitted for curation",  # noqa E501
+        #     "WARNING",
+        # )
+        # return "CONFLICT"

@@ -63,7 +63,9 @@ class DataSource(Base):
     updated_at = Column(DateTime, default=utcnow, onupdate=utcnow)
 
     # Relationships
-    source_system = relationship("SourceSystem", back_populates="data_sources")  # noqa: E501
+    source_system = relationship(
+        "SourceSystem", back_populates="data_sources"
+    )  # noqa: E501
     # etl_processes = relationship(
     #     "ETLProcess", back_populates="data_source", cascade="all, delete-orphan"  # noqa: E501
     # )

@@ -1,0 +1,11 @@
+{
+    "allele_types": [
+        { "name": "ref" },
+        { "name": "sub" },
+        { "name": "del" },
+        { "name": "dup" },
+        { "name": "ins" },
+        { "name": "rep" },
+        { "name": "oth" }
+    ]
+}

@@ -36,7 +36,7 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
         self.conflict_mgr = ConflictManager(session, logger)
 
     # def extract(self, download_path):
-    def extract(self, raw_dir: str, source_url: str, last_hash: str):    
+    def extract(self, raw_dir: str, source_url: str, last_hash: str):
         """
         Extracts data from the HGNC API and stores it locally.
         Also computes a file hash to track content versioning.
@@ -149,7 +149,8 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
                 self.logger.log(msg, "ERROR")
                 return total_gene, load_status, msg
 
-            df = pd.read_csv(processed_path)
+            # df = pd.read_csv(processed_path)
+            df = pd.read_csv(processed_path, dtype=str)
 
         # Get Entity Group ID
         if not hasattr(self, "entity_group") or self.entity_group is None:
@@ -307,7 +308,7 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
             if gene is not None:
                 total_gene += 1
 
-                location = self.create_gene_location(
+                location = self.get_or_create_gene_location(
                     gene=gene,
                     chromosome=chromosome,
                     start=row.get("start"),

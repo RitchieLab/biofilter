@@ -115,8 +115,68 @@ class GeneQueryMixin:
         self.logger.log(msg, "DEBUG")
         return region
 
-    def get_or_create_gene_location(self):
-        pass
+    def get_or_create_gene_location(
+        self,
+        gene: Gene,
+        chromosome: str = None,
+        start: int = None,
+        end: int = None,
+        strand: str = None,
+        region: GenomicRegion = None,
+        assembly: str = "GRCh38",
+        data_source_id: int = None,
+    ):
+        """
+        GET or Create a location entry for the associated Gene.
+
+        Returns:
+            GeneLocation instance
+        """
+        if not gene:
+            msg = "⚠️ Gene Location invalid: Gene not provided"
+            self.logger.log(msg, "WARNING")
+            return None
+
+        # Check if the location already exists
+        existing_location = (
+            self.session.query(GeneLocation)
+            .filter_by(
+                gene_id=gene.id,
+                chromosome=chromosome,
+                start=start,
+                end=end,
+                strand=strand,
+                region_id=region.id if region else None,
+                assembly=assembly,
+                data_source_id=data_source_id,
+            )
+            .first()
+        )
+
+        if existing_location:
+            # msg = f"♻️ GeneLocation already exists for Gene '{gene.id}' on chromosome {chromosome}"  # noqa: E501
+            # self.logger.log(msg, "DEBUG")
+            return existing_location
+
+        # Create new if it does not exist
+        location = GeneLocation(
+            gene_id=gene.id,
+            chromosome=chromosome,
+            start=start,
+            end=end,
+            strand=strand,
+            region_id=region.id if region else None,
+            assembly=assembly,
+            data_source_id=data_source_id,
+        )
+
+        self.session.add(location)
+        self.session.commit()
+
+        msg = f"📌 GeneLocation created for Gene '{gene.id}' on chromosome {chromosome}"
+        self.logger.log(msg, "DEBUG")
+
+        return location
 
     def get_status_id(self, name: str) -> int:
         status = self.session.query(OmicStatus).filter_by(name=name).first()
@@ -239,46 +299,46 @@ class GeneQueryMixin:
 
         return gene, conflict_flag
 
-    def create_gene_location(
-        self,
-        gene: Gene,
-        chromosome: str = None,
-        start: int = None,
-        end: int = None,
-        strand: str = None,
-        region: GenomicRegion = None,
-        assembly: str = "GRCh38",
-        data_source_id: int = None,
-    ):
-        """
-        Create a location entry for the associated Gene.
+    # def create_gene_location(
+    #     self,
+    #     gene: Gene,
+    #     chromosome: str = None,
+    #     start: int = None,
+    #     end: int = None,
+    #     strand: str = None,
+    #     region: GenomicRegion = None,
+    #     assembly: str = "GRCh38",
+    #     data_source_id: int = None,
+    # ):
+    #     """
+    #     Create a location entry for the associated Gene.
 
-        Returns:
-            GeneLocation instance
-        """
-        if not gene:
-            msg = "⚠️ Gene Location invalid: Gene not provided"
-            self.logger.log(msg, "WARNING")
-            return None
+    #     Returns:
+    #         GeneLocation instance
+    #     """
+    #     if not gene:
+    #         msg = "⚠️ Gene Location invalid: Gene not provided"
+    #         self.logger.log(msg, "WARNING")
+    #         return None
 
-        location = GeneLocation(  # BUG: GeneLocation should be created only once         # noqa: E501
-            gene_id=gene.id,
-            chromosome=chromosome,
-            start=start,
-            end=end,
-            strand=strand,
-            region_id=region.id if region else None,
-            assembly=assembly,
-            data_source_id=data_source_id,
-        )
+    #     location = GeneLocation(  # BUG: GeneLocation should be created only once         # noqa: E501
+    #         gene_id=gene.id,
+    #         chromosome=chromosome,
+    #         start=start,
+    #         end=end,
+    #         strand=strand,
+    #         region_id=region.id if region else None,
+    #         assembly=assembly,
+    #         data_source_id=data_source_id,
+    #     )
 
-        self.session.add(location)
-        self.session.commit()
+    #     self.session.add(location)
+    #     self.session.commit()
 
-        msg = f"📌 GeneLocation created for Gene '{gene.id}' on chromosome {chromosome}"  # noqa E501
-        self.logger.log(msg, "DEBUG")
+    #     msg = f"📌 GeneLocation created for Gene '{gene.id}' on chromosome {chromosome}"  # noqa E501
+    #     self.logger.log(msg, "DEBUG")
 
-        return location
+    #     return location
 
     def parse_gene_groups(self, group_data) -> list:
         """

@@ -1,5 +1,5 @@
 from sqlalchemy import Column, Integer, String, Boolean
-
+# from sqlalchemy.orm import relationship
 # from sqlalchemy.orm import relationship
 from biofilter.db.base import Base
 import datetime
@@ -39,6 +39,9 @@ class Entity(Base):
     is_deactive = Column(
         Boolean, nullable=True, default=None
     )  # 🚫 Indica se foi desativada
+
+    # Relacionamento reverso com Variant
+    # variant = relationship("Variant", back_populates="entity", uselist=False)
 
     """
     📘 Interpretação no sistema:

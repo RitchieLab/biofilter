@@ -12,7 +12,7 @@ class DTPBase:
 
         response = requests.get(url, stream=True)
         if response.status_code != 200:
-            msg = f"Failed to download {filename}. HTTP Status: {response.status_code}"         # noqa: E501
+            msg = f"Failed to download {filename}. HTTP Status: {response.status_code}"  # noqa: E501
             return False, msg
 
         with open(local_path, "wb") as f:
@@ -39,7 +39,9 @@ class DTPBase:
 
     # File System Management Methods
     def get_path(self, path: str) -> Path:
-        raw_path_ds = Path(path) / self.datasource.source_system.name / self.datasource.name      # noqa: E501
+        raw_path_ds = (
+            Path(path) / self.datasource.source_system.name / self.datasource.name
+        )  # noqa: E501
         raw_path_ds.mkdir(parents=True, exist_ok=True)
         return raw_path_ds
 

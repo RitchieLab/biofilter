@@ -4,6 +4,7 @@ import glob
 import importlib
 from typing import Union, List
 from datetime import datetime
+
 # from collections.abc import Iterable
 from sqlalchemy.orm import Session
 from biofilter.utils.logger import Logger
@@ -237,7 +238,9 @@ class ETLManager:
         query = self.session.query(DataSource).filter_by(active=True)
 
         if source_system:
-            query = query.join(SourceSystem).filter(SourceSystem.name.in_(source_system))       # noqa: E501
+            query = query.join(SourceSystem).filter(
+                SourceSystem.name.in_(source_system)
+            )  # noqa: E501
 
         if data_sources:
             query = query.filter(DataSource.name.in_(data_sources))
@@ -246,7 +249,9 @@ class ETLManager:
 
         # Finish if no DataSources are found
         if not datasources_to_process:
-            self.logger.log("⚠️ No matching active DataSources found.", "WARNING")              # noqa: E501
+            self.logger.log(
+                "⚠️ No matching active DataSources found.", "WARNING"
+            )  # noqa: E501
             return
 
         for ds in datasources_to_process:
@@ -276,7 +281,8 @@ class ETLManager:
                 # EXTRACT PHASE
                 # if process.extract_status == "pending":
                 if "extract" in run_steps and (
-                    process.extract_status in ("pending", "completed", "failed")                # noqa E501
+                    process.extract_status
+                    in ("pending", "completed", "failed")  # noqa E501
                     or "extract" in force_steps
                 ):  # noqa E501
                     process.extract_start = datetime.now()
@@ -300,7 +306,7 @@ class ETLManager:
                             process.extract_status = "completed"
                             process.transform_status = "pending"
                             process.load_status = "pending"
-                            msg = f"Data changed for {ds.name}, reprocessing transform/load steps"              # noqa E501
+                            msg = f"Data changed for {ds.name}, reprocessing transform/load steps"  # noqa E501
                         else:
                             # No change detected, set transform/load phases to completed                        # noqa E501
                             process.extract_status = "completed"
