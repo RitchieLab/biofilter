@@ -125,7 +125,7 @@ class Gene(Base):
     locations = relationship(
         "GeneLocation", back_populates="gene", cascade="all, delete-orphan"
     )  # noqa E501
-    variant_links = relationship("GeneVariantLink", back_populates="gene", cascade="all, delete-orphan")
+    # variant_links = relationship("GeneVariantLink", back_populates="gene", cascade="all, delete-orphan")
 
     # Audit fields
     # created_at = Column(DateTime, default=utcnow)

@@ -10,21 +10,24 @@ import pandas as pd
 import __main__
 import sys
 from concurrent.futures import ProcessPoolExecutor, as_completed
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy import text
+
 
 from biofilter.etl.conflict_manager import ConflictManager
 from biofilter.etl.mixins.base_dtp import DTPBase
 from biofilter.etl.mixins.variant_query_mixin import VariantQueryMixin
 
-from biofilter.db.models.variants_models import Variant, VariantLocation, GeneVariantLink
+# from biofilter.db.models.variants_models import Variant, VariantLocation, GeneVariantLink
 from biofilter.db.models.omics_models import Gene
 
 
 from biofilter.db.models.variants_models import (
-    VariantType,
-    AlleleType,
+    # VariantType,
+    # AlleleType,
     GenomeAssembly,
     Variant,
-    VariantLocation,
+    # VariantLocation,
     GeneVariantLink,
 )
 
@@ -38,6 +41,10 @@ def transform_batch(lines_batch):
         last_build_id = record.get("last_update_build_id", None)
         primary_data = record.get("primary_snapshot_data", {})
         variant_type = primary_data.get("variant_type", None)
+
+        if variant_type != "snv":
+            continue
+        # Apos reuniao com a Molly, ela solicitou que apenas as snv fosse carregadas no sistama
 
         # Run only last build
         placements = primary_data.get("placements_with_allele", [])
@@ -225,21 +232,13 @@ class DTP(DTPBase, VariantQueryMixin):
             transform_df = pd.DataFrame(results)
 
             # # Buscar os valores do banco
-            # variant_type_map = {v.name: v.id for v in self.session.query(VariantType)}
-            # allele_type_map = {a.name: a.id for a in self.session.query(AlleleType)}
-            # assembly_map = {a.accession: a.id for a in self.session.query(GenomeAssembly)}
+            # variant_type_map = {v.name: str(v.id) for v in self.session.query(VariantType)}
+            # allele_type_map = {a.name: str(a.id) for a in self.session.query(AlleleType)}
+            assembly_map = {a.accession: str(a.id) for a in self.session.query(GenomeAssembly)}
 
             # # Mapear as colunas
             # transform_df["variant_type_id"] = transform_df["var_type"].map(variant_type_map)
             # transform_df["allele_type_id"] = transform_df["allele_type"].map(allele_type_map)
-            # transform_df["assembly_id"] = transform_df["seq_id"].map(assembly_map)
-
-            variant_type_map = {v.name: str(v.id) for v in self.session.query(VariantType)}
-            allele_type_map = {a.name: str(a.id) for a in self.session.query(AlleleType)}
-            assembly_map = {a.accession: str(a.id) for a in self.session.query(GenomeAssembly)}
-
-            transform_df["variant_type_id"] = transform_df["var_type"].map(variant_type_map)
-            transform_df["allele_type_id"] = transform_df["allele_type"].map(allele_type_map)
             transform_df["assembly_id"] = transform_df["seq_id"].map(assembly_map)
 
             column_order = [
@@ -248,13 +247,13 @@ class DTP(DTPBase, VariantQueryMixin):
                 "seq_id",
                 "assembly_id",
                 "var_type",
-                "variant_type_id",
+                # "variant_type_id",
                 "hgvs",
                 "position_base_1",
                 "position_start",
                 "position_end",
                 "allele_type",
-                "allele_type_id",
+                # "allele_type_id",
                 "allele",
                 "gene_ids",
             ]
@@ -275,93 +274,6 @@ class DTP(DTPBase, VariantQueryMixin):
             return None, False, msg
 
     # # 🚧 🚜 In developing
-    # def load(self, df=None, processed_path=None):
-    #     total_variant = 0  # not considered conflict genes
-    #     load_status = False
-    #     message = ""
-
-    #     data_source_id = self.datasource.id
-
-    #     # Models that will be used to store the data
-    #     # - VariantType,
-    #     # - AlleleType,
-    #     # - GenomeAssembly,
-    #     # - Variant,
-    #     # - VariantLocation,
-    #     # - GeneVariantLink,
-
-    #     if df is None:
-    #         if not processed_path:
-    #             msg = "Either 'df' or 'processed_path' must be provided."
-    #             self.logger.log(msg, "ERROR")
-    #             return total_variant, load_status, message
-    #             # raise ValueError(msg)
-    #         msg = f"Loading data from {processed_path}"
-    #         self.logger.log(msg, "INFO")
-
-    #         # PROCESSED DATA
-    #         processed_path = self.get_path(processed_path)
-    #         processed_data = str(processed_path) + "/processed_data.csv"
-
-    #         if not os.path.exists(processed_data):
-    #             msg = f"File not found: {processed_data}"
-    #             self.logger.log(msg, "ERROR")
-    #             return total_variant, load_status, msg
-
-    #         df = pd.read_csv(processed_data, dtype=str)
-
-    #     variant_group_cols = ["build_id", "rs_id", "assembly_id", "variant_type_id"]
-
-    #     # Agrupa e remove duplicatas (mantém apenas uma linha por variante)
-    #     df_variants = df[variant_group_cols].drop_duplicates()
-
-    #     # Preparar os dfs para cargas
-    #     # 1. Criar um DS para carregar na Variants
-    #     # 2. Criar um DS para carregar na Locations
-    #     # 3. Criar um DS para carregar na Gene x Variant
-
-    #     """"
-    #     build_id,   rs_id,      seq_id,         assembly_id,    var_type,   variant_type_id,    hgvs,position_base_1,           position_start,position_end,allele_type,allele_type_id,allele,gene_ids
-    #     157,        2086265909, NC_000024.10,   24,             ins,        7,                  NC_000024.10:g.1176407_1176408=,1176408,1176407,1176408,ref,1,,[]
-    #     157,        2086265909, NC_000024.10,   24,             ins,        7,                  NC_000024.10:g.1176407_1176408insAATAATAATAATAGATTATAATTATAAAATAATAATAAAATATTATTATTAT,1176408,1176407,1176408,oth,7,AATAATAATAATAGATTATAATTATAAAATAATAATAAAATATTATTATTAT,[]
-
-    #     Variants Model
-    #     build_id           build_id
-    #     rs_id              external_id
-    #     seq_id             
-    #     assembly_id        assembly_id
-    #     var_type           
-    #     variant_type_id    variant_type_id
-    #     hgvs               object
-    #     position_base_1    object
-    #     position_start     object
-    #     position_end       object
-    #     allele_type        object
-    #     allele_type_id     object
-    #     allele             object
-    #     gene_ids           object
-    #     dtype: object
-    #     """
-
-    #     for _, row in df_variants.iterrows():
-    #         status = self.get_or_create_variant(row, data_source_id)
-
-
-
-
-    #             # o que fazer aqui:
-    #             # Carregar a tabela de variant
-    #             # Carregar a tabela de Locations
-    #             # Carregar a gene x Variant
-
-    #             # try:
-    #             #     variant_mgr.get_or_create_variant(row, datasource_id=self.datasource.id)
-    #             #     total_variant += 1
-    #             # except Exception as e:
-    #             #     self.logger.log(f"❌ Failed to load variant {row['rs_id']}: {str(e)}", "WARNING")
-
-    #     return True
-
     def load(self, df=None, processed_path=None, chunk_size=100_000):
         total_variants = 0
         load_status = False
@@ -387,230 +299,121 @@ class DTP(DTPBase, VariantQueryMixin):
 
             self.logger.log(f"📥 Reading data in chunks from {processed_data}", "INFO")
 
-            try:
-                for chunk_df in pd.read_csv(processed_data, dtype=str, chunksize=chunk_size):
-                    self.logger.log(f"⚙️ Processing chunk with {len(chunk_df)} rows...", "INFO")
-                    n = self._process_chunk(chunk_df, data_source_id)
-                    total_variants += n
+            df = pd.read_csv(processed_data, dtype=str)
 
-                msg = f"✅ Loaded {total_variants} variant records successfully."
-                self.logger.log(msg, "INFO")
-                return total_variants, True, msg
+        # Apaga os dados da tabela de links
+        self.session.query(GeneVariantLink).filter_by(data_source_id=self.datasource.id).delete()
 
-            except Exception as e:
-                msg = f"❌ ETL Load failed: {str(e)}"
-                self.logger.log(msg, "ERROR")
-                return total_variants, False, msg
+        # Opcional: apagar também os variants, se desejar
+        self.session.query(Variant).filter_by(data_source_id=self.datasource.id).delete()
 
-        else:
-            # 🔁 fallback para df em memória
-            n = self._process_chunk(df, data_source_id)
-            total_variants += n
-            return total_variants, True, "Loaded from in-memory DataFrame."
+        self.session.commit()
+        self.logger.log("🗑️ Previous records deleted for this data source", "INFO")
 
-    def _process_chunk(self, df_chunk, data_source_id):
+        # 🧼 Limpeza de dados
+        # df["position"] = df["position_base_1"].astype(int)
+        # df["assembly_id"] = df["assembly_id"].astype(int)
+        # df["chromosome"] = df["assembly_id"].astype(str) # Adicionar o Cromossmo do CSV
+        df["ref"] = ''
+        df["alt"] = ''
+        # df["rs_id"] = df["rs_id"].astype(str)
 
-        variant_cache = {}  # rs_id -> variant_id
-        gene_cache = {}     # entrez_id -> gene_id
-        gene_variant_seen = set()
-        location_seen = set()
+        # Isola os registros do tipo 'ref' para obter o alelo de referência
+        df_ref = df[df["allele_type"] == "ref"].copy()
+        df_ref = df_ref[["rs_id", "position_base_1", "assembly_id", "allele"]].drop_duplicates("rs_id")
 
+        # Agrupa os alternativos por rs_id e junta os diferentes ALT
+        df_alt = (
+            df[df["allele_type"] == "sub"]
+            .groupby("rs_id")["allele"]
+            .agg(lambda alleles: "/".join(sorted(set(alleles))))
+            .reset_index()
+            .rename(columns={"allele": "alt"})
+        )
+
+        # 🔄 Certifique-se de que os tipos são iguais para merge
+        df_ref["rs_id"] = df_ref["rs_id"].astype(str)
+        df_alt["rs_id"] = df_alt["rs_id"].astype(str)
+
+        # Junta ref + alt
+        df_variants = df_ref.merge(df_alt, on="rs_id", how="left")
+        df_variants["alt"] = df_variants["alt"].fillna("")  # pode haver variante sem alt
+
+        # Vou apagar quem nao tem assenmbly_id
+        df_variants = df_variants.dropna(subset=["assembly_id", "position_base_1"])
+
+        df_variants["assembly_id"] = df_variants["assembly_id"].astype(int)
+        df_variants["position_base_1"] = df_variants["position_base_1"].astype(int)
+
+        # 🔄 Inserção em batch
         variants_to_insert = []
-        location_cache = set()
-        gene_variant_cache = set()
-
-        for _, row in df_chunk.iterrows():
-            # rs_id = row["rs_id"]
-            # build_id = int(row["build_id"])
-            # assembly_id = int(row["assembly_id"])
-            # variant_type_id = int(row["variant_type_id"])
-            # allele_type_id = int(row["allele_type_id"]) if row["allele_type_id"] else None
-            rs_id = row.get("rs_id")
-
-            # Campos obrigatórios — necessário logar erro se faltarem
-            # if pd.isna(rs_id) or pd.isna(row.get("assembly_id")) or pd.isna(row.get("variant_type_id")):
-            #     self.logger.log(f"⚠️ Skipping row with missing critical fields: {row.to_dict()}", "WARNING")
-            #     continue
-
-            # Conversão segura com fallback para None
-            # TODO: Precisamos de um padrão para os IDs?
-            try:
-                assembly_id = int(row["assembly_id"])
-            except (ValueError, TypeError):
-                assembly_id = 1
-
-            try:
-                variant_type_id = int(row["variant_type_id"])
-            except (ValueError, TypeError):
-                variant_type_id = 1
-
-            try:
-                allele_type_id = int(row["allele_type_id"]) if not pd.isna(row["allele_type_id"]) else None
-            except (ValueError, TypeError):
-                allele_type_id = 1
-
-            try:
-                build_id = int(row["build_id"]) if not pd.isna(row["build_id"]) else None
-            except (ValueError, TypeError):
-                build_id = 1
-
-
-            # 🔄 Skip if already created in this chunk
-            if rs_id not in variant_cache:
-
-                # Check if the variant already exists in the database
-                variant = (
-                    self.session.query(Variant)
-                    .filter_by(
-                        external_id=rs_id,
-                        assembly_id=assembly_id,
-                        variant_type_id=variant_type_id,
-                    )
-                    .first()
-                )
-
-                if not variant:
-                    variant = Variant(
-                        external_id=rs_id,
-                        # build_id=build_id,
-                        assembly_id=assembly_id,
-                        variant_type_id=variant_type_id,
-                        data_source_id=data_source_id,
-                        entity_id=1  # placeholder
-                    )
-                    self.session.add(variant)
-                    self.session.flush()  # get variant.id
-
-                variant_cache[rs_id] = variant.id
-
-            variant_id = variant_cache[rs_id]
-
-            # LOCATIONS
-            # Key para deduplicar localizações no chunk
-            location_key = (
-                variant_id,
-                row["hgvs"],
-                int(row["position_base_1"]),
-                int(row["position_start"]),
-                int(row["position_end"]),
-                allele_type_id,
-                row["allele"]
+        for _, row in df_variants.iterrows():
+            variant = Variant(
+                rs_id=row["rs_id"],
+                position=row["position_base_1"],
+                assembly_id=row["assembly_id"],
+                chromosome=row["assembly_id"],
+                ref=row["allele"],
+                alt=row["alt"],
+                data_source_id=data_source_id
             )
+            variants_to_insert.append(variant)
 
-            if location_key not in location_cache:
-                exists = self.session.query(VariantLocation).filter_by(
-                    variant_id=variant_id,
-                    hgvs=row["hgvs"],
-                    # position_base_1=int(row["position_base_1"]),
-                    # position_start=int(row["position_start"]),
-                    # position_end=int(row["position_end"]),
-                    # allele_type_id=allele_type_id,
-                    # allele=row["allele"]
-                ).first()
+        try:
+            self.session.bulk_save_objects(variants_to_insert)
+            self.session.commit()
+            total_inserted = len(variants_to_insert)
+            load_status = True
+            message = f"✅ Loaded {total_inserted} variants into database."
+            self.logger.log(message, "SUCCESS")
 
-                if not exists:
-                    loc = VariantLocation(
-                        variant_id=variant_id,
-                        assembly_id=assembly_id,
-                        hgvs=row["hgvs"],
-                        position_base_1=int(row["position_base_1"]),
-                        position_start=int(row["position_start"]),
-                        position_end=int(row["position_end"]),
-                        allele_type_id=allele_type_id,
-                        allele=row["allele"]
-                    )
-                    self.session.add(loc)
-                    self.session.flush()
+        except IntegrityError as e:
+            self.session.rollback()
+            message = f"❌ Integrity error during load: {str(e)}"
+            self.logger.log(message, "ERROR")
 
-                location_cache.add(location_key)
+        # Processar os genes variantes links
+        # 1. Remove registros sem genes
+        df_links = df[df["gene_ids"].notna() & (df["gene_ids"] != "[]")].copy()
 
-            # GENE VARIANT LINK
-            gene_ids = ast.literal_eval(row["gene_ids"]) if isinstance(row["gene_ids"], str) else row["gene_ids"]
-            for entrez_id in gene_ids:
-                if entrez_id not in gene_cache:
-                    gene = self.session.query(Gene).filter_by(entrez_id=str(entrez_id)).first()
-                    if gene:
-                        gene_cache[entrez_id] = gene.id
-                    else:
-                        continue
+        df_links = df_links[["rs_id", "gene_ids"]].drop_duplicates("rs_id")
 
-                gene_id = gene_cache[entrez_id]
-                link_key = (gene_id, variant_id)
+        # 2. Converte string para lista (se necessário)
+        df_links["gene_ids"] = df_links["gene_ids"].apply(
+            lambda x: ast.literal_eval(x) if isinstance(x, str) else x
+        )
 
-                if link_key not in gene_variant_cache:
-                    exists = self.session.query(GeneVariantLink).filter_by(
-                        gene_id=gene_id,
-                        variant_id=variant_id
-                    ).first()
+        # 3. Explode o campo gene_ids
+        df_links = df_links.explode("gene_ids")
 
-                    if not exists:
-                        link = GeneVariantLink(gene_id=gene_id, variant_id=variant_id)
-                        self.session.add(link)
-                        self.session.flush()
+        # 5. (Opcional) Converte tipos para segurança
+        df_links["gene_ids"] = df_links["gene_ids"].astype(int)
+        df_links["rs_id"] = df_links["rs_id"].astype(str)
 
-                    gene_variant_cache.add(link_key)
+        links_to_insert = []
 
+        for _, row in df_links.iterrows():
+            link = GeneVariantLink(
+                gene_id=row["gene_ids"],
+                variant_id=row["rs_id"],
+                data_source_id=data_source_id
+            )
+            links_to_insert.append(link)
 
-        #     location_key = (
-        #         variant_id,
-        #         row["hgvs"],
-        #         int(row["position_start"]),
-        #         int(row["position_end"]),
-        #         row["allele"],
-        #     )
+        self.session.bulk_save_objects(links_to_insert)
+        self.session.commit()
+        self.logger.log(f"✅ Inserted {len(links_to_insert)} gene-variant links", "INFO")
 
-        #     if location_key not in location_seen:
-        #         location_seen.add(location_key)
-
-        #         # locations_to_insert.append(VariantLocation(
-        #         #     variant_id=variant_id,
-        #         #     assembly_id=assembly_id,
-        #         #     hgvs=row["hgvs"],
-        #         #     position_base_1=int(row["position_base_1"]),
-        #         #     position_start=int(row["position_start"]),
-        #         #     position_end=int(row["position_end"]),
-        #         #     allele_type_id=allele_type_id,
-        #         #     allele=row["allele"]
-        #         # ))
-        #         location = VariantLocation(
-        #             variant_id=variant_id,
-        #             assembly_id=assembly_id,
-        #             hgvs=row["hgvs"],
-        #             position_base_1=int(row["position_base_1"]),
-        #             position_start=int(row["position_start"]),
-        #             position_end=int(row["position_end"]),
-        #             allele_type_id=allele_type_id,
-        #             allele=row["allele"]
-        #         )
-        #         self.session.merge(location)
-
-
-        #     # GENES
-        #     # ✅ Process gene links (deduplicated)
-        #     gene_ids = ast.literal_eval(row["gene_ids"]) if isinstance(row["gene_ids"], str) else row["gene_ids"]
-        #     for entrez_id in gene_ids:
-        #         if entrez_id not in gene_cache:
-        #             gene = self.session.query(Gene).filter_by(entrez_id=str(entrez_id)).first()
-        #             if gene:
-        #                 gene_cache[entrez_id] = gene.id
-        #             else:
-        #                 continue
-
-        #         gene_id = gene_cache[entrez_id]
-        #         link = GeneVariantLink(gene_id=gene_id, variant_id=variant_id)
-        #         self.session.merge(link)
-        #         # key = (gene_id, variant_id)
-
-        #         # if key not in gene_variant_seen:
-        #         #     gene_variant_seen.add(key)
-        #         #     links_to_insert.append(GeneVariantLink(
-        #         #         gene_id=gene_id,
-        #         #         variant_id=variant_id
-        #         #     ))
-
-        # # 🔄 Commit all batch inserts
-        # # self.session.bulk_save_objects(locations_to_insert)
-        # # self.session.bulk_save_objects(links_to_insert)
+        # Manutencao:
+        self.session.execute(text("VACUUM"))
         self.session.commit()
 
-        return len(variant_cache)
+        self.session.execute(text("DROP INDEX IF EXISTS uq_gene_variant"))
+        self.session.execute(text("""
+            CREATE UNIQUE INDEX uq_gene_variant 
+            ON gene_variant_links (gene_id, variant_id)
+        """))
+        self.session.commit()
+        # TODO criar um methodo optimize_database() para essas tarefas
+
+        return total_inserted, load_status, message

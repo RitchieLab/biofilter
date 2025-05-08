@@ -19,7 +19,7 @@ from .variants_models import (
     AlleleType,
     GenomeAssembly,
     Variant,
-    VariantLocation,
+    # VariantLocation,
     GeneVariantLink,
 )
 
@@ -49,6 +49,6 @@ __all__ = [
     "AlleleType",
     "GenomeAssembly",
     "Variant",
-    "VariantLocation",
+    # "VariantLocation",
     "GeneVariantLink",
 ]

@@ -7,17 +7,18 @@ bf = Biofilter(db_uri)
 # bf.update(source_system=["HGNC"])
 # bf.update(source_system=["HGNC"], run_steps=["load"], force_steps=["load"])
 # bf.update(data_sources=["dbSNP_chrY"], run_steps=["load"], force_steps=["load"])
-# bf.update(data_sources=["dbSNP_chrX"])
+# bf.update(data_sources=["dbSNP_chr22"])
 # bf.update(source_system=["dbSNP"], run_steps=["extract"], force_steps=["extract"])
-bf.update(
-    data_sources=["dbSNP_chrY"], run_steps=["load"], force_steps=["load"]
-)
 # bf.update(
-#     data_sources=["dbSNP_SAMPLE"], run_steps=["transform"], force_steps=["transform"]
+#     data_sources=["dbSNP_chrY"], run_steps=["load"], force_steps=["load"]
 # )
+bf.update(
+    data_sources=["dbSNP_chr22"], run_steps=["load"], force_steps=["load"]
+)
 # bf.update(
 #     data_sources=["dbSNP_SAMPLE"], run_steps=["load"], force_steps=["load"]
 # )
+
 
 print("Database updated successfully.")
 

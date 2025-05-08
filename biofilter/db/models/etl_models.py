@@ -69,6 +69,7 @@ class DataSource(Base):
     # etl_processes = relationship(
     #     "ETLProcess", back_populates="data_source", cascade="all, delete-orphan"  # noqa: E501
     # )
+    variants = relationship("Variant", back_populates="data_source")
 
 
 # ETL DOMAINS
