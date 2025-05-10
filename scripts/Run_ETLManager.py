@@ -13,7 +13,7 @@ bf = Biofilter(db_uri)
 #     data_sources=["dbSNP_chrY"], run_steps=["load"], force_steps=["load"]
 # )
 bf.update(
-    data_sources=["dbSNP_chr22"], run_steps=["load"], force_steps=["load"]
+    data_sources=["Reactome_Pathways"], run_steps=["extract"], force_steps=["extract"]
 )
 # bf.update(
 #     data_sources=["dbSNP_SAMPLE"], run_steps=["load"], force_steps=["load"]

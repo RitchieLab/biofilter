@@ -223,6 +223,14 @@
             "transform_status": "pending",
             "load_status": "pending",
             "dtp_script": "dtp_dbsnp"
+        },
+        {
+            "data_source": "Reactome_Pathways",
+            "global_status": "pending",
+            "extract_status": "pending",
+            "transform_status": "pending",
+            "load_status": "pending",
+            "dtp_script": "dtp_reactome"
         }
 
     ]

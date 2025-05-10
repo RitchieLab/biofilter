@@ -17,6 +17,12 @@
             "description": "NCBI Single Nucleotide Polymorphism Database",
             "homepage": "https://www.ncbi.nlm.nih.gov/snp",
             "active": true
+        },
+        {
+            "name": "Reactome",
+            "description": "xxxxxxx",
+            "homepage": "https://reactome.org/",
+            "active": true
         }
     ]
 }

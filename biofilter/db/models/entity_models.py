@@ -69,6 +69,7 @@ class Entity(Base):
     # cascade="all,
     # delete-orphan"
     # )
+    # pathway = relationship("Pathway", back_populates="entity", uselist=False)
 
 
 class EntityName(Base):

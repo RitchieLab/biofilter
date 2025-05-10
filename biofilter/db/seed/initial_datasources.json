@@ -323,6 +323,18 @@
             "dtp_script": "dtp_dbsnp",
             "last_status": "pending",
             "active": true
+        },
+        {
+            "source_system": "Reactome",
+            "name": "Reactome_Pathways",
+            "data_type": "Pathway",
+            "source_url": "https://reactome.org/download/current/",
+            "format": "TXT",
+            "grch_version": "GRCh38",
+            "ucschg_version": "hg38",
+            "dtp_script": "dtp_reactome",
+            "last_status": "pending",
+            "active": true
         }
     ]
 } 

@@ -22,6 +22,7 @@ from .variants_models import (
     # VariantLocation,
     GeneVariantLink,
 )
+from .pathway_models import Pathway
 
 __all__ = [
     # # CONFIGURATION MODELS
@@ -51,4 +52,5 @@ __all__ = [
     "Variant",
     # "VariantLocation",
     "GeneVariantLink",
+    "Pathway",
 ]
