@@ -1,7 +1,7 @@
 import re
 import ast
 import pandas as pd
-from biofilter.db.models.omics_models import (
+from biofilter.db.models.genes_models import (
     Gene,
     GeneGroup,
     GeneGroupMembership,

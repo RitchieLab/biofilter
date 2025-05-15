@@ -1,12 +1,12 @@
 from .config_models import SystemConfig
 
-from .omics_models import Gene, GeneGroup
+from .genes_models import Gene, GeneGroup
 from .etl_models import DataSource, SourceSystem, ETLProcess, ETLLog
 from .entity_models import (
     EntityGroup,
     Entity,
     EntityName,
-    RelationshipType,
+    EntityRelationshipType,
     EntityRelationship,
 )
 from .curation_models import (
@@ -39,7 +39,7 @@ __all__ = [
     "EntityGroup",
     "Entity",
     "EntityName",
-    "RelationshipType",
+    "EntityRelationshipType",
     "EntityRelationship",
     # CURATION MODELS
     "ConflictStatus",

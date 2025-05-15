@@ -29,45 +29,64 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
         self.etl_process = etl_process
         self.session = session
         self.use_conflict_csv = use_conflict_csv
-
-        self.HGNC_API_URL = "https://rest.genenames.org/fetch/all"
-        self.file_name = "hgnc_data.json"
-
         self.conflict_mgr = ConflictManager(session, logger)
 
-    # def extract(self, download_path):
-    def extract(self, raw_dir: str, source_url: str, last_hash: str):
+    def extract(self, raw_dir: str, force_steps: bool):
         """
-        Extracts data from the HGNC API and stores it locally.
+        Download data from the HGNC API and stores it locally.
         Also computes a file hash to track content versioning.
         """
 
-        message = ""
+        msg = ""
+        source_url = self.datasource.source_url
+        if force_steps:
+            last_hash = ""
+            msg = "Ignoring hash check."
+            self.logger.log(msg, "WARNING")
+        else:
+            last_hash = self.etl_process.raw_data_hash
 
         try:
-            raw_file = os.path.join(raw_dir, "hgnc", self.file_name)
-            os.makedirs(os.path.dirname(raw_file), exist_ok=True)
+            # Landing directory
+            landing_path = os.path.join(
+                raw_dir,
+                self.datasource.source_system.name,
+                self.datasource.name,
+            )
+            os.makedirs(landing_path, exist_ok=True)
+            file_path = os.path.join(landing_path, "hgnc_data.json")
+
+            # Download the file
+            msg = f"⬇️ Fetching JSON from API: {source_url} ..."
+            self.logger.log(msg, "INFO")
 
             headers = {"Accept": "application/json"}
-            response = requests.get(self.HGNC_API_URL, headers=headers)
+            response = requests.get(source_url, headers=headers)
 
             if response.status_code != 200:
                 msg = f"Failed to fetch data from HGNC: {response.status_code}"
-                raise Exception(msg)
+                self.logger.log(msg, "ERROR")
+                return False, msg, None
 
-            with open(raw_file, "w") as f:
+            with open(file_path, "w") as f:
                 f.write(response.text)
 
-            message = f"HGNC data extracted and saved at {raw_file}"
+            # Compute hash and compare
+            current_hash = compute_file_hash(file_path)
+            if current_hash == last_hash:
+                msg = f"No change detected in {file_path}"
+                self.logger.log(msg, "INFO")
+                return False, msg, current_hash
 
-            file_hash = compute_file_hash(raw_file)
-
-            return True, message, file_hash
+            # Finish block
+            msg = f"✅ HGNC file downloaded to {file_path}"
+            self.logger.log(msg, "INFO")
+            return True, msg, current_hash
 
         except Exception as e:
-            message = f"❌ Error during extraction: {e}"
-
-            return False, message, None
+            msg = f"❌ ETL extract failed: {str(e)}"
+            self.logger.log(msg, "ERROR")
+            return False, msg, None
 
     def transform(self, raw_path, processed_path):
         message = ""

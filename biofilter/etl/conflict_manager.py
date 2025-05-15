@@ -7,7 +7,7 @@ from typing import Optional
 
 from biofilter.utils.logger import Logger
 from biofilter.db.models.entity_models import Entity, EntityName
-from biofilter.db.models.omics_models import Gene, OmicStatus
+from biofilter.db.models.genes_models import Gene, OmicStatus
 from biofilter.db.models.curation_models import (
     CurationConflict,
     ConflictStatus,

@@ -87,8 +87,17 @@ class EntityName(Base):
     # entity = relationship("Entity", back_populates="names")
 
 
-class RelationshipType(Base):
-    __tablename__ = "relationship_types"
+# class RelationshipType(Base):
+#     __tablename__ = "relationship_types"
+
+#     id = Column(Integer, primary_key=True, autoincrement=True)
+#     # code ex: "is_a", "part_of", "regulates"
+#     code = Column(String, unique=True, nullable=False)
+#     # desc ex: "Subclass of", "Part of structure"
+#     description = Column(String, nullable=True)
+
+class EntityRelationshipType(Base):
+    __tablename__ = "entity_relationship_types"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     # code ex: "is_a", "part_of", "regulates"
@@ -98,7 +107,7 @@ class RelationshipType(Base):
 
 
 class EntityRelationship(Base):
-    __tablename__ = "entityrelationships"
+    __tablename__ = "entity_relationships"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     entity_1_id = Column(Integer, nullable=False)
@@ -110,6 +119,7 @@ class EntityRelationship(Base):
     relationship_type_id = Column(Integer, nullable=False)
     # role = Column(String, nullable=True)
     # created_at = Column(DateTime, default=utcnow)
+    datasource_id = Column(Integer, nullable=False)
 
 
 """

@@ -285,6 +285,12 @@ class ETLManager:
                     in ("pending", "completed", "failed")  # noqa E501
                     or "extract" in force_steps
                 ):  # noqa E501
+                    
+                    if force_steps:
+                        force_flag = True
+                    else:
+                        force_flag = False
+
                     process.extract_start = datetime.now()
                     process.extract_status = "running"
                     self.session.commit()
@@ -293,8 +299,9 @@ class ETLManager:
                     )  # noqa E501
                     status, message, file_hash = dtp_instance.extract(
                         raw_dir=download_path,
-                        source_url=ds.source_url,
-                        last_hash=process.raw_data_hash,
+                        force_steps=force_flag,
+                        # source_url=ds.source_url, # TODO: Add this to the DTP class
+                        # last_hash=process.raw_data_hash, # TODO Use internal class call
                     )  # noqa E501
                     process.extract_end = datetime.now()
 

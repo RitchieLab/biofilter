@@ -10,13 +10,17 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy import text
 
+
 from biofilter.etl.conflict_manager import ConflictManager
 from biofilter.etl.mixins.base_dtp import DTPBase
 from biofilter.etl.mixins.variant_query_mixin import VariantQueryMixin
 
 from biofilter.db.models.variants_models import (
+    # VariantType,
+    # AlleleType,
     GenomeAssembly,
     Variant,
+    # VariantLocation,
     GeneVariantLink,
 )
 
@@ -175,6 +179,11 @@ class DTP(DTPBase, VariantQueryMixin):
             msg = f"❌ ETL extract failed: {str(e)}"
             self.logger.log(msg, "ERROR")
             return False, msg, None
+
+
+
+
+
 
 
     def transform(self, raw_path, processed_path):

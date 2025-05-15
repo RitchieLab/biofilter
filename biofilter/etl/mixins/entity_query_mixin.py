@@ -1,5 +1,5 @@
 from sqlalchemy.exc import IntegrityError
-from biofilter.db.models.entity_models import Entity, EntityName
+from biofilter.db.models.entity_models import Entity, EntityName, EntityRelationship
 
 
 class EntityQueryMixin:
@@ -88,3 +88,54 @@ class EntityQueryMixin:
             msg = f"⚠️ Couldn't add alias '{clean_name}' to Entity {entity_id}"
             self.logger.log(msg, "WARNING")
             return False
+
+    def get_or_create_entity_relationship(
+        self,
+        entity_1_id: int,
+        entity_2_id: int,
+        relationship_type_id: int,
+        data_source_id: int,
+    ):
+        """
+        Get or create an EntityRelationship.
+        Ensures that no duplicates are created.
+        """
+
+        # Check if relationship already exists
+        rel = (
+            self.session.query(EntityRelationship)
+            .filter_by(
+                entity_1_id=entity_1_id,
+                entity_2_id=entity_2_id,
+                relationship_type_id=relationship_type_id,
+                datasource_id=data_source_id,
+            )
+            .first()
+        )
+
+        if rel:
+            return False  # Already exists
+
+        # Create new relationship
+        rel = EntityRelationship(
+            entity_1_id=entity_1_id,
+            entity_2_id=entity_2_id,
+            relationship_type_id=relationship_type_id,
+            datasource_id=data_source_id,
+        )
+
+        self.session.add(rel)
+
+        return True
+
+        # Nao realizando o commit aqui, pois o commit deve ser feito no final do ETL
+        # try:
+        #     self.session.commit()
+        #     msg = f"✅ Added relationship {entity_1_id} -> {entity_2_id} (type {relationship_type_id})"
+        #     self.logger.log(msg, "DEBUG")
+        #     return True
+        # except IntegrityError:
+        #     self.session.rollback()
+        #     msg = f"⚠️ IntegrityError adding relationship {entity_1_id} -> {entity_2_id} (type {relationship_type_id})"
+        #     self.logger.log(msg, "WARNING")
+        #     return False

@@ -4,7 +4,7 @@
             "source_system": "HGNC",
             "name": "hgnc_genes",
             "data_type": "Gene",
-            "source_url": "https://rest.genenames.org/fetch/all",
+            "source_url": "https://rest.genenames.org/fetch/all/hgnc_data.json",
             "format": "JSON",
             "grch_version": "GRCh38",
             "ucschg_version": "hg38",

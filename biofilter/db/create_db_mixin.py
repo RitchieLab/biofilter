@@ -62,8 +62,14 @@ class CreateDBMixin:
             key="entity_groups",
         )
         self._seed_from_json(
+            f"{seed_dir}/initial_entity_relationship_types.json",
+            "entity_models",
+            "EntityRelationshipType",
+            key="entity_relationship_types",
+        )
+        self._seed_from_json(
             f"{seed_dir}/initial_omic_status.json",
-            "omics_models",
+            "genes_models",
             "OmicStatus",
             key="omic_status",
         )

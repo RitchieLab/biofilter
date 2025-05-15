@@ -1,6 +1,6 @@
 import pytest
 from sqlalchemy.exc import IntegrityError
-from biofilter.db.models.omics_models import (
+from db.models.genes_models import (
     Gene,
     GeneGroup,
     LocusGroup,

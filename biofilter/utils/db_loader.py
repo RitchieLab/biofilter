@@ -10,9 +10,10 @@ def load_all_models():
     import_module("biofilter.db.models.config_models")
     import_module("biofilter.db.models.etl_models")
     import_module("biofilter.db.models.entity_models")
-    import_module("biofilter.db.models.omics_models")
+    import_module("biofilter.db.models.genes_models")
     import_module("biofilter.db.models.curation_models")
     import_module("biofilter.db.models.variants_models")
+    import_module("biofilter.db.models.pathway_models")
 
     # NOTE: Will be removed in the future
     # import_module("biofilter.db.models.loki_models")

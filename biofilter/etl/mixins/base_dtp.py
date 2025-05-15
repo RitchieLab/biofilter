@@ -2,6 +2,7 @@ import os
 import requests
 from pathlib import Path
 from typing import Optional
+from biofilter.utils.file_hash import compute_file_hash
 
 
 class DTPBase:
@@ -15,13 +16,15 @@ class DTPBase:
             msg = f"Failed to download {filename}. HTTP Status: {response.status_code}"  # noqa: E501
             return False, msg
 
+        msg = f"⬇️  Downloading {filename} ..."
+        self.logger.log(msg, "INFO")
+
         with open(local_path, "wb") as f:
             for chunk in response.iter_content(chunk_size=1024):
                 if chunk:
                     f.write(chunk)
 
         msg = f"Downloaded {filename} to {landing_dir}"
-
         return True, msg
 
     def get_md5_from_url_file(self, url_md5: str) -> Optional[str]:

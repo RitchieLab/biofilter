@@ -136,7 +136,7 @@ class ETLProcess(Base):
         nullable=True,  # noqa: E501
     )
 
-    dtp_script = Column(String, nullable=False)
+    # dtp_script = Column(String, nullable=False)
 
     raw_data_hash = Column(String, nullable=True)
     process_data_hash = Column(String, nullable=True)

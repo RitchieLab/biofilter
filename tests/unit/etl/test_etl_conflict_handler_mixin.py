@@ -1,4 +1,4 @@
-from biofilter.db.models.omics_models import Gene
+from db.models.genes_models import Gene
 from biofilter.db.models.entity_models import Entity
 from biofilter.db.models.curation_models import (
     CurationConflict,
