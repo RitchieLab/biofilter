@@ -17,7 +17,7 @@ from biofilter.etl.mixins.variant_query_mixin import VariantQueryMixin
 from biofilter.db.models.variants_models import (
     GenomeAssembly,
     Variant,
-    GeneVariantLink,
+    VariantGeneRelationship,
 )
 
 
@@ -86,21 +86,24 @@ def transform_batch(lines_batch):
                 else:
                     allele_type = "oth"
 
-                results.append({
-                    "rs_id": rs_id,
-                    "build_id": last_build_id,
-                    "seq_id": seq_id,
-                    "var_type": variant_type,
-                    "hgvs": hgvs,
-                    "position_base_1": position_base_1,
-                    "position_start": pos_start,
-                    "position_end": pos_end,
-                    "allele_type": allele_type,
-                    "allele": alt_seq,
-                    "gene_ids": list(gene_ids),
-                })
+                results.append(
+                    {
+                        "rs_id": rs_id,
+                        "build_id": last_build_id,
+                        "seq_id": seq_id,
+                        "var_type": variant_type,
+                        "hgvs": hgvs,
+                        "position_base_1": position_base_1,
+                        "position_start": pos_start,
+                        "position_end": pos_end,
+                        "allele_type": allele_type,
+                        "allele": alt_seq,
+                        "gene_ids": list(gene_ids),
+                    }
+                )
 
     return results
+
 
 # TODO: Ajustar o source_url
 
@@ -115,20 +118,27 @@ class DTP(DTPBase, VariantQueryMixin):
         use_conflict_csv=False,
     ):  # noqa: E501
         self.logger = logger
-        self.datasource = datasource
+        self.data_source = datasource
         self.etl_process = etl_process
         self.session = session
         self.use_conflict_csv = use_conflict_csv
         self.conflict_mgr = ConflictManager(session, logger)
 
+    # ⬇️  --------------------------  ⬇️
+    # ⬇️  ------ EXTRACT FASE ------  ⬇️
+    # ⬇️  --------------------------  ⬇️
     def extract(self, raw_dir: str, force_steps: bool):
         """
         Downloads the file from the dbSNP JSON release and stores it locally
         only if it doesn't exist or if the MD5 has changed.
         """
 
+        self.logger.log(
+            f"⬇️ Starting extraction of {self.data_source.name} data...", "INFO"
+        )  # noqa: E501
+
         msg = ""
-        source_url = self.datasource.source_url
+        source_url = self.data_source.source_url
         if force_steps:
             last_hash = ""
             msg = "Ignoring hash check."
@@ -140,8 +150,8 @@ class DTP(DTPBase, VariantQueryMixin):
             # Landing path
             landing_path = os.path.join(
                 raw_dir,
-                self.datasource.source_system.name,
-                self.datasource.name,
+                self.data_source.source_system.name,
+                self.data_source.name,
             )
 
             # Get hash from current md5 file
@@ -167,7 +177,7 @@ class DTP(DTPBase, VariantQueryMixin):
                 return False, msg, current_hash
 
             # Finish block
-            msg = f"✅ {self.datasource.name} file downloaded to {landing_path}"
+            msg = f"✅ {self.data_source.name} file downloaded to {landing_path}"
             self.logger.log(msg, "INFO")
             return True, msg, current_hash
 
@@ -176,8 +186,14 @@ class DTP(DTPBase, VariantQueryMixin):
             self.logger.log(msg, "ERROR")
             return False, msg, None
 
-
+    # ⚙️  ----------------------------  ⚙️
+    # ⚙️  ------ TRANSFORM FASE ------  ⚙️
+    # ⚙️  ----------------------------  ⚙️
     def transform(self, raw_path, processed_path):
+
+        self.logger.log(
+            f"🔧 Transforming the {self.data_source.name} data ...", "INFO"
+        )  # noqa: E501
 
         # INPUT DATA
         input_file = self.get_raw_file(raw_path)
@@ -204,7 +220,9 @@ class DTP(DTPBase, VariantQueryMixin):
         try:
             with bz2.open(input_file, "rt", encoding="utf-8") as f:
                 # if hasattr(__main__, "__file__"):
-                if __name__ == "__main__" or (hasattr(__main__, "__file__") and not hasattr(sys, "ps1")):
+                if __name__ == "__main__" or (
+                    hasattr(__main__, "__file__") and not hasattr(sys, "ps1")
+                ):
                     with ProcessPoolExecutor(max_workers=max_workers) as executor:
 
                         for line in f:
@@ -238,7 +256,9 @@ class DTP(DTPBase, VariantQueryMixin):
             # # Buscar os valores do banco
             # variant_type_map = {v.name: str(v.id) for v in self.session.query(VariantType)}
             # allele_type_map = {a.name: str(a.id) for a in self.session.query(AlleleType)}
-            assembly_map = {a.accession: str(a.id) for a in self.session.query(GenomeAssembly)}
+            assembly_map = {
+                a.accession: str(a.id) for a in self.session.query(GenomeAssembly)
+            }
 
             # # Mapear as colunas
             # transform_df["variant_type_id"] = transform_df["var_type"].map(variant_type_map)
@@ -263,7 +283,9 @@ class DTP(DTPBase, VariantQueryMixin):
             ]
 
             # Reorganiza o DataFrame (ignora colunas faltantes)
-            transform_df = transform_df[[col for col in column_order if col in transform_df.columns]]
+            transform_df = transform_df[
+                [col for col in column_order if col in transform_df.columns]
+            ]
 
             transform_df.to_csv(output_dir / "processed_data.csv", index=False)
 
@@ -277,15 +299,23 @@ class DTP(DTPBase, VariantQueryMixin):
             self.logger.log(msg, "ERROR")
             return None, False, msg
 
-    # # 🚧 🚜 In developing
+    # 📥  ------------------------ 📥
+    # 📥  ------ LOAD FASE ------  📥
+    # 📥  ------------------------ 📥
     def load(self, df=None, processed_path=None, chunk_size=100_000):
+
+        self.logger.log(
+            f"📥 Loading {self.data_source.name} data into the database...",
+            "INFO",  # noqa E501
+        )
+
         total_variants = 0
         load_status = False
         message = ""
 
-        # 🚨 Garante que self.datasource é válido na sessão atual
-        self.datasource = self.session.merge(self.datasource)
-        data_source_id = self.datasource.id
+        # 🚨 Garante que self.data_source é válido na sessão atual
+        self.data_source = self.session.merge(self.data_source)
+        data_source_id = self.data_source.id
 
         if df is None:
             if not processed_path:
@@ -294,7 +324,9 @@ class DTP(DTPBase, VariantQueryMixin):
                 return total_variants, load_status, msg
 
             processed_path = self.get_path(processed_path)
-            processed_data = str(processed_path / "processed_data.csv")  # TODO: change to Msater_data
+            processed_data = str(
+                processed_path / "processed_data.csv"
+            )  # TODO: change to Msater_data
 
             if not os.path.exists(processed_data):
                 msg = f"File not found: {processed_data}"
@@ -306,10 +338,14 @@ class DTP(DTPBase, VariantQueryMixin):
             df = pd.read_csv(processed_data, dtype=str)
 
         # Apaga os dados da tabela de links
-        self.session.query(GeneVariantLink).filter_by(data_source_id=self.datasource.id).delete()
+        self.session.query(VariantGeneRelationship).filter_by(
+            data_source_id=self.data_source.id
+        ).delete()
 
         # Opcional: apagar também os variants, se desejar
-        self.session.query(Variant).filter_by(data_source_id=self.datasource.id).delete()
+        self.session.query(Variant).filter_by(
+            data_source_id=self.data_source.id
+        ).delete()
 
         self.session.commit()
         self.logger.log("🗑️ Previous records deleted for this data source", "INFO")
@@ -318,13 +354,15 @@ class DTP(DTPBase, VariantQueryMixin):
         # df["position"] = df["position_base_1"].astype(int)
         # df["assembly_id"] = df["assembly_id"].astype(int)
         # df["chromosome"] = df["assembly_id"].astype(str) # Adicionar o Cromossmo do CSV
-        df["ref"] = ''
-        df["alt"] = ''
+        df["ref"] = ""
+        df["alt"] = ""
         # df["rs_id"] = df["rs_id"].astype(str)
 
         # Isola os registros do tipo 'ref' para obter o alelo de referência
         df_ref = df[df["allele_type"] == "ref"].copy()
-        df_ref = df_ref[["rs_id", "position_base_1", "assembly_id", "allele"]].drop_duplicates("rs_id")
+        df_ref = df_ref[
+            ["rs_id", "position_base_1", "assembly_id", "allele"]
+        ].drop_duplicates("rs_id")
 
         # Agrupa os alternativos por rs_id e junta os diferentes ALT
         df_alt = (
@@ -341,7 +379,9 @@ class DTP(DTPBase, VariantQueryMixin):
 
         # Junta ref + alt
         df_variants = df_ref.merge(df_alt, on="rs_id", how="left")
-        df_variants["alt"] = df_variants["alt"].fillna("")  # pode haver variante sem alt
+        df_variants["alt"] = df_variants["alt"].fillna(
+            ""
+        )  # pode haver variante sem alt
 
         # Vou apagar quem nao tem assenmbly_id
         df_variants = df_variants.dropna(subset=["assembly_id", "position_base_1"])
@@ -359,7 +399,7 @@ class DTP(DTPBase, VariantQueryMixin):
                 chromosome=row["assembly_id"],
                 ref=row["allele"],
                 alt=row["alt"],
-                data_source_id=data_source_id
+                data_source_id=data_source_id,
             )
             variants_to_insert.append(variant)
 
@@ -397,26 +437,32 @@ class DTP(DTPBase, VariantQueryMixin):
         links_to_insert = []
 
         for _, row in df_links.iterrows():
-            link = GeneVariantLink(
+            link = VariantGeneRelationship(
                 gene_id=row["gene_ids"],
                 variant_id=row["rs_id"],
-                data_source_id=data_source_id
+                data_source_id=data_source_id,
             )
             links_to_insert.append(link)
 
         self.session.bulk_save_objects(links_to_insert)
         self.session.commit()
-        self.logger.log(f"✅ Inserted {len(links_to_insert)} gene-variant links", "INFO")
+        self.logger.log(
+            f"✅ Inserted {len(links_to_insert)} gene-variant links", "INFO"
+        )
 
         # Manutencao:
         self.session.execute(text("VACUUM"))
         self.session.commit()
 
         self.session.execute(text("DROP INDEX IF EXISTS uq_gene_variant"))
-        self.session.execute(text("""
+        self.session.execute(
+            text(
+                """
             CREATE UNIQUE INDEX uq_gene_variant 
             ON gene_variant_links (gene_id, variant_id)
-        """))
+        """
+            )
+        )
         self.session.commit()
         # TODO criar um methodo optimize_database() para essas tarefas
 

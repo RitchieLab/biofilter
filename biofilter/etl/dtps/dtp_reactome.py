@@ -3,7 +3,11 @@ import pandas as pd
 import zipfile
 from biofilter.utils.file_hash import compute_file_hash
 from biofilter.etl.mixins.entity_query_mixin import EntityQueryMixin
-from biofilter.db.models.entity_models import EntityGroup, EntityName, EntityRelationshipType  # noqa E501
+from biofilter.db.models.entity_models import (
+    EntityGroup,
+    EntityName,
+    EntityRelationshipType,
+)  # noqa E501
 from biofilter.db.models.pathway_models import Pathway
 from biofilter.etl.mixins.base_dtp import DTPBase
 
@@ -18,19 +22,26 @@ class DTP(DTPBase, EntityQueryMixin):
         use_conflict_csv=False,
     ):  # noqa: E501
         self.logger = logger
-        self.datasource = datasource
+        self.data_source = datasource
         self.etl_process = etl_process
         self.session = session
         self.use_conflict_csv = use_conflict_csv
 
+    # ⬇️  --------------------------  ⬇️
+    # ⬇️  ------ EXTRACT FASE ------  ⬇️
+    # ⬇️  --------------------------  ⬇️
     def extract(self, raw_dir: str, force_steps: bool):
         """
         Downloads Reactome data. Uses the hash of 'ReactomePathways.txt' as
         reference. Only proceeds with full extraction if the hash has changed.
         """
 
+        self.logger.log(
+            f"⬇️ Starting extraction of {self.data_source.name} data...", "INFO"  # noqa: E501
+        )  # noqa: E501
+
         msg = ""
-        source_url = self.datasource.source_url
+        source_url = self.data_source.source_url
         files_to_download = [
             "ReactomePathways.txt",
             "ReactomePathwaysRelation.txt",
@@ -49,8 +60,8 @@ class DTP(DTPBase, EntityQueryMixin):
             # Landing directory
             landing_path = os.path.join(
                 raw_dir,
-                self.datasource.source_system.name,
-                self.datasource.name,
+                self.data_source.source_system.name,
+                self.data_source.name,
             )
             os.makedirs(landing_path, exist_ok=True)
 
@@ -66,7 +77,7 @@ class DTP(DTPBase, EntityQueryMixin):
             # Step 2: Compute hash and compare
             current_hash = compute_file_hash(file_path)
             if current_hash == last_hash:
-                msg = f"No change detected in {main_file}"   # noqa: E501
+                msg = f"No change detected in {main_file}"  # noqa: E501
                 self.logger.log(msg, "INFO")
                 return False, msg, current_hash  # Skip further downloads
 
@@ -92,21 +103,26 @@ class DTP(DTPBase, EntityQueryMixin):
             self.logger.log(msg, "ERROR")
             return False, msg, None
 
-
-
-
+    # ⚙️  ----------------------------  ⚙️
+    # ⚙️  ------ TRANSFORM FASE ------  ⚙️
+    # ⚙️  ----------------------------  ⚙️
     def transform(self, raw_dir: str, processed_dir: str):
+
+        self.logger.log(
+            f"🔧 Transforming the {self.data_source.name} data ...", "INFO"
+        )  # noqa: E501
+
         try:
-            message = ""
+            msg = ""
             landing_path = os.path.join(
                 raw_dir,
-                self.datasource.source_system.name,
-                self.datasource.name,
+                self.data_source.source_system.name,
+                self.data_source.name,
             )
             processed_path = os.path.join(
                 processed_dir,
-                self.datasource.source_system.name,
-                self.datasource.name,
+                self.data_source.source_system.name,
+                self.data_source.name,
             )
             os.makedirs(processed_path, exist_ok=True)
 
@@ -114,7 +130,10 @@ class DTP(DTPBase, EntityQueryMixin):
             # Process pathways
             pathways_file = os.path.join(landing_path, "ReactomePathways.txt")
             df_pathways = pd.read_csv(
-                pathways_file, sep="\t", header=None, names=["reactome_id", "pathway_name", "species"]
+                pathways_file,
+                sep="\t",
+                header=None,
+                names=["reactome_id", "pathway_name", "species"],
             )
 
             # Filter only Homo sapiens
@@ -123,14 +142,18 @@ class DTP(DTPBase, EntityQueryMixin):
             # Save filtered pathways
             pathways_csv = os.path.join(processed_path, "master_data.csv")
             df_pathways.to_csv(pathways_csv, index=False)
-            self.logger.log(f"✅ Pathways transformed and saved to {pathways_csv}", "INFO")
+            self.logger.log(
+                f"✅ Pathways transformed and saved to {pathways_csv}", "INFO"
+            )
 
             # START SECOND FILES
             # Process relations
             records = []
             valid_ids = set(df_pathways["reactome_id"])
             # Pathways relations
-            relations_file = os.path.join(landing_path, "ReactomePathwaysRelation.txt")
+            relations_file = os.path.join(
+                landing_path, "ReactomePathwaysRelation.txt"
+            )  # noqa E501
 
             with open(relations_file, "r") as infile:
                 for line in infile:
@@ -143,18 +166,24 @@ class DTP(DTPBase, EntityQueryMixin):
                     child_id = parts[1]
 
                     if parent_id in valid_ids and child_id in valid_ids:
-                        records.append({
-                            "reactome_id": child_id,
-                            "relation_type": "pathway_parent",
-                            "relation": parent_id,
-                            "evidence": "curated"  # Manually set to IEA
-                        })
+                        records.append(
+                            {
+                                "reactome_id": child_id,
+                                "relation_type": "pathway_parent",
+                                "relation": parent_id,
+                                "evidence": "curated",  # Manually set to IEA
+                            }
+                        )
 
             # Process Genes Symbols
-            gmt_zip_file = os.path.join(landing_path, "ReactomePathways.gmt.zip")
+            gmt_zip_file = os.path.join(
+                landing_path, "ReactomePathways.gmt.zip"
+            )  # noqa E501
 
             # Map Pathway Name -> Reactome ID
-            pathway_name_to_id = df_pathways.set_index("pathway_name")["reactome_id"].to_dict()
+            pathway_name_to_id = df_pathways.set_index("pathway_name")[
+                "reactome_id"
+            ].to_dict()
 
             with zipfile.ZipFile(gmt_zip_file, "r") as zip_ref:
                 for info in zip_ref.infolist():
@@ -175,12 +204,14 @@ class DTP(DTPBase, EntityQueryMixin):
                             gene_symbols = parts[2:]
 
                             for gene_symbol in gene_symbols:
-                                records.append({
-                                    "reactome_id": reactome_id,
-                                    "relation_type": "gene_symbol",
-                                    "relation": gene_symbol,
-                                    "evidence": "IEA"  # Manually set to IEA
-                                })
+                                records.append(
+                                    {
+                                        "reactome_id": reactome_id,
+                                        "relation_type": "gene_symbol",
+                                        "relation": gene_symbol,
+                                        "evidence": "IEA",  # Manually set IEA
+                                    }
+                                )
 
             # Process Emsembl IDs (Genes and Proteins)
             ensembl_file = os.path.join(landing_path, "Ensembl2Reactome.txt")
@@ -210,12 +241,14 @@ class DTP(DTPBase, EntityQueryMixin):
                     else:
                         continue  # Ignore unexpected entries
 
-                    records.append({
-                        "reactome_id": reactome_id,
-                        "relation_type": ensembl_type,
-                        "relation": ensembl_id,
-                        "evidence": evidence,
-                    })
+                    records.append(
+                        {
+                            "reactome_id": reactome_id,
+                            "relation_type": ensembl_type,
+                            "relation": ensembl_id,
+                            "evidence": evidence,
+                        }
+                    )
 
             # Proces Uniprot (Protein)
             uniprot_file = os.path.join(landing_path, "UniProt2Reactome.txt")
@@ -238,42 +271,53 @@ class DTP(DTPBase, EntityQueryMixin):
                     if reactome_id not in valid_ids:
                         continue
 
-                    records.append({
-                        "reactome_id": reactome_id,
-                        "relation_type": "uniprot_protein",
-                        "relation": uniprot_id,
-                        "evidence": evidence,
-                    })
+                    records.append(
+                        {
+                            "reactome_id": reactome_id,
+                            "relation_type": "uniprot_protein",
+                            "relation": uniprot_id,
+                            "evidence": evidence,
+                        }
+                    )
 
             # Save results in process file
             df_relations = pd.DataFrame(records)
-            relations_csv = os.path.join(processed_path, "pathway_relations.csv")
+            relations_csv = os.path.join(
+                processed_path, "pathway_relations.csv"
+            )  # noqa E501
             df_relations.to_csv(relations_csv, index=False)
 
-            self.logger.log(f"✅ Pathways Relations transformed and saved to {relations_csv}", "INFO")
+            self.logger.log(
+                f"✅ Pathways Relations transformed and saved to {relations_csv}",  # noqa E501
+                "INFO",
+            )
 
-            message = "Transformation Completed"
+            msg = "Transformation Completed"
 
-            return None, True, message
+            return None, True, msg
 
         except Exception as e:
-            message = f"❌ ETL transform failed: {str(e)}"
-            self.logger.log(message, "ERROR")
-            return None, False, message
+            msg = f"❌ ETL transform failed: {str(e)}"
+            self.logger.log(msg, "ERROR")
+            return None, False, msg
 
-
+    # 📥  ------------------------ 📥
+    # 📥  ------ LOAD FASE ------  📥
+    # 📥  ------------------------ 📥
     def load(self, df=None, processed_path=None, chunk_size=100_000):
-        """
-        Load the transformed data into the database.
-        """
+
+        self.logger.log(
+            f"📥 Loading {self.data_source.name} data into the database...",
+            "INFO",  # noqa E501
+        )
 
         total_pathways = 0
         load_status = False
-        message = ""
+        msg = ""
 
-        # 🚨 Garante que self.datasource é válido na sessão atual
-        self.datasource = self.session.merge(self.datasource)
-        data_source_id = self.datasource.id
+        # NOTE: Garante que self.data_source é válido na sessão atual
+        # self.data_source = self.session.merge(self.data_source)
+        data_source_id = self.data_source.id
 
         if df is None:
             if not processed_path:
@@ -289,7 +333,9 @@ class DTP(DTPBase, EntityQueryMixin):
                 self.logger.log(msg, "ERROR")
                 return total_pathways, load_status, msg
 
-            self.logger.log(f"📥 Reading data in chunks from {processed_data}", "INFO")
+            self.logger.log(
+                f"📥 Reading data in chunks from {processed_data}", "INFO"
+            )  # noqa E501
 
             df = pd.read_csv(processed_data, dtype=str)
 
@@ -326,25 +372,15 @@ class DTP(DTPBase, EntityQueryMixin):
             entity_id, _ = self.get_or_create_entity(
                 name=pathway_master,
                 group_id=self.entity_group,
-                data_source_id=self.datasource.id,
+                data_source_id=self.data_source.id,
             )
 
             # Add or Get Entity Name
             self.get_or_create_entity_name(
-                entity_id,
-                pathway_name,
-                data_source_id=self.datasource.id
+                entity_id, pathway_name, data_source_id=self.data_source.id
             )
 
-            # Add or Get Pathway Master Data
-            # pathway = self.get_or_create_pathway(
-            #     entity_id,
-            #     pathway_master,
-            #     pathway_name,
-            #     data_source_id,
-            # )
-
-            # Check if the location already exists
+            # Check if the pathway already exists
             existing_pathway = (
                 self.session.query(Pathway)
                 .filter_by(
@@ -353,16 +389,12 @@ class DTP(DTPBase, EntityQueryMixin):
                 .first()
             )
 
-            # if existing_pathway:
-            # return existing_location
-
             # Create new if it does not exist
             if not existing_pathway:
                 pathway = Pathway(
                     entity_id=entity_id,
-                    reactome_id=pathway_master,
-                    short_name=pathway_name,
-                    full_name=pathway_name,
+                    pathway_id=pathway_master,
+                    description=pathway_name,
                     data_source_id=data_source_id,
                 )
 
@@ -371,12 +403,11 @@ class DTP(DTPBase, EntityQueryMixin):
 
                 total_pathways += 1
 
-        # PROCESSO PARA CARREGAR AS RELAÇÕES
-
-        # TODO: ADICIONAR O DS na tabela de EntityRelacionships
+        # ----------------------------------------------
+        # START TRANSACTION DATA (--> PATHWAY RELATIONS)
 
         try:
-            message = ""
+            msg = ""
             load_status = False
 
             # processed_path = self.get_path(processed_path)
@@ -387,7 +418,6 @@ class DTP(DTPBase, EntityQueryMixin):
                 self.logger.log(msg, "ERROR")
                 return 0, load_status, msg
 
-            # Load DataFrame
             df = pd.read_csv(relations_file, dtype=str)
 
             # Add columns for IDs and relationship type
@@ -395,29 +425,28 @@ class DTP(DTPBase, EntityQueryMixin):
             df["entity_2_id"] = None
             df["relationship_type_id"] = None
 
-
-            # BUG: PAREI AQUI
-            # Get pathway IDs from EntityName (entity_1_id)
+            # Get pathway IDs from EntityName
             pathway_ids = (
                 self.session.query(EntityName.name, EntityName.entity_id)
-                .filter(EntityName.datasource_id == self.datasource.id)
+                .filter(EntityName.data_source_id == self.data_source.id)
                 .all()
             )
             pathway_id_map = dict(pathway_ids)
 
-
-            # Já mapeamos Pathways (entity_1_id e entity_2_id para pathway_parent)
+            # Map entity_1_id and entity_2_id (pathway_parent)
             df["entity_1_id"] = df["reactome_id"].map(pathway_id_map)
-            df["entity_2_id"] = None  # Limpamos antes para evitar ruídos
+            df["entity_2_id"] = None  # Clean to avoid overwriting
 
-            # Mapeia entity_2_id apenas para pathway_parent diretamente via pathway_id_map
             mask_pathway_parent = df["relation_type"] == "pathway_parent"
-            df.loc[mask_pathway_parent, "entity_2_id"] = df.loc[mask_pathway_parent, "relation"].map(pathway_id_map)
+            df.loc[mask_pathway_parent, "entity_2_id"] = df.loc[
+                mask_pathway_parent, "relation"
+            ].map(pathway_id_map)
 
-            # Agora iteramos apenas para os casos que não são pathway_parent (ex: gene, protein)
+            # Map entity_2_id (gene_symbol, ensembl_gene, uniprot_protein)
             mask_others = ~mask_pathway_parent
-
-            relation_names_to_lookup = df.loc[mask_others, "relation"].dropna().unique().tolist()
+            relation_names_to_lookup = (
+                df.loc[mask_others, "relation"].dropna().unique().tolist()
+            )
 
             # Query EntityName in batch
             relation_entities = (
@@ -428,47 +457,57 @@ class DTP(DTPBase, EntityQueryMixin):
             relation_name_to_entity_id = dict(relation_entities)
 
             # Apply map on remaining entity_2_id
-            df.loc[mask_others, "entity_2_id"] = df.loc[mask_others, "relation"].map(relation_name_to_entity_id)
-
-
-            # Buscar os tipos de relacionamento
-            relationship_types = (
-                self.session.query(EntityRelationshipType.code, EntityRelationshipType.id)
-                .all()
+            df.loc[mask_others, "entity_2_id"] = df.loc[
+                mask_others, "relation"
+            ].map(  # noqa: E501
+                relation_name_to_entity_id
             )
 
-            # 1. Criar dict de mapeamento
+            # Get all relationship types
+            relationship_types = self.session.query(
+                EntityRelationshipType.code, EntityRelationshipType.id
+            ).all()
             relationship_type_map = dict(relationship_types)
 
-            # 2. Definir a lógica de mapeamento usando apply
+            # Map relationship types to REACTOME relation types
             relation_type_to_relationship_code = {
                 "pathway_parent": "part_of",
                 "gene_symbol": "in_pathway",
                 "ensembl_gene": "in_pathway",
                 "ensembl_protein": "in_pathway",
-                "uniprot_protein": "in_pathway"
+                "uniprot_protein": "in_pathway",
             }
-
+            # Map relationship types to IDs
             df["relationship_type_id"] = df["relation_type"].apply(
-                lambda x: relationship_type_map[relation_type_to_relationship_code.get(x, "in_pathway")]
+                lambda x: relationship_type_map[
+                    relation_type_to_relationship_code.get(x, "in_pathway")
+                ]
             )
 
-            # Codigo mais generico
+            # USE THIS IF YOU WANT TO KEEP THE OLD RELATIONSHIP TYPE
             # df["relationship_type_id"] = df["relation_type"].apply(
-            #     lambda x: relationship_type_map["part_of"] if x == "pathway_parent" else relationship_type_map["in_pathway"]
+            #     lambda x: relationship_type_map["part_of"]
+            #     if x == "pathway_parent"
+            #     else relationship_type_map["in_pathway"]
             # )
 
-            # Filter valid
-            df_valid = df[df["entity_1_id"].notnull() & df["entity_2_id"].notnull()]
-            # df_valid["entity_2_id"] = df_valid["entity_2_id"].astype(int)
+            # Load only valid relationships and save invalid ones in file
+            df_valid = df[
+                df["entity_1_id"].notnull() & df["entity_2_id"].notnull()
+            ]  # noqa: E501
+            df_invalid = df[
+                df["entity_1_id"].isnull() | df["entity_2_id"].isnull()
+            ]  # noqa: E501
 
-            df_invalid = df[df["entity_1_id"].isnull() | df["entity_2_id"].isnull()]
+            # Load duplicates relationships in valid dataframe
+            df_valid.loc[:, "entity_2_id"] = df_valid["entity_2_id"].astype(
+                int
+            )  # noqa: E501
+            df_valid = df_valid.drop_duplicates(
+                subset=["entity_1_id", "entity_2_id", "relationship_type_id"]
+            )
 
-            # Remove duplicates
-            df_valid.loc[:, "entity_2_id"] = df_valid["entity_2_id"].astype(int)
-            df_valid = df_valid.drop_duplicates(subset=["entity_1_id", "entity_2_id", "relationship_type_id"])
-
-            # # Insert valid relationships
+            # Load valid relationships
             total_pathways_relations_added = 0
             total_pathways_relations_existed = 0
             for _, row in df_valid.iterrows():
@@ -476,7 +515,7 @@ class DTP(DTPBase, EntityQueryMixin):
                     entity_1_id=int(row["entity_1_id"]),
                     entity_2_id=int(row["entity_2_id"]),
                     relationship_type_id=int(row["relationship_type_id"]),
-                    data_source_id=self.datasource.id
+                    data_source_id=self.data_source.id,
                 )
                 if status:
                     total_pathways_relations_added += 1
@@ -487,25 +526,30 @@ class DTP(DTPBase, EntityQueryMixin):
             try:
                 self.session.commit()
                 load_status = True
-                message = f"✅ {len(df_valid)} relations loaded successfully"
-                self.logger.log(message, "INFO")
+                msg = f"✅ {len(df_valid)} relations loaded successfully"
+                self.logger.log(msg, "INFO")
             except Exception as e:
                 self.session.rollback()
                 load_status = False
-                message = f"❌ Error loading relations: {str(e)}"
-                self.logger.log(message, "ERROR")
-                return 0, load_status, message
+                msg = f"❌ Error loading relations: {str(e)}"
+                self.logger.log(msg, "ERROR")
+                return 0, load_status, msg
 
             # Export not found to CSV
-            not_found_csv = os.path.join(processed_path, "pathway_relations_not_found.csv")
+            not_found_csv = os.path.join(
+                processed_path, "pathway_relations_not_found.csv"
+            )
             df_invalid.to_csv(not_found_csv, index=False)
-            self.logger.log(f"⚠️ Relations not found exported to {not_found_csv}", "WARNING")
+            self.logger.log(
+                f"⚠️ Relations not found exported to {not_found_csv}",
+                "WARNING",  # noqa: E501
+            )
 
-            msg = f"✅ Relations loaded: {len(df_valid)} | Not found: {len(df_invalid)}"
+            msg = f"✅ Relations loaded: {len(df_valid)} | Not found: {len(df_invalid)}"  # noqa: E501
             self.logger.log(msg, "INFO")
             return len(df_valid), True, msg
 
         except Exception as e:
-            message = f"❌ ETL load_relations failed: {str(e)}"
-            self.logger.log(message, "ERROR")
-            return 0, False, message
+            msg = f"❌ ETL load_relations failed: {str(e)}"
+            self.logger.log(msg, "ERROR")
+            return 0, False, msg

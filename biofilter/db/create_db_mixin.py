@@ -38,19 +38,19 @@ class CreateDBMixin:
         )
 
         self._seed_from_json(
-            f"{seed_dir}/initial_sourcesystems.json",
+            f"{seed_dir}/initial_source_systems.json",
             "etl_models",
             "SourceSystem",
             key="source_systems",
         )
         self._seed_from_json(
-            f"{seed_dir}/initial_datasources.json",
+            f"{seed_dir}/initial_data_sources.json",
             "etl_models",
             "DataSource",
             key="data_sources",
         )
         self._seed_from_json(
-            f"{seed_dir}/initial_etlprocesses.json",
+            f"{seed_dir}/initial_etl_processes.json",
             "etl_models",
             "ETLProcess",
             key="etl_processes",
@@ -79,18 +79,18 @@ class CreateDBMixin:
             "GenomeAssembly",
             key="genome_assemblies",
         )
-        self._seed_from_json(
-            f"{seed_dir}/initial_variant_types.json",
-            "variants_models",
-            "VariantType",
-            key="variant_types",
-        )
-        self._seed_from_json(
-            f"{seed_dir}/initial_allele_types.json",
-            "variants_models",
-            "AlleleType",
-            key="allele_types",
-        )
+        # self._seed_from_json(
+        #     f"{seed_dir}/initial_variant_types.json",
+        #     "variants_models",
+        #     "VariantType",
+        #     key="variant_types",
+        # )
+        # self._seed_from_json(
+        #     f"{seed_dir}/initial_allele_types.json",
+        #     "variants_models",
+        #     "AlleleType",
+        #     key="allele_types",
+        # )
 
     def _seed_from_json(self, file, module_name, model_name, key=None):
         model_module = import_module(f"biofilter.db.models.{module_name}")

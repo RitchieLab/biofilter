@@ -285,7 +285,7 @@ class ETLManager:
                     in ("pending", "completed", "failed")  # noqa E501
                     or "extract" in force_steps
                 ):  # noqa E501
-                    
+
                     if force_steps:
                         force_flag = True
                     else:

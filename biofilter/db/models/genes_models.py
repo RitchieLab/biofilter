@@ -98,8 +98,10 @@ class Gene(Base):
 
     entity_id = Column(Integer, nullable=False)
 
-    # NOTE / TODO: Improve this field to save space and standardize with other sources
-    hgnc_status = Column(String, nullable=True)  # Ex: "Approved", "Symbol Approved"
+    # NOTE / TODO: Improve this field to save space and standardize with other sources      # noqa E501
+    hgnc_status = Column(
+        String, nullable=True
+    )  # Ex: "Approved", "Symbol Approved"        # noqa E501
 
     hgnc_id = Column(String, unique=True, nullable=True)
     entrez_id = Column(String, nullable=True)
@@ -125,7 +127,7 @@ class Gene(Base):
     locations = relationship(
         "GeneLocation", back_populates="gene", cascade="all, delete-orphan"
     )  # noqa E501
-    # variant_links = relationship("GeneVariantLink", back_populates="gene", cascade="all, delete-orphan")
+    # variant_links = relationship("GeneVariantLink", back_populates="gene", cascade="all, delete-orphan")  # noqa E501
 
     # Audit fields
     # created_at = Column(DateTime, default=utcnow)

@@ -25,20 +25,27 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
         use_conflict_csv=False,
     ):  # noqa: E501
         self.logger = logger
-        self.datasource = datasource
+        self.data_source = datasource
         self.etl_process = etl_process
         self.session = session
         self.use_conflict_csv = use_conflict_csv
         self.conflict_mgr = ConflictManager(session, logger)
 
+    # ⬇️  --------------------------  ⬇️
+    # ⬇️  ------ EXTRACT FASE ------  ⬇️
+    # ⬇️  --------------------------  ⬇️
     def extract(self, raw_dir: str, force_steps: bool):
         """
         Download data from the HGNC API and stores it locally.
         Also computes a file hash to track content versioning.
         """
 
+        self.logger.log(
+            f"⬇️ Starting extraction of {self.data_source.name} data...", "INFO"
+        )  # noqa: E501
+
         msg = ""
-        source_url = self.datasource.source_url
+        source_url = self.data_source.source_url
         if force_steps:
             last_hash = ""
             msg = "Ignoring hash check."
@@ -50,8 +57,8 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
             # Landing directory
             landing_path = os.path.join(
                 raw_dir,
-                self.datasource.source_system.name,
-                self.datasource.name,
+                self.data_source.source_system.name,
+                self.data_source.name,
             )
             os.makedirs(landing_path, exist_ok=True)
             file_path = os.path.join(landing_path, "hgnc_data.json")
@@ -88,8 +95,16 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
             self.logger.log(msg, "ERROR")
             return False, msg, None
 
+    # ⚙️  ----------------------------  ⚙️
+    # ⚙️  ------ TRANSFORM FASE ------  ⚙️
+    # ⚙️  ----------------------------  ⚙️
     def transform(self, raw_path, processed_path):
-        message = ""
+
+        self.logger.log(
+            f"🔧 Transforming the {self.data_source.name} data ...", "INFO"
+        )  # noqa: E501
+
+        msg = ""
         try:
             # Paths
             json_file = os.path.join(raw_path, "hgnc", "hgnc_data.json")
@@ -123,16 +138,25 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
                 f"✅ HGNC data transformed and saved at {csv_file}", "INFO"
             )  # noqa: E501
 
-            return df, True, message
+            return df, True, msg
 
         except Exception as e:
-            message = f"❌ Error during transformation: {e}"
-            return None, False, message
+            msg = f"❌ Error during transformation: {e}"
+            return None, False, msg
 
+    # 📥  ------------------------ 📥
+    # 📥  ------ LOAD FASE ------  📥
+    # 📥  ------------------------ 📥
     def load(self, df=None, processed_path=None):
+
+        self.logger.log(
+            f"📥 Loading {self.data_source.name} data into the database...",
+            "INFO",  # noqa E501
+        )
+
         total_gene = 0  # not considered conflict genes
         load_status = False
-        message = ""
+        msg = ""
 
         # Models that will be used to store the data
         # - Entity
@@ -270,14 +294,14 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
                 name=gene_master,
                 group_id=self.entity_group,
                 # category_id=self.gene_category,
-                data_source_id=self.datasource.id,
+                data_source_id=self.data_source.id,
             )
 
             # Add or Get EntityName
             for alias in aliases:
                 if alias.strip() != gene_master.strip():
                     self.get_or_create_entity_name(
-                        entity_id, alias, data_source_id=self.datasource.id
+                        entity_id, alias, data_source_id=self.data_source.id
                     )
 
             # BLOCK TO CREATE THE GENES RECORDS
@@ -312,7 +336,7 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
                 entrez_id=row.get("entrez_id"),
                 ensembl_id=row.get("ensembl_gene_id"),
                 entity_id=entity_id,
-                data_source_id=self.datasource.id,
+                data_source_id=self.data_source.id,
                 locus_group=locus_group_instance,
                 locus_type=locus_type_instance,
                 gene_group_names=group_names_list,
@@ -334,7 +358,7 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
                     end=row.get("end"),
                     strand=row.get("strand"),
                     region=region_instance,
-                    data_source_id=self.datasource.id,
+                    data_source_id=self.data_source.id,
                 )
 
             # Check if location was created successfully
@@ -368,6 +392,6 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
             # Apply conflict resolution
             self.conflict_mgr.apply_resolution(row)
 
-        message = f"Loaded {total_gene} genes into database"
+        msg = f"Loaded {total_gene} genes into database"
         self.logger.log(msg, "INFO")
-        return total_gene, True, message
+        return total_gene, True, msg

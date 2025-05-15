@@ -15,12 +15,12 @@ from .curation_models import (
     CurationConflict,
 )
 from .variants_models import (
-    VariantType,
-    AlleleType,
+    # VariantType,
+    # AlleleType,
     GenomeAssembly,
     Variant,
     # VariantLocation,
-    GeneVariantLink,
+    VariantGeneRelationship,
 )
 from .pathway_models import Pathway
 
@@ -46,11 +46,11 @@ __all__ = [
     "ConflictResolution",
     "CurationConflict",
     # VARIANTS MODELS
-    "VariantType",
-    "AlleleType",
+    # "VariantType",
+    # "AlleleType",
     "GenomeAssembly",
     "Variant",
     # "VariantLocation",
-    "GeneVariantLink",
+    "VariantGeneRelationship",
     "Pathway",
 ]

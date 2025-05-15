@@ -439,17 +439,9 @@ class ConflictManager:
         for g in candidates:
 
             conflicts = []
-            if (
-                entrez_id
-                and g.entrez_id == entrez_id
-                and g.hgnc_id != hgnc_id
-            ):
+            if entrez_id and g.entrez_id == entrez_id and g.hgnc_id != hgnc_id:
                 conflicts.append(f"entrez_id={entrez_id}")
-            if (
-                ensembl_id
-                and g.ensembl_id == ensembl_id
-                and g.hgnc_id != hgnc_id
-            ):
+            if ensembl_id and g.ensembl_id == ensembl_id and g.hgnc_id != hgnc_id:
                 conflicts.append(f"ensembl_id={ensembl_id}")
 
             if not conflicts:
@@ -495,10 +487,9 @@ class ConflictManager:
                 f"🚫 Conflict detected for Gene '{symbol}' - submitted for curation",  # noqa E501
                 "WARNING",
             )
-            
-            return "CONFLICT" 
-        
-        
+
+            return "CONFLICT"
+
         # # Check for existing gene with same identifiers
 
         # existing_gene = self.session.query(Gene).filter(or_(*filters)).first()

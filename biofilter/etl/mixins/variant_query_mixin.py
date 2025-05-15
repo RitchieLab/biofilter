@@ -1,6 +1,7 @@
 import re
 import ast
 import pandas as pd
+
 # from biofilter.db.models.variants_models import (
 #     VariantType,
 #     AlleleType,
@@ -11,8 +12,9 @@ import pandas as pd
 # )
 
 
-class VariantQueryMixin:
-    ...
+class VariantQueryMixin: ...
+
+
 #     def get_or_create_variant_type(self, name):
 #         if name not in self._variant_type_cache:
 #             obj = self.session.query(VariantType).filter_by(name=name).first()

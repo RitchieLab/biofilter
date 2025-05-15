@@ -3,14 +3,8 @@
         {
             "data_source": "hgnc_genes",
             "global_status": "pending",
-            "extract_start": "2025-04-01T10:00:00",
-            "extract_end": "2025-04-01T10:05:00",
             "extract_status": "pending",
-            "transform_start": "2025-04-01T10:05:00",
-            "transform_end": "2025-04-01T10:10:00",
             "transform_status": "pending",
-            "load_start": "2025-04-01T10:10:00",
-            "load_end": "2025-04-01T10:15:00",
             "load_status": "pending"
         },
         {

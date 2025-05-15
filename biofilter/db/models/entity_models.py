@@ -1,4 +1,5 @@
 from sqlalchemy import Column, Integer, String, Boolean
+
 # from sqlalchemy.orm import relationship
 # from sqlalchemy.orm import relationship
 from biofilter.db.base import Base
@@ -35,26 +36,25 @@ class Entity(Base):
     group_id = Column(Integer, nullable=True)
     has_conflict = Column(
         Boolean, nullable=True, default=None
-    )  # ⚠️ Indica conflito conhecido
+    )  # ⚠️ Inform conflict status
     is_deactive = Column(
         Boolean, nullable=True, default=None
-    )  # 🚫 Indica se foi desativada
+    )  # 🚫 Inform entity deactives
 
-    # Relacionamento reverso com Variant
+    # Foreign keys
     # variant = relationship("Variant", back_populates="entity", uselist=False)
 
     """
-    📘 Interpretação no sistema:
-    Situação	                    has_conflict	is_deactive	Ação esperada
-    Entidade normal	                None ou False	None	    Usar normalmente
-    Conflito pendente	            True	        None	    Marcar, mas pode usar com cautela
-    Conflito resolvido com delete	True	        True	    Ignorar nas consultas e ingestões
-    Conflito resolvido com merge	True	        True	    Transferir aliases e ignorar essa entidade
-    Entidade obsoleta (manual)	    None	        True	    Desativada por curadoria
+    System interpretation:
+    Situation	                    has_conflict	is_deactive	Expected action
+    Normal entity	                None or False	None	    Use normally
+    Pending conflict	            True	        None	    Mark, but can use with caution          # noqa E501
+    Resolved conflict with delete	True	        True	    Ignore in queries and ingestions        # noqa E501
+    Resolved conflict with merge	True	        True	    Transfer aliases and ignore this entity # noqa E501
+    Obsolete entity (manual)	    None	        True	    Deactivated by curation
 
-    # Exemplo de filtro seguro
-    session.query(Entity).filter(Entity.is_deactive.is_(None))  
-
+    # Example of safe filter
+    session.query(Entity).filter(Entity.is_deactive.is_(None))
     """
 
     # category_id = Column(Integer, nullable=True)
@@ -87,15 +87,6 @@ class EntityName(Base):
     # entity = relationship("Entity", back_populates="names")
 
 
-# class RelationshipType(Base):
-#     __tablename__ = "relationship_types"
-
-#     id = Column(Integer, primary_key=True, autoincrement=True)
-#     # code ex: "is_a", "part_of", "regulates"
-#     code = Column(String, unique=True, nullable=False)
-#     # desc ex: "Subclass of", "Part of structure"
-#     description = Column(String, nullable=True)
-
 class EntityRelationshipType(Base):
     __tablename__ = "entity_relationship_types"
 
@@ -119,7 +110,7 @@ class EntityRelationship(Base):
     relationship_type_id = Column(Integer, nullable=False)
     # role = Column(String, nullable=True)
     # created_at = Column(DateTime, default=utcnow)
-    datasource_id = Column(Integer, nullable=False)
+    data_source_id = Column(Integer, nullable=False)
 
 
 """

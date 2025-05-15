@@ -10,7 +10,7 @@
             "ucschg_version": "hg38",
             "dtp_script": "dtp_hgnc",
             "last_status": "pending",
-            "active": false
+            "active": true
         },
         {
             "source_system": "dbSNP",
@@ -22,7 +22,7 @@
             "ucschg_version": "hg38",
             "dtp_script": "dtp_dbsnp",
             "last_status": "pending",
-            "active": false
+            "active": true
         },
         {
             "source_system": "dbSNP",
@@ -34,7 +34,7 @@
             "ucschg_version": "hg38",
             "dtp_script": "dtp_dbsnp",
             "last_status": "pending",
-            "active": false
+            "active": true
         },
         {
             "source_system": "dbSNP",
@@ -46,7 +46,7 @@
             "ucschg_version": "hg38",
             "dtp_script": "dtp_dbsnp",
             "last_status": "pending",
-            "active": false
+            "active": true
         },
         {
             "source_system": "dbSNP",
@@ -58,7 +58,7 @@
             "ucschg_version": "hg38",
             "dtp_script": "dtp_dbsnp",
             "last_status": "pending",
-            "active": false
+            "active": true
         },
         {
             "source_system": "dbSNP",
@@ -70,7 +70,7 @@
             "ucschg_version": "hg38",
             "dtp_script": "dtp_dbsnp",
             "last_status": "pending",
-            "active": false
+            "active": true
         },
         {
             "source_system": "dbSNP",
@@ -82,7 +82,7 @@
             "ucschg_version": "hg38",
             "dtp_script": "dtp_dbsnp",
             "last_status": "pending",
-            "active": false
+            "active": true
         },
         {
             "source_system": "dbSNP",
@@ -94,7 +94,7 @@
             "ucschg_version": "hg38",
             "dtp_script": "dtp_dbsnp",
             "last_status": "pending",
-            "active": false
+            "active": true
         },
         {
             "source_system": "dbSNP",
@@ -106,7 +106,7 @@
             "ucschg_version": "hg38",
             "dtp_script": "dtp_dbsnp",
             "last_status": "pending",
-            "active": false
+            "active": true
         },
         {
             "source_system": "dbSNP",
@@ -118,7 +118,7 @@
             "ucschg_version": "hg38",
             "dtp_script": "dtp_dbsnp",
             "last_status": "pending",
-            "active": false
+            "active": true
         },
         {
             "source_system": "dbSNP",
@@ -130,7 +130,7 @@
             "ucschg_version": "hg38",
             "dtp_script": "dtp_dbsnp",
             "last_status": "pending",
-            "active": false
+            "active": true
         },
         {
             "source_system": "dbSNP",
@@ -142,7 +142,7 @@
             "ucschg_version": "hg38",
             "dtp_script": "dtp_dbsnp",
             "last_status": "pending",
-            "active": false
+            "active": true
         },
         {
             "source_system": "dbSNP",
@@ -154,7 +154,7 @@
             "ucschg_version": "hg38",
             "dtp_script": "dtp_dbsnp",
             "last_status": "pending",
-            "active": false
+            "active": true
         },
         {
             "source_system": "dbSNP",
@@ -166,7 +166,7 @@
             "ucschg_version": "hg38",
             "dtp_script": "dtp_dbsnp",
             "last_status": "pending",
-            "active": false
+            "active": true
         },
         {
             "source_system": "dbSNP",
@@ -178,7 +178,7 @@
             "ucschg_version": "hg38",
             "dtp_script": "dtp_dbsnp",
             "last_status": "pending",
-            "active": false
+            "active": true
         },
         {
             "source_system": "dbSNP",
@@ -190,7 +190,7 @@
             "ucschg_version": "hg38",
             "dtp_script": "dtp_dbsnp",
             "last_status": "pending",
-            "active": false
+            "active": true
         },
         {
             "source_system": "dbSNP",
@@ -202,7 +202,7 @@
             "ucschg_version": "hg38",
             "dtp_script": "dtp_dbsnp",
             "last_status": "pending",
-            "active": false
+            "active": true
         },
         {
             "source_system": "dbSNP",
@@ -214,7 +214,7 @@
             "ucschg_version": "hg38",
             "dtp_script": "dtp_dbsnp",
             "last_status": "pending",
-            "active": false
+            "active": true
         },
         {
             "source_system": "dbSNP",
@@ -226,7 +226,7 @@
             "ucschg_version": "hg38",
             "dtp_script": "dtp_dbsnp",
             "last_status": "pending",
-            "active": false
+            "active": true
         },
         {
             "source_system": "dbSNP",
@@ -238,7 +238,7 @@
             "ucschg_version": "hg38",
             "dtp_script": "dtp_dbsnp",
             "last_status": "pending",
-            "active": false
+            "active": true
         },
         {
             "source_system": "dbSNP",
@@ -250,7 +250,7 @@
             "ucschg_version": "hg38",
             "dtp_script": "dtp_dbsnp",
             "last_status": "pending",
-            "active": false
+            "active": true
         },
         {
             "source_system": "dbSNP",
@@ -262,7 +262,7 @@
             "ucschg_version": "hg38",
             "dtp_script": "dtp_dbsnp",
             "last_status": "pending",
-            "active": false
+            "active": true
         },
         {
             "source_system": "dbSNP",
@@ -274,7 +274,7 @@
             "ucschg_version": "hg38",
             "dtp_script": "dtp_dbsnp",
             "last_status": "pending",
-            "active": false
+            "active": true
         },
         {
             "source_system": "dbSNP",
@@ -286,7 +286,7 @@
             "ucschg_version": "hg38",
             "dtp_script": "dtp_dbsnp",
             "last_status": "pending",
-            "active": false
+            "active": true
         },
         {
             "source_system": "dbSNP",
@@ -298,7 +298,7 @@
             "ucschg_version": "hg38",
             "dtp_script": "dtp_dbsnp",
             "last_status": "pending",
-            "active": false
+            "active": true
         },
         {
             "source_system": "dbSNP",
@@ -310,7 +310,7 @@
             "ucschg_version": "hg38",
             "dtp_script": "dtp_dbsnp",
             "last_status": "pending",
-            "active": false
+            "active": true
         },
         {
             "source_system": "dbSNP",
