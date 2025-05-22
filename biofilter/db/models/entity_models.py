@@ -78,7 +78,7 @@ class EntityName(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     entity_id = Column(Integer, nullable=False)
     # entity_id = Column(Integer, ForeignKey("entities.id"))
-    datasource_id = Column(Integer, nullable=False)
+    data_source_id = Column(Integer, nullable=False)
     name = Column(String, nullable=False)
     # None value = False by default (Save db space)
     is_primary = Column(Boolean, nullable=True, default=None)

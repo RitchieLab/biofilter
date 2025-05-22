@@ -2,22 +2,41 @@ from biofilter import Biofilter
 
 db_uri = "sqlite:///dev_biofilter.db"
 
-bf = Biofilter(db_uri)
+if __name__ == "__main__":
 
-# bf.update(source_system=["HGNC"])
-bf.update(data_sources=["hgnc_genes"], run_steps=["extract"], force_steps=["extract"])
-# bf.update(data_sources=["dbSNP_chrY"], run_steps=["load"], force_steps=["load"])
-# bf.update(data_sources=["dbSNP_chr22"])
-# bf.update(source_system=["dbSNP"], run_steps=["extract"], force_steps=["extract"])
-# bf.update(
-#     data_sources=["dbSNP_chrY"], run_steps=["extract"], force_steps=["extract"]
-# )
-# bf.update(
-#     data_sources=["Reactome_Pathways"], run_steps=["extract"]
-# )
-# bf.update(
-#     data_sources=["dbSNP_SAMPLE"], run_steps=["load"], force_steps=["load"]
-# )
+    bf = Biofilter(db_uri)
+
+    # ETL HGNC -- GENES
+    # bf.update(data_sources=["hgnc"], run_steps=["extract"], force_steps=["extract"])      # noqa: E501
+    # bf.update(data_sources=["hgnc"], run_steps=["transform"], force_steps=["transform"])  # noqa: E501
+    # bf.update(data_sources=["hgnc"], run_steps=["load"], force_steps=["load"])
+
+    # ETL dbSNP - VARIANTS
+    # bf.update(
+    #     data_sources=["dbsnp_sample"], run_steps=["extract"], force_steps=["extract"]
+    # )  # noqa: E501
+    # bf.update(
+    #     data_sources=["dbsnp_sample"],
+    #     run_steps=["transform"],
+    #     force_steps=["transform"],
+    # )  # noqa: E501
+    # bf.update(
+    #     data_sources=["dbsnp_sample"], run_steps=["load"], force_steps=["load"]
+    # )  # noqa: E501
+
+    # bf.update(data_sources=["dbsnp_chr1"], run_steps=["extract"], force_steps=["extract"])  # noqa: E501
+    bf.update(data_sources=["dbsnp_chr1"], run_steps=["transform"], force_steps=["transform"])  # noqa: E501
+    bf.update(data_sources=["dbsnp_chr1"], run_steps=["load"], force_steps=["load"])  # noqa: E501
+
+    # bf.update(data_sources=["dbsnp_chrx"], run_steps=["extract"], force_steps=["extract"])  # noqa: E501
+    # bf.update(data_sources=["dbsnp_chrx"], run_steps=["transform"], force_steps=["transform"])  # noqa: E501
+    # bf.update(data_sources=["dbsnp_chrx"], run_steps=["load"], force_steps=["load"])  # noqa: E501
+
+    # ETL REACTOME - PATHWAYS
+    # bf.update(data_sources=["reactome"], run_steps=["extract"], force_steps=["extract"]) # noqa: E501
+    # bf.update(data_sources=["reactome"], run_steps=["transform"], force_steps=["transform"]) # noqa: E501
+    # bf.update(data_sources=["reactome"], run_steps=["load"], force_steps=["load"]) # noqa: E501
 
 
 print("Database updated successfully.")
+print("-----------------------------------------------------------------")

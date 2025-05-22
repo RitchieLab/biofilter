@@ -1,8 +1,7 @@
 import os
-import re
 import ast
 import bz2
-import json
+import glob
 import pandas as pd
 import __main__
 import sys
@@ -20,92 +19,8 @@ from biofilter.db.models.variants_models import (
     VariantGeneRelationship,
 )
 
-
-def transform_batch(lines_batch):
-    results = []
-
-    for line in lines_batch:
-        record = json.loads(line)
-        rs_id = f"{record['refsnp_id']}"
-        last_build_id = record.get("last_update_build_id", None)
-        primary_data = record.get("primary_snapshot_data", {})
-        variant_type = primary_data.get("variant_type", None)
-
-        if variant_type != "snv":
-            continue
-        # Apos reuniao com a Molly, ela solicitou que apenas as snv fosse carregadas no sistama
-
-        # Run only last build
-        placements = primary_data.get("placements_with_allele", [])
-        ptlp_placement = next(
-            (p for p in placements if p.get("is_ptlp", False)), None
-        )  # noqa: E501
-
-        # Get Genes ID
-        gene_ids = set()
-        for allele_annot in primary_data.get("allele_annotations", []):
-            for assembly in allele_annot.get("assembly_annotation", []):
-                for gene in assembly.get("genes", []):
-                    gene_id = gene.get("id")
-                    if gene_id:
-                        gene_ids.add(gene_id)
-
-        # Get Allele Info
-        if ptlp_placement:
-            for allele_info in ptlp_placement.get("alleles", []):
-
-                # Get Data
-                hgvs = allele_info.get("hgvs")
-                spdi = allele_info.get("allele", {}).get("spdi", {})
-                seq_id = spdi.get("seq_id")
-                spdi_position = spdi.get("position")
-                position_base_1 = int(spdi_position + 1)
-                alt_seq = spdi.get("inserted_sequence")
-
-                match = re.match(r"^(.*?):g\.([\d_]+)(.*)$", hgvs)
-                pos_raw = match.group(2)
-                suffix = match.group(3)
-
-                # Positions
-                if "_" in pos_raw:
-                    pos_start, pos_end = map(int, pos_raw.split("_"))
-                else:
-                    pos_start = pos_end = int(pos_raw)
-
-                # Type
-                if suffix == "=":
-                    allele_type = "ref"
-                elif "del" in suffix:
-                    allele_type = "del"
-                elif "dup" in suffix:
-                    allele_type = "dup"
-                elif re.search(r"\[\d+\]$", suffix):
-                    allele_type = "rep"
-                elif re.match(r"[ACGT]>[ACGT]", suffix):
-                    allele_type = "sub"
-                else:
-                    allele_type = "oth"
-
-                results.append(
-                    {
-                        "rs_id": rs_id,
-                        "build_id": last_build_id,
-                        "seq_id": seq_id,
-                        "var_type": variant_type,
-                        "hgvs": hgvs,
-                        "position_base_1": position_base_1,
-                        "position_start": pos_start,
-                        "position_end": pos_end,
-                        "allele_type": allele_type,
-                        "allele": alt_seq,
-                        "gene_ids": list(gene_ids),
-                    }
-                )
-
-    return results
-
-
-# TODO: Ajustar o source_url
+# Worker function to suport transform in parallel
+from biofilter.etl.dtps.worker_dbsnp import worker_dbsnp
 
 
 class DTP(DTPBase, VariantQueryMixin):
@@ -134,7 +49,8 @@ class DTP(DTPBase, VariantQueryMixin):
         """
 
         self.logger.log(
-            f"⬇️ Starting extraction of {self.data_source.name} data...", "INFO"
+            f"⬇️ Starting extraction of {self.data_source.name} data...",
+            "INFO",  # noqa: E501
         )  # noqa: E501
 
         msg = ""
@@ -177,7 +93,7 @@ class DTP(DTPBase, VariantQueryMixin):
                 return False, msg, current_hash
 
             # Finish block
-            msg = f"✅ {self.data_source.name} file downloaded to {landing_path}"
+            msg = f"✅ {self.data_source.name} file downloaded to {landing_path}"  # noqa: E501
             self.logger.log(msg, "INFO")
             return True, msg, current_hash
 
@@ -206,93 +122,69 @@ class DTP(DTPBase, VariantQueryMixin):
         # OUTPUT DATA
         output_dir = self.get_path(processed_path)
         output_dir.mkdir(parents=True, exist_ok=True)
+        # Clean only batch CSVs that follow the expected naming
+        for f in output_dir.iterdir():
+            if f.name.startswith("processed_part_") and f.name.endswith(".csv"):
+                f.unlink()
 
         # VARIABLES
-        batch_size: int = 1000
+        # Transfer to interface this parameters
+        batch_size: int = 10_000
         max_workers: int = 10
-        # assembly: str = "GRCh38"
-        status = False
 
-        results = []
         futures = []
         batch = []
+        batch_id = 0
 
         try:
-            with bz2.open(input_file, "rt", encoding="utf-8") as f:
-                # if hasattr(__main__, "__file__"):
+            # Get GenomeAssembly IDs List
+            assembly_map = {
+                a.accession: str(a.id)
+                for a in self.session.query(GenomeAssembly)  # noqa: E501
+            }
+
+            with bz2.open(input_file, "rt", encoding="utf-8") as f, ProcessPoolExecutor(  # noqa: E501
+                max_workers=max_workers
+            ) as executor:  # noqa: E501
                 if __name__ == "__main__" or (
                     hasattr(__main__, "__file__") and not hasattr(sys, "ps1")
                 ):
-                    with ProcessPoolExecutor(max_workers=max_workers) as executor:
 
-                        for line in f:
-                            batch.append(line)
-                            if len(batch) >= batch_size:
-                                futures.append(
-                                    executor.submit(transform_batch, batch)
-                                )  # noqa: E501
-                                batch = []
+                    for line in f:
+                        batch.append(line)
+                        if len(batch) >= batch_size:
+                            futures.append(
+                                executor.submit(
+                                    worker_dbsnp,
+                                    batch.copy(),
+                                    batch_id,
+                                    output_dir,
+                                    assembly_map,
+                                )
+                            )  # noqa: E501
+                            batch.clear()
+                            batch_id += 1
 
-                        # Runs the last batch
-                        if batch:
-                            futures.append(executor.submit(transform_batch, batch))
+                    if batch:
+                        futures.append(
+                            executor.submit(
+                                worker_dbsnp,
+                                batch.copy(),
+                                batch_id,
+                                output_dir,
+                                assembly_map,
+                            )
+                        )  # noqa: E501
 
-                        # Rescues the results from the futures
-                        for future in as_completed(futures):
-                            try:
-                                batch_result = future.result()
-                                results.extend(batch_result)
-                            except Exception as e:
-                                msg = f"⚠️ Worker failed during batch transform: {e}"
-                                self.logger.log(msg, "WARNING")
-
+                    for future in as_completed(futures):
+                        future.result()
                 else:
-                    msg = "⚠️ Skipping multiprocessing: not in __main__ context."
+                    msg = "⚠️ Skipping multiprocessing: not in __main__ context."  # noqa: E501
                     self.logger.log(msg, "WARNING")
 
-            # Save the results to a CSV file
-            transform_df = pd.DataFrame(results)
-
-            # # Buscar os valores do banco
-            # variant_type_map = {v.name: str(v.id) for v in self.session.query(VariantType)}
-            # allele_type_map = {a.name: str(a.id) for a in self.session.query(AlleleType)}
-            assembly_map = {
-                a.accession: str(a.id) for a in self.session.query(GenomeAssembly)
-            }
-
-            # # Mapear as colunas
-            # transform_df["variant_type_id"] = transform_df["var_type"].map(variant_type_map)
-            # transform_df["allele_type_id"] = transform_df["allele_type"].map(allele_type_map)
-            transform_df["assembly_id"] = transform_df["seq_id"].map(assembly_map)
-
-            column_order = [
-                "build_id",
-                "rs_id",
-                "seq_id",
-                "assembly_id",
-                "var_type",
-                # "variant_type_id",
-                "hgvs",
-                "position_base_1",
-                "position_start",
-                "position_end",
-                "allele_type",
-                # "allele_type_id",
-                "allele",
-                "gene_ids",
-            ]
-
-            # Reorganiza o DataFrame (ignora colunas faltantes)
-            transform_df = transform_df[
-                [col for col in column_order if col in transform_df.columns]
-            ]
-
-            transform_df.to_csv(output_dir / "processed_data.csv", index=False)
-
-            msg = f"✅ Transform completed with {len(transform_df)} records."
+            msg = f"✅ Processing completed with {len(futures)} batches."
             self.logger.log(msg, "INFO")
-            status = True
-            return transform_df, status, msg
+            return None, True, msg
 
         except Exception as e:
             msg = f"❌ ETL transform failed: {str(e)}"
@@ -324,18 +216,14 @@ class DTP(DTPBase, VariantQueryMixin):
                 return total_variants, load_status, msg
 
             processed_path = self.get_path(processed_path)
-            processed_data = str(
-                processed_path / "processed_data.csv"
-            )  # TODO: change to Msater_data
+            csv_files = sorted(glob.glob(str(processed_path / "processed_part_*.csv")))
 
-            if not os.path.exists(processed_data):
-                msg = f"File not found: {processed_data}"
+            if not csv_files:
+                msg = f"No part files found in {processed_path}"
                 self.logger.log(msg, "ERROR")
                 return total_variants, load_status, msg
 
-            self.logger.log(f"📥 Reading data in chunks from {processed_data}", "INFO")
-
-            df = pd.read_csv(processed_data, dtype=str)
+            self.logger.log(f"📄 Found {len(csv_files)} part files to load", "INFO")
 
         # Apaga os dados da tabela de links
         self.session.query(VariantGeneRelationship).filter_by(
@@ -350,120 +238,83 @@ class DTP(DTPBase, VariantQueryMixin):
         self.session.commit()
         self.logger.log("🗑️ Previous records deleted for this data source", "INFO")
 
-        # 🧼 Limpeza de dados
-        # df["position"] = df["position_base_1"].astype(int)
-        # df["assembly_id"] = df["assembly_id"].astype(int)
-        # df["chromosome"] = df["assembly_id"].astype(str) # Adicionar o Cromossmo do CSV
-        df["ref"] = ""
-        df["alt"] = ""
-        # df["rs_id"] = df["rs_id"].astype(str)
+        # Processa arquivo por arquivo
+        for csv_file in csv_files:
+            self.logger.log(f"📂 Processing {csv_file}", "INFO")
+            df = pd.read_csv(csv_file, dtype=str)
+            df["ref"] = ""
+            df["alt"] = ""
 
-        # Isola os registros do tipo 'ref' para obter o alelo de referência
-        df_ref = df[df["allele_type"] == "ref"].copy()
-        df_ref = df_ref[
-            ["rs_id", "position_base_1", "assembly_id", "allele"]
-        ].drop_duplicates("rs_id")
+            # ➤ Preparar DataFrame de Variants
+            df_ref = df[df["allele_type"] == "ref"].copy()
+            df_ref = df_ref[["rs_id", "position_base_1", "assembly_id", "allele"]].drop_duplicates("rs_id")
 
-        # Agrupa os alternativos por rs_id e junta os diferentes ALT
-        df_alt = (
-            df[df["allele_type"] == "sub"]
-            .groupby("rs_id")["allele"]
-            .agg(lambda alleles: "/".join(sorted(set(alleles))))
-            .reset_index()
-            .rename(columns={"allele": "alt"})
-        )
-
-        # 🔄 Certifique-se de que os tipos são iguais para merge
-        df_ref["rs_id"] = df_ref["rs_id"].astype(str)
-        df_alt["rs_id"] = df_alt["rs_id"].astype(str)
-
-        # Junta ref + alt
-        df_variants = df_ref.merge(df_alt, on="rs_id", how="left")
-        df_variants["alt"] = df_variants["alt"].fillna(
-            ""
-        )  # pode haver variante sem alt
-
-        # Vou apagar quem nao tem assenmbly_id
-        df_variants = df_variants.dropna(subset=["assembly_id", "position_base_1"])
-
-        df_variants["assembly_id"] = df_variants["assembly_id"].astype(int)
-        df_variants["position_base_1"] = df_variants["position_base_1"].astype(int)
-
-        # 🔄 Inserção em batch
-        variants_to_insert = []
-        for _, row in df_variants.iterrows():
-            variant = Variant(
-                rs_id=row["rs_id"],
-                position=row["position_base_1"],
-                assembly_id=row["assembly_id"],
-                chromosome=row["assembly_id"],
-                ref=row["allele"],
-                alt=row["alt"],
-                data_source_id=data_source_id,
+            df_alt = (
+                df[df["allele_type"] == "sub"]
+                .groupby("rs_id")["allele"]
+                .agg(lambda alleles: "/".join(sorted(set(alleles))))
+                .reset_index()
+                .rename(columns={"allele": "alt"})
             )
-            variants_to_insert.append(variant)
 
-        try:
-            self.session.bulk_save_objects(variants_to_insert)
+            df_ref["rs_id"] = df_ref["rs_id"].astype(str)
+            df_alt["rs_id"] = df_alt["rs_id"].astype(str)
+            df_variants = df_ref.merge(df_alt, on="rs_id", how="left")
+            df_variants["alt"] = df_variants["alt"].fillna("")
+            df_variants = df_variants.dropna(subset=["assembly_id", "position_base_1"])
+            df_variants["assembly_id"] = df_variants["assembly_id"].astype(int)
+            df_variants["position_base_1"] = df_variants["position_base_1"].astype(int)
+
+            variants_to_insert = [
+                Variant(
+                    rs_id=row["rs_id"],
+                    position=row["position_base_1"],
+                    assembly_id=row["assembly_id"],
+                    chromosome=row["assembly_id"],
+                    ref=row["allele"],
+                    alt=row["alt"],
+                    data_source_id=data_source_id
+                )
+                for _, row in df_variants.iterrows()
+            ]
+
+            try:
+                self.session.bulk_save_objects(variants_to_insert)
+                self.session.commit()
+                total_variants += len(variants_to_insert)
+            except IntegrityError as e:
+                self.session.rollback()
+                self.logger.log(f"❌ Integrity error in {csv_file}: {str(e)}", "ERROR")
+
+            # ➤ Gene links
+            df_links = df[df["gene_ids"].notna() & (df["gene_ids"] != "[]")].copy()
+            df_links = df_links[["rs_id", "gene_ids"]].drop_duplicates("rs_id")
+            df_links["gene_ids"] = df_links["gene_ids"].apply(
+                lambda x: ast.literal_eval(x) if isinstance(x, str) else x
+            )
+            df_links = df_links.explode("gene_ids")
+            df_links["gene_ids"] = df_links["gene_ids"].astype(int)
+            df_links["rs_id"] = df_links["rs_id"].astype(str)
+
+            links_to_insert = [
+                VariantGeneRelationship(
+                    gene_id=row["gene_ids"],
+                    variant_id=row["rs_id"],
+                    data_source_id=data_source_id
+                )
+                for _, row in df_links.iterrows()
+            ]
+
+            self.session.bulk_save_objects(links_to_insert)
             self.session.commit()
-            total_inserted = len(variants_to_insert)
-            load_status = True
-            message = f"✅ Loaded {total_inserted} variants into database."
-            self.logger.log(message, "SUCCESS")
+            self.logger.log(f"✅ Inserted {len(links_to_insert)} gene-variant links from {csv_file}", "INFO")
 
-        except IntegrityError as e:
-            self.session.rollback()
-            message = f"❌ Integrity error during load: {str(e)}"
-            self.logger.log(message, "ERROR")
-
-        # Processar os genes variantes links
-        # 1. Remove registros sem genes
-        df_links = df[df["gene_ids"].notna() & (df["gene_ids"] != "[]")].copy()
-
-        df_links = df_links[["rs_id", "gene_ids"]].drop_duplicates("rs_id")
-
-        # 2. Converte string para lista (se necessário)
-        df_links["gene_ids"] = df_links["gene_ids"].apply(
-            lambda x: ast.literal_eval(x) if isinstance(x, str) else x
-        )
-
-        # 3. Explode o campo gene_ids
-        df_links = df_links.explode("gene_ids")
-
-        # 5. (Opcional) Converte tipos para segurança
-        df_links["gene_ids"] = df_links["gene_ids"].astype(int)
-        df_links["rs_id"] = df_links["rs_id"].astype(str)
-
-        links_to_insert = []
-
-        for _, row in df_links.iterrows():
-            link = VariantGeneRelationship(
-                gene_id=row["gene_ids"],
-                variant_id=row["rs_id"],
-                data_source_id=data_source_id,
-            )
-            links_to_insert.append(link)
-
-        self.session.bulk_save_objects(links_to_insert)
-        self.session.commit()
-        self.logger.log(
-            f"✅ Inserted {len(links_to_insert)} gene-variant links", "INFO"
-        )
-
-        # Manutencao:
+        # Vacuum + manutenção final
         self.session.execute(text("VACUUM"))
         self.session.commit()
 
-        self.session.execute(text("DROP INDEX IF EXISTS uq_gene_variant"))
-        self.session.execute(
-            text(
-                """
-            CREATE UNIQUE INDEX uq_gene_variant 
-            ON gene_variant_links (gene_id, variant_id)
-        """
-            )
-        )
-        self.session.commit()
-        # TODO criar um methodo optimize_database() para essas tarefas
+        load_status = True
+        message = f"✅ Loaded {total_variants} variants from {len(csv_files)} CSV chunks."
+        self.logger.log(message, "SUCCESS")
 
-        return total_inserted, load_status, message
+        return total_variants, load_status, message

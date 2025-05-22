@@ -361,10 +361,12 @@ class ETLManager:
                     transform_df, status, message = dtp_instance.transform(
                         download_path, processed_path
                     )  # noqa E501
-                    # No data returned set status to False
+
                     if transform_df is None or transform_df.empty:
-                        status = False
-                        message = "Transform returned an empty DataFrame"
+                        # status = False
+                        # message = "Transform returned an empty DataFrame"
+                        transform_df = None
+
                     process.transform_end = datetime.now()
                     if status:
                         process.transform_status = "completed"
@@ -401,6 +403,7 @@ class ETLManager:
                     records, status, message = dtp_instance.load(
                         transform_df, processed_path
                     )  # noqa E501
+                    # TODO: na funcao essa como processed_dir
 
                     process.load_end = datetime.now()
                     if status:

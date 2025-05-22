@@ -37,7 +37,8 @@ class DTP(DTPBase, EntityQueryMixin):
         """
 
         self.logger.log(
-            f"⬇️ Starting extraction of {self.data_source.name} data...", "INFO"  # noqa: E501
+            f"⬇️ Starting extraction of {self.data_source.name} data...",
+            "INFO",  # noqa: E501
         )  # noqa: E501
 
         msg = ""
@@ -112,8 +113,8 @@ class DTP(DTPBase, EntityQueryMixin):
             f"🔧 Transforming the {self.data_source.name} data ...", "INFO"
         )  # noqa: E501
 
+        msg = ""
         try:
-            msg = ""
             landing_path = os.path.join(
                 raw_dir,
                 self.data_source.source_system.name,
@@ -294,7 +295,7 @@ class DTP(DTPBase, EntityQueryMixin):
 
             msg = "Transformation Completed"
 
-            return None, True, msg
+            return df_pathways, True, msg
 
         except Exception as e:
             msg = f"❌ ETL transform failed: {str(e)}"
@@ -304,7 +305,7 @@ class DTP(DTPBase, EntityQueryMixin):
     # 📥  ------------------------ 📥
     # 📥  ------ LOAD FASE ------  📥
     # 📥  ------------------------ 📥
-    def load(self, df=None, processed_path=None, chunk_size=100_000):
+    def load(self, df=None, processed_dir=None, chunk_size=100_000):
 
         self.logger.log(
             f"📥 Loading {self.data_source.name} data into the database...",
@@ -320,12 +321,12 @@ class DTP(DTPBase, EntityQueryMixin):
         data_source_id = self.data_source.id
 
         if df is None:
-            if not processed_path:
+            if not processed_dir:
                 msg = "Either 'df' or 'processed_path' must be provided."
                 self.logger.log(msg, "ERROR")
                 return total_pathways, load_status, msg
 
-            processed_path = self.get_path(processed_path)
+            processed_path = self.get_path(processed_dir)
             processed_data = str(processed_path / "master_data.csv")
 
             if not os.path.exists(processed_data):
@@ -384,7 +385,7 @@ class DTP(DTPBase, EntityQueryMixin):
             existing_pathway = (
                 self.session.query(Pathway)
                 .filter_by(
-                    reactome_id=pathway_master,
+                    pathway_id=pathway_master,
                 )
                 .first()
             )

@@ -43,12 +43,12 @@ class DTPBase:
     # File System Management Methods
     def get_path(self, path: str) -> Path:
         raw_path_ds = (
-            Path(path) / self.datasource.source_system.name / self.datasource.name
+            Path(path) / self.data_source.source_system.name / self.data_source.name
         )  # noqa: E501
         raw_path_ds.mkdir(parents=True, exist_ok=True)
         return raw_path_ds
 
     def get_raw_file(self, raw_path: str) -> Path:
         raw_path_ds = self.get_path(raw_path)
-        filename = Path(self.datasource.source_url).name
+        filename = Path(self.data_source.source_url).name
         return raw_path_ds / filename

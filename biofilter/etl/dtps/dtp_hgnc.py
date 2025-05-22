@@ -41,14 +41,15 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
         """
 
         self.logger.log(
-            f"⬇️ Starting extraction of {self.data_source.name} data...", "INFO"
+            f"⬇️  Starting extraction of {self.data_source.name} data...",
+            "INFO",  # noqa: E501
         )  # noqa: E501
 
         msg = ""
         source_url = self.data_source.source_url
         if force_steps:
             last_hash = ""
-            msg = "Ignoring hash check."
+            msg = "Ignoring hash check, forcing download"
             self.logger.log(msg, "WARNING")
         else:
             last_hash = self.etl_process.raw_data_hash
@@ -64,7 +65,7 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
             file_path = os.path.join(landing_path, "hgnc_data.json")
 
             # Download the file
-            msg = f"⬇️ Fetching JSON from API: {source_url} ..."
+            msg = f"⬇️  Fetching JSON from API: {source_url} ..."
             self.logger.log(msg, "INFO")
 
             headers = {"Accept": "application/json"}
@@ -98,7 +99,8 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
     # ⚙️  ----------------------------  ⚙️
     # ⚙️  ------ TRANSFORM FASE ------  ⚙️
     # ⚙️  ----------------------------  ⚙️
-    def transform(self, raw_path, processed_path):
+    # def transform(self, raw_path, processed_path):
+    def transform(self, raw_dir: str, processed_dir: str):
 
         self.logger.log(
             f"🔧 Transforming the {self.data_source.name} data ...", "INFO"
@@ -106,14 +108,26 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
 
         msg = ""
         try:
-            # Paths
-            json_file = os.path.join(raw_path, "hgnc", "hgnc_data.json")
-            csv_file = os.path.join(processed_path, "hgnc", "hgnc_data.csv")
+            # json_file = os.path.join(raw_path, "hgnc", "hgnc_data.json")
+            landing_path = os.path.join(
+                raw_dir,
+                self.data_source.source_system.name,
+                self.data_source.name,
+            )
+            processed_path = os.path.join(
+                processed_dir,
+                self.data_source.source_system.name,
+                self.data_source.name,
+            )
+            os.makedirs(processed_path, exist_ok=True)
+
+            json_file = os.path.join(landing_path, "hgnc_data.json")
+            csv_file = os.path.join(processed_path, "master_data.csv")
 
             # Check if the JSON file exists
             if not os.path.exists(json_file):
                 msg = f"File not found: {json_file}"
-                raise Exception(msg)
+                return None, False, msg
 
             # Create output directory if it doesn't exist
             os.makedirs(os.path.dirname(csv_file), exist_ok=True)
@@ -147,7 +161,7 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
     # 📥  ------------------------ 📥
     # 📥  ------ LOAD FASE ------  📥
     # 📥  ------------------------ 📥
-    def load(self, df=None, processed_path=None):
+    def load(self, df=None, processed_dir=None, chunk_size=100_000):
 
         self.logger.log(
             f"📥 Loading {self.data_source.name} data into the database...",
@@ -172,18 +186,27 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
         # Check source of data. It can be integrated either using a DataFrame
         # or by specifying the data path as a CSV file.
         if df is None:
-            if not processed_path:
-                msg = "Either 'df' or 'processed_path' must be provided."
+            if not processed_dir:
+                msg = "Either 'df' or 'processed_dir' must be provided."
                 self.logger.log(msg, "ERROR")
                 return total_gene, load_status
                 # raise ValueError(msg)
-            msg = f"Loading data from {processed_path}"
-            self.logger.log(msg, "INFO")
-            # TODO: Fix the path to processed_path (avoid hardcode now)
-            conflict_path = processed_path + "hgnc/hgnc_data_conflict.csv"
-            processed_path = processed_path + "hgnc/hgnc_data.csv"
+            # msg = f"Loading data from {processed_path}"
+            # self.logger.log(msg, "INFO")
+            # # TODO: Fix the path to processed_path (avoid hardcode now)
+
+            processed_path = os.path.join(
+                processed_dir,
+                self.data_source.source_system.name,
+                self.data_source.name,
+            )
+
+            conflict_path = processed_path + "/master_data_conflict.csv"
+            processed_path = processed_path + "/master_data.csv"
 
             # Switch to Conflict Mode
+            # Reclace the processed_path with the conflict_path and load genes
+            # with previous conflicts indentified
             if self.use_conflict_csv:
                 processed_path = conflict_path
 
@@ -199,16 +222,16 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
         if not hasattr(self, "entity_group") or self.entity_group is None:
             group = (
                 self.session.query(EntityGroup)
-                .filter_by(name="Genomics")
+                .filter_by(name="Genes")
                 .first()  # noqa: E501
             )  # noqa: E501
             if not group:
-                msg = "EntityGroup 'Genomics' not found in the database."
+                msg = "EntityGroup 'Genes' not found in the database."
                 self.logger.log(msg, "ERROR")
                 return total_gene, load_status
                 # raise ValueError(msg)
             self.entity_group = group.id
-            msg = f"EntityGroup ID for 'Genomics' is {self.entity_group}"
+            msg = f"EntityGroup ID for 'Genes' is {self.entity_group}"
             self.logger.log(msg, "DEBUG")
 
         # Preload the HGNC IDs with resolved conflicts

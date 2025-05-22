@@ -2,7 +2,7 @@
     "entity_groups": [
         {
             "id": 1,
-            "name": "Genomics",
+            "name": "Genes",
             "description": "Genetic elements such as genes, SNPs, and sequences"
         },
         {

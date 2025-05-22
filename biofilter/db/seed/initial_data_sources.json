@@ -2,9 +2,9 @@
     "data_sources": [
         {
             "source_system": "HGNC",
-            "name": "hgnc_genes",
+            "name": "hgnc",
             "data_type": "Gene",
-            "source_url": "https://rest.genenames.org/fetch/all/hgnc_data.json",
+            "source_url": "https://rest.genenames.org/fetch/all",
             "format": "JSON",
             "grch_version": "GRCh38",
             "ucschg_version": "hg38",
@@ -14,7 +14,7 @@
         },
         {
             "source_system": "dbSNP",
-            "name": "dbSNP_chr1",
+            "name": "dbsnp_chr1",
             "data_type": "Variant",
             "source_url": "https://ftp.ncbi.nlm.nih.gov/snp/latest_release/JSON/refsnp-chr1.json.bz2",
             "format": "JSON",
@@ -26,7 +26,7 @@
         },
         {
             "source_system": "dbSNP",
-            "name": "dbSNP_chr2",
+            "name": "dbsnp_chr2",
             "data_type": "Variant",
             "source_url": "https://ftp.ncbi.nlm.nih.gov/snp/latest_release/JSON/refsnp-chr2.json.bz2",
             "format": "JSON",
@@ -38,7 +38,7 @@
         },
         {
             "source_system": "dbSNP",
-            "name": "dbSNP_chr3",
+            "name": "dbsnp_chr3",
             "data_type": "Variant",
             "source_url": "https://ftp.ncbi.nlm.nih.gov/snp/latest_release/JSON/refsnp-chr3.json.bz2",
             "format": "JSON",
@@ -50,7 +50,7 @@
         },
         {
             "source_system": "dbSNP",
-            "name": "dbSNP_chr4",
+            "name": "dbsnp_chr4",
             "data_type": "Variant",
             "source_url": "https://ftp.ncbi.nlm.nih.gov/snp/latest_release/JSON/refsnp-chr4.json.bz2",
             "format": "JSON",
@@ -62,7 +62,7 @@
         },
         {
             "source_system": "dbSNP",
-            "name": "dbSNP_chr5",
+            "name": "dbsnp_chr5",
             "data_type": "Variant",
             "source_url": "https://ftp.ncbi.nlm.nih.gov/snp/latest_release/JSON/refsnp-chr5.json.bz2",
             "format": "JSON",
@@ -74,7 +74,7 @@
         },
         {
             "source_system": "dbSNP",
-            "name": "dbSNP_chr6",
+            "name": "dbsnp_chr6",
             "data_type": "Variant",
             "source_url": "https://ftp.ncbi.nlm.nih.gov/snp/latest_release/JSON/refsnp-chr6.json.bz2",
             "format": "JSON",
@@ -86,7 +86,7 @@
         },
         {
             "source_system": "dbSNP",
-            "name": "dbSNP_chr7",
+            "name": "dbsnp_chr7",
             "data_type": "Variant",
             "source_url": "https://ftp.ncbi.nlm.nih.gov/snp/latest_release/JSON/refsnp-chr7.json.bz2",
             "format": "JSON",
@@ -98,7 +98,7 @@
         },
         {
             "source_system": "dbSNP",
-            "name": "dbSNP_chr8",
+            "name": "dbsnp_chr8",
             "data_type": "Variant",
             "source_url": "https://ftp.ncbi.nlm.nih.gov/snp/latest_release/JSON/refsnp-chr8.json.bz2",
             "format": "JSON",
@@ -110,7 +110,7 @@
         },
         {
             "source_system": "dbSNP",
-            "name": "dbSNP_chr9",
+            "name": "dbsnp_chr9",
             "data_type": "Variant",
             "source_url": "https://ftp.ncbi.nlm.nih.gov/snp/latest_release/JSON/refsnp-chr9.json.bz2",
             "format": "JSON",
@@ -122,7 +122,7 @@
         },
         {
             "source_system": "dbSNP",
-            "name": "dbSNP_chr10",
+            "name": "dbsnp_chr10",
             "data_type": "Variant",
             "source_url": "https://ftp.ncbi.nlm.nih.gov/snp/latest_release/JSON/refsnp-chr10.json.bz2",
             "format": "JSON",
@@ -134,7 +134,7 @@
         },
         {
             "source_system": "dbSNP",
-            "name": "dbSNP_chr11",
+            "name": "dbsnp_chr11",
             "data_type": "Variant",
             "source_url": "https://ftp.ncbi.nlm.nih.gov/snp/latest_release/JSON/refsnp-chr11.json.bz2",
             "format": "JSON",
@@ -146,7 +146,7 @@
         },
         {
             "source_system": "dbSNP",
-            "name": "dbSNP_chr12",
+            "name": "dbsnp_chr12",
             "data_type": "Variant",
             "source_url": "https://ftp.ncbi.nlm.nih.gov/snp/latest_release/JSON/refsnp-chr12.json.bz2",
             "format": "JSON",
@@ -158,7 +158,7 @@
         },
         {
             "source_system": "dbSNP",
-            "name": "dbSNP_chr13",
+            "name": "dbsnp_chr13",
             "data_type": "Variant",
             "source_url": "https://ftp.ncbi.nlm.nih.gov/snp/latest_release/JSON/refsnp-chr13.json.bz2",
             "format": "JSON",
@@ -170,7 +170,7 @@
         },
         {
             "source_system": "dbSNP",
-            "name": "dbSNP_chr14",
+            "name": "dbsnp_chr14",
             "data_type": "Variant",
             "source_url": "https://ftp.ncbi.nlm.nih.gov/snp/latest_release/JSON/refsnp-chr14.json.bz2",
             "format": "JSON",
@@ -182,7 +182,7 @@
         },
         {
             "source_system": "dbSNP",
-            "name": "dbSNP_chr15",
+            "name": "dbsnp_chr15",
             "data_type": "Variant",
             "source_url": "https://ftp.ncbi.nlm.nih.gov/snp/latest_release/JSON/refsnp-chr15.json.bz2",
             "format": "JSON",
@@ -194,7 +194,7 @@
         },
         {
             "source_system": "dbSNP",
-            "name": "dbSNP_chr16",
+            "name": "dbsnp_chr16",
             "data_type": "Variant",
             "source_url": "https://ftp.ncbi.nlm.nih.gov/snp/latest_release/JSON/refsnp-chr16.json.bz2",
             "format": "JSON",
@@ -206,7 +206,7 @@
         },
         {
             "source_system": "dbSNP",
-            "name": "dbSNP_chr17",
+            "name": "dbsnp_chr17",
             "data_type": "Variant",
             "source_url": "https://ftp.ncbi.nlm.nih.gov/snp/latest_release/JSON/refsnp-chr17.json.bz2",
             "format": "JSON",
@@ -218,7 +218,7 @@
         },
         {
             "source_system": "dbSNP",
-            "name": "dbSNP_chr18",
+            "name": "dbsnp_chr18",
             "data_type": "Variant",
             "source_url": "https://ftp.ncbi.nlm.nih.gov/snp/latest_release/JSON/refsnp-chr18.json.bz2",
             "format": "JSON",
@@ -230,7 +230,7 @@
         },
         {
             "source_system": "dbSNP",
-            "name": "dbSNP_chr19",
+            "name": "dbsnp_chr19",
             "data_type": "Variant",
             "source_url": "https://ftp.ncbi.nlm.nih.gov/snp/latest_release/JSON/refsnp-chr19.json.bz2",
             "format": "JSON",
@@ -242,7 +242,7 @@
         },
         {
             "source_system": "dbSNP",
-            "name": "dbSNP_chr20",
+            "name": "dbsnp_chr20",
             "data_type": "Variant",
             "source_url": "https://ftp.ncbi.nlm.nih.gov/snp/latest_release/JSON/refsnp-chr20.json.bz2",
             "format": "JSON",
@@ -254,7 +254,7 @@
         },
         {
             "source_system": "dbSNP",
-            "name": "dbSNP_chr21",
+            "name": "dbsnp_chr21",
             "data_type": "Variant",
             "source_url": "https://ftp.ncbi.nlm.nih.gov/snp/latest_release/JSON/refsnp-chr21.json.bz2",
             "format": "JSON",
@@ -266,7 +266,7 @@
         },
         {
             "source_system": "dbSNP",
-            "name": "dbSNP_chr22",
+            "name": "dbsnp_chr22",
             "data_type": "Variant",
             "source_url": "https://ftp.ncbi.nlm.nih.gov/snp/latest_release/JSON/refsnp-chr22.json.bz2",
             "format": "JSON",
@@ -278,7 +278,7 @@
         },
         {
             "source_system": "dbSNP",
-            "name": "dbSNP_chrX",
+            "name": "dbsnp_chrx",
             "data_type": "Variant",
             "source_url": "https://ftp.ncbi.nlm.nih.gov/snp/latest_release/JSON/refsnp-chrX.json.bz2",
             "format": "JSON",
@@ -290,7 +290,7 @@
         },
         {
             "source_system": "dbSNP",
-            "name": "dbSNP_chrY",
+            "name": "dbsnp_chry",
             "data_type": "Variant",
             "source_url": "https://ftp.ncbi.nlm.nih.gov/snp/latest_release/JSON/refsnp-chrY.json.bz2",
             "format": "JSON",
@@ -302,7 +302,7 @@
         },
         {
             "source_system": "dbSNP",
-            "name": "dbSNP_chrMT",
+            "name": "dbsnp_chrmt",
             "data_type": "Variant",
             "source_url": "https://ftp.ncbi.nlm.nih.gov/snp/latest_release/JSON/refsnp-chrMT.json.bz2",
             "format": "JSON",
@@ -314,7 +314,7 @@
         },
         {
             "source_system": "dbSNP",
-            "name": "dbSNP_SAMPLE",
+            "name": "dbsnp_sample",
             "data_type": "Variant",
             "source_url": "https://ftp.ncbi.nlm.nih.gov/snp/latest_release/JSON/refsnp-sample.json.bz2",
             "format": "JSON",
@@ -326,7 +326,7 @@
         },
         {
             "source_system": "Reactome",
-            "name": "Reactome_Pathways",
+            "name": "reactome",
             "data_type": "Pathway",
             "source_url": "https://reactome.org/download/current/",
             "format": "TXT",

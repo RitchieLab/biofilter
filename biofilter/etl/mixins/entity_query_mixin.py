@@ -108,7 +108,7 @@ class EntityQueryMixin:
                 entity_1_id=entity_1_id,
                 entity_2_id=entity_2_id,
                 relationship_type_id=relationship_type_id,
-                datasource_id=data_source_id,
+                data_source_id=data_source_id,
             )
             .first()
         )
@@ -121,7 +121,7 @@ class EntityQueryMixin:
             entity_1_id=entity_1_id,
             entity_2_id=entity_2_id,
             relationship_type_id=relationship_type_id,
-            datasource_id=data_source_id,
+            data_source_id=data_source_id,
         )
 
         self.session.add(rel)
