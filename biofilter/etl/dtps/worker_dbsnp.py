@@ -119,8 +119,12 @@ def worker_dbsnp(batch, batch_id, output_dir, assembly_map):
 
         # Reorder the DataFrame columns
         df = df[[col for col in column_order if col in df.columns]]  # noqa: E501
-        part_file = Path(output_dir) / f"processed_part_{batch_id}.csv"
-        df.to_csv(part_file, index=False)
+        # part_file = Path(output_dir) / f"processed_part_{batch_id}.csv"
+        # df.to_csv(part_file, index=False)
+
+        # Salvar em Parquet em vez de CSV
+        parquet_file = Path(output_dir) / f"processed_part_{batch_id}.parquet"
+        df.to_parquet(parquet_file, index=False)
 
         # Worker finished the taks
         print(f"[PID {os.getpid()}] ✅ Finished batch {batch_id}, saved {len(df)} rows")  # noqa: E501

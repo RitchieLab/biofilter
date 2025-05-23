@@ -124,12 +124,12 @@ class DTP(DTPBase, VariantQueryMixin):
         output_dir.mkdir(parents=True, exist_ok=True)
         # Clean only batch CSVs that follow the expected naming
         for f in output_dir.iterdir():
-            if f.name.startswith("processed_part_") and f.name.endswith(".parquet"):
+            if f.name.startswith("processed_part_") and f.name.endswith(".csv"):
                 f.unlink()
 
         # VARIABLES
         # Transfer to interface this parameters
-        batch_size: int = 200_000
+        batch_size: int = 10_000
         max_workers: int = 10
 
         futures = []
@@ -216,8 +216,7 @@ class DTP(DTPBase, VariantQueryMixin):
                 return total_variants, load_status, msg
 
             processed_path = self.get_path(processed_path)
-            # csv_files = sorted(glob.glob(str(processed_path / "processed_part_*.csv")))
-            csv_files = sorted(glob.glob(str(processed_path / "processed_part_*.parquet")))
+            csv_files = sorted(glob.glob(str(processed_path / "processed_part_*.csv")))
 
             if not csv_files:
                 msg = f"No part files found in {processed_path}"
@@ -242,11 +241,7 @@ class DTP(DTPBase, VariantQueryMixin):
         # Processa arquivo por arquivo
         for csv_file in csv_files:
             self.logger.log(f"📂 Processing {csv_file}", "INFO")
-
-            # df = pd.read_csv(csv_file, dtype=str)
-            # Evita carregar colunas como hgvs ou seq_id se não forem mais necessários.
-            df = pd.read_parquet(csv_file, columns=["rs_id", "position_base_1", "assembly_id", "allele", "allele_type", "gene_ids"])
-
+            df = pd.read_csv(csv_file, dtype=str)
             df["ref"] = ""
             df["alt"] = ""
 
@@ -292,8 +287,7 @@ class DTP(DTPBase, VariantQueryMixin):
                 self.logger.log(f"❌ Integrity error in {csv_file}: {str(e)}", "ERROR")
 
             # ➤ Gene links
-            # df_links = df[df["gene_ids"].notna() & (df["gene_ids"] != "[]")].copy()
-            df_links = df[df["gene_ids"].apply(lambda x: hasattr(x, "__len__") and len(x) > 0)].copy()          
+            df_links = df[df["gene_ids"].notna() & (df["gene_ids"] != "[]")].copy()
             df_links = df_links[["rs_id", "gene_ids"]].drop_duplicates("rs_id")
             df_links["gene_ids"] = df_links["gene_ids"].apply(
                 lambda x: ast.literal_eval(x) if isinstance(x, str) else x
