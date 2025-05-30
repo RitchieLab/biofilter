@@ -32,7 +32,7 @@ class EntityQueryMixin:
         primary_name = EntityName(
             entity_id=new_entity.id,
             name=clean_name,
-            datasource_id=data_source_id,
+            data_source_id=data_source_id,
             is_primary=True,
         )
         self.session.add(primary_name)
@@ -73,7 +73,7 @@ class EntityQueryMixin:
         alias = EntityName(
             entity_id=entity_id,
             name=clean_name,
-            datasource_id=data_source_id,
+            data_source_id=data_source_id,
             is_primary=False,
         )
         self.session.add(alias)
