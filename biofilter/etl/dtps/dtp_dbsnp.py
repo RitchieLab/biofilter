@@ -272,7 +272,7 @@ class DTP(DTPBase, VariantQueryMixin):
 
             variants_to_insert = [
                 Variant(
-                    rs_id=row["rs_id"],
+                    variant_id=row["rs_id"],
                     position=row["position_base_1"],
                     assembly_id=row["assembly_id"],
                     chromosome=row["assembly_id"],
@@ -311,9 +311,13 @@ class DTP(DTPBase, VariantQueryMixin):
                 for _, row in df_links.iterrows()
             ]
 
-            self.session.bulk_save_objects(links_to_insert)
-            self.session.commit()
-            self.logger.log(f"✅ Inserted {len(links_to_insert)} gene-variant links from {csv_file}", "INFO")
+            try:
+                self.session.bulk_save_objects(links_to_insert)
+                self.session.commit()
+                self.logger.log(f"✅ Inserted {len(links_to_insert)} gene-variant links from {csv_file}", "INFO")
+            except IntegrityError as e:
+                self.session.rollback()
+                self.logger.log(f"❌ Integrity error in {csv_file} for gene-variant links: {str(e)}", "ERROR")
 
         # Vacuum + manutenção final
         self.session.execute(text("VACUUM"))

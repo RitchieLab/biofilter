@@ -51,6 +51,7 @@ def worker_dbsnp(batch, batch_id, output_dir, assembly_map):
                     alt_seq = spdi.get("inserted_sequence")
 
                     match = re.match(r"^(.*?):g\.([\d_]+)(.*)$", hgvs)
+                    # match = re.match(r"^(.*?):[gm]\.([\d_]+)(.*)$", hgvs)  # TODO: to process MT  # noqa: E501
                     pos_raw = match.group(2)
                     suffix = match.group(3)
 

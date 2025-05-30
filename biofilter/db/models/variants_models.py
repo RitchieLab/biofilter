@@ -44,13 +44,16 @@ class GenomeAssembly(Base):
 class Variant(Base):
     __tablename__ = "variants"
 
-    rs_id = Column(String, primary_key=True)  # PK
+    # id = Column(Integer, primary_key=True, autoincrement=True)
+    # variant_id = Column(String)  # e.g., rsID (not unique globally)
+    variant_id = Column(String, primary_key=True)  # e.g., rsID
     position = Column(Integer, nullable=False)
     assembly_id = Column(Integer, nullable=False)
-    chromosome = Column(String)  # (X, Y, MT or 1-22)?
+    chromosome = Column(String)  # values like '1', 'X', 'Y', 'MT'
     ref = Column(Text)
     alt = Column(Text)
     data_source_id = Column(Integer, nullable=False)
+
     # assembly_id = Column(Integer, ForeignKey("genome_assemblies.id"), nullable=False)                     # noqa E501
     # data_source_id = Column(Integer, ForeignKey("etl_data_sources.id"), nullable=False)                   # noqa E501
 
@@ -72,6 +75,9 @@ class VariantGeneRelationship(Base):
     __table_args__ = (
         UniqueConstraint("gene_id", "variant_id", name="uq_gene_variant"),
     )
+    # __table_args__ = (
+    #     UniqueConstraint("gene_id", "variant_id", "data_source_id", name="uq_gene_variant"),
+    # )
 
     # Optional relationships
     # gene = relationship("Gene", back_populates="variant_links")

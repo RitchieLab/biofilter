@@ -1,21 +1,11 @@
 [tool.poetry]
 name = "biofilter"
-version = "3.0.2"
-description = "Biofilter for LOKI data processing"
+version = "3.1.0"
+description = "Biofilter Know"
 authors = ["Ritchie Lab <Software_RitchieLab@pennmedicine.upenn.edu>"]
 license = "MIT"
 homepage = "https://ritchielab.org"
 readme = "README.md"
-packages = [
-    { include = "biofilter_modules" },
-    { include = "loki_modules" },
-    { include = "omics_modules" }
-]
-
-[tool.poetry.scripts]
-biofilter = "biofilter_modules.biofilter:main"
-loki-build = "loki_modules.loki_build:main"
-omics-init = "omics_modules.init_db:init_db"
 
 [tool.poetry.dependencies]
 python = "^3.10"

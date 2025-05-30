@@ -24,9 +24,24 @@ if __name__ == "__main__":
     #     data_sources=["dbsnp_chry"], run_steps=["load"], force_steps=["load"]
     # )  # noqa: E501
 
-    bf.update(data_sources=["dbsnp_chr2"], run_steps=["extract"], force_steps=["extract"])  # noqa: E501
-    bf.update(data_sources=["dbsnp_chr2"], run_steps=["transform"], force_steps=["transform"])  # noqa: E501
-    bf.update(data_sources=["dbsnp_chr2"], run_steps=["load"], force_steps=["load"])  # noqa: E501
+    # bf.update(data_sources=["dbsnp_chr8"], run_steps=["extract"], force_steps=["extract"])  # noqa: E501
+    # bf.update(data_sources=["dbsnp_chr8"], run_steps=["transform"], force_steps=["transform"])  # noqa: E501 
+    # bf.update(data_sources=["dbsnp_chr18"], run_steps=["load"], force_steps=["load"])  # noqa: E501
+    # bf.update(data_sources=["dbsnp_chr19"], run_steps=["load"], force_steps=["load"])  # noqa: E501
+    # bf.update(data_sources=["dbsnp_chr20"], run_steps=["load"], force_steps=["load"])  # noqa: E501
+    # bf.update(data_sources=["dbsnp_chr21"], run_steps=["load"], force_steps=["load"])  # noqa: E501
+    # bf.update(data_sources=["dbsnp_chr3"], run_steps=["extract"], force_steps=["extract"])  # noqa: E501
+    # bf.update(data_sources=["dbsnp_chr3"], run_steps=["transform"], force_steps=["transform"])  # noqa: E501
+    # bf.update(data_sources=["dbsnp_chr4"], run_steps=["extract"], force_steps=["extract"])  # noqa: E501
+    # bf.update(data_sources=["dbsnp_chr4"], run_steps=["transform"], force_steps=["transform"])  # noqa: E501
+    # bf.update(data_sources=["dbsnp_chr4"], run_steps=["load"], force_steps=["load"])  # noqa: E501
+    # bf.update(data_sources=["dbsnp_chry"], run_steps=["load"], force_steps=["load"])  # noqa: E501
+    bf.update(data_sources=["dbsnp_chrmt"], run_steps=["extract"], force_steps=["extract"])  # noqa: E501
+    bf.update(data_sources=["dbsnp_chrmt"], run_steps=["transform"], force_steps=["transform"])  # noqa: E501
+    bf.update(data_sources=["dbsnp_chrmt"], run_steps=["load"], force_steps=["load"])  # noqa: E501
+
+
+
 
     # bf.update(data_sources=["dbsnp_chrx"], run_steps=["extract"], force_steps=["extract"])  # noqa: E501
     # bf.update(data_sources=["dbsnp_chrx"], run_steps=["transform"], force_steps=["transform"])  # noqa: E501
@@ -39,4 +54,4 @@ if __name__ == "__main__":
 
 
 print("Database updated successfully.")
-print("-----------------------------------------------------------------")
+print("------------------------------")
