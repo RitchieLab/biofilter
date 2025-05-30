@@ -1,0 +1,29 @@
+#!/bin/bash
+#BSUB -J biofilter_create_project
+#BSUB -o bsub.%J.out
+#BSUB -e bsub.%J.err
+#BSUB -n 1
+#BSUB -M 4000
+#BSUB -W 00:30
+#BSUB -R "select[ostype>=CENT7]"
+
+# Ativa os módulos necessários
+module load python/3.11
+module load git/2.39.0
+
+# Caminho para Poetry e Git local
+export PATH="$HOME/.local/bin:$PATH"
+
+# Entra na pasta do projeto
+cd /home/alrico/group/software/biofilter3R
+
+# Ativa o ambiente virtual local
+source .venv/bin/activate
+
+# Roda o script Python inline
+python -c "
+from biofilter import Biofilter
+bf = Biofilter()
+bf.create_new_project('sqlite:///dev_biofilter.db', overwrite=True)
+"
+
