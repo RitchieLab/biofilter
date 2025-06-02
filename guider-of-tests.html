@@ -47,7 +47,7 @@
   
   
     <title>Testing Guider &#8212; Biofilter Developer Documentation 2.4.4 documentation</title>
-    <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=83e35b93" />
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=75810a84" />
     <link rel="stylesheet" type="text/css" href="_static/material.css?v=79c92029" />
     <script src="_static/documentation_options.js?v=b1e24531"></script>
     <script src="_static/doctools.js?v=9bcbadda"></script>
@@ -508,16 +508,16 @@
 <section id="example-fixture">
 <h4 id="example-fixture">Example Fixture<a class="headerlink" href="#example-fixture" title="Link to this heading">¶</a></h4>
 <p>Here’s an example of a fixture in the project:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">pytest</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">pytest</span>
 
 <span class="nd">@pytest</span><span class="o">.</span><span class="n">fixture</span>
-<span class="k">def</span> <span class="nf">sample_data</span><span class="p">():</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">sample_data</span><span class="p">():</span>
     <span class="k">return</span> <span class="p">{</span>
         <span class="s2">"param1"</span><span class="p">:</span> <span class="mi">42</span><span class="p">,</span>
         <span class="s2">"param2"</span><span class="p">:</span> <span class="s2">"example"</span>
     <span class="p">}</span>
 
-<span class="k">def</span> <span class="nf">test_example_function</span><span class="p">(</span><span class="n">sample_data</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">test_example_function</span><span class="p">(</span><span class="n">sample_data</span><span class="p">):</span>
     <span class="n">result</span> <span class="o">=</span> <span class="n">example_function</span><span class="p">(</span><span class="n">sample_data</span><span class="p">[</span><span class="s2">"param1"</span><span class="p">])</span>
     <span class="k">assert</span> <span class="n">result</span> <span class="o">==</span> <span class="n">expected_result</span>
 </pre></div>
