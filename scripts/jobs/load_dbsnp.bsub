@@ -2,9 +2,9 @@
 #BSUB -J load_hgnc
 #BSUB -o bsub.load_hgnc.%J.out
 #BSUB -e bsub.load_hgnc.%J.err
-#BSUB -n 1
-#BSUB -M 8000
-#BSUB -W 01:00
+#BSUB -n 8
+#BSUB -M 32000
+#BSUB -W 05:00
 #BSUB -R "select[ostype>=CENT7]"
 
 # Carrega os módulos necessários
