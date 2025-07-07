@@ -71,6 +71,12 @@ class DataSource(Base):
     # )
     # variants = relationship("Variant", back_populates="data_source")
     pathways = relationship("Pathway", back_populates="data_source")
+    protein_pfams = relationship("ProteinPfam", back_populates="data_source")
+    protein_masters = relationship("ProteinMaster", back_populates="data_source")
+    protein_entities = relationship("ProteinEntity", back_populates="data_source")
+    protein_pfam_links = relationship(
+        "ProteinPfamLink", back_populates="data_source"
+    )  # noqa: E501
 
 
 # ETL DOMAINS

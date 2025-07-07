@@ -23,6 +23,12 @@ from .variants_models import (
     VariantGeneRelationship,
 )
 from .pathway_models import Pathway
+from .protein_models import (
+    ProteinPfam,
+    ProteinMaster,
+    ProteinEntity,
+    ProteinPfamLink,
+)
 
 __all__ = [
     # # CONFIGURATION MODELS
@@ -53,4 +59,9 @@ __all__ = [
     # "VariantLocation",
     "VariantGeneRelationship",
     "Pathway",
+    # PROTEIN MODELS
+    "ProteinPfam",
+    "ProteinMaster",
+    "ProteinEntity",
+    "ProteinPfamLink",
 ]

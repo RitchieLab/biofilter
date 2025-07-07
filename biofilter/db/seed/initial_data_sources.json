@@ -335,6 +335,31 @@
             "dtp_script": "dtp_reactome",
             "last_status": "pending",
             "active": true
+        },
+        {
+            "source_system": "UniProt",
+            "name": "uniprot",
+            "data_type": "Protein",
+            "source_url": "https://rest.uniprot.org/uniprotkb/stream?query=organism_id:9606+AND+reviewed:true&format=xml",
+            "format": "XML",
+            "grch_version": "GRCh38",
+            "ucschg_version": "hg38",
+            "dtp_script": "dtp_uniprot",
+            "last_status": "pending",
+            "active": true
+        },
+        {
+            "source_system": "EBI",
+            "name": "pfam",
+            "data_type": "Protein",
+            "source_url": "https://ftp.ebi.ac.uk/pub/databases/Pfam/current_release/pfamA.txt.gz",
+            "format": "HMM",
+            "grch_version": "GRCh38",
+            "ucschg_version": "hg38",
+            "dtp_script": "dtp_pfam",
+            "last_status": "pending",
+            "active": true
         }
+
     ]
 } 
