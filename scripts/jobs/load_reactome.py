@@ -7,6 +7,7 @@ if __name__ == "__main__":
 
     # ETL HGNC -- GENES
     bf.update(data_sources=["reactome"], run_steps=["extract"], force_steps=["extract"])
-    bf.update(data_sources=["reactome"], run_steps=["transform"], force_steps=["transform"])
+    bf.update(
+        data_sources=["reactome"], run_steps=["transform"], force_steps=["transform"]
+    )
     bf.update(data_sources=["reactome"], run_steps=["load"], force_steps=["load"])
-

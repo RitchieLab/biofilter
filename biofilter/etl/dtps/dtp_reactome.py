@@ -11,6 +11,8 @@ from biofilter.db.models.entity_models import (
 from biofilter.db.models.pathway_models import Pathway
 from biofilter.etl.mixins.base_dtp import DTPBase
 
+# TODO: Separa os processos de dados mestres e dados de relacionamentos
+
 
 class DTP(DTPBase, EntityQueryMixin):
     def __init__(
@@ -36,12 +38,13 @@ class DTP(DTPBase, EntityQueryMixin):
         reference. Only proceeds with full extraction if the hash has changed.
         """
 
+        msg = f"⬇️ Starting extraction of {self.data_source.name} data..."
+
         self.logger.log(
-            f"⬇️ Starting extraction of {self.data_source.name} data...",
+            msg,
             "INFO",  # noqa: E501
         )  # noqa: E501
 
-        msg = ""
         source_url = self.data_source.source_url
         files_to_download = [
             "ReactomePathways.txt",

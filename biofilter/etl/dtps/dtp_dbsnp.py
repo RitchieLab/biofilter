@@ -143,7 +143,9 @@ class DTP(DTPBase, VariantQueryMixin):
                 for a in self.session.query(GenomeAssembly)  # noqa: E501
             }
 
-            with bz2.open(input_file, "rt", encoding="utf-8") as f, ProcessPoolExecutor(  # noqa: E501
+            with bz2.open(
+                input_file, "rt", encoding="utf-8"
+            ) as f, ProcessPoolExecutor(  # noqa: E501
                 max_workers=max_workers
             ) as executor:  # noqa: E501
                 if __name__ == "__main__" or (
@@ -217,7 +219,9 @@ class DTP(DTPBase, VariantQueryMixin):
 
             processed_path = self.get_path(processed_path)
             # csv_files = sorted(glob.glob(str(processed_path / "processed_part_*.csv")))
-            csv_files = sorted(glob.glob(str(processed_path / "processed_part_*.parquet")))
+            csv_files = sorted(
+                glob.glob(str(processed_path / "processed_part_*.parquet"))
+            )
 
             if not csv_files:
                 msg = f"No part files found in {processed_path}"
@@ -245,14 +249,26 @@ class DTP(DTPBase, VariantQueryMixin):
 
             # df = pd.read_csv(csv_file, dtype=str)
             # Evita carregar colunas como hgvs ou seq_id se não forem mais necessários.
-            df = pd.read_parquet(csv_file, columns=["rs_id", "position_base_1", "assembly_id", "allele", "allele_type", "gene_ids"])
+            df = pd.read_parquet(
+                csv_file,
+                columns=[
+                    "rs_id",
+                    "position_base_1",
+                    "assembly_id",
+                    "allele",
+                    "allele_type",
+                    "gene_ids",
+                ],
+            )
 
             df["ref"] = ""
             df["alt"] = ""
 
             # ➤ Preparar DataFrame de Variants
             df_ref = df[df["allele_type"] == "ref"].copy()
-            df_ref = df_ref[["rs_id", "position_base_1", "assembly_id", "allele"]].drop_duplicates("rs_id")
+            df_ref = df_ref[
+                ["rs_id", "position_base_1", "assembly_id", "allele"]
+            ].drop_duplicates("rs_id")
 
             df_alt = (
                 df[df["allele_type"] == "sub"]
@@ -278,7 +294,7 @@ class DTP(DTPBase, VariantQueryMixin):
                     chromosome=row["assembly_id"],
                     ref=row["allele"],
                     alt=row["alt"],
-                    data_source_id=data_source_id
+                    data_source_id=data_source_id,
                 )
                 for _, row in df_variants.iterrows()
             ]
@@ -293,7 +309,9 @@ class DTP(DTPBase, VariantQueryMixin):
 
             # ➤ Gene links
             # df_links = df[df["gene_ids"].notna() & (df["gene_ids"] != "[]")].copy()
-            df_links = df[df["gene_ids"].apply(lambda x: hasattr(x, "__len__") and len(x) > 0)].copy()          
+            df_links = df[
+                df["gene_ids"].apply(lambda x: hasattr(x, "__len__") and len(x) > 0)
+            ].copy()
             df_links = df_links[["rs_id", "gene_ids"]].drop_duplicates("rs_id")
             df_links["gene_ids"] = df_links["gene_ids"].apply(
                 lambda x: ast.literal_eval(x) if isinstance(x, str) else x
@@ -306,7 +324,7 @@ class DTP(DTPBase, VariantQueryMixin):
                 VariantGeneRelationship(
                     gene_id=row["gene_ids"],
                     variant_id=row["rs_id"],
-                    data_source_id=data_source_id
+                    data_source_id=data_source_id,
                 )
                 for _, row in df_links.iterrows()
             ]
@@ -314,17 +332,25 @@ class DTP(DTPBase, VariantQueryMixin):
             try:
                 self.session.bulk_save_objects(links_to_insert)
                 self.session.commit()
-                self.logger.log(f"✅ Inserted {len(links_to_insert)} gene-variant links from {csv_file}", "INFO")
+                self.logger.log(
+                    f"✅ Inserted {len(links_to_insert)} gene-variant links from {csv_file}",
+                    "INFO",
+                )
             except IntegrityError as e:
                 self.session.rollback()
-                self.logger.log(f"❌ Integrity error in {csv_file} for gene-variant links: {str(e)}", "ERROR")
+                self.logger.log(
+                    f"❌ Integrity error in {csv_file} for gene-variant links: {str(e)}",
+                    "ERROR",
+                )
 
         # Vacuum + manutenção final
         self.session.execute(text("VACUUM"))
         self.session.commit()
 
         load_status = True
-        message = f"✅ Loaded {total_variants} variants from {len(csv_files)} CSV chunks."
+        message = (
+            f"✅ Loaded {total_variants} variants from {len(csv_files)} CSV chunks."
+        )
         self.logger.log(message, "SUCCESS")
 
         return total_variants, load_status, message

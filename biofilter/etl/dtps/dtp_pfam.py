@@ -32,7 +32,9 @@ class DTP(DTPBase, EntityQueryMixin):
         Download pfamA.txt.gz from the FTP server and extract it locally.
         Also computes a file hash to track content versioning.
         """
-        self.logger.log(f"⬇️  Starting extraction of {self.data_source.name} data...", "INFO")
+        self.logger.log(
+            f"⬇️  Starting extraction of {self.data_source.name} data...", "INFO"
+        )
 
         source_url = self.data_source.source_url
         last_hash = "" if force_steps else self.etl_process.raw_data_hash
@@ -40,9 +42,7 @@ class DTP(DTPBase, EntityQueryMixin):
         try:
             # Create destination directory
             landing_path = os.path.join(
-                raw_dir,
-                self.data_source.source_system.name,
-                self.data_source.name
+                raw_dir, self.data_source.source_system.name, self.data_source.name
             )
             os.makedirs(landing_path, exist_ok=True)
 
@@ -130,14 +130,14 @@ class DTP(DTPBase, EntityQueryMixin):
 
             # define column names
             columns = [
-                "pfam_acc",         # accession (ex: PF00001)
-                "pfam_id",          # ID do domínio (ex: 7tm_1)
-                "none_column",      # Column 2(C) no data
-                "description",      # descrição curta
-                "clan_acc",         # accession do clan (ex: CL0192)
+                "pfam_acc",  # accession (ex: PF00001)
+                "pfam_id",  # ID do domínio (ex: 7tm_1)
+                "none_column",  # Column 2(C) no data
+                "description",  # descrição curta
+                "clan_acc",  # accession do clan (ex: CL0192)
                 "source_database",  # nome da base de dados (ex: Prosite)
-                "type",             # domain ou family
-                "long_description", # descrição longa (última coluna do arquivo)
+                "type",  # domain ou family
+                "long_description",  # descrição longa (última coluna do arquivo)
             ]
 
             # Read only first N columns matching `columns`
@@ -146,16 +146,16 @@ class DTP(DTPBase, EntityQueryMixin):
                 sep="\t",
                 header=None,
                 usecols=range(len(columns)),  # <- seleciona apenas as colunas desejadas
-                names=columns,                # <- define os nomes das colunas
+                names=columns,  # <- define os nomes das colunas
                 dtype=str,
-                compression="gzip"
+                compression="gzip",
             )
 
             df.drop(columns=["none_column"], inplace=True)
             df["source_database"] = "Pfam"
 
             # Save DataFrame to CSV
-            df.to_csv(csv_file, index=False) # DUBUG propose only!
+            df.to_csv(csv_file, index=False)  # DUBUG propose only!
             df.to_parquet(csv_file.replace(".csv", ".parquet"), index=False)
 
             self.logger.log(
@@ -172,7 +172,9 @@ class DTP(DTPBase, EntityQueryMixin):
     # 📥  ------ LOAD FASE ------  📥
     # 📥  ------------------------ 📥
     def load(self, df=None, processed_dir=None, chunk_size=100_000):
-        self.logger.log(f"📥 Loading {self.data_source.name} data into the database...", "INFO")
+        self.logger.log(
+            f"📥 Loading {self.data_source.name} data into the database...", "INFO"
+        )
         total_pfam = 0
         load_status = False
         msg = ""
@@ -206,16 +208,18 @@ class DTP(DTPBase, EntityQueryMixin):
                 )
 
                 if not existing:
-                    new_entries.append(ProteinPfam(
-                        pfam_acc=row.pfam_acc,
-                        pfam_id=row.pfam_id,
-                        description=row.description,
-                        clan_acc=row.clan_acc,
-                        source_database=row.source_database,
-                        type=row.type,
-                        long_description=row.long_description,
-                        data_source_id=data_source_id
-                    ))
+                    new_entries.append(
+                        ProteinPfam(
+                            pfam_acc=row.pfam_acc,
+                            pfam_id=row.pfam_id,
+                            description=row.description,
+                            clan_acc=row.clan_acc,
+                            source_database=row.source_database,
+                            type=row.type,
+                            long_description=row.long_description,
+                            data_source_id=data_source_id,
+                        )
+                    )
 
             if new_entries:
                 self.session.bulk_save_objects(new_entries)

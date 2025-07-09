@@ -29,6 +29,7 @@ from .protein_models import (
     ProteinEntity,
     ProteinPfamLink,
 )
+from .go_models import GOMaster, GORelation
 
 __all__ = [
     # # CONFIGURATION MODELS
@@ -64,4 +65,7 @@ __all__ = [
     "ProteinMaster",
     "ProteinEntity",
     "ProteinPfamLink",
+    # GENE ONTOLOGY MODELS
+    "GOMaster",
+    "GORelation",
 ]

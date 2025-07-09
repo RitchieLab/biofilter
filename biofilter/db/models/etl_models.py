@@ -103,7 +103,9 @@ class ETLLog(Base):
 
 
 def get_etl_status_enum(name: str):
-    return Enum("pending", "running", "completed", "failed", name=name)
+    return Enum(
+        "pending", "running", "completed", "failed", "not_applicable", name=name
+    )
 
 
 class ETLProcess(Base):

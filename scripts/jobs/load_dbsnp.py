@@ -9,7 +9,9 @@ if __name__ == "__main__":
     # bf.update(data_sources=["dbsnp_chr1"], run_steps=["transform"], force_steps=["transform"])
     # bf.update(data_sources=["dbsnp_chr1"], run_steps=["load"], force_steps=["load"])
 
-    bf.update(data_sources=["dbsnp_chr2"], run_steps=["extract"], force_steps=["extract"])
+    bf.update(
+        data_sources=["dbsnp_chr2"], run_steps=["extract"], force_steps=["extract"]
+    )
     # bf.update(data_sources=["dbsnp_chr2"], run_steps=["transform"], force_steps=["transform"])
     # bf.update(data_sources=["dbsnp_chr2"], run_steps=["load"], force_steps=["load"])
 

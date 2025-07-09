@@ -29,6 +29,26 @@
             "id": 6,
             "name": "Pathways",
             "description": "Biological pathways and interactions"
+        },
+        {
+            "id": 7,
+            "name": "GO",
+            "description": "Gene Ontology terms and relations"
+        },
+        {
+            "id": 8,
+            "name": "Chemicals",
+            "description": "Chemical compounds and substances"
+        },
+        {
+            "id": 9,
+            "name": "Clinical Trials",
+            "description": "Clinical trial data and results"
+        },
+        {
+            "id": 10,
+            "name": "Microbiome",
+            "description": "Microbial communities and their interactions"
         }
     ]
 }

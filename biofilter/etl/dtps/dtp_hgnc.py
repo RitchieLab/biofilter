@@ -3,6 +3,7 @@ import ast
 import json
 import requests
 import pandas as pd
+from pathlib import Path
 from biofilter.utils.file_hash import compute_file_hash
 from biofilter.etl.mixins.entity_query_mixin import EntityQueryMixin
 from biofilter.etl.mixins.gene_query_mixin import GeneQueryMixin
@@ -40,12 +41,12 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
         Also computes a file hash to track content versioning.
         """
 
+        msg = f"⬇️  Starting extraction of {self.data_source.name} data..."
         self.logger.log(
-            f"⬇️  Starting extraction of {self.data_source.name} data...",
+            msg,
             "INFO",  # noqa: E501
         )  # noqa: E501
 
-        msg = ""
         source_url = self.data_source.source_url
         if force_steps:
             last_hash = ""
@@ -102,57 +103,67 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
     # def transform(self, raw_path, processed_path):
     def transform(self, raw_dir: str, processed_dir: str):
 
-        self.logger.log(
-            f"🔧 Transforming the {self.data_source.name} data ...", "INFO"
-        )  # noqa: E501
+        msg = f"🔧 Transforming the {self.data_source.name} data ..."
 
-        msg = ""
+        self.logger.log(msg, "INFO")  # noqa: E501
+
+        # Check if raw_dir and processed_dir are provided
         try:
-            # json_file = os.path.join(raw_path, "hgnc", "hgnc_data.json")
-            landing_path = os.path.join(
-                raw_dir,
-                self.data_source.source_system.name,
-                self.data_source.name,
-            )
-            processed_path = os.path.join(
-                processed_dir,
-                self.data_source.source_system.name,
-                self.data_source.name,
-            )
-            os.makedirs(processed_path, exist_ok=True)
+            # Define input/output base paths
+            input_path = (
+                Path(raw_dir)
+                / self.data_source.source_system.name
+                / self.data_source.name
+            )  # noqa E501
+            output_path = (
+                Path(processed_dir)
+                / self.data_source.source_system.name
+                / self.data_source.name
+            )  # noqa E501
 
-            json_file = os.path.join(landing_path, "hgnc_data.json")
-            csv_file = os.path.join(processed_path, "master_data.csv")
+            # Ensure output directory exists
+            output_path.mkdir(parents=True, exist_ok=True)
 
-            # Check if the JSON file exists
-            if not os.path.exists(json_file):
-                msg = f"File not found: {json_file}"
+            # Input file path
+            input_file = input_path / "hgnc_data.json"
+            if not input_file.exists():
+                msg = f"❌ Input file not found: {input_file}"
+                self.logger.log(msg, "ERROR")
                 return None, False, msg
 
-            # Create output directory if it doesn't exist
-            os.makedirs(os.path.dirname(csv_file), exist_ok=True)
+            # Output files paths
+            output_file_master = output_path / "master_data"
 
-            # Remove CSV file if it exists
-            if os.path.exists(csv_file):
-                os.remove(csv_file)
-                self.logger.log(
-                    f"⚠️ Previous CSV file deleted: {csv_file}", "DEBUG"
-                )  # noqa: E501
+            # Delete existing files if they exist (both .csv and .parquet)
+            for f in [output_file_master]:
+                for ext in [".csv", ".parquet"]:
+                    target_file = f.with_suffix(ext)
+                    if target_file.exists():
+                        target_file.unlink()
+                        self.logger.log(
+                            f"🗑️  Removed existing file: {target_file}", "INFO"
+                        )  # noqa E501
 
+        except Exception as e:
+            msg = f"❌ Error constructing paths: {str(e)}"
+            self.logger.log(msg, "ERROR")
+            return None, False, msg
+
+        try:
             # LOAD JSON
-            with open(json_file, "r") as f:
+            with open(input_file, "r") as f:
                 data = json.load(f)
 
             df = pd.DataFrame(data["response"]["docs"])
 
-            # Save DataFrame to CSV
-            df.to_csv(csv_file, index=False)
-
-            self.logger.log(
-                f"✅ HGNC data transformed and saved at {csv_file}", "INFO"
+            df.to_csv(output_file_master.with_suffix(".csv"), index=False)  # noqa: E501
+            df.to_parquet(
+                output_file_master.with_suffix(".parquet"), index=False
             )  # noqa: E501
 
-            return df, True, msg
+            msg = f"✅ HGNC data transformed and saved at {output_file_master}"  # noqa: E501
+            self.logger.log(msg, "INFO")
+            return None, True, msg
 
         except Exception as e:
             msg = f"❌ Error during transformation: {e}"
@@ -163,14 +174,15 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
     # 📥  ------------------------ 📥
     def load(self, df=None, processed_dir=None, chunk_size=100_000):
 
+        msg = f"📥 Loading {self.data_source.name} data into the database..."
+
         self.logger.log(
-            f"📥 Loading {self.data_source.name} data into the database...",
+            msg,
             "INFO",  # noqa E501
         )
 
         total_gene = 0  # not considered conflict genes
         load_status = False
-        msg = ""
 
         # Models that will be used to store the data
         # - Entity

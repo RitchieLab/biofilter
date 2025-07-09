@@ -35,6 +35,18 @@
             "description": "EMBL's European Bioinformatics Institute.",
             "homepage": "https://www.ebi.ac.uk/",
             "active": true
+        },
+        {
+            "name": "GO",
+            "description": "GO Consortium",
+            "homepage": "https://geneontology.org/",
+            "active": true
+        },
+        {
+            "name": "KEGG",
+            "description": "Kyoto Encyclopedia of Genes and Genomes, a database resource for understanding high-level functions and utilities of the biological system.",
+            "homepage": "https://www.genome.jp/kegg/",
+            "active": true
         }
     ]
 }

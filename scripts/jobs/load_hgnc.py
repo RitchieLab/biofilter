@@ -9,4 +9,3 @@ if __name__ == "__main__":
     bf.update(data_sources=["hgnc"], run_steps=["extract"], force_steps=["extract"])
     bf.update(data_sources=["hgnc"], run_steps=["transform"], force_steps=["transform"])
     bf.update(data_sources=["hgnc"], run_steps=["load"], force_steps=["load"])
-
