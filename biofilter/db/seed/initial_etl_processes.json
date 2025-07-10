@@ -1,6 +1,13 @@
 {
     "etl_processes": [
         {
+            "data_source": "gene_ncbi",
+            "global_status": "pending",
+            "extract_status": "pending",
+            "transform_status": "pending",
+            "load_status": "pending"
+        },
+        {
             "data_source": "hgnc",
             "global_status": "pending",
             "extract_status": "pending",
@@ -193,6 +200,13 @@
         },
         {
             "data_source": "reactome",
+            "global_status": "pending",
+            "extract_status": "pending",
+            "transform_status": "pending",
+            "load_status": "pending"
+        },
+        {
+            "data_source": "reactome_relationships",
             "global_status": "pending",
             "extract_status": "pending",
             "transform_status": "pending",

@@ -200,6 +200,19 @@ class DTP(DTPBase, EntityQueryMixin):
                     self.session.add(rel)
                     total_relationships += 1
 
+            # Commit batch
+            try:
+                self.session.commit()
+                load_status = True
+                msg = f"✅ {total_relationships} relations loaded successfully"
+                self.logger.log(msg, "INFO")
+            except Exception as e:
+                self.session.rollback()
+                load_status = False
+                msg = f"❌ Error loading relations: {str(e)}"
+                self.logger.log(msg, "ERROR")
+                # return 0, load_status, msg
+
             # If there are relationships not loaded, save them in a DataFrame
             df_not_loaded = pd.DataFrame(not_loaded)
 
@@ -208,16 +221,14 @@ class DTP(DTPBase, EntityQueryMixin):
                 self.logger.log(msg, "WARNING")
 
                 # Save the not loaded relationships to a CSV file
-                not_loaded_path = processed_path / "not_loaded_relationships.csv"  # noqa E501
+                not_loaded_path = processed_path / "relationship_data_not_loaded.csv"  # noqa E501
                 df_not_loaded.to_csv(not_loaded_path, index=False)
 
-            # Commit the session to save the relationships
-            self.session.commit()
-            msg = f"✅ Loaded {total_relationships} relationships."
+            msg = f"✅ Relations loaded: {total_relationships} | Not found: {len(df_not_loaded)}"  # noqa: E501
             self.logger.log(msg, "INFO")
             return total_relationships, True, msg
 
-        except KeyError as e:
+        except Exception as e:
             msg = f"KeyError during loading relationships: {e}"
             self.logger.log(msg, "ERROR")
             return total_relationships, load_status, msg

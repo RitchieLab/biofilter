@@ -32,17 +32,28 @@ class DTP(DTPBase, EntityQueryMixin):
         Download pfamA.txt.gz from the FTP server and extract it locally.
         Also computes a file hash to track content versioning.
         """
+
+        msg = f"⬇️ Starting extraction of {self.data_source.name} data..."
+
         self.logger.log(
-            f"⬇️  Starting extraction of {self.data_source.name} data...", "INFO"
-        )
+            msg,
+            "INFO",  # noqa: E501
+        )  # noqa: E501
 
         source_url = self.data_source.source_url
-        last_hash = "" if force_steps else self.etl_process.raw_data_hash
+        if force_steps:
+            last_hash = ""
+            msg = "Ignoring hash check, forcing download"
+            self.logger.log(msg, "WARNING")
+        else:
+            last_hash = self.etl_process.raw_data_hash
 
         try:
             # Create destination directory
             landing_path = os.path.join(
-                raw_dir, self.data_source.source_system.name, self.data_source.name
+                raw_dir,
+                self.data_source.source_system.name,
+                self.data_source.name,
             )
             os.makedirs(landing_path, exist_ok=True)
 
@@ -51,8 +62,11 @@ class DTP(DTPBase, EntityQueryMixin):
             txt_path = os.path.join(landing_path, "pfamA.txt")
 
             # Download the file
-            self.logger.log(f"⬇️  Fetching gzipped file from: {source_url}", "INFO")
+            msg = f"⬇️  Fetching gzipped file from: {source_url}"
+            self.logger.log(msg, "INFO")
+
             response = requests.get(source_url, stream=True)
+
             if response.status_code != 200:
                 msg = f"❌ Failed to fetch data: {response.status_code}"
                 self.logger.log(msg, "ERROR")

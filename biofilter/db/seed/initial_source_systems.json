@@ -1,6 +1,12 @@
 {
     "source_systems": [
         {
+            "name": "NCBI",
+            "description": "National Center for Biotechnology Information",
+            "homepage": "https://www.ncbi.nlm.nih.gov/",
+            "active": true
+        },
+        {
             "name": "HGNC",
             "description": "HUGO Gene Nomenclature Committee",
             "homepage": "https://www.genenames.org/",

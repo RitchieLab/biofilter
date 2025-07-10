@@ -19,6 +19,11 @@
             "id": 4,
             "name": "conflict",
             "description": "Entity is under curation due to conflicting data"
+        },
+        {
+            "id": 5,
+            "name": "not_defined",
+            "description": "Not defined"
         }
     ]
 }

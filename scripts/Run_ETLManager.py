@@ -16,9 +16,9 @@ if __name__ == "__main__":
     # bf.update(
     #     data_sources=["uniprot"], run_steps=["transform"], force_steps=["transform"]
     # )
-    bf.update(
-        data_sources=["uniprot_relationships"], run_steps=["load"], force_steps=["load"]
-    )  # noqa: E501
+    # bf.update(
+    #     data_sources=["uniprot_relationships"], run_steps=["load"], force_steps=["load"]
+    # )  # noqa: E501
     # bf.update(data_sources=["hgnc"], run_steps=["load"], force_steps=["load"])
 
     # bf.update(data_sources=["gene_ontology"], run_steps=["load"], force_steps=["load"])
@@ -69,6 +69,14 @@ if __name__ == "__main__":
     # bf.update(data_sources=["reactome"], run_steps=["extract"], force_steps=["extract"]) # noqa: E501
     # bf.update(data_sources=["reactome"], run_steps=["transform"], force_steps=["transform"]) # noqa: E501
     # bf.update(data_sources=["reactome"], run_steps=["load"], force_steps=["load"]) # noqa: E501
+
+    # bf.update(data_sources=["reactome_relationships"], run_steps=["extract"], force_steps=["extract"]) # noqa: E501
+    # bf.update(data_sources=["reactome_relationships"], run_steps=["transform"], force_steps=["transform"]) # noqa: E501
+    # bf.update(data_sources=["reactome_relationships"], run_steps=["load"], force_steps=["load"]) # noqa: E501
+
+    # bf.update(data_sources=["gene_ncbi"], run_steps=["extract"], force_steps=["extract"])  # noqa: E501
+    # bf.update(data_sources=["gene_ncbi"], run_steps=["transform"], force_steps=["transform"]) # noqa: E501
+    bf.update(data_sources=["gene_ncbi"], run_steps=["load"], force_steps=["load"]) # noqa: E501
 
 
 print("Database updated successfully.")

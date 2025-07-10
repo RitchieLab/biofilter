@@ -1,6 +1,18 @@
 {
     "data_sources": [
         {
+            "source_system": "NCBI",
+            "name": "gene_ncbi",
+            "data_type": "Gene",
+            "source_url": "https://ftp.ncbi.nih.gov/gene/DATA/gene_info.gz",
+            "format": "TXT",
+            "grch_version": "GRCh38",
+            "ucschg_version": "hg38",
+            "dtp_script": "dtp_gene_ncbi",
+            "last_status": "pending",
+            "active": true
+        },
+        {
             "source_system": "HGNC",
             "name": "hgnc",
             "data_type": "Gene",
@@ -333,6 +345,18 @@
             "grch_version": "GRCh38",
             "ucschg_version": "hg38",
             "dtp_script": "dtp_reactome",
+            "last_status": "pending",
+            "active": true
+        },
+        {
+            "source_system": "Reactome",
+            "name": "reactome_relationships",
+            "data_type": "Pathway",
+            "source_url": "not_applicable",
+            "format": "not_applicable",
+            "grch_version": "GRCh38",
+            "ucschg_version": "hg38",
+            "dtp_script": "dtp_reactome_relationships",
             "last_status": "pending",
             "active": true
         },
