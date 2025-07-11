@@ -300,7 +300,9 @@ class DTP(DTPBase, EntityQueryMixin):
 
         # Get or create EntityGroup for GO
         if not hasattr(self, "entity_group") or self.entity_group is None:
-            group = self.session.query(EntityGroup).filter_by(name="GO").first()  # noqa: E501
+            group = (
+                self.session.query(EntityGroup).filter_by(name="GO").first()
+            )  # noqa: E501
             if not group:
                 msg = "EntityGroup 'GO' not found."
                 self.logger.log(msg, "ERROR")
@@ -350,7 +352,9 @@ class DTP(DTPBase, EntityQueryMixin):
                     )
 
                 # Add GO term to GOMaster if it doesn't exist
-                go_master = self.session.query(GOMaster).filter_by(go_id=go_id).first()  # noqa: E501
+                go_master = (
+                    self.session.query(GOMaster).filter_by(go_id=go_id).first()
+                )  # noqa: E501
                 if not go_master:
                     go_master = GOMaster(
                         go_id=go_id,
@@ -421,9 +425,7 @@ class DTP(DTPBase, EntityQueryMixin):
 
                 # Create new relation
                 relation = GORelation(
-                    parent_id=parent.id,
-                    child_id=child.id,
-                    relation_type=rel_type
+                    parent_id=parent.id, child_id=child.id, relation_type=rel_type
                 )  # noqa: E501
                 self.session.add(relation)
                 total_relations += 1

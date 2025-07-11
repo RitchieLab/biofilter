@@ -1,9 +1,12 @@
 # import os
+import json
+from pathlib import Path
 from biofilter.db.database import Database
 from biofilter.core.settings_manager import SettingsManager
 from biofilter.utils.logger import Logger
 from biofilter.etl.etl_manager import ETLManager
 from biofilter.etl.conflict_manager import ConflictManager
+from biofilter.cli.model_explorer import ModelExplorer
 
 
 class Biofilter:
@@ -171,3 +174,9 @@ class Biofilter:
 
         manager = ConflictManager(self.db.get_session(), self.logger)
         return manager.import_conflicts_from_excel(input_path)
+
+    def model_explorer(self):
+            model_info_path = Path(__file__).parent.parent / "biofilter"/ "db" / "models" / "models_info.json"
+            with open(model_info_path) as f:
+                model_info = json.load(f)
+            return ModelExplorer(session=self.db.session(), model_info=model_info)

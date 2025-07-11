@@ -160,7 +160,7 @@ class DTP(DTPBase, EntityQueryMixin):
                 output_file_master.with_suffix(".parquet"), index=False
             )
 
-            msg =  f"✅ Pathways master data written with {len(df_pathways)} records)"  # noqa E501
+            msg = f"✅ Pathways master data written with {len(df_pathways)} records)"  # noqa E501
             self.logger.log(msg, "INFO")
 
             # START SECOND FILES
@@ -309,7 +309,8 @@ class DTP(DTPBase, EntityQueryMixin):
             )
 
             self.logger.log(
-                f"✅ Reactome links written with {len(df_relations)} links)", "INFO"  # noqa E501
+                f"✅ Reactome links written with {len(df_relations)} links)",
+                "INFO",  # noqa E501
             )  # noqa: E501
 
             msg = f"✅ Finished transforming {self.data_source.name} data."

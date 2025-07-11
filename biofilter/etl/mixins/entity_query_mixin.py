@@ -1,5 +1,9 @@
 from sqlalchemy.exc import IntegrityError
-from biofilter.db.models.entity_models import Entity, EntityName, EntityRelationship
+from biofilter.db.models.entity_models import (
+    Entity,
+    EntityName,
+    EntityRelationship,  # noqa: E501
+)
 
 
 class EntityQueryMixin:
@@ -128,14 +132,14 @@ class EntityQueryMixin:
 
         return True
 
-        # Nao realizando o commit aqui, pois o commit deve ser feito no final do ETL
+        # Do not commit here, as the commit should be done at the end of the ETL.   # noqa: E501
         # try:
         #     self.session.commit()
-        #     msg = f"✅ Added relationship {entity_1_id} -> {entity_2_id} (type {relationship_type_id})"
+        #     msg = f"✅ Added relationship {entity_1_id} -> {entity_2_id} (type {relationship_type_id})"  # noqa: E501
         #     self.logger.log(msg, "DEBUG")
         #     return True
         # except IntegrityError:
         #     self.session.rollback()
-        #     msg = f"⚠️ IntegrityError adding relationship {entity_1_id} -> {entity_2_id} (type {relationship_type_id})"
+        #     msg = f"⚠️ IntegrityError adding relationship {entity_1_id} -> {entity_2_id} (type {relationship_type_id})"  # noqa: E501
         #     self.logger.log(msg, "WARNING")
         #     return False

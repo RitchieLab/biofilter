@@ -45,7 +45,6 @@ class DTP(DTPBase, EntityQueryMixin):
     # ⚙️  ------ TRANSFORM FASE ------  ⚙️
     # ⚙️  ----------------------------  ⚙️
     def transform(self, raw_dir: str, processed_dir: str):
-
         """
         This DTP is specifically for loading relationships from Reactome.
         It does not perform data transformation. To transform Reactome data,
@@ -80,7 +79,9 @@ class DTP(DTPBase, EntityQueryMixin):
         # We cannot use the get_path method here, because:
         #    The file is hosted in the parent dtp.
         processed_path = (
-            Path(processed_dir) / self.data_source.source_system.name / parent_source  # noqa E501
+            Path(processed_dir)
+            / self.data_source.source_system.name
+            / parent_source  # noqa E501
         )  # noqa: E501
         processed_data = str(processed_path / "relationship_data.parquet")
 
@@ -101,7 +102,7 @@ class DTP(DTPBase, EntityQueryMixin):
             self.logger.log(msg, "ERROR")
             return total_relationships, load_status, msg
 
-        # Map entity groups and relationship types to their IDs 
+        # Map entity groups and relationship types to their IDs
         try:
             # Add columns for IDs and relationship type
             df["entity_1_id"] = None
@@ -112,9 +113,7 @@ class DTP(DTPBase, EntityQueryMixin):
             # This is necessary because the Entities were loaded from the
             # Reactome data source.
             parent_ds_id = (
-                self.session.query(DataSource.id)
-                .filter_by(name=parent_source)
-                .scalar()
+                self.session.query(DataSource.id).filter_by(name=parent_source).scalar()
             )
 
             # Get pathway IDs from EntityName
@@ -233,7 +232,9 @@ class DTP(DTPBase, EntityQueryMixin):
                 self.logger.log(msg, "WARNING")
 
                 # Save the not loaded relationships to a CSV file
-                not_loaded_path = processed_path / "relationship_data_not_loaded.csv"  # noqa E501
+                not_loaded_path = (
+                    processed_path / "relationship_data_not_loaded.csv"
+                )  # noqa E501
                 df_not_loaded.to_csv(not_loaded_path, index=False)
 
             msg = f"✅ Relations loaded: {len(df_valid)} | Not found: {len(df_not_loaded)}"  # noqa: E501

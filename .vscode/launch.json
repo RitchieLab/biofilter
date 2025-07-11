@@ -35,6 +35,13 @@
             "request": "launch",
             "program": "${workspaceFolder}/scripts/Run_ETLManager_conflict.py",
             "console": "integratedTerminal"
+        },
+        {
+            "name": "Bio 3R - Model Explorer",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/scripts/debug_runner.py",
+            "console": "integratedTerminal"
         }
     ]
 }

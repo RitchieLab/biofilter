@@ -78,7 +78,7 @@ class DTP(DTPBase, EntityQueryMixin):
 
             # Extract the gz file
             self.logger.log(f"🗜️  Unzipping to: {txt_path}", "INFO")
-            with gzip.open(gz_path, "rb") as f_in, open(txt_path, "wb") as f_out:
+            with gzip.open(gz_path, "rb") as f_in, open(txt_path, "wb") as f_out:  # noqa: E501
                 shutil.copyfileobj(f_in, f_out)
 
             # Compute and compare hash
@@ -145,13 +145,13 @@ class DTP(DTPBase, EntityQueryMixin):
             # define column names
             columns = [
                 "pfam_acc",  # accession (ex: PF00001)
-                "pfam_id",  # ID do domínio (ex: 7tm_1)
+                "pfam_id",  # domain ID (ex: 7tm_1)
                 "none_column",  # Column 2(C) no data
-                "description",  # descrição curta
-                "clan_acc",  # accession do clan (ex: CL0192)
-                "source_database",  # nome da base de dados (ex: Prosite)
-                "type",  # domain ou family
-                "long_description",  # descrição longa (última coluna do arquivo)
+                "description",
+                "clan_acc",  # accession clan (ex: CL0192)
+                "source_database",  # DB Source (ex: Prosite)
+                "type",  # domain or family
+                "long_description",
             ]
 
             # Read only first N columns matching `columns`
@@ -159,8 +159,8 @@ class DTP(DTPBase, EntityQueryMixin):
                 txt_file,
                 sep="\t",
                 header=None,
-                usecols=range(len(columns)),  # <- seleciona apenas as colunas desejadas
-                names=columns,  # <- define os nomes das colunas
+                usecols=range(len(columns)),
+                names=columns,
                 dtype=str,
                 compression="gzip",
             )
@@ -187,7 +187,8 @@ class DTP(DTPBase, EntityQueryMixin):
     # 📥  ------------------------ 📥
     def load(self, df=None, processed_dir=None, chunk_size=100_000):
         self.logger.log(
-            f"📥 Loading {self.data_source.name} data into the database...", "INFO"
+            f"📥 Loading {self.data_source.name} data into the database...",
+            "INFO"  # noqa: E501
         )
         total_pfam = 0
         load_status = False
@@ -210,7 +211,10 @@ class DTP(DTPBase, EntityQueryMixin):
                     self.logger.log(msg, "ERROR")
                     return total_pfam, load_status, msg
 
-                self.logger.log(f"📥 Reading data from {processed_data}", "INFO")
+                self.logger.log(
+                    f"📥 Reading data from {processed_data}",
+                    "INFO"  # noqa: E501
+                )
                 df = pd.read_csv(processed_data, dtype=str)
 
             new_entries = []

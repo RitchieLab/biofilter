@@ -80,7 +80,9 @@ class DTP(DTPBase, EntityQueryMixin):
         # We cannot use the get_path method here, because:
         #    The file is hosted in the parent dtp.
         processed_path = (
-            Path(processed_dir) / self.data_source.source_system.name / "uniprot"  # noqa E501
+            Path(processed_dir)
+            / self.data_source.source_system.name
+            / "uniprot"  # noqa E501
         )  # noqa: E501
         processed_data = str(processed_path / "relationship_data.parquet")
 
@@ -105,7 +107,8 @@ class DTP(DTPBase, EntityQueryMixin):
         try:
             # Load in memory all entity groups to avoid multiple queries
             group_map = {
-                g.name.lower(): g.id for g in self.session.query(EntityGroup).all()  # noqa E501
+                g.name.lower(): g.id
+                for g in self.session.query(EntityGroup).all()  # noqa E501
             }  # noqa E501
             # Load in memory all relationship types to avoid multiple queries
             rel_type_map = {
@@ -119,10 +122,16 @@ class DTP(DTPBase, EntityQueryMixin):
 
         try:
             # Transform the mapping to a Series with Int64 type (allows NaN)
-            df["source_group_id"] = df["source_type"].str.lower().map(group_map).astype("Int64")  # noqa E501
-            df["target_group_id"] = df["target_type"].str.lower().map(group_map).astype("Int64")  # noqa E501
+            df["source_group_id"] = (
+                df["source_type"].str.lower().map(group_map).astype("Int64")
+            )  # noqa E501
+            df["target_group_id"] = (
+                df["target_type"].str.lower().map(group_map).astype("Int64")
+            )  # noqa E501
             # Map relationship types to their IDs
-            df["relation_type_id"] = df["relation_type"].str.lower().map(rel_type_map).astype("Int64")  # noqa E501
+            df["relation_type_id"] = (
+                df["relation_type"].str.lower().map(rel_type_map).astype("Int64")
+            )  # noqa E501
         except KeyError as e:
             msg = f"Error mapping group IDs or relationship types: {e}"
             self.logger.log(msg, "ERROR")
@@ -135,7 +144,10 @@ class DTP(DTPBase, EntityQueryMixin):
                 .filter_by(data_source_id=self.data_source.id)
                 .delete(synchronize_session=False)
             )
-            self.logger.log(f"🧹  Deleted {deleted} existing relationships from this data source", "INFO")  # noqa E501
+            self.logger.log(
+                f"🧹  Deleted {deleted} existing relationships from this data source",
+                "INFO",
+            )  # noqa E501
             self.session.commit()
 
             # Reserve all relationships not loaded
@@ -153,13 +165,14 @@ class DTP(DTPBase, EntityQueryMixin):
                     target_type = row["target_group_id"]
 
                     # Check values before processing
-                    if pd.isna(row["relation_type_id"]) or pd.isna(row["source_id"]) or pd.isna(row["target_id"]):  # noqa E501
+                    if (
+                        pd.isna(row["relation_type_id"])
+                        or pd.isna(row["source_id"])
+                        or pd.isna(row["target_id"])
+                    ):  # noqa E501
                         not_loaded.append(row)
                         msg = f"⚠️  Skipping: Missing required fields: {source_name} ➝ {target_name} - {relation_type}"  # noqa E501
-                        self.logger.log(
-                            msg,
-                            "WARNING"
-                        )
+                        self.logger.log(msg, "WARNING")
                         continue
 
                     # Get entity_1_id
@@ -184,10 +197,7 @@ class DTP(DTPBase, EntityQueryMixin):
                     if not source_entity or not target_entity:
                         not_loaded.append(row)
                         msg = f"⚠️  Skipping: Entity not found or group mismatch: {source_name} ➝ {target_name}"  # noqa E501
-                        self.logger.log(
-                            msg,
-                            "WARNING"
-                        )
+                        self.logger.log(msg, "WARNING")
                         continue
 
                     # TODO: check if exists a relationship already or add it in DB  # noqa E501
@@ -221,7 +231,9 @@ class DTP(DTPBase, EntityQueryMixin):
                 self.logger.log(msg, "WARNING")
 
                 # Save the not loaded relationships to a CSV file
-                not_loaded_path = processed_path / "relationship_data_not_loaded.csv"  # noqa E501
+                not_loaded_path = (
+                    processed_path / "relationship_data_not_loaded.csv"
+                )  # noqa E501
                 df_not_loaded.to_csv(not_loaded_path, index=False)
 
             msg = f"✅ Relations loaded: {total_relationships} | Not found: {len(df_not_loaded)}"  # noqa: E501

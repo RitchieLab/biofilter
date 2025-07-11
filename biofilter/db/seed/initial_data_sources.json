@@ -20,7 +20,7 @@
             "format": "JSON",
             "grch_version": "GRCh38",
             "ucschg_version": "hg38",
-            "dtp_script": "dtp_hgnc",
+            "dtp_script": "dtp_gene_hgnc",
             "last_status": "pending",
             "active": true
         },
@@ -32,7 +32,7 @@
             "format": "JSON",
             "grch_version": "GRCh38",
             "ucschg_version": "hg38",
-            "dtp_script": "dtp_dbsnp",
+            "dtp_script": "dtp_variant_ncbi",
             "last_status": "pending",
             "active": true
         },
@@ -44,7 +44,7 @@
             "format": "JSON",
             "grch_version": "GRCh38",
             "ucschg_version": "hg38",
-            "dtp_script": "dtp_dbsnp",
+            "dtp_script": "dtp_variant_ncbi",
             "last_status": "pending",
             "active": true
         },
@@ -56,7 +56,7 @@
             "format": "JSON",
             "grch_version": "GRCh38",
             "ucschg_version": "hg38",
-            "dtp_script": "dtp_dbsnp",
+            "dtp_script": "dtp_variant_ncbi",
             "last_status": "pending",
             "active": true
         },
@@ -68,7 +68,7 @@
             "format": "JSON",
             "grch_version": "GRCh38",
             "ucschg_version": "hg38",
-            "dtp_script": "dtp_dbsnp",
+            "dtp_script": "dtp_variant_ncbi",
             "last_status": "pending",
             "active": true
         },
@@ -80,7 +80,7 @@
             "format": "JSON",
             "grch_version": "GRCh38",
             "ucschg_version": "hg38",
-            "dtp_script": "dtp_dbsnp",
+            "dtp_script": "dtp_variant_ncbi",
             "last_status": "pending",
             "active": true
         },
@@ -92,7 +92,7 @@
             "format": "JSON",
             "grch_version": "GRCh38",
             "ucschg_version": "hg38",
-            "dtp_script": "dtp_dbsnp",
+            "dtp_script": "dtp_variant_ncbi",
             "last_status": "pending",
             "active": true
         },
@@ -104,7 +104,7 @@
             "format": "JSON",
             "grch_version": "GRCh38",
             "ucschg_version": "hg38",
-            "dtp_script": "dtp_dbsnp",
+            "dtp_script": "dtp_variant_ncbi",
             "last_status": "pending",
             "active": true
         },
@@ -116,7 +116,7 @@
             "format": "JSON",
             "grch_version": "GRCh38",
             "ucschg_version": "hg38",
-            "dtp_script": "dtp_dbsnp",
+            "dtp_script": "dtp_variant_ncbi",
             "last_status": "pending",
             "active": true
         },
@@ -128,7 +128,7 @@
             "format": "JSON",
             "grch_version": "GRCh38",
             "ucschg_version": "hg38",
-            "dtp_script": "dtp_dbsnp",
+            "dtp_script": "dtp_variant_ncbi",
             "last_status": "pending",
             "active": true
         },
@@ -140,7 +140,7 @@
             "format": "JSON",
             "grch_version": "GRCh38",
             "ucschg_version": "hg38",
-            "dtp_script": "dtp_dbsnp",
+            "dtp_script": "dtp_variant_ncbi",
             "last_status": "pending",
             "active": true
         },
@@ -152,7 +152,7 @@
             "format": "JSON",
             "grch_version": "GRCh38",
             "ucschg_version": "hg38",
-            "dtp_script": "dtp_dbsnp",
+            "dtp_script": "dtp_variant_ncbi",
             "last_status": "pending",
             "active": true
         },
@@ -164,7 +164,7 @@
             "format": "JSON",
             "grch_version": "GRCh38",
             "ucschg_version": "hg38",
-            "dtp_script": "dtp_dbsnp",
+            "dtp_script": "dtp_variant_ncbi",
             "last_status": "pending",
             "active": true
         },
@@ -176,7 +176,7 @@
             "format": "JSON",
             "grch_version": "GRCh38",
             "ucschg_version": "hg38",
-            "dtp_script": "dtp_dbsnp",
+            "dtp_script": "dtp_variant_ncbi",
             "last_status": "pending",
             "active": true
         },
@@ -188,7 +188,7 @@
             "format": "JSON",
             "grch_version": "GRCh38",
             "ucschg_version": "hg38",
-            "dtp_script": "dtp_dbsnp",
+            "dtp_script": "dtp_variant_ncbi",
             "last_status": "pending",
             "active": true
         },
@@ -200,7 +200,7 @@
             "format": "JSON",
             "grch_version": "GRCh38",
             "ucschg_version": "hg38",
-            "dtp_script": "dtp_dbsnp",
+            "dtp_script": "dtp_variant_ncbi",
             "last_status": "pending",
             "active": true
         },
@@ -212,7 +212,7 @@
             "format": "JSON",
             "grch_version": "GRCh38",
             "ucschg_version": "hg38",
-            "dtp_script": "dtp_dbsnp",
+            "dtp_script": "dtp_variant_ncbi",
             "last_status": "pending",
             "active": true
         },
@@ -224,7 +224,7 @@
             "format": "JSON",
             "grch_version": "GRCh38",
             "ucschg_version": "hg38",
-            "dtp_script": "dtp_dbsnp",
+            "dtp_script": "dtp_variant_ncbi",
             "last_status": "pending",
             "active": true
         },
@@ -236,7 +236,7 @@
             "format": "JSON",
             "grch_version": "GRCh38",
             "ucschg_version": "hg38",
-            "dtp_script": "dtp_dbsnp",
+            "dtp_script": "dtp_variant_ncbi",
             "last_status": "pending",
             "active": true
         },
@@ -248,7 +248,7 @@
             "format": "JSON",
             "grch_version": "GRCh38",
             "ucschg_version": "hg38",
-            "dtp_script": "dtp_dbsnp",
+            "dtp_script": "dtp_variant_ncbi",
             "last_status": "pending",
             "active": true
         },
@@ -260,7 +260,7 @@
             "format": "JSON",
             "grch_version": "GRCh38",
             "ucschg_version": "hg38",
-            "dtp_script": "dtp_dbsnp",
+            "dtp_script": "dtp_variant_ncbi",
             "last_status": "pending",
             "active": true
         },
@@ -272,7 +272,7 @@
             "format": "JSON",
             "grch_version": "GRCh38",
             "ucschg_version": "hg38",
-            "dtp_script": "dtp_dbsnp",
+            "dtp_script": "dtp_variant_ncbi",
             "last_status": "pending",
             "active": true
         },
@@ -284,7 +284,7 @@
             "format": "JSON",
             "grch_version": "GRCh38",
             "ucschg_version": "hg38",
-            "dtp_script": "dtp_dbsnp",
+            "dtp_script": "dtp_variant_ncbi",
             "last_status": "pending",
             "active": true
         },
@@ -296,7 +296,7 @@
             "format": "JSON",
             "grch_version": "GRCh38",
             "ucschg_version": "hg38",
-            "dtp_script": "dtp_dbsnp",
+            "dtp_script": "dtp_variant_ncbi",
             "last_status": "pending",
             "active": true
         },
@@ -308,7 +308,7 @@
             "format": "JSON",
             "grch_version": "GRCh38",
             "ucschg_version": "hg38",
-            "dtp_script": "dtp_dbsnp",
+            "dtp_script": "dtp_variant_ncbi",
             "last_status": "pending",
             "active": true
         },
@@ -320,7 +320,7 @@
             "format": "JSON",
             "grch_version": "GRCh38",
             "ucschg_version": "hg38",
-            "dtp_script": "dtp_dbsnp",
+            "dtp_script": "dtp_variant_ncbi",
             "last_status": "pending",
             "active": true
         },
@@ -332,7 +332,7 @@
             "format": "JSON",
             "grch_version": "GRCh38",
             "ucschg_version": "hg38",
-            "dtp_script": "dtp_dbsnp",
+            "dtp_script": "dtp_variant_ncbi",
             "last_status": "pending",
             "active": true
         },
