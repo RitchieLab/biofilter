@@ -12,6 +12,7 @@ from biofilter.db.models.curation_models import (
     CurationConflict,
     ConflictStatus,
 )  # noqa E501
+
 from biofilter.etl.conflict_manager import ConflictManager
 from biofilter.etl.mixins.base_dtp import DTPBase
 
@@ -32,6 +33,12 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
         self.use_conflict_csv = use_conflict_csv
         self.conflict_mgr = ConflictManager(session, logger)
 
+        # DTP versioning
+        self.dtp_name = "dtp_gene_hgnc"
+        self.dtp_version = "1.0.0"
+        self.compatible_schema_min = "3.0.0"
+        self.compatible_schema_max = "4.0.0"
+
     # ⬇️  --------------------------  ⬇️
     # ⬇️  ------ EXTRACT FASE ------  ⬇️
     # ⬇️  --------------------------  ⬇️
@@ -46,6 +53,9 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
             msg,
             "INFO",  # noqa: E501
         )  # noqa: E501
+
+        # Check Compartibility
+        self.check_compatibility()
 
         source_url = self.data_source.source_url
         if force_steps:

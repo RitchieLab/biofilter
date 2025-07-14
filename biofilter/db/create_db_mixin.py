@@ -36,7 +36,12 @@ class CreateDBMixin:
         self._seed_from_json(
             f"{seed_dir}/initial_config.json", "config_models", "SystemConfig"
         )
-
+        self._seed_from_json(
+            f"{seed_dir}/initial_metadata.json",
+            "config_models",
+            "BiofilterMetadata",
+            # key="schema_version",
+        )
         self._seed_from_json(
             f"{seed_dir}/initial_source_systems.json",
             "etl_models",
@@ -79,6 +84,7 @@ class CreateDBMixin:
             "GenomeAssembly",
             key="genome_assemblies",
         )
+
         # self._seed_from_json(
         #     f"{seed_dir}/initial_variant_types.json",
         #     "variants_models",

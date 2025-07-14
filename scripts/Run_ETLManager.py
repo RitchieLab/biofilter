@@ -9,7 +9,7 @@ if __name__ == "__main__":
     # ETL HGNC -- GENES
     # bf.update(data_sources=["hgnc"], run_steps=["extract"], force_steps=["extract"])      # noqa: E501
     # bf.update(data_sources=["hgnc"], run_steps=["transform"], force_steps=["transform"])  # noqa: E501
-    # bf.update(data_sources=["pfam"], run_steps=["extract"], force_steps=["extract"])
+    bf.update(data_sources=["pfam"], run_steps=["extract"], force_steps=["extract"])
     # bf.update(data_sources=["pfam"], run_steps=["transform"], force_steps=["transform"])
     # bf.update(data_sources=["pfam"], run_steps=["load"], force_steps=["load"])
     # bf.update(data_sources=["uniprot"], run_steps=["extract"], force_steps=["extract"])
@@ -76,9 +76,9 @@ if __name__ == "__main__":
 
     # bf.update(data_sources=["gene_ncbi"], run_steps=["extract"], force_steps=["extract"])  # noqa: E501
     # bf.update(data_sources=["gene_ncbi"], run_steps=["transform"], force_steps=["transform"]) # noqa: E501
-    bf.update(
-        data_sources=["gene_ncbi"], run_steps=["load"], force_steps=["load"]
-    )  # noqa: E501
+    # bf.update(
+    #     data_sources=["gene_ncbi"], run_steps=["load"], force_steps=["load"]
+    # )  # noqa: E501
 
 
 print("Database updated successfully.")

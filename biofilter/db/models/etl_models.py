@@ -40,6 +40,8 @@ class DataSource(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     name = Column(String, unique=True, nullable=False)  # Ex: dbSNP, Ensembl
+    dtp_version = Column(String, nullable=True)  # control version
+    schema_version = Column(String, nullable=True)  # compat schema version
     source_system_id = Column(
         Integer,
         ForeignKey("etl_source_systems.id", ondelete="CASCADE"),

@@ -1,8 +1,10 @@
 import os
 import requests
+from packaging import version
 from pathlib import Path
 from typing import Optional
 from biofilter.utils.file_hash import compute_file_hash
+from biofilter.db.models.config_models import BiofilterMetadata
 
 
 class DTPBase:
@@ -52,3 +54,27 @@ class DTPBase:
         raw_path_ds = self.get_path(raw_path)
         filename = Path(self.data_source.source_url).name
         return raw_path_ds / filename
+
+    def check_compatibility(self):
+        metadata = (
+            self.session.query(BiofilterMetadata)
+            .order_by(BiofilterMetadata.id.desc())
+            .first()
+        )
+        if not metadata:
+            raise Exception("❌ Database metadata not found. Schema may not be initialized.")
+
+        db_version = metadata.schema_version
+        db_v = version.parse(db_version)
+        min_v = version.parse(self.compatible_schema_min)
+        max_v = version.parse(self.compatible_schema_max) if self.compatible_schema_max else None
+
+        if db_v < min_v or (max_v and db_v > max_v):
+            msg = (
+                f"❌ Incompatible schema version for {self.dtp_name} v{self.dtp_version}.\n"
+                f"   Required: >= {self.compatible_schema_min}"
+            )
+            if self.compatible_schema_max:
+                msg += f" and <= {self.compatible_schema_max}"
+            msg += f"\n   Current DB version: {db_version}"
+            raise Exception(msg)

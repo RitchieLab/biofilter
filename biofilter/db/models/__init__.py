@@ -1,4 +1,4 @@
-from .config_models import SystemConfig
+from .config_models import SystemConfig, BiofilterMetadata
 
 from .genes_models import Gene, GeneGroup
 from .etl_models import DataSource, SourceSystem, ETLProcess, ETLLog
@@ -34,6 +34,7 @@ from .go_models import GOMaster, GORelation
 __all__ = [
     # # CONFIGURATION MODELS
     "SystemConfig",
+    "BiofilterMetadata",
     # # OMICS MODELS
     "GeneGroup",
     "Gene",

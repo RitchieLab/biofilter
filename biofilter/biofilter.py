@@ -7,6 +7,7 @@ from biofilter.utils.logger import Logger
 from biofilter.etl.etl_manager import ETLManager
 from biofilter.etl.conflict_manager import ConflictManager
 from biofilter.cli.model_explorer import ModelExplorer
+from biofilter.cli.migrate import run_migration
 
 
 class Biofilter:
@@ -180,3 +181,7 @@ class Biofilter:
             with open(model_info_path) as f:
                 model_info = json.load(f)
             return ModelExplorer(session=self.db.session(), model_info=model_info)
+    
+    def migrate(self):
+        """Trigger schema migration logic."""
+        run_migration()

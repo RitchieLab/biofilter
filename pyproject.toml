@@ -7,6 +7,12 @@ license = "MIT"
 homepage = "https://ritchielab.org"
 readme = "README.md"
 
+include = [
+    "alembic",
+    "alembic.ini"
+]
+
+
 [tool.poetry.dependencies]
 python = "^3.10"
 apsw = "3.46.1.0"
@@ -34,6 +40,7 @@ sphinx-rtd-theme = "^3.0.2"
 tox = "^4.23.2"
 sphinx-material = "^0.0.36"
 pylint = "^3.3.3"
+alembic = "^1.16.4"
 
 [build-system]
 requires = ["poetry-core"]
