@@ -1,17 +1,20 @@
 [tool.poetry]
 name = "biofilter"
-version = "3.1.0"
+version = "3.0.2"
 description = "Biofilter Know"
 authors = ["Ritchie Lab <Software_RitchieLab@pennmedicine.upenn.edu>"]
 license = "MIT"
 homepage = "https://ritchielab.org"
 readme = "README.md"
 
+packages = [{ include = "biofilter" }]
 include = [
-    "alembic",
+    "biofilter/alembic/**",
     "alembic.ini"
 ]
 
+[tool.poetry.scripts]
+biofilter = "biofilter.cli:main"
 
 [tool.poetry.dependencies]
 python = "^3.10"
@@ -30,6 +33,7 @@ aiosqlite = "^0.21.0"
 pandas = "^2.2.3"
 openpyxl = "^3.1.5"
 pyarrow = "^19.0.1"
+alembic = "^1.16.4"
 
 [tool.poetry.group.dev.dependencies]
 black = "^24.10.0"
@@ -40,7 +44,6 @@ sphinx-rtd-theme = "^3.0.2"
 tox = "^4.23.2"
 sphinx-material = "^0.0.36"
 pylint = "^3.3.3"
-alembic = "^1.16.4"
 
 [build-system]
 requires = ["poetry-core"]

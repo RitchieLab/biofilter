@@ -1,8 +1,8 @@
-"""Initial Biofilter3R schema
+"""3.0.1-Update
 
-Revision ID: 21e261bc8b74
-Revises: 
-Create Date: 2025-07-14 08:54:14.237611
+Revision ID: c16939017531
+Revises: f30af5d1545b
+Create Date: 2025-07-14 16:06:42.474902
 
 """
 from typing import Sequence, Union
@@ -12,8 +12,8 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = '21e261bc8b74'
-down_revision: Union[str, Sequence[str], None] = None
+revision: str = 'c16939017531'
+down_revision: Union[str, Sequence[str], None] = 'f30af5d1545b'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

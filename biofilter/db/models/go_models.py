@@ -13,6 +13,7 @@ class GOMaster(Base):
     entity_id = Column(Integer, nullable=False)
     name = Column(String, nullable=False)
     namespace = Column(String, nullable=False)  # MF, BP, CC
+    test = Column(String, nullable=True)
 
     # Optional: relations to other GO terms (DAG)
     parents = relationship(
