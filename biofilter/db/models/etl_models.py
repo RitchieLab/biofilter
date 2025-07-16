@@ -40,6 +40,8 @@ class DataSource(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     name = Column(String, unique=True, nullable=False)  # Ex: dbSNP, Ensembl
+    dtp_version = Column(String, nullable=True)  # control version
+    schema_version = Column(String, nullable=True)  # compat schema version
     source_system_id = Column(
         Integer,
         ForeignKey("etl_source_systems.id", ondelete="CASCADE"),
@@ -71,6 +73,12 @@ class DataSource(Base):
     # )
     # variants = relationship("Variant", back_populates="data_source")
     pathways = relationship("Pathway", back_populates="data_source")
+    protein_pfams = relationship("ProteinPfam", back_populates="data_source")
+    protein_masters = relationship("ProteinMaster", back_populates="data_source")
+    protein_entities = relationship("ProteinEntity", back_populates="data_source")
+    protein_pfam_links = relationship(
+        "ProteinPfamLink", back_populates="data_source"
+    )  # noqa: E501
 
 
 # ETL DOMAINS
@@ -97,7 +105,9 @@ class ETLLog(Base):
 
 
 def get_etl_status_enum(name: str):
-    return Enum("pending", "running", "completed", "failed", name=name)
+    return Enum(
+        "pending", "running", "completed", "failed", "not_applicable", name=name
+    )
 
 
 class ETLProcess(Base):

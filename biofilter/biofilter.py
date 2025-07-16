@@ -1,9 +1,15 @@
 # import os
+import json
+from pathlib import Path
 from biofilter.db.database import Database
 from biofilter.core.settings_manager import SettingsManager
 from biofilter.utils.logger import Logger
 from biofilter.etl.etl_manager import ETLManager
 from biofilter.etl.conflict_manager import ConflictManager
+from biofilter.utils.model_explorer import ModelExplorer
+from biofilter.utils.migrate import run_migration
+
+from biofilter.reports.report_manager import ReportManager
 
 
 class Biofilter:
@@ -171,3 +177,31 @@ class Biofilter:
 
         manager = ConflictManager(self.db.get_session(), self.logger)
         return manager.import_conflicts_from_excel(input_path)
+
+    def model_explorer(self):
+            model_info_path = Path(__file__).parent.parent / "biofilter"/ "db" / "models" / "models_info.json"
+            with open(model_info_path) as f:
+                model_info = json.load(f)
+            return ModelExplorer(session=self.db.session(), model_info=model_info)
+
+    def migrate(self):
+        # run_migration(self.db.session)
+        run_migration(self.db.session, self.db.db_uri)
+
+
+    # REPORTS
+    def list_reports(self):
+        """
+        List all available reports with name and description.
+        """
+        report = ReportManager(self.db.get_session())
+
+        return report.list_reports()
+
+    def run_report(self, name: str, as_dataframe: bool = True, **kwargs):
+        """
+        Run a report by name, optionally returning the result as a DataFrame.
+        """
+        report = ReportManager(self.db.get_session())
+
+        return report.run_report(name=name, as_dataframe=as_dataframe, **kwargs)

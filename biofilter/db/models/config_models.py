@@ -69,7 +69,19 @@ Limitations & Future Enhancements:
     layer.
 
 ================================================================================
-    Author: Andre Garon - Biofilter 3R  
+    Author: Andre Garon - Biofilter 3R
     Date: 2025-04
 ================================================================================
 """
+
+
+class BiofilterMetadata(Base):
+    __tablename__ = "biofilter_metadata"
+
+    id = Column(Integer, primary_key=True)
+    schema_version = Column(String, nullable=False)
+    etl_version = Column(String, nullable=True)
+    description = Column(Text, nullable=True)
+    created_at = Column(
+        DateTime, default=lambda: datetime.datetime.now(datetime.timezone.utc)
+    )

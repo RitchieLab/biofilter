@@ -1,11 +1,14 @@
 [tool.poetry]
 name = "biofilter"
-version = "3.1.0"
+version = "3.0.0"
 description = "Biofilter Know"
 authors = ["Ritchie Lab <Software_RitchieLab@pennmedicine.upenn.edu>"]
 license = "MIT"
 homepage = "https://ritchielab.org"
 readme = "README.md"
+
+[tool.poetry.scripts]
+biofilter = "biofilter.cli:main"
 
 [tool.poetry.dependencies]
 python = "^3.10"
@@ -24,6 +27,9 @@ aiosqlite = "^0.21.0"
 pandas = "^2.2.3"
 openpyxl = "^3.1.5"
 pyarrow = "^19.0.1"
+alembic = "^1.16.4"
+toml = "^0.10.2"
+requests = "^2.32.4"
 
 [tool.poetry.group.dev.dependencies]
 black = "^24.10.0"

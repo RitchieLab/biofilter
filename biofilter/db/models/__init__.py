@@ -1,4 +1,4 @@
-from .config_models import SystemConfig
+from .config_models import SystemConfig, BiofilterMetadata
 
 from .genes_models import Gene, GeneGroup
 from .etl_models import DataSource, SourceSystem, ETLProcess, ETLLog
@@ -23,10 +23,18 @@ from .variants_models import (
     VariantGeneRelationship,
 )
 from .pathway_models import Pathway
+from .protein_models import (
+    ProteinPfam,
+    ProteinMaster,
+    ProteinEntity,
+    ProteinPfamLink,
+)
+from .go_models import GOMaster, GORelation
 
 __all__ = [
     # # CONFIGURATION MODELS
     "SystemConfig",
+    "BiofilterMetadata",
     # # OMICS MODELS
     "GeneGroup",
     "Gene",
@@ -53,4 +61,12 @@ __all__ = [
     # "VariantLocation",
     "VariantGeneRelationship",
     "Pathway",
+    # PROTEIN MODELS
+    "ProteinPfam",
+    "ProteinMaster",
+    "ProteinEntity",
+    "ProteinPfamLink",
+    # GENE ONTOLOGY MODELS
+    "GOMaster",
+    "GORelation",
 ]

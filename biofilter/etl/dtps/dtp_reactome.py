@@ -1,15 +1,16 @@
 import os
 import pandas as pd
+from pathlib import Path
 import zipfile
 from biofilter.utils.file_hash import compute_file_hash
 from biofilter.etl.mixins.entity_query_mixin import EntityQueryMixin
 from biofilter.db.models.entity_models import (
     EntityGroup,
-    EntityName,
-    EntityRelationshipType,
 )  # noqa E501
 from biofilter.db.models.pathway_models import Pathway
 from biofilter.etl.mixins.base_dtp import DTPBase
+
+# TODO: Separa os processos de dados mestres e dados de relacionamentos
 
 
 class DTP(DTPBase, EntityQueryMixin):
@@ -27,6 +28,12 @@ class DTP(DTPBase, EntityQueryMixin):
         self.session = session
         self.use_conflict_csv = use_conflict_csv
 
+        # DTP versioning
+        self.dtp_name = "dtp_reactome"
+        self.dtp_version = "1.0.0"
+        self.compatible_schema_min = "3.0.0"
+        self.compatible_schema_max = "4.0.0"
+
     # ⬇️  --------------------------  ⬇️
     # ⬇️  ------ EXTRACT FASE ------  ⬇️
     # ⬇️  --------------------------  ⬇️
@@ -36,12 +43,16 @@ class DTP(DTPBase, EntityQueryMixin):
         reference. Only proceeds with full extraction if the hash has changed.
         """
 
+        msg = f"⬇️ Starting extraction of {self.data_source.name} data..."
+
         self.logger.log(
-            f"⬇️ Starting extraction of {self.data_source.name} data...",
+            msg,
             "INFO",  # noqa: E501
         )  # noqa: E501
 
-        msg = ""
+        # Check Compartibility
+        self.check_compatibility()
+
         source_url = self.data_source.source_url
         files_to_download = [
             "ReactomePathways.txt",
@@ -109,29 +120,39 @@ class DTP(DTPBase, EntityQueryMixin):
     # ⚙️  ----------------------------  ⚙️
     def transform(self, raw_dir: str, processed_dir: str):
 
-        self.logger.log(
-            f"🔧 Transforming the {self.data_source.name} data ...", "INFO"
-        )  # noqa: E501
+        msg = f"🔧 Transforming the {self.data_source.name} data ..."
+        self.logger.log(msg, "INFO")
 
-        msg = ""
+        # Check Compartibility
+        self.check_compatibility()
+
+        # Check if raw_dir and processed_dir are provided
         try:
-            landing_path = os.path.join(
-                raw_dir,
-                self.data_source.source_system.name,
-                self.data_source.name,
-            )
-            processed_path = os.path.join(
-                processed_dir,
-                self.data_source.source_system.name,
-                self.data_source.name,
-            )
-            os.makedirs(processed_path, exist_ok=True)
+            # Define input/output base paths
+            input_path = (
+                Path(raw_dir)
+                / self.data_source.source_system.name
+                / self.data_source.name
+            )  # noqa E501
+            output_path = (
+                Path(processed_dir)
+                / self.data_source.source_system.name
+                / self.data_source.name
+            )  # noqa E501
 
-            # START FIRST FILE
-            # Process pathways
-            pathways_file = os.path.join(landing_path, "ReactomePathways.txt")
+            # Ensure output directory exists
+            output_path.mkdir(parents=True, exist_ok=True)
+
+            # Input file path
+            input_file = input_path / "ReactomePathways.txt"
+
+            if not input_file.exists():
+                msg = f"❌ Input file not found: {input_file}"
+                self.logger.log(msg, "ERROR")
+                return None, False, msg
+
             df_pathways = pd.read_csv(
-                pathways_file,
+                input_file,
                 sep="\t",
                 header=None,
                 names=["reactome_id", "pathway_name", "species"],
@@ -140,21 +161,27 @@ class DTP(DTPBase, EntityQueryMixin):
             # Filter only Homo sapiens
             df_pathways = df_pathways[df_pathways["species"] == "Homo sapiens"]
 
+            # Output files paths
+            output_file_master = output_path / "master_data"
+
             # Save filtered pathways
-            pathways_csv = os.path.join(processed_path, "master_data.csv")
-            df_pathways.to_csv(pathways_csv, index=False)
-            self.logger.log(
-                f"✅ Pathways transformed and saved to {pathways_csv}", "INFO"
+            df_pathways.to_csv(
+                output_file_master.with_suffix(".csv"), index=False
+            )  # noqa: E501
+            df_pathways.to_parquet(
+                output_file_master.with_suffix(".parquet"), index=False
             )
+
+            msg = f"✅ Pathways master data written with {len(df_pathways)} records)"  # noqa E501
+            self.logger.log(msg, "INFO")
 
             # START SECOND FILES
             # Process relations
             records = []
             valid_ids = set(df_pathways["reactome_id"])
+
             # Pathways relations
-            relations_file = os.path.join(
-                landing_path, "ReactomePathwaysRelation.txt"
-            )  # noqa E501
+            relations_file = input_path / "ReactomePathwaysRelation.txt"
 
             with open(relations_file, "r") as infile:
                 for line in infile:
@@ -177,9 +204,7 @@ class DTP(DTPBase, EntityQueryMixin):
                         )
 
             # Process Genes Symbols
-            gmt_zip_file = os.path.join(
-                landing_path, "ReactomePathways.gmt.zip"
-            )  # noqa E501
+            gmt_zip_file = input_path / "ReactomePathways.gmt.zip"
 
             # Map Pathway Name -> Reactome ID
             pathway_name_to_id = df_pathways.set_index("pathway_name")[
@@ -214,8 +239,8 @@ class DTP(DTPBase, EntityQueryMixin):
                                     }
                                 )
 
-            # Process Emsembl IDs (Genes and Proteins)
-            ensembl_file = os.path.join(landing_path, "Ensembl2Reactome.txt")
+            # Process Ensembl IDs (Genes and Proteins)
+            ensembl_file = input_path / "Ensembl2Reactome.txt"
 
             with open(ensembl_file, "r") as infile:
                 for line in infile:
@@ -251,8 +276,8 @@ class DTP(DTPBase, EntityQueryMixin):
                         }
                     )
 
-            # Proces Uniprot (Protein)
-            uniprot_file = os.path.join(landing_path, "UniProt2Reactome.txt")
+            # Process Uniprot (Protein)
+            uniprot_file = input_path / "UniProt2Reactome.txt"
 
             with open(uniprot_file, "r") as infile:
                 for line in infile:
@@ -281,21 +306,27 @@ class DTP(DTPBase, EntityQueryMixin):
                         }
                     )
 
-            # Save results in process file
+            # Convert to DataFrame
             df_relations = pd.DataFrame(records)
-            relations_csv = os.path.join(
-                processed_path, "pathway_relations.csv"
-            )  # noqa E501
-            df_relations.to_csv(relations_csv, index=False)
 
-            self.logger.log(
-                f"✅ Pathways Relations transformed and saved to {relations_csv}",  # noqa E501
-                "INFO",
+            # Output files paths
+            output_file_relationship = output_path / "relationship_data"
+
+            # Save relationship pathways
+            df_relations.to_csv(
+                output_file_relationship.with_suffix(".csv"), index=False
+            )  # noqa: E501
+            df_relations.to_parquet(
+                output_file_relationship.with_suffix(".parquet"), index=False
             )
 
-            msg = "Transformation Completed"
+            self.logger.log(
+                f"✅ Reactome links written with {len(df_relations)} links)",
+                "INFO",  # noqa E501
+            )  # noqa: E501
 
-            return df_pathways, True, msg
+            msg = f"✅ Finished transforming {self.data_source.name} data."
+            return None, True, msg
 
         except Exception as e:
             msg = f"❌ ETL transform failed: {str(e)}"
@@ -307,17 +338,18 @@ class DTP(DTPBase, EntityQueryMixin):
     # 📥  ------------------------ 📥
     def load(self, df=None, processed_dir=None, chunk_size=100_000):
 
+        msg = f"📥 Loading {self.data_source.name} data into the database..."
         self.logger.log(
-            f"📥 Loading {self.data_source.name} data into the database...",
-            "INFO",  # noqa E501
+            msg,
+            "INFO",
         )
+
+        # Check Compartibility
+        self.check_compatibility()
 
         total_pathways = 0
         load_status = False
-        msg = ""
 
-        # NOTE: Garante que self.data_source é válido na sessão atual
-        # self.data_source = self.session.merge(self.data_source)
         data_source_id = self.data_source.id
 
         if df is None:
@@ -327,7 +359,7 @@ class DTP(DTPBase, EntityQueryMixin):
                 return total_pathways, load_status, msg
 
             processed_path = self.get_path(processed_dir)
-            processed_data = str(processed_path / "master_data.csv")
+            processed_data = str(processed_path / "master_data.parquet")
 
             if not os.path.exists(processed_data):
                 msg = f"File not found: {processed_data}"
@@ -338,7 +370,7 @@ class DTP(DTPBase, EntityQueryMixin):
                 f"📥 Reading data in chunks from {processed_data}", "INFO"
             )  # noqa E501
 
-            df = pd.read_csv(processed_data, dtype=str)
+            df = pd.read_parquet(processed_data, engine="pyarrow")
 
         # Get Entity Group ID
         if not hasattr(self, "entity_group") or self.entity_group is None:
@@ -356,199 +388,56 @@ class DTP(DTPBase, EntityQueryMixin):
             msg = f"EntityGroup ID for 'Pathways' is {self.entity_group}"
             self.logger.log(msg, "DEBUG")
 
-        # IMPORTANT: We will not use conflict manager here
-
-        # Interaction to each Reactome Pathway
-        for _, row in df.iterrows():
-
-            pathway_master = row.get("reactome_id")
-            pathway_name = row.get("pathway_name")
-
-            if not pathway_master:
-                msg = f"Pathway Master not found in row: {row}"
-                self.logger.log(msg, "WARNING")
-                continue
-
-            # Add or Get Entity
-            entity_id, _ = self.get_or_create_entity(
-                name=pathway_master,
-                group_id=self.entity_group,
-                data_source_id=self.data_source.id,
-            )
-
-            # Add or Get Entity Name
-            self.get_or_create_entity_name(
-                entity_id, pathway_name, data_source_id=self.data_source.id
-            )
-
-            # Check if the pathway already exists
-            existing_pathway = (
-                self.session.query(Pathway)
-                .filter_by(
-                    pathway_id=pathway_master,
-                )
-                .first()
-            )
-
-            # Create new if it does not exist
-            if not existing_pathway:
-                pathway = Pathway(
-                    entity_id=entity_id,
-                    pathway_id=pathway_master,
-                    description=pathway_name,
-                    data_source_id=data_source_id,
-                )
-
-                self.session.add(pathway)
-                self.session.commit()
-
-                total_pathways += 1
-
-        # ----------------------------------------------
-        # START TRANSACTION DATA (--> PATHWAY RELATIONS)
-
         try:
-            msg = ""
-            load_status = False
+            # Interaction to each Reactome Pathway
+            for _, row in df.iterrows():
 
-            # processed_path = self.get_path(processed_path)
-            relations_file = str(processed_path / "pathway_relations.csv")
+                pathway_master = row.get("reactome_id")
+                pathway_name = row.get("pathway_name")
 
-            if not os.path.exists(relations_file):
-                msg = f"File not found: {relations_file}"
-                self.logger.log(msg, "ERROR")
-                return 0, load_status, msg
+                if not pathway_master:
+                    msg = f"Pathway Master not found in row: {row}"
+                    self.logger.log(msg, "WARNING")
+                    continue
 
-            df = pd.read_csv(relations_file, dtype=str)
-
-            # Add columns for IDs and relationship type
-            df["entity_1_id"] = None
-            df["entity_2_id"] = None
-            df["relationship_type_id"] = None
-
-            # Get pathway IDs from EntityName
-            pathway_ids = (
-                self.session.query(EntityName.name, EntityName.entity_id)
-                .filter(EntityName.data_source_id == self.data_source.id)
-                .all()
-            )
-            pathway_id_map = dict(pathway_ids)
-
-            # Map entity_1_id and entity_2_id (pathway_parent)
-            df["entity_1_id"] = df["reactome_id"].map(pathway_id_map)
-            df["entity_2_id"] = None  # Clean to avoid overwriting
-
-            mask_pathway_parent = df["relation_type"] == "pathway_parent"
-            df.loc[mask_pathway_parent, "entity_2_id"] = df.loc[
-                mask_pathway_parent, "relation"
-            ].map(pathway_id_map)
-
-            # Map entity_2_id (gene_symbol, ensembl_gene, uniprot_protein)
-            mask_others = ~mask_pathway_parent
-            relation_names_to_lookup = (
-                df.loc[mask_others, "relation"].dropna().unique().tolist()
-            )
-
-            # Query EntityName in batch
-            relation_entities = (
-                self.session.query(EntityName.name, EntityName.entity_id)
-                .filter(EntityName.name.in_(relation_names_to_lookup))
-                .all()
-            )
-            relation_name_to_entity_id = dict(relation_entities)
-
-            # Apply map on remaining entity_2_id
-            df.loc[mask_others, "entity_2_id"] = df.loc[
-                mask_others, "relation"
-            ].map(  # noqa: E501
-                relation_name_to_entity_id
-            )
-
-            # Get all relationship types
-            relationship_types = self.session.query(
-                EntityRelationshipType.code, EntityRelationshipType.id
-            ).all()
-            relationship_type_map = dict(relationship_types)
-
-            # Map relationship types to REACTOME relation types
-            relation_type_to_relationship_code = {
-                "pathway_parent": "part_of",
-                "gene_symbol": "in_pathway",
-                "ensembl_gene": "in_pathway",
-                "ensembl_protein": "in_pathway",
-                "uniprot_protein": "in_pathway",
-            }
-            # Map relationship types to IDs
-            df["relationship_type_id"] = df["relation_type"].apply(
-                lambda x: relationship_type_map[
-                    relation_type_to_relationship_code.get(x, "in_pathway")
-                ]
-            )
-
-            # USE THIS IF YOU WANT TO KEEP THE OLD RELATIONSHIP TYPE
-            # df["relationship_type_id"] = df["relation_type"].apply(
-            #     lambda x: relationship_type_map["part_of"]
-            #     if x == "pathway_parent"
-            #     else relationship_type_map["in_pathway"]
-            # )
-
-            # Load only valid relationships and save invalid ones in file
-            df_valid = df[
-                df["entity_1_id"].notnull() & df["entity_2_id"].notnull()
-            ]  # noqa: E501
-            df_invalid = df[
-                df["entity_1_id"].isnull() | df["entity_2_id"].isnull()
-            ]  # noqa: E501
-
-            # Load duplicates relationships in valid dataframe
-            df_valid.loc[:, "entity_2_id"] = df_valid["entity_2_id"].astype(
-                int
-            )  # noqa: E501
-            df_valid = df_valid.drop_duplicates(
-                subset=["entity_1_id", "entity_2_id", "relationship_type_id"]
-            )
-
-            # Load valid relationships
-            total_pathways_relations_added = 0
-            total_pathways_relations_existed = 0
-            for _, row in df_valid.iterrows():
-                status = self.get_or_create_entity_relationship(
-                    entity_1_id=int(row["entity_1_id"]),
-                    entity_2_id=int(row["entity_2_id"]),
-                    relationship_type_id=int(row["relationship_type_id"]),
+                # Add or Get Entity
+                entity_id, _ = self.get_or_create_entity(
+                    name=pathway_master,
+                    group_id=self.entity_group,
                     data_source_id=self.data_source.id,
                 )
-                if status:
-                    total_pathways_relations_added += 1
-                else:
-                    total_pathways_relations_existed += 1
 
-            # Commit ao final do batch
-            try:
-                self.session.commit()
-                load_status = True
-                msg = f"✅ {len(df_valid)} relations loaded successfully"
-                self.logger.log(msg, "INFO")
-            except Exception as e:
-                self.session.rollback()
-                load_status = False
-                msg = f"❌ Error loading relations: {str(e)}"
-                self.logger.log(msg, "ERROR")
-                return 0, load_status, msg
+                # Add or Get Entity Name
+                self.get_or_create_entity_name(
+                    entity_id, pathway_name, data_source_id=self.data_source.id
+                )
 
-            # Export not found to CSV
-            not_found_csv = os.path.join(
-                processed_path, "pathway_relations_not_found.csv"
-            )
-            df_invalid.to_csv(not_found_csv, index=False)
-            self.logger.log(
-                f"⚠️ Relations not found exported to {not_found_csv}",
-                "WARNING",  # noqa: E501
-            )
+                # Check if the pathway already exists
+                existing_pathway = (
+                    self.session.query(Pathway)
+                    .filter_by(
+                        pathway_id=pathway_master,
+                    )
+                    .first()
+                )
 
-            msg = f"✅ Relations loaded: {len(df_valid)} | Not found: {len(df_invalid)}"  # noqa: E501
+                # Create new if it does not exist
+                if not existing_pathway:
+                    pathway = Pathway(
+                        entity_id=entity_id,
+                        pathway_id=pathway_master,
+                        description=pathway_name,
+                        data_source_id=data_source_id,
+                    )
+
+                    self.session.add(pathway)
+                    self.session.commit()
+
+                    total_pathways += 1
+
+            msg = f"📥 Total Pathways: {total_pathways}"  # noqa E501
             self.logger.log(msg, "INFO")
-            return len(df_valid), True, msg
+            return total_pathways, True, msg
 
         except Exception as e:
             msg = f"❌ ETL load_relations failed: {str(e)}"

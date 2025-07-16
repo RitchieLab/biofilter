@@ -1,0 +1,371 @@
+import os
+import ast
+import bz2
+import glob
+import pandas as pd
+import __main__
+import sys
+from concurrent.futures import ProcessPoolExecutor, as_completed
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy import text
+
+from biofilter.etl.conflict_manager import ConflictManager
+from biofilter.etl.mixins.base_dtp import DTPBase
+from biofilter.etl.mixins.variant_query_mixin import VariantQueryMixin
+
+from biofilter.db.models.variants_models import (
+    GenomeAssembly,
+    Variant,
+    VariantGeneRelationship,
+)
+
+# Worker function to suport transform in parallel
+from biofilter.etl.dtps.worker_dbsnp import worker_dbsnp
+
+
+class DTP(DTPBase, VariantQueryMixin):
+    def __init__(
+        self,
+        logger=None,
+        datasource=None,
+        etl_process=None,
+        session=None,
+        use_conflict_csv=False,
+    ):  # noqa: E501
+        self.logger = logger
+        self.data_source = datasource
+        self.etl_process = etl_process
+        self.session = session
+        self.use_conflict_csv = use_conflict_csv
+        self.conflict_mgr = ConflictManager(session, logger)
+
+        # DTP versioning
+        self.dtp_name = "dtp_variant_ncbi"
+        self.dtp_version = "1.0.0"
+        self.compatible_schema_min = "3.0.0"
+        self.compatible_schema_max = "4.0.0"
+
+    # ⬇️  --------------------------  ⬇️
+    # ⬇️  ------ EXTRACT FASE ------  ⬇️
+    # ⬇️  --------------------------  ⬇️
+    def extract(self, raw_dir: str, force_steps: bool):
+        """
+        Downloads the file from the dbSNP JSON release and stores it locally
+        only if it doesn't exist or if the MD5 has changed.
+        """
+
+        self.logger.log(
+            f"⬇️ Starting extraction of {self.data_source.name} data...",
+            "INFO",  # noqa: E501
+        )  # noqa: E501
+
+        # Check Compartibility
+        self.check_compatibility()
+
+        msg = ""
+        source_url = self.data_source.source_url
+        if force_steps:
+            last_hash = ""
+            msg = "Ignoring hash check."
+            self.logger.log(msg, "WARNING")
+        else:
+            last_hash = self.etl_process.raw_data_hash
+
+        try:
+            # Landing path
+            landing_path = os.path.join(
+                raw_dir,
+                self.data_source.source_system.name,
+                self.data_source.name,
+            )
+
+            # Get hash from current md5 file
+            url_md5 = f"{source_url}.md5"
+            current_hash = self.get_md5_from_url_file(url_md5)
+
+            if not current_hash:
+                msg = f"Failed to retrieve MD5 from {url_md5}"
+                self.logger.log(msg, "WARNING")
+                return False, msg, None
+
+            # Compare current hash and last processed hash
+            if current_hash == last_hash:
+                msg = f"No change detected in {source_url}"
+                self.logger.log(msg, "INFO")
+                return False, msg, current_hash
+
+            # Download the file
+            status, msg = self.http_download(source_url, landing_path)
+
+            if not status:
+                self.logger.log(msg, "ERROR")
+                return False, msg, current_hash
+
+            # Finish block
+            msg = f"✅ {self.data_source.name} file downloaded to {landing_path}"  # noqa: E501
+            self.logger.log(msg, "INFO")
+            return True, msg, current_hash
+
+        except Exception as e:
+            msg = f"❌ ETL extract failed: {str(e)}"
+            self.logger.log(msg, "ERROR")
+            return False, msg, None
+
+    # ⚙️  ----------------------------  ⚙️
+    # ⚙️  ------ TRANSFORM FASE ------  ⚙️
+    # ⚙️  ----------------------------  ⚙️
+    def transform(self, raw_path, processed_path):
+
+        self.logger.log(
+            f"🔧 Transforming the {self.data_source.name} data ...", "INFO"
+        )  # noqa: E501
+
+        # Check Compartibility
+        self.check_compatibility()
+
+        # INPUT DATA
+        input_file = self.get_raw_file(raw_path)
+        if not input_file.exists():
+            msg = f"❌ Input file not found: {input_file}."
+            msg += " Consider running the extract() step or checking the source URL."  # noqa: E501
+            self.logger.log(msg, "ERROR")
+            return None, False, msg
+
+        # OUTPUT DATA
+        output_dir = self.get_path(processed_path)
+        output_dir.mkdir(parents=True, exist_ok=True)
+        # Clean only batch CSVs that follow the expected naming
+        for f in output_dir.iterdir():
+            if f.name.startswith("processed_part_") and f.name.endswith(".parquet"):  # noqa: E501
+                f.unlink()
+
+        # VARIABLES
+        # Transfer to interface this parameters
+        batch_size: int = 200_000
+        max_workers: int = 10
+
+        futures = []
+        batch = []
+        batch_id = 0
+
+        try:
+            # Get GenomeAssembly IDs List
+            assembly_map = {
+                a.accession: str(a.id)
+                for a in self.session.query(GenomeAssembly)  # noqa: E501
+            }
+
+            with bz2.open(
+                input_file, "rt", encoding="utf-8"
+            ) as f, ProcessPoolExecutor(  # noqa: E501
+                max_workers=max_workers
+            ) as executor:  # noqa: E501
+                if __name__ == "__main__" or (
+                    hasattr(__main__, "__file__") and not hasattr(sys, "ps1")
+                ):
+
+                    for line in f:
+                        batch.append(line)
+                        if len(batch) >= batch_size:
+                            futures.append(
+                                executor.submit(
+                                    worker_dbsnp,
+                                    batch.copy(),
+                                    batch_id,
+                                    output_dir,
+                                    assembly_map,
+                                )
+                            )  # noqa: E501
+                            batch.clear()
+                            batch_id += 1
+
+                    if batch:
+                        futures.append(
+                            executor.submit(
+                                worker_dbsnp,
+                                batch.copy(),
+                                batch_id,
+                                output_dir,
+                                assembly_map,
+                            )
+                        )  # noqa: E501
+
+                    for future in as_completed(futures):
+                        future.result()
+                else:
+                    msg = "⚠️ Skipping multiprocessing: not in __main__ context."  # noqa: E501
+                    self.logger.log(msg, "WARNING")
+
+            msg = f"✅ Processing completed with {len(futures)} batches."
+            self.logger.log(msg, "INFO")
+            return None, True, msg
+
+        except Exception as e:
+            msg = f"❌ ETL transform failed: {str(e)}"
+            self.logger.log(msg, "ERROR")
+            return None, False, msg
+
+    # 📥  ------------------------ 📥
+    # 📥  ------ LOAD FASE ------  📥
+    # 📥  ------------------------ 📥
+    def load(self, df=None, processed_path=None, chunk_size=100_000):
+
+        self.logger.log(
+            f"📥 Loading {self.data_source.name} data into the database...",
+            "INFO",  # noqa E501
+        )
+
+        # Check Compartibility
+        self.check_compatibility()
+
+        total_variants = 0
+        load_status = False
+        message = ""
+
+        # 🚨 Garante que self.data_source é válido na sessão atual
+        self.data_source = self.session.merge(self.data_source)
+        data_source_id = self.data_source.id
+
+        if df is None:
+            if not processed_path:
+                msg = "Either 'df' or 'processed_path' must be provided."
+                self.logger.log(msg, "ERROR")
+                return total_variants, load_status, msg
+
+            processed_path = self.get_path(processed_path)
+            # csv_files = sorted(glob.glob(str(processed_path / "processed_part_*.csv")))  # noqa: E501
+            csv_files = sorted(
+                glob.glob(str(processed_path / "processed_part_*.parquet"))
+            )
+
+            if not csv_files:
+                msg = f"No part files found in {processed_path}"
+                self.logger.log(msg, "ERROR")
+                return total_variants, load_status, msg
+
+            self.logger.log(f"📄 Found {len(csv_files)} part files to load", "INFO")  # noqa: E501
+
+        # Apaga os dados da tabela de links
+        self.session.query(VariantGeneRelationship).filter_by(
+            data_source_id=self.data_source.id
+        ).delete()
+
+        # Opcional: apagar também os variants, se desejar
+        self.session.query(Variant).filter_by(
+            data_source_id=self.data_source.id
+        ).delete()
+
+        self.session.commit()
+        self.logger.log("🗑️ Previous records deleted for this data source", "INFO")  # noqa: E501
+
+        # Processa arquivo por arquivo
+        for csv_file in csv_files:
+            self.logger.log(f"📂 Processing {csv_file}", "INFO")
+
+            # df = pd.read_csv(csv_file, dtype=str)
+            # Evita carregar colunas como hgvs ou seq_id se não forem mais necessários.  # noqa: E501
+            df = pd.read_parquet(
+                csv_file,
+                columns=[
+                    "rs_id",
+                    "position_base_1",
+                    "assembly_id",
+                    "allele",
+                    "allele_type",
+                    "gene_ids",
+                ],
+            )
+
+            df["ref"] = ""
+            df["alt"] = ""
+
+            # ➤ Preparar DataFrame de Variants
+            df_ref = df[df["allele_type"] == "ref"].copy()
+            df_ref = df_ref[
+                ["rs_id", "position_base_1", "assembly_id", "allele"]
+            ].drop_duplicates("rs_id")
+
+            df_alt = (
+                df[df["allele_type"] == "sub"]
+                .groupby("rs_id")["allele"]
+                .agg(lambda alleles: "/".join(sorted(set(alleles))))
+                .reset_index()
+                .rename(columns={"allele": "alt"})
+            )
+
+            df_ref["rs_id"] = df_ref["rs_id"].astype(str)
+            df_alt["rs_id"] = df_alt["rs_id"].astype(str)
+            df_variants = df_ref.merge(df_alt, on="rs_id", how="left")
+            df_variants["alt"] = df_variants["alt"].fillna("")
+            df_variants = df_variants.dropna(subset=["assembly_id", "position_base_1"])  # noqa: E501
+            df_variants["assembly_id"] = df_variants["assembly_id"].astype(int)
+            df_variants["position_base_1"] = df_variants["position_base_1"].astype(int)  # noqa: E501
+
+            variants_to_insert = [
+                Variant(
+                    variant_id=row["rs_id"],
+                    position=row["position_base_1"],
+                    assembly_id=row["assembly_id"],
+                    chromosome=row["assembly_id"],
+                    ref=row["allele"],
+                    alt=row["alt"],
+                    data_source_id=data_source_id,
+                )
+                for _, row in df_variants.iterrows()
+            ]
+
+            try:
+                self.session.bulk_save_objects(variants_to_insert)
+                self.session.commit()
+                total_variants += len(variants_to_insert)
+            except IntegrityError as e:
+                self.session.rollback()
+                self.logger.log(f"❌ Integrity error in {csv_file}: {str(e)}", "ERROR")  # noqa: E501
+
+            # ➤ Gene links
+            # df_links = df[df["gene_ids"].notna() & (df["gene_ids"] != "[]")].copy()  # noqa: E501
+            df_links = df[
+                df["gene_ids"].apply(lambda x: hasattr(x, "__len__") and len(x) > 0)  # noqa: E501
+            ].copy()  # noqa: E501
+            df_links = df_links[["rs_id", "gene_ids"]].drop_duplicates("rs_id")
+            df_links["gene_ids"] = df_links["gene_ids"].apply(
+                lambda x: ast.literal_eval(x) if isinstance(x, str) else x
+            )
+            df_links = df_links.explode("gene_ids")
+            df_links["gene_ids"] = df_links["gene_ids"].astype(int)
+            df_links["rs_id"] = df_links["rs_id"].astype(str)
+
+            links_to_insert = [
+                VariantGeneRelationship(
+                    gene_id=row["gene_ids"],
+                    variant_id=row["rs_id"],
+                    data_source_id=data_source_id,
+                )
+                for _, row in df_links.iterrows()
+            ]
+
+            try:
+                self.session.bulk_save_objects(links_to_insert)
+                self.session.commit()
+                self.logger.log(
+                    f"✅ Inserted {len(links_to_insert)} gene-variant links from {csv_file}",  # noqa: E501
+                    "INFO",
+                )
+            except IntegrityError as e:
+                self.session.rollback()
+                self.logger.log(
+                    f"❌ Integrity error in {csv_file} for gene-variant links: {str(e)}",  # noqa: E501
+                    "ERROR",
+                )
+
+        # Vacuum + manutenção final
+        self.session.execute(text("VACUUM"))
+        self.session.commit()
+
+        load_status = True
+        message = (
+            f"✅ Loaded {total_variants} variants from {len(csv_files)} CSV chunks."  # noqa: E501
+        )
+        self.logger.log(message, "SUCCESS")
+
+        return total_variants, load_status, message

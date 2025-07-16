@@ -1,0 +1,2 @@
+[database]
+db_uri = "sqlite:///dev_biofilter.db"
