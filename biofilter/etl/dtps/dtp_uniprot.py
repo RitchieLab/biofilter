@@ -76,7 +76,7 @@ class DTP(DTPBase, EntityQueryMixin):
                 self.data_source.name,
             )
             os.makedirs(landing_path, exist_ok=True)
-            file_path = os.path.join(landing_path, "master_data.xml")
+            file_path = os.path.join(landing_path, "proteins.xml")
 
             # Download the XML file
             msg = f"⬇️  Fetching XML from URL: {source_url} ..."

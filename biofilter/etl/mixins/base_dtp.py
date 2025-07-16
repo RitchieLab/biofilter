@@ -1,5 +1,6 @@
 import os
 import requests
+from sqlalchemy import text
 from packaging import version
 from pathlib import Path
 from typing import Optional
@@ -78,3 +79,53 @@ class DTPBase:
                 msg += f" and <= {self.compatible_schema_max}"
             msg += f"\n   Current DB version: {db_version}"
             raise Exception(msg)
+
+    def apply_sqlite_write_optimizations(self):
+        """
+        Apply SQLite PRAGMA settings to optimize for bulk insert.
+        Only applies when the current engine is SQLite.
+        """
+        if self.session.bind.dialect.name != "sqlite":
+            return
+
+        self.logger.log("⚙️ Applying SQLite PRAGMA optimizations for bulk insert", "DEBUG")
+
+        # self.session.execute(text("PRAGMA journal_mode = OFF;"))
+        # self.session.execute(text("PRAGMA synchronous = OFF;"))
+        self.session.execute(text("PRAGMA journal_mode = WAL;"))         # Melhor desempenho e permite leitura paralela
+        self.session.execute(text("PRAGMA synchronous = NORMAL;"))       # Mais rápido que FULL, ainda com segurança razoável
+        self.session.execute(text("PRAGMA locking_mode = EXCLUSIVE;"))   # Trava exclusivo para este processo
+        self.session.execute(text("PRAGMA temp_store = MEMORY;"))        # Operações temporárias em RAM
+        self.session.execute(text("PRAGMA cache_size = -100000"))        # ~100MB de cache
+        self.session.execute(text("PRAGMA foreign_keys = OFF;"))         # Ignora FK durante carga
+        self.session.commit()
+
+    def reset_sqlite_pragmas(self):
+        if self.session.bind.dialect.name != "sqlite":
+            return
+
+        self.session.execute(text("PRAGMA journal_mode = DELETE;"))
+        self.session.execute(text("PRAGMA synchronous = FULL;"))
+        self.session.execute(text("PRAGMA locking_mode = NORMAL;"))
+        self.session.execute(text("PRAGMA foreign_keys = ON;"))
+        self.session.commit()
+
+    # NOTE: ⚠️ Se quiser cobrir outros bancos no futuro (ex: MySQL, Oracle),
+    # seria bom extrair para um IndexManagerMixin mais genérico.
+    def create_indexes(self, index_specs: list[tuple[str, list[str]]]):
+        """
+        Create indexes for the current database engine.
+        Accepts a list of tuples: (table_name, [columns])
+        """
+        if self.session.bind.dialect.name not in ("sqlite", "postgresql"):
+            self.logger.log("❌ Unsupported database engine for index creation", "WARNING")
+            return
+
+        for table, columns in index_specs:
+            index_name = f"idx_{table}_{'_'.join(columns)}"
+            col_str = ", ".join(columns)
+            sql = f"CREATE INDEX IF NOT EXISTS {index_name} ON {table} ({col_str});"
+            self.logger.log(f"📌 Creating index: {index_name}", "DEBUG")
+            self.session.execute(text(sql))
+
+        self.session.commit()

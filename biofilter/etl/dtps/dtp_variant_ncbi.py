@@ -218,6 +218,10 @@ class DTP(DTPBase, VariantQueryMixin):
         # Check Compartibility
         self.check_compatibility()
 
+        # Apply SQLite PRAGMAs
+        self.apply_sqlite_write_optimizations()
+
+        # Variables
         total_variants = 0
         load_status = False
         message = ""
@@ -358,9 +362,24 @@ class DTP(DTPBase, VariantQueryMixin):
                     "ERROR",
                 )
 
+        # Stating Indexs
+        if self.session.bind.dialect.name in ("sqlite", "postgresql"):
+            index_specs = [
+                ("variants", ["variant_id"]),
+                ("variants", ["chromosome"]),
+                ("variant_gene_relationships", ["variant_id"]),
+                ("variant_gene_relationships", ["gene_id"]),
+            ]
+            self.create_indexes(index_specs)
+
         # Vacuum + manutenção final
-        self.session.execute(text("VACUUM"))
-        self.session.commit()
+        if self.session.bind.dialect.name == "sqlite":
+            self.logger.log("🧹 Running VACUUM on SQLite database...", "DEBUG")
+            self.session.execute(text("VACUUM"))
+            self.session.commit()
+
+        # Apply SQLite PRAGMAs to READ MODE
+        self.reset_sqlite_pragmas()
 
         load_status = True
         message = (
