@@ -1,10 +1,10 @@
 #!/bin/bash
-#BSUB -J load_hgnc
-#BSUB -o bsub.load_hgnc.%J.out
-#BSUB -e bsub.load_hgnc.%J.err
-#BSUB -n 1
-#BSUB -M 8000
-#BSUB -W 01:00
+#BSUB -J trans_chr
+#BSUB -o bsub.transf_chr.%J.out
+#BSUB -e bsub.transf_chr.%J.err
+#BSUB -n 4
+#BSUB -M 128000
+#BSUB -W 24:00
 #BSUB -R "select[ostype>=CENT7]"
 
 # Carrega os módulos necessários
@@ -21,5 +21,4 @@ cd /home/alrico/group/software/biofilter3R
 source .venv/bin/activate
 
 # Executa o script Python
-python /home/alrico/group/software/biofilter3R/scripts/jobs/load_reactome.py
-
+python /home/alrico/group/software/biofilter3R/scripts/jobs/transf_chr.py

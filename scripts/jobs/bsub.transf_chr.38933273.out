@@ -1,0 +1,3175 @@
+Sender: LSF System <jszostek@krypton15>
+Subject: Job 38933273: <trans_chr> in cluster <PMACS-SCC> Done
+
+Job <trans_chr> was submitted from host <superman> by user <alrico> in cluster <PMACS-SCC> at Mon Jun 30 08:32:42 2025
+Job was executed on host(s) <4*krypton15>, in queue <epistasis_normal>, as user <alrico> in cluster <PMACS-SCC> at Mon Jun 30 08:32:43 2025
+</home/alrico> was used as the home directory.
+</home/alrico/group/software/biofilter3R/scripts/jobs> was used as the working directory.
+Started at Mon Jun 30 08:32:43 2025
+Terminated at Tue Jul  1 07:08:52 2025
+Results reported at Tue Jul  1 07:08:52 2025
+
+Your job looked like:
+
+------------------------------------------------------------
+# LSBATCH: User input
+#!/bin/bash
+#BSUB -J trans_chr
+#BSUB -o bsub.transf_chr.%J.out
+#BSUB -e bsub.transf_chr.%J.err
+#BSUB -n 4
+#BSUB -M 128000
+#BSUB -W 24:00
+#BSUB -R "select[ostype>=CENT7]"
+
+# Carrega os módulos necessários
+module load python/3.11
+module load git/2.39.0
+
+# Ativa o poetry no ambiente do usuário
+export PATH="$HOME/.local/bin:$PATH"
+
+# Entra no diretório do projeto
+cd /home/alrico/group/software/biofilter3R
+
+# Ativa o ambiente virtual local
+source .venv/bin/activate
+
+# Executa o script Python
+python /home/alrico/group/software/biofilter3R/scripts/jobs/transf_chr.py
+
+------------------------------------------------------------
+
+Successfully completed.
+
+Resource usage summary:
+
+    CPU time :                                   130341.63 sec.
+    Max Memory :                                 94046 MB
+    Average Memory :                             71931.70 MB
+    Total Requested Memory :                     4096.00 MB
+    Delta Memory :                               -89950.00 MB
+    Max Swap :                                   2 MB
+    Max Processes :                              14
+    Max Threads :                                23
+    Run time :                                   81368 sec.
+    Turnaround time :                            81370 sec.
+
+The output (if any) follows:
+
+[PID 3387] Processing batch 0
+[PID 3387] ✅ Finished batch 0, saved 529929 rows
+[PID 3388] Processing batch 1
+[PID 3388] ✅ Finished batch 1, saved 490810 rows
+[PID 3389] Processing batch 2
+[PID 3389] ✅ Finished batch 2, saved 308311 rows
+[PID 3390] Processing batch 3
+[PID 3390] ✅ Finished batch 3, saved 424651 rows
+[PID 3391] Processing batch 4
+[PID 3391] ✅ Finished batch 4, saved 448852 rows
+[PID 3392] Processing batch 5
+[PID 3392] ✅ Finished batch 5, saved 450190 rows
+[PID 3393] Processing batch 6
+[PID 3393] ✅ Finished batch 6, saved 427435 rows
+[PID 3395] Processing batch 7
+[PID 3395] ✅ Finished batch 7, saved 428800 rows
+[PID 3396] Processing batch 8
+[PID 3396] ✅ Finished batch 8, saved 449943 rows
+[PID 3397] Processing batch 9
+[PID 3397] ✅ Finished batch 9, saved 459840 rows
+[PID 3387] Processing batch 10
+[PID 3387] ✅ Finished batch 10, saved 459474 rows
+[PID 3388] Processing batch 11
+[PID 3388] ✅ Finished batch 11, saved 381036 rows
+[PID 3389] Processing batch 12
+[PID 3389] ✅ Finished batch 12, saved 426006 rows
+[PID 3390] Processing batch 13
+[PID 3390] ✅ Finished batch 13, saved 401407 rows
+[PID 3391] Processing batch 14
+[PID 3391] ✅ Finished batch 14, saved 442628 rows
+[PID 3392] Processing batch 15
+[PID 3392] ✅ Finished batch 15, saved 443077 rows
+[PID 3393] Processing batch 16
+[PID 3393] ✅ Finished batch 16, saved 442771 rows
+[PID 3395] Processing batch 17
+[PID 3395] ✅ Finished batch 17, saved 442644 rows
+[PID 3396] Processing batch 18
+[PID 3396] ✅ Finished batch 18, saved 442462 rows
+[PID 3397] Processing batch 19
+[PID 3397] ✅ Finished batch 19, saved 442767 rows
+[PID 3387] Processing batch 20
+[PID 3387] ✅ Finished batch 20, saved 442443 rows
+[PID 3388] Processing batch 21
+[PID 3388] ✅ Finished batch 21, saved 442744 rows
+[PID 3389] Processing batch 22
+[PID 3389] ✅ Finished batch 22, saved 443068 rows
+[PID 3390] Processing batch 23
+[PID 3390] ✅ Finished batch 23, saved 442895 rows
+[PID 3391] Processing batch 24
+[PID 3391] ✅ Finished batch 24, saved 443016 rows
+[PID 3392] Processing batch 25
+[PID 3392] ✅ Finished batch 25, saved 442247 rows
+[PID 3393] Processing batch 26
+[PID 3393] ✅ Finished batch 26, saved 418357 rows
+[PID 3395] Processing batch 27
+[PID 3395] ✅ Finished batch 27, saved 413606 rows
+[PID 3396] Processing batch 28
+[PID 3396] ✅ Finished batch 28, saved 414196 rows
+[PID 3397] Processing batch 29
+[PID 3397] ✅ Finished batch 29, saved 414031 rows
+[PID 3387] Processing batch 30
+[PID 3387] ✅ Finished batch 30, saved 414476 rows
+[PID 3388] Processing batch 31
+[PID 3388] ✅ Finished batch 31, saved 414483 rows
+[PID 3389] Processing batch 32
+[PID 3389] ✅ Finished batch 32, saved 414597 rows
+[PID 3390] Processing batch 33
+[PID 3390] ✅ Finished batch 33, saved 415299 rows
+[PID 3391] Processing batch 34
+[PID 3391] ✅ Finished batch 34, saved 444259 rows
+[PID 3392] Processing batch 35
+[PID 3392] ✅ Finished batch 35, saved 407923 rows
+[PID 3393] Processing batch 36
+[PID 3393] ✅ Finished batch 36, saved 433942 rows
+[PID 3395] Processing batch 37
+[PID 3395] ✅ Finished batch 37, saved 433905 rows
+[PID 3396] Processing batch 38
+[PID 3396] ✅ Finished batch 38, saved 434077 rows
+[PID 3397] Processing batch 39
+[PID 3397] ✅ Finished batch 39, saved 433854 rows
+[PID 3387] Processing batch 40
+[PID 3387] ✅ Finished batch 40, saved 433369 rows
+[PID 3388] Processing batch 41
+[PID 3388] ✅ Finished batch 41, saved 433412 rows
+[PID 3389] Processing batch 42
+[PID 3389] ✅ Finished batch 42, saved 433148 rows
+[PID 3390] Processing batch 43
+[PID 3390] ✅ Finished batch 43, saved 433658 rows
+[PID 3391] Processing batch 44
+[PID 3391] ✅ Finished batch 44, saved 433215 rows
+[PID 3392] Processing batch 45
+[PID 3392] ✅ Finished batch 45, saved 434133 rows
+[PID 3393] Processing batch 46
+[PID 3393] ✅ Finished batch 46, saved 434002 rows
+[PID 3395] Processing batch 47
+[PID 3395] ✅ Finished batch 47, saved 433919 rows
+[PID 3396] Processing batch 48
+[PID 3396] ✅ Finished batch 48, saved 433944 rows
+[PID 3397] Processing batch 49
+[PID 3397] ✅ Finished batch 49, saved 434421 rows
+[PID 3387] Processing batch 50
+[PID 3387] ✅ Finished batch 50, saved 433636 rows
+[PID 3388] Processing batch 51
+[PID 3388] ✅ Finished batch 51, saved 434034 rows
+[PID 3389] Processing batch 52
+[PID 3389] ✅ Finished batch 52, saved 434148 rows
+[PID 3390] Processing batch 53
+[PID 3390] ✅ Finished batch 53, saved 433724 rows
+[PID 3391] Processing batch 54
+[PID 3391] ✅ Finished batch 54, saved 434058 rows
+[PID 3392] Processing batch 55
+[PID 3392] ✅ Finished batch 55, saved 434547 rows
+[PID 3393] Processing batch 56
+[PID 3393] ✅ Finished batch 56, saved 434756 rows
+[PID 3395] Processing batch 57
+[PID 3395] ✅ Finished batch 57, saved 434035 rows
+[PID 3396] Processing batch 58
+[PID 3396] ✅ Finished batch 58, saved 434056 rows
+[PID 3397] Processing batch 59
+[PID 3397] ✅ Finished batch 59, saved 434389 rows
+[PID 3387] Processing batch 60
+[PID 3387] ✅ Finished batch 60, saved 434659 rows
+[PID 3388] Processing batch 61
+[PID 3388] ✅ Finished batch 61, saved 434307 rows
+[PID 3389] Processing batch 62
+[PID 3389] ✅ Finished batch 62, saved 434254 rows
+[PID 3390] Processing batch 63
+[PID 3390] ✅ Finished batch 63, saved 434498 rows
+[PID 3391] Processing batch 64
+[PID 3391] ✅ Finished batch 64, saved 434383 rows
+[PID 3392] Processing batch 65
+[PID 3392] ✅ Finished batch 65, saved 434486 rows
+[PID 3393] Processing batch 66
+[PID 3393] ✅ Finished batch 66, saved 434611 rows
+[PID 3395] Processing batch 67
+[PID 3395] ✅ Finished batch 67, saved 434593 rows
+[PID 3396] Processing batch 68
+[PID 3396] ✅ Finished batch 68, saved 434983 rows
+[PID 3397] Processing batch 69
+[PID 3397] ✅ Finished batch 69, saved 434479 rows
+[PID 3387] Processing batch 70
+[PID 3387] ✅ Finished batch 70, saved 434554 rows
+[PID 3388] Processing batch 71
+[PID 3388] ✅ Finished batch 71, saved 434462 rows
+[PID 3389] Processing batch 72
+[PID 3389] ✅ Finished batch 72, saved 434855 rows
+[PID 3390] Processing batch 73
+[PID 3390] ✅ Finished batch 73, saved 434561 rows
+[PID 3391] Processing batch 74
+[PID 3391] ✅ Finished batch 74, saved 419464 rows
+[PID 3392] Processing batch 75
+[PID 3392] ✅ Finished batch 75, saved 391580 rows
+[PID 3393] Processing batch 76
+[PID 3393] ✅ Finished batch 76, saved 391038 rows
+[PID 3395] Processing batch 77
+[PID 3395] ✅ Finished batch 77, saved 390889 rows
+[PID 3396] Processing batch 78
+[PID 3396] ✅ Finished batch 78, saved 390770 rows
+[PID 3397] Processing batch 79
+[PID 3397] ✅ Finished batch 79, saved 391241 rows
+[PID 3387] Processing batch 80
+[PID 3387] ✅ Finished batch 80, saved 391844 rows
+[PID 3388] Processing batch 81
+[PID 3388] ✅ Finished batch 81, saved 391510 rows
+[PID 3389] Processing batch 82
+[PID 3389] ✅ Finished batch 82, saved 391147 rows
+[PID 3390] Processing batch 83
+[PID 3390] ✅ Finished batch 83, saved 391191 rows
+[PID 3391] Processing batch 84
+[PID 3391] ✅ Finished batch 84, saved 391101 rows
+[PID 3392] Processing batch 85
+[PID 3392] ✅ Finished batch 85, saved 391451 rows
+[PID 3393] Processing batch 86
+[PID 3393] ✅ Finished batch 86, saved 391264 rows
+[PID 3395] Processing batch 87
+[PID 3395] ✅ Finished batch 87, saved 391288 rows
+[PID 3396] Processing batch 88
+[PID 3396] ✅ Finished batch 88, saved 391372 rows
+[PID 3397] Processing batch 89
+[PID 3397] ✅ Finished batch 89, saved 391730 rows
+[PID 3387] Processing batch 90
+[PID 3387] ✅ Finished batch 90, saved 391924 rows
+[PID 3388] Processing batch 91
+[PID 3388] ✅ Finished batch 91, saved 391437 rows
+[PID 3389] Processing batch 92
+[PID 3389] ✅ Finished batch 92, saved 391802 rows
+[PID 3390] Processing batch 93
+[PID 3390] ✅ Finished batch 93, saved 392183 rows
+[PID 3391] Processing batch 94
+[PID 3391] ✅ Finished batch 94, saved 391947 rows
+[PID 3392] Processing batch 95
+[PID 3392] ✅ Finished batch 95, saved 392427 rows
+[PID 3393] Processing batch 96
+[PID 3393] ✅ Finished batch 96, saved 392589 rows
+[PID 3395] Processing batch 97
+[PID 3395] ✅ Finished batch 97, saved 391960 rows
+[PID 3396] Processing batch 98
+[PID 3396] ✅ Finished batch 98, saved 391830 rows
+[PID 3397] Processing batch 99
+[PID 3397] ✅ Finished batch 99, saved 392758 rows
+[PID 3387] Processing batch 100
+[PID 3387] ✅ Finished batch 100, saved 392085 rows
+[PID 3388] Processing batch 101
+[PID 3388] ✅ Finished batch 101, saved 391891 rows
+[PID 3389] Processing batch 102
+[PID 3389] ✅ Finished batch 102, saved 392288 rows
+[PID 3390] Processing batch 103
+[PID 3390] ✅ Finished batch 103, saved 391601 rows
+[PID 3391] Processing batch 104
+[PID 3391] ✅ Finished batch 104, saved 392416 rows
+[PID 3392] Processing batch 105
+[PID 3392] ✅ Finished batch 105, saved 392303 rows
+[PID 3393] Processing batch 106
+[PID 3393] ✅ Finished batch 106, saved 391818 rows
+[PID 3395] Processing batch 107
+[PID 3395] ✅ Finished batch 107, saved 392161 rows
+[PID 3396] Processing batch 108
+[PID 3396] ✅ Finished batch 108, saved 392322 rows
+[PID 3397] Processing batch 109
+[PID 3397] ✅ Finished batch 109, saved 392666 rows
+[PID 3387] Processing batch 110
+[PID 3387] ✅ Finished batch 110, saved 392243 rows
+[PID 3388] Processing batch 111
+[PID 3388] ✅ Finished batch 111, saved 392473 rows
+[PID 3389] Processing batch 112
+[PID 3389] ✅ Finished batch 112, saved 391742 rows
+[PID 3390] Processing batch 113
+[PID 3390] ✅ Finished batch 113, saved 392890 rows
+[PID 3391] Processing batch 114
+[PID 3391] ✅ Finished batch 114, saved 392128 rows
+[PID 3392] Processing batch 115
+[PID 3392] ✅ Finished batch 115, saved 392378 rows
+[PID 3393] Processing batch 116
+[PID 3393] ✅ Finished batch 116, saved 392436 rows
+[PID 3395] Processing batch 117
+[PID 3395] ✅ Finished batch 117, saved 392895 rows
+[PID 3396] Processing batch 118
+[PID 3396] ✅ Finished batch 118, saved 393533 rows
+[PID 3397] Processing batch 119
+[PID 3397] ✅ Finished batch 119, saved 392199 rows
+[PID 3387] Processing batch 120
+[PID 3387] ✅ Finished batch 120, saved 392930 rows
+[PID 3388] Processing batch 121
+[PID 3388] ✅ Finished batch 121, saved 392720 rows
+[PID 3389] Processing batch 122
+[PID 3389] ✅ Finished batch 122, saved 392503 rows
+[PID 3390] Processing batch 123
+[PID 3390] ✅ Finished batch 123, saved 392298 rows
+[PID 3391] Processing batch 124
+[PID 3391] ✅ Finished batch 124, saved 392436 rows
+[PID 3392] Processing batch 125
+[PID 3392] ✅ Finished batch 125, saved 392489 rows
+[PID 3393] Processing batch 126
+[PID 3393] ✅ Finished batch 126, saved 392878 rows
+[PID 3395] Processing batch 127
+[PID 3395] ✅ Finished batch 127, saved 392467 rows
+[PID 3396] Processing batch 128
+[PID 3396] ✅ Finished batch 128, saved 392584 rows
+[PID 3397] Processing batch 129
+[PID 3397] ✅ Finished batch 129, saved 392934 rows
+[PID 3387] Processing batch 130
+[PID 3387] ✅ Finished batch 130, saved 392593 rows
+[PID 3388] Processing batch 131
+[PID 3388] ✅ Finished batch 131, saved 392788 rows
+[PID 3389] Processing batch 132
+[PID 3389] ✅ Finished batch 132, saved 392646 rows
+[PID 3390] Processing batch 133
+[PID 3390] ✅ Finished batch 133, saved 393578 rows
+[PID 3391] Processing batch 134
+[PID 3391] ✅ Finished batch 134, saved 392791 rows
+[PID 3392] Processing batch 135
+[PID 3392] ✅ Finished batch 135, saved 392297 rows
+[PID 3393] Processing batch 136
+[PID 3393] ✅ Finished batch 136, saved 393527 rows
+[PID 3395] Processing batch 137
+[PID 3395] ✅ Finished batch 137, saved 392871 rows
+[PID 3396] Processing batch 138
+[PID 3396] ✅ Finished batch 138, saved 393011 rows
+[PID 3397] Processing batch 139
+[PID 3397] ✅ Finished batch 139, saved 393281 rows
+[PID 3387] Processing batch 140
+[PID 3387] ✅ Finished batch 140, saved 393810 rows
+[PID 3388] Processing batch 141
+[PID 3388] ✅ Finished batch 141, saved 393178 rows
+[PID 3389] Processing batch 142
+[PID 3389] ✅ Finished batch 142, saved 393796 rows
+[PID 3390] Processing batch 143
+[PID 3390] ✅ Finished batch 143, saved 393051 rows
+[PID 3391] Processing batch 144
+[PID 3391] ✅ Finished batch 144, saved 392733 rows
+[PID 3392] Processing batch 145
+[PID 3392] ✅ Finished batch 145, saved 393030 rows
+[PID 3393] Processing batch 146
+[PID 3393] ✅ Finished batch 146, saved 393080 rows
+[PID 3395] Processing batch 147
+[PID 3395] ✅ Finished batch 147, saved 393336 rows
+[PID 3396] Processing batch 148
+[PID 3396] ✅ Finished batch 148, saved 393346 rows
+[PID 3397] Processing batch 149
+[PID 3397] ✅ Finished batch 149, saved 338621 rows
+[PID 3387] Processing batch 150
+[PID 3387] ✅ Finished batch 150, saved 268376 rows
+[PID 3388] Processing batch 151
+[PID 3388] ✅ Finished batch 151, saved 305778 rows
+[PID 3389] Processing batch 152
+[PID 3389] ✅ Finished batch 152, saved 306261 rows
+[PID 3390] Processing batch 153
+[PID 3390] ✅ Finished batch 153, saved 324568 rows
+[PID 3391] Processing batch 154
+[PID 3391] ✅ Finished batch 154, saved 413097 rows
+[PID 3392] Processing batch 155
+[PID 3392] ✅ Finished batch 155, saved 430111 rows
+[PID 3393] Processing batch 156
+[PID 3393] ✅ Finished batch 156, saved 409146 rows
+[PID 3395] Processing batch 157
+[PID 3395] ✅ Finished batch 157, saved 409536 rows
+[PID 3396] Processing batch 158
+[PID 3396] ✅ Finished batch 158, saved 409907 rows
+[PID 3397] Processing batch 159
+[PID 3397] ✅ Finished batch 159, saved 409197 rows
+[PID 3387] Processing batch 160
+[PID 3387] ✅ Finished batch 160, saved 411952 rows
+[PID 3388] Processing batch 161
+[PID 3388] ✅ Finished batch 161, saved 400091 rows
+[PID 3389] Processing batch 162
+[PID 3389] ✅ Finished batch 162, saved 366812 rows
+[PID 3390] Processing batch 163
+[PID 3390] ✅ Finished batch 163, saved 361546 rows
+[PID 3391] Processing batch 164
+[PID 3391] ✅ Finished batch 164, saved 361293 rows
+[PID 3392] Processing batch 165
+[PID 3392] ✅ Finished batch 165, saved 363825 rows
+[PID 3393] Processing batch 166
+[PID 3393] ✅ Finished batch 166, saved 367027 rows
+[PID 3395] Processing batch 167
+[PID 3395] ✅ Finished batch 167, saved 363941 rows
+[PID 3396] Processing batch 168
+[PID 3396] ✅ Finished batch 168, saved 365180 rows
+[PID 3397] Processing batch 169
+[PID 3397] ✅ Finished batch 169, saved 364439 rows
+[PID 3387] Processing batch 170
+[PID 3387] ✅ Finished batch 170, saved 364686 rows
+[PID 3388] Processing batch 171
+[PID 3388] ✅ Finished batch 171, saved 365243 rows
+[PID 3389] Processing batch 172
+[PID 3389] ✅ Finished batch 172, saved 367786 rows
+[PID 3390] Processing batch 173
+[PID 3390] ✅ Finished batch 173, saved 369645 rows
+[PID 3391] Processing batch 174
+[PID 3391] ✅ Finished batch 174, saved 384429 rows
+[PID 3392] Processing batch 175
+[PID 3392] ✅ Finished batch 175, saved 384461 rows
+[PID 3393] Processing batch 176
+[PID 3393] ✅ Finished batch 176, saved 384947 rows
+[PID 3395] Processing batch 177
+[PID 3395] ✅ Finished batch 177, saved 375929 rows
+[PID 3396] Processing batch 178
+[PID 3396] ✅ Finished batch 178, saved 371739 rows
+[PID 3397] Processing batch 179
+[PID 3397] ✅ Finished batch 179, saved 373332 rows
+[PID 3387] Processing batch 180
+[PID 3387] ✅ Finished batch 180, saved 374437 rows
+[PID 3388] Processing batch 181
+[PID 3388] ✅ Finished batch 181, saved 374657 rows
+[PID 3389] Processing batch 182
+[PID 3389] ✅ Finished batch 182, saved 372019 rows
+[PID 3390] Processing batch 183
+[PID 3390] ✅ Finished batch 183, saved 369309 rows
+[PID 3391] Processing batch 184
+[PID 3391] ✅ Finished batch 184, saved 369979 rows
+[PID 3392] Processing batch 185
+[PID 3392] ✅ Finished batch 185, saved 373822 rows
+[PID 3393] Processing batch 186
+[PID 3393] ✅ Finished batch 186, saved 369568 rows
+[PID 3395] Processing batch 187
+[PID 3395] ✅ Finished batch 187, saved 369569 rows
+[PID 3396] Processing batch 188
+[PID 3396] ✅ Finished batch 188, saved 369540 rows
+[PID 3397] Processing batch 189
+[PID 3397] ✅ Finished batch 189, saved 367797 rows
+[PID 3387] Processing batch 190
+[PID 3387] ✅ Finished batch 190, saved 370176 rows
+[PID 3388] Processing batch 191
+[PID 3388] ✅ Finished batch 191, saved 368661 rows
+[PID 3389] Processing batch 192
+[PID 3389] ✅ Finished batch 192, saved 369719 rows
+[PID 3390] Processing batch 193
+[PID 3390] ✅ Finished batch 193, saved 368624 rows
+[PID 3391] Processing batch 194
+[PID 3391] ✅ Finished batch 194, saved 367616 rows
+[PID 3392] Processing batch 195
+[PID 3392] ✅ Finished batch 195, saved 367603 rows
+[PID 3393] Processing batch 196
+[PID 3393] ✅ Finished batch 196, saved 368202 rows
+[PID 3395] Processing batch 197
+[PID 3395] ✅ Finished batch 197, saved 364963 rows
+[PID 3396] Processing batch 198
+[PID 3396] ✅ Finished batch 198, saved 367019 rows
+[PID 3397] Processing batch 199
+[PID 3397] ✅ Finished batch 199, saved 367020 rows
+[PID 3387] Processing batch 200
+[PID 3387] ✅ Finished batch 200, saved 367677 rows
+[PID 3388] Processing batch 201
+[PID 3388] ✅ Finished batch 201, saved 366086 rows
+[PID 3389] Processing batch 202
+[PID 3389] ✅ Finished batch 202, saved 367436 rows
+[PID 3390] Processing batch 203
+[PID 3390] ✅ Finished batch 203, saved 364796 rows
+[PID 3391] Processing batch 204
+[PID 3391] ✅ Finished batch 204, saved 365180 rows
+[PID 3392] Processing batch 205
+[PID 3392] ✅ Finished batch 205, saved 367839 rows
+[PID 3393] Processing batch 206
+[PID 3393] ✅ Finished batch 206, saved 366041 rows
+[PID 3395] Processing batch 207
+[PID 3395] ✅ Finished batch 207, saved 367149 rows
+[PID 3396] Processing batch 208
+[PID 3396] ✅ Finished batch 208, saved 365627 rows
+[PID 3397] Processing batch 209
+[PID 3397] ✅ Finished batch 209, saved 365007 rows
+[PID 3387] Processing batch 210
+[PID 3387] ✅ Finished batch 210, saved 365921 rows
+[PID 3388] Processing batch 211
+[PID 3388] ✅ Finished batch 211, saved 366950 rows
+[PID 3389] Processing batch 212
+[PID 3389] ✅ Finished batch 212, saved 366691 rows
+[PID 3390] Processing batch 213
+[PID 3390] ✅ Finished batch 213, saved 366183 rows
+[PID 3391] Processing batch 214
+[PID 3391] ✅ Finished batch 214, saved 362987 rows
+[PID 3392] Processing batch 215
+[PID 3392] ✅ Finished batch 215, saved 361058 rows
+[PID 3393] Processing batch 216
+[PID 3393] ✅ Finished batch 216, saved 364871 rows
+[PID 3395] Processing batch 217
+[PID 3395] ✅ Finished batch 217, saved 364184 rows
+[PID 3396] Processing batch 218
+[PID 3396] ✅ Finished batch 218, saved 362586 rows
+[PID 3397] Processing batch 219
+[PID 3397] ✅ Finished batch 219, saved 362638 rows
+[PID 3387] Processing batch 220
+[PID 3387] ✅ Finished batch 220, saved 360695 rows
+[PID 3388] Processing batch 221
+[PID 3388] ✅ Finished batch 221, saved 361630 rows
+[PID 3389] Processing batch 222
+[PID 3389] ✅ Finished batch 222, saved 365945 rows
+[PID 3390] Processing batch 223
+[PID 3390] ✅ Finished batch 223, saved 364730 rows
+[PID 3391] Processing batch 224
+[PID 3391] ✅ Finished batch 224, saved 365602 rows
+[PID 3392] Processing batch 225
+[PID 3392] ✅ Finished batch 225, saved 362037 rows
+[PID 3393] Processing batch 226
+[PID 3393] ✅ Finished batch 226, saved 361510 rows
+[PID 3395] Processing batch 227
+[PID 3395] ✅ Finished batch 227, saved 362110 rows
+[PID 3396] Processing batch 228
+[PID 3396] ✅ Finished batch 228, saved 361176 rows
+[PID 3397] Processing batch 229
+[PID 3397] ✅ Finished batch 229, saved 368979 rows
+[PID 3387] Processing batch 230
+[PID 3387] ✅ Finished batch 230, saved 361299 rows
+[PID 3388] Processing batch 231
+[PID 3388] ✅ Finished batch 231, saved 361464 rows
+[PID 3389] Processing batch 232
+[PID 3389] ✅ Finished batch 232, saved 364153 rows
+[PID 3390] Processing batch 233
+[PID 3390] ✅ Finished batch 233, saved 366027 rows
+[PID 3391] Processing batch 234
+[PID 3391] ✅ Finished batch 234, saved 362086 rows
+[PID 3392] Processing batch 235
+[PID 3392] ✅ Finished batch 235, saved 365685 rows
+[PID 3393] Processing batch 236
+[PID 3393] ✅ Finished batch 236, saved 367836 rows
+[PID 3395] Processing batch 237
+[PID 3395] ✅ Finished batch 237, saved 363229 rows
+[PID 3396] Processing batch 238
+[PID 3396] ✅ Finished batch 238, saved 362816 rows
+[PID 3397] Processing batch 239
+[PID 3397] ✅ Finished batch 239, saved 364011 rows
+[PID 3387] Processing batch 240
+[PID 3387] ✅ Finished batch 240, saved 366124 rows
+[PID 3388] Processing batch 241
+[PID 3388] ✅ Finished batch 241, saved 366268 rows
+[PID 3389] Processing batch 242
+[PID 3389] ✅ Finished batch 242, saved 361715 rows
+[PID 3390] Processing batch 243
+[PID 3391] Processing batch 244
+[PID 3390] ✅ Finished batch 243, saved 366826 rows
+[PID 3391] ✅ Finished batch 244, saved 367577 rows
+[PID 3392] Processing batch 245
+[PID 3392] ✅ Finished batch 245, saved 370761 rows
+[PID 3393] Processing batch 246
+[PID 3393] ✅ Finished batch 246, saved 371244 rows
+[PID 3395] Processing batch 247
+[PID 3395] ✅ Finished batch 247, saved 369429 rows
+[PID 3396] Processing batch 248
+[PID 3396] ✅ Finished batch 248, saved 354731 rows
+[PID 3397] Processing batch 249
+[PID 3397] ✅ Finished batch 249, saved 386527 rows
+[PID 3387] Processing batch 250
+[PID 3387] ✅ Finished batch 250, saved 375807 rows
+[PID 3388] Processing batch 251
+[PID 3388] ✅ Finished batch 251, saved 370209 rows
+[PID 3389] Processing batch 252
+[PID 3389] ✅ Finished batch 252, saved 369392 rows
+[PID 3390] Processing batch 253
+[PID 3390] ✅ Finished batch 253, saved 366377 rows
+[PID 3391] Processing batch 254
+[PID 3391] ✅ Finished batch 254, saved 353810 rows
+[PID 3392] Processing batch 255
+[PID 3392] ✅ Finished batch 255, saved 337732 rows
+[PID 3393] Processing batch 256
+[PID 3393] ✅ Finished batch 256, saved 337983 rows
+[PID 3395] Processing batch 257
+[PID 3395] ✅ Finished batch 257, saved 320119 rows
+[PID 3396] Processing batch 258
+[PID 3396] ✅ Finished batch 258, saved 344705 rows
+[PID 3397] Processing batch 259
+[PID 3397] ✅ Finished batch 259, saved 343721 rows
+[PID 3387] Processing batch 260
+[PID 3387] ✅ Finished batch 260, saved 345316 rows
+[PID 3388] Processing batch 261
+[PID 3388] ✅ Finished batch 261, saved 342610 rows
+[PID 3389] Processing batch 262
+[PID 3389] ✅ Finished batch 262, saved 344699 rows
+[PID 3390] Processing batch 263
+[PID 3390] ✅ Finished batch 263, saved 340914 rows
+[PID 3391] Processing batch 264
+[PID 3391] ✅ Finished batch 264, saved 336379 rows
+[PID 3392] Processing batch 265
+[PID 3392] ✅ Finished batch 265, saved 340640 rows
+[PID 3393] Processing batch 266
+[PID 3393] ✅ Finished batch 266, saved 340943 rows
+[PID 3395] Processing batch 267
+[PID 3395] ✅ Finished batch 267, saved 337857 rows
+[PID 3396] Processing batch 268
+[PID 3396] ✅ Finished batch 268, saved 336261 rows
+[PID 3397] Processing batch 269
+[PID 3397] ✅ Finished batch 269, saved 337960 rows
+[PID 3387] Processing batch 270
+[PID 3388] Processing batch 271
+[PID 3387] ✅ Finished batch 270, saved 340176 rows
+[PID 3388] ✅ Finished batch 271, saved 128884 rows
+[PID 54874] Processing batch 0
+[PID 54874] ✅ Finished batch 0, saved 533454 rows
+[PID 54875] Processing batch 1
+[PID 54875] ✅ Finished batch 1, saved 496719 rows
+[PID 54876] Processing batch 2
+[PID 54876] ✅ Finished batch 2, saved 299495 rows
+[PID 54877] Processing batch 3
+[PID 54877] ✅ Finished batch 3, saved 433060 rows
+[PID 54878] Processing batch 4
+[PID 54878] ✅ Finished batch 4, saved 450600 rows
+[PID 54879] Processing batch 5
+[PID 54879] ✅ Finished batch 5, saved 451734 rows
+[PID 54880] Processing batch 6
+[PID 54880] ✅ Finished batch 6, saved 429505 rows
+[PID 54881] Processing batch 7
+[PID 54881] ✅ Finished batch 7, saved 431430 rows
+[PID 54882] Processing batch 8
+[PID 54882] ✅ Finished batch 8, saved 454301 rows
+[PID 54883] Processing batch 9
+[PID 54883] ✅ Finished batch 9, saved 462135 rows
+[PID 54874] Processing batch 10
+[PID 54874] ✅ Finished batch 10, saved 462405 rows
+[PID 54875] Processing batch 11
+[PID 54875] ✅ Finished batch 11, saved 392145 rows
+[PID 54876] Processing batch 12
+[PID 54876] ✅ Finished batch 12, saved 433743 rows
+[PID 54877] Processing batch 13
+[PID 54877] ✅ Finished batch 13, saved 434776 rows
+[PID 54878] Processing batch 14
+[PID 54878] ✅ Finished batch 14, saved 416094 rows
+[PID 54879] Processing batch 15
+[PID 54879] ✅ Finished batch 15, saved 443891 rows
+[PID 54880] Processing batch 16
+[PID 54880] ✅ Finished batch 16, saved 444248 rows
+[PID 54881] Processing batch 17
+[PID 54881] ✅ Finished batch 17, saved 444096 rows
+[PID 54882] Processing batch 18
+[PID 54882] ✅ Finished batch 18, saved 444452 rows
+[PID 54883] Processing batch 19
+[PID 54883] ✅ Finished batch 19, saved 444748 rows
+[PID 54874] Processing batch 20
+[PID 54874] ✅ Finished batch 20, saved 444659 rows
+[PID 54875] Processing batch 21
+[PID 54875] ✅ Finished batch 21, saved 444439 rows
+[PID 54876] Processing batch 22
+[PID 54876] ✅ Finished batch 22, saved 444489 rows
+[PID 54877] Processing batch 23
+[PID 54877] ✅ Finished batch 23, saved 444909 rows
+[PID 54878] Processing batch 24
+[PID 54878] ✅ Finished batch 24, saved 444584 rows
+[PID 54879] Processing batch 25
+[PID 54879] ✅ Finished batch 25, saved 444793 rows
+[PID 54880] Processing batch 26
+[PID 54880] ✅ Finished batch 26, saved 435619 rows
+[PID 54881] Processing batch 27
+[PID 54881] ✅ Finished batch 27, saved 420109 rows
+[PID 54882] Processing batch 28
+[PID 54882] ✅ Finished batch 28, saved 419939 rows
+[PID 54883] Processing batch 29
+[PID 54883] ✅ Finished batch 29, saved 420540 rows
+[PID 54874] Processing batch 30
+[PID 54874] ✅ Finished batch 30, saved 419735 rows
+[PID 54875] Processing batch 31
+[PID 54875] ✅ Finished batch 31, saved 421231 rows
+[PID 54876] Processing batch 32
+[PID 54876] ✅ Finished batch 32, saved 421071 rows
+[PID 54877] Processing batch 33
+[PID 54877] ✅ Finished batch 33, saved 421179 rows
+[PID 54878] Processing batch 34
+[PID 54878] ✅ Finished batch 34, saved 421193 rows
+[PID 54879] Processing batch 35
+[PID 54879] ✅ Finished batch 35, saved 434611 rows
+[PID 54880] Processing batch 36
+[PID 54880] ✅ Finished batch 36, saved 415992 rows
+[PID 54881] Processing batch 37
+[PID 54881] ✅ Finished batch 37, saved 435784 rows
+[PID 54882] Processing batch 38
+[PID 54882] ✅ Finished batch 38, saved 436101 rows
+[PID 54883] Processing batch 39
+[PID 54883] ✅ Finished batch 39, saved 435943 rows
+[PID 54874] Processing batch 40
+[PID 54874] ✅ Finished batch 40, saved 435388 rows
+[PID 54875] Processing batch 41
+[PID 54875] ✅ Finished batch 41, saved 435606 rows
+[PID 54876] Processing batch 42
+[PID 54876] ✅ Finished batch 42, saved 435422 rows
+[PID 54877] Processing batch 43
+[PID 54877] ✅ Finished batch 43, saved 435691 rows
+[PID 54878] Processing batch 44
+[PID 54878] ✅ Finished batch 44, saved 435526 rows
+[PID 54879] Processing batch 45
+[PID 54879] ✅ Finished batch 45, saved 435802 rows
+[PID 54880] Processing batch 46
+[PID 54880] ✅ Finished batch 46, saved 435794 rows
+[PID 54881] Processing batch 47
+[PID 54881] ✅ Finished batch 47, saved 436334 rows
+[PID 54882] Processing batch 48
+[PID 54882] ✅ Finished batch 48, saved 435986 rows
+[PID 54883] Processing batch 49
+[PID 54883] ✅ Finished batch 49, saved 436392 rows
+[PID 54874] Processing batch 50
+[PID 54874] ✅ Finished batch 50, saved 436042 rows
+[PID 54875] Processing batch 51
+[PID 54875] ✅ Finished batch 51, saved 435717 rows
+[PID 54876] Processing batch 52
+[PID 54876] ✅ Finished batch 52, saved 435907 rows
+[PID 54877] Processing batch 53
+[PID 54877] ✅ Finished batch 53, saved 436139 rows
+[PID 54878] Processing batch 54
+[PID 54878] ✅ Finished batch 54, saved 435335 rows
+[PID 54879] Processing batch 55
+[PID 54879] ✅ Finished batch 55, saved 435496 rows
+[PID 54880] Processing batch 56
+[PID 54880] ✅ Finished batch 56, saved 435992 rows
+[PID 54881] Processing batch 57
+[PID 54881] ✅ Finished batch 57, saved 436383 rows
+[PID 54882] Processing batch 58
+[PID 54882] ✅ Finished batch 58, saved 436902 rows
+[PID 54883] Processing batch 59
+[PID 54883] ✅ Finished batch 59, saved 436358 rows
+[PID 54874] Processing batch 60
+[PID 54874] ✅ Finished batch 60, saved 436991 rows
+[PID 54875] Processing batch 61
+[PID 54875] ✅ Finished batch 61, saved 436713 rows
+[PID 54876] Processing batch 62
+[PID 54876] ✅ Finished batch 62, saved 436342 rows
+[PID 54877] Processing batch 63
+[PID 54877] ✅ Finished batch 63, saved 436111 rows
+[PID 54878] Processing batch 64
+[PID 54878] ✅ Finished batch 64, saved 436103 rows
+[PID 54879] Processing batch 65
+[PID 54879] ✅ Finished batch 65, saved 435912 rows
+[PID 54880] Processing batch 66
+[PID 54880] ✅ Finished batch 66, saved 435989 rows
+[PID 54881] Processing batch 67
+[PID 54881] ✅ Finished batch 67, saved 436764 rows
+[PID 54882] Processing batch 68
+[PID 54882] ✅ Finished batch 68, saved 436528 rows
+[PID 54883] Processing batch 69
+[PID 54883] ✅ Finished batch 69, saved 436149 rows
+[PID 54874] Processing batch 70
+[PID 54874] ✅ Finished batch 70, saved 436410 rows
+[PID 54875] Processing batch 71
+[PID 54875] ✅ Finished batch 71, saved 436202 rows
+[PID 54876] Processing batch 72
+[PID 54876] ✅ Finished batch 72, saved 436576 rows
+[PID 54877] Processing batch 73
+[PID 54877] ✅ Finished batch 73, saved 436955 rows
+[PID 54878] Processing batch 74
+[PID 54878] ✅ Finished batch 74, saved 436499 rows
+[PID 54879] Processing batch 75
+[PID 54879] ✅ Finished batch 75, saved 436690 rows
+[PID 54880] Processing batch 76
+[PID 54880] ✅ Finished batch 76, saved 415985 rows
+[PID 54881] Processing batch 77
+[PID 54881] ✅ Finished batch 77, saved 395020 rows
+[PID 54882] Processing batch 78
+[PID 54882] ✅ Finished batch 78, saved 396556 rows
+[PID 54883] Processing batch 79
+[PID 54883] ✅ Finished batch 79, saved 395774 rows
+[PID 54874] Processing batch 80
+[PID 54874] ✅ Finished batch 80, saved 395901 rows
+[PID 54875] Processing batch 81
+[PID 54875] ✅ Finished batch 81, saved 395936 rows
+[PID 54876] Processing batch 82
+[PID 54876] ✅ Finished batch 82, saved 396150 rows
+[PID 54877] Processing batch 83
+[PID 54877] ✅ Finished batch 83, saved 396186 rows
+[PID 54878] Processing batch 84
+[PID 54878] ✅ Finished batch 84, saved 395508 rows
+[PID 54879] Processing batch 85
+[PID 54879] ✅ Finished batch 85, saved 396324 rows
+[PID 54880] Processing batch 86
+[PID 54880] ✅ Finished batch 86, saved 395732 rows
+[PID 54881] Processing batch 87
+[PID 54881] ✅ Finished batch 87, saved 396460 rows
+[PID 54882] Processing batch 88
+[PID 54882] ✅ Finished batch 88, saved 395989 rows
+[PID 54883] Processing batch 89
+[PID 54883] ✅ Finished batch 89, saved 396053 rows
+[PID 54874] Processing batch 90
+[PID 54874] ✅ Finished batch 90, saved 396174 rows
+[PID 54875] Processing batch 91
+[PID 54875] ✅ Finished batch 91, saved 395765 rows
+[PID 54876] Processing batch 92
+[PID 54876] ✅ Finished batch 92, saved 395949 rows
+[PID 54877] Processing batch 93
+[PID 54877] ✅ Finished batch 93, saved 396420 rows
+[PID 54878] Processing batch 94
+[PID 54878] ✅ Finished batch 94, saved 396842 rows
+[PID 54879] Processing batch 95
+[PID 54879] ✅ Finished batch 95, saved 396817 rows
+[PID 54880] Processing batch 96
+[PID 54880] ✅ Finished batch 96, saved 395633 rows
+[PID 54881] Processing batch 97
+[PID 54881] ✅ Finished batch 97, saved 396963 rows
+[PID 54882] Processing batch 98
+[PID 54882] ✅ Finished batch 98, saved 396574 rows
+[PID 54883] Processing batch 99
+[PID 54883] ✅ Finished batch 99, saved 396349 rows
+[PID 54874] Processing batch 100
+[PID 54874] ✅ Finished batch 100, saved 396179 rows
+[PID 54875] Processing batch 101
+[PID 54875] ✅ Finished batch 101, saved 396997 rows
+[PID 54876] Processing batch 102
+[PID 54876] ✅ Finished batch 102, saved 396690 rows
+[PID 54877] Processing batch 103
+[PID 54877] ✅ Finished batch 103, saved 396833 rows
+[PID 54878] Processing batch 104
+[PID 54878] ✅ Finished batch 104, saved 396500 rows
+[PID 54879] Processing batch 105
+[PID 54879] ✅ Finished batch 105, saved 396856 rows
+[PID 54880] Processing batch 106
+[PID 54880] ✅ Finished batch 106, saved 396724 rows
+[PID 54881] Processing batch 107
+[PID 54881] ✅ Finished batch 107, saved 396635 rows
+[PID 54882] Processing batch 108
+[PID 54882] ✅ Finished batch 108, saved 396665 rows
+[PID 54883] Processing batch 109
+[PID 54883] ✅ Finished batch 109, saved 396700 rows
+[PID 54874] Processing batch 110
+[PID 54874] ✅ Finished batch 110, saved 396358 rows
+[PID 54875] Processing batch 111
+[PID 54875] ✅ Finished batch 111, saved 396274 rows
+[PID 54876] Processing batch 112
+[PID 54876] ✅ Finished batch 112, saved 396501 rows
+[PID 54877] Processing batch 113
+[PID 54877] ✅ Finished batch 113, saved 397922 rows
+[PID 54878] Processing batch 114
+[PID 54878] ✅ Finished batch 114, saved 396766 rows
+[PID 54879] Processing batch 115
+[PID 54879] ✅ Finished batch 115, saved 396971 rows
+[PID 54880] Processing batch 116
+[PID 54880] ✅ Finished batch 116, saved 396875 rows
+[PID 54881] Processing batch 117
+[PID 54881] ✅ Finished batch 117, saved 397490 rows
+[PID 54882] Processing batch 118
+[PID 54882] ✅ Finished batch 118, saved 397625 rows
+[PID 54883] Processing batch 119
+[PID 54883] ✅ Finished batch 119, saved 397337 rows
+[PID 54874] Processing batch 120
+[PID 54874] ✅ Finished batch 120, saved 397264 rows
+[PID 54875] Processing batch 121
+[PID 54875] ✅ Finished batch 121, saved 397305 rows
+[PID 54876] Processing batch 122
+[PID 54876] ✅ Finished batch 122, saved 397260 rows
+[PID 54877] Processing batch 123
+[PID 54877] ✅ Finished batch 123, saved 397767 rows
+[PID 54878] Processing batch 124
+[PID 54878] ✅ Finished batch 124, saved 397210 rows
+[PID 54879] Processing batch 125
+[PID 54879] ✅ Finished batch 125, saved 397503 rows
+[PID 54880] Processing batch 126
+[PID 54880] ✅ Finished batch 126, saved 397103 rows
+[PID 54881] Processing batch 127
+[PID 54881] ✅ Finished batch 127, saved 397799 rows
+[PID 54882] Processing batch 128
+[PID 54882] ✅ Finished batch 128, saved 397245 rows
+[PID 54883] Processing batch 129
+[PID 54883] ✅ Finished batch 129, saved 397304 rows
+[PID 54874] Processing batch 130
+[PID 54874] ✅ Finished batch 130, saved 397222 rows
+[PID 54875] Processing batch 131
+[PID 54875] ✅ Finished batch 131, saved 397258 rows
+[PID 54876] Processing batch 132
+[PID 54876] ✅ Finished batch 132, saved 396967 rows
+[PID 54877] Processing batch 133
+[PID 54877] ✅ Finished batch 133, saved 396823 rows
+[PID 54878] Processing batch 134
+[PID 54878] ✅ Finished batch 134, saved 397412 rows
+[PID 54879] Processing batch 135
+[PID 54879] ✅ Finished batch 135, saved 397210 rows
+[PID 54880] Processing batch 136
+[PID 54880] ✅ Finished batch 136, saved 397966 rows
+[PID 54881] Processing batch 137
+[PID 54881] ✅ Finished batch 137, saved 397604 rows
+[PID 54882] Processing batch 138
+[PID 54882] ✅ Finished batch 138, saved 397469 rows
+[PID 54883] Processing batch 139
+[PID 54883] ✅ Finished batch 139, saved 397483 rows
+[PID 54874] Processing batch 140
+[PID 54874] ✅ Finished batch 140, saved 397701 rows
+[PID 54875] Processing batch 141
+[PID 54875] ✅ Finished batch 141, saved 397659 rows
+[PID 54876] Processing batch 142
+[PID 54876] ✅ Finished batch 142, saved 398332 rows
+[PID 54877] Processing batch 143
+[PID 54877] ✅ Finished batch 143, saved 397758 rows
+[PID 54878] Processing batch 144
+[PID 54878] ✅ Finished batch 144, saved 397732 rows
+[PID 54879] Processing batch 145
+[PID 54879] ✅ Finished batch 145, saved 397718 rows
+[PID 54880] Processing batch 146
+[PID 54880] ✅ Finished batch 146, saved 397691 rows
+[PID 54881] Processing batch 147
+[PID 54881] ✅ Finished batch 147, saved 397579 rows
+[PID 54882] Processing batch 148
+[PID 54882] ✅ Finished batch 148, saved 397319 rows
+[PID 54883] Processing batch 149
+[PID 54883] ✅ Finished batch 149, saved 397396 rows
+[PID 54874] Processing batch 150
+[PID 54874] ✅ Finished batch 150, saved 398455 rows
+[PID 54875] Processing batch 151
+[PID 54875] ✅ Finished batch 151, saved 397946 rows
+[PID 54876] Processing batch 152
+[PID 54876] ✅ Finished batch 152, saved 397081 rows
+[PID 54877] Processing batch 153
+[PID 54877] ✅ Finished batch 153, saved 296157 rows
+[PID 54878] Processing batch 154
+[PID 54878] ✅ Finished batch 154, saved 289386 rows
+[PID 54879] Processing batch 155
+[PID 54879] ✅ Finished batch 155, saved 316025 rows
+[PID 54880] Processing batch 156
+[PID 54880] ✅ Finished batch 156, saved 312987 rows
+[PID 54881] Processing batch 157
+[PID 54881] ✅ Finished batch 157, saved 376807 rows
+[PID 54882] Processing batch 158
+[PID 54882] ✅ Finished batch 158, saved 411302 rows
+[PID 54883] Processing batch 159
+[PID 54883] ✅ Finished batch 159, saved 438733 rows
+[PID 54874] Processing batch 160
+[PID 54874] ✅ Finished batch 160, saved 413758 rows
+[PID 54875] Processing batch 161
+[PID 54875] ✅ Finished batch 161, saved 412199 rows
+[PID 54876] Processing batch 162
+[PID 54876] ✅ Finished batch 162, saved 410611 rows
+[PID 54877] Processing batch 163
+[PID 54877] ✅ Finished batch 163, saved 409923 rows
+[PID 54878] Processing batch 164
+[PID 54878] ✅ Finished batch 164, saved 411187 rows
+[PID 54879] Processing batch 165
+[PID 54879] ✅ Finished batch 165, saved 389586 rows
+[PID 54880] Processing batch 166
+[PID 54880] ✅ Finished batch 166, saved 367816 rows
+[PID 54881] Processing batch 167
+[PID 54881] ✅ Finished batch 167, saved 364102 rows
+[PID 54882] Processing batch 168
+[PID 54882] ✅ Finished batch 168, saved 364625 rows
+[PID 54883] Processing batch 169
+[PID 54883] ✅ Finished batch 169, saved 365557 rows
+[PID 54874] Processing batch 170
+[PID 54874] ✅ Finished batch 170, saved 367654 rows
+[PID 54875] Processing batch 171
+[PID 54875] ✅ Finished batch 171, saved 368572 rows
+[PID 54876] Processing batch 172
+[PID 54876] ✅ Finished batch 172, saved 367170 rows
+[PID 54877] Processing batch 173
+[PID 54877] ✅ Finished batch 173, saved 366612 rows
+[PID 54878] Processing batch 174
+[PID 54878] ✅ Finished batch 174, saved 365169 rows
+[PID 54879] Processing batch 175
+[PID 54879] ✅ Finished batch 175, saved 366395 rows
+[PID 54880] Processing batch 176
+[PID 54880] ✅ Finished batch 176, saved 368449 rows
+[PID 54881] Processing batch 177
+[PID 54881] ✅ Finished batch 177, saved 367887 rows
+[PID 54882] Processing batch 178
+[PID 54882] ✅ Finished batch 178, saved 366669 rows
+[PID 54883] Processing batch 179
+[PID 54883] ✅ Finished batch 179, saved 368782 rows
+[PID 54874] Processing batch 180
+[PID 54874] ✅ Finished batch 180, saved 383172 rows
+[PID 54875] Processing batch 181
+[PID 54875] ✅ Finished batch 181, saved 391087 rows
+[PID 54876] Processing batch 182
+[PID 54876] ✅ Finished batch 182, saved 390829 rows
+[PID 54877] Processing batch 183
+[PID 54877] ✅ Finished batch 183, saved 392600 rows
+[PID 54878] Processing batch 184
+[PID 54878] ✅ Finished batch 184, saved 389471 rows
+[PID 54879] Processing batch 185
+[PID 54879] ✅ Finished batch 185, saved 388342 rows
+[PID 54880] Processing batch 186
+[PID 54880] ✅ Finished batch 186, saved 387946 rows
+[PID 54881] Processing batch 187
+[PID 54881] ✅ Finished batch 187, saved 387944 rows
+[PID 54882] Processing batch 188
+[PID 54882] ✅ Finished batch 188, saved 385967 rows
+[PID 54883] Processing batch 189
+[PID 54883] ✅ Finished batch 189, saved 389127 rows
+[PID 54874] Processing batch 190
+[PID 54874] ✅ Finished batch 190, saved 385508 rows
+[PID 54875] Processing batch 191
+[PID 54875] ✅ Finished batch 191, saved 382656 rows
+[PID 54876] Processing batch 192
+[PID 54876] ✅ Finished batch 192, saved 382798 rows
+[PID 54877] Processing batch 193
+[PID 54877] ✅ Finished batch 193, saved 378891 rows
+[PID 54878] Processing batch 194
+[PID 54878] ✅ Finished batch 194, saved 374988 rows
+[PID 54879] Processing batch 195
+[PID 54879] ✅ Finished batch 195, saved 374590 rows
+[PID 54880] Processing batch 196
+[PID 54880] ✅ Finished batch 196, saved 376632 rows
+[PID 54881] Processing batch 197
+[PID 54881] ✅ Finished batch 197, saved 371484 rows
+[PID 54882] Processing batch 198
+[PID 54882] ✅ Finished batch 198, saved 372023 rows
+[PID 54883] Processing batch 199
+[PID 54883] ✅ Finished batch 199, saved 371177 rows
+[PID 54874] Processing batch 200
+[PID 54874] ✅ Finished batch 200, saved 370754 rows
+[PID 54875] Processing batch 201
+[PID 54875] ✅ Finished batch 201, saved 372124 rows
+[PID 54876] Processing batch 202
+[PID 54876] ✅ Finished batch 202, saved 374105 rows
+[PID 54877] Processing batch 203
+[PID 54877] ✅ Finished batch 203, saved 371222 rows
+[PID 54878] Processing batch 204
+[PID 54878] ✅ Finished batch 204, saved 372561 rows
+[PID 54879] Processing batch 205
+[PID 54879] ✅ Finished batch 205, saved 369732 rows
+[PID 54880] Processing batch 206
+[PID 54880] ✅ Finished batch 206, saved 370356 rows
+[PID 54881] Processing batch 207
+[PID 54881] ✅ Finished batch 207, saved 366768 rows
+[PID 54882] Processing batch 208
+[PID 54882] ✅ Finished batch 208, saved 369894 rows
+[PID 54883] Processing batch 209
+[PID 54883] ✅ Finished batch 209, saved 370160 rows
+[PID 54874] Processing batch 210
+[PID 54874] ✅ Finished batch 210, saved 367541 rows
+[PID 54875] Processing batch 211
+[PID 54875] ✅ Finished batch 211, saved 365383 rows
+[PID 54876] Processing batch 212
+[PID 54876] ✅ Finished batch 212, saved 365385 rows
+[PID 54877] Processing batch 213
+[PID 54877] ✅ Finished batch 213, saved 368937 rows
+[PID 54878] Processing batch 214
+[PID 54878] ✅ Finished batch 214, saved 365849 rows
+[PID 54879] Processing batch 215
+[PID 54879] ✅ Finished batch 215, saved 367486 rows
+[PID 54880] Processing batch 216
+[PID 54880] ✅ Finished batch 216, saved 366941 rows
+[PID 54881] Processing batch 217
+[PID 54881] ✅ Finished batch 217, saved 365811 rows
+[PID 54882] Processing batch 218
+[PID 54882] ✅ Finished batch 218, saved 366995 rows
+[PID 54883] Processing batch 219
+[PID 54883] ✅ Finished batch 219, saved 366793 rows
+[PID 54874] Processing batch 220
+[PID 54874] ✅ Finished batch 220, saved 364357 rows
+[PID 54875] Processing batch 221
+[PID 54875] ✅ Finished batch 221, saved 366519 rows
+[PID 54876] Processing batch 222
+[PID 54876] ✅ Finished batch 222, saved 364348 rows
+[PID 54877] Processing batch 223
+[PID 54877] ✅ Finished batch 223, saved 364525 rows
+[PID 54878] Processing batch 224
+[PID 54878] ✅ Finished batch 224, saved 366481 rows
+[PID 54879] Processing batch 225
+[PID 54879] ✅ Finished batch 225, saved 366358 rows
+[PID 54880] Processing batch 226
+[PID 54880] ✅ Finished batch 226, saved 365571 rows
+[PID 54881] Processing batch 227
+[PID 54881] ✅ Finished batch 227, saved 366547 rows
+[PID 54882] Processing batch 228
+[PID 54882] ✅ Finished batch 228, saved 365925 rows
+[PID 54883] Processing batch 229
+[PID 54883] ✅ Finished batch 229, saved 364922 rows
+[PID 54874] Processing batch 230
+[PID 54874] ✅ Finished batch 230, saved 364228 rows
+[PID 54875] Processing batch 231
+[PID 54875] ✅ Finished batch 231, saved 366913 rows
+[PID 54876] Processing batch 232
+[PID 54876] ✅ Finished batch 232, saved 367932 rows
+[PID 54877] Processing batch 233
+[PID 54877] ✅ Finished batch 233, saved 366152 rows
+[PID 54878] Processing batch 234
+[PID 54878] ✅ Finished batch 234, saved 364466 rows
+[PID 54879] Processing batch 235
+[PID 54879] ✅ Finished batch 235, saved 368010 rows
+[PID 54880] Processing batch 236
+[PID 54880] ✅ Finished batch 236, saved 369802 rows
+[PID 54881] Processing batch 237
+[PID 54881] ✅ Finished batch 237, saved 366040 rows
+[PID 54882] Processing batch 238
+[PID 54882] ✅ Finished batch 238, saved 366795 rows
+[PID 54883] Processing batch 239
+[PID 54883] ✅ Finished batch 239, saved 367320 rows
+[PID 54874] Processing batch 240
+[PID 54874] ✅ Finished batch 240, saved 364901 rows
+[PID 54875] Processing batch 241
+[PID 54875] ✅ Finished batch 241, saved 366599 rows
+[PID 54876] Processing batch 242
+[PID 54876] ✅ Finished batch 242, saved 365707 rows
+[PID 54877] Processing batch 243
+[PID 54877] ✅ Finished batch 243, saved 367306 rows
+[PID 54878] Processing batch 244
+[PID 54878] ✅ Finished batch 244, saved 367843 rows
+[PID 54879] Processing batch 245
+[PID 54879] ✅ Finished batch 245, saved 368737 rows
+[PID 54880] Processing batch 246
+[PID 54880] ✅ Finished batch 246, saved 366403 rows
+[PID 54881] Processing batch 247
+[PID 54881] ✅ Finished batch 247, saved 368508 rows
+[PID 54882] Processing batch 248
+[PID 54882] ✅ Finished batch 248, saved 366720 rows
+[PID 54883] Processing batch 249
+[PID 54883] ✅ Finished batch 249, saved 373822 rows
+[PID 54874] Processing batch 250
+[PID 54874] ✅ Finished batch 250, saved 371759 rows
+[PID 54875] Processing batch 251
+[PID 54875] ✅ Finished batch 251, saved 369220 rows
+[PID 54876] Processing batch 252
+[PID 54876] ✅ Finished batch 252, saved 371905 rows
+[PID 54877] Processing batch 253
+[PID 54877] ✅ Finished batch 253, saved 372698 rows
+[PID 54878] Processing batch 254
+[PID 54878] ✅ Finished batch 254, saved 376195 rows
+[PID 54879] Processing batch 255
+[PID 54879] ✅ Finished batch 255, saved 382996 rows
+[PID 54880] Processing batch 256
+[PID 54880] ✅ Finished batch 256, saved 380317 rows
+[PID 54881] Processing batch 257
+[PID 54881] ✅ Finished batch 257, saved 376948 rows
+[PID 54882] Processing batch 258
+[PID 54882] ✅ Finished batch 258, saved 372284 rows
+[PID 54883] Processing batch 259
+[PID 54883] ✅ Finished batch 259, saved 374629 rows
+[PID 54874] Processing batch 260
+[PID 54874] ✅ Finished batch 260, saved 350163 rows
+[PID 54875] Processing batch 261
+[PID 54875] ✅ Finished batch 261, saved 340331 rows
+[PID 54876] Processing batch 262
+[PID 54876] ✅ Finished batch 262, saved 338635 rows
+[PID 54877] Processing batch 263
+[PID 54877] ✅ Finished batch 263, saved 341120 rows
+[PID 54878] Processing batch 264
+[PID 54878] ✅ Finished batch 264, saved 358029 rows
+[PID 54879] Processing batch 265
+[PID 54879] ✅ Finished batch 265, saved 352817 rows
+[PID 54880] Processing batch 266
+[PID 54880] ✅ Finished batch 266, saved 347749 rows
+[PID 54881] Processing batch 267
+[PID 54881] ✅ Finished batch 267, saved 345257 rows
+[PID 54882] Processing batch 268
+[PID 54882] ✅ Finished batch 268, saved 341231 rows
+[PID 54883] Processing batch 269
+[PID 54883] ✅ Finished batch 269, saved 344030 rows
+[PID 54874] Processing batch 270
+[PID 54874] ✅ Finished batch 270, saved 340620 rows
+[PID 54875] Processing batch 271
+[PID 54875] ✅ Finished batch 271, saved 345164 rows
+[PID 54876] Processing batch 272
+[PID 54876] ✅ Finished batch 272, saved 345372 rows
+[PID 54877] Processing batch 273
+[PID 54877] ✅ Finished batch 273, saved 343118 rows
+[PID 54878] Processing batch 274
+[PID 54878] ✅ Finished batch 274, saved 346710 rows
+[PID 54879] Processing batch 275
+[PID 54880] Processing batch 276
+[PID 54879] ✅ Finished batch 275, saved 340279 rows
+[PID 54880] ✅ Finished batch 276, saved 347023 rows
+[PID 54881] Processing batch 277
+[PID 54881] ✅ Finished batch 277, saved 342409 rows
+[PID 54882] Processing batch 278
+[PID 54883] Processing batch 279
+[PID 54882] ✅ Finished batch 278, saved 344421 rows
+[PID 54883] ✅ Finished batch 279, saved 115699 rows
+[PID 44496] Processing batch 0
+[PID 44496] ✅ Finished batch 0, saved 529435 rows
+[PID 44497] Processing batch 1
+[PID 44497] ✅ Finished batch 1, saved 487528 rows
+[PID 44498] Processing batch 2
+[PID 44498] ✅ Finished batch 2, saved 290853 rows
+[PID 44499] Processing batch 3
+[PID 44499] ✅ Finished batch 3, saved 428195 rows
+[PID 44500] Processing batch 4
+[PID 44500] ✅ Finished batch 4, saved 444604 rows
+[PID 44501] Processing batch 5
+[PID 44501] ✅ Finished batch 5, saved 441757 rows
+[PID 44502] Processing batch 6
+[PID 44502] ✅ Finished batch 6, saved 424362 rows
+[PID 44503] Processing batch 7
+[PID 44503] ✅ Finished batch 7, saved 425982 rows
+[PID 44504] Processing batch 8
+[PID 44504] ✅ Finished batch 8, saved 452997 rows
+[PID 44505] Processing batch 9
+[PID 44505] ✅ Finished batch 9, saved 458836 rows
+[PID 44496] Processing batch 10
+[PID 44496] ✅ Finished batch 10, saved 449456 rows
+[PID 44497] Processing batch 11
+[PID 44497] ✅ Finished batch 11, saved 380403 rows
+[PID 44498] Processing batch 12
+[PID 44498] ✅ Finished batch 12, saved 427053 rows
+[PID 44499] Processing batch 13
+[PID 44499] ✅ Finished batch 13, saved 407223 rows
+[PID 44500] Processing batch 14
+[PID 44500] ✅ Finished batch 14, saved 440361 rows
+[PID 44501] Processing batch 15
+[PID 44501] ✅ Finished batch 15, saved 439883 rows
+[PID 44502] Processing batch 16
+[PID 44502] ✅ Finished batch 16, saved 440700 rows
+[PID 44503] Processing batch 17
+[PID 44503] ✅ Finished batch 17, saved 440157 rows
+[PID 44504] Processing batch 18
+[PID 44504] ✅ Finished batch 18, saved 440469 rows
+[PID 44505] Processing batch 19
+[PID 44505] ✅ Finished batch 19, saved 440057 rows
+[PID 44496] Processing batch 20
+[PID 44496] ✅ Finished batch 20, saved 439981 rows
+[PID 44497] Processing batch 21
+[PID 44497] ✅ Finished batch 21, saved 440497 rows
+[PID 44498] Processing batch 22
+[PID 44498] ✅ Finished batch 22, saved 440685 rows
+[PID 44499] Processing batch 23
+[PID 44499] ✅ Finished batch 23, saved 440328 rows
+[PID 44500] Processing batch 24
+[PID 44500] ✅ Finished batch 24, saved 439817 rows
+[PID 44501] Processing batch 25
+[PID 44501] ✅ Finished batch 25, saved 422128 rows
+[PID 44502] Processing batch 26
+[PID 44502] ✅ Finished batch 26, saved 414957 rows
+[PID 44503] Processing batch 27
+[PID 44503] ✅ Finished batch 27, saved 415204 rows
+[PID 44504] Processing batch 28
+[PID 44504] ✅ Finished batch 28, saved 415660 rows
+[PID 44505] Processing batch 29
+[PID 44505] ✅ Finished batch 29, saved 414290 rows
+[PID 44496] Processing batch 30
+[PID 44496] ✅ Finished batch 30, saved 415659 rows
+[PID 44497] Processing batch 31
+[PID 44497] ✅ Finished batch 31, saved 415966 rows
+[PID 44498] Processing batch 32
+[PID 44498] ✅ Finished batch 32, saved 415425 rows
+[PID 44499] Processing batch 33
+[PID 44499] ✅ Finished batch 33, saved 413149 rows
+[PID 44500] Processing batch 34
+[PID 44500] ✅ Finished batch 34, saved 422955 rows
+[PID 44501] Processing batch 35
+[PID 44501] ✅ Finished batch 35, saved 432406 rows
+[PID 44502] Processing batch 36
+[PID 44502] ✅ Finished batch 36, saved 431812 rows
+[PID 44503] Processing batch 37
+[PID 44503] ✅ Finished batch 37, saved 431925 rows
+[PID 44504] Processing batch 38
+[PID 44504] ✅ Finished batch 38, saved 432080 rows
+[PID 44505] Processing batch 39
+[PID 44505] ✅ Finished batch 39, saved 432377 rows
+[PID 44496] Processing batch 40
+[PID 44496] ✅ Finished batch 40, saved 431789 rows
+[PID 44497] Processing batch 41
+[PID 44497] ✅ Finished batch 41, saved 432033 rows
+[PID 44498] Processing batch 42
+[PID 44498] ✅ Finished batch 42, saved 431592 rows
+[PID 44499] Processing batch 43
+[PID 44499] ✅ Finished batch 43, saved 432454 rows
+[PID 44500] Processing batch 44
+[PID 44500] ✅ Finished batch 44, saved 432337 rows
+[PID 44501] Processing batch 45
+[PID 44501] ✅ Finished batch 45, saved 433018 rows
+[PID 44502] Processing batch 46
+[PID 44502] ✅ Finished batch 46, saved 432691 rows
+[PID 44503] Processing batch 47
+[PID 44503] ✅ Finished batch 47, saved 432238 rows
+[PID 44504] Processing batch 48
+[PID 44504] ✅ Finished batch 48, saved 432432 rows
+[PID 44505] Processing batch 49
+[PID 44505] ✅ Finished batch 49, saved 432626 rows
+[PID 44496] Processing batch 50
+[PID 44496] ✅ Finished batch 50, saved 431771 rows
+[PID 44497] Processing batch 51
+[PID 44497] ✅ Finished batch 51, saved 432088 rows
+[PID 44498] Processing batch 52
+[PID 44498] ✅ Finished batch 52, saved 432259 rows
+[PID 44499] Processing batch 53
+[PID 44499] ✅ Finished batch 53, saved 432642 rows
+[PID 44500] Processing batch 54
+[PID 44500] ✅ Finished batch 54, saved 432271 rows
+[PID 44501] Processing batch 55
+[PID 44501] ✅ Finished batch 55, saved 432895 rows
+[PID 44502] Processing batch 56
+[PID 44502] ✅ Finished batch 56, saved 432549 rows
+[PID 44503] Processing batch 57
+[PID 44503] ✅ Finished batch 57, saved 433118 rows
+[PID 44504] Processing batch 58
+[PID 44504] ✅ Finished batch 58, saved 432721 rows
+[PID 44505] Processing batch 59
+[PID 44505] ✅ Finished batch 59, saved 432371 rows
+[PID 44496] Processing batch 60
+[PID 44496] ✅ Finished batch 60, saved 432000 rows
+[PID 44497] Processing batch 61
+[PID 44497] ✅ Finished batch 61, saved 432839 rows
+[PID 44498] Processing batch 62
+[PID 44498] ✅ Finished batch 62, saved 432248 rows
+[PID 44499] Processing batch 63
+[PID 44499] ✅ Finished batch 63, saved 432243 rows
+[PID 44500] Processing batch 64
+[PID 44500] ✅ Finished batch 64, saved 432540 rows
+[PID 44501] Processing batch 65
+[PID 44501] ✅ Finished batch 65, saved 432936 rows
+[PID 44502] Processing batch 66
+[PID 44502] ✅ Finished batch 66, saved 432803 rows
+[PID 44503] Processing batch 67
+[PID 44503] ✅ Finished batch 67, saved 433277 rows
+[PID 44504] Processing batch 68
+[PID 44504] ✅ Finished batch 68, saved 432924 rows
+[PID 44505] Processing batch 69
+[PID 44505] ✅ Finished batch 69, saved 433308 rows
+[PID 44496] Processing batch 70
+[PID 44496] ✅ Finished batch 70, saved 432801 rows
+[PID 44497] Processing batch 71
+[PID 44497] ✅ Finished batch 71, saved 432745 rows
+[PID 44498] Processing batch 72
+[PID 44498] ✅ Finished batch 72, saved 432632 rows
+[PID 44499] Processing batch 73
+[PID 44499] ✅ Finished batch 73, saved 432332 rows
+[PID 44500] Processing batch 74
+[PID 44500] ✅ Finished batch 74, saved 401669 rows
+[PID 44501] Processing batch 75
+[PID 44501] ✅ Finished batch 75, saved 392103 rows
+[PID 44502] Processing batch 76
+[PID 44502] ✅ Finished batch 76, saved 391750 rows
+[PID 44503] Processing batch 77
+[PID 44503] ✅ Finished batch 77, saved 391599 rows
+[PID 44504] Processing batch 78
+[PID 44504] ✅ Finished batch 78, saved 392074 rows
+[PID 44505] Processing batch 79
+[PID 44505] ✅ Finished batch 79, saved 392542 rows
+[PID 44496] Processing batch 80
+[PID 44496] ✅ Finished batch 80, saved 392861 rows
+[PID 44497] Processing batch 81
+[PID 44497] ✅ Finished batch 81, saved 391940 rows
+[PID 44498] Processing batch 82
+[PID 44498] ✅ Finished batch 82, saved 392251 rows
+[PID 44499] Processing batch 83
+[PID 44499] ✅ Finished batch 83, saved 392437 rows
+[PID 44500] Processing batch 84
+[PID 44500] ✅ Finished batch 84, saved 392258 rows
+[PID 44501] Processing batch 85
+[PID 44501] ✅ Finished batch 85, saved 391750 rows
+[PID 44502] Processing batch 86
+[PID 44502] ✅ Finished batch 86, saved 392777 rows
+[PID 44503] Processing batch 87
+[PID 44503] ✅ Finished batch 87, saved 392180 rows
+[PID 44504] Processing batch 88
+[PID 44504] ✅ Finished batch 88, saved 391800 rows
+[PID 44505] Processing batch 89
+[PID 44505] ✅ Finished batch 89, saved 392842 rows
+[PID 44496] Processing batch 90
+[PID 44496] ✅ Finished batch 90, saved 392251 rows
+[PID 44497] Processing batch 91
+[PID 44497] ✅ Finished batch 91, saved 392889 rows
+[PID 44498] Processing batch 92
+[PID 44498] ✅ Finished batch 92, saved 392674 rows
+[PID 44499] Processing batch 93
+[PID 44499] ✅ Finished batch 93, saved 392168 rows
+[PID 44500] Processing batch 94
+[PID 44500] ✅ Finished batch 94, saved 393040 rows
+[PID 44501] Processing batch 95
+[PID 44501] ✅ Finished batch 95, saved 392757 rows
+[PID 44502] Processing batch 96
+[PID 44502] ✅ Finished batch 96, saved 392728 rows
+[PID 44503] Processing batch 97
+[PID 44503] ✅ Finished batch 97, saved 392834 rows
+[PID 44504] Processing batch 98
+[PID 44504] ✅ Finished batch 98, saved 392627 rows
+[PID 44505] Processing batch 99
+[PID 44505] ✅ Finished batch 99, saved 392751 rows
+[PID 44496] Processing batch 100
+[PID 44496] ✅ Finished batch 100, saved 392501 rows
+[PID 44497] Processing batch 101
+[PID 44497] ✅ Finished batch 101, saved 392095 rows
+[PID 44498] Processing batch 102
+[PID 44498] ✅ Finished batch 102, saved 393371 rows
+[PID 44499] Processing batch 103
+[PID 44499] ✅ Finished batch 103, saved 392855 rows
+[PID 44500] Processing batch 104
+[PID 44500] ✅ Finished batch 104, saved 392960 rows
+[PID 44501] Processing batch 105
+[PID 44501] ✅ Finished batch 105, saved 392853 rows
+[PID 44502] Processing batch 106
+[PID 44502] ✅ Finished batch 106, saved 392387 rows
+[PID 44503] Processing batch 107
+[PID 44503] ✅ Finished batch 107, saved 393522 rows
+[PID 44504] Processing batch 108
+[PID 44504] ✅ Finished batch 108, saved 393272 rows
+[PID 44505] Processing batch 109
+[PID 44505] ✅ Finished batch 109, saved 392985 rows
+[PID 44496] Processing batch 110
+[PID 44496] ✅ Finished batch 110, saved 393133 rows
+[PID 44497] Processing batch 111
+[PID 44497] ✅ Finished batch 111, saved 392499 rows
+[PID 44498] Processing batch 112
+[PID 44498] ✅ Finished batch 112, saved 393645 rows
+[PID 44499] Processing batch 113
+[PID 44499] ✅ Finished batch 113, saved 393341 rows
+[PID 44500] Processing batch 114
+[PID 44500] ✅ Finished batch 114, saved 392700 rows
+[PID 44501] Processing batch 115
+[PID 44501] ✅ Finished batch 115, saved 393397 rows
+[PID 44502] Processing batch 116
+[PID 44502] ✅ Finished batch 116, saved 393345 rows
+[PID 44503] Processing batch 117
+[PID 44503] ✅ Finished batch 117, saved 393292 rows
+[PID 44504] Processing batch 118
+[PID 44504] ✅ Finished batch 118, saved 393343 rows
+[PID 44505] Processing batch 119
+[PID 44505] ✅ Finished batch 119, saved 394078 rows
+[PID 44496] Processing batch 120
+[PID 44496] ✅ Finished batch 120, saved 393575 rows
+[PID 44497] Processing batch 121
+[PID 44497] ✅ Finished batch 121, saved 393267 rows
+[PID 44498] Processing batch 122
+[PID 44498] ✅ Finished batch 122, saved 393485 rows
+[PID 44499] Processing batch 123
+[PID 44499] ✅ Finished batch 123, saved 393395 rows
+[PID 44500] Processing batch 124
+[PID 44500] ✅ Finished batch 124, saved 393460 rows
+[PID 44501] Processing batch 125
+[PID 44501] ✅ Finished batch 125, saved 393460 rows
+[PID 44502] Processing batch 126
+[PID 44502] ✅ Finished batch 126, saved 393852 rows
+[PID 44503] Processing batch 127
+[PID 44503] ✅ Finished batch 127, saved 393004 rows
+[PID 44504] Processing batch 128
+[PID 44504] ✅ Finished batch 128, saved 392880 rows
+[PID 44505] Processing batch 129
+[PID 44505] ✅ Finished batch 129, saved 394320 rows
+[PID 44496] Processing batch 130
+[PID 44496] ✅ Finished batch 130, saved 393716 rows
+[PID 44497] Processing batch 131
+[PID 44497] ✅ Finished batch 131, saved 393701 rows
+[PID 44498] Processing batch 132
+[PID 44498] ✅ Finished batch 132, saved 393852 rows
+[PID 44499] Processing batch 133
+[PID 44499] ✅ Finished batch 133, saved 393588 rows
+[PID 44500] Processing batch 134
+[PID 44500] ✅ Finished batch 134, saved 394468 rows
+[PID 44501] Processing batch 135
+[PID 44501] ✅ Finished batch 135, saved 393357 rows
+[PID 44502] Processing batch 136
+[PID 44502] ✅ Finished batch 136, saved 393826 rows
+[PID 44503] Processing batch 137
+[PID 44503] ✅ Finished batch 137, saved 394072 rows
+[PID 44504] Processing batch 138
+[PID 44504] ✅ Finished batch 138, saved 393405 rows
+[PID 44505] Processing batch 139
+[PID 44505] ✅ Finished batch 139, saved 394232 rows
+[PID 44496] Processing batch 140
+[PID 44496] ✅ Finished batch 140, saved 393548 rows
+[PID 44497] Processing batch 141
+[PID 44497] ✅ Finished batch 141, saved 394491 rows
+[PID 44498] Processing batch 142
+[PID 44498] ✅ Finished batch 142, saved 393474 rows
+[PID 44499] Processing batch 143
+[PID 44499] ✅ Finished batch 143, saved 394550 rows
+[PID 44500] Processing batch 144
+[PID 44500] ✅ Finished batch 144, saved 393541 rows
+[PID 44501] Processing batch 145
+[PID 44501] ✅ Finished batch 145, saved 394012 rows
+[PID 44502] Processing batch 146
+[PID 44502] ✅ Finished batch 146, saved 393741 rows
+[PID 44503] Processing batch 147
+[PID 44503] ✅ Finished batch 147, saved 393692 rows
+[PID 44504] Processing batch 148
+[PID 44504] ✅ Finished batch 148, saved 292750 rows
+[PID 44505] Processing batch 149
+[PID 44505] ✅ Finished batch 149, saved 264880 rows
+[PID 44496] Processing batch 150
+[PID 44496] ✅ Finished batch 150, saved 309397 rows
+[PID 44497] Processing batch 151
+[PID 44497] ✅ Finished batch 151, saved 297488 rows
+[PID 44498] Processing batch 152
+[PID 44498] ✅ Finished batch 152, saved 410827 rows
+[PID 44499] Processing batch 153
+[PID 44499] ✅ Finished batch 153, saved 427253 rows
+[PID 44500] Processing batch 154
+[PID 44500] ✅ Finished batch 154, saved 411412 rows
+[PID 44501] Processing batch 155
+[PID 44501] ✅ Finished batch 155, saved 409382 rows
+[PID 44502] Processing batch 156
+[PID 44502] ✅ Finished batch 156, saved 408848 rows
+[PID 44503] Processing batch 157
+[PID 44503] ✅ Finished batch 157, saved 409756 rows
+[PID 44504] Processing batch 158
+[PID 44504] ✅ Finished batch 158, saved 411190 rows
+[PID 44505] Processing batch 159
+[PID 44505] ✅ Finished batch 159, saved 406400 rows
+[PID 44496] Processing batch 160
+[PID 44496] ✅ Finished batch 160, saved 369096 rows
+[PID 44497] Processing batch 161
+[PID 44497] ✅ Finished batch 161, saved 364838 rows
+[PID 44498] Processing batch 162
+[PID 44498] ✅ Finished batch 162, saved 365116 rows
+[PID 44499] Processing batch 163
+[PID 44499] ✅ Finished batch 163, saved 365960 rows
+[PID 44500] Processing batch 164
+[PID 44500] ✅ Finished batch 164, saved 367559 rows
+[PID 44501] Processing batch 165
+[PID 44501] ✅ Finished batch 165, saved 382513 rows
+[PID 44502] Processing batch 166
+[PID 44502] ✅ Finished batch 166, saved 381556 rows
+[PID 44503] Processing batch 167
+[PID 44503] ✅ Finished batch 167, saved 366278 rows
+[PID 44504] Processing batch 168
+[PID 44504] ✅ Finished batch 168, saved 367774 rows
+[PID 44505] Processing batch 169
+[PID 44505] ✅ Finished batch 169, saved 366472 rows
+[PID 44496] Processing batch 170
+[PID 44496] ✅ Finished batch 170, saved 365315 rows
+[PID 44497] Processing batch 171
+[PID 44497] ✅ Finished batch 171, saved 364365 rows
+[PID 44498] Processing batch 172
+[PID 44498] ✅ Finished batch 172, saved 365633 rows
+[PID 44499] Processing batch 173
+[PID 44499] ✅ Finished batch 173, saved 366174 rows
+[PID 44500] Processing batch 174
+[PID 44500] ✅ Finished batch 174, saved 364566 rows
+[PID 44501] Processing batch 175
+[PID 44501] ✅ Finished batch 175, saved 363453 rows
+[PID 44502] Processing batch 176
+[PID 44502] ✅ Finished batch 176, saved 367233 rows
+[PID 44503] Processing batch 177
+[PID 44503] ✅ Finished batch 177, saved 364151 rows
+[PID 44504] Processing batch 178
+[PID 44504] ✅ Finished batch 178, saved 366544 rows
+[PID 44505] Processing batch 179
+[PID 44505] ✅ Finished batch 179, saved 364141 rows
+[PID 44496] Processing batch 180
+[PID 44496] ✅ Finished batch 180, saved 362749 rows
+[PID 44497] Processing batch 181
+[PID 44497] ✅ Finished batch 181, saved 364068 rows
+[PID 44498] Processing batch 182
+[PID 44498] ✅ Finished batch 182, saved 364504 rows
+[PID 44499] Processing batch 183
+[PID 44499] ✅ Finished batch 183, saved 362398 rows
+[PID 44500] Processing batch 184
+[PID 44500] ✅ Finished batch 184, saved 365432 rows
+[PID 44501] Processing batch 185
+[PID 44501] ✅ Finished batch 185, saved 365332 rows
+[PID 44502] Processing batch 186
+[PID 44502] ✅ Finished batch 186, saved 366885 rows
+[PID 44503] Processing batch 187
+[PID 44503] ✅ Finished batch 187, saved 361285 rows
+[PID 44504] Processing batch 188
+[PID 44504] ✅ Finished batch 188, saved 363713 rows
+[PID 44505] Processing batch 189
+[PID 44505] ✅ Finished batch 189, saved 364572 rows
+[PID 44496] Processing batch 190
+[PID 44496] ✅ Finished batch 190, saved 363160 rows
+[PID 44497] Processing batch 191
+[PID 44497] ✅ Finished batch 191, saved 364104 rows
+[PID 44498] Processing batch 192
+[PID 44498] ✅ Finished batch 192, saved 364123 rows
+[PID 44499] Processing batch 193
+[PID 44499] ✅ Finished batch 193, saved 365155 rows
+[PID 44500] Processing batch 194
+[PID 44500] ✅ Finished batch 194, saved 363769 rows
+[PID 44501] Processing batch 195
+[PID 44501] ✅ Finished batch 195, saved 365812 rows
+[PID 44502] Processing batch 196
+[PID 44502] ✅ Finished batch 196, saved 364836 rows
+[PID 44503] Processing batch 197
+[PID 44503] ✅ Finished batch 197, saved 377462 rows
+[PID 44504] Processing batch 198
+[PID 44504] ✅ Finished batch 198, saved 378741 rows
+[PID 44505] Processing batch 199
+[PID 44505] ✅ Finished batch 199, saved 380914 rows
+[PID 44496] Processing batch 200
+[PID 44496] ✅ Finished batch 200, saved 382149 rows
+[PID 44497] Processing batch 201
+[PID 44497] ✅ Finished batch 201, saved 382097 rows
+[PID 44498] Processing batch 202
+[PID 44498] ✅ Finished batch 202, saved 380934 rows
+[PID 44499] Processing batch 203
+[PID 44499] ✅ Finished batch 203, saved 380024 rows
+[PID 44500] Processing batch 204
+[PID 44500] ✅ Finished batch 204, saved 376575 rows
+[PID 44501] Processing batch 205
+[PID 44501] ✅ Finished batch 205, saved 380360 rows
+[PID 44502] Processing batch 206
+[PID 44502] ✅ Finished batch 206, saved 384339 rows
+[PID 44503] Processing batch 207
+[PID 44503] ✅ Finished batch 207, saved 380901 rows
+[PID 44504] Processing batch 208
+[PID 44504] ✅ Finished batch 208, saved 368906 rows
+[PID 44505] Processing batch 209
+[PID 44505] ✅ Finished batch 209, saved 365141 rows
+[PID 44496] Processing batch 210
+[PID 44496] ✅ Finished batch 210, saved 364905 rows
+[PID 44497] Processing batch 211
+[PID 44497] ✅ Finished batch 211, saved 365103 rows
+[PID 44498] Processing batch 212
+[PID 44498] ✅ Finished batch 212, saved 363460 rows
+[PID 44499] Processing batch 213
+[PID 44499] ✅ Finished batch 213, saved 363511 rows
+[PID 44500] Processing batch 214
+[PID 44500] ✅ Finished batch 214, saved 368192 rows
+[PID 44501] Processing batch 215
+[PID 44501] ✅ Finished batch 215, saved 376919 rows
+[PID 44502] Processing batch 216
+[PID 44502] ✅ Finished batch 216, saved 377813 rows
+[PID 44503] Processing batch 217
+[PID 44503] ✅ Finished batch 217, saved 370759 rows
+[PID 44504] Processing batch 218
+[PID 44504] ✅ Finished batch 218, saved 365048 rows
+[PID 44505] Processing batch 219
+[PID 44505] ✅ Finished batch 219, saved 361594 rows
+[PID 44496] Processing batch 220
+[PID 44496] ✅ Finished batch 220, saved 362513 rows
+[PID 44497] Processing batch 221
+[PID 44497] ✅ Finished batch 221, saved 361487 rows
+[PID 44498] Processing batch 222
+[PID 44498] ✅ Finished batch 222, saved 361080 rows
+[PID 44499] Processing batch 223
+[PID 44499] ✅ Finished batch 223, saved 365325 rows
+[PID 44500] Processing batch 224
+[PID 44500] ✅ Finished batch 224, saved 361834 rows
+[PID 44501] Processing batch 225
+[PID 44501] ✅ Finished batch 225, saved 365611 rows
+[PID 44502] Processing batch 226
+[PID 44502] ✅ Finished batch 226, saved 363768 rows
+[PID 44503] Processing batch 227
+[PID 44503] ✅ Finished batch 227, saved 363188 rows
+[PID 44504] Processing batch 228
+[PID 44504] ✅ Finished batch 228, saved 362443 rows
+[PID 44505] Processing batch 229
+[PID 44505] ✅ Finished batch 229, saved 364240 rows
+[PID 44496] Processing batch 230
+[PID 44496] ✅ Finished batch 230, saved 365900 rows
+[PID 44497] Processing batch 231
+[PID 44497] ✅ Finished batch 231, saved 361473 rows
+[PID 44498] Processing batch 232
+[PID 44498] ✅ Finished batch 232, saved 364755 rows
+[PID 44499] Processing batch 233
+[PID 44499] ✅ Finished batch 233, saved 366193 rows
+[PID 44500] Processing batch 234
+[PID 44500] ✅ Finished batch 234, saved 360698 rows
+[PID 44501] Processing batch 235
+[PID 44501] ✅ Finished batch 235, saved 365877 rows
+[PID 44502] Processing batch 236
+[PID 44502] ✅ Finished batch 236, saved 362339 rows
+[PID 44503] Processing batch 237
+[PID 44503] ✅ Finished batch 237, saved 361817 rows
+[PID 44504] Processing batch 238
+[PID 44504] ✅ Finished batch 238, saved 358325 rows
+[PID 44505] Processing batch 239
+[PID 44505] ✅ Finished batch 239, saved 361535 rows
+[PID 44496] Processing batch 240
+[PID 44496] ✅ Finished batch 240, saved 362009 rows
+[PID 44497] Processing batch 241
+[PID 44498] Processing batch 242
+[PID 44497] ✅ Finished batch 241, saved 378686 rows
+[PID 44498] ✅ Finished batch 242, saved 379370 rows
+[PID 44499] Processing batch 243
+[PID 44499] ✅ Finished batch 243, saved 374664 rows
+[PID 44500] Processing batch 244
+[PID 44500] ✅ Finished batch 244, saved 369839 rows
+[PID 44501] Processing batch 245
+[PID 44501] ✅ Finished batch 245, saved 367329 rows
+[PID 44502] Processing batch 246
+[PID 44502] ✅ Finished batch 246, saved 375736 rows
+[PID 44503] Processing batch 247
+[PID 44503] ✅ Finished batch 247, saved 376617 rows
+[PID 44504] Processing batch 248
+[PID 44504] ✅ Finished batch 248, saved 370234 rows
+[PID 44505] Processing batch 249
+[PID 44505] ✅ Finished batch 249, saved 369218 rows
+[PID 44496] Processing batch 250
+[PID 44496] ✅ Finished batch 250, saved 377861 rows
+[PID 44497] Processing batch 251
+[PID 44497] ✅ Finished batch 251, saved 358845 rows
+[PID 44498] Processing batch 252
+[PID 44498] ✅ Finished batch 252, saved 341524 rows
+[PID 44499] Processing batch 253
+[PID 44499] ✅ Finished batch 253, saved 340686 rows
+[PID 44500] Processing batch 254
+[PID 44500] ✅ Finished batch 254, saved 343175 rows
+[PID 44501] Processing batch 255
+[PID 44501] ✅ Finished batch 255, saved 344847 rows
+[PID 44502] Processing batch 256
+[PID 44502] ✅ Finished batch 256, saved 344988 rows
+[PID 44503] Processing batch 257
+[PID 44503] ✅ Finished batch 257, saved 340374 rows
+[PID 44504] Processing batch 258
+[PID 44504] ✅ Finished batch 258, saved 337922 rows
+[PID 44505] Processing batch 259
+[PID 44505] ✅ Finished batch 259, saved 341576 rows
+[PID 44496] Processing batch 260
+[PID 44496] ✅ Finished batch 260, saved 338761 rows
+[PID 44497] Processing batch 261
+[PID 44497] ✅ Finished batch 261, saved 339259 rows
+[PID 44498] Processing batch 262
+[PID 44499] Processing batch 263
+[PID 44498] ✅ Finished batch 262, saved 338633 rows
+[PID 44499] ✅ Finished batch 263, saved 344832 rows
+[PID 44500] Processing batch 264
+[PID 44500] ✅ Finished batch 264, saved 344974 rows
+[PID 44501] Processing batch 265
+[PID 44501] ✅ Finished batch 265, saved 343016 rows
+[PID 44502] Processing batch 266
+[PID 44502] ✅ Finished batch 266, saved 334596 rows
+[PID 44503] Processing batch 267
+[PID 44503] ✅ Finished batch 267, saved 338883 rows
+[PID 44504] Processing batch 268
+[PID 44504] ✅ Finished batch 268, saved 337423 rows
+[PID 44505] Processing batch 269
+[PID 44496] Processing batch 270
+[PID 44505] ✅ Finished batch 269, saved 340664 rows
+[PID 44496] ✅ Finished batch 270, saved 135459 rows
+[PID 26524] Processing batch 0
+[PID 26524] ✅ Finished batch 0, saved 533741 rows
+[PID 26525] Processing batch 1
+[PID 26525] ✅ Finished batch 1, saved 370740 rows
+[PID 26526] Processing batch 2
+[PID 26526] ✅ Finished batch 2, saved 404420 rows
+[PID 26527] Processing batch 3
+[PID 26527] ✅ Finished batch 3, saved 447867 rows
+[PID 26528] Processing batch 4
+[PID 26528] ✅ Finished batch 4, saved 425341 rows
+[PID 26529] Processing batch 5
+[PID 26529] ✅ Finished batch 5, saved 425100 rows
+[PID 26530] Processing batch 6
+[PID 26530] ✅ Finished batch 6, saved 457176 rows
+[PID 26531] Processing batch 7
+[PID 26531] ✅ Finished batch 7, saved 457185 rows
+[PID 26532] Processing batch 8
+[PID 26532] ✅ Finished batch 8, saved 379149 rows
+[PID 26533] Processing batch 9
+[PID 26533] ✅ Finished batch 9, saved 404810 rows
+[PID 26524] Processing batch 10
+[PID 26524] ✅ Finished batch 10, saved 438269 rows
+[PID 26525] Processing batch 11
+[PID 26525] ✅ Finished batch 11, saved 437780 rows
+[PID 26526] Processing batch 12
+[PID 26526] ✅ Finished batch 12, saved 438564 rows
+[PID 26527] Processing batch 13
+[PID 26527] ✅ Finished batch 13, saved 438266 rows
+[PID 26528] Processing batch 14
+[PID 26528] ✅ Finished batch 14, saved 438012 rows
+[PID 26529] Processing batch 15
+[PID 26529] ✅ Finished batch 15, saved 438500 rows
+[PID 26530] Processing batch 16
+[PID 26530] ✅ Finished batch 16, saved 438009 rows
+[PID 26531] Processing batch 17
+[PID 26531] ✅ Finished batch 17, saved 438314 rows
+[PID 26532] Processing batch 18
+[PID 26532] ✅ Finished batch 18, saved 427847 rows
+[PID 26533] Processing batch 19
+[PID 26533] ✅ Finished batch 19, saved 409495 rows
+[PID 26524] Processing batch 20
+[PID 26524] ✅ Finished batch 20, saved 409219 rows
+[PID 26525] Processing batch 21
+[PID 26525] ✅ Finished batch 21, saved 409976 rows
+[PID 26526] Processing batch 22
+[PID 26526] ✅ Finished batch 22, saved 410167 rows
+[PID 26527] Processing batch 23
+[PID 26527] ✅ Finished batch 23, saved 410762 rows
+[PID 26528] Processing batch 24
+[PID 26528] ✅ Finished batch 24, saved 416018 rows
+[PID 26529] Processing batch 25
+[PID 26529] ✅ Finished batch 25, saved 431303 rows
+[PID 26530] Processing batch 26
+[PID 26530] ✅ Finished batch 26, saved 431544 rows
+[PID 26531] Processing batch 27
+[PID 26531] ✅ Finished batch 27, saved 431414 rows
+[PID 26532] Processing batch 28
+[PID 26532] ✅ Finished batch 28, saved 431219 rows
+[PID 26533] Processing batch 29
+[PID 26533] ✅ Finished batch 29, saved 431297 rows
+[PID 26524] Processing batch 30
+[PID 26524] ✅ Finished batch 30, saved 431573 rows
+[PID 26525] Processing batch 31
+[PID 26525] ✅ Finished batch 31, saved 431152 rows
+[PID 26526] Processing batch 32
+[PID 26526] ✅ Finished batch 32, saved 431517 rows
+[PID 26527] Processing batch 33
+[PID 26527] ✅ Finished batch 33, saved 431497 rows
+[PID 26528] Processing batch 34
+[PID 26528] ✅ Finished batch 34, saved 432169 rows
+[PID 26529] Processing batch 35
+[PID 26529] ✅ Finished batch 35, saved 431968 rows
+[PID 26530] Processing batch 36
+[PID 26530] ✅ Finished batch 36, saved 431335 rows
+[PID 26531] Processing batch 37
+[PID 26531] ✅ Finished batch 37, saved 431616 rows
+[PID 26532] Processing batch 38
+[PID 26532] ✅ Finished batch 38, saved 431128 rows
+[PID 26533] Processing batch 39
+[PID 26533] ✅ Finished batch 39, saved 432020 rows
+[PID 26524] Processing batch 40
+[PID 26524] ✅ Finished batch 40, saved 432435 rows
+[PID 26525] Processing batch 41
+[PID 26525] ✅ Finished batch 41, saved 432270 rows
+[PID 26526] Processing batch 42
+[PID 26526] ✅ Finished batch 42, saved 432341 rows
+[PID 26527] Processing batch 43
+[PID 26527] ✅ Finished batch 43, saved 432469 rows
+[PID 26528] Processing batch 44
+[PID 26528] ✅ Finished batch 44, saved 431957 rows
+[PID 26529] Processing batch 45
+[PID 26529] ✅ Finished batch 45, saved 431936 rows
+[PID 26530] Processing batch 46
+[PID 26530] ✅ Finished batch 46, saved 431636 rows
+[PID 26531] Processing batch 47
+[PID 26531] ✅ Finished batch 47, saved 432390 rows
+[PID 26532] Processing batch 48
+[PID 26532] ✅ Finished batch 48, saved 432410 rows
+[PID 26533] Processing batch 49
+[PID 26533] ✅ Finished batch 49, saved 432324 rows
+[PID 26524] Processing batch 50
+[PID 26524] ✅ Finished batch 50, saved 432207 rows
+[PID 26525] Processing batch 51
+[PID 26525] ✅ Finished batch 51, saved 432706 rows
+[PID 26526] Processing batch 52
+[PID 26526] ✅ Finished batch 52, saved 432109 rows
+[PID 26527] Processing batch 53
+[PID 26527] ✅ Finished batch 53, saved 432238 rows
+[PID 26528] Processing batch 54
+[PID 26528] ✅ Finished batch 54, saved 404783 rows
+[PID 26529] Processing batch 55
+[PID 26529] ✅ Finished batch 55, saved 395129 rows
+[PID 26530] Processing batch 56
+[PID 26530] ✅ Finished batch 56, saved 395185 rows
+[PID 26531] Processing batch 57
+[PID 26531] ✅ Finished batch 57, saved 395204 rows
+[PID 26532] Processing batch 58
+[PID 26532] ✅ Finished batch 58, saved 395116 rows
+[PID 26533] Processing batch 59
+[PID 26533] ✅ Finished batch 59, saved 394880 rows
+[PID 26524] Processing batch 60
+[PID 26524] ✅ Finished batch 60, saved 395297 rows
+[PID 26525] Processing batch 61
+[PID 26525] ✅ Finished batch 61, saved 395230 rows
+[PID 26526] Processing batch 62
+[PID 26526] ✅ Finished batch 62, saved 395248 rows
+[PID 26527] Processing batch 63
+[PID 26527] ✅ Finished batch 63, saved 395481 rows
+[PID 26528] Processing batch 64
+[PID 26528] ✅ Finished batch 64, saved 395462 rows
+[PID 26529] Processing batch 65
+[PID 26529] ✅ Finished batch 65, saved 395520 rows
+[PID 26530] Processing batch 66
+[PID 26530] ✅ Finished batch 66, saved 395223 rows
+[PID 26531] Processing batch 67
+[PID 26531] ✅ Finished batch 67, saved 395453 rows
+[PID 26532] Processing batch 68
+[PID 26532] ✅ Finished batch 68, saved 395801 rows
+[PID 26533] Processing batch 69
+[PID 26533] ✅ Finished batch 69, saved 396095 rows
+[PID 26524] Processing batch 70
+[PID 26524] ✅ Finished batch 70, saved 395440 rows
+[PID 26525] Processing batch 71
+[PID 26525] ✅ Finished batch 71, saved 395906 rows
+[PID 26526] Processing batch 72
+[PID 26526] ✅ Finished batch 72, saved 396394 rows
+[PID 26527] Processing batch 73
+[PID 26527] ✅ Finished batch 73, saved 395591 rows
+[PID 26528] Processing batch 74
+[PID 26528] ✅ Finished batch 74, saved 395799 rows
+[PID 26529] Processing batch 75
+[PID 26529] ✅ Finished batch 75, saved 396088 rows
+[PID 26530] Processing batch 76
+[PID 26530] ✅ Finished batch 76, saved 396172 rows
+[PID 26531] Processing batch 77
+[PID 26531] ✅ Finished batch 77, saved 396149 rows
+[PID 26532] Processing batch 78
+[PID 26532] ✅ Finished batch 78, saved 395286 rows
+[PID 26533] Processing batch 79
+[PID 26533] ✅ Finished batch 79, saved 396916 rows
+[PID 26524] Processing batch 80
+[PID 26524] ✅ Finished batch 80, saved 395202 rows
+[PID 26525] Processing batch 81
+[PID 26525] ✅ Finished batch 81, saved 396400 rows
+[PID 26526] Processing batch 82
+[PID 26526] ✅ Finished batch 82, saved 396454 rows
+[PID 26527] Processing batch 83
+[PID 26527] ✅ Finished batch 83, saved 396228 rows
+[PID 26528] Processing batch 84
+[PID 26528] ✅ Finished batch 84, saved 395895 rows
+[PID 26529] Processing batch 85
+[PID 26529] ✅ Finished batch 85, saved 396101 rows
+[PID 26530] Processing batch 86
+[PID 26530] ✅ Finished batch 86, saved 396732 rows
+[PID 26531] Processing batch 87
+[PID 26531] ✅ Finished batch 87, saved 396540 rows
+[PID 26532] Processing batch 88
+[PID 26532] ✅ Finished batch 88, saved 396996 rows
+[PID 26533] Processing batch 89
+[PID 26533] ✅ Finished batch 89, saved 396605 rows
+[PID 26524] Processing batch 90
+[PID 26524] ✅ Finished batch 90, saved 395939 rows
+[PID 26525] Processing batch 91
+[PID 26525] ✅ Finished batch 91, saved 396150 rows
+[PID 26526] Processing batch 92
+[PID 26526] ✅ Finished batch 92, saved 396367 rows
+[PID 26527] Processing batch 93
+[PID 26527] ✅ Finished batch 93, saved 396045 rows
+[PID 26528] Processing batch 94
+[PID 26528] ✅ Finished batch 94, saved 397152 rows
+[PID 26529] Processing batch 95
+[PID 26529] ✅ Finished batch 95, saved 396761 rows
+[PID 26530] Processing batch 96
+[PID 26530] ✅ Finished batch 96, saved 397109 rows
+[PID 26531] Processing batch 97
+[PID 26531] ✅ Finished batch 97, saved 396135 rows
+[PID 26532] Processing batch 98
+[PID 26532] ✅ Finished batch 98, saved 396601 rows
+[PID 26533] Processing batch 99
+[PID 26533] ✅ Finished batch 99, saved 396399 rows
+[PID 26524] Processing batch 100
+[PID 26524] ✅ Finished batch 100, saved 396454 rows
+[PID 26525] Processing batch 101
+[PID 26525] ✅ Finished batch 101, saved 397153 rows
+[PID 26526] Processing batch 102
+[PID 26526] ✅ Finished batch 102, saved 396395 rows
+[PID 26527] Processing batch 103
+[PID 26527] ✅ Finished batch 103, saved 396519 rows
+[PID 26528] Processing batch 104
+[PID 26528] ✅ Finished batch 104, saved 396710 rows
+[PID 26529] Processing batch 105
+[PID 26529] ✅ Finished batch 105, saved 396975 rows
+[PID 26530] Processing batch 106
+[PID 26530] ✅ Finished batch 106, saved 397186 rows
+[PID 26531] Processing batch 107
+[PID 26531] ✅ Finished batch 107, saved 397730 rows
+[PID 26532] Processing batch 108
+[PID 26532] ✅ Finished batch 108, saved 396595 rows
+[PID 26533] Processing batch 109
+[PID 26533] ✅ Finished batch 109, saved 379176 rows
+[PID 26524] Processing batch 110
+[PID 26524] ✅ Finished batch 110, saved 230283 rows
+[PID 26525] Processing batch 111
+[PID 26525] ✅ Finished batch 111, saved 311063 rows
+[PID 26526] Processing batch 112
+[PID 26526] ✅ Finished batch 112, saved 372578 rows
+[PID 26527] Processing batch 113
+[PID 26527] ✅ Finished batch 113, saved 408810 rows
+[PID 26528] Processing batch 114
+[PID 26528] ✅ Finished batch 114, saved 408645 rows
+[PID 26529] Processing batch 115
+[PID 26529] ✅ Finished batch 115, saved 407984 rows
+[PID 26530] Processing batch 116
+[PID 26530] ✅ Finished batch 116, saved 409652 rows
+[PID 26531] Processing batch 117
+[PID 26531] ✅ Finished batch 117, saved 399282 rows
+[PID 26532] Processing batch 118
+[PID 26532] ✅ Finished batch 118, saved 379633 rows
+[PID 26533] Processing batch 119
+[PID 26533] ✅ Finished batch 119, saved 393185 rows
+[PID 26524] Processing batch 120
+[PID 26524] ✅ Finished batch 120, saved 395071 rows
+[PID 26525] Processing batch 121
+[PID 26525] ✅ Finished batch 121, saved 390867 rows
+[PID 26526] Processing batch 122
+[PID 26526] ✅ Finished batch 122, saved 387122 rows
+[PID 26527] Processing batch 123
+[PID 26527] ✅ Finished batch 123, saved 383248 rows
+[PID 26528] Processing batch 124
+[PID 26528] ✅ Finished batch 124, saved 380482 rows
+[PID 26529] Processing batch 125
+[PID 26529] ✅ Finished batch 125, saved 378997 rows
+[PID 26530] Processing batch 126
+[PID 26530] ✅ Finished batch 126, saved 377417 rows
+[PID 26531] Processing batch 127
+[PID 26531] ✅ Finished batch 127, saved 378507 rows
+[PID 26532] Processing batch 128
+[PID 26532] ✅ Finished batch 128, saved 378607 rows
+[PID 26533] Processing batch 129
+[PID 26533] ✅ Finished batch 129, saved 378926 rows
+[PID 26524] Processing batch 130
+[PID 26524] ✅ Finished batch 130, saved 374876 rows
+[PID 26525] Processing batch 131
+[PID 26525] ✅ Finished batch 131, saved 372700 rows
+[PID 26526] Processing batch 132
+[PID 26526] ✅ Finished batch 132, saved 370727 rows
+[PID 26527] Processing batch 133
+[PID 26527] ✅ Finished batch 133, saved 367934 rows
+[PID 26528] Processing batch 134
+[PID 26528] ✅ Finished batch 134, saved 371232 rows
+[PID 26529] Processing batch 135
+[PID 26529] ✅ Finished batch 135, saved 368296 rows
+[PID 26530] Processing batch 136
+[PID 26530] ✅ Finished batch 136, saved 369203 rows
+[PID 26531] Processing batch 137
+[PID 26531] ✅ Finished batch 137, saved 369498 rows
+[PID 26532] Processing batch 138
+[PID 26532] ✅ Finished batch 138, saved 369669 rows
+[PID 26533] Processing batch 139
+[PID 26533] ✅ Finished batch 139, saved 368263 rows
+[PID 26524] Processing batch 140
+[PID 26524] ✅ Finished batch 140, saved 367157 rows
+[PID 26525] Processing batch 141
+[PID 26525] ✅ Finished batch 141, saved 365209 rows
+[PID 26526] Processing batch 142
+[PID 26526] ✅ Finished batch 142, saved 363133 rows
+[PID 26527] Processing batch 143
+[PID 26527] ✅ Finished batch 143, saved 366887 rows
+[PID 26528] Processing batch 144
+[PID 26528] ✅ Finished batch 144, saved 366236 rows
+[PID 26529] Processing batch 145
+[PID 26529] ✅ Finished batch 145, saved 364484 rows
+[PID 26530] Processing batch 146
+[PID 26530] ✅ Finished batch 146, saved 366946 rows
+[PID 26531] Processing batch 147
+[PID 26531] ✅ Finished batch 147, saved 367044 rows
+[PID 26532] Processing batch 148
+[PID 26532] ✅ Finished batch 148, saved 365908 rows
+[PID 26533] Processing batch 149
+[PID 26533] ✅ Finished batch 149, saved 367551 rows
+[PID 26524] Processing batch 150
+[PID 26524] ✅ Finished batch 150, saved 365398 rows
+[PID 26525] Processing batch 151
+[PID 26525] ✅ Finished batch 151, saved 362094 rows
+[PID 26526] Processing batch 152
+[PID 26526] ✅ Finished batch 152, saved 364901 rows
+[PID 26527] Processing batch 153
+[PID 26527] ✅ Finished batch 153, saved 364198 rows
+[PID 26528] Processing batch 154
+[PID 26528] ✅ Finished batch 154, saved 365991 rows
+[PID 26529] Processing batch 155
+[PID 26529] ✅ Finished batch 155, saved 364938 rows
+[PID 26530] Processing batch 156
+[PID 26530] ✅ Finished batch 156, saved 366259 rows
+[PID 26531] Processing batch 157
+[PID 26531] ✅ Finished batch 157, saved 367567 rows
+[PID 26532] Processing batch 158
+[PID 26532] ✅ Finished batch 158, saved 366983 rows
+[PID 26533] Processing batch 159
+[PID 26533] ✅ Finished batch 159, saved 368854 rows
+[PID 26524] Processing batch 160
+[PID 26524] ✅ Finished batch 160, saved 385663 rows
+[PID 26525] Processing batch 161
+[PID 26525] ✅ Finished batch 161, saved 381245 rows
+[PID 26526] Processing batch 162
+[PID 26526] ✅ Finished batch 162, saved 379856 rows
+[PID 26527] Processing batch 163
+[PID 26527] ✅ Finished batch 163, saved 384888 rows
+[PID 26528] Processing batch 164
+[PID 26528] ✅ Finished batch 164, saved 383921 rows
+[PID 26529] Processing batch 165
+[PID 26529] ✅ Finished batch 165, saved 389571 rows
+[PID 26530] Processing batch 166
+[PID 26530] ✅ Finished batch 166, saved 400514 rows
+[PID 26531] Processing batch 167
+[PID 26531] ✅ Finished batch 167, saved 415991 rows
+[PID 26532] Processing batch 168
+[PID 26532] ✅ Finished batch 168, saved 442713 rows
+[PID 26533] Processing batch 169
+[PID 26533] ✅ Finished batch 169, saved 379253 rows
+[PID 26524] Processing batch 170
+[PID 26524] ✅ Finished batch 170, saved 362956 rows
+[PID 26525] Processing batch 171
+[PID 26525] ✅ Finished batch 171, saved 362551 rows
+[PID 26526] Processing batch 172
+[PID 26526] ✅ Finished batch 172, saved 361828 rows
+[PID 26527] Processing batch 173
+[PID 26527] ✅ Finished batch 173, saved 358265 rows
+[PID 26528] Processing batch 174
+[PID 26528] ✅ Finished batch 174, saved 358950 rows
+[PID 26529] Processing batch 175
+[PID 26529] ✅ Finished batch 175, saved 355203 rows
+[PID 26530] Processing batch 176
+[PID 26530] ✅ Finished batch 176, saved 364964 rows
+[PID 26531] Processing batch 177
+[PID 26531] ✅ Finished batch 177, saved 363709 rows
+[PID 26532] Processing batch 178
+[PID 26532] ✅ Finished batch 178, saved 358542 rows
+[PID 26533] Processing batch 179
+[PID 26533] ✅ Finished batch 179, saved 363538 rows
+[PID 26524] Processing batch 180
+[PID 26525] Processing batch 181
+[PID 26524] ✅ Finished batch 180, saved 364857 rows
+[PID 26525] ✅ Finished batch 181, saved 371504 rows
+[PID 26526] Processing batch 182
+[PID 26526] ✅ Finished batch 182, saved 373926 rows
+[PID 26527] Processing batch 183
+[PID 26527] ✅ Finished batch 183, saved 370981 rows
+[PID 26528] Processing batch 184
+[PID 26528] ✅ Finished batch 184, saved 372329 rows
+[PID 26529] Processing batch 185
+[PID 26529] ✅ Finished batch 185, saved 369466 rows
+[PID 26530] Processing batch 186
+[PID 26530] ✅ Finished batch 186, saved 371111 rows
+[PID 26531] Processing batch 187
+[PID 26531] ✅ Finished batch 187, saved 367610 rows
+[PID 26532] Processing batch 188
+[PID 26532] ✅ Finished batch 188, saved 364202 rows
+[PID 26533] Processing batch 189
+[PID 26533] ✅ Finished batch 189, saved 335862 rows
+[PID 26524] Processing batch 190
+[PID 26524] ✅ Finished batch 190, saved 335138 rows
+[PID 26525] Processing batch 191
+[PID 26525] ✅ Finished batch 191, saved 333431 rows
+[PID 26526] Processing batch 192
+[PID 26526] ✅ Finished batch 192, saved 332006 rows
+[PID 26527] Processing batch 193
+[PID 26527] ✅ Finished batch 193, saved 333252 rows
+[PID 26528] Processing batch 194
+[PID 26528] ✅ Finished batch 194, saved 330971 rows
+[PID 26529] Processing batch 195
+[PID 26529] ✅ Finished batch 195, saved 336071 rows
+[PID 26530] Processing batch 196
+[PID 26530] ✅ Finished batch 196, saved 331804 rows
+[PID 26531] Processing batch 197
+[PID 26531] ✅ Finished batch 197, saved 338446 rows
+[PID 26532] Processing batch 198
+[PID 26532] ✅ Finished batch 198, saved 338792 rows
+[PID 26533] Processing batch 199
+[PID 26524] Processing batch 200
+[PID 26524] ✅ Finished batch 200, saved 41334 rows
+[PID 26533] ✅ Finished batch 199, saved 340381 rows
+[PID 53602] Processing batch 0
+[PID 53602] ✅ Finished batch 0, saved 510332 rows
+[PID 53603] Processing batch 1
+[PID 53603] ✅ Finished batch 1, saved 350797 rows
+[PID 53604] Processing batch 2
+[PID 53604] ✅ Finished batch 2, saved 447133 rows
+[PID 53605] Processing batch 3
+[PID 53605] ✅ Finished batch 3, saved 443408 rows
+[PID 53606] Processing batch 4
+[PID 53606] ✅ Finished batch 4, saved 429198 rows
+[PID 53607] Processing batch 5
+[PID 53607] ✅ Finished batch 5, saved 444018 rows
+[PID 53608] Processing batch 6
+[PID 53608] ✅ Finished batch 6, saved 459863 rows
+[PID 53609] Processing batch 7
+[PID 53609] ✅ Finished batch 7, saved 404149 rows
+[PID 53610] Processing batch 8
+[PID 53610] ✅ Finished batch 8, saved 430170 rows
+[PID 53611] Processing batch 9
+[PID 53611] ✅ Finished batch 9, saved 421946 rows
+[PID 53602] Processing batch 10
+[PID 53602] ✅ Finished batch 10, saved 440741 rows
+[PID 53603] Processing batch 11
+[PID 53603] ✅ Finished batch 11, saved 441193 rows
+[PID 53604] Processing batch 12
+[PID 53604] ✅ Finished batch 12, saved 441246 rows
+[PID 53605] Processing batch 13
+[PID 53605] ✅ Finished batch 13, saved 441259 rows
+[PID 53606] Processing batch 14
+[PID 53606] ✅ Finished batch 14, saved 440915 rows
+[PID 53607] Processing batch 15
+[PID 53607] ✅ Finished batch 15, saved 441273 rows
+[PID 53608] Processing batch 16
+[PID 53608] ✅ Finished batch 16, saved 441225 rows
+[PID 53609] Processing batch 17
+[PID 53609] ✅ Finished batch 17, saved 426991 rows
+[PID 53610] Processing batch 18
+[PID 53610] ✅ Finished batch 18, saved 414318 rows
+[PID 53611] Processing batch 19
+[PID 53611] ✅ Finished batch 19, saved 414948 rows
+[PID 53602] Processing batch 20
+[PID 53602] ✅ Finished batch 20, saved 415572 rows
+[PID 53603] Processing batch 21
+[PID 53603] ✅ Finished batch 21, saved 415989 rows
+[PID 53604] Processing batch 22
+[PID 53604] ✅ Finished batch 22, saved 415467 rows
+[PID 53605] Processing batch 23
+[PID 53605] ✅ Finished batch 23, saved 428284 rows
+[PID 53606] Processing batch 24
+[PID 53606] ✅ Finished batch 24, saved 431954 rows
+[PID 53607] Processing batch 25
+[PID 53607] ✅ Finished batch 25, saved 432108 rows
+[PID 53608] Processing batch 26
+[PID 53608] ✅ Finished batch 26, saved 432553 rows
+[PID 53609] Processing batch 27
+[PID 53609] ✅ Finished batch 27, saved 432358 rows
+[PID 53610] Processing batch 28
+[PID 53610] ✅ Finished batch 28, saved 432173 rows
+[PID 53611] Processing batch 29
+[PID 53611] ✅ Finished batch 29, saved 432718 rows
+[PID 53602] Processing batch 30
+[PID 53602] ✅ Finished batch 30, saved 431776 rows
+[PID 53603] Processing batch 31
+[PID 53603] ✅ Finished batch 31, saved 432555 rows
+[PID 53604] Processing batch 32
+[PID 53604] ✅ Finished batch 32, saved 432773 rows
+[PID 53605] Processing batch 33
+[PID 53605] ✅ Finished batch 33, saved 432684 rows
+[PID 53606] Processing batch 34
+[PID 53606] ✅ Finished batch 34, saved 432399 rows
+[PID 53607] Processing batch 35
+[PID 53607] ✅ Finished batch 35, saved 432586 rows
+[PID 53608] Processing batch 36
+[PID 53608] ✅ Finished batch 36, saved 432191 rows
+[PID 53609] Processing batch 37
+[PID 53609] ✅ Finished batch 37, saved 432543 rows
+[PID 53610] Processing batch 38
+[PID 53610] ✅ Finished batch 38, saved 433538 rows
+[PID 53611] Processing batch 39
+[PID 53611] ✅ Finished batch 39, saved 433492 rows
+[PID 53602] Processing batch 40
+[PID 53602] ✅ Finished batch 40, saved 433348 rows
+[PID 53603] Processing batch 41
+[PID 53603] ✅ Finished batch 41, saved 433058 rows
+[PID 53604] Processing batch 42
+[PID 53604] ✅ Finished batch 42, saved 432762 rows
+[PID 53605] Processing batch 43
+[PID 53605] ✅ Finished batch 43, saved 433079 rows
+[PID 53606] Processing batch 44
+[PID 53606] ✅ Finished batch 44, saved 433721 rows
+[PID 53607] Processing batch 45
+[PID 53607] ✅ Finished batch 45, saved 433536 rows
+[PID 53608] Processing batch 46
+[PID 53608] ✅ Finished batch 46, saved 432964 rows
+[PID 53609] Processing batch 47
+[PID 53609] ✅ Finished batch 47, saved 433067 rows
+[PID 53610] Processing batch 48
+[PID 53610] ✅ Finished batch 48, saved 433287 rows
+[PID 53611] Processing batch 49
+[PID 53611] ✅ Finished batch 49, saved 433467 rows
+[PID 53602] Processing batch 50
+[PID 53602] ✅ Finished batch 50, saved 414834 rows
+[PID 53603] Processing batch 51
+[PID 53603] ✅ Finished batch 51, saved 387061 rows
+[PID 53604] Processing batch 52
+[PID 53604] ✅ Finished batch 52, saved 386414 rows
+[PID 53605] Processing batch 53
+[PID 53605] ✅ Finished batch 53, saved 387427 rows
+[PID 53606] Processing batch 54
+[PID 53606] ✅ Finished batch 54, saved 387075 rows
+[PID 53607] Processing batch 55
+[PID 53607] ✅ Finished batch 55, saved 387550 rows
+[PID 53608] Processing batch 56
+[PID 53608] ✅ Finished batch 56, saved 387902 rows
+[PID 53609] Processing batch 57
+[PID 53609] ✅ Finished batch 57, saved 387411 rows
+[PID 53610] Processing batch 58
+[PID 53610] ✅ Finished batch 58, saved 387723 rows
+[PID 53611] Processing batch 59
+[PID 53611] ✅ Finished batch 59, saved 387673 rows
+[PID 53602] Processing batch 60
+[PID 53602] ✅ Finished batch 60, saved 387870 rows
+[PID 53603] Processing batch 61
+[PID 53603] ✅ Finished batch 61, saved 387417 rows
+[PID 53604] Processing batch 62
+[PID 53604] ✅ Finished batch 62, saved 387696 rows
+[PID 53605] Processing batch 63
+[PID 53605] ✅ Finished batch 63, saved 388351 rows
+[PID 53606] Processing batch 64
+[PID 53606] ✅ Finished batch 64, saved 387924 rows
+[PID 53607] Processing batch 65
+[PID 53607] ✅ Finished batch 65, saved 388036 rows
+[PID 53608] Processing batch 66
+[PID 53608] ✅ Finished batch 66, saved 388787 rows
+[PID 53609] Processing batch 67
+[PID 53609] ✅ Finished batch 67, saved 387979 rows
+[PID 53610] Processing batch 68
+[PID 53610] ✅ Finished batch 68, saved 388691 rows
+[PID 53611] Processing batch 69
+[PID 53611] ✅ Finished batch 69, saved 388143 rows
+[PID 53602] Processing batch 70
+[PID 53602] ✅ Finished batch 70, saved 388104 rows
+[PID 53603] Processing batch 71
+[PID 53603] ✅ Finished batch 71, saved 387977 rows
+[PID 53604] Processing batch 72
+[PID 53604] ✅ Finished batch 72, saved 388318 rows
+[PID 53605] Processing batch 73
+[PID 53605] ✅ Finished batch 73, saved 388407 rows
+[PID 53606] Processing batch 74
+[PID 53606] ✅ Finished batch 74, saved 388046 rows
+[PID 53607] Processing batch 75
+[PID 53607] ✅ Finished batch 75, saved 388141 rows
+[PID 53608] Processing batch 76
+[PID 53608] ✅ Finished batch 76, saved 388621 rows
+[PID 53609] Processing batch 77
+[PID 53609] ✅ Finished batch 77, saved 388656 rows
+[PID 53610] Processing batch 78
+[PID 53610] ✅ Finished batch 78, saved 388845 rows
+[PID 53611] Processing batch 79
+[PID 53611] ✅ Finished batch 79, saved 388716 rows
+[PID 53602] Processing batch 80
+[PID 53602] ✅ Finished batch 80, saved 388346 rows
+[PID 53603] Processing batch 81
+[PID 53603] ✅ Finished batch 81, saved 389093 rows
+[PID 53604] Processing batch 82
+[PID 53604] ✅ Finished batch 82, saved 388861 rows
+[PID 53605] Processing batch 83
+[PID 53605] ✅ Finished batch 83, saved 388689 rows
+[PID 53606] Processing batch 84
+[PID 53606] ✅ Finished batch 84, saved 388273 rows
+[PID 53607] Processing batch 85
+[PID 53607] ✅ Finished batch 85, saved 388229 rows
+[PID 53608] Processing batch 86
+[PID 53608] ✅ Finished batch 86, saved 388586 rows
+[PID 53609] Processing batch 87
+[PID 53609] ✅ Finished batch 87, saved 388967 rows
+[PID 53610] Processing batch 88
+[PID 53610] ✅ Finished batch 88, saved 388652 rows
+[PID 53611] Processing batch 89
+[PID 53611] ✅ Finished batch 89, saved 389185 rows
+[PID 53602] Processing batch 90
+[PID 53602] ✅ Finished batch 90, saved 389207 rows
+[PID 53603] Processing batch 91
+[PID 53603] ✅ Finished batch 91, saved 388484 rows
+[PID 53604] Processing batch 92
+[PID 53604] ✅ Finished batch 92, saved 388817 rows
+[PID 53605] Processing batch 93
+[PID 53605] ✅ Finished batch 93, saved 388973 rows
+[PID 53606] Processing batch 94
+[PID 53606] ✅ Finished batch 94, saved 389567 rows
+[PID 53607] Processing batch 95
+[PID 53607] ✅ Finished batch 95, saved 388466 rows
+[PID 53608] Processing batch 96
+[PID 53608] ✅ Finished batch 96, saved 389804 rows
+[PID 53609] Processing batch 97
+[PID 53609] ✅ Finished batch 97, saved 389287 rows
+[PID 53610] Processing batch 98
+[PID 53610] ✅ Finished batch 98, saved 389693 rows
+[PID 53611] Processing batch 99
+[PID 53611] ✅ Finished batch 99, saved 371164 rows
+[PID 53602] Processing batch 100
+[PID 53602] ✅ Finished batch 100, saved 257694 rows
+[PID 53603] Processing batch 101
+[PID 53603] ✅ Finished batch 101, saved 310471 rows
+[PID 53604] Processing batch 102
+[PID 53604] ✅ Finished batch 102, saved 383080 rows
+[PID 53605] Processing batch 103
+[PID 53605] ✅ Finished batch 103, saved 410250 rows
+[PID 53606] Processing batch 104
+[PID 53606] ✅ Finished batch 104, saved 410305 rows
+[PID 53607] Processing batch 105
+[PID 53607] ✅ Finished batch 105, saved 411937 rows
+[PID 53608] Processing batch 106
+[PID 53608] ✅ Finished batch 106, saved 412261 rows
+[PID 53609] Processing batch 107
+[PID 53609] ✅ Finished batch 107, saved 392489 rows
+[PID 53610] Processing batch 108
+[PID 53610] ✅ Finished batch 108, saved 371805 rows
+[PID 53611] Processing batch 109
+[PID 53611] ✅ Finished batch 109, saved 368800 rows
+[PID 53602] Processing batch 110
+[PID 53602] ✅ Finished batch 110, saved 367999 rows
+[PID 53603] Processing batch 111
+[PID 53603] ✅ Finished batch 111, saved 367954 rows
+[PID 53604] Processing batch 112
+[PID 53604] ✅ Finished batch 112, saved 367481 rows
+[PID 53605] Processing batch 113
+[PID 53605] ✅ Finished batch 113, saved 368073 rows
+[PID 53606] Processing batch 114
+[PID 53606] ✅ Finished batch 114, saved 367261 rows
+[PID 53607] Processing batch 115
+[PID 53607] ✅ Finished batch 115, saved 368030 rows
+[PID 53608] Processing batch 116
+[PID 53608] ✅ Finished batch 116, saved 364772 rows
+[PID 53609] Processing batch 117
+[PID 53609] ✅ Finished batch 117, saved 365298 rows
+[PID 53610] Processing batch 118
+[PID 53610] ✅ Finished batch 118, saved 366198 rows
+[PID 53611] Processing batch 119
+[PID 53611] ✅ Finished batch 119, saved 366237 rows
+[PID 53602] Processing batch 120
+[PID 53602] ✅ Finished batch 120, saved 367600 rows
+[PID 53603] Processing batch 121
+[PID 53603] ✅ Finished batch 121, saved 367333 rows
+[PID 53604] Processing batch 122
+[PID 53604] ✅ Finished batch 122, saved 364888 rows
+[PID 53605] Processing batch 123
+[PID 53605] ✅ Finished batch 123, saved 367406 rows
+[PID 53606] Processing batch 124
+[PID 53606] ✅ Finished batch 124, saved 364840 rows
+[PID 53607] Processing batch 125
+[PID 53607] ✅ Finished batch 125, saved 366043 rows
+[PID 53608] Processing batch 126
+[PID 53608] ✅ Finished batch 126, saved 366175 rows
+[PID 53609] Processing batch 127
+[PID 53609] ✅ Finished batch 127, saved 364569 rows
+[PID 53610] Processing batch 128
+[PID 53610] ✅ Finished batch 128, saved 367483 rows
+[PID 53611] Processing batch 129
+[PID 53611] ✅ Finished batch 129, saved 366192 rows
+[PID 53602] Processing batch 130
+[PID 53602] ✅ Finished batch 130, saved 366405 rows
+[PID 53603] Processing batch 131
+[PID 53603] ✅ Finished batch 131, saved 367401 rows
+[PID 53604] Processing batch 132
+[PID 53604] ✅ Finished batch 132, saved 368540 rows
+[PID 53605] Processing batch 133
+[PID 53605] ✅ Finished batch 133, saved 366303 rows
+[PID 53606] Processing batch 134
+[PID 53606] ✅ Finished batch 134, saved 365639 rows
+[PID 53607] Processing batch 135
+[PID 53607] ✅ Finished batch 135, saved 365667 rows
+[PID 53608] Processing batch 136
+[PID 53608] ✅ Finished batch 136, saved 364351 rows
+[PID 53609] Processing batch 137
+[PID 53609] ✅ Finished batch 137, saved 365876 rows
+[PID 53610] Processing batch 138
+[PID 53610] ✅ Finished batch 138, saved 364782 rows
+[PID 53611] Processing batch 139
+[PID 53611] ✅ Finished batch 139, saved 363274 rows
+[PID 53602] Processing batch 140
+[PID 53602] ✅ Finished batch 140, saved 361436 rows
+[PID 53603] Processing batch 141
+[PID 53603] ✅ Finished batch 141, saved 363863 rows
+[PID 53604] Processing batch 142
+[PID 53604] ✅ Finished batch 142, saved 363280 rows
+[PID 53605] Processing batch 143
+[PID 53605] ✅ Finished batch 143, saved 364309 rows
+[PID 53606] Processing batch 144
+[PID 53606] ✅ Finished batch 144, saved 365584 rows
+[PID 53607] Processing batch 145
+[PID 53607] ✅ Finished batch 145, saved 367720 rows
+[PID 53608] Processing batch 146
+[PID 53608] ✅ Finished batch 146, saved 363200 rows
+[PID 53609] Processing batch 147
+[PID 53609] ✅ Finished batch 147, saved 362087 rows
+[PID 53610] Processing batch 148
+[PID 53610] ✅ Finished batch 148, saved 364582 rows
+[PID 53611] Processing batch 149
+[PID 53611] ✅ Finished batch 149, saved 364859 rows
+[PID 53602] Processing batch 150
+[PID 53602] ✅ Finished batch 150, saved 364244 rows
+[PID 53603] Processing batch 151
+[PID 53603] ✅ Finished batch 151, saved 367488 rows
+[PID 53604] Processing batch 152
+[PID 53604] ✅ Finished batch 152, saved 361376 rows
+[PID 53605] Processing batch 153
+[PID 53605] ✅ Finished batch 153, saved 363449 rows
+[PID 53606] Processing batch 154
+[PID 53606] ✅ Finished batch 154, saved 362111 rows
+[PID 53607] Processing batch 155
+[PID 53607] ✅ Finished batch 155, saved 366414 rows
+[PID 53608] Processing batch 156
+[PID 53608] ✅ Finished batch 156, saved 364679 rows
+[PID 53609] Processing batch 157
+[PID 53609] ✅ Finished batch 157, saved 360905 rows
+[PID 53610] Processing batch 158
+[PID 53610] ✅ Finished batch 158, saved 362075 rows
+[PID 53611] Processing batch 159
+[PID 53611] ✅ Finished batch 159, saved 363444 rows
+[PID 53602] Processing batch 160
+[PID 53602] ✅ Finished batch 160, saved 362246 rows
+[PID 53603] Processing batch 161
+[PID 53604] Processing batch 162
+[PID 53604] ✅ Finished batch 162, saved 370425 rows
+[PID 53603] ✅ Finished batch 161, saved 367577 rows
+[PID 53605] Processing batch 163
+[PID 53605] ✅ Finished batch 163, saved 371740 rows
+[PID 53606] Processing batch 164
+[PID 53606] ✅ Finished batch 164, saved 369411 rows
+[PID 53607] Processing batch 165
+[PID 53607] ✅ Finished batch 165, saved 370316 rows
+[PID 53608] Processing batch 166
+[PID 53608] ✅ Finished batch 166, saved 367864 rows
+[PID 53609] Processing batch 167
+[PID 53609] ✅ Finished batch 167, saved 363883 rows
+[PID 53610] Processing batch 168
+[PID 53610] ✅ Finished batch 168, saved 350401 rows
+[PID 53611] Processing batch 169
+[PID 53611] ✅ Finished batch 169, saved 340724 rows
+[PID 53602] Processing batch 170
+[PID 53602] ✅ Finished batch 170, saved 338711 rows
+[PID 53604] Processing batch 171
+[PID 53604] ✅ Finished batch 171, saved 341373 rows
+[PID 53603] Processing batch 172
+[PID 53603] ✅ Finished batch 172, saved 342499 rows
+[PID 53605] Processing batch 173
+[PID 53605] ✅ Finished batch 173, saved 337886 rows
+[PID 53606] Processing batch 174
+[PID 53606] ✅ Finished batch 174, saved 340651 rows
+[PID 53607] Processing batch 175
+[PID 53607] ✅ Finished batch 175, saved 338509 rows
+[PID 53608] Processing batch 176
+[PID 53608] ✅ Finished batch 176, saved 331170 rows
+[PID 53609] Processing batch 177
+[PID 53609] ✅ Finished batch 177, saved 336772 rows
+[PID 53610] Processing batch 178
+[PID 53610] ✅ Finished batch 178, saved 335581 rows
+[PID 53611] Processing batch 179
+[PID 53611] ✅ Finished batch 179, saved 291871 rows
+[PID 18917] Processing batch 0
+[PID 18917] ✅ Finished batch 0, saved 510567 rows
+[PID 18918] Processing batch 1
+[PID 18918] ✅ Finished batch 1, saved 350250 rows
+[PID 18919] Processing batch 2
+[PID 18919] ✅ Finished batch 2, saved 451458 rows
+[PID 18920] Processing batch 3
+[PID 18920] ✅ Finished batch 3, saved 441884 rows
+[PID 18922] Processing batch 4
+[PID 18922] ✅ Finished batch 4, saved 431673 rows
+[PID 18923] Processing batch 5
+[PID 18923] ✅ Finished batch 5, saved 457676 rows
+[PID 18924] Processing batch 6
+[PID 18924] ✅ Finished batch 6, saved 433746 rows
+[PID 18925] Processing batch 7
+[PID 18925] ✅ Finished batch 7, saved 416787 rows
+[PID 18926] Processing batch 8
+[PID 18926] ✅ Finished batch 8, saved 420684 rows
+[PID 18927] Processing batch 9
+[PID 18927] ✅ Finished batch 9, saved 442534 rows
+[PID 18917] Processing batch 10
+[PID 18917] ✅ Finished batch 10, saved 442624 rows
+[PID 18918] Processing batch 11
+[PID 18918] ✅ Finished batch 11, saved 441956 rows
+[PID 18919] Processing batch 12
+[PID 18919] ✅ Finished batch 12, saved 442215 rows
+[PID 18920] Processing batch 13
+[PID 18920] ✅ Finished batch 13, saved 442509 rows
+[PID 18922] Processing batch 14
+[PID 18922] ✅ Finished batch 14, saved 442440 rows
+[PID 18923] Processing batch 15
+[PID 18923] ✅ Finished batch 15, saved 442656 rows
+[PID 18924] Processing batch 16
+[PID 18924] ✅ Finished batch 16, saved 417277 rows
+[PID 18925] Processing batch 17
+[PID 18925] ✅ Finished batch 17, saved 417533 rows
+[PID 18926] Processing batch 18
+[PID 18926] ✅ Finished batch 18, saved 417138 rows
+[PID 18927] Processing batch 19
+[PID 18927] ✅ Finished batch 19, saved 417808 rows
+[PID 18917] Processing batch 20
+[PID 18917] ✅ Finished batch 20, saved 417829 rows
+[PID 18918] Processing batch 21
+[PID 18918] ✅ Finished batch 21, saved 422614 rows
+[PID 18919] Processing batch 22
+[PID 18919] ✅ Finished batch 22, saved 434057 rows
+[PID 18920] Processing batch 23
+[PID 18920] ✅ Finished batch 23, saved 434179 rows
+[PID 18922] Processing batch 24
+[PID 18922] ✅ Finished batch 24, saved 434102 rows
+[PID 18923] Processing batch 25
+[PID 18923] ✅ Finished batch 25, saved 433880 rows
+[PID 18924] Processing batch 26
+[PID 18924] ✅ Finished batch 26, saved 434257 rows
+[PID 18925] Processing batch 27
+[PID 18925] ✅ Finished batch 27, saved 434420 rows
+[PID 18926] Processing batch 28
+[PID 18926] ✅ Finished batch 28, saved 434722 rows
+[PID 18927] Processing batch 29
+[PID 18927] ✅ Finished batch 29, saved 434747 rows
+[PID 18917] Processing batch 30
+[PID 18917] ✅ Finished batch 30, saved 434014 rows
+[PID 18918] Processing batch 31
+[PID 18918] ✅ Finished batch 31, saved 434398 rows
+[PID 18919] Processing batch 32
+[PID 18919] ✅ Finished batch 32, saved 434350 rows
+[PID 18920] Processing batch 33
+[PID 18920] ✅ Finished batch 33, saved 434119 rows
+[PID 18922] Processing batch 34
+[PID 18922] ✅ Finished batch 34, saved 434803 rows
+[PID 18923] Processing batch 35
+[PID 18923] ✅ Finished batch 35, saved 434799 rows
+[PID 18924] Processing batch 36
+[PID 18924] ✅ Finished batch 36, saved 434799 rows
+[PID 18925] Processing batch 37
+[PID 18925] ✅ Finished batch 37, saved 434036 rows
+[PID 18926] Processing batch 38
+[PID 18926] ✅ Finished batch 38, saved 434264 rows
+[PID 18927] Processing batch 39
+[PID 18927] ✅ Finished batch 39, saved 434971 rows
+[PID 18917] Processing batch 40
+[PID 18917] ✅ Finished batch 40, saved 434788 rows
+[PID 18918] Processing batch 41
+[PID 18918] ✅ Finished batch 41, saved 435018 rows
+[PID 18919] Processing batch 42
+[PID 18919] ✅ Finished batch 42, saved 434983 rows
+[PID 18920] Processing batch 43
+[PID 18920] ✅ Finished batch 43, saved 434851 rows
+[PID 18922] Processing batch 44
+[PID 18922] ✅ Finished batch 44, saved 435124 rows
+[PID 18923] Processing batch 45
+[PID 18923] ✅ Finished batch 45, saved 425701 rows
+[PID 18924] Processing batch 46
+[PID 18924] ✅ Finished batch 46, saved 389759 rows
+[PID 18925] Processing batch 47
+[PID 18925] ✅ Finished batch 47, saved 389370 rows
+[PID 18926] Processing batch 48
+[PID 18926] ✅ Finished batch 48, saved 390530 rows
+[PID 18927] Processing batch 49
+[PID 18927] ✅ Finished batch 49, saved 390017 rows
+[PID 18917] Processing batch 50
+[PID 18917] ✅ Finished batch 50, saved 390752 rows
+[PID 18918] Processing batch 51
+[PID 18918] ✅ Finished batch 51, saved 391112 rows
+[PID 18919] Processing batch 52
+[PID 18919] ✅ Finished batch 52, saved 391007 rows
+[PID 18920] Processing batch 53
+[PID 18920] ✅ Finished batch 53, saved 390271 rows
+[PID 18922] Processing batch 54
+[PID 18922] ✅ Finished batch 54, saved 390524 rows
+[PID 18923] Processing batch 55
+[PID 18923] ✅ Finished batch 55, saved 390943 rows
+[PID 18924] Processing batch 56
+[PID 18924] ✅ Finished batch 56, saved 390734 rows
+[PID 18925] Processing batch 57
+[PID 18925] ✅ Finished batch 57, saved 390674 rows
+[PID 18926] Processing batch 58
+[PID 18926] ✅ Finished batch 58, saved 390697 rows
+[PID 18927] Processing batch 59
+[PID 18927] ✅ Finished batch 59, saved 391286 rows
+[PID 18917] Processing batch 60
+[PID 18917] ✅ Finished batch 60, saved 391686 rows
+[PID 18918] Processing batch 61
+[PID 18918] ✅ Finished batch 61, saved 390851 rows
+[PID 18919] Processing batch 62
+[PID 18919] ✅ Finished batch 62, saved 391570 rows
+[PID 18920] Processing batch 63
+[PID 18920] ✅ Finished batch 63, saved 390988 rows
+[PID 18922] Processing batch 64
+[PID 18922] ✅ Finished batch 64, saved 391184 rows
+[PID 18923] Processing batch 65
+[PID 18923] ✅ Finished batch 65, saved 391988 rows
+[PID 18924] Processing batch 66
+[PID 18924] ✅ Finished batch 66, saved 391160 rows
+[PID 18925] Processing batch 67
+[PID 18925] ✅ Finished batch 67, saved 391300 rows
+[PID 18926] Processing batch 68
+[PID 18926] ✅ Finished batch 68, saved 391300 rows
+[PID 18927] Processing batch 69
+[PID 18927] ✅ Finished batch 69, saved 391262 rows
+[PID 18917] Processing batch 70
+[PID 18917] ✅ Finished batch 70, saved 392103 rows
+[PID 18918] Processing batch 71
+[PID 18918] ✅ Finished batch 71, saved 391852 rows
+[PID 18919] Processing batch 72
+[PID 18919] ✅ Finished batch 72, saved 391789 rows
+[PID 18920] Processing batch 73
+[PID 18920] ✅ Finished batch 73, saved 392272 rows
+[PID 18922] Processing batch 74
+[PID 18922] ✅ Finished batch 74, saved 392381 rows
+[PID 18923] Processing batch 75
+[PID 18923] ✅ Finished batch 75, saved 391564 rows
+[PID 18924] Processing batch 76
+[PID 18924] ✅ Finished batch 76, saved 391784 rows
+[PID 18925] Processing batch 77
+[PID 18925] ✅ Finished batch 77, saved 391402 rows
+[PID 18926] Processing batch 78
+[PID 18926] ✅ Finished batch 78, saved 391636 rows
+[PID 18927] Processing batch 79
+[PID 18927] ✅ Finished batch 79, saved 391440 rows
+[PID 18917] Processing batch 80
+[PID 18917] ✅ Finished batch 80, saved 391797 rows
+[PID 18918] Processing batch 81
+[PID 18918] ✅ Finished batch 81, saved 391818 rows
+[PID 18919] Processing batch 82
+[PID 18919] ✅ Finished batch 82, saved 392252 rows
+[PID 18920] Processing batch 83
+[PID 18920] ✅ Finished batch 83, saved 391675 rows
+[PID 18922] Processing batch 84
+[PID 18922] ✅ Finished batch 84, saved 392744 rows
+[PID 18923] Processing batch 85
+[PID 18923] ✅ Finished batch 85, saved 392118 rows
+[PID 18924] Processing batch 86
+[PID 18924] ✅ Finished batch 86, saved 391880 rows
+[PID 18925] Processing batch 87
+[PID 18925] ✅ Finished batch 87, saved 392421 rows
+[PID 18926] Processing batch 88
+[PID 18926] ✅ Finished batch 88, saved 392171 rows
+[PID 18927] Processing batch 89
+[PID 18927] ✅ Finished batch 89, saved 392010 rows
+[PID 18917] Processing batch 90
+[PID 18917] ✅ Finished batch 90, saved 391882 rows
+[PID 18918] Processing batch 91
+[PID 18918] ✅ Finished batch 91, saved 393192 rows
+[PID 18919] Processing batch 92
+[PID 18919] ✅ Finished batch 92, saved 392776 rows
+[PID 18920] Processing batch 93
+[PID 18920] ✅ Finished batch 93, saved 268294 rows
+[PID 18922] Processing batch 94
+[PID 18922] ✅ Finished batch 94, saved 311491 rows
+[PID 18923] Processing batch 95
+[PID 18923] ✅ Finished batch 95, saved 358513 rows
+[PID 18924] Processing batch 96
+[PID 18924] ✅ Finished batch 96, saved 412261 rows
+[PID 18925] Processing batch 97
+[PID 18925] ✅ Finished batch 97, saved 412186 rows
+[PID 18926] Processing batch 98
+[PID 18926] ✅ Finished batch 98, saved 412596 rows
+[PID 18927] Processing batch 99
+[PID 18927] ✅ Finished batch 99, saved 412654 rows
+[PID 18917] Processing batch 100
+[PID 18917] ✅ Finished batch 100, saved 387233 rows
+[PID 18918] Processing batch 101
+[PID 18918] ✅ Finished batch 101, saved 383195 rows
+[PID 18919] Processing batch 102
+[PID 18919] ✅ Finished batch 102, saved 378337 rows
+[PID 18920] Processing batch 103
+[PID 18920] ✅ Finished batch 103, saved 372973 rows
+[PID 18922] Processing batch 104
+[PID 18922] ✅ Finished batch 104, saved 369412 rows
+[PID 18923] Processing batch 105
+[PID 18923] ✅ Finished batch 105, saved 366903 rows
+[PID 18924] Processing batch 106
+[PID 18924] ✅ Finished batch 106, saved 365567 rows
+[PID 18925] Processing batch 107
+[PID 18925] ✅ Finished batch 107, saved 367582 rows
+[PID 18926] Processing batch 108
+[PID 18926] ✅ Finished batch 108, saved 366379 rows
+[PID 18927] Processing batch 109
+[PID 18927] ✅ Finished batch 109, saved 365641 rows
+[PID 18917] Processing batch 110
+[PID 18917] ✅ Finished batch 110, saved 365656 rows
+[PID 18918] Processing batch 111
+[PID 18918] ✅ Finished batch 111, saved 365009 rows
+[PID 18919] Processing batch 112
+[PID 18919] ✅ Finished batch 112, saved 365931 rows
+[PID 18920] Processing batch 113
+[PID 18920] ✅ Finished batch 113, saved 363118 rows
+[PID 18922] Processing batch 114
+[PID 18922] ✅ Finished batch 114, saved 368913 rows
+[PID 18923] Processing batch 115
+[PID 18923] ✅ Finished batch 115, saved 364472 rows
+[PID 18924] Processing batch 116
+[PID 18924] ✅ Finished batch 116, saved 367338 rows
+[PID 18925] Processing batch 117
+[PID 18925] ✅ Finished batch 117, saved 367272 rows
+[PID 18926] Processing batch 118
+[PID 18926] ✅ Finished batch 118, saved 365796 rows
+[PID 18927] Processing batch 119
+[PID 18927] ✅ Finished batch 119, saved 367993 rows
+[PID 18917] Processing batch 120
+[PID 18917] ✅ Finished batch 120, saved 363890 rows
+[PID 18918] Processing batch 121
+[PID 18918] ✅ Finished batch 121, saved 365795 rows
+[PID 18919] Processing batch 122
+[PID 18919] ✅ Finished batch 122, saved 364952 rows
+[PID 18920] Processing batch 123
+[PID 18920] ✅ Finished batch 123, saved 365636 rows
+[PID 18922] Processing batch 124
+[PID 18922] ✅ Finished batch 124, saved 364313 rows
+[PID 18923] Processing batch 125
+[PID 18923] ✅ Finished batch 125, saved 367130 rows
+[PID 18924] Processing batch 126
+[PID 18924] ✅ Finished batch 126, saved 364891 rows
+[PID 18925] Processing batch 127
+[PID 18925] ✅ Finished batch 127, saved 365663 rows
+[PID 18926] Processing batch 128
+[PID 18926] ✅ Finished batch 128, saved 366495 rows
+[PID 18927] Processing batch 129
+[PID 18927] ✅ Finished batch 129, saved 366024 rows
+[PID 18917] Processing batch 130
+[PID 18917] ✅ Finished batch 130, saved 365985 rows
+[PID 18918] Processing batch 131
+[PID 18918] ✅ Finished batch 131, saved 365396 rows
+[PID 18919] Processing batch 132
+[PID 18919] ✅ Finished batch 132, saved 364874 rows
+[PID 18920] Processing batch 133
+[PID 18920] ✅ Finished batch 133, saved 362619 rows
+[PID 18922] Processing batch 134
+[PID 18922] ✅ Finished batch 134, saved 361988 rows
+[PID 18923] Processing batch 135
+[PID 18923] ✅ Finished batch 135, saved 360711 rows
+[PID 18924] Processing batch 136
+[PID 18924] ✅ Finished batch 136, saved 361569 rows
+[PID 18925] Processing batch 137
+[PID 18925] ✅ Finished batch 137, saved 363908 rows
+[PID 18926] Processing batch 138
+[PID 18926] ✅ Finished batch 138, saved 363041 rows
+[PID 18927] Processing batch 139
+[PID 18927] ✅ Finished batch 139, saved 361736 rows
+[PID 18917] Processing batch 140
+[PID 18917] ✅ Finished batch 140, saved 363754 rows
+[PID 18918] Processing batch 141
+[PID 18918] ✅ Finished batch 141, saved 367182 rows
+[PID 18919] Processing batch 142
+[PID 18919] ✅ Finished batch 142, saved 366186 rows
+[PID 18920] Processing batch 143
+[PID 18920] ✅ Finished batch 143, saved 362969 rows
+[PID 18922] Processing batch 144
+[PID 18922] ✅ Finished batch 144, saved 366365 rows
+[PID 18923] Processing batch 145
+[PID 18923] ✅ Finished batch 145, saved 365198 rows
+[PID 18924] Processing batch 146
+[PID 18924] ✅ Finished batch 146, saved 367447 rows
+[PID 18925] Processing batch 147
+[PID 18925] ✅ Finished batch 147, saved 366587 rows
+[PID 18926] Processing batch 148
+[PID 18926] ✅ Finished batch 148, saved 367105 rows
+[PID 18927] Processing batch 149
+[PID 18927] ✅ Finished batch 149, saved 364623 rows
+[PID 18917] Processing batch 150
+[PID 18917] ✅ Finished batch 150, saved 362847 rows
+[PID 18918] Processing batch 151
+[PID 18918] ✅ Finished batch 151, saved 367152 rows
+[PID 18919] Processing batch 152
+[PID 18919] ✅ Finished batch 152, saved 374538 rows
+[PID 18920] Processing batch 153
+[PID 18920] ✅ Finished batch 153, saved 371333 rows
+[PID 18922] Processing batch 154
+[PID 18922] ✅ Finished batch 154, saved 370859 rows
+[PID 18923] Processing batch 155
+[PID 18923] ✅ Finished batch 155, saved 369584 rows
+[PID 18924] Processing batch 156
+[PID 18924] ✅ Finished batch 156, saved 371688 rows
+[PID 18925] Processing batch 157
+[PID 18925] ✅ Finished batch 157, saved 355013 rows
+[PID 18926] Processing batch 158
+[PID 18926] ✅ Finished batch 158, saved 334963 rows
+[PID 18927] Processing batch 159
+[PID 18927] ✅ Finished batch 159, saved 342989 rows
+[PID 18917] Processing batch 160
+[PID 18917] ✅ Finished batch 160, saved 342047 rows
+[PID 18918] Processing batch 161
+[PID 18918] ✅ Finished batch 161, saved 342982 rows
+[PID 18919] Processing batch 162
+[PID 18919] ✅ Finished batch 162, saved 345231 rows
+[PID 18920] Processing batch 163
+[PID 18920] ✅ Finished batch 163, saved 337324 rows
+[PID 18922] Processing batch 164
+[PID 18922] ✅ Finished batch 164, saved 342030 rows
+[PID 18923] Processing batch 165
+[PID 18923] ✅ Finished batch 165, saved 345355 rows
+[PID 18924] Processing batch 166
+[PID 18924] ✅ Finished batch 166, saved 342033 rows
+[PID 18925] Processing batch 167
+[PID 18925] ✅ Finished batch 167, saved 348448 rows
+[PID 18926] Processing batch 168
+[PID 18926] ✅ Finished batch 168, saved 324550 rows
+[PID 47692] Processing batch 0
+[PID 47692] ✅ Finished batch 0, saved 521272 rows
+[PID 47693] Processing batch 1
+[PID 47693] ✅ Finished batch 1, saved 388100 rows
+[PID 47694] Processing batch 2
+[PID 47694] ✅ Finished batch 2, saved 453417 rows
+[PID 47695] Processing batch 3
+[PID 47695] ✅ Finished batch 3, saved 461177 rows
+[PID 47696] Processing batch 4
+[PID 47696] ✅ Finished batch 4, saved 450897 rows
+[PID 47697] Processing batch 5
+[PID 47697] ✅ Finished batch 5, saved 459758 rows
+[PID 47698] Processing batch 6
+[PID 47698] ✅ Finished batch 6, saved 474871 rows
+[PID 47700] Processing batch 7
+[PID 47700] ✅ Finished batch 7, saved 427589 rows
+[PID 47701] Processing batch 8
+[PID 47701] ✅ Finished batch 8, saved 448790 rows
+[PID 47702] Processing batch 9
+[PID 47702] ✅ Finished batch 9, saved 435737 rows
+[PID 47692] Processing batch 10
+[PID 47692] ✅ Finished batch 10, saved 457743 rows
+[PID 47693] Processing batch 11
+[PID 47693] ✅ Finished batch 11, saved 457657 rows
+[PID 47694] Processing batch 12
+[PID 47694] ✅ Finished batch 12, saved 457859 rows
+[PID 47695] Processing batch 13
+[PID 47695] ✅ Finished batch 13, saved 458399 rows
+[PID 47696] Processing batch 14
+[PID 47696] ✅ Finished batch 14, saved 457879 rows
+[PID 47697] Processing batch 15
+[PID 47697] ✅ Finished batch 15, saved 457903 rows
+[PID 47698] Processing batch 16
+[PID 47698] ✅ Finished batch 16, saved 458069 rows
+[PID 47700] Processing batch 17
+[PID 47700] ✅ Finished batch 17, saved 457871 rows
+[PID 47701] Processing batch 18
+[PID 47701] ✅ Finished batch 18, saved 435445 rows
+[PID 47702] Processing batch 19
+[PID 47702] ✅ Finished batch 19, saved 435273 rows
+[PID 47692] Processing batch 20
+[PID 47692] ✅ Finished batch 20, saved 435911 rows
+[PID 47693] Processing batch 21
+[PID 47693] ✅ Finished batch 21, saved 436234 rows
+[PID 47694] Processing batch 22
+[PID 47694] ✅ Finished batch 22, saved 437215 rows
+[PID 47695] Processing batch 23
+[PID 47695] ✅ Finished batch 23, saved 433548 rows
+[PID 47696] Processing batch 24
+[PID 47696] ✅ Finished batch 24, saved 442232 rows
+[PID 47697] Processing batch 25
+[PID 47697] ✅ Finished batch 25, saved 447543 rows
+[PID 47698] Processing batch 26
+[PID 47698] ✅ Finished batch 26, saved 447478 rows
+[PID 47700] Processing batch 27
+[PID 47700] ✅ Finished batch 27, saved 447316 rows
+[PID 47701] Processing batch 28
+[PID 47701] ✅ Finished batch 28, saved 447196 rows
+[PID 47702] Processing batch 29
+[PID 47702] ✅ Finished batch 29, saved 447474 rows
+[PID 47692] Processing batch 30
+[PID 47692] ✅ Finished batch 30, saved 447109 rows
+[PID 47693] Processing batch 31
+[PID 47693] ✅ Finished batch 31, saved 447492 rows
+[PID 47694] Processing batch 32
+[PID 47694] ✅ Finished batch 32, saved 447619 rows
+[PID 47695] Processing batch 33
+[PID 47695] ✅ Finished batch 33, saved 447419 rows
+[PID 47696] Processing batch 34
+[PID 47696] ✅ Finished batch 34, saved 446844 rows
+[PID 47697] Processing batch 35
+[PID 47697] ✅ Finished batch 35, saved 447085 rows
+[PID 47698] Processing batch 36
+[PID 47698] ✅ Finished batch 36, saved 447371 rows
+[PID 47700] Processing batch 37
+[PID 47700] ✅ Finished batch 37, saved 447170 rows
+[PID 47701] Processing batch 38
+[PID 47701] ✅ Finished batch 38, saved 447845 rows
+[PID 47702] Processing batch 39
+[PID 47702] ✅ Finished batch 39, saved 447873 rows
+[PID 47692] Processing batch 40
+[PID 47692] ✅ Finished batch 40, saved 448110 rows
+[PID 47693] Processing batch 41
+[PID 47693] ✅ Finished batch 41, saved 447827 rows
+[PID 47694] Processing batch 42
+[PID 47694] ✅ Finished batch 42, saved 447555 rows
+[PID 47695] Processing batch 43
+[PID 47695] ✅ Finished batch 43, saved 447911 rows
+[PID 47696] Processing batch 44
+[PID 47696] ✅ Finished batch 44, saved 447641 rows
+[PID 47697] Processing batch 45
+[PID 47697] ✅ Finished batch 45, saved 448014 rows
+[PID 47698] Processing batch 46
+[PID 47698] ✅ Finished batch 46, saved 448040 rows
+[PID 47700] Processing batch 47
+[PID 47700] ✅ Finished batch 47, saved 448342 rows
+[PID 47701] Processing batch 48
+[PID 47701] ✅ Finished batch 48, saved 448358 rows
+[PID 47702] Processing batch 49
+[PID 47702] ✅ Finished batch 49, saved 448574 rows
+[PID 47692] Processing batch 50
+[PID 47692] ✅ Finished batch 50, saved 448039 rows
+[PID 47693] Processing batch 51
+[PID 47693] ✅ Finished batch 51, saved 413900 rows
+[PID 47694] Processing batch 52
+[PID 47694] ✅ Finished batch 52, saved 402317 rows
+[PID 47695] Processing batch 53
+[PID 47695] ✅ Finished batch 53, saved 401822 rows
+[PID 47696] Processing batch 54
+[PID 47696] ✅ Finished batch 54, saved 402363 rows
+[PID 47697] Processing batch 55
+[PID 47697] ✅ Finished batch 55, saved 402742 rows
+[PID 47698] Processing batch 56
+[PID 47698] ✅ Finished batch 56, saved 402805 rows
+[PID 47700] Processing batch 57
+[PID 47700] ✅ Finished batch 57, saved 402972 rows
+[PID 47701] Processing batch 58
+[PID 47701] ✅ Finished batch 58, saved 403050 rows
+[PID 47702] Processing batch 59
+[PID 47702] ✅ Finished batch 59, saved 402458 rows
+[PID 47692] Processing batch 60
+[PID 47692] ✅ Finished batch 60, saved 403054 rows
+[PID 47693] Processing batch 61
+[PID 47693] ✅ Finished batch 61, saved 402780 rows
+[PID 47694] Processing batch 62
+[PID 47694] ✅ Finished batch 62, saved 402730 rows
+[PID 47695] Processing batch 63
+[PID 47695] ✅ Finished batch 63, saved 402645 rows
+[PID 47696] Processing batch 64
+[PID 47696] ✅ Finished batch 64, saved 403385 rows
+[PID 47697] Processing batch 65
+[PID 47697] ✅ Finished batch 65, saved 403650 rows
+[PID 47698] Processing batch 66
+[PID 47698] ✅ Finished batch 66, saved 403537 rows
+[PID 47700] Processing batch 67
+[PID 47700] ✅ Finished batch 67, saved 402948 rows
+[PID 47701] Processing batch 68
+[PID 47701] ✅ Finished batch 68, saved 403899 rows
+[PID 47702] Processing batch 69
+[PID 47702] ✅ Finished batch 69, saved 403581 rows
+[PID 47692] Processing batch 70
+[PID 47692] ✅ Finished batch 70, saved 403591 rows
+[PID 47693] Processing batch 71
+[PID 47693] ✅ Finished batch 71, saved 403499 rows
+[PID 47694] Processing batch 72
+[PID 47694] ✅ Finished batch 72, saved 403348 rows
+[PID 47695] Processing batch 73
+[PID 47695] ✅ Finished batch 73, saved 402235 rows
+[PID 47696] Processing batch 74
+[PID 47696] ✅ Finished batch 74, saved 404182 rows
+[PID 47697] Processing batch 75
+[PID 47697] ✅ Finished batch 75, saved 403997 rows
+[PID 47698] Processing batch 76
+[PID 47698] ✅ Finished batch 76, saved 403424 rows
+[PID 47700] Processing batch 77
+[PID 47700] ✅ Finished batch 77, saved 402924 rows
+[PID 47701] Processing batch 78
+[PID 47701] ✅ Finished batch 78, saved 403869 rows
+[PID 47702] Processing batch 79
+[PID 47702] ✅ Finished batch 79, saved 404990 rows
+[PID 47692] Processing batch 80
+[PID 47692] ✅ Finished batch 80, saved 403698 rows
+[PID 47693] Processing batch 81
+[PID 47693] ✅ Finished batch 81, saved 404642 rows
+[PID 47694] Processing batch 82
+[PID 47694] ✅ Finished batch 82, saved 404216 rows
+[PID 47695] Processing batch 83
+[PID 47695] ✅ Finished batch 83, saved 403948 rows
+[PID 47696] Processing batch 84
+[PID 47696] ✅ Finished batch 84, saved 403531 rows
+[PID 47697] Processing batch 85
+[PID 47697] ✅ Finished batch 85, saved 404482 rows
+[PID 47698] Processing batch 86
+[PID 47698] ✅ Finished batch 86, saved 404215 rows
+[PID 47700] Processing batch 87
+[PID 47700] ✅ Finished batch 87, saved 404072 rows
+[PID 47701] Processing batch 88
+[PID 47701] ✅ Finished batch 88, saved 403828 rows
+[PID 47702] Processing batch 89
+[PID 47702] ✅ Finished batch 89, saved 404893 rows
+[PID 47692] Processing batch 90
+[PID 47692] ✅ Finished batch 90, saved 404093 rows
+[PID 47693] Processing batch 91
+[PID 47693] ✅ Finished batch 91, saved 404534 rows
+[PID 47694] Processing batch 92
+[PID 47694] ✅ Finished batch 92, saved 403946 rows
+[PID 47695] Processing batch 93
+[PID 47695] ✅ Finished batch 93, saved 403967 rows
+[PID 47696] Processing batch 94
+[PID 47696] ✅ Finished batch 94, saved 404239 rows
+[PID 47697] Processing batch 95
+[PID 47697] ✅ Finished batch 95, saved 404659 rows
+[PID 47698] Processing batch 96
+[PID 47698] ✅ Finished batch 96, saved 404459 rows
+[PID 47700] Processing batch 97
+[PID 47700] ✅ Finished batch 97, saved 404149 rows
+[PID 47701] Processing batch 98
+[PID 47701] ✅ Finished batch 98, saved 404124 rows
+[PID 47702] Processing batch 99
+[PID 47702] ✅ Finished batch 99, saved 404629 rows
+[PID 47692] Processing batch 100
+[PID 47692] ✅ Finished batch 100, saved 404646 rows
+[PID 47693] Processing batch 101
+[PID 47693] ✅ Finished batch 101, saved 405172 rows
+[PID 47694] Processing batch 102
+[PID 47694] ✅ Finished batch 102, saved 360933 rows
+[PID 47695] Processing batch 103
+[PID 47695] ✅ Finished batch 103, saved 248734 rows
+[PID 47696] Processing batch 104
+[PID 47696] ✅ Finished batch 104, saved 312831 rows
+[PID 47697] Processing batch 105
+[PID 47697] ✅ Finished batch 105, saved 404271 rows
+[PID 47698] Processing batch 106
+[PID 47698] ✅ Finished batch 106, saved 418990 rows
+[PID 47700] Processing batch 107
+[PID 47700] ✅ Finished batch 107, saved 417966 rows
+[PID 47701] Processing batch 108
+[PID 47701] ✅ Finished batch 108, saved 418430 rows
+[PID 47702] Processing batch 109
+[PID 47702] ✅ Finished batch 109, saved 419723 rows
+[PID 47692] Processing batch 110
+[PID 47692] ✅ Finished batch 110, saved 392048 rows
+[PID 47693] Processing batch 111
+[PID 47693] ✅ Finished batch 111, saved 370784 rows
+[PID 47694] Processing batch 112
+[PID 47694] ✅ Finished batch 112, saved 372787 rows
+[PID 47695] Processing batch 113
+[PID 47695] ✅ Finished batch 113, saved 380191 rows
+[PID 47696] Processing batch 114
+[PID 47696] ✅ Finished batch 114, saved 381680 rows
+[PID 47697] Processing batch 115
+[PID 47697] ✅ Finished batch 115, saved 381823 rows
+[PID 47698] Processing batch 116
+[PID 47698] ✅ Finished batch 116, saved 377904 rows
+[PID 47700] Processing batch 117
+[PID 47700] ✅ Finished batch 117, saved 366711 rows
+[PID 47701] Processing batch 118
+[PID 47701] ✅ Finished batch 118, saved 370403 rows
+[PID 47702] Processing batch 119
+[PID 47702] ✅ Finished batch 119, saved 376696 rows
+[PID 47692] Processing batch 120
+[PID 47692] ✅ Finished batch 120, saved 374683 rows
+[PID 47693] Processing batch 121
+[PID 47693] ✅ Finished batch 121, saved 374907 rows
+[PID 47694] Processing batch 122
+[PID 47694] ✅ Finished batch 122, saved 376892 rows
+[PID 47695] Processing batch 123
+[PID 47695] ✅ Finished batch 123, saved 372269 rows
+[PID 47696] Processing batch 124
+[PID 47696] ✅ Finished batch 124, saved 367390 rows
+[PID 47697] Processing batch 125
+[PID 47697] ✅ Finished batch 125, saved 368598 rows
+[PID 47698] Processing batch 126
+[PID 47698] ✅ Finished batch 126, saved 365739 rows
+[PID 47700] Processing batch 127
+[PID 47700] ✅ Finished batch 127, saved 368380 rows
+[PID 47701] Processing batch 128
+[PID 47701] ✅ Finished batch 128, saved 366449 rows
+[PID 47702] Processing batch 129
+[PID 47702] ✅ Finished batch 129, saved 364536 rows
+[PID 47692] Processing batch 130
+[PID 47692] ✅ Finished batch 130, saved 365854 rows
+[PID 47693] Processing batch 131
+[PID 47693] ✅ Finished batch 131, saved 366180 rows
+[PID 47694] Processing batch 132
+[PID 47694] ✅ Finished batch 132, saved 367408 rows
+[PID 47695] Processing batch 133
+[PID 47695] ✅ Finished batch 133, saved 368851 rows
+[PID 47696] Processing batch 134
+[PID 47696] ✅ Finished batch 134, saved 368192 rows
+[PID 47697] Processing batch 135
+[PID 47697] ✅ Finished batch 135, saved 364784 rows
+[PID 47698] Processing batch 136
+[PID 47698] ✅ Finished batch 136, saved 363219 rows
+[PID 47700] Processing batch 137
+[PID 47700] ✅ Finished batch 137, saved 367385 rows
+[PID 47701] Processing batch 138
+[PID 47701] ✅ Finished batch 138, saved 370095 rows
+[PID 47702] Processing batch 139
+[PID 47702] ✅ Finished batch 139, saved 370584 rows
+[PID 47692] Processing batch 140
+[PID 47692] ✅ Finished batch 140, saved 367153 rows
+[PID 47693] Processing batch 141
+[PID 47693] ✅ Finished batch 141, saved 367097 rows
+[PID 47694] Processing batch 142
+[PID 47694] ✅ Finished batch 142, saved 367485 rows
+[PID 47695] Processing batch 143
+[PID 47695] ✅ Finished batch 143, saved 367221 rows
+[PID 47696] Processing batch 144
+[PID 47696] ✅ Finished batch 144, saved 367256 rows
+[PID 47697] Processing batch 145
+[PID 47697] ✅ Finished batch 145, saved 367629 rows
+[PID 47698] Processing batch 146
+[PID 47698] ✅ Finished batch 146, saved 369094 rows
+[PID 47700] Processing batch 147
+[PID 47700] ✅ Finished batch 147, saved 368335 rows
+[PID 47701] Processing batch 148
+[PID 47701] ✅ Finished batch 148, saved 368751 rows
+[PID 47702] Processing batch 149
+[PID 47702] ✅ Finished batch 149, saved 371766 rows
+[PID 47692] Processing batch 150
+[PID 47692] ✅ Finished batch 150, saved 371058 rows
+[PID 47693] Processing batch 151
+[PID 47693] ✅ Finished batch 151, saved 372325 rows
+[PID 47694] Processing batch 152
+[PID 47694] ✅ Finished batch 152, saved 366886 rows
+[PID 47695] Processing batch 153
+[PID 47695] ✅ Finished batch 153, saved 370263 rows
+[PID 47696] Processing batch 154
+[PID 47696] ✅ Finished batch 154, saved 370201 rows
+[PID 47697] Processing batch 155
+[PID 47697] ✅ Finished batch 155, saved 369610 rows
+[PID 47698] Processing batch 156
+[PID 47698] ✅ Finished batch 156, saved 367651 rows
+[PID 47700] Processing batch 157
+[PID 47700] ✅ Finished batch 157, saved 368523 rows
+[PID 47701] Processing batch 158
+[PID 47701] ✅ Finished batch 158, saved 369107 rows
+[PID 47702] Processing batch 159
+[PID 47702] ✅ Finished batch 159, saved 367704 rows
+[PID 47692] Processing batch 160
+[PID 47692] ✅ Finished batch 160, saved 370769 rows
+[PID 47693] Processing batch 161
+[PID 47693] ✅ Finished batch 161, saved 370839 rows
+[PID 47694] Processing batch 162
+[PID 47695] Processing batch 163
+[PID 47694] ✅ Finished batch 162, saved 375892 rows
+[PID 47695] ✅ Finished batch 163, saved 371829 rows
+[PID 47696] Processing batch 164
+[PID 47696] ✅ Finished batch 164, saved 368594 rows
+[PID 47697] Processing batch 165
+[PID 47697] ✅ Finished batch 165, saved 374420 rows
+[PID 47698] Processing batch 166
+[PID 47698] ✅ Finished batch 166, saved 370041 rows
+[PID 47700] Processing batch 167
+[PID 47700] ✅ Finished batch 167, saved 371688 rows
+[PID 47701] Processing batch 168
+[PID 47701] ✅ Finished batch 168, saved 372452 rows
+[PID 47702] Processing batch 169
+[PID 47702] ✅ Finished batch 169, saved 344935 rows
+[PID 47692] Processing batch 170
+[PID 47692] ✅ Finished batch 170, saved 337226 rows
+[PID 47693] Processing batch 171
+[PID 47693] ✅ Finished batch 171, saved 330248 rows
+[PID 47694] Processing batch 172
+[PID 47694] ✅ Finished batch 172, saved 341252 rows
+[PID 47695] Processing batch 173
+[PID 47695] ✅ Finished batch 173, saved 342784 rows
+[PID 47696] Processing batch 174
+[PID 47696] ✅ Finished batch 174, saved 344112 rows
+[PID 47697] Processing batch 175
+[PID 47697] ✅ Finished batch 175, saved 342315 rows
+[PID 47698] Processing batch 176
+[PID 47698] ✅ Finished batch 176, saved 342449 rows
+[PID 47700] Processing batch 177
+[PID 47700] ✅ Finished batch 177, saved 342429 rows
+[PID 47701] Processing batch 178
+[PID 47701] ✅ Finished batch 178, saved 342732 rows
+[PID 47702] Processing batch 179
+[PID 47702] ✅ Finished batch 179, saved 340942 rows
+[PID 47692] Processing batch 180
+[PID 47693] Processing batch 181
+[PID 47692] ✅ Finished batch 180, saved 340515 rows
+[PID 47693] ✅ Finished batch 181, saved 264556 rows
+
+
+PS:
+
+Read file <bsub.transf_chr.38933273.err> for stderr output of this job.
+
