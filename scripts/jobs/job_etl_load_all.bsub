@@ -1,0 +1,24 @@
+#!/bin/bash
+#BSUB -J etl_load_all
+#BSUB -o bsub.etl_load_all.%J.out
+#BSUB -e bsub.etl_load_all.%J.err
+#BSUB -n 4
+#BSUB -M 128000
+#BSUB -W 24:00
+#BSUB -R "select[ostype>=CENT7]"
+
+# Carrega os módulos necessários
+module load python/3.11
+module load git/2.39.0
+
+# Ativa o poetry no ambiente do usuário
+export PATH="$HOME/.local/bin:$PATH"
+
+# Entra no diretório do projeto
+cd /home/alrico/group/software/biofilter3R
+
+# Ativa o ambiente virtual local
+source .venv/bin/activate
+
+# Executa o script Python
+python /home/alrico/group/software/biofilter3R/scripts/jobs/etl_load_all.py
