@@ -19,12 +19,6 @@
             "active": true
         },
         {
-            "name": "dbSNP",
-            "description": "NCBI Single Nucleotide Polymorphism Database",
-            "homepage": "https://www.ncbi.nlm.nih.gov/snp",
-            "active": true
-        },
-        {
             "name": "Reactome",
             "description": "Open-source, peer-reviewed pathway database providing curated biological pathways and reactions in human biology and other species.",
             "homepage": "https://reactome.org/",

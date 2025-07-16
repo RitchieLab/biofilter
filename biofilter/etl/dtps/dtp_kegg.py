@@ -26,6 +26,12 @@ class DTP(DTPBase, EntityQueryMixin):
         self.session = session
         self.use_conflict_csv = use_conflict_csv
 
+        # DTP versioning
+        self.dtp_name = "dtp_kegg"
+        self.dtp_version = "1.0.0"
+        self.compatible_schema_min = "3.0.0"
+        self.compatible_schema_max = "4.0.0"
+
     # ⬇️  --------------------------  ⬇️
     # ⬇️  ------ EXTRACT FASE ------  ⬇️
     # ⬇️  --------------------------  ⬇️
@@ -41,6 +47,9 @@ class DTP(DTPBase, EntityQueryMixin):
             msg,
             "INFO",  # noqa: E501
         )  # noqa: E501
+
+        # Check Compartibility
+        self.check_compatibility()
 
         source_url = self.data_source.source_url
         if force_steps:
@@ -106,6 +115,9 @@ class DTP(DTPBase, EntityQueryMixin):
         msg = f"🔧 Transforming the {self.data_source.name} data ..."
 
         self.logger.log(msg, "INFO")  # noqa: E501
+
+        # Check Compartibility
+        self.check_compatibility()
 
         # Check if raw_dir and processed_dir are provided
         try:
@@ -190,6 +202,9 @@ class DTP(DTPBase, EntityQueryMixin):
             msg,
             "INFO",  # noqa E501
         )
+
+        # Check Compartibility
+        self.check_compatibility()
 
         total_pathways = 0
         load_status = False

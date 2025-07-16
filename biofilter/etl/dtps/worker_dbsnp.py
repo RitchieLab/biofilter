@@ -129,5 +129,5 @@ def worker_dbsnp(batch, batch_id, output_dir, assembly_map):
 
         # Worker finished the taks
         print(
-            f"[PID {os.getpid()}] ✅ Finished batch {batch_id}, saved {len(df)} rows"
+            f"[PID {os.getpid()}] ✅ Finished batch {batch_id}, saved {len(df)} rows"  # noqa: E501
         )  # noqa: E501

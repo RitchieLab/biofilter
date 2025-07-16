@@ -37,6 +37,12 @@ class DTP(DTPBase, EntityQueryMixin):
         self.session = session
         self.use_conflict_csv = use_conflict_csv
 
+        # DTP versioning
+        self.dtp_name = "dtp_uniprot"
+        self.dtp_version = "1.0.0"
+        self.compatible_schema_min = "3.0.0"
+        self.compatible_schema_max = "4.0.0"
+
     # ⬇️  --------------------------  ⬇️
     # ⬇️  ------ EXTRACT FASE ------  ⬇️
     # ⬇️  --------------------------  ⬇️
@@ -49,6 +55,9 @@ class DTP(DTPBase, EntityQueryMixin):
             f"⬇️  Starting extraction of {self.data_source.name} data...",
             "INFO",
         )
+
+        # Check Compartibility
+        self.check_compatibility()
 
         msg = ""
         source_url = self.data_source.source_url
@@ -114,6 +123,9 @@ class DTP(DTPBase, EntityQueryMixin):
 
         msg = f"🔧 Transforming the {self.data_source.name} data ..."
         self.logger.log(msg, "INFO")
+
+        # Check Compartibility
+        self.check_compatibility()
 
         # Check if raw_dir and processed_dir are provided
         try:
@@ -399,6 +411,9 @@ class DTP(DTPBase, EntityQueryMixin):
             msg,
             "INFO",
         )
+
+        # Check Compartibility
+        self.check_compatibility()
 
         total_proteins = 0
         total_isoforms = 0

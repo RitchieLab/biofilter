@@ -39,6 +39,12 @@ class DTP(DTPBase, VariantQueryMixin):
         self.use_conflict_csv = use_conflict_csv
         self.conflict_mgr = ConflictManager(session, logger)
 
+        # DTP versioning
+        self.dtp_name = "dtp_variant_ncbi"
+        self.dtp_version = "1.0.0"
+        self.compatible_schema_min = "3.0.0"
+        self.compatible_schema_max = "4.0.0"
+
     # ⬇️  --------------------------  ⬇️
     # ⬇️  ------ EXTRACT FASE ------  ⬇️
     # ⬇️  --------------------------  ⬇️
@@ -52,6 +58,9 @@ class DTP(DTPBase, VariantQueryMixin):
             f"⬇️ Starting extraction of {self.data_source.name} data...",
             "INFO",  # noqa: E501
         )  # noqa: E501
+
+        # Check Compartibility
+        self.check_compatibility()
 
         msg = ""
         source_url = self.data_source.source_url
@@ -111,6 +120,9 @@ class DTP(DTPBase, VariantQueryMixin):
             f"🔧 Transforming the {self.data_source.name} data ...", "INFO"
         )  # noqa: E501
 
+        # Check Compartibility
+        self.check_compatibility()
+
         # INPUT DATA
         input_file = self.get_raw_file(raw_path)
         if not input_file.exists():
@@ -124,7 +136,7 @@ class DTP(DTPBase, VariantQueryMixin):
         output_dir.mkdir(parents=True, exist_ok=True)
         # Clean only batch CSVs that follow the expected naming
         for f in output_dir.iterdir():
-            if f.name.startswith("processed_part_") and f.name.endswith(".parquet"):
+            if f.name.startswith("processed_part_") and f.name.endswith(".parquet"):  # noqa: E501
                 f.unlink()
 
         # VARIABLES
@@ -203,6 +215,9 @@ class DTP(DTPBase, VariantQueryMixin):
             "INFO",  # noqa E501
         )
 
+        # Check Compartibility
+        self.check_compatibility()
+
         total_variants = 0
         load_status = False
         message = ""
@@ -218,7 +233,7 @@ class DTP(DTPBase, VariantQueryMixin):
                 return total_variants, load_status, msg
 
             processed_path = self.get_path(processed_path)
-            # csv_files = sorted(glob.glob(str(processed_path / "processed_part_*.csv")))
+            # csv_files = sorted(glob.glob(str(processed_path / "processed_part_*.csv")))  # noqa: E501
             csv_files = sorted(
                 glob.glob(str(processed_path / "processed_part_*.parquet"))
             )
@@ -228,7 +243,7 @@ class DTP(DTPBase, VariantQueryMixin):
                 self.logger.log(msg, "ERROR")
                 return total_variants, load_status, msg
 
-            self.logger.log(f"📄 Found {len(csv_files)} part files to load", "INFO")
+            self.logger.log(f"📄 Found {len(csv_files)} part files to load", "INFO")  # noqa: E501
 
         # Apaga os dados da tabela de links
         self.session.query(VariantGeneRelationship).filter_by(
@@ -241,14 +256,14 @@ class DTP(DTPBase, VariantQueryMixin):
         ).delete()
 
         self.session.commit()
-        self.logger.log("🗑️ Previous records deleted for this data source", "INFO")
+        self.logger.log("🗑️ Previous records deleted for this data source", "INFO")  # noqa: E501
 
         # Processa arquivo por arquivo
         for csv_file in csv_files:
             self.logger.log(f"📂 Processing {csv_file}", "INFO")
 
             # df = pd.read_csv(csv_file, dtype=str)
-            # Evita carregar colunas como hgvs ou seq_id se não forem mais necessários.
+            # Evita carregar colunas como hgvs ou seq_id se não forem mais necessários.  # noqa: E501
             df = pd.read_parquet(
                 csv_file,
                 columns=[
@@ -282,9 +297,9 @@ class DTP(DTPBase, VariantQueryMixin):
             df_alt["rs_id"] = df_alt["rs_id"].astype(str)
             df_variants = df_ref.merge(df_alt, on="rs_id", how="left")
             df_variants["alt"] = df_variants["alt"].fillna("")
-            df_variants = df_variants.dropna(subset=["assembly_id", "position_base_1"])
+            df_variants = df_variants.dropna(subset=["assembly_id", "position_base_1"])  # noqa: E501
             df_variants["assembly_id"] = df_variants["assembly_id"].astype(int)
-            df_variants["position_base_1"] = df_variants["position_base_1"].astype(int)
+            df_variants["position_base_1"] = df_variants["position_base_1"].astype(int)  # noqa: E501
 
             variants_to_insert = [
                 Variant(
@@ -305,13 +320,13 @@ class DTP(DTPBase, VariantQueryMixin):
                 total_variants += len(variants_to_insert)
             except IntegrityError as e:
                 self.session.rollback()
-                self.logger.log(f"❌ Integrity error in {csv_file}: {str(e)}", "ERROR")
+                self.logger.log(f"❌ Integrity error in {csv_file}: {str(e)}", "ERROR")  # noqa: E501
 
             # ➤ Gene links
-            # df_links = df[df["gene_ids"].notna() & (df["gene_ids"] != "[]")].copy()
+            # df_links = df[df["gene_ids"].notna() & (df["gene_ids"] != "[]")].copy()  # noqa: E501
             df_links = df[
-                df["gene_ids"].apply(lambda x: hasattr(x, "__len__") and len(x) > 0)
-            ].copy()
+                df["gene_ids"].apply(lambda x: hasattr(x, "__len__") and len(x) > 0)  # noqa: E501
+            ].copy()  # noqa: E501
             df_links = df_links[["rs_id", "gene_ids"]].drop_duplicates("rs_id")
             df_links["gene_ids"] = df_links["gene_ids"].apply(
                 lambda x: ast.literal_eval(x) if isinstance(x, str) else x
@@ -333,13 +348,13 @@ class DTP(DTPBase, VariantQueryMixin):
                 self.session.bulk_save_objects(links_to_insert)
                 self.session.commit()
                 self.logger.log(
-                    f"✅ Inserted {len(links_to_insert)} gene-variant links from {csv_file}",
+                    f"✅ Inserted {len(links_to_insert)} gene-variant links from {csv_file}",  # noqa: E501
                     "INFO",
                 )
             except IntegrityError as e:
                 self.session.rollback()
                 self.logger.log(
-                    f"❌ Integrity error in {csv_file} for gene-variant links: {str(e)}",
+                    f"❌ Integrity error in {csv_file} for gene-variant links: {str(e)}",  # noqa: E501
                     "ERROR",
                 )
 
@@ -349,7 +364,7 @@ class DTP(DTPBase, VariantQueryMixin):
 
         load_status = True
         message = (
-            f"✅ Loaded {total_variants} variants from {len(csv_files)} CSV chunks."
+            f"✅ Loaded {total_variants} variants from {len(csv_files)} CSV chunks."  # noqa: E501
         )
         self.logger.log(message, "SUCCESS")
 

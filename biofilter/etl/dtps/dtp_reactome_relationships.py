@@ -25,6 +25,12 @@ class DTP(DTPBase, EntityQueryMixin):
         self.session = session
         self.use_conflict_csv = use_conflict_csv
 
+        # DTP versioning
+        self.dtp_name = "dtp_reactome_relationships"
+        self.dtp_version = "1.0.0"
+        self.compatible_schema_min = "3.0.0"
+        self.compatible_schema_max = "4.0.0"
+
     # ⬇️  --------------------------  ⬇️
     # ⬇️  ------ EXTRACT FASE ------  ⬇️
     # ⬇️  --------------------------  ⬇️
@@ -65,6 +71,9 @@ class DTP(DTPBase, EntityQueryMixin):
         Load relationships between pathways and other entities from processed file.  # noqa: E501
         """
         msg = f"🔄 Loading relationships for data source '{self.data_source.name}'..."  # noqa E501
+
+        # Check Compartibility
+        self.check_compatibility()
 
         self.logger.log(msg, "INFO")
         load_status = False
@@ -113,7 +122,7 @@ class DTP(DTPBase, EntityQueryMixin):
             # This is necessary because the Entities were loaded from the
             # Reactome data source.
             parent_ds_id = (
-                self.session.query(DataSource.id).filter_by(name=parent_source).scalar()
+                self.session.query(DataSource.id).filter_by(name=parent_source).scalar()  # noqa E501
             )
 
             # Get pathway IDs from EntityName

@@ -9,6 +9,8 @@ from biofilter.etl.conflict_manager import ConflictManager
 from biofilter.utils.model_explorer import ModelExplorer
 from biofilter.utils.migrate import run_migration
 
+from biofilter.reports.report_manager import ReportManager
+
 
 class Biofilter:
     def __init__(self, db_uri: str = None):
@@ -185,3 +187,21 @@ class Biofilter:
     def migrate(self):
         # run_migration(self.db.session)
         run_migration(self.db.session, self.db.db_uri)
+
+
+    # REPORTS
+    def list_reports(self):
+        """
+        List all available reports with name and description.
+        """
+        report = ReportManager(self.db.get_session())
+
+        return report.list_reports()
+
+    def run_report(self, name: str, as_dataframe: bool = True, **kwargs):
+        """
+        Run a report by name, optionally returning the result as a DataFrame.
+        """
+        report = ReportManager(self.db.get_session())
+
+        return report.run_report(name=name, as_dataframe=as_dataframe, **kwargs)

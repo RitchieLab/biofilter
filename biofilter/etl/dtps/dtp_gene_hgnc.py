@@ -117,6 +117,9 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
 
         self.logger.log(msg, "INFO")  # noqa: E501
 
+        # Check Compartibility
+        self.check_compatibility()
+
         # Check if raw_dir and processed_dir are provided
         try:
             # Define input/output base paths
@@ -190,6 +193,9 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
             msg,
             "INFO",  # noqa E501
         )
+
+        # Check Compartibility
+        self.check_compatibility()
 
         total_gene = 0  # not considered conflict genes
         load_status = False

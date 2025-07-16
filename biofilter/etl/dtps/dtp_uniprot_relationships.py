@@ -27,6 +27,12 @@ class DTP(DTPBase, EntityQueryMixin):
         self.session = session
         self.use_conflict_csv = use_conflict_csv
 
+        # DTP versioning
+        self.dtp_name = "dtp_uniprot_relationships"
+        self.dtp_version = "1.0.0"
+        self.compatible_schema_min = "3.0.0"
+        self.compatible_schema_max = "4.0.0"
+
     # ⬇️  --------------------------  ⬇️
     # ⬇️  ------ EXTRACT FASE ------  ⬇️
     # ⬇️  --------------------------  ⬇️
@@ -69,8 +75,11 @@ class DTP(DTPBase, EntityQueryMixin):
         msg = f"🔄 Loading relationships for data source '{self.data_source.name}'..."  # noqa E501
 
         self.logger.log(msg, "INFO")
-        load_status = False
 
+        # Check Compartibility
+        self.check_compatibility()
+
+        load_status = False
         total_relationships = 0
 
         # data_source_id = self.data_source.id
@@ -130,7 +139,7 @@ class DTP(DTPBase, EntityQueryMixin):
             )  # noqa E501
             # Map relationship types to their IDs
             df["relation_type_id"] = (
-                df["relation_type"].str.lower().map(rel_type_map).astype("Int64")
+                df["relation_type"].str.lower().map(rel_type_map).astype("Int64")  # noqa E501
             )  # noqa E501
         except KeyError as e:
             msg = f"Error mapping group IDs or relationship types: {e}"
@@ -145,7 +154,7 @@ class DTP(DTPBase, EntityQueryMixin):
                 .delete(synchronize_session=False)
             )
             self.logger.log(
-                f"🧹  Deleted {deleted} existing relationships from this data source",
+                f"🧹  Deleted {deleted} existing relationships from this data source"  # noqa E501
                 "INFO",
             )  # noqa E501
             self.session.commit()

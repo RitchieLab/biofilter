@@ -11,7 +11,7 @@ from biofilter.etl.mixins.entity_query_mixin import EntityQueryMixin
 from biofilter.db.models.entity_models import (
     EntityGroup,
 )  # noqa E501
-from biofilter.db.models.genes_models import Gene, GeneGroup, GeneGroupMembership
+from biofilter.db.models.genes_models import Gene, GeneGroup, GeneGroupMembership  # noqa E501
 from biofilter.etl.mixins.gene_query_mixin import GeneQueryMixin
 from biofilter.etl.mixins.base_dtp import DTPBase
 
@@ -38,6 +38,12 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
         self.session = session
         self.use_conflict_csv = use_conflict_csv
 
+        # DTP versioning
+        self.dtp_name = "dtp_gene_ncbi"
+        self.dtp_version = "1.0.0"
+        self.compatible_schema_min = "3.0.0"
+        self.compatible_schema_max = "4.0.0"
+
     # ⬇️  --------------------------  ⬇️
     # ⬇️  ------ EXTRACT FASE ------  ⬇️
     # ⬇️  --------------------------  ⬇️
@@ -53,6 +59,9 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
             msg,
             "INFO",  # noqa: E501
         )  # noqa: E501
+
+        # Check Compartibility
+        self.check_compatibility()
 
         source_url = self.data_source.source_url
         if force_steps:
@@ -127,6 +136,9 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
         msg = f"🔧 Transforming the {self.data_source.name} data ..."
 
         self.logger.log(msg, "INFO")  # noqa: E501
+
+        # Check Compartibility
+        self.check_compatibility()
 
         # Check if raw_dir and processed_dir are provided
         try:
@@ -284,6 +296,9 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
             "INFO",  # noqa: E501
         )
 
+        # Check Compartibility
+        self.check_compatibility()
+
         total_genes = 0
         total_gene_existing = 0
         load_status = False
@@ -315,7 +330,7 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
             # Get or create EntityGroup for Genes
             if not hasattr(self, "entity_group") or self.entity_group is None:
                 group = (
-                    self.session.query(EntityGroup).filter_by(name="Genes").first()
+                    self.session.query(EntityGroup).filter_by(name="Genes").first()  # noqa E501
                 )  # noqa: E501
                 if not group:
                     msg = "EntityGroup 'Genes' not found in the database."

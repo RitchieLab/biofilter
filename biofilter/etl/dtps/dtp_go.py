@@ -25,6 +25,12 @@ class DTP(DTPBase, EntityQueryMixin):
         self.session = session
         self.use_conflict_csv = use_conflict_csv
 
+        # DTP versioning
+        self.dtp_name = "dtp_go"
+        self.dtp_version = "1.0.0"
+        self.compatible_schema_min = "3.0.0"
+        self.compatible_schema_max = "4.0.0"
+
     # ⬇️  --------------------------  ⬇️
     # ⬇️  ------ EXTRACT FASE ------  ⬇️
     # ⬇️  --------------------------  ⬇️
@@ -40,6 +46,9 @@ class DTP(DTPBase, EntityQueryMixin):
             msg,
             "INFO",
         )
+
+        # Check Compartibility
+        self.check_compatibility()
 
         source_url = self.data_source.source_url
 
@@ -107,6 +116,9 @@ class DTP(DTPBase, EntityQueryMixin):
         msg = f"⚙️  Starting transformation of {self.data_source.name} data..."
 
         self.logger.log(msg, "INFO")
+
+        # Check Compartibility
+        self.check_compatibility()
 
         # Check if raw_dir and processed_dir are provided
         try:
@@ -273,6 +285,9 @@ class DTP(DTPBase, EntityQueryMixin):
 
         self.logger.log(msg, "INFO")
 
+        # Check Compartibility
+        self.check_compatibility()
+
         total_terms = 0
         load_status = False
 
@@ -425,7 +440,7 @@ class DTP(DTPBase, EntityQueryMixin):
 
                 # Create new relation
                 relation = GORelation(
-                    parent_id=parent.id, child_id=child.id, relation_type=rel_type
+                    parent_id=parent.id, child_id=child.id, relation_type=rel_type  # noqa E501
                 )  # noqa: E501
                 self.session.add(relation)
                 total_relations += 1

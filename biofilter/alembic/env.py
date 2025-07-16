@@ -1,17 +1,15 @@
 import os
-from logging.config import fileConfig
-
-from sqlalchemy import engine_from_config
-from sqlalchemy import pool
-
 from alembic import context
+from logging.config import fileConfig
+from sqlalchemy import pool
+from sqlalchemy import engine_from_config
+
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config
 
 # Set DB URL manually if not in alembic.ini
-# db_path = os.getenv("BIOFILTER_DB_URI", "sqlite:///dev_biofilter.db")
 # config.set_main_option("sqlalchemy.url", db_path)
 # Override sqlalchemy.url from environment variable if set
 db_path = os.getenv("BIOFILTER_DB_URI")
@@ -28,8 +26,8 @@ if config.config_file_name is not None:
 # from myapp import mymodel
 # target_metadata = mymodel.Base.metadata
 # target_metadata = None # Default
-from biofilter.db import Base
-from biofilter.db import models # Import all models
+from biofilter.db import Base  # noqa E402
+from biofilter.db import models # Import all models. # noqa
 target_metadata = Base.metadata
 
 
@@ -89,62 +87,3 @@ if context.is_offline_mode():
     run_migrations_offline()
 else:
     run_migrations_online()
-
-
-# import sys
-# from pathlib import Path
-
-# sys.path.append(str(Path(__file__).resolve().parents[1]))
-
-# from logging.config import fileConfig
-# from sqlalchemy import engine_from_config, pool
-# from alembic import context
-
-# from biofilter.db.database import Base  # suas tabelas
-# from biofilter.db import models  # necessário para registrar metadata
-
-# # Alembic Config object
-# config = context.config
-
-# # Logging
-# fileConfig(config.config_file_name)
-
-# # Add your model's MetaData object for 'autogenerate' support
-# target_metadata = Base.metadata
-
-
-# def run_migrations_offline():
-#     url = config.get_main_option("sqlalchemy.url")
-#     context.configure(
-#         url=url,
-#         target_metadata=target_metadata,
-#         literal_binds=True,
-#         compare_type=True,
-#     )
-
-#     with context.begin_transaction():
-#         context.run_migrations()
-
-
-# def run_migrations_online():
-#     connectable = engine_from_config(
-#         config.get_section(config.config_ini_section),
-#         prefix='sqlalchemy.',
-#         poolclass=pool.NullPool,
-#     )
-
-#     with connectable.connect() as connection:
-#         context.configure(
-#             connection=connection,
-#             target_metadata=target_metadata,
-#             compare_type=True,
-#         )
-
-#         with context.begin_transaction():
-#             context.run_migrations()
-
-
-# if context.is_offline_mode():
-#     run_migrations_offline()
-# else:
-#     run_migrations_online()
