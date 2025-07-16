@@ -24,6 +24,7 @@ source .venv/bin/activate
 python -c "
 from biofilter import Biofilter
 bf = Biofilter()
-bf.create_new_project('sqlite:///dev_biofilter.db', overwrite=True)
+bf.create_new_project('sqlite:///biofilter.db', overwrite=True)
 "
-
+# used:
+# (biofilter-py3.11) [alrico@superman biofilter_data]$ poetry run biofilter project create --db-uri sqlite:///biofilter.db
