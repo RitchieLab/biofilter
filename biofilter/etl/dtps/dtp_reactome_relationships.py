@@ -79,7 +79,43 @@ class DTP(DTPBase, EntityQueryMixin):
         load_status = False
 
         total_relationships = 0
+        total_warnings = 0
         parent_source = "reactome"
+
+        # Set DB and drop indexes
+        try:
+            index_specs_entity = [
+                # Entity
+                ("entities", ["group_id"]),
+                ("entities", ["has_conflict"]),
+                ("entities", ["is_deactive"]),
+
+                # EntityName
+                ("entity_names", ["entity_id"]),
+                ("entity_names", ["name"]),
+                ("entity_names", ["data_source_id"]),
+                ("entity_names", ["data_source_id", "name"]),
+                ("entity_names", ["data_source_id", "entity_id"]),
+                ("entity_names", ["entity_id", "is_primary"]),
+
+                # EntityRelationship
+                ("entity_relationships", ["entity_1_id"]),
+                ("entity_relationships", ["entity_2_id"]),
+                ("entity_relationships", ["relationship_type_id"]),
+                ("entity_relationships", ["data_source_id"]),
+                ("entity_relationships", ["entity_1_id", "relationship_type_id"]),  # noqa E501
+                ("entity_relationships", ["entity_1_id", "entity_2_id", "relationship_type_id"]),  # noqa E501
+
+                # EntityRelationshipType
+                ("entity_relationship_types", ["code"]),
+            ]
+
+            self.db_write_mode()
+            # self.drop_indexes(index_specs) # Keep indices to improve checks
+        except Exception as e:
+            total_warnings += 1
+            msg = f"⚠️ Failed to switch DB to write mode or drop indexes: {e}"
+            self.logger.log(msg, "WARNING")
 
         # data_source_id = self.data_source.id
 
@@ -246,11 +282,36 @@ class DTP(DTPBase, EntityQueryMixin):
                 )  # noqa E501
                 df_not_loaded.to_csv(not_loaded_path, index=False)
 
-            msg = f"✅ Relations loaded: {len(df_valid)} | Not found: {len(df_not_loaded)}"  # noqa: E501
-            self.logger.log(msg, "INFO")
-            return len(df_valid), True, msg
+            # msg = f"✅ Relations loaded: {len(df_valid)} | Not found: {len(df_not_loaded)}"  # noqa: E501
+            # self.logger.log(msg, "INFO")
+            # return len(df_valid), True, msg
 
         except Exception as e:
             msg = f"KeyError during loading relationships: {e}"
             self.logger.log(msg, "ERROR")
             return total_relationships, load_status, msg
+
+        # Set DB to Read Mode and Create Index
+        try:
+            # Drop Indexs
+            # self.drop_indexes(index_specs)
+            self.drop_indexes(index_specs_entity)
+            # Stating Indexs
+            # self.create_indexes(index_specs)
+            self.create_indexes(index_specs_entity)
+            self.db_read_mode()
+        except Exception as e:
+            total_warnings += 1
+            msg = f"Failed to switch DB to write mode or drop indexes: {e}"
+            self.logger.log(msg, "WARNING")
+
+        load_status = True
+
+        if total_warnings != 0:
+            msg = f"{total_warnings} warning to analysis in log file"
+            self.logger.log(msg, "WARNING")
+
+        msg = f"✅ Relations loaded: {len(df_valid)} | Not found: {len(df_not_loaded)}"  # noqa: E501
+        self.logger.log(msg, "INFO")
+
+        return len(df_valid), True, msg

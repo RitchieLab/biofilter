@@ -2,6 +2,7 @@ import os
 import gc
 import gzip
 import shutil
+import time  # DEBUG
 import requests
 import pandas as pd
 from pathlib import Path
@@ -301,7 +302,77 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
 
         total_genes = 0
         total_gene_existing = 0
+        total_warnings = 0
         load_status = False
+
+        # Set DB and drop indexes
+        try:
+            index_specs = [
+                # ──────────────── gene_groups ────────────────
+                ("gene_groups", ["name"]),
+                # ──────────────── locus_groups ────────────────
+                ("locus_groups", ["name"]),
+                # ──────────────── locus_types ────────────────
+                ("locus_types", ["name"]),
+                # ──────────────── omic_status ────────────────
+                ("omic_status", ["name"]),
+                # ──────────────── genomic_regions ────────────────
+                ("genomic_regions", ["label"]),
+                ("genomic_regions", ["chromosome"]),
+                ("genomic_regions", ["chromosome", "start", "end"]),
+                # ──────────────── genes ────────────────
+                ("genes", ["entity_id"]),
+                ("genes", ["hgnc_id"]),
+                ("genes", ["entrez_id"]),
+                ("genes", ["ensembl_id"]),
+                ("genes", ["locus_group_id"]),
+                ("genes", ["locus_type_id"]),
+                ("genes", ["data_source_id"]),
+                ("genes", ["omic_status_id"]),
+                # ──────────────── gene_group_membership ────────────────
+                ("gene_group_membership", ["group_id"]),
+                ("gene_group_membership", ["gene_id"]),
+                # ──────────────── gene_locations ────────────────
+                ("gene_locations", ["gene_id"]),
+                ("gene_locations", ["region_id"]),
+                ("gene_locations", ["assembly"]),
+                ("gene_locations", ["chromosome"]),
+                ("gene_locations", ["chromosome", "start", "end"]),
+                ("gene_locations", ["data_source_id"]),
+            ]
+
+            index_specs_entity = [
+                # Entity
+                ("entities", ["group_id"]),
+                ("entities", ["has_conflict"]),
+                ("entities", ["is_deactive"]),
+
+                # EntityName
+                ("entity_names", ["entity_id"]),
+                ("entity_names", ["name"]),
+                ("entity_names", ["data_source_id"]),
+                ("entity_names", ["data_source_id", "name"]),
+                ("entity_names", ["data_source_id", "entity_id"]),
+                ("entity_names", ["entity_id", "is_primary"]),
+
+                # EntityRelationship
+                ("entity_relationships", ["entity_1_id"]),
+                ("entity_relationships", ["entity_2_id"]),
+                ("entity_relationships", ["relationship_type_id"]),
+                ("entity_relationships", ["data_source_id"]),
+                ("entity_relationships", ["entity_1_id", "relationship_type_id"]),  # noqa E501
+                ("entity_relationships", ["entity_1_id", "entity_2_id", "relationship_type_id"]),  # noqa E501
+
+                # EntityRelationshipType
+                ("entity_relationship_types", ["code"]),
+            ]
+
+            self.db_write_mode()
+            # self.drop_indexes(index_specs) # Keep indices to improve checks
+        except Exception as e:
+            total_warnings += 1
+            msg = f"⚠️ Failed to switch DB to write mode or drop indexes: {e}"
+            self.logger.log(msg, "WARNING")
 
         try:
             # Load data
@@ -365,8 +436,21 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
             start = None
             end = None
 
+            # DEBUG
+            start_total = time.time()
+            prev_time = start_total
+
             for _, row in df.iterrows():
                 gene_master = row.get("symbol", "").strip()
+
+                # DEBUG
+                current_time = time.time()
+                # Tempo desde o início
+                elapsed_total = current_time - start_total
+                # Tempo desde a última iteração
+                elapsed_since_last = (current_time - prev_time) * 1000
+                prev_time = current_time
+                print(f"{row.name} - {gene_master} | Total: {elapsed_total:.2f}s | Δ: {elapsed_since_last:.0f}ms")  # noqa E501
 
                 # Skip genes with invalid symbol
                 if not gene_master or gene_master.lower() in {
@@ -499,12 +583,34 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
                 total_genes += 1
 
             self.session.commit()
-            msg = f"✅ Genes loaded from NCBI (not in HGNC): {total_genes} new, {total_gene_existing} existing"  # noqa: E501
-            self.logger.log(msg, "INFO")
-            return total_genes, True, msg
 
         except Exception as e:
             self.session.rollback()
             msg = f"❌ Load failed: {str(e)}"
             self.logger.log(msg, "ERROR")
             return 0, False, msg
+
+        # Set DB to Read Mode and Create Index
+        try:
+            # Drop Indexs
+            self.drop_indexes(index_specs)
+            self.drop_indexes(index_specs_entity)
+            # Stating Indexs
+            self.create_indexes(index_specs)
+            self.create_indexes(index_specs_entity)
+            self.db_read_mode()
+        except Exception as e:
+            total_warnings += 1
+            msg = f"Failed to switch DB to write mode or drop indexes: {e}"
+            self.logger.log(msg, "WARNING")
+
+        load_status = True
+
+        if total_warnings != 0:
+            msg = f"{total_warnings} warning to analysis in log file"
+            self.logger.log(msg, "WARNING")
+
+        msg = f"✅ Genes loaded from NCBI (not in HGNC): {total_genes} new, {total_gene_existing} existing"  # noqa: E501
+        self.logger.log(msg, "INFO")
+
+        return total_genes, True, msg

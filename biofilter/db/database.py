@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+from sqlalchemy import text
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from biofilter.utils.logger import Logger
@@ -49,6 +50,18 @@ class Database(CreateDBMixin):
 
         self.engine = create_engine(self.db_uri, future=True)
         self.session = sessionmaker(bind=self.engine, future=True)
+
+        # Be sure that setting is correct.
+        # if self.session.bind.dialect.name == "sqlite":
+        #     self.session.execute(text("PRAGMA journal_mode = DELETE;"))
+        #     self.session.execute(text("PRAGMA foreign_keys = ON;"))
+        #     self.session.commit()
+        # if self.engine.dialect.name == "sqlite":
+        #     with self.Session() as s:
+        #         s.execute(text("PRAGMA journal_mode = DELETE;"))
+        #         s.execute(text("PRAGMA foreign_keys = ON;"))
+        #         s.commit()
+
         self.connected = True
 
     def exists_db(self):

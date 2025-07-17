@@ -348,9 +348,52 @@ class DTP(DTPBase, EntityQueryMixin):
         self.check_compatibility()
 
         total_pathways = 0
+        total_warnings = 0
         load_status = False
 
         data_source_id = self.data_source.id
+
+        # Set DB and drop indexes
+        try:
+            index_specs = [
+                ("pathways", ["entity_id"]),
+                # Já possui index=True + unique=True, mas bom explicitar
+                ("pathways", ["pathway_id"]),
+                ("pathways", ["data_source_id"]),
+            ]
+
+            index_specs_entity = [
+                # Entity
+                ("entities", ["group_id"]),
+                ("entities", ["has_conflict"]),
+                ("entities", ["is_deactive"]),
+
+                # EntityName
+                ("entity_names", ["entity_id"]),
+                ("entity_names", ["name"]),
+                ("entity_names", ["data_source_id"]),
+                ("entity_names", ["data_source_id", "name"]),
+                ("entity_names", ["data_source_id", "entity_id"]),
+                ("entity_names", ["entity_id", "is_primary"]),
+
+                # EntityRelationship
+                ("entity_relationships", ["entity_1_id"]),
+                ("entity_relationships", ["entity_2_id"]),
+                ("entity_relationships", ["relationship_type_id"]),
+                ("entity_relationships", ["data_source_id"]),
+                ("entity_relationships", ["entity_1_id", "relationship_type_id"]),  # noqa E501
+                ("entity_relationships", ["entity_1_id", "entity_2_id", "relationship_type_id"]),  # noqa E501
+
+                # EntityRelationshipType
+                ("entity_relationship_types", ["code"]),
+            ]
+
+            self.db_write_mode()
+            # self.drop_indexes(index_specs) # Keep indices to improve checks
+        except Exception as e:
+            total_warnings += 1
+            msg = f"⚠️ Failed to switch DB to write mode or drop indexes: {e}"
+            self.logger.log(msg, "WARNING")
 
         if df is None:
             if not processed_dir:
@@ -435,11 +478,32 @@ class DTP(DTPBase, EntityQueryMixin):
 
                     total_pathways += 1
 
-            msg = f"📥 Total Pathways: {total_pathways}"  # noqa E501
-            self.logger.log(msg, "INFO")
-            return total_pathways, True, msg
-
         except Exception as e:
             msg = f"❌ ETL load_relations failed: {str(e)}"
             self.logger.log(msg, "ERROR")
             return 0, False, msg
+
+        # Set DB to Read Mode and Create Index
+        try:
+            # Drop Indexs
+            self.drop_indexes(index_specs)
+            self.drop_indexes(index_specs_entity)
+            # Stating Indexs
+            self.create_indexes(index_specs)
+            self.create_indexes(index_specs_entity)
+            self.db_read_mode()
+        except Exception as e:
+            total_warnings += 1
+            msg = f"Failed to switch DB to write mode or drop indexes: {e}"
+            self.logger.log(msg, "WARNING")
+
+        load_status = True
+
+        if total_warnings != 0:
+            msg = f"{total_warnings} warning to analysis in log file"
+            self.logger.log(msg, "WARNING")
+
+        msg = f"📥 Total Pathways: {total_pathways}"  # noqa E501  # noqa E501
+        self.logger.log(msg, "INFO")
+
+        return total_pathways, True, msg

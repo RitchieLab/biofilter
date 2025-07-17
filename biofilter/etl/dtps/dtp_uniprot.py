@@ -1,4 +1,5 @@
 import os
+import time  # DEBUG
 import requests
 from pathlib import Path
 import pandas as pd
@@ -415,11 +416,61 @@ class DTP(DTPBase, EntityQueryMixin):
         # Check Compartibility
         self.check_compatibility()
 
+        # Setting variables
         total_proteins = 0
         total_isoforms = 0
+        total_warnings = 0
         load_status = False
 
         data_source_id = self.data_source.id
+
+        # Set DB and drop indexes
+        try:
+            index_specs = [
+                # protein_master
+                # ("protein_master", ["data_source_id", "protein_id"]),
+                ("protein_master", ["protein_id"]),
+                # protein_entity
+                ("protein_entity", ["entity_id"]),
+                ("protein_entity", ["protein_master_id", "is_isoform"]),
+                # ("protein_entity", ["data_source_id", "entity_id"]),
+                # protein_pfam_link
+                ("protein_pfam_link", ["pfam_id"]),
+                # ("protein_pfam_link", ["data_source_id"]),
+            ]
+
+            index_specs_entity = [
+                # Entity
+                ("entities", ["group_id"]),
+                ("entities", ["has_conflict"]),
+                ("entities", ["is_deactive"]),
+
+                # EntityName
+                ("entity_names", ["entity_id"]),
+                ("entity_names", ["name"]),
+                ("entity_names", ["data_source_id"]),
+                ("entity_names", ["data_source_id", "name"]),
+                ("entity_names", ["data_source_id", "entity_id"]),
+                ("entity_names", ["entity_id", "is_primary"]),
+
+                # EntityRelationship
+                ("entity_relationships", ["entity_1_id"]),
+                ("entity_relationships", ["entity_2_id"]),
+                ("entity_relationships", ["relationship_type_id"]),
+                ("entity_relationships", ["data_source_id"]),
+                ("entity_relationships", ["entity_1_id", "relationship_type_id"]),  # noqa E501
+                ("entity_relationships", ["entity_1_id", "entity_2_id", "relationship_type_id"]),  # noqa E501
+
+                # EntityRelationshipType
+                ("entity_relationship_types", ["code"]),
+            ]
+
+            self.db_write_mode()
+            # self.drop_indexes(index_specs) # Keep indices to improve checks
+        except Exception as e:
+            total_warnings += 1
+            msg = f"⚠️ Failed to switch DB to write mode or drop indexes: {e}"
+            self.logger.log(msg, "WARNING")
 
         if df is None:
             if not processed_dir:
@@ -469,8 +520,22 @@ class DTP(DTPBase, EntityQueryMixin):
             self.logger.log(msg, "DEBUG")
 
         try:
+
+            # DEBUG
+            start_total = time.time()
+            prev_time = start_total
+
             # Interaction to each UnitProt entry
             for _, row in df.iterrows():
+
+                # DEBUG
+                current_time = time.time()
+                # Tempo desde o início
+                elapsed_total = current_time - start_total
+                # Tempo desde a última iteração
+                elapsed_since_last = (current_time - prev_time) * 1000
+                prev_time = current_time
+                print(f"{row.name} - {row['uniprot_id']} | Total: {elapsed_total:.2f}s | Δ: {elapsed_since_last:.0f}ms")  # noqa E501
 
                 # CANONICAL PROTEIN
                 # Add or Get Entity for Canonical protein
@@ -620,11 +685,32 @@ class DTP(DTPBase, EntityQueryMixin):
 
                 total_proteins += 1
 
-            msg = f"📥 Total Proteins: {total_proteins} | Total Isoforms: {total_isoforms}"  # noqa E501
-            self.logger.log(msg, "INFO")
-            return total_proteins, True, msg
-
         except Exception as e:
             msg = f"❌ ETL load_relations failed: {str(e)}"
             self.logger.log(msg, "ERROR")
             return 0, False, msg
+
+        # Set DB to Read Mode and Create Index
+        try:
+            # Drop Indexs
+            self.drop_indexes(index_specs)
+            self.drop_indexes(index_specs_entity)
+            # Stating Indexs
+            self.create_indexes(index_specs)
+            self.create_indexes(index_specs_entity)
+            self.db_read_mode()
+        except Exception as e:
+            total_warnings += 1
+            msg = f"Failed to switch DB to write mode or drop indexes: {e}"
+            self.logger.log(msg, "WARNING")
+
+        load_status = True
+
+        if total_warnings != 0:
+            msg = f"{total_warnings} warning to analysis in log file"
+            self.logger.log(msg, "WARNING")
+
+        msg = f"📥 Total Proteins: {total_proteins} | Total Isoforms: {total_isoforms}"  # noqa E501
+        self.logger.log(msg, "INFO")
+
+        return total_proteins, True, msg

@@ -207,10 +207,25 @@ class DTP(DTPBase, EntityQueryMixin):
         self.check_compatibility()
 
         total_pfam = 0
+        total_warnings = 0
         load_status = False
         msg = ""
 
         data_source_id = self.data_source.id
+
+        # Set DB and drop indexes
+        try:
+            index_specs = [
+                # protein_pfam
+                ("protein_pfam", ["clan_acc"]),
+                ("protein_pfam", ["pfam_id"]),
+            ]
+            self.db_write_mode()
+            self.drop_indexes(index_specs)
+        except Exception as e:
+            total_warnings += 1
+            msg = f"⚠️ Failed to switch DB to write mode or drop indexes: {e}"
+            self.logger.log(msg, "WARNING")
 
         try:
             if df is None:
@@ -260,11 +275,28 @@ class DTP(DTPBase, EntityQueryMixin):
                 self.session.commit()
                 total_pfam = len(new_entries)
 
-            msg = f"✅ New Pfam loaded: {total_pfam}"
-            self.logger.log(msg, "INFO")
-            return total_pfam, True, msg
-
         except Exception as e:
             msg = f"❌ ETL load_relations failed: {str(e)}"
             self.logger.log(msg, "ERROR")
             return 0, False, msg
+
+        # Set DB to Read Mode and Create Index
+        try:
+            # Stating Indexs
+            self.create_indexes(index_specs)
+            self.db_read_mode()
+        except Exception as e:
+            total_warnings += 1
+            msg = f"Failed to switch DB to write mode or drop indexes: {e}"
+            self.logger.log(msg, "WARNING")
+
+        load_status = True
+
+        if total_warnings != 0:
+            msg = f"{total_warnings} warning to analysis in log file"
+            self.logger.log(msg, "WARNING")
+
+        msg = f"✅ New Pfam loaded: {total_pfam}"
+        self.logger.log(msg, "INFO")
+
+        return total_pfam, True, msg

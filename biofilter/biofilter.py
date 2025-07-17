@@ -1,6 +1,7 @@
 # import os
 import json
 from pathlib import Path
+# from functools import cached_property
 from biofilter.db.database import Database
 from biofilter.core.settings_manager import SettingsManager
 from biofilter.utils.logger import Logger
@@ -8,8 +9,8 @@ from biofilter.etl.etl_manager import ETLManager
 from biofilter.etl.conflict_manager import ConflictManager
 from biofilter.utils.model_explorer import ModelExplorer
 from biofilter.utils.migrate import run_migration
-
 from biofilter.reports.report_manager import ReportManager
+from biofilter.db.models import BiofilterMetadata
 
 
 class Biofilter:
@@ -17,6 +18,7 @@ class Biofilter:
         self.logger = Logger(log_level="DEBUG")
         self.db_uri = db_uri
         self.db = None
+        self._metadata = None
 
         if self.db_uri:
             self.connect_db()
@@ -34,6 +36,20 @@ class Biofilter:
             with self.db.get_session() as session:
                 self._settings = SettingsManager(session)
         return self._settings
+
+    def get_metadata(self):
+        if self._metadata is None:
+            with self.db.get_session() as session:
+                self._metadata = (
+                    session.query(BiofilterMetadata)
+                    .order_by(BiofilterMetadata.id.desc())
+                    .first()
+                )
+        return self._metadata
+
+    @property
+    def metadata(self):
+        return self.get_metadata()
 
     def create_new_project(self, db_uri: str, overwrite=False):
         """Create a new Biofilter project database and connect to it."""

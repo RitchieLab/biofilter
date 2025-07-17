@@ -7,7 +7,7 @@ import __main__
 import sys
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy import text
+# from sqlalchemy import text
 
 from biofilter.etl.conflict_manager import ConflictManager
 from biofilter.etl.mixins.base_dtp import DTPBase
@@ -53,16 +53,13 @@ class DTP(DTPBase, VariantQueryMixin):
         Downloads the file from the dbSNP JSON release and stores it locally
         only if it doesn't exist or if the MD5 has changed.
         """
+        msg = f"Starting extraction of {self.data_source.name} data..."
 
-        self.logger.log(
-            f"⬇️ Starting extraction of {self.data_source.name} data...",
-            "INFO",  # noqa: E501
-        )  # noqa: E501
+        self.logger.log(msg, "INFO")
 
         # Check Compartibility
         self.check_compatibility()
 
-        msg = ""
         source_url = self.data_source.source_url
         if force_steps:
             last_hash = ""
@@ -210,24 +207,35 @@ class DTP(DTPBase, VariantQueryMixin):
     # 📥  ------------------------ 📥
     def load(self, df=None, processed_path=None, chunk_size=100_000):
 
-        self.logger.log(
-            f"📥 Loading {self.data_source.name} data into the database...",
-            "INFO",  # noqa E501
-        )
+        msg = f"📥 Loading {self.data_source.name} data into the database..."
+        self.logger.log(msg, "INFO")
 
         # Check Compartibility
         self.check_compatibility()
 
-        # Apply SQLite PRAGMAs
-        self.apply_sqlite_write_optimizations()
+        try:
+            index_specs = [
+                ("variants", ["data_source_id"]),
+                ("variants", ["variant_id"]),
+                ("variants", ["chromosome"]),
+                ("variant_gene_relationships", ["data_source_id"]),
+                ("variant_gene_relationships", ["variant_id"]),
+                ("variant_gene_relationships", ["gene_id"]),
+                ("variant_gene_relationships", ["variant_id", "gene_id"]),
+            ]
+            self.db_write_mode()
+            self.drop_indexes(index_specs)
+        except Exception as e:
+            msg = f"⚠️ Failed to switch DB to write mode or drop indexes: {e}"
+            self.logger.log(msg, "WARNING")
 
         # Variables
         total_variants = 0
+        total_warnings = 0
         load_status = False
-        message = ""
 
         # 🚨 Garante que self.data_source é válido na sessão atual
-        self.data_source = self.session.merge(self.data_source)
+        # self.data_source = self.session.merge(self.data_source)
         data_source_id = self.data_source.id
 
         if df is None:
@@ -237,7 +245,6 @@ class DTP(DTPBase, VariantQueryMixin):
                 return total_variants, load_status, msg
 
             processed_path = self.get_path(processed_path)
-            # csv_files = sorted(glob.glob(str(processed_path / "processed_part_*.csv")))  # noqa: E501
             csv_files = sorted(
                 glob.glob(str(processed_path / "processed_part_*.parquet"))
             )
@@ -249,142 +256,150 @@ class DTP(DTPBase, VariantQueryMixin):
 
             self.logger.log(f"📄 Found {len(csv_files)} part files to load", "INFO")  # noqa: E501
 
-        # Apaga os dados da tabela de links
-        self.session.query(VariantGeneRelationship).filter_by(
-            data_source_id=self.data_source.id
-        ).delete()
+        # Drop all variants x Genes from Data Source
+        # NOTE: If we change the schema, review it!
+        try:
+            self.session.query(VariantGeneRelationship).filter_by(
+                data_source_id=data_source_id
+            ).delete()
+            self.session.query(Variant).filter_by(
+                data_source_id=data_source_id
+            ).delete()
 
-        # Opcional: apagar também os variants, se desejar
-        self.session.query(Variant).filter_by(
-            data_source_id=self.data_source.id
-        ).delete()
-
-        self.session.commit()
-        self.logger.log("🗑️ Previous records deleted for this data source", "INFO")  # noqa: E501
-
-        # Processa arquivo por arquivo
-        for csv_file in csv_files:
-            self.logger.log(f"📂 Processing {csv_file}", "INFO")
-
-            # df = pd.read_csv(csv_file, dtype=str)
-            # Evita carregar colunas como hgvs ou seq_id se não forem mais necessários.  # noqa: E501
-            df = pd.read_parquet(
-                csv_file,
-                columns=[
-                    "rs_id",
-                    "position_base_1",
-                    "assembly_id",
-                    "allele",
-                    "allele_type",
-                    "gene_ids",
-                ],
-            )
-
-            df["ref"] = ""
-            df["alt"] = ""
-
-            # ➤ Preparar DataFrame de Variants
-            df_ref = df[df["allele_type"] == "ref"].copy()
-            df_ref = df_ref[
-                ["rs_id", "position_base_1", "assembly_id", "allele"]
-            ].drop_duplicates("rs_id")
-
-            df_alt = (
-                df[df["allele_type"] == "sub"]
-                .groupby("rs_id")["allele"]
-                .agg(lambda alleles: "/".join(sorted(set(alleles))))
-                .reset_index()
-                .rename(columns={"allele": "alt"})
-            )
-
-            df_ref["rs_id"] = df_ref["rs_id"].astype(str)
-            df_alt["rs_id"] = df_alt["rs_id"].astype(str)
-            df_variants = df_ref.merge(df_alt, on="rs_id", how="left")
-            df_variants["alt"] = df_variants["alt"].fillna("")
-            df_variants = df_variants.dropna(subset=["assembly_id", "position_base_1"])  # noqa: E501
-            df_variants["assembly_id"] = df_variants["assembly_id"].astype(int)
-            df_variants["position_base_1"] = df_variants["position_base_1"].astype(int)  # noqa: E501
-
-            variants_to_insert = [
-                Variant(
-                    variant_id=row["rs_id"],
-                    position=row["position_base_1"],
-                    assembly_id=row["assembly_id"],
-                    chromosome=row["assembly_id"],
-                    ref=row["allele"],
-                    alt=row["alt"],
-                    data_source_id=data_source_id,
-                )
-                for _, row in df_variants.iterrows()
-            ]
-
-            try:
-                self.session.bulk_save_objects(variants_to_insert)
-                self.session.commit()
-                total_variants += len(variants_to_insert)
-            except IntegrityError as e:
-                self.session.rollback()
-                self.logger.log(f"❌ Integrity error in {csv_file}: {str(e)}", "ERROR")  # noqa: E501
-
-            # ➤ Gene links
-            # df_links = df[df["gene_ids"].notna() & (df["gene_ids"] != "[]")].copy()  # noqa: E501
-            df_links = df[
-                df["gene_ids"].apply(lambda x: hasattr(x, "__len__") and len(x) > 0)  # noqa: E501
-            ].copy()  # noqa: E501
-            df_links = df_links[["rs_id", "gene_ids"]].drop_duplicates("rs_id")
-            df_links["gene_ids"] = df_links["gene_ids"].apply(
-                lambda x: ast.literal_eval(x) if isinstance(x, str) else x
-            )
-            df_links = df_links.explode("gene_ids")
-            df_links["gene_ids"] = df_links["gene_ids"].astype(int)
-            df_links["rs_id"] = df_links["rs_id"].astype(str)
-
-            links_to_insert = [
-                VariantGeneRelationship(
-                    gene_id=row["gene_ids"],
-                    variant_id=row["rs_id"],
-                    data_source_id=data_source_id,
-                )
-                for _, row in df_links.iterrows()
-            ]
-
-            try:
-                self.session.bulk_save_objects(links_to_insert)
-                self.session.commit()
-                self.logger.log(
-                    f"✅ Inserted {len(links_to_insert)} gene-variant links from {csv_file}",  # noqa: E501
-                    "INFO",
-                )
-            except IntegrityError as e:
-                self.session.rollback()
-                self.logger.log(
-                    f"❌ Integrity error in {csv_file} for gene-variant links: {str(e)}",  # noqa: E501
-                    "ERROR",
-                )
-
-        # Stating Indexs
-        if self.session.bind.dialect.name in ("sqlite", "postgresql"):
-            index_specs = [
-                ("variants", ["variant_id"]),
-                ("variants", ["chromosome"]),
-                ("variant_gene_relationships", ["variant_id"]),
-                ("variant_gene_relationships", ["gene_id"]),
-            ]
-            self.create_indexes(index_specs)
-
-        # Vacuum + manutenção final
-        if self.session.bind.dialect.name == "sqlite":
-            self.logger.log("🧹 Running VACUUM on SQLite database...", "DEBUG")
-            self.session.execute(text("VACUUM"))
             self.session.commit()
+            msg = "🗑️ Previous records deleted for this data source"
+            self.logger.log(msg, "INFO")
 
-        # Apply SQLite PRAGMAs to READ MODE
-        self.reset_sqlite_pragmas()
+        except Exception as e:
+            self.session.rollback()
+            msg = f"❌ Failed to delete previous records: {e}"
+            self.logger.log(msg, "ERROR")
+            return total_variants, load_status, msg
 
-        load_status = True
-        message = (
-            f"✅ Loaded {total_variants} variants from {len(csv_files)} CSV chunks."  # noqa: E501
-        )
-        self.logger.log(message, "SUCCESS")
+        # Process and ingest variants and gene links from file
+        for csv_file in csv_files:
+            try:
+                self.logger.log(f"📂 Processing {csv_file}", "INFO")
 
-        return total_variants, load_status, message
+                # Read file
+                df = pd.read_parquet(
+                    csv_file,
+                    columns=[
+                        "rs_id",
+                        "position_base_1",
+                        "assembly_id",
+                        "allele",
+                        "allele_type",
+                        "gene_ids",
+                    ],
+                )
+
+                df["ref"] = ""
+                df["alt"] = ""
+
+                # Prepare Variants DataFrame
+                df_ref = df[df["allele_type"] == "ref"].copy()
+                df_ref = df_ref[
+                    ["rs_id", "position_base_1", "assembly_id", "allele"]
+                ].drop_duplicates("rs_id")
+
+                df_alt = (
+                    df[df["allele_type"] == "sub"]
+                    .groupby("rs_id")["allele"]
+                    .agg(lambda alleles: "/".join(sorted(set(alleles))))
+                    .reset_index()
+                    .rename(columns={"allele": "alt"})
+                )
+                df_ref["rs_id"] = df_ref["rs_id"].astype(str)
+                df_alt["rs_id"] = df_alt["rs_id"].astype(str)
+                df_variants = df_ref.merge(df_alt, on="rs_id", how="left")
+                df_variants["alt"] = df_variants["alt"].fillna("")
+                df_variants = df_variants.dropna(subset=["assembly_id", "position_base_1"])  # noqa: E501
+                df_variants["assembly_id"] = df_variants["assembly_id"].astype(int)  # noqa: E501
+                df_variants["position_base_1"] = df_variants["position_base_1"].astype(int)  # noqa: E501
+
+                variants_to_insert = [
+                    Variant(
+                        variant_id=row["rs_id"],
+                        position=row["position_base_1"],
+                        assembly_id=row["assembly_id"],
+                        chromosome=row["assembly_id"],
+                        ref=row["allele"],
+                        alt=row["alt"],
+                        data_source_id=data_source_id,
+                    )
+                    for _, row in df_variants.iterrows()
+                ]
+
+                try:
+                    self.session.bulk_save_objects(variants_to_insert)
+                    self.session.commit()
+                    total_variants += len(variants_to_insert)
+                except IntegrityError as e:
+                    self.session.rollback()
+                    total_warnings += 1
+                    msg = f"Integrity error in {csv_file}: {str(e)}"
+                    self.logger.log(msg, "ERROR")
+                    # Go to next file
+                    continue
+
+                # Variants x Gene links
+                df_links = df[
+                    df["gene_ids"].apply(lambda x: hasattr(x, "__len__") and len(x) > 0)  # noqa: E501
+                ].copy()  # noqa: E501
+                df_links = df_links[["rs_id", "gene_ids"]].drop_duplicates("rs_id")  # noqa: E501
+                df_links["gene_ids"] = df_links["gene_ids"].apply(
+                    lambda x: ast.literal_eval(x) if isinstance(x, str) else x
+                )
+                df_links = df_links.explode("gene_ids")
+                df_links["gene_ids"] = df_links["gene_ids"].astype(int)
+                df_links["rs_id"] = df_links["rs_id"].astype(str)
+
+                links_to_insert = [
+                    VariantGeneRelationship(
+                        gene_id=row["gene_ids"],
+                        variant_id=row["rs_id"],
+                        data_source_id=data_source_id,
+                    )
+                    for _, row in df_links.iterrows()
+                ]
+
+                try:
+                    self.session.bulk_save_objects(links_to_insert)
+                    self.session.commit()
+                except IntegrityError as e:
+                    self.session.rollback()
+                    total_warnings += 1
+                    msg = f"Integrity error in {csv_file} for gene-variant links: {str(e)}"  # noqa E501
+                    self.logger.log(msg, "ERROR")
+                    # Go to next file
+                    continue
+
+            except Exception as e:
+                total_warnings += 1
+                msg = f"Unexpected error processing {csv_file}: {e}"
+                self.logger.log(msg, "ERROR")
+                # Go to next file
+                continue
+
+        try:
+            # Stating Indexs
+            self.create_indexes(index_specs)
+            self.db_read_mode()
+            load_status = True
+        except Exception as e:
+            total_warnings += 1
+            msg = f"Failed to switch DB to write mode or drop indexes: {e}"
+            self.logger.log(msg, "WARNING")
+            load_status = True  # TODO: Think \ keep as success!?!
+
+        if total_warnings == 0:
+            msg = (
+                f"✅ Loaded {total_variants} variants from {len(csv_files)} CSV chunks."  # noqa: E501
+            )
+            self.logger.log(msg, "SUCCESS")
+        else:
+            msg = f"Loaded {total_variants} with {total_warnings} warning to analysis in log file"  # noqa: E501
+            self.logger.log(msg, "WARNING")
+
+        return total_variants, load_status, msg

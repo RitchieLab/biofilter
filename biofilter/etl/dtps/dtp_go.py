@@ -289,7 +289,57 @@ class DTP(DTPBase, EntityQueryMixin):
         self.check_compatibility()
 
         total_terms = 0
+        total_warnings = 0
         load_status = False
+
+        # Set DB and drop indexes
+        try:
+            index_specs = [
+                # GOMaster
+                ("go_master", ["go_id"]),               # busca e checagem de duplicidade  # noqa E501
+                ("go_master", ["entity_id"]),           # vinculação com Entity
+                ("go_master", ["namespace"]),           # MF, BP, CC — comum em filtros ontológicos  # noqa E501
+
+                # GORelation
+                ("go_relations", ["parent_id"]),        # relações ascendentes
+                ("go_relations", ["child_id"]),         # relações descendentes
+                ("go_relations", ["relation_type"]),    # ex: is_a, part_of
+                ("go_relations", ["parent_id", "relation_type"]),
+                ("go_relations", ["child_id", "relation_type"]),
+            ]
+
+            index_specs_entity = [
+                # Entity
+                ("entities", ["group_id"]),
+                ("entities", ["has_conflict"]),
+                ("entities", ["is_deactive"]),
+
+                # EntityName
+                ("entity_names", ["entity_id"]),
+                ("entity_names", ["name"]),
+                ("entity_names", ["data_source_id"]),
+                ("entity_names", ["data_source_id", "name"]),
+                ("entity_names", ["data_source_id", "entity_id"]),
+                ("entity_names", ["entity_id", "is_primary"]),
+
+                # EntityRelationship
+                ("entity_relationships", ["entity_1_id"]),
+                ("entity_relationships", ["entity_2_id"]),
+                ("entity_relationships", ["relationship_type_id"]),
+                ("entity_relationships", ["data_source_id"]),
+                ("entity_relationships", ["entity_1_id", "relationship_type_id"]),  # noqa E501
+                ("entity_relationships", ["entity_1_id", "entity_2_id", "relationship_type_id"]),  # noqa E501
+
+                # EntityRelationshipType
+                ("entity_relationship_types", ["code"]),
+            ]
+
+            self.db_write_mode()
+            # self.drop_indexes(index_specs) # Keep indices to improve checks
+        except Exception as e:
+            total_warnings += 1
+            msg = f"⚠️ Failed to switch DB to write mode or drop indexes: {e}"
+            self.logger.log(msg, "WARNING")
 
         if df is None:
             if not processed_dir:
@@ -445,9 +495,6 @@ class DTP(DTPBase, EntityQueryMixin):
                 self.session.add(relation)
                 total_relations += 1
 
-            msg = f"🔗 Total GO relations loaded: {total_relations}"
-            self.logger.log(msg, "INFO")
-
         except FileNotFoundError as e:
             msg = f"⚠️ Relations file not found: {str(e)}", "WARNING"
             self.logger.log(msg, "ERROR")
@@ -457,5 +504,28 @@ class DTP(DTPBase, EntityQueryMixin):
             msg = f"❌ ETL load failed: {str(e)}"
             self.logger.log(msg, "ERROR")
             return 0, False, msg
+
+        # Set DB to Read Mode and Create Index
+        try:
+            # Drop Indexs
+            self.drop_indexes(index_specs)
+            self.drop_indexes(index_specs_entity)
+            # Stating Indexs
+            self.create_indexes(index_specs)
+            self.create_indexes(index_specs_entity)
+            self.db_read_mode()
+        except Exception as e:
+            total_warnings += 1
+            msg = f"Failed to switch DB to write mode or drop indexes: {e}"
+            self.logger.log(msg, "WARNING")
+
+        load_status = True
+
+        if total_warnings != 0:
+            msg = f"{total_warnings} warning to analysis in log file"
+            self.logger.log(msg, "WARNING")
+
+        msg = f"🔗 Total GO relations loaded: {total_relations}"
+        self.logger.log(msg, "INFO")
 
         return total_terms, True, msg
