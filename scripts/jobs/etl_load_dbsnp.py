@@ -10,4 +10,6 @@ if __name__ == "__main__":
     bf = Biofilter(db_uri)
 
     # Variants / SNPs
-    bf.update(data_sources=["dbsnp_chr1"], run_steps=["transform"], force_steps=["transform"])  # noqa E501
+    bf.update(
+        data_sources=["dbsnp_chr1"], run_steps=["transform"], force_steps=["transform"]
+    )  # noqa E501

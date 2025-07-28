@@ -6,20 +6,40 @@ if __name__ == "__main__":
     bf = Biofilter(db_uri)
 
     # Genes
-    bf.update(data_sources=["hgnc"], run_steps=["load"], force_steps=["load"])  # noqa E501
-    bf.update(data_sources=["gene_ncbi"], run_steps=["load"], force_steps=["load"])  # noqa E501
+    bf.update(
+        data_sources=["hgnc"], run_steps=["load"], force_steps=["load"]
+    )  # noqa E501
+    bf.update(
+        data_sources=["gene_ncbi"], run_steps=["load"], force_steps=["load"]
+    )  # noqa E501
 
     # Proteins
-    bf.update(data_sources=["pfam"], run_steps=["load"], force_steps=["load"])  # noqa E501
-    bf.update(data_sources=["uniprot"], run_steps=["load"], force_steps=["load"])  # noqa E501
+    bf.update(
+        data_sources=["pfam"], run_steps=["load"], force_steps=["load"]
+    )  # noqa E501
+    bf.update(
+        data_sources=["uniprot"], run_steps=["load"], force_steps=["load"]
+    )  # noqa E501
 
     # GO
-    bf.update(data_sources=["gene_ontology"], run_steps=["load"], force_steps=["load"])  # noqa E501
+    bf.update(
+        data_sources=["gene_ontology"], run_steps=["load"], force_steps=["load"]
+    )  # noqa E501
 
     # Pathways
-    bf.update(data_sources=["reactome"], run_steps=["load"], force_steps=["load"])  # noqa E501
-    bf.update(data_sources=["kegg_pathways"], run_steps=["load"], force_steps=["load"])  # noqa E501
+    bf.update(
+        data_sources=["reactome"], run_steps=["load"], force_steps=["load"]
+    )  # noqa E501
+    bf.update(
+        data_sources=["kegg_pathways"], run_steps=["load"], force_steps=["load"]
+    )  # noqa E501
 
     # relationShips (Does not have load method)
-    bf.update(data_sources=["reactome_relationships"], run_steps=["load"], force_steps=["load"])  # noqa E501
-    bf.update(data_sources=["uniprot_relationships"], run_steps=["load"], force_steps=["load"])  # noqa E501
+    bf.update(
+        data_sources=["reactome_relationships"],
+        run_steps=["load"],
+        force_steps=["load"],
+    )  # noqa E501
+    bf.update(
+        data_sources=["uniprot_relationships"], run_steps=["load"], force_steps=["load"]
+    )  # noqa E501
