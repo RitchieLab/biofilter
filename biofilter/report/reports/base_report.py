@@ -1,8 +1,8 @@
 from sqlalchemy.orm import Session
-import pandas as pd
+# import pandas as pd
 
 
-class QryBase:
+class ReportBase:
     name: str = "unnamed_report"
     description: str = "No description provided"
 

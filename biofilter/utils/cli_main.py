@@ -197,7 +197,7 @@ def list_reports(db_uri):
             )
 
     bf = Biofilter(db_uri=db_uri)
-    reports = bf.list_reports()
+    reports = bf.report.list_reports()
     click.echo("📊 Available Reports:")
     for r in reports:
         click.echo(f" - {r}")
@@ -223,7 +223,7 @@ def run_report(name, db_uri, as_csv, output):
             )
 
     bf = Biofilter(db_uri=db_uri)
-    result = bf.run_report(name=name, as_dataframe=True)
+    result = bf.report.run_report(name=name, as_dataframe=True)
 
     if as_csv:
         if not output:

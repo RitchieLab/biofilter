@@ -10,7 +10,7 @@ from biofilter.etl.etl_manager import ETLManager
 from biofilter.etl.conflict_manager import ConflictManager
 from biofilter.utils.model_explorer import ModelExplorer
 from biofilter.utils.migrate import run_migration
-from biofilter.reports.report_manager import ReportManager
+from biofilter.report.report_manager import ReportManager
 from biofilter.db.models import BiofilterMetadata
 
 
@@ -20,6 +20,10 @@ class Biofilter:
         self.db_uri = db_uri
         self.db = None
         self._metadata = None
+        self._settings = None
+        self._report = None     # Lazy-load: Report Manager
+        self._etl = None        # Lazy-load: ETL Manager
+        self._conflict = None   # Lazy-load: Conflict Manager
 
         if self.db_uri:
             self.connect_db()
@@ -51,6 +55,17 @@ class Biofilter:
     @property
     def metadata(self):
         return self.get_metadata()
+
+    @property
+    def report(self):
+        if self._report is None:
+            if not self.db:
+                raise RuntimeError("You must connect to a database first.")
+            self._report = ReportManager(
+                session=self.db.get_session(),
+                logger=self.logger,
+            )
+        return self._report
 
     def create_new_project(self, db_uri: str, overwrite=False):
         """Create a new Biofilter project database and connect to it."""
@@ -210,20 +225,3 @@ class Biofilter:
     def migrate(self):
         # run_migration(self.db.session)
         run_migration(self.db.session, self.db.db_uri)
-
-    # REPORTS
-    def list_reports(self):
-        """
-        List all available reports with name and description.
-        """
-        report = ReportManager(self.db.get_session())
-
-        return report.list_reports()
-
-    def run_report(self, name: str, as_dataframe: bool = True, **kwargs):
-        """
-        Run a report by name, optionally returning the result as a DataFrame.
-        """
-        report = ReportManager(self.db.get_session())
-
-        return report.run_report(name=name, as_dataframe=as_dataframe, **kwargs)

@@ -1,9 +1,9 @@
 import pandas as pd
-from biofilter.reports.base import QryBase
+from biofilter.report.reports.base_report import ReportBase
 from biofilter.db.models.etl_models import SourceSystem, DataSource, ETLProcess
 
 
-class ETLStatusReport(QryBase):
+class ETLStatusReport(ReportBase):
     name = "qry_etl_status"
     description = "Summarizes the ETL status for each data source"
 

@@ -1,12 +1,12 @@
 # biofilter/reports/queries/qry_template.py
 
 import pandas as pd
-from biofilter.reports.base import QryBase
+from biofilter.report.reports.base_report import ReportBase
 
 # from biofilter.db.models import SeuModelo
 
 
-class TemplateReport(QryBase):
+class TemplateReport(ReportBase):
     name = "qry_template"
     description = "Describe what this report does here"
 
