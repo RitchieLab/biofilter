@@ -120,7 +120,9 @@ class Query:
 
     def _to_dict(self, obj) -> Dict[str, Any]:
         return {
-            k: v for k, v in vars(obj).items() if not k.startswith("_sa_instance_state")  # noqa E501
+            k: v
+            for k, v in vars(obj).items()
+            if not k.startswith("_sa_instance_state")  # noqa E501
         }
 
     def run_query(
@@ -149,7 +151,9 @@ class Query:
         """List all registered models."""
         return list(self.models.keys())
 
-    def describe_model(self, model_name: str) -> Optional[Dict[str, List[str]]]:  # noqa E501
+    def describe_model(
+        self, model_name: str
+    ) -> Optional[Dict[str, List[str]]]:  # noqa E501
         """Return column and relationship info for a given model."""
         model = self.get_model(model_name)
         if not model:

@@ -16,7 +16,11 @@ if __name__ == "__main__":
 
     df = bf.report.run_report(
         "report_entity_filter",
-        input_data=["A0A087X1C5", "A0AV02", "rs456", "Q68D04", "LOC130057800"],
+        input_data=["A0A087X1C5", "A0AV02", "rs456", "Q68D04", "LOC130057800", "A0av02", "Cytochrome"],
     )
+    # df = bf.report.run_report(
+    #     "report_entity_filter",
+    #     input_data=["A0av02"],
+    # )
 
     print(df)

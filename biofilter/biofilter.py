@@ -21,9 +21,9 @@ class Biofilter:
         self.db = None
         self._metadata = None
         self._settings = None
-        self._report = None     # Lazy-load: Report Manager
-        self._etl = None        # Lazy-load: ETL Manager
-        self._conflict = None   # Lazy-load: Conflict Manager
+        self._report = None  # Lazy-load: Report Manager
+        self._etl = None  # Lazy-load: ETL Manager
+        self._conflict = None  # Lazy-load: Conflict Manager
 
         if self.db_uri:
             self.connect_db()

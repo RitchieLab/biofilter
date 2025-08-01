@@ -16,7 +16,11 @@ class ReportManager:
         module = importlib.import_module(f"biofilter.report.reports.{name}")
         for attr in dir(module):
             obj = getattr(module, attr)
-            if isinstance(obj, type) and issubclass(obj, ReportBase) and obj != ReportBase:
+            if (
+                isinstance(obj, type)
+                and issubclass(obj, ReportBase)
+                and obj != ReportBase
+            ):
                 return obj
         raise ImportError(f"No valid report class found in {name}")
 

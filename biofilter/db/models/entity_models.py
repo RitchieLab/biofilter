@@ -21,14 +21,6 @@ class EntityGroup(Base):
     description = Column(String)
 
 
-# class EntityCategory(Base):
-#     __tablename__ = "entity_categories"
-
-#     id = Column(Integer, primary_key=True)
-#     name = Column(String, unique=True, nullable=False)
-#     description = Column(String)
-
-
 class Entity(Base):
     __tablename__ = "entities"
 

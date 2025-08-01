@@ -1,5 +1,4 @@
 from sqlalchemy.orm import Session
-# import pandas as pd
 
 
 class ReportBase:
@@ -19,11 +18,3 @@ class ReportBase:
 
     def run(self):
         raise NotImplementedError("Subclasses must implement `run()`.")
-
-    # def to_dataframe(self, result):
-    #     if isinstance(result, pd.DataFrame):
-    #         return result
-    #     elif hasattr(result, "__iter__"):
-    #         return pd.DataFrame([dict(row) for row in result])
-    #     else:
-    #         return pd.DataFrame([{"result": result}])
