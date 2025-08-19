@@ -350,7 +350,7 @@ class DTP(DTPBase, EntityQueryMixin):
         if not hasattr(self, "entity_group") or self.entity_group is None:
             group = (
                 self.session.query(EntityGroup)
-                .filter_by(name="Variants")
+                .filter_by(name="Genomic Variants")
                 .first()  # noqa: E501
             )  # noqa: E501
             if not group:

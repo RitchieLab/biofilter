@@ -367,7 +367,7 @@ class DTP(DTPBase, EntityQueryMixin):
         # Get or create EntityGroup for GO
         if not hasattr(self, "entity_group") or self.entity_group is None:
             group = (
-                self.session.query(EntityGroup).filter_by(name="GO").first()
+                self.session.query(EntityGroup).filter_by(name="Gene Ontology").first()
             )  # noqa: E501
             if not group:
                 msg = "EntityGroup 'GO' not found."

@@ -1,59 +1,74 @@
 {
-    "entity_groups": [
+  "entity_groups": [
         {
             "id": 1,
-            "name": "Genes",
-            "description": "Genetic elements such as genes, SNPs, and sequences"
+            "name": "Genomic Variants",
+            "description": "Genetic variants including SNPs, InDels, structural variants, and CNVs"
         },
         {
             "id": 2,
-            "name": "Transcriptomics",
-            "description": "Transcripts and RNA expression data"
+            "name": "Genomics",
+            "description": "Genes, genomic sequences, and related annotations"
         },
         {
             "id": 3,
-            "name": "Proteomics",
-            "description": "Proteins and peptides"
+            "name": "Epigenomics",
+            "description": "Epigenetic modifications such as DNA methylation, histone marks, and chromatin states"
         },
         {
             "id": 4,
-            "name": "Metabolomics",
-            "description": "Metabolites and small molecules"
+            "name": "Transcriptomics",
+            "description": "Transcripts, isoforms, and RNA expression profiles"
         },
         {
             "id": 5,
-            "name": "Diseases",
-            "description": "Disease classifications and annotations"
+            "name": "Proteomics",
+            "description": "Proteins, isoforms, peptides, and functional annotations"
         },
         {
             "id": 6,
-            "name": "Pathways",
-            "description": "Biological pathways and interactions"
+            "name": "Metabolomics",
+            "description": "Metabolites, small molecules, and biochemical pathways"
         },
         {
             "id": 7,
-            "name": "GO",
-            "description": "Gene Ontology terms and relations"
+            "name": "Diseases",
+            "description": "Disease entities, classifications, and associated phenotypes"
         },
         {
             "id": 8,
-            "name": "Chemicals",
-            "description": "Chemical compounds and substances"
+            "name": "Pathways",
+            "description": "Biological pathways, networks, and molecular interactions"
         },
         {
             "id": 9,
-            "name": "Clinical Trials",
-            "description": "Clinical trial data and results"
+            "name": "Gene Ontology",
+            "description": "GO terms for molecular function, biological process, and cellular component"
         },
         {
             "id": 10,
-            "name": "Microbiome",
-            "description": "Microbial communities and their interactions"
+            "name": "Chemicals",
+            "description": "Chemical compounds, drugs, and experimental substances"
         },
         {
             "id": 11,
-            "name": "Variants",
-            "description": "Variants."
+            "name": "Clinical Trials",
+            "description": "Clinical trial metadata, interventions, and outcomes"
+        },
+        {
+            "id": 12,
+            "name": "Microbiome",
+            "description": "Microbial species, communities, and host interactions"
+        },
+        {
+            "id": 13,
+            "name": "Phenotypes",
+            "description": "Observable traits, phenotypic ontologies (HPO), and GWAS associations"
+        },
+        {
+            "id": 14,
+            "name": "Cell Types",
+            "description": "Cellular taxonomy and single-cell expression atlases"
         }
     ]
 }

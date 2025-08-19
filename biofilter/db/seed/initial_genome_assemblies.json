@@ -126,9 +126,124 @@
             "chromosome": "MT"
         },
         {
+            "accession": "NC_000001.10",
+            "assembly_name": "GRCh37.p13",
+            "chromosome": "1"
+        },
+        {
+            "accession": "NC_000002.11",
+            "assembly_name": "GRCh37.p13",
+            "chromosome": "2"
+        },
+        {
+            "accession": "NC_000003.11",
+            "assembly_name": "GRCh37.p13",
+            "chromosome": "3"
+        },
+        {
+            "accession": "NC_000004.11",
+            "assembly_name": "GRCh37.p13",
+            "chromosome": "4"
+        },
+        {
+            "accession": "NC_000005.9",
+            "assembly_name": "GRCh37.p13",
+            "chromosome": "5"
+        },
+        {
+            "accession": "NC_000006.11",
+            "assembly_name": "GRCh37.p13",
+            "chromosome": "6"
+        },
+        {
+            "accession": "NC_000007.13",
+            "assembly_name": "GRCh37.p13",
+            "chromosome": "7"
+        },
+        {
             "accession": "NC_000008.10",
             "assembly_name": "GRCh37.p13",
             "chromosome": "8"
+        },
+        {
+            "accession": "NC_000009.11",
+            "assembly_name": "GRCh37.p13",
+            "chromosome": "9"
+        },
+        {
+            "accession": "NC_000010.10",
+            "assembly_name": "GRCh37.p13",
+            "chromosome": "10"
+        },
+        {
+            "accession": "NC_000011.9",
+            "assembly_name": "GRCh37.p13",
+            "chromosome": "11"
+        },
+        {
+            "accession": "NC_000012.11",
+            "assembly_name": "GRCh37.p13",
+            "chromosome": "12"
+        },
+        {
+            "accession": "NC_000013.10",
+            "assembly_name": "GRCh37.p13",
+            "chromosome": "13"
+        },
+        {
+            "accession": "NC_000014.8",
+            "assembly_name": "GRCh37.p13",
+            "chromosome": "14"
+        },
+        {
+            "accession": "NC_000015.9",
+            "assembly_name": "GRCh37.p13",
+            "chromosome": "15"
+        },
+        {
+            "accession": "NC_000016.9",
+            "assembly_name": "GRCh37.p13",
+            "chromosome": "16"
+        },
+        {
+            "accession": "NC_000017.10",
+            "assembly_name": "GRCh37.p13",
+            "chromosome": "17"
+        },
+        {
+            "accession": "NC_000018.9",
+            "assembly_name": "GRCh37.p13",
+            "chromosome": "18"
+        },
+        {
+            "accession": "NC_000019.9",
+            "assembly_name": "GRCh37.p13",
+            "chromosome": "19"
+        },
+        {
+            "accession": "NC_000020.10",
+            "assembly_name": "GRCh37.p13",
+            "chromosome": "20"
+        },
+        {
+            "accession": "NC_000021.8",
+            "assembly_name": "GRCh37.p13",
+            "chromosome": "21"
+        },
+        {
+            "accession": "NC_000022.10",
+            "assembly_name": "GRCh37.p13",
+            "chromosome": "22"
+        },
+        {
+            "accession": "NC_000023.10",
+            "assembly_name": "GRCh37.p13",
+            "chromosome": "X"
+        },
+        {
+            "accession": "NC_000024.9",
+            "assembly_name": "GRCh37.p13",
+            "chromosome": "Y"
         }
     ]
 }
