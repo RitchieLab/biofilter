@@ -34,69 +34,56 @@ class CreateDBMixin:
 
     def _seed_all(self, seed_dir):
         self._seed_from_json(
-            f"{seed_dir}/initial_config.json", "config_models", "SystemConfig"
+            f"{seed_dir}/initial_config.json", "model_config", "SystemConfig"
         )
         self._seed_from_json(
             f"{seed_dir}/initial_metadata.json",
-            "config_models",
+            "model_config",
             "BiofilterMetadata",
             # key="schema_version",
         )
         self._seed_from_json(
             f"{seed_dir}/initial_source_systems.json",
-            "etl_models",
+            "model_etl",
             "SourceSystem",
             key="source_systems",
         )
         self._seed_from_json(
             f"{seed_dir}/initial_data_sources.json",
-            "etl_models",
+            "model_etl",
             "DataSource",
             key="data_sources",
         )
         self._seed_from_json(
             f"{seed_dir}/initial_etl_processes.json",
-            "etl_models",
+            "model_etl",
             "ETLProcess",
             key="etl_processes",
         )
         self._seed_from_json(
             f"{seed_dir}/initial_entity_group.json",
-            "entity_models",
+            "model_entities",
             "EntityGroup",
             key="entity_groups",
         )
         self._seed_from_json(
             f"{seed_dir}/initial_entity_relationship_types.json",
-            "entity_models",
+            "model_entities",
             "EntityRelationshipType",
             key="entity_relationship_types",
         )
         self._seed_from_json(
             f"{seed_dir}/initial_omic_status.json",
-            "genes_models",
+            "model_curation",
             "OmicStatus",
             key="omic_status",
         )
         self._seed_from_json(
             f"{seed_dir}/initial_genome_assemblies.json",
-            "variants_models",
+            "model_config",
             "GenomeAssembly",
             key="genome_assemblies",
         )
-
-        # self._seed_from_json(
-        #     f"{seed_dir}/initial_variant_types.json",
-        #     "variants_models",
-        #     "VariantType",
-        #     key="variant_types",
-        # )
-        # self._seed_from_json(
-        #     f"{seed_dir}/initial_allele_types.json",
-        #     "variants_models",
-        #     "AlleleType",
-        #     key="allele_types",
-        # )
 
     def _seed_from_json(self, file, module_name, model_name, key=None):
         model_module = import_module(f"biofilter.db.models.{module_name}")
@@ -121,7 +108,7 @@ class CreateDBMixin:
                                 item[key] = datetime.fromisoformat(value)
                             except ValueError:
                                 self.logger.log(
-                                    f"Invalid datetime format in key {key}: {value}",
+                                    f"Invalid datetime format in key {key}: {value}",  # noqa E501
                                     "WARNING",
                                 )  # noqa: E501
 
@@ -130,7 +117,9 @@ class CreateDBMixin:
                     fk_name = item.pop("source_system")
                     fk_qry = (
                         session.query(
-                            import_module("biofilter.db.models.etl_models").SourceSystem
+                            import_module(
+                                "biofilter.db.models.model_etl"
+                            ).SourceSystem  # noqa E501
                         )
                         .filter_by(name=fk_name)
                         .first()
@@ -138,7 +127,8 @@ class CreateDBMixin:
 
                     if not fk_qry:
                         self.logger.log(
-                            f"Source System not found for name: {fk_name}", "WARNING"
+                            f"Source System not found for name: {fk_name}",
+                            "WARNING",  # noqa E501
                         )
                         continue
                     item["source_system_id"] = fk_qry.id
@@ -147,7 +137,9 @@ class CreateDBMixin:
                     fk_name = item.pop("data_source")
                     fk_qry = (
                         session.query(
-                            import_module("biofilter.db.models.etl_models").DataSource
+                            import_module(
+                                "biofilter.db.models.model_etl"
+                            ).DataSource  # noqa E501
                         )
                         .filter_by(name=fk_name)
                         .first()
@@ -155,7 +147,8 @@ class CreateDBMixin:
 
                     if not fk_qry:
                         self.logger.log(
-                            f"Data Source not found for name: {fk_name}", "WARNING"
+                            f"Data Source not found for name: {fk_name}",
+                            "WARNING",  # noqa E501
                         )
                         continue
                     item["data_source_id"] = fk_qry.id

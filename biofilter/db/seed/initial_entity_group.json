@@ -49,6 +49,11 @@
             "id": 10,
             "name": "Microbiome",
             "description": "Microbial communities and their interactions"
+        },
+        {
+            "id": 11,
+            "name": "Variants",
+            "description": "Variants."
         }
     ]
 }

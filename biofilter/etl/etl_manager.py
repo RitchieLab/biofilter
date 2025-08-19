@@ -6,14 +6,29 @@ from typing import Union, List
 from datetime import datetime
 
 # from collections.abc import Iterable
+from sqlalchemy import MetaData, func, select  # inspect
 from sqlalchemy.orm import Session
 from biofilter.utils.logger import Logger
-from biofilter.db.models.etl_models import (
+from biofilter.db.models import (
     ETLProcess,
     DataSource,
     SourceSystem,
     ETLLog,
 )  # noqa: E501
+
+ETL_TABLE_PREFIX = "etl_"
+PURGE_ORDER_OVERRIDE = [
+    "VariantLocus",
+    "VariantMaster",
+    "EntityRelationship",
+    "EntityName",
+    "Entity",
+    # ...
+]
+
+
+def _is_etl_table(table_name: str) -> bool:
+    return table_name.lower().startswith(ETL_TABLE_PREFIX)
 
 
 class ETLManager:
@@ -29,8 +44,6 @@ class ETLManager:
         processed_path: str = None,
         delete_files: bool = True,
     ) -> bool:
-
-        # 🔥 TODO Delete Data? 🔥
 
         """
         Restarts one or more ETL processes, optionally filtering by DataSource
@@ -78,6 +91,10 @@ class ETLManager:
             return False
 
         for ds in data_sources:
+
+            # PURGE simples (sem batch, sem LIMIT)
+            self._simple_purge_by_data_source(ds_id=ds.id)
+
             process = (
                 self.session.query(ETLProcess)
                 .filter_by(data_source_id=ds.id)
@@ -300,8 +317,8 @@ class ETLManager:
                     status, message, file_hash = dtp_instance.extract(
                         raw_dir=download_path,
                         force_steps=force_flag,
-                        # source_url=ds.source_url, # TODO: Add this to the DTP class
-                        # last_hash=process.raw_data_hash, # TODO Use internal class call
+                        # source_url=ds.source_url, # TODO: Add this to the DTP class. # noqa E501
+                        # last_hash=process.raw_data_hash, # TODO Use internal class call # noqa E501
                     )  # noqa E501
                     process.extract_end = datetime.now()
 
@@ -450,3 +467,123 @@ class ETLManager:
                 self.session.add(log)
 
                 self.session.commit()
+
+    def _simple_purge_by_data_source(self, ds_id: int) -> None:
+        """
+        Very simple rollback: delete rows where data_source_id = :ds_id
+        across all non-ETL tables, in FK-safe order.
+
+        - Auto-discovers tables with a `data_source_id` column
+        - Excludes ETL tables (etl_*)
+        - Uses dependency-aware order (children first). Falls back to reverse
+        sorted_tables.
+        """
+        engine = self.session.get_bind()
+        # insp = inspect(engine)
+        metadata = MetaData()
+        metadata.reflect(bind=engine)
+
+        # 1) Pick candidate tables (have `data_source_id` and are NOT ETL)
+        candidates = []
+        for tname, table in metadata.tables.items():
+            if _is_etl_table(tname):
+                continue
+            if "data_source_id" in table.columns:
+                candidates.append(table)
+
+        if not candidates:
+            self.logger.log("ℹ️ No non-ETL tables with `data_source_id` found.", "INFO") # noqa E501
+            return
+
+        # 2) Order tables: override > FK topo (children->parents) > reverse of metadata.sorted_tables # noqa E501
+        ordered = self._order_for_delete(candidates, metadata)
+
+        # 3) Delete per table
+        total = 0
+        for table in ordered:
+            # Count (for log)
+            cnt = (
+                self.session.execute(
+                    select(func.count())
+                    .select_from(table)
+                    .where(table.c.data_source_id == ds_id)
+                ).scalar()
+                or 0
+            )
+            if cnt == 0:
+                continue
+
+            self.logger.log(
+                f"🗑️  Deleting {cnt} rows from {table.name} (data_source_id={ds_id})", # noqa E501
+                "INFO",
+            )
+            self.session.execute(table.delete().where(table.c.data_source_id == ds_id)) # noqa E501
+            total += cnt
+
+        self.session.commit()
+        self.logger.log(
+            f"✅ Simple purge complete for data_source_id={ds_id}. Total rows: {total}", # noqa E501
+            "INFO",
+        )
+
+    def _order_for_delete(self, candidates, metadata):
+        """
+        Compute delete order: children -> parents.
+        Priority:
+        1) PURGE_ORDER_OVERRIDE if it fully matches subset of candidates
+        2) Graph-based order using FKs among candidates
+        3) Fallback: reverse of metadata.sorted_tables
+        """
+        cand_by_name = {t.name: t for t in candidates}
+
+        # 1) Manual override (only include tables actually present)
+        if PURGE_ORDER_OVERRIDE:
+            override = [
+                cand_by_name[n] for n in PURGE_ORDER_OVERRIDE if n in cand_by_name # noqa E501
+            ]
+            # Add any remaining not covered by override at the end (still children->parents via FK) # noqa E501
+            rest = [t for t in candidates if t.name not in PURGE_ORDER_OVERRIDE] # noqa E501
+        else:
+            override, rest = [], list(candidates)
+
+        # 2) Graph-based order for 'rest'
+        if rest:
+            graph = {t.name: set() for t in rest}  # parent -> set(children)
+            names = set(graph.keys())
+
+            for t in rest:
+                for fk in t.foreign_keys:
+                    parent = fk.column.table.name
+                    if parent in names:
+                        graph[parent].add(t.name)
+
+            ordered_names = []
+            no_incoming = [
+                n for n in graph if not any(n in cs for cs in graph.values())
+            ]
+
+            while no_incoming:
+                n = no_incoming.pop()
+                ordered_names.append(n)
+                for m in list(graph[n]):
+                    graph[n].remove(m)
+                    if not any(m in cs for cs in graph.values()):
+                        no_incoming.append(m)
+
+            # Any remaining -> append (cycle or missing FK metadata)
+            remaining = [n for n, cs in graph.items() if cs]
+            ordered_rest = [cand_by_name[n] for n in ordered_names] + [
+                cand_by_name[n] for n in remaining
+            ]
+        else:
+            ordered_rest = []
+
+        # 3) Fallback if nothing computed
+        ordered = override + ordered_rest
+        if not ordered:
+            # reverse creation order ≈ children->parents; acceptable fallback
+            sorted_all = list(metadata.sorted_tables)
+            fallback = [t for t in reversed(sorted_all) if t in candidates]
+            ordered = fallback
+
+        return ordered

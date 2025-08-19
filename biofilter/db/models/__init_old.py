@@ -26,9 +26,7 @@ from .model_curation import (
 )
 from .model_variants import (
     VariantMaster,
-    VariantLocus,
-    # VariantLiftedPosition,
-    # VariantMergeLog,
+    VariantGeneRelationship,
 )
 from .model_pathways import PathwayMaster
 
@@ -71,9 +69,7 @@ __all__ = [
     "OmicStatus",
     # VARIANTS MODELS
     "VariantMaster",
-    "VariantLocus",
-    # "VariantLiftedPosition",
-    # "VariantMergeLog",
+    "VariantGeneRelationship",
     # PATHWAY MODELS
     "PathwayMaster",
     # PROTEIN MODELS

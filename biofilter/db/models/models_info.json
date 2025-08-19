@@ -1,8 +1,4 @@
 {
-  "Gene": {
-    "path": "biofilter.db.models.genes_models.Gene",
-    "description": "Gene table with HGNC, Entrez, and Ensembl identifiers, linked to master Entity."
-  },
   "Entity": {
     "path": "biofilter.db.models.entity_models.Entity",
     "description": "Master table for all biological entities (gene, variant, protein, etc)."
@@ -15,16 +11,72 @@
     "path": "biofilter.db.models.entity_models.EntityRelationship",
     "description": "Relationships between two entities (e.g., Gene ↔ Protein)."
   },
+  "Gene": {
+    "path": "biofilter.db.models.gene_models.GeneMaster",
+    "description": "Gene master table with HGNC, Entrez, Ensembl identifiers, linked to entity and functional categories."
+  },
+  "GeneGroup": {
+    "path": "biofilter.db.models.gene_models.GeneGroup",
+    "description": "Functional groupings of genes (e.g., 'protein-coding', 'RNA genes')."
+  },
+  "GeneGroupMembership": {
+    "path": "biofilter.db.models.gene_models.GeneGroupMembership",
+    "description": "Many-to-many relationship between Gene and GeneGroup."
+  },
+  "GeneLocation": {
+    "path": "biofilter.db.models.gene_models.GeneLocation",
+    "description": "Stores genomic coordinates for each gene (e.g., chromosome, start, end, strand)."
+  },
+  "GeneGenomicRegion": {
+    "path": "biofilter.db.models.gene_models.GeneGenomicRegion",
+    "description": "Cytogenetic band or chromosomal region associated with a gene (e.g., 1p36.33)."
+  },
+  "GeneLocusGroup": {
+    "path": "biofilter.db.models.gene_models.GeneLocusGroup",
+    "description": "Locus groups as defined by HGNC (e.g., 'RNA genes', 'Pseudogenes')."
+  },
+  "GeneLocusType": {
+    "path": "biofilter.db.models.gene_models.GeneLocusType",
+    "description": "Locus types as defined by HGNC (e.g., 'protein-coding gene', 'miRNA')."
+  },
   "Variant": {
-    "path": "biofilter.db.models.variants_models.Variant",
-    "description": "Genetic variants (SNPs, Indels) with position and type information."
+    "path": "biofilter.db.models.variants_models.VariantMaster",
+    "description": "Genetic variants (SNPs, indels) with position, alleles, and reference assembly."
+  },
+  "VariantGeneRelationship": {
+    "path": "biofilter.db.models.variants_models.VariantGeneRelationship",
+    "description": "Links between variants and genes, with data source tracking."
   },
   "Protein": {
     "path": "biofilter.db.models.protein_models.ProteinMaster",
-    "description": "Protein information extracted from UniProt, linked to genes and Pfam."
+    "description": "Protein information extracted from UniProt, linked to genes and Pfam domains."
+  },
+  "ProteinPfam": {
+    "path": "biofilter.db.models.protein_models.ProteinPfam",
+    "description": "Pfam domain metadata including accession, ID, and descriptions."
+  },
+  "ProteinPfamLink": {
+    "path": "biofilter.db.models.protein_models.ProteinPfamLink",
+    "description": "Many-to-many links between proteins and Pfam domains."
   },
   "Pathway": {
     "path": "biofilter.db.models.pathway_models.Pathway",
-    "description": "Biological pathways with KEGG and Reactome identifiers."
+    "description": "Biological pathway definitions, integrated from Reactome and KEGG."
+  },
+  "OmicStatus": {
+    "path": "biofilter.db.models.model_curation.OmicStatus",
+    "description": "Optional status annotation applied to genes (e.g., 'Manually curated')."
+  },
+  "SystemConfig": {
+    "path": "biofilter.db.models.config_models.SystemConfig",
+    "description": "Key-value storage for system-wide configurations and tunable parameters."
+  },
+  "BiofilterMetadata": {
+    "path": "biofilter.db.models.config_models.BiofilterMetadata",
+    "description": "Versioning metadata for schema and ETL processes; includes optional build hash."
+  },
+  "GenomeAssembly": {
+    "path": "biofilter.db.models.config_models.GenomeAssembly",
+    "description": "Reference genome assemblies and their accessions (e.g., GRCh38.p14)."
   }
 }

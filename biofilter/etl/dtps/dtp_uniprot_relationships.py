@@ -1,15 +1,15 @@
 import os
 from pathlib import Path
 import pandas as pd
+from biofilter.etl.mixins.base_dtp import DTPBase
 from biofilter.etl.mixins.entity_query_mixin import EntityQueryMixin
-from biofilter.db.models.entity_models import (
+from biofilter.db.models.model_entities import (
     EntityGroup,
     Entity,
     EntityName,
     EntityRelationship,
     EntityRelationshipType,
 )  # noqa E501
-from biofilter.etl.mixins.base_dtp import DTPBase
 
 
 class DTP(DTPBase, EntityQueryMixin):

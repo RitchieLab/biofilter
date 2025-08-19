@@ -1,7 +1,7 @@
 import pytest
 import pandas as pd
 from biofilter.etl.mixins.gene_query_mixin import GeneQueryMixin
-from db.models.genes_models import (
+from db.models.model_genes import (
     LocusGroup,
     LocusType,
     GenomicRegion,

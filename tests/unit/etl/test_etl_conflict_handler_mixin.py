@@ -1,6 +1,6 @@
-from db.models.genes_models import Gene
-from biofilter.db.models.entity_models import Entity
-from biofilter.db.models.curation_models import (
+from db.models.model_genes import Gene
+from db.models.model_entities import Entity
+from db.models.model_curation import (
     CurationConflict,
     ConflictStatus,
 )  # noqa: E501

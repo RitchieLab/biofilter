@@ -2,7 +2,7 @@
 # import tempfile
 import pytest
 from biofilter import Biofilter
-from biofilter.db.models.config_models import SystemConfig
+from db.models.model_config import SystemConfig
 from sqlalchemy import inspect
 
 

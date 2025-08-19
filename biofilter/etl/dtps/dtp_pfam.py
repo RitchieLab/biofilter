@@ -6,7 +6,7 @@ import pandas as pd
 from biofilter.utils.file_hash import compute_file_hash
 from biofilter.etl.mixins.entity_query_mixin import EntityQueryMixin
 from biofilter.etl.mixins.base_dtp import DTPBase
-from biofilter.db.models.protein_models import ProteinPfam
+from biofilter.db.models.model_proteins import ProteinPfam
 
 
 class DTP(DTPBase, EntityQueryMixin):
@@ -219,8 +219,8 @@ class DTP(DTPBase, EntityQueryMixin):
         try:
             index_specs = [
                 # protein_pfam
-                ("protein_pfam", ["clan_acc"]),
-                ("protein_pfam", ["pfam_id"]),
+                ("protein_pfams", ["clan_acc"]),
+                ("protein_pfams", ["pfam_id"]),
             ]
             self.db_write_mode()
             self.drop_indexes(index_specs)

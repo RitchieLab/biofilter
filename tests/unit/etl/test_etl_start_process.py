@@ -2,7 +2,7 @@ import pytest
 import pandas as pd
 from unittest.mock import MagicMock, patch
 from biofilter.etl.etl_manager import ETLManager
-from biofilter.db.models.etl_models import SourceSystem, DataSource, ETLProcess
+from db.models.model_etl import SourceSystem, DataSource, ETLProcess
 
 """
 🧪 Extensões possíveis:

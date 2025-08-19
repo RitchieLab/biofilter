@@ -1,50 +1,50 @@
 from biofilter import Biofilter
 
-db_uri = "sqlite:///dev_biofilter.db"
+db_uri = "sqlite:///biofilter_301.db"
 
 # Configure below
 data_sources_to_process = [
     # Genes
-    "hgnc",
-    "gene_ncbi",
+    # "hgnc",
+    # "gene_ncbi",
     # Proteins
-    "pfam",
-    "uniprot",
+    # "pfam",
+    # "uniprot",
     # Pathways
-    "reactome",
-    "kegg_pathways",
+    # "reactome",
+    # "kegg_pathways",
     # Gene Ontology
-    "gene_ontology",
+    # "gene_ontology",
     # Variants
     "dbsnp_sample",
-    "dbsnp_chr1",
-    "dbsnp_chr2",
-    "dbsnp_chr3",
-    "dbsnp_chr4",
-    "dbsnp_chr5",
-    "dbsnp_chr6",
-    "dbsnp_chr7",
-    "dbsnp_chr8",
-    "dbsnp_chr9",
-    "dbsnp_chr10",
-    "dbsnp_chr11",
-    "dbsnp_chr12",
-    "dbsnp_chr13",
-    "dbsnp_chr14",
-    "dbsnp_chr15",
-    "dbsnp_chr16",
-    "dbsnp_chr17",
-    "dbsnp_chr18",
-    "dbsnp_chr19",
-    "dbsnp_chr20",
-    "dbsnp_chr21",
-    "dbsnp_chr22",
-    "dbsnp_chrx",
-    "dbsnp_chry",
-    "dbsnp_chrmt",
+    # "dbsnp_chr1",
+    # "dbsnp_chr2",
+    # "dbsnp_chr3",
+    # "dbsnp_chr4",
+    # "dbsnp_chr5",
+    # "dbsnp_chr6",
+    # "dbsnp_chr7",
+    # "dbsnp_chr8",
+    # "dbsnp_chr9",
+    # "dbsnp_chr10",
+    # "dbsnp_chr11",
+    # "dbsnp_chr12",
+    # "dbsnp_chr13",
+    # "dbsnp_chr14",
+    # "dbsnp_chr15",
+    # "dbsnp_chr16",
+    # "dbsnp_chr17",
+    # "dbsnp_chr18",
+    # "dbsnp_chr19",
+    # "dbsnp_chr20",
+    # "dbsnp_chr21",
+    # "dbsnp_chr22",
+    # "dbsnp_chrx",
+    # "dbsnp_chry",
+    # "dbsnp_chrmt",
     # RelationShips
-    "reactome_relationships",
-    "uniprot_relationships",
+    # "reactome_relationships",
+    # "uniprot_relationships",
 ]
 
 run_steps = [

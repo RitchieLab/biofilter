@@ -4,13 +4,11 @@ from pathlib import Path
 import zipfile
 from biofilter.utils.file_hash import compute_file_hash
 from biofilter.etl.mixins.entity_query_mixin import EntityQueryMixin
-from biofilter.db.models.entity_models import (
+from biofilter.db.models import (
     EntityGroup,
+    PathwayMaster,
 )  # noqa E501
-from biofilter.db.models.pathway_models import Pathway
 from biofilter.etl.mixins.base_dtp import DTPBase
-
-# TODO: Separa os processos de dados mestres e dados de relacionamentos
 
 
 class DTP(DTPBase, EntityQueryMixin):
@@ -356,10 +354,10 @@ class DTP(DTPBase, EntityQueryMixin):
         # Set DB and drop indexes
         try:
             index_specs = [
-                ("pathways", ["entity_id"]),
+                ("pathway_masters", ["entity_id"]),
                 # Já possui index=True + unique=True, mas bom explicitar
-                ("pathways", ["pathway_id"]),
-                ("pathways", ["data_source_id"]),
+                ("pathway_masters", ["pathway_id"]),
+                ("pathway_masters", ["data_source_id"]),
             ]
 
             index_specs_entity = [
@@ -460,7 +458,7 @@ class DTP(DTPBase, EntityQueryMixin):
 
                 # Check if the pathway already exists
                 existing_pathway = (
-                    self.session.query(Pathway)
+                    self.session.query(PathwayMaster)
                     .filter_by(
                         pathway_id=pathway_master,
                     )
@@ -469,7 +467,7 @@ class DTP(DTPBase, EntityQueryMixin):
 
                 # Create new if it does not exist
                 if not existing_pathway:
-                    pathway = Pathway(
+                    pathway = PathwayMaster(
                         entity_id=entity_id,
                         pathway_id=pathway_master,
                         description=pathway_name,

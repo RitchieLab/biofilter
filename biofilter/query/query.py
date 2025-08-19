@@ -24,17 +24,17 @@ from biofilter.db.models import (
     ETLLog,
     ETLProcess,
     # Gene Models
-    Gene,
+    GeneMaster,
     GeneGroup,
-    LocusGroup,
-    LocusType,
-    GenomicRegion,
+    GeneLocusGroup,
+    GeneLocusType,
+    GeneGenomicRegion,
     OmicStatus,
     GeneGroupMembership,
     GeneLocation,
     # Variant Models
     GenomeAssembly,
-    Variant,
+    VariantMaster,
     VariantGeneRelationship,
     # Protein Models
     ProteinMaster,
@@ -42,7 +42,7 @@ from biofilter.db.models import (
     ProteinPfamLink,
     ProteinEntity,
     # Pathway Models
-    Pathway,
+    PathwayMaster,
     # GO Models
     GOMaster,
     GORelation,
@@ -86,17 +86,17 @@ class Query:
             "ETLLog": ETLLog,
             "ETLProcess": ETLProcess,
             # Gene
-            "Gene": Gene,
+            "GeneMaster": GeneMaster,
             "GeneGroup": GeneGroup,
-            "LocusGroup": LocusGroup,
-            "LocusType": LocusType,
-            "GenomicRegion": GenomicRegion,
+            "GeneLocusGroup": GeneLocusGroup,
+            "GeneLocusType": GeneLocusType,
+            "GeneGenomicRegion": GeneGenomicRegion,
             "OmicStatus": OmicStatus,
             "GeneGroupMembership": GeneGroupMembership,
             "GeneLocation": GeneLocation,
             # Variant
             "GenomeAssembly": GenomeAssembly,
-            "Variant": Variant,
+            "VariantMaster": VariantMaster,
             "VariantGeneRelationship": VariantGeneRelationship,
             # Protein
             "ProteinMaster": ProteinMaster,
@@ -104,7 +104,7 @@ class Query:
             "ProteinPfamLink": ProteinPfamLink,
             "ProteinEntity": ProteinEntity,
             # Pathway
-            "Pathway": Pathway,
+            "PathwayMaster": PathwayMaster,
             # GO
             "GOMaster": GOMaster,
             "GORelation": GORelation,

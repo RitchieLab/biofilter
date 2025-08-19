@@ -5,9 +5,8 @@ import pandas as pd
 from pathlib import Path
 from biofilter.utils.file_hash import compute_file_hash
 from biofilter.etl.mixins.entity_query_mixin import EntityQueryMixin
-from biofilter.db.models.entity_models import EntityGroup
 from biofilter.etl.mixins.base_dtp import DTPBase
-from biofilter.db.models.go_models import GOMaster, GORelation
+from biofilter.db.models import GOMaster, GORelation, EntityGroup
 
 
 class DTP(DTPBase, EntityQueryMixin):
@@ -296,15 +295,9 @@ class DTP(DTPBase, EntityQueryMixin):
         try:
             index_specs = [
                 # GOMaster
-                (
-                    "go_master",
-                    ["go_id"],
-                ),  # busca e checagem de duplicidade  # noqa E501
-                ("go_master", ["entity_id"]),  # vinculação com Entity
-                (
-                    "go_master",
-                    ["namespace"],
-                ),  # MF, BP, CC — comum em filtros ontológicos  # noqa E501
+                ("go_masters", ["go_id"]),
+                ("go_masters", ["entity_id"]),
+                ("go_masters", ["namespace"]),
                 # GORelation
                 ("go_relations", ["parent_id"]),  # relações ascendentes
                 ("go_relations", ["child_id"]),  # relações descendentes
@@ -434,6 +427,7 @@ class DTP(DTPBase, EntityQueryMixin):
                         entity_id=entity_id,
                         name=row.get("name", "").strip(),
                         namespace=row.get("namespace", "").strip(),
+                        data_source_id=self.data_source.id,
                     )
                     self.session.add(go_master)
                     self.session.flush()
@@ -501,6 +495,7 @@ class DTP(DTPBase, EntityQueryMixin):
                     parent_id=parent.id,
                     child_id=child.id,
                     relation_type=rel_type,  # noqa E501
+                    data_source_id=self.data_source.id,
                 )  # noqa: E501
                 self.session.add(relation)
                 total_relations += 1

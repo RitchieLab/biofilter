@@ -8,8 +8,8 @@ from pathlib import Path
 from biofilter.utils.file_hash import compute_file_hash
 from biofilter.etl.mixins.entity_query_mixin import EntityQueryMixin
 from biofilter.etl.mixins.gene_query_mixin import GeneQueryMixin
-from biofilter.db.models.entity_models import EntityGroup
-from biofilter.db.models.curation_models import (
+from biofilter.db.models import (
+    EntityGroup,
     CurationConflict,
     ConflictStatus,
 )  # noqa E501
@@ -221,27 +221,27 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
                 # ──────────────── gene_groups ────────────────
                 ("gene_groups", ["name"]),
                 # ──────────────── locus_groups ────────────────
-                ("locus_groups", ["name"]),
+                ("gene_locus_groups", ["name"]),
                 # ──────────────── locus_types ────────────────
-                ("locus_types", ["name"]),
+                ("gene_locus_types", ["name"]),
                 # ──────────────── omic_status ────────────────
                 ("omic_status", ["name"]),
                 # ──────────────── genomic_regions ────────────────
-                ("genomic_regions", ["label"]),
-                ("genomic_regions", ["chromosome"]),
-                ("genomic_regions", ["chromosome", "start", "end"]),
+                ("gene_genomic_regions", ["label"]),
+                ("gene_genomic_regions", ["chromosome"]),
+                ("gene_genomic_regions", ["chromosome", "start", "end"]),
                 # ──────────────── genes ────────────────
-                ("genes", ["entity_id"]),
-                ("genes", ["hgnc_id"]),
-                ("genes", ["entrez_id"]),
-                ("genes", ["ensembl_id"]),
-                ("genes", ["locus_group_id"]),
-                ("genes", ["locus_type_id"]),
-                ("genes", ["data_source_id"]),
-                ("genes", ["omic_status_id"]),
+                ("gene_masters", ["entity_id"]),
+                ("gene_masters", ["hgnc_id"]),
+                ("gene_masters", ["entrez_id"]),
+                ("gene_masters", ["ensembl_id"]),
+                ("gene_masters", ["locus_group_id"]),
+                ("gene_masters", ["locus_type_id"]),
+                ("gene_masters", ["data_source_id"]),
+                ("gene_masters", ["omic_status_id"]),
                 # ──────────────── gene_group_membership ────────────────
-                ("gene_group_membership", ["group_id"]),
-                ("gene_group_membership", ["gene_id"]),
+                ("gene_group_memberships", ["group_id"]),
+                ("gene_group_memberships", ["gene_id"]),
                 # ──────────────── gene_locations ────────────────
                 ("gene_locations", ["gene_id"]),
                 ("gene_locations", ["region_id"]),
@@ -368,7 +368,7 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
             prev_time = current_time
             gene_master = row.get("hgnc_id")
             print(
-                f"{row.name} - {gene_master} | Total: {elapsed_total:.2f}s | Δ: {elapsed_since_last:.0f}ms"
+                f"{row.name} - {gene_master} | Total: {elapsed_total:.2f}s | Δ: {elapsed_since_last:.0f}ms"  # noqa E501
             )  # noqa E501
 
             # Define the Gene Master
@@ -458,16 +458,19 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
             end = row.get("end")
 
             locus_group_instance = self.get_or_create_locus_group(
-                locus_group_name
+                name=locus_group_name,
+                data_source_id=self.data_source.id,
             )  # noqa: E501
             locus_type_instance = self.get_or_create_locus_type(
-                locus_type_name
+                name=locus_type_name,
+                data_source_id=self.data_source.id,
             )  # noqa: E501
             region_instance = self.get_or_create_genomic_region(
                 label=region_label,
                 chromosome=chromosome,
                 start=start,
                 end=end,
+                data_source_id=self.data_source.id,
             )  # noqa: E501
 
             group_names_list = self.parse_gene_groups(row.get("gene_group"))

@@ -1,5 +1,5 @@
 from sqlalchemy.exc import IntegrityError
-from biofilter.db.models.entity_models import (
+from biofilter.db.models.model_entities import (
     Entity,
     EntityName,
     EntityRelationship,  # noqa: E501
@@ -29,7 +29,10 @@ class EntityQueryMixin:
             return existing.entity_id, False
 
         # Create Entity and its primary EntityName
-        new_entity = Entity(group_id=group_id)
+        new_entity = Entity(
+            group_id=group_id,
+            data_source_id=data_source_id,
+        )
         self.session.add(new_entity)
         self.session.flush()
 

@@ -24,6 +24,7 @@ class EntityFilterReport(ReportBase):
         PrimaryName = aliased(EntityName)
 
         # Query
+
         matches = (
             self.session.query(
                 EntityName.name.label("input_original"),
@@ -37,7 +38,6 @@ class EntityFilterReport(ReportBase):
                 Entity.is_deactive,
                 EntityName.data_source_id,
                 # DataSource.name.label("data_source_name"),
-
             )
             .join(Entity, Entity.id == EntityName.entity_id)
             .join(PrimaryName, PrimaryName.entity_id == Entity.id)
@@ -86,25 +86,29 @@ class EntityFilterReport(ReportBase):
         ]  # noqa E501
 
         if not_found:
-            missing = pd.DataFrame({
-                "input_original": not_found,
-                "input": not_found,
-                "name": None,
-                "is_primary": None,
-                "entity_id": None,
-                "primary_name": None,
-                "group_id": None,
-                "group_name": None,
-                "has_conflict": None,
-                "is_deactive": None,
-                "data_source_id": None,
-                # "data_source_name": None,
-                "observation": "not found"
-            })
+            missing = pd.DataFrame(
+                {
+                    "input_original": not_found,
+                    "input": not_found,
+                    "name": None,
+                    "is_primary": None,
+                    "entity_id": None,
+                    "primary_name": None,
+                    "group_id": None,
+                    "group_name": None,
+                    "has_conflict": None,
+                    "is_deactive": None,
+                    "data_source_id": None,
+                    # "data_source_name": None,
+                    "observation": "not found",
+                }
+            )
             df = pd.concat([df, missing], ignore_index=True)
 
         self.results = df
         return df
 
     def to_dataframe(self, data=None):
-        return data if isinstance(data, pd.DataFrame) else pd.DataFrame(data or [])  # noqa E501
+        return (
+            data if isinstance(data, pd.DataFrame) else pd.DataFrame(data or [])
+        )  # noqa E501

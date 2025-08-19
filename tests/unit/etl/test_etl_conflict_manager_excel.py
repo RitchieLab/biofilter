@@ -2,7 +2,7 @@ import os
 import pytest
 import pandas as pd
 from openpyxl import load_workbook
-from biofilter.db.models.curation_models import (
+from db.models.model_curation import (
     CurationConflict,
     ConflictStatus,
     ConflictResolution,

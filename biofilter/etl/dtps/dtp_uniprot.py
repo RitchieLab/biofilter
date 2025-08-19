@@ -5,10 +5,10 @@ from pathlib import Path
 import pandas as pd
 from biofilter.utils.file_hash import compute_file_hash
 from biofilter.etl.mixins.entity_query_mixin import EntityQueryMixin
-from biofilter.db.models.entity_models import EntityGroup
 from biofilter.etl.mixins.base_dtp import DTPBase
 
-from biofilter.db.models.protein_models import (
+from biofilter.db.models import (
+    EntityGroup,
     ProteinMaster,
     ProteinEntity,
     ProteinPfam,
@@ -429,13 +429,13 @@ class DTP(DTPBase, EntityQueryMixin):
             index_specs = [
                 # protein_master
                 # ("protein_master", ["data_source_id", "protein_id"]),
-                ("protein_master", ["protein_id"]),
+                ("protein_masters", ["protein_id"]),
                 # protein_entity
-                ("protein_entity", ["entity_id"]),
-                ("protein_entity", ["protein_master_id", "is_isoform"]),
+                ("protein_entities", ["entity_id"]),
+                ("protein_entities", ["protein_master_id", "is_isoform"]),
                 # ("protein_entity", ["data_source_id", "entity_id"]),
                 # protein_pfam_link
-                ("protein_pfam_link", ["pfam_id"]),
+                ("protein_pfam_links", ["pfam_pk_id"]),
                 # ("protein_pfam_link", ["data_source_id"]),
             ]
 
@@ -539,7 +539,7 @@ class DTP(DTPBase, EntityQueryMixin):
                 elapsed_since_last = (current_time - prev_time) * 1000
                 prev_time = current_time
                 print(
-                    f"{row.name} - {row['uniprot_id']} | Total: {elapsed_total:.2f}s | Δ: {elapsed_since_last:.0f}ms"
+                    f"{row.name} - {row['uniprot_id']} | Total: {elapsed_total:.2f}s | Δ: {elapsed_since_last:.0f}ms"  # noqa E501
                 )  # noqa E501
 
                 # CANONICAL PROTEIN
@@ -604,6 +604,7 @@ class DTP(DTPBase, EntityQueryMixin):
                     .filter_by(
                         protein_master_id=protein_master_obj.id,
                         entity_id=entity_id,
+                        data_source_id=self.data_source.id,
                     )
                     .first()
                 )
@@ -638,14 +639,14 @@ class DTP(DTPBase, EntityQueryMixin):
                             self.session.query(ProteinPfamLink)
                             .filter_by(
                                 protein_master_id=protein_master_obj.id,
-                                pfam_id=pfam.id,
+                                pfam_pk_id=pfam.id,
                             )
                             .first()
                         )
                         if not protein_pfam_link:
                             pfam_link = ProteinPfamLink(
                                 protein_master_id=protein_master_obj.id,
-                                pfam_id=pfam.id,
+                                pfam_pk_id=pfam.id,
                                 data_source_id=self.data_source.id,
                             )
                             self.session.add(pfam_link)
@@ -672,6 +673,7 @@ class DTP(DTPBase, EntityQueryMixin):
                             .filter_by(
                                 protein_master_id=protein_master_obj.id,
                                 entity_id=isoform_entity_id,
+                                data_source_id=self.data_source.id,
                             )
                             .first()
                         )

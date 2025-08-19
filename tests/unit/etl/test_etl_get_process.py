@@ -1,4 +1,4 @@
-from biofilter.db.models.etl_models import DataSource, SourceSystem, ETLProcess
+from db.models.model_etl import DataSource, SourceSystem, ETLProcess
 from biofilter.etl.etl_manager import ETLManager
 
 

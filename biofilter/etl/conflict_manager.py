@@ -6,18 +6,26 @@ from sqlalchemy import or_
 from typing import Optional
 
 from biofilter.utils.logger import Logger
-from biofilter.db.models.entity_models import Entity, EntityName
-from biofilter.db.models.genes_models import Gene, OmicStatus
-from biofilter.db.models.curation_models import (
+
+# from biofilter.db.models.model_entities import Entity, EntityName
+# from biofilter.db.models.model_genes import Gene, OmicStatus
+# from biofilter.db.models.model_curation import (
+#     CurationConflict,
+#     ConflictStatus,
+#     ConflictResolution,
+# )  # noqa E501
+from biofilter.db.models import (
+    Entity,
+    EntityName,
+    GeneMaster,
+    OmicStatus,
     CurationConflict,
     ConflictStatus,
     ConflictResolution,
-)  # noqa E501
+)
 
-"""
-No futuro podemos criar uma estrutura em que essa classe sera generica e
-teremos Mixin para expandir as funcionalidades de cada tipo omico
-"""
+# TODO: Create a strutucture to convert this class to generic and
+# extend to mixin to each omic type
 
 
 # class ConflictManager(ConflictResolutionMixin):
@@ -257,7 +265,7 @@ class ConflictManager:
                 self.logger.log(msg, "WARNING")
 
             # ❌ Remove the Gene associated with the hgnc_id
-            gene = self.session.query(Gene).filter_by(hgnc_id=hgnc_id).first()
+            gene = self.session.query(GeneMaster).filter_by(hgnc_id=hgnc_id).first()
             if gene:
                 self.session.delete(gene)
                 msg = f"🗑️ Gene {hgnc_id} deleted from database"
@@ -286,7 +294,7 @@ class ConflictManager:
 
             # Load the target gene (the one that will remain in the system)
             target_gene = (
-                self.session.query(Gene)
+                self.session.query(GeneMaster)
                 .filter_by(hgnc_id=conflict.existing_identifier)
                 .first()
             )
@@ -339,7 +347,7 @@ class ConflictManager:
 
             # Alterar o status do Gene para "merged"
             source_gene = (
-                self.session.query(Gene).filter_by(hgnc_id=hgnc_id).first()
+                self.session.query(GeneMaster).filter_by(hgnc_id=hgnc_id).first()
             )  # noqa: E501
             omic_status = (
                 self.session.query(OmicStatus).filter_by(name="merged").first()
@@ -404,21 +412,21 @@ class ConflictManager:
         entity_id: int,
         symbol: str,
         data_source_id,
-    ) -> Optional[Gene]:
+    ) -> Optional[GeneMaster]:
         """
         Returns existing Gene if safe, or logs a conflict and returns None.
         """
         filters = []
         if hgnc_id:
-            filters.append(Gene.hgnc_id == hgnc_id)
+            filters.append(GeneMaster.hgnc_id == hgnc_id)
         if entrez_id:
-            filters.append(Gene.entrez_id == entrez_id)
+            filters.append(GeneMaster.entrez_id == entrez_id)
         if ensembl_id:
-            filters.append(Gene.ensembl_id == ensembl_id)
+            filters.append(GeneMaster.ensembl_id == ensembl_id)
         if entity_id:
-            filters.append(Gene.entity_id == entity_id)
+            filters.append(GeneMaster.entity_id == entity_id)
 
-        candidates = self.session.query(Gene).filter(or_(*filters)).all()
+        candidates = self.session.query(GeneMaster).filter(or_(*filters)).all()
 
         if not candidates:
             return None

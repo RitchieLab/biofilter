@@ -9,11 +9,9 @@ from pathlib import Path
 
 from biofilter.utils.file_hash import compute_file_hash
 from biofilter.etl.mixins.entity_query_mixin import EntityQueryMixin
-from biofilter.db.models.entity_models import (
+from biofilter.db.models import (
     EntityGroup,
-)  # noqa E501
-from biofilter.db.models.genes_models import (
-    Gene,
+    GeneMaster,
     GeneGroup,
     GeneGroupMembership,
 )  # noqa E501
@@ -315,27 +313,27 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
                 # ──────────────── gene_groups ────────────────
                 ("gene_groups", ["name"]),
                 # ──────────────── locus_groups ────────────────
-                ("locus_groups", ["name"]),
+                ("gene_locus_groups", ["name"]),
                 # ──────────────── locus_types ────────────────
-                ("locus_types", ["name"]),
+                ("gene_locus_types", ["name"]),
                 # ──────────────── omic_status ────────────────
                 ("omic_status", ["name"]),
                 # ──────────────── genomic_regions ────────────────
-                ("genomic_regions", ["label"]),
-                ("genomic_regions", ["chromosome"]),
-                ("genomic_regions", ["chromosome", "start", "end"]),
+                ("gene_genomic_regions", ["label"]),
+                ("gene_genomic_regions", ["chromosome"]),
+                ("gene_genomic_regions", ["chromosome", "start", "end"]),
                 # ──────────────── genes ────────────────
-                ("genes", ["entity_id"]),
-                ("genes", ["hgnc_id"]),
-                ("genes", ["entrez_id"]),
-                ("genes", ["ensembl_id"]),
-                ("genes", ["locus_group_id"]),
-                ("genes", ["locus_type_id"]),
-                ("genes", ["data_source_id"]),
-                ("genes", ["omic_status_id"]),
+                ("gene_masters", ["entity_id"]),
+                ("gene_masters", ["hgnc_id"]),
+                ("gene_masters", ["entrez_id"]),
+                ("gene_masters", ["ensembl_id"]),
+                ("gene_masters", ["locus_group_id"]),
+                ("gene_masters", ["locus_type_id"]),
+                ("gene_masters", ["data_source_id"]),
+                ("gene_masters", ["omic_status_id"]),
                 # ──────────────── gene_group_membership ────────────────
-                ("gene_group_membership", ["group_id"]),
-                ("gene_group_membership", ["gene_id"]),
+                ("gene_group_memberships", ["group_id"]),
+                ("gene_group_memberships", ["gene_id"]),
                 # ──────────────── gene_locations ────────────────
                 ("gene_locations", ["gene_id"]),
                 ("gene_locations", ["region_id"]),
@@ -432,6 +430,7 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
                 gene_group = GeneGroup(
                     name="NCBI Gene",
                     description="Gene group for NCBI genes",
+                    data_source_id=self.data_source.id,
                 )
                 self.session.add(gene_group)
                 self.session.commit()
@@ -460,7 +459,7 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
                 elapsed_since_last = (current_time - prev_time) * 1000
                 prev_time = current_time
                 print(
-                    f"{row.name} - {gene_master} | Total: {elapsed_total:.2f}s | Δ: {elapsed_since_last:.0f}ms"
+                    f"{row.name} - {gene_master} | Total: {elapsed_total:.2f}s | Δ: {elapsed_since_last:.0f}ms"  # noqa E501
                 )  # noqa E501
 
                 # Skip genes with invalid symbol
@@ -541,11 +540,12 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
                         chromosome=chromosome,
                         start=start,
                         end=end,
+                        data_source_id=self.data_source.id,
                     )
 
                 # Check if Gene already exists
                 existing = (
-                    self.session.query(Gene)
+                    self.session.query(GeneMaster)
                     .filter_by(entity_id=entity_id, entrez_id=row["entrez_id"])
                     .first()
                 )
@@ -557,7 +557,7 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
                     continue
 
                 # Create Gene
-                gene_instance = Gene(
+                gene_instance = GeneMaster(
                     omic_status_id=5,  # Arbitrary placeholder status
                     entity_id=entity_id,
                     hgnc_status="Gene from NCBI",
@@ -575,6 +575,7 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
                 membership = GeneGroupMembership(
                     gene_id=gene_instance.id,
                     group_id=gene_group.id,
+                    data_source_id=self.data_source.id,
                 )
                 self.session.add(membership)
                 # self.session.flush()

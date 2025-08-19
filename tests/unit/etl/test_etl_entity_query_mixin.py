@@ -1,6 +1,6 @@
 import pytest
 from biofilter.etl.mixins.entity_query_mixin import EntityQueryMixin
-from biofilter.db.models.entity_models import EntityName
+from db.models.model_entities import EntityName
 from unittest.mock import MagicMock, patch
 from sqlalchemy.exc import IntegrityError
 

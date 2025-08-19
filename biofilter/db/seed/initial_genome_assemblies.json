@@ -124,6 +124,11 @@
             "accession": "NC_012920.1",
             "assembly_name": "GRCh38.p14",
             "chromosome": "MT"
+        },
+        {
+            "accession": "NC_000008.10",
+            "assembly_name": "GRCh37.p13",
+            "chromosome": "8"
         }
     ]
 }

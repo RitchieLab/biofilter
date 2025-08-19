@@ -1,13 +1,13 @@
 import re
 import ast
 import pandas as pd
-from biofilter.db.models.genes_models import (
-    Gene,
+from biofilter.db.models import (
+    GeneMaster,
     GeneGroup,
     GeneGroupMembership,
-    LocusGroup,
-    LocusType,
-    GenomicRegion,
+    GeneLocusGroup,
+    GeneLocusType,
+    GeneGenomicRegion,
     GeneLocation,
     OmicStatus,
 )  # noqa: E501
@@ -15,7 +15,11 @@ from biofilter.db.models.genes_models import (
 
 class GeneQueryMixin:
 
-    def get_or_create_locus_group(self, name: str):
+    def get_or_create_locus_group(
+        self,
+        name: str,
+        data_source_id: int = None,
+    ):
         """
         Retrieves an existing LocusGroup by name or creates a new one.
 
@@ -33,20 +37,27 @@ class GeneQueryMixin:
             return None
 
         group = (
-            self.session.query(LocusGroup).filter_by(name=name_clean).first()
+            self.session.query(GeneLocusGroup).filter_by(name=name_clean).first()
         )  # noqa: E501
         if group:
             return group
 
         # Create new LocusGroup
-        locus_group = LocusGroup(name=name_clean)
+        locus_group = GeneLocusGroup(
+            name=name_clean,
+            data_source_id=data_source_id,
+        )
         self.session.add(locus_group)
         self.session.flush()  # commits later in batch
         msg = f"LocusGroup '{name_clean}' created"
         self.logger.log(msg, "DEBUG")
         return locus_group
 
-    def get_or_create_locus_type(self, name: str):
+    def get_or_create_locus_type(
+        self,
+        name: str,
+        data_source_id: int = None,
+    ):
         """
         Retrieves an existing LocusType by name or creates a new one.
 
@@ -64,13 +75,16 @@ class GeneQueryMixin:
             return None
 
         locus_type = (
-            self.session.query(LocusType).filter_by(name=name_clean).first()
+            self.session.query(GeneLocusType).filter_by(name=name_clean).first()
         )  # noqa: E501
         if locus_type:
             return locus_type
 
         # Create new LocusType
-        locus_type = LocusType(name=name_clean)
+        locus_type = GeneLocusType(
+            name=name_clean,
+            data_source_id=data_source_id,
+        )
         self.session.add(locus_type)
         self.session.flush()  # commits later in batch
         self.logger.log(f"Created new LocusType: {name_clean}", "DEBUG")
@@ -82,7 +96,7 @@ class GeneQueryMixin:
         chromosome: str = None,
         start: int = None,
         end: int = None,
-        description: str = None,
+        data_source_id: int = None,
     ):
         """
         Returns an existing GenomicRegion by label, or creates a new one.
@@ -95,19 +109,20 @@ class GeneQueryMixin:
             return None
 
         region = (
-            self.session.query(GenomicRegion)
+            self.session.query(GeneGenomicRegion)
             .filter_by(label=label_clean)
             .first()  # noqa: E501
         )  # noqa: E501
         if region:
             return region
 
-        region = GenomicRegion(
+        region = GeneGenomicRegion(
             label=label_clean,
             chromosome=chromosome,
             start=start,
             end=end,
-            description=description,
+            description="",
+            data_source_id=data_source_id,
         )
         self.session.add(region)
         self.session.flush()
@@ -117,12 +132,12 @@ class GeneQueryMixin:
 
     def get_or_create_gene_location(
         self,
-        gene: Gene,
+        gene: GeneMaster,
         chromosome: str = None,
         start: int = None,
         end: int = None,
         strand: str = None,
-        region: GenomicRegion = None,
+        region: GeneGenomicRegion = None,
         assembly: str = "GRCh38",
         data_source_id: int = None,
     ):
@@ -240,7 +255,7 @@ class GeneQueryMixin:
         else:
             status_id = self.get_status_id("active")
 
-        gene = Gene(
+        gene = GeneMaster(
             # symbol=symbol,
             omic_status_id=status_id,
             hgnc_status=hgnc_status,
@@ -249,8 +264,8 @@ class GeneQueryMixin:
             entrez_id=entrez_id,
             ensembl_id=ensembl_id,
             data_source_id=data_source_id,
-            locus_group=locus_group,
-            locus_type=locus_type,
+            gene_locus_group=locus_group,
+            gene_locus_type=locus_type,
         )
         self.session.add(gene)
         self.session.flush()
@@ -269,7 +284,10 @@ class GeneQueryMixin:
                     .first()
                 )
                 if not group:
-                    group = GeneGroup(name=group_name.strip())
+                    group = GeneGroup(
+                        name=group_name.strip(),
+                        data_source_id=data_source_id,
+                    )
                     self.session.add(group)
                     self.session.flush()
                     msg = f"🧩 GeneGroup '{group_name}' created"
@@ -288,7 +306,9 @@ class GeneQueryMixin:
         for group in group_objs:
             if group.id not in existing_links:
                 membership = GeneGroupMembership(
-                    gene_id=gene.id, group_id=group.id
+                    gene_id=gene.id,
+                    group_id=group.id,
+                    data_source_id=data_source_id,
                 )  # noqa: E501
                 self.session.add(membership)
                 new_links += 1

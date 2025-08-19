@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Optional
 
 # from biofilter.utils.file_hash import compute_file_hash
-from biofilter.db.models.config_models import BiofilterMetadata
+from biofilter.db.models.model_config import BiofilterMetadata
 from biofilter.etl.mixins.base_dtp_turning import DBTuningMixin
 
 

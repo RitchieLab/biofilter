@@ -20,7 +20,7 @@ class Biofilter:
         self.db_uri = db_uri
         self.db = None
         self._metadata = None
-        self._settings = None
+        # self._settings = None
         self._report = None  # Lazy-load: Report Manager
         self._etl = None  # Lazy-load: ETL Manager
         self._conflict = None  # Lazy-load: Conflict Manager
@@ -158,7 +158,7 @@ class Biofilter:
         self,
         data_source: list[str] = None,
         source_system: list[str] = None,
-        delete_files: bool = True,
+        delete_files: bool = False,
     ):
         """
         Restart ETL processes for the specified DataSources or SourceSystems.
@@ -185,7 +185,7 @@ class Biofilter:
             delete_files=delete_files,
         )
 
-    def export_conflicts_to_excel(self, output_path: str = "curation_conflicts.xlsx"):
+    def export_conflicts_to_excel(self, output_path: str = "curation_conflicts.xlsx"):  # noqa E501
         """
         Exporta os conflitos de curadoria para um arquivo Excel.
         """
@@ -196,7 +196,7 @@ class Biofilter:
 
         self.logger.log("🔄 Resetting the ETL Process", "INFO")
 
-        manager = ConflictManager(session=self.db.get_session(), logger=self.logger)
+        manager = ConflictManager(session=self.db.get_session(), logger=self.logger)  # noqa E501
         return manager.export_conflicts_to_excel(output_path)
 
     def import_conflicts_from_excel(

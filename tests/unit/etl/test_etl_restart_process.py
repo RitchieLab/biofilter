@@ -1,5 +1,5 @@
 import pytest
-from biofilter.db.models.etl_models import ETLProcess, DataSource, SourceSystem
+from db.models.model_etl import ETLProcess, DataSource, SourceSystem
 from biofilter.etl.etl_manager import ETLManager
 
 
