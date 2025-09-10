@@ -1,11 +1,9 @@
 from biofilter.db.base import Base
 from sqlalchemy.orm import relationship
-from sqlalchemy.sql import func
 from sqlalchemy import (
     Column,
     Integer,
     String,
-    DateTime,
     ForeignKey,
     Boolean,
     PrimaryKeyConstraint,
@@ -33,19 +31,16 @@ class ProteinPfam(Base):
     data_source_id = Column(
         Integer,
         ForeignKey("etl_data_sources.id", ondelete="CASCADE"),
-        nullable=False,
+        nullable=True,
     )
+    data_source = relationship("ETLDataSource", passive_deletes=True)
 
-    created_at = Column(DateTime, server_default=func.now(), nullable=False)
-    updated_at = Column(
-        DateTime,
-        server_default=func.now(),
-        onupdate=func.now(),
-        nullable=False,  # noqa E501
+    etl_package_id = Column(
+        Integer,
+        ForeignKey("etl_packages.id", ondelete="CASCADE"),
+        nullable=True,
     )
-
-    # Relationships (Go Up)
-    data_source = relationship("DataSource", passive_deletes=True)
+    etl_package = relationship("ETLPackage", passive_deletes=True)
 
     # Relationships (Go Down)
     protein_links = relationship("ProteinPfamLink", back_populates="pfam")
@@ -69,22 +64,23 @@ class ProteinMaster(Base):
     data_source_id = Column(
         Integer,
         ForeignKey("etl_data_sources.id", ondelete="CASCADE"),
-        nullable=False,
+        nullable=True,
     )
-    created_at = Column(DateTime, server_default=func.now(), nullable=False)
-    updated_at = Column(
-        DateTime,
-        server_default=func.now(),
-        onupdate=func.now(),
-        nullable=False,  # noqa E501
-    )
+    data_source = relationship("ETLDataSource", passive_deletes=True)
 
-    # Relationships (Go Up)
-    data_source = relationship("DataSource", passive_deletes=True)
+    etl_package_id = Column(
+        Integer,
+        ForeignKey("etl_packages.id", ondelete="CASCADE"),
+        nullable=True,
+    )
+    etl_package = relationship("ETLPackage", passive_deletes=True)
 
     # Relationships (Go Down)
     pfam_links = relationship(
         "ProteinPfamLink", back_populates="protein_master"
+    )  # noqa E501
+    protein_entity = relationship(
+        "ProteinEntity", back_populates="protein_master"
     )  # noqa E501
 
     def __repr__(self):
@@ -99,11 +95,17 @@ class ProteinEntity(Base):
 
     __tablename__ = "protein_entities"
 
-    id = Column(Integer, primary_key=True)
-    entity_id = Column(Integer, ForeignKey("entities.id"), nullable=False)
-    protein_master_id = Column(
+    id = Column(Integer, primary_key=True, autoincrement=True)
+
+    entity_id = Column(
+        Integer, ForeignKey("entities.id", ondelete="CASCADE"), nullable=False
+    )  # noqa E501
+    entity = relationship("Entity", passive_deletes=True)
+
+    protein_id = Column(
         Integer, ForeignKey("protein_masters.id"), nullable=False
     )  # noqa E501
+    protein_master = relationship("ProteinMaster", back_populates="protein_entity")
 
     is_isoform = Column(Boolean, default=False, nullable=False)
     isoform_accession = Column(String(20), nullable=True)
@@ -111,15 +113,21 @@ class ProteinEntity(Base):
     data_source_id = Column(
         Integer,
         ForeignKey("etl_data_sources.id", ondelete="CASCADE"),
-        nullable=False,
+        nullable=True,
     )
+    data_source = relationship("ETLDataSource", passive_deletes=True)
 
-    created_at = Column(DateTime, server_default=func.now(), nullable=False)
+    etl_package_id = Column(
+        Integer,
+        ForeignKey("etl_packages.id", ondelete="CASCADE"),
+        nullable=True,
+    )
+    etl_package = relationship("ETLPackage", passive_deletes=True)
 
-    # Relationships (Go Up)
-    protein_master = relationship("ProteinMaster")
-    data_source = relationship("DataSource", passive_deletes=True)
-    entity = relationship("Entity")
+    # __table_args__ = (
+    #     PrimaryKeyConstraint("protein_id", "pfam_pk_id"),
+    #     UniqueConstraint("entity_id", "protein_id"),  # em ProteinEntity
+    # )
 
 
 class ProteinPfamLink(Base):
@@ -130,28 +138,34 @@ class ProteinPfamLink(Base):
 
     __tablename__ = "protein_pfam_links"
 
-    protein_master_id = Column(
+    protein_id = Column(
         Integer, ForeignKey("protein_masters.id"), nullable=False
     )  # noqa E501
+    protein_master = relationship("ProteinMaster", back_populates="pfam_links")
+
     pfam_pk_id = Column(
         Integer,
         ForeignKey("protein_pfams.id", ondelete="CASCADE"),
         nullable=False,  # noqa E501
     )  # noqa E501
-    data_source_id = Column(
-        Integer,
-        ForeignKey("etl_data_sources.id", ondelete="CASCADE"),
-        nullable=False,
-    )
-    created_at = Column(DateTime, server_default=func.now(), nullable=False)
-
-    __table_args__ = (PrimaryKeyConstraint("protein_master_id", "pfam_pk_id"),)
-
-    # Relationships (Go Up)
-    protein_master = relationship("ProteinMaster", back_populates="pfam_links")
     pfam = relationship(
         "ProteinPfam",
         back_populates="protein_links",
         foreign_keys=[pfam_pk_id],  # noqa E501
     )  # noqa E501
-    data_source = relationship("DataSource", passive_deletes=True)
+
+    data_source_id = Column(
+        Integer,
+        ForeignKey("etl_data_sources.id", ondelete="CASCADE"),
+        nullable=True,
+    )
+    data_source = relationship("ETLDataSource", passive_deletes=True)
+
+    etl_package_id = Column(
+        Integer,
+        ForeignKey("etl_packages.id", ondelete="CASCADE"),
+        nullable=True,
+    )
+    etl_package = relationship("ETLPackage", passive_deletes=True)
+
+    __table_args__ = (PrimaryKeyConstraint("protein_id", "pfam_pk_id"),)

@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Optional
 
 # from biofilter.utils.file_hash import compute_file_hash
-from biofilter.db.models.model_config import BiofilterMetadata
+from biofilter.db.models import BiofilterMetadata, EntityGroup
 from biofilter.etl.mixins.base_dtp_turning import DBTuningMixin
 
 
@@ -88,3 +88,20 @@ class DTPBase(DBTuningMixin):
                 msg += f" and <= {self.compatible_schema_max}"
             msg += f"\n   Current DB version: {db_version}"
             raise Exception(msg)
+
+    def get_entity_group(self, entity_group):
+        if not hasattr(self, "entity_group") or self.entity_group is None:
+            group = (
+                self.session.query(EntityGroup)
+                .filter_by(name=entity_group)
+                .first()  # noqa: E501
+            )  # noqa: E501
+            if not group:
+                msg = f"EntityGroup {entity_group} not found in the database."
+                # self.logger.log(msg, "ERROR")
+                raise ValueError(msg)
+
+            self.entity_group = group.id
+
+            msg = f"EntityGroup ID for {entity_group}  is {self.entity_group}"
+            self.logger.log(msg, "DEBUG")

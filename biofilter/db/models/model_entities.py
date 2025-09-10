@@ -1,13 +1,17 @@
 from biofilter.db.base import Base
 from sqlalchemy.orm import relationship
-from sqlalchemy.sql import func
+
+# from sqlalchemy.sql import func
 from sqlalchemy import (
     Column,
     Integer,
     String,
     Boolean,
-    DateTime,
+    # DateTime,
     ForeignKey,
+    # Index,
+    # CheckConstraint,
+    UniqueConstraint,
 )
 
 
@@ -57,33 +61,32 @@ class Entity(Base):
         ForeignKey("entity_groups.id", ondelete="SET NULL"),
         nullable=True,  # noqa E501
     )  # noqa E501
+    entity_group = relationship("EntityGroup", back_populates="entities")
+
     has_conflict = Column(
         Boolean, nullable=True, default=None
     )  # ⚠️ Inform conflict status
-    is_deactive = Column(
+    is_active = Column(
         Boolean, nullable=True, default=None
     )  # 🚫 Inform entity deactives
 
     data_source_id = Column(
         Integer,
         ForeignKey("etl_data_sources.id", ondelete="CASCADE"),
-        nullable=False,
+        nullable=True,
     )
+    data_source = relationship("ETLDataSource", passive_deletes=True)
 
-    created_at = Column(DateTime, server_default=func.now(), nullable=False)
-    updated_at = Column(
-        DateTime,
-        server_default=func.now(),
-        onupdate=func.now(),
-        nullable=False,  # noqa E501
+    etl_package_id = Column(
+        Integer,
+        ForeignKey("etl_packages.id", ondelete="CASCADE"),
+        nullable=True,
     )
-
-    # Relationships (Go Up)
-    entity_group = relationship("EntityGroup", back_populates="entities")
-    data_source = relationship("DataSource", passive_deletes=True)
+    etl_package = relationship("ETLPackage", passive_deletes=True)
 
     # Relationships (Go Down)
-    entity_names = relationship("EntityName", back_populates="entity")
+    entity_alias = relationship("EntityAlias", back_populates="entity")
+
     relationships_as_1 = relationship(
         "EntityRelationship",
         foreign_keys="[EntityRelationship.entity_1_id]",
@@ -97,51 +100,114 @@ class Entity(Base):
 
     # -- Permit load primary name in a single query
     primary_name = relationship(
-        "EntityName",
-        primaryjoin="and_(Entity.id==EntityName.entity_id, EntityName.is_primary==True)",  # noqa E501
+        "EntityAlias",
+        primaryjoin="and_(Entity.id==EntityAlias.entity_id, EntityAlias.is_primary==True)",  # noqa E501
         viewonly=True,
         uselist=False,
     )
 
 
-class EntityName(Base):
+class EntityAlias(Base):
     """
-    Stores a synonym or alias for a given entity, typically sourced from
-    external databases or literature.
+    Canonical registry of display names, synonyms, and external codes for an
+    Entity.
 
-    Allows mapping multiple naming conventions (e.g., symbols, synonyms,
-    IDs) to a unified `Entity`. One name can be flagged as primary to serve
-    as the canonical name during queries and display.
+    Key ideas:
+    - `alias_value`: the literal string (name, symbol, or external code).
+    - `alias_type`: semantic category for the alias (preferred/synonym/code).
+    - `xref_source`: origin/system of the alias
+    (e.g., HGNC, ENSEMBL, OMIM, ICD10, MONDO, MESH, UMLS, NONE).
+    - `is_primary`: soft flag kept for backward compatibility; only meaningful
+    when alias_type='preferred'.
 
-    Relationships:
-    - Linked to `Entity` via entity_id
-    - Linked to `DataSource` to track origin of the name
+    Typical patterns:
+    - Genes: (HGNC symbol) -> alias_type='preferred', xref_source='HGNC'
+        (Ensembl ID)   -> alias_type='code',      xref_source='ENSEMBL'
+        (Synonym)      -> alias_type='synonym',   xref_source='HGNC' or 'LITERATURE'. # noqa E501
+    - Diseases: (MONDO label)    -> 'preferred' + xref_source='MONDO'
+        (ICD10 code)     -> 'code' + xref_source='ICD10'
+        (Common synonym) -> 'synonym' + xref_source='MESH' or 'NONE'
+
+    Constraints:
+    - At most one 'preferred' alias per entity_id (enforced by app logic or a
+    filtered unique index where supported).
+    - Prevent duplicates of the *same* alias within the *same* system for an
+    entity.
     """
 
-    __tablename__ = "entity_names"
+    __tablename__ = "entity_aliases"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    entity_id = Column(Integer, ForeignKey("entities.id", ondelete="CASCADE"))
+
+    # Core foreign keys
+    entity_id = Column(
+        Integer,
+        ForeignKey("entities.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    entity = relationship("Entity", back_populates="entity_alias")
+
+    group_id = Column(
+        Integer,
+        ForeignKey("entity_groups.id", ondelete="SET NULL"),
+        nullable=True,  # noqa E501
+    )  # noqa E501
+    entity_group = relationship("EntityGroup", passive_deletes=True)
+
+    # Alias value + semantics
+    alias_value = Column(String(255), nullable=False)
+
+    # Allowed: 'preferred' | 'synonym' | 'code'
+    alias_type = Column(String(16), nullable=False, default="synonym")
+
+    # e.g., HGNC, ENSEMBL, OMIM, ICD10, MONDO, MESH, UMLS, NONE
+    xref_source = Column(String(32), nullable=True)
+
+    # Compatibility flag; only meaningful when alias_type='preferred'
+    is_primary = Column(Boolean, nullable=True, default=None)
+
+    is_active = Column(Boolean, nullable=True, default=None)
+
+    # Optional normalization helpers (future-proof)
+    # e.g., lowercased/stripped for stable matching
+    alias_norm = Column(String(255), nullable=True)
+    # e.g., 'en', 'pt'; useful for disease common names
+    locale = Column(String(8), nullable=True)
 
     data_source_id = Column(
         Integer,
         ForeignKey("etl_data_sources.id", ondelete="CASCADE"),
-        nullable=False,
+        nullable=True,
     )
+    data_source = relationship("ETLDataSource", passive_deletes=True)
 
-    name = Column(String(255), nullable=False)
-    is_primary = Column(Boolean, nullable=True, default=None)
-    created_at = Column(DateTime, server_default=func.now(), nullable=False)
-    updated_at = Column(
-        DateTime,
-        server_default=func.now(),
-        onupdate=func.now(),
-        nullable=False,  # noqa E501
+    etl_package_id = Column(
+        Integer,
+        ForeignKey("etl_packages.id", ondelete="CASCADE"),
+        nullable=True,
     )
+    etl_package = relationship("ETLPackage", passive_deletes=True)
 
-    # Relationships as FK
-    entity = relationship("Entity", back_populates="entity_names")
-    data_source = relationship("DataSource", passive_deletes=True)
+    __table_args__ = (
+        # 1) Soft domain for alias_type to stay SQLite-friendly (no native ENUM):  # noqa E501
+        # CheckConstraint(
+        #     "alias_type IN ('preferred','synonym','code')",
+        #     name="ck_entity_names_alias_type",
+        # ),
+        # 2) Avoid duplicates for the same (entity, alias_type, xref_source, alias_value)  # noqa E501
+        UniqueConstraint(
+            "entity_id",
+            "alias_type",
+            "xref_source",
+            "alias_value",
+            name="uq_entity_names_semantic_unique",
+        ),
+        # # 3) Index to accelerate lookup by (xref_source, alias_value) -> resolve code->entity fast  # noqa E501
+        # Index("ix_entity_names_xref_lookup", "xref_source", "alias_value"),
+        # # 4) Index for normalized search (case-insensitive dedup/matching)
+        # Index("ix_entity_names_alias_norm", "alias_norm"),
+    )
 
 
 class EntityRelationshipType(Base):
@@ -196,45 +262,54 @@ class EntityRelationship(Base):
         ForeignKey("entities.id", ondelete="CASCADE"),
         nullable=False,
     )
-    entity_2_id = Column(
-        Integer,
-        ForeignKey("entities.id", ondelete="CASCADE"),
-        nullable=False,
-    )
-    relationship_type_id = Column(
-        Integer,
-        ForeignKey("entity_relationship_types.id", ondelete="CASCADE"),
-        nullable=False,
-    )
-    data_source_id = Column(
-        Integer,
-        ForeignKey("etl_data_sources.id", ondelete="CASCADE"),
-        nullable=False,
-    )
-
-    created_at = Column(DateTime, server_default=func.now(), nullable=False)
-
-    # Relationships
     entity_1 = relationship(
         "Entity",
         foreign_keys=[entity_1_id],
         back_populates="relationships_as_1",  # noqa E501
     )  # noqa E501
+
+    entity_2_id = Column(
+        Integer,
+        ForeignKey("entities.id", ondelete="CASCADE"),
+        nullable=False,
+    )
     entity_2 = relationship(
         "Entity",
         foreign_keys=[entity_2_id],
         back_populates="relationships_as_2",  # noqa E501
     )  # noqa E501
+
+    relationship_type_id = Column(
+        Integer,
+        ForeignKey("entity_relationship_types.id", ondelete="CASCADE"),
+        nullable=False,
+    )
     relationship_type = relationship(
         "EntityRelationshipType", back_populates="relationships"
     )  # noqa E501
-    data_source = relationship("DataSource", passive_deletes=True)  # noqa E501
+
+    # Denormalized for fast deletion/filter
+    data_source_id = Column(
+        Integer,
+        ForeignKey("etl_data_sources.id", ondelete="CASCADE"),
+        nullable=True,
+    )
+    data_source = relationship("ETLDataSource", passive_deletes=True)
+
+    etl_package_id = Column(
+        Integer,
+        ForeignKey("etl_packages.id", ondelete="CASCADE"),
+        nullable=True,
+    )
+    etl_package = relationship("ETLPackage", passive_deletes=True)
 
 
 """
 ================================================================================
 Developer Note - Entity Core Models
 ================================================================================
+
+IMPORT: THIS IS NOT UPDATE (Changes was made)
 
 This module defines the foundational models for the Biofilter's core entities.
 To optimize performance and disk space usage for massive omics data ingestion,

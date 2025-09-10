@@ -1,14 +1,15 @@
 from biofilter import Biofilter
 
-db_uri = "sqlite:///biofilter_301.db"
+db_uri = "sqlite:///biofilter.db"
 
 # Configure below
 data_sources_to_process = [
     # Genes
     # "hgnc",
+    # "ensembl",
     # "gene_ncbi",
     # Proteins
-    # "pfam",
+    "pfam",
     # "uniprot",
     # Pathways
     # "reactome",
@@ -16,7 +17,7 @@ data_sources_to_process = [
     # Gene Ontology
     # "gene_ontology",
     # Variants
-    "dbsnp_sample",
+    # "dbsnp_sample",
     # "dbsnp_chr1",
     # "dbsnp_chr2",
     # "dbsnp_chr3",
@@ -50,23 +51,36 @@ data_sources_to_process = [
 run_steps = [
     # "extract",
     # "transform",
-    "load"
+    "load",
+    # "all"
 ]  # noqa E501
 
 if __name__ == "__main__":
-    bf = Biofilter(db_uri)
+    bf = Biofilter(db_uri, debug_mode=True)
+    # bf = Biofilter(db_uri)
 
     for source in data_sources_to_process:
         for step in run_steps:
-            try:
-                print(f"▶ Running ETL - Source: {source} | Step: {step}")
-                bf.update(
-                    data_sources=[source],
-                    run_steps=[step],
-                    force_steps=[step],
-                )
-            except Exception as e:
-                print(f"❌ Error processing {source} [{step}]: {e}")
+            if step != "all":
+                try:
+                    print(f"▶ Running ETL - Source: {source} | Step: {step}")
+                    bf.update(
+                        data_sources=[source],
+                        run_steps=[step],
+                        force_steps=[step],
+                    )
+                except Exception as e:
+                    print(f"❌ Error processing {source} [{step}]: {e}")
+            elif step == "all":
+                try:
+                    print(f"▶ Running ETL - Source: {source} | Step: {step}")
+                    bf.update(
+                        data_sources=[source],
+                        # run_steps=[step],
+                        # force_steps=[step],
+                    )
+                except Exception as e:
+                    print(f"❌ Error processing {source} [{step}]: {e}")
 
     print("✅ All ETL tasks finished.")
     print("------------------------------")

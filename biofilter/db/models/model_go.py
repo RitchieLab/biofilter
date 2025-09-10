@@ -1,6 +1,5 @@
 from biofilter.db.base import Base
 from sqlalchemy.orm import relationship
-from sqlalchemy.sql import func
 from sqlalchemy import Column, String, Integer, ForeignKey, DateTime  # noqa E501
 
 
@@ -24,25 +23,28 @@ class GOMaster(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     go_id = Column(String(100), unique=True, nullable=False)
+
+    name = Column(String(255), nullable=False)
+    namespace = Column(String(50), nullable=False)  # MF, BP, CC
+
     entity_id = Column(
         Integer, ForeignKey("entities.id", ondelete="CASCADE"), nullable=False
     )  # noqa E501
-    name = Column(String(255), nullable=False)
-    namespace = Column(String(50), nullable=False)  # MF, BP, CC
+    entity = relationship("Entity", passive_deletes=True)
 
     data_source_id = Column(
         Integer,
         ForeignKey("etl_data_sources.id", ondelete="CASCADE"),
-        nullable=False,
+        nullable=True,
     )
+    data_source = relationship("ETLDataSource", passive_deletes=True)
 
-    created_at = Column(DateTime, server_default=func.now(), nullable=False)
-    updated_at = Column(
-        DateTime,
-        server_default=func.now(),
-        onupdate=func.now(),
-        nullable=False,  # noqa E501
+    etl_package_id = Column(
+        Integer,
+        ForeignKey("etl_packages.id", ondelete="CASCADE"),
+        nullable=True,
     )
+    etl_package = relationship("ETLPackage", passive_deletes=True)
 
     # Relationships (Go Down)
     parents = relationship(
@@ -55,10 +57,6 @@ class GOMaster(Base):
         back_populates="parent_term",
         foreign_keys="GORelation.parent_id",  # noqa E501
     )
-
-    # Relationships (Go Up)
-    data_source = relationship("DataSource", passive_deletes=True)
-    entity = relationship("Entity")
 
     def __repr__(self):
         return f"<GOMaster(go_id={self.go_id})>"
@@ -87,11 +85,19 @@ class GORelation(Base):
         ForeignKey("go_masters.id", ondelete="CASCADE"),
         nullable=False,  # noqa E501
     )  # noqa E501
+    parent_term = relationship(
+        "GOMaster", foreign_keys=[parent_id], back_populates="children"
+    )  # noqa E501
+
     child_id = Column(
         Integer,
         ForeignKey("go_masters.id", ondelete="CASCADE"),
         nullable=False,  # noqa E501
     )  # noqa E501
+    child_term = relationship(
+        "GOMaster", foreign_keys=[child_id], back_populates="parents"
+    )  # noqa E501
+
     relation_type = Column(
         String(50), nullable=False
     )  # e.g., 'is_a', 'part_of'                   # noqa E501
@@ -101,16 +107,11 @@ class GORelation(Base):
         ForeignKey("etl_data_sources.id", ondelete="CASCADE"),
         nullable=False,
     )
+    data_source = relationship("ETLDataSource", passive_deletes=True)
 
-    created_at = Column(DateTime, server_default=func.now(), nullable=False)
-
-    # Relationships (Go Up)
-    parent_term = relationship(
-        "GOMaster", foreign_keys=[parent_id], back_populates="children"
-    )  # noqa E501
-    child_term = relationship(
-        "GOMaster", foreign_keys=[child_id], back_populates="parents"
-    )  # noqa E501
-
-    # Relationships (Go Up)
-    data_source = relationship("DataSource", passive_deletes=True)
+    etl_package_id = Column(
+        Integer,
+        ForeignKey("etl_packages.id", ondelete="CASCADE"),
+        nullable=True,
+    )
+    etl_package = relationship("ETLPackage", passive_deletes=True)

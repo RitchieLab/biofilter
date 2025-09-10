@@ -5,7 +5,6 @@ import requests
 from biofilter.utils.file_hash import compute_file_hash
 from biofilter.etl.mixins.entity_query_mixin import EntityQueryMixin
 from biofilter.db.models import (
-    EntityGroup,
     PathwayMaster,
 )  # noqa E501
 
@@ -16,27 +15,29 @@ class DTP(DTPBase, EntityQueryMixin):
     def __init__(
         self,
         logger=None,
+        debug_mode=False,
         datasource=None,
-        etl_process=None,
+        package=None,
         session=None,
         use_conflict_csv=False,
     ):  # noqa: E501
         self.logger = logger
+        self.debug_mode = debug_mode
         self.data_source = datasource
-        self.etl_process = etl_process
+        self.package = package
         self.session = session
         self.use_conflict_csv = use_conflict_csv
 
         # DTP versioning
         self.dtp_name = "dtp_kegg"
-        self.dtp_version = "1.0.0"
-        self.compatible_schema_min = "3.0.0"
+        self.dtp_version = "1.1.0"
+        self.compatible_schema_min = "3.1.0"
         self.compatible_schema_max = "4.0.0"
 
     # ⬇️  --------------------------  ⬇️
     # ⬇️  ------ EXTRACT FASE ------  ⬇️
     # ⬇️  --------------------------  ⬇️
-    def extract(self, raw_dir: str, force_steps: bool):
+    def extract(self, raw_dir: str):
         """
         Downloads KEGG Pathway data. Uses the hash of 'KEGGPathways.txt' as
         reference. Only proceeds with full extraction if the hash has changed.
@@ -53,12 +54,6 @@ class DTP(DTPBase, EntityQueryMixin):
         self.check_compatibility()
 
         source_url = self.data_source.source_url
-        if force_steps:
-            last_hash = ""
-            msg = "Ignoring hash check, forcing download"
-            self.logger.log(msg, "WARNING")
-        else:
-            last_hash = self.etl_process.raw_data_hash
 
         try:
             # Prepare download path
@@ -91,10 +86,6 @@ class DTP(DTPBase, EntityQueryMixin):
 
             # Compute hash
             current_hash = compute_file_hash(file_path)
-            if current_hash == last_hash:
-                msg = f"No change detected in {file_path}"
-                self.logger.log(msg, "INFO")
-                return False, msg, current_hash
 
             msg = f"✅ GO file downloaded to {file_path}"
             self.logger.log(msg, "INFO")
@@ -114,7 +105,6 @@ class DTP(DTPBase, EntityQueryMixin):
         """
 
         msg = f"🔧 Transforming the {self.data_source.name} data ..."
-
         self.logger.log(msg, "INFO")  # noqa: E501
 
         # Check Compartibility
@@ -142,7 +132,7 @@ class DTP(DTPBase, EntityQueryMixin):
             if not input_file.exists():
                 msg = f"❌ Input file not found: {input_file}"
                 self.logger.log(msg, "ERROR")
-                return None, False, msg
+                return False, msg
 
             # Output files paths
             output_file_master = output_path / "master_data"
@@ -160,7 +150,7 @@ class DTP(DTPBase, EntityQueryMixin):
         except Exception as e:
             msg = f"❌ Error constructing paths: {str(e)}"
             self.logger.log(msg, "ERROR")
-            return None, False, msg
+            return False, msg
 
         # Process source file to Biofilter format
         try:
@@ -177,28 +167,29 @@ class DTP(DTPBase, EntityQueryMixin):
                     rows.append((pid, desc))
 
             df = pd.DataFrame(rows, columns=["pathway_id", "description"])
-            df.to_csv(output_file_master.with_suffix(".csv"), index=False)  # noqa: E501
             df.to_parquet(
                 output_file_master.with_suffix(".parquet"), index=False
             )  # noqa: E501
 
+            if self.debug_mode:
+                df.to_csv(output_file_master.with_suffix(".csv"), index=False)  # noqa: E501
+
             self.logger.log(
                 f"✅ KEGG pathways transformed to CSV at {output_path}", "INFO"
             )
-            return df, True, f"{len(df)} pathways processed"
+            return True, f"{len(df)} pathways processed"
 
         except Exception as e:
             msg = f"❌ Transform failed: {str(e)}"
             self.logger.log(msg, "ERROR")
-            return None, False, msg
+            return False, msg
 
     # 📥  ------------------------ 📥
     # 📥  ------ LOAD FASE ------  📥
     # 📥  ------------------------ 📥
-    def load(self, df=None, processed_dir=None, chunk_size=100_000):
+    def load(self, processed_dir=None):
 
         msg = f"📥 Loading {self.data_source.name} data into the database..."
-
         self.logger.log(
             msg,
             "INFO",  # noqa E501
@@ -209,120 +200,108 @@ class DTP(DTPBase, EntityQueryMixin):
 
         total_pathways = 0
         total_warnings = 0
-        load_status = False
 
-        data_source_id = self.data_source.id
+        # ALIASES MAP FROM PROCESS DATA FIELDS
+        self.alias_schema = {
+            "pathway_id": ("code", "KEGG", True),
+            "description": ("name", "KEGG", None),
+        }
+
+        # READ PROCESSED DATA TO LOAD
+        try:
+            # Check if processed dir was set
+            if not processed_dir:
+                msg = "⚠️  processed_dir MUST be provided."
+                self.logger.log(msg, "ERROR")
+                return False, msg  # ⧮ Leaving with ERROR
+
+            processed_path = os.path.join(
+                processed_dir,
+                self.data_source.source_system.name,
+                self.data_source.name,
+            )
+            processed_file_name = processed_path + "/master_data.parquet"
+
+            if not os.path.exists(processed_file_name):
+                msg = f"⚠️  File not found: {processed_file_name}"
+                self.logger.log(msg, "ERROR")
+                return False, msg  # ⧮ Leaving with ERROR
+
+            df = pd.read_parquet(processed_file_name, engine="pyarrow")
+
+            if df.empty:
+                msg = "DataFrame is empty."
+                self.logger.log(msg, "ERROR")
+                return False, msg
+
+            df.fillna("", inplace=True)
+
+        except Exception as e:
+            msg = f"⚠️  Failed to try read data: {e}"
+            self.logger.log(msg, "ERROR")
+            return False, msg  # ⧮ Leaving with ERROR
 
         # Set DB and drop indexes
         try:
-            index_specs = [
-                ("pathway_masters", ["entity_id"]),
-                # Já possui index=True + unique=True, mas bom explicitar
-                ("pathway_masters", ["pathway_id"]),
-                ("pathway_masters", ["data_source_id"]),
-            ]
-
-            index_specs_entity = [
-                # Entity
-                ("entities", ["group_id"]),
-                ("entities", ["has_conflict"]),
-                ("entities", ["is_deactive"]),
-                # EntityName
-                ("entity_names", ["entity_id"]),
-                ("entity_names", ["name"]),
-                ("entity_names", ["data_source_id"]),
-                ("entity_names", ["data_source_id", "name"]),
-                ("entity_names", ["data_source_id", "entity_id"]),
-                ("entity_names", ["entity_id", "is_primary"]),
-                # EntityRelationship
-                ("entity_relationships", ["entity_1_id"]),
-                ("entity_relationships", ["entity_2_id"]),
-                ("entity_relationships", ["relationship_type_id"]),
-                ("entity_relationships", ["data_source_id"]),
-                (
-                    "entity_relationships",
-                    ["entity_1_id", "relationship_type_id"],
-                ),  # noqa E501
-                (
-                    "entity_relationships",
-                    ["entity_1_id", "entity_2_id", "relationship_type_id"],
-                ),  # noqa E501
-                # EntityRelationshipType
-                ("entity_relationship_types", ["code"]),
-            ]
-
             self.db_write_mode()
-            # self.drop_indexes(index_specs) # Keep indices to improve checks
+            self.drop_indexes(self.get_pathway_index_specs)
+            self.drop_indexes(self.get_entity_index_specs)
         except Exception as e:
             total_warnings += 1
-            msg = f"⚠️ Failed to switch DB to write mode or drop indexes: {e}"
+            msg = f"⚠️  Failed to switch DB to write mode or drop indexes: {e}"
             self.logger.log(msg, "WARNING")
+            return False, msg  # ⧮ Leaving with ERROR
 
+        # GET ENTITY GROUP ID AND OMICS STATUS
         try:
+            self.get_entity_group("Pathways")
+        except Exception as e:
+            msg = f"Error on DTP to get Entity Group: {e}"
+            return False, msg  # ⧮ Leaving with ERROR
 
-            if df is None:
-                if not processed_dir:
-                    msg = "Either 'df' or 'processed_path' must be provided."
-                    self.logger.log(msg, "ERROR")
-                    return total_pathways, load_status, msg
-
-                processed_path = self.get_path(processed_dir)
-                # processed_data = str(processed_path / "master_data.csv")
-                processed_data = str(processed_path / "master_data.parquet")
-
-                if not os.path.exists(processed_data):
-                    msg = f"File not found: {processed_data}"
-                    self.logger.log(msg, "ERROR")
-                    return total_pathways, load_status, msg
-
-                self.logger.log(
-                    f"📥 Reading data in chunks from {processed_data}", "INFO"
-                )  # noqa E501
-
-                # df = pd.read_csv(processed_data, dtype=str)
-                df = pd.read_parquet(processed_data, engine="pyarrow")
-
-            # Get Entity Group ID
-            if not hasattr(self, "entity_group") or self.entity_group is None:
-                group = (
-                    self.session.query(EntityGroup)
-                    .filter_by(name="Pathways")
-                    .first()  # noqa: E501
-                )  # noqa: E501
-                if not group:
-                    msg = "EntityGroup 'Pathways' not found in the database."
-                    self.logger.log(msg, "ERROR")
-                    return total_pathways, load_status
-                    # raise ValueError(msg)
-                self.entity_group = group.id
-                msg = f"EntityGroup ID for 'Pathways' is {self.entity_group}"
-                self.logger.log(msg, "DEBUG")
-
-            # IMPORTANT: We will not use conflict manager here
-            # Interaction to each Reactome Pathway
+        # RUN LOAD BY ROW
+        try:
             for _, row in df.iterrows():
 
                 pathway_master = row["pathway_id"]
                 pathway_name = row["description"]
-                # name = pathway_name.split(" - ")[
-                #     0
-                # ].strip()
 
                 if not pathway_master:
                     msg = f"Pathway Master not found in row: {row}"
                     self.logger.log(msg, "WARNING")
                     continue
 
+                # --- ALIASES STRUCTURE ---
+                # Create a dict of Aliases
+                alias_dict = self.build_alias(row)
+                # Only primary Name
+                is_primary_alias = next(
+                    (a for a in alias_dict if a.get("is_primary")), None
+                )
+                # Only Aliases Names
+                not_primary_alias = [
+                    a for a in alias_dict if a != is_primary_alias
+                ]  # noqa E501
+
                 # Add or Get Entity
                 entity_id, _ = self.get_or_create_entity(
-                    name=pathway_master,
+                    name=is_primary_alias["alias_value"],
                     group_id=self.entity_group,
                     data_source_id=self.data_source.id,
+                    package_id=self.package.id,
+                    alias_type=is_primary_alias["alias_type"],
+                    xref_source=is_primary_alias["xref_source"],
+                    alias_norm=is_primary_alias["alias_norm"],
+                    is_active=True,
                 )
 
-                # Add or Get Entity Name
                 self.get_or_create_entity_name(
-                    entity_id, pathway_name, data_source_id=self.data_source.id
+                    group_id=self.entity_group,
+                    entity_id=entity_id,
+                    aliases=not_primary_alias,
+                    is_active=True,
+                    data_source_id=self.data_source.id,  # noqa E501
+                    package_id=self.package.id,
                 )
 
                 # Check if the pathway already exists
@@ -340,7 +319,8 @@ class DTP(DTPBase, EntityQueryMixin):
                         entity_id=entity_id,
                         pathway_id=pathway_master,
                         description=pathway_name,
-                        data_source_id=data_source_id,
+                        data_source_id=self.data_source.id,
+                        etl_package_id=self.package.id,
                     )
 
                     self.session.add(pathway)
@@ -348,30 +328,20 @@ class DTP(DTPBase, EntityQueryMixin):
 
                     total_pathways += 1
 
-            # msg = f"✅ Relations loaded: {total_pathways}"  # noqa: E501
-            # self.logger.log(msg, "INFO")
-            # return total_pathways, True, msg
-
         except Exception as e:
             msg = f"❌ ETL load_relations failed: {str(e)}"
             self.logger.log(msg, "ERROR")
-            return 0, False, msg
+            return False, msg
 
         # Set DB to Read Mode and Create Index
         try:
-            # Drop Indexs
-            self.drop_indexes(index_specs)
-            self.drop_indexes(index_specs_entity)
-            # Stating Indexs
-            self.create_indexes(index_specs)
-            self.create_indexes(index_specs_entity)
+            self.create_indexes(self.get_pathway_index_specs)
+            self.create_indexes(self.get_entity_index_specs)
             self.db_read_mode()
         except Exception as e:
             total_warnings += 1
             msg = f"Failed to switch DB to write mode or drop indexes: {e}"
             self.logger.log(msg, "WARNING")
-
-        load_status = True
 
         if total_warnings != 0:
             msg = f"{total_warnings} warning to analysis in log file"
@@ -380,4 +350,4 @@ class DTP(DTPBase, EntityQueryMixin):
         msg = f"📥 Total Pathways: {total_pathways}"  # noqa E501  # noqa E501
         self.logger.log(msg, "INFO")
 
-        return total_pathways, True, msg
+        return True, msg

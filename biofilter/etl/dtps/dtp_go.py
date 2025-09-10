@@ -6,34 +6,36 @@ from pathlib import Path
 from biofilter.utils.file_hash import compute_file_hash
 from biofilter.etl.mixins.entity_query_mixin import EntityQueryMixin
 from biofilter.etl.mixins.base_dtp import DTPBase
-from biofilter.db.models import GOMaster, GORelation, EntityGroup
+from biofilter.db.models import GOMaster, GORelation
 
 
 class DTP(DTPBase, EntityQueryMixin):
     def __init__(
         self,
         logger=None,
+        debug_mode=False,
         datasource=None,
-        etl_process=None,
+        package=None,
         session=None,
         use_conflict_csv=False,
     ):  # noqa: E501
         self.logger = logger
+        self.debug_mode = debug_mode
         self.data_source = datasource
-        self.etl_process = etl_process
+        self.package = package
         self.session = session
         self.use_conflict_csv = use_conflict_csv
 
         # DTP versioning
         self.dtp_name = "dtp_go"
-        self.dtp_version = "1.0.0"
-        self.compatible_schema_min = "3.0.0"
+        self.dtp_version = "1.1.0"
+        self.compatible_schema_min = "3.1.0"
         self.compatible_schema_max = "4.0.0"
 
     # ⬇️  --------------------------  ⬇️
     # ⬇️  ------ EXTRACT FASE ------  ⬇️
     # ⬇️  --------------------------  ⬇️
-    def extract(self, raw_dir: str, force_steps: bool):
+    def extract(self, raw_dir: str):
         """
         Download GO data in OBO format and store it locally.
         Also computes a file hash to track content versioning.
@@ -50,13 +52,6 @@ class DTP(DTPBase, EntityQueryMixin):
         self.check_compatibility()
 
         source_url = self.data_source.source_url
-
-        if force_steps:
-            last_hash = ""
-            msg = "Ignoring hash check, forcing download"
-            self.logger.log(msg, "WARNING")
-        else:
-            last_hash = self.etl_process.raw_data_hash
 
         try:
             # Prepare download path
@@ -76,8 +71,6 @@ class DTP(DTPBase, EntityQueryMixin):
                 "Accept": "application/x-obo"
             }  # Optional, GO responds with OBO anyway
             response = requests.get(source_url, headers=headers)
-            # Case if the file grows too large, we can use streaming
-            # response = requests.get(source_url, headers=headers, stream=True)
 
             if response.status_code != 200:
                 msg = f"Failed to fetch data from GO: {response.status_code}"
@@ -89,10 +82,6 @@ class DTP(DTPBase, EntityQueryMixin):
 
             # Compute hash
             current_hash = compute_file_hash(file_path)
-            if current_hash == last_hash:
-                msg = f"No change detected in {file_path}"
-                self.logger.log(msg, "INFO")
-                return False, msg, current_hash
 
             msg = f"✅ GO file downloaded to {file_path}"
             self.logger.log(msg, "INFO")
@@ -106,14 +95,13 @@ class DTP(DTPBase, EntityQueryMixin):
     # ⚙️  ----------------------------  ⚙️
     # ⚙️  ------ TRANSFORM FASE ------  ⚙️
     # ⚙️  ----------------------------  ⚙️
-    def transform(self, raw_dir, processed_dir):
+    def transform(self, raw_dir: str, processed_dir: str):
         """
         Transform the downloaded GO OBO file into structured CSV and Parquet.
         Extracts GO terms and their relationships.
         """
 
         msg = f"⚙️  Starting transformation of {self.data_source.name} data..."
-
         self.logger.log(msg, "INFO")
 
         # Check Compartibility
@@ -141,7 +129,7 @@ class DTP(DTPBase, EntityQueryMixin):
             if not input_file.exists():
                 msg = f"❌ Input file not found: {input_file}"
                 self.logger.log(msg, "ERROR")
-                return None, False, msg
+                return False, msg
 
             # Output files paths
             output_file_master = output_path / "master_data"
@@ -160,7 +148,7 @@ class DTP(DTPBase, EntityQueryMixin):
         except Exception as e:
             msg = f"❌ Error constructing paths: {str(e)}"
             self.logger.log(msg, "ERROR")
-            return None, False, msg
+            return False, msg
 
         # Process source file to Biofilter format
         try:
@@ -235,7 +223,6 @@ class DTP(DTPBase, EntityQueryMixin):
             # Save the last term if it exists
             if current.get("go_id"):
                 terms.append(current)
-
             df_terms = pd.DataFrame(terms)
 
             df_terms["is_obsolete"] = (
@@ -244,44 +231,44 @@ class DTP(DTPBase, EntityQueryMixin):
                 .astype(bool)
             )
 
-            # Normalizar campos compostos
+            # Compond Fields as Lists
             for col in ["alt_ids", "consider", "synonyms", "xrefs"]:
                 df_terms[col] = df_terms[col].apply(
-                    lambda x: ";".join(x) if isinstance(x, list) else ""
+                    lambda x: x if isinstance(x, list) else (None if pd.isna(x) else [x])  # noqa E501
                 )
 
             df_rel = pd.DataFrame(relations)
 
-            df_terms.to_csv(
-                output_file_master.with_suffix(".csv"), index=False
-            )  # noqa: E501
+            # SAVE FILES
             df_terms.to_parquet(
                 output_file_master.with_suffix(".parquet"), index=False
-            )  # noqa: E501
-
-            # Save Hierarchical relations
-            df_rel.to_csv(
-                output_file_relations.with_suffix(".csv"), index=False
             )  # noqa: E501
             df_rel.to_parquet(
                 output_file_relations.with_suffix(".parquet"), index=False
             )  # noqa: E501
 
+            if self.debug_mode:
+                df_terms.to_csv(
+                    output_file_master.with_suffix(".csv"), index=False
+                )  # noqa: E501
+                df_rel.to_csv(
+                    output_file_relations.with_suffix(".csv"), index=False
+                )  # noqa: E501
+
             self.logger.log("✅ GO terms and relations transformed.", "INFO")
-            return df_terms, True, msg
+            return True, msg
 
         except Exception as e:
             msg = f"❌ Error during transformation: {e}"
             self.logger.log(msg, "ERROR")
-            return None, False, msg
+            return False, msg
 
     # 📥  ------------------------ 📥
     # 📥  ------ LOAD FASE ------  📥
     # 📥  ------------------------ 📥
-    def load(self, df=None, processed_dir=None, chunk_size=100_000):
+    def load(self, processed_dir=None):
 
         msg = "📥 Loading Gene Ontology data into the database..."
-
         self.logger.log(msg, "INFO")
 
         # Check Compartibility
@@ -289,133 +276,139 @@ class DTP(DTPBase, EntityQueryMixin):
 
         total_terms = 0
         total_warnings = 0
-        load_status = False
+        skipped = 0
 
-        # Set DB and drop indexes
+        # ALIASES MAP FROM PROCESS DATA FIELDS
+        self.alias_schema = {
+            "go_id": ("code", "GO", True),
+            # "name": ("name", "GO", None),
+            # "synonyms": ("synonym", "GO", None),
+            "alt_ids": ("code", "GO", None),
+            # "replaced_by": ("xref", "GO", None),
+            # "consider": ("xref", "GO", None),
+        }
+
+        # READ PROCESSED DATA TO LOAD
         try:
-            index_specs = [
-                # GOMaster
-                ("go_masters", ["go_id"]),
-                ("go_masters", ["entity_id"]),
-                ("go_masters", ["namespace"]),
-                # GORelation
-                ("go_relations", ["parent_id"]),  # relações ascendentes
-                ("go_relations", ["child_id"]),  # relações descendentes
-                ("go_relations", ["relation_type"]),  # ex: is_a, part_of
-                ("go_relations", ["parent_id", "relation_type"]),
-                ("go_relations", ["child_id", "relation_type"]),
-            ]
+            # Check if processed dir was set
+            if not processed_dir:
+                msg = "⚠️  processed_dir MUST be provided."
+                self.logger.log(msg, "ERROR")
+                return False, msg  # ⧮ Leaving with ERROR
 
-            index_specs_entity = [
-                # Entity
-                ("entities", ["group_id"]),
-                ("entities", ["has_conflict"]),
-                ("entities", ["is_deactive"]),
-                # EntityName
-                ("entity_names", ["entity_id"]),
-                ("entity_names", ["name"]),
-                ("entity_names", ["data_source_id"]),
-                ("entity_names", ["data_source_id", "name"]),
-                ("entity_names", ["data_source_id", "entity_id"]),
-                ("entity_names", ["entity_id", "is_primary"]),
-                # EntityRelationship
-                ("entity_relationships", ["entity_1_id"]),
-                ("entity_relationships", ["entity_2_id"]),
-                ("entity_relationships", ["relationship_type_id"]),
-                ("entity_relationships", ["data_source_id"]),
-                (
-                    "entity_relationships",
-                    ["entity_1_id", "relationship_type_id"],
-                ),  # noqa E501
-                (
-                    "entity_relationships",
-                    ["entity_1_id", "entity_2_id", "relationship_type_id"],
-                ),  # noqa E501
-                # EntityRelationshipType
-                ("entity_relationship_types", ["code"]),
-            ]
+            processed_path = os.path.join(
+                processed_dir,
+                self.data_source.source_system.name,
+                self.data_source.name,
+            )
 
+            # Setting files names
+            processed_file_name = processed_path + "/master_data.parquet"
+
+            if not os.path.exists(processed_file_name):
+                msg = f"⚠️  File not found: {processed_file_name}"
+                self.logger.log(msg, "ERROR")
+                return False, msg  # ⧮ Leaving with ERROR
+
+            df = pd.read_parquet(processed_file_name, engine="pyarrow")
+
+            if df.empty:
+                msg = "DataFrame is empty."
+                self.logger.log(msg, "ERROR")
+                return False, msg
+
+            df.fillna("", inplace=True)
+
+        except Exception as e:
+            msg = f"⚠️  Failed to try read data: {e}"
+            self.logger.log(msg, "ERROR")
+            return False, msg  # ⧮ Leaving with ERROR
+
+        # SET DB AND DROP INDEXES
+        try:
             self.db_write_mode()
-            # self.drop_indexes(index_specs) # Keep indices to improve checks
+            self.drop_indexes(self.get_go_index_specs)
+            self.drop_indexes(self.get_entity_index_specs)
         except Exception as e:
             total_warnings += 1
-            msg = f"⚠️ Failed to switch DB to write mode or drop indexes: {e}"
+            msg = f"⚠️  Failed to switch DB to write mode or drop indexes: {e}"
             self.logger.log(msg, "WARNING")
+            return False, msg  # ⧮ Leaving with ERROR
 
-        if df is None:
-            if not processed_dir:
-                msg = "Either 'df' or 'processed_dir' must be provided."
-                self.logger.log(msg, "ERROR")
-                return total_terms, load_status, msg
+        # GET ENTITY GROUP ID AND OMICS STATUS
+        try:
+            self.get_entity_group("Gene Ontology")
+        except Exception as e:
+            msg = f"Error on DTP to get Entity Group: {e}"
+            return False, msg  # ⧮ Leaving with ERROR
 
-            processed_path = self.get_path(processed_dir)
-            processed_data = str(processed_path / "master_data.parquet")
-            if not os.path.exists(processed_data):
-                msg = f"File not found: {processed_data}"
-                self.logger.log(msg, "ERROR")
-                return total_terms, load_status, msg
-
-            df = pd.read_parquet(processed_data, engine="pyarrow")
-
-        if df.empty:
-            msg = "DataFrame is empty."
-            self.logger.log(msg, "ERROR")
-            return total_terms, load_status, msg
-
-        df.fillna("", inplace=True)
-
-        # Get or create EntityGroup for GO
-        if not hasattr(self, "entity_group") or self.entity_group is None:
-            group = (
-                self.session.query(EntityGroup).filter_by(name="Gene Ontology").first()
-            )  # noqa: E501
-            if not group:
-                msg = "EntityGroup 'GO' not found."
-                self.logger.log(msg, "ERROR")
-                return total_terms, load_status, msg
-            self.entity_group = group.id
-            msg = f"Using EntityGroup ID for 'GO': {self.entity_group}"
-            self.logger.log(msg, "DEBUG")
-
+        # RUN LOAD BY ROW
         try:
             for _, row in df.iterrows():
-                go_id = row["go_id"].strip()
-                if not go_id:
+                go_id = row.get("go_id")
+                name = row.get("name")
+                is_obsolete = str(row.get("is_obsolete", "")).strip().lower() == "true"  # noqa E501
+
+                if go_id == "GO:0000050":
+                    pass
+
+                # Skip entries with missing required fields
+                if not go_id or not name:
+                    skipped += 1
                     continue
 
-                # Create princial Entity for GO term
+                # Skip obsolete terms entirely (optional — configurable)
+                if is_obsolete:
+                    skipped += 1
+                    continue
+
+                # --- ALIASES STRUCTURE ---
+                # Create a dict of Aliases
+                alias_dict = self.build_alias(row)
+                # Only primary Name
+                is_primary_alias = next(
+                    (a for a in alias_dict if a.get("is_primary")), None
+                )
+                # Only Aliases Names
+                not_primary_alias = [
+                    a for a in alias_dict if a != is_primary_alias
+                ]  # noqa E501
+
+                # Add or Get Entity
                 entity_id, _ = self.get_or_create_entity(
-                    name=go_id,
+                    name=is_primary_alias["alias_value"],
                     group_id=self.entity_group,
                     data_source_id=self.data_source.id,
+                    package_id=self.package.id,
+                    alias_type=is_primary_alias["alias_type"],
+                    xref_source=is_primary_alias["xref_source"],
+                    alias_norm=is_primary_alias["alias_norm"],
+                    is_active=True,
                 )
 
-                # Additional names from synonyms, alt_ids, etc.
-                names = set()
+                self.get_or_create_entity_name(
+                    group_id=self.entity_group,
+                    entity_id=entity_id,
+                    aliases=not_primary_alias,
+                    is_active=True,
+                    data_source_id=self.data_source.id,  # noqa E501
+                    package_id=self.package.id,
+                )
+                # # Additional names from synonyms, alt_ids, etc.
+                # names = set()
 
-                # # Nome principal
-                # if row.get("name"):
-                #     names.add(row["name"].strip())
+                # # Alt IDs
+                # if row.get("alt_ids"):
+                #     for alt in row["alt_ids"].split(";"):
+                #         alt = alt.strip()
+                #         if alt:
+                #             names.add(alt)
 
-                # # Synonyms
-                # if row.get("synonyms"):
-                #     for name in row["synonyms"].split(";"):
-                #         name = name.strip()
-                #         if name:
-                #             names.add(name)
-
-                # Alt IDs
-                if row.get("alt_ids"):
-                    for alt in row["alt_ids"].split(";"):
-                        alt = alt.strip()
-                        if alt:
-                            names.add(alt)
-
-                # Save all names for the entity
-                for name in names:
-                    self.get_or_create_entity_name(
-                        entity_id, name, data_source_id=self.data_source.id
-                    )
+                # # Save all names for the entity
+                # for name in names:
+                #     self.get_or_create_entity_name(
+                #         entity_id, name, data_source_id=self.data_source.id
+                #     )
 
                 # Add GO term to GOMaster if it doesn't exist
                 go_master = (
@@ -428,6 +421,7 @@ class DTP(DTPBase, EntityQueryMixin):
                         name=row.get("name", "").strip(),
                         namespace=row.get("namespace", "").strip(),
                         data_source_id=self.data_source.id,
+                        etl_package_id=self.package.id,
                     )
                     self.session.add(go_master)
                     self.session.flush()
@@ -496,6 +490,7 @@ class DTP(DTPBase, EntityQueryMixin):
                     child_id=child.id,
                     relation_type=rel_type,  # noqa E501
                     data_source_id=self.data_source.id,
+                    etl_package_id=self.package.id,
                 )  # noqa: E501
                 self.session.add(relation)
                 total_relations += 1
@@ -503,28 +498,22 @@ class DTP(DTPBase, EntityQueryMixin):
         except FileNotFoundError as e:
             msg = f"⚠️ Relations file not found: {str(e)}", "WARNING"
             self.logger.log(msg, "ERROR")
-            return 0, False, msg
+            return False, msg
 
         except Exception as e:
             msg = f"❌ ETL load failed: {str(e)}"
             self.logger.log(msg, "ERROR")
-            return 0, False, msg
+            return False, msg
 
         # Set DB to Read Mode and Create Index
         try:
-            # Drop Indexs
-            self.drop_indexes(index_specs)
-            self.drop_indexes(index_specs_entity)
-            # Stating Indexs
-            self.create_indexes(index_specs)
-            self.create_indexes(index_specs_entity)
+            self.create_indexes(self.get_go_index_specs)
+            self.create_indexes(self.get_entity_index_specs)
             self.db_read_mode()
         except Exception as e:
             total_warnings += 1
             msg = f"Failed to switch DB to write mode or drop indexes: {e}"
             self.logger.log(msg, "WARNING")
-
-        load_status = True
 
         if total_warnings != 0:
             msg = f"{total_warnings} warning to analysis in log file"
@@ -533,4 +522,4 @@ class DTP(DTPBase, EntityQueryMixin):
         msg = f"🔗 Total GO relations loaded: {total_relations}"
         self.logger.log(msg, "INFO")
 
-        return total_terms, True, msg
+        return True, msg

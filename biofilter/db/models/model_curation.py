@@ -46,7 +46,7 @@ class CurationConflict(Base):
     data_source_id = Column(
         Integer, ForeignKey("etl_data_sources.id"), nullable=True
     )  # noqa E501
-    data_source = relationship("DataSource")
+    data_source = relationship("ETLDataSource")
     entity_type = Column(String, nullable=False)  # Ex: "gene"
     entity_id = Column(Integer, nullable=True)
     identifier = Column(String, nullable=False)  # Ex: "HGNC:40594"

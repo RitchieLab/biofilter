@@ -24,6 +24,11 @@
             "id": 5,
             "code": "encodes",
             "description": "The gene encodes the protein or other gene product."
+        },
+        {
+            "id": 6,
+            "code": "has_transcript",
+            "description": "..."
         }
     ]
 }

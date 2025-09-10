@@ -2,12 +2,12 @@
   "entity_groups": [
         {
             "id": 1,
-            "name": "Genomic Variants",
+            "name": "Variants",
             "description": "Genetic variants including SNPs, InDels, structural variants, and CNVs"
         },
         {
             "id": 2,
-            "name": "Genomics",
+            "name": "Genes",
             "description": "Genes, genomic sequences, and related annotations"
         },
         {
@@ -22,7 +22,7 @@
         },
         {
             "id": 5,
-            "name": "Proteomics",
+            "name": "Proteins",
             "description": "Proteins, isoforms, peptides, and functional annotations"
         },
         {

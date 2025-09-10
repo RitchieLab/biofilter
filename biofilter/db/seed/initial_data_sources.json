@@ -9,10 +9,9 @@
             "grch_version": "GRCh38",
             "ucschg_version": "hg38",
             "dtp_script": "dtp_gene_ncbi",
-            "last_status": "pending",
             "active": true,
-            "dtp_version": "1.0.0",
-            "schema_version": "3.0.0"
+            "dtp_version": "1.1.0",
+            "schema_version": "3.1.0"
         },
         {
             "source_system": "HGNC",
@@ -23,10 +22,22 @@
             "grch_version": "GRCh38",
             "ucschg_version": "hg38",
             "dtp_script": "dtp_gene_hgnc",
-            "last_status": "pending",
             "active": true,
-            "dtp_version": "1.0.0",
-            "schema_version": "3.0.0"
+            "dtp_version": "1.1.0",
+            "schema_version": "3.1.0"
+        },
+        {
+            "source_system": "Ensembl",
+            "name": "ensembl",
+            "data_type": "Gene",
+            "source_url": "https://ftp.ensembl.org/pub/current_gff3/homo_sapiens/Homo_sapiens.GRCh38.115.chr.gff3.gz",
+            "format": "GFF3",
+            "grch_version": "GRCh38",
+            "ucschg_version": "hg38",
+            "dtp_script": "dtp_gene_ensembl",
+            "active": true,
+            "dtp_version": "1.1.0",
+            "schema_version": "3.1.0"
         },
         {
             "source_system": "NCBI",
@@ -37,10 +48,9 @@
             "grch_version": "GRCh38",
             "ucschg_version": "hg38",
             "dtp_script": "dtp_variant_ncbi",
-            "last_status": "pending",
             "active": true,
-            "dtp_version": "1.0.0",
-            "schema_version": "3.0.0"
+            "dtp_version": "1.1.0",
+            "schema_version": "3.1.0"
         },
         {
             "source_system": "NCBI",
@@ -51,10 +61,9 @@
             "grch_version": "GRCh38",
             "ucschg_version": "hg38",
             "dtp_script": "dtp_variant_ncbi",
-            "last_status": "pending",
             "active": true,
-            "dtp_version": "1.0.0",
-            "schema_version": "3.0.0"
+            "dtp_version": "1.1.0",
+            "schema_version": "3.1.0"
         },
         {
             "source_system": "NCBI",
@@ -65,10 +74,9 @@
             "grch_version": "GRCh38",
             "ucschg_version": "hg38",
             "dtp_script": "dtp_variant_ncbi",
-            "last_status": "pending",
             "active": true,
-            "dtp_version": "1.0.0",
-            "schema_version": "3.0.0"
+            "dtp_version": "1.1.0",
+            "schema_version": "3.1.0"
         },
         {
             "source_system": "NCBI",
@@ -79,10 +87,9 @@
             "grch_version": "GRCh38",
             "ucschg_version": "hg38",
             "dtp_script": "dtp_variant_ncbi",
-            "last_status": "pending",
             "active": true,
-            "dtp_version": "1.0.0",
-            "schema_version": "3.0.0"
+            "dtp_version": "1.1.0",
+            "schema_version": "3.1.0"
         },
         {
             "source_system": "NCBI",
@@ -93,10 +100,9 @@
             "grch_version": "GRCh38",
             "ucschg_version": "hg38",
             "dtp_script": "dtp_variant_ncbi",
-            "last_status": "pending",
             "active": true,
-            "dtp_version": "1.0.0",
-            "schema_version": "3.0.0"
+            "dtp_version": "1.1.0",
+            "schema_version": "3.1.0"
         },
         {
             "source_system": "NCBI",
@@ -107,10 +113,9 @@
             "grch_version": "GRCh38",
             "ucschg_version": "hg38",
             "dtp_script": "dtp_variant_ncbi",
-            "last_status": "pending",
             "active": true,
-            "dtp_version": "1.0.0",
-            "schema_version": "3.0.0"
+            "dtp_version": "1.1.0",
+            "schema_version": "3.1.0"
         },
         {
             "source_system": "NCBI",
@@ -121,10 +126,9 @@
             "grch_version": "GRCh38",
             "ucschg_version": "hg38",
             "dtp_script": "dtp_variant_ncbi",
-            "last_status": "pending",
             "active": true,
-            "dtp_version": "1.0.0",
-            "schema_version": "3.0.0"
+            "dtp_version": "1.1.0",
+            "schema_version": "3.1.0"
         },
         {
             "source_system": "NCBI",
@@ -135,10 +139,9 @@
             "grch_version": "GRCh38",
             "ucschg_version": "hg38",
             "dtp_script": "dtp_variant_ncbi",
-            "last_status": "pending",
             "active": true,
-            "dtp_version": "1.0.0",
-            "schema_version": "3.0.0"
+            "dtp_version": "1.1.0",
+            "schema_version": "3.1.0"
         },
         {
             "source_system": "NCBI",
@@ -149,10 +152,9 @@
             "grch_version": "GRCh38",
             "ucschg_version": "hg38",
             "dtp_script": "dtp_variant_ncbi",
-            "last_status": "pending",
             "active": true,
-            "dtp_version": "1.0.0",
-            "schema_version": "3.0.0"
+            "dtp_version": "1.1.0",
+            "schema_version": "3.1.0"
         },
         {
             "source_system": "NCBI",
@@ -163,10 +165,9 @@
             "grch_version": "GRCh38",
             "ucschg_version": "hg38",
             "dtp_script": "dtp_variant_ncbi",
-            "last_status": "pending",
             "active": true,
-            "dtp_version": "1.0.0",
-            "schema_version": "3.0.0"
+            "dtp_version": "1.1.0",
+            "schema_version": "3.1.0"
         },
         {
             "source_system": "NCBI",
@@ -177,10 +178,9 @@
             "grch_version": "GRCh38",
             "ucschg_version": "hg38",
             "dtp_script": "dtp_variant_ncbi",
-            "last_status": "pending",
             "active": true,
-            "dtp_version": "1.0.0",
-            "schema_version": "3.0.0"
+            "dtp_version": "1.1.0",
+            "schema_version": "3.1.0"
         },
         {
             "source_system": "NCBI",
@@ -191,10 +191,9 @@
             "grch_version": "GRCh38",
             "ucschg_version": "hg38",
             "dtp_script": "dtp_variant_ncbi",
-            "last_status": "pending",
             "active": true,
-            "dtp_version": "1.0.0",
-            "schema_version": "3.0.0"
+            "dtp_version": "1.1.0",
+            "schema_version": "3.1.0"
         },
         {
             "source_system": "NCBI",
@@ -205,10 +204,9 @@
             "grch_version": "GRCh38",
             "ucschg_version": "hg38",
             "dtp_script": "dtp_variant_ncbi",
-            "last_status": "pending",
             "active": true,
-            "dtp_version": "1.0.0",
-            "schema_version": "3.0.0"
+            "dtp_version": "1.1.0",
+            "schema_version": "3.1.0"
         },
         {
             "source_system": "NCBI",
@@ -219,10 +217,9 @@
             "grch_version": "GRCh38",
             "ucschg_version": "hg38",
             "dtp_script": "dtp_variant_ncbi",
-            "last_status": "pending",
             "active": true,
-            "dtp_version": "1.0.0",
-            "schema_version": "3.0.0"
+            "dtp_version": "1.1.0",
+            "schema_version": "3.1.0"
         },
         {
             "source_system": "NCBI",
@@ -233,10 +230,9 @@
             "grch_version": "GRCh38",
             "ucschg_version": "hg38",
             "dtp_script": "dtp_variant_ncbi",
-            "last_status": "pending",
             "active": true,
-            "dtp_version": "1.0.0",
-            "schema_version": "3.0.0"
+            "dtp_version": "1.1.0",
+            "schema_version": "3.1.0"
         },
         {
             "source_system": "NCBI",
@@ -247,10 +243,9 @@
             "grch_version": "GRCh38",
             "ucschg_version": "hg38",
             "dtp_script": "dtp_variant_ncbi",
-            "last_status": "pending",
             "active": true,
-            "dtp_version": "1.0.0",
-            "schema_version": "3.0.0"
+            "dtp_version": "1.1.0",
+            "schema_version": "3.1.0"
         },
         {
             "source_system": "NCBI",
@@ -261,10 +256,9 @@
             "grch_version": "GRCh38",
             "ucschg_version": "hg38",
             "dtp_script": "dtp_variant_ncbi",
-            "last_status": "pending",
             "active": true,
-            "dtp_version": "1.0.0",
-            "schema_version": "3.0.0"
+            "dtp_version": "1.1.0",
+            "schema_version": "3.1.0"
         },
         {
             "source_system": "NCBI",
@@ -275,10 +269,9 @@
             "grch_version": "GRCh38",
             "ucschg_version": "hg38",
             "dtp_script": "dtp_variant_ncbi",
-            "last_status": "pending",
             "active": true,
-            "dtp_version": "1.0.0",
-            "schema_version": "3.0.0"
+            "dtp_version": "1.1.0",
+            "schema_version": "3.1.0"
         },
         {
             "source_system": "NCBI",
@@ -289,10 +282,9 @@
             "grch_version": "GRCh38",
             "ucschg_version": "hg38",
             "dtp_script": "dtp_variant_ncbi",
-            "last_status": "pending",
             "active": true,
-            "dtp_version": "1.0.0",
-            "schema_version": "3.0.0"
+            "dtp_version": "1.1.0",
+            "schema_version": "3.1.0"
         },
         {
             "source_system": "NCBI",
@@ -303,10 +295,9 @@
             "grch_version": "GRCh38",
             "ucschg_version": "hg38",
             "dtp_script": "dtp_variant_ncbi",
-            "last_status": "pending",
             "active": true,
-            "dtp_version": "1.0.0",
-            "schema_version": "3.0.0"
+            "dtp_version": "1.1.0",
+            "schema_version": "3.1.0"
         },
         {
             "source_system": "NCBI",
@@ -317,10 +308,9 @@
             "grch_version": "GRCh38",
             "ucschg_version": "hg38",
             "dtp_script": "dtp_variant_ncbi",
-            "last_status": "pending",
             "active": true,
-            "dtp_version": "1.0.0",
-            "schema_version": "3.0.0"
+            "dtp_version": "1.1.0",
+            "schema_version": "3.1.0"
         },
         {
             "source_system": "NCBI",
@@ -331,10 +321,9 @@
             "grch_version": "GRCh38",
             "ucschg_version": "hg38",
             "dtp_script": "dtp_variant_ncbi",
-            "last_status": "pending",
             "active": true,
-            "dtp_version": "1.0.0",
-            "schema_version": "3.0.0"
+            "dtp_version": "1.1.0",
+            "schema_version": "3.1.0"
         },
         {
             "source_system": "NCBI",
@@ -345,10 +334,9 @@
             "grch_version": "GRCh38",
             "ucschg_version": "hg38",
             "dtp_script": "dtp_variant_ncbi",
-            "last_status": "pending",
             "active": true,
-            "dtp_version": "1.0.0",
-            "schema_version": "3.0.0"
+            "dtp_version": "1.1.0",
+            "schema_version": "3.1.0"
         },
         {
             "source_system": "NCBI",
@@ -359,10 +347,9 @@
             "grch_version": "GRCh38",
             "ucschg_version": "hg38",
             "dtp_script": "dtp_variant_ncbi",
-            "last_status": "pending",
             "active": true,
-            "dtp_version": "1.0.0",
-            "schema_version": "3.0.0"
+            "dtp_version": "1.1.0",
+            "schema_version": "3.1.0"
         },
         {
             "source_system": "NCBI",
@@ -373,10 +360,9 @@
             "grch_version": "GRCh38",
             "ucschg_version": "hg38",
             "dtp_script": "dtp_variant_ncbi",
-            "last_status": "pending",
             "active": true,
-            "dtp_version": "1.0.0",
-            "schema_version": "3.0.0"
+            "dtp_version": "1.1.0",
+            "schema_version": "3.1.0"
         },
         {
             "source_system": "NCBI",
@@ -387,10 +373,9 @@
             "grch_version": "GRCh38",
             "ucschg_version": "hg38",
             "dtp_script": "dtp_variant_ncbi",
-            "last_status": "pending",
             "active": true,
-            "dtp_version": "1.0.0",
-            "schema_version": "3.0.0"
+            "dtp_version": "1.1.0",
+            "schema_version": "3.1.0"
         },
         {
             "source_system": "Reactome",
@@ -401,10 +386,9 @@
             "grch_version": "GRCh38",
             "ucschg_version": "hg38",
             "dtp_script": "dtp_reactome",
-            "last_status": "pending",
             "active": true,
-            "dtp_version": "1.0.0",
-            "schema_version": "3.0.0"
+            "dtp_version": "1.1.0",
+            "schema_version": "3.1.0"
         },
         {
             "source_system": "Reactome",
@@ -415,10 +399,9 @@
             "grch_version": "GRCh38",
             "ucschg_version": "hg38",
             "dtp_script": "dtp_reactome_relationships",
-            "last_status": "pending",
             "active": true,
-            "dtp_version": "1.0.0",
-            "schema_version": "3.0.0"
+            "dtp_version": "1.1.0",
+            "schema_version": "3.1.0"
         },
         {
             "source_system": "UniProt",
@@ -429,10 +412,9 @@
             "grch_version": "GRCh38",
             "ucschg_version": "hg38",
             "dtp_script": "dtp_uniprot",
-            "last_status": "pending",
             "active": true,
-            "dtp_version": "1.0.0",
-            "schema_version": "3.0.0"
+            "dtp_version": "1.1.0",
+            "schema_version": "3.1.0"
         },
         {
             "source_system": "UniProt",
@@ -443,10 +425,9 @@
             "grch_version": "GRCh38",
             "ucschg_version": "hg38",
             "dtp_script": "dtp_uniprot_relationships",
-            "last_status": "pending",
             "active": true,
-            "dtp_version": "1.0.0",
-            "schema_version": "3.0.0"
+            "dtp_version": "1.1.0",
+            "schema_version": "3.1.0"
         },
         {
             "source_system": "EBI",
@@ -457,10 +438,9 @@
             "grch_version": "GRCh38",
             "ucschg_version": "hg38",
             "dtp_script": "dtp_pfam",
-            "last_status": "pending",
             "active": true,
-            "dtp_version": "1.0.0",
-            "schema_version": "3.0.0"
+            "dtp_version": "1.1.0",
+            "schema_version": "3.1.0"
         },
         {
             "source_system": "GO",
@@ -471,10 +451,9 @@
             "grch_version": "GRCh38",
             "ucschg_version": "hg38",
             "dtp_script": "dtp_go",
-            "last_status": "pending",
             "active": true,
-            "dtp_version": "1.0.0",
-            "schema_version": "3.0.0"
+            "dtp_version": "1.1.0",
+            "schema_version": "3.1.0"
         },
         {
             "source_system": "KEGG",
@@ -485,10 +464,9 @@
             "grch_version": "GRCh38",
             "ucschg_version": "hg38",
             "dtp_script": "dtp_kegg",
-            "last_status": "pending",
             "active": true,
-            "dtp_version": "1.0.0",
-            "schema_version": "3.0.0"
+            "dtp_version": "1.1.0",
+            "schema_version": "3.1.0"
         }
     ]
 } 

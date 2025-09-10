@@ -3,14 +3,12 @@ from sqlalchemy import (
     Integer,
     Numeric,
     String,
-    DateTime,
     ForeignKey,
-    UniqueConstraint,
-    Index,
-    CheckConstraint,  # noqa E501
+    #     UniqueConstraint,
+    #     Index,
+    #     CheckConstraint,  # noqa E501
 )
 from sqlalchemy.orm import relationship
-from sqlalchemy.sql import func
 from biofilter.db.base import Base
 
 
@@ -32,62 +30,61 @@ class VariantMaster(Base):
     # dbSNP rsID (stable external id)
     variant_id = Column(String(100), unique=True, index=True, nullable=False)
 
-    entity_id = Column(Integer, ForeignKey("entities.id"), nullable=True)
-
     variant_type = Column(String(16), nullable=False, default="SNP")
+
     omic_status_id = Column(
         Integer, ForeignKey("omic_status.id"), nullable=True
     )  # noqa E501
+    omic_status = relationship("OmicStatus", passive_deletes=True)
 
-    assembly_id = Column(
-        Integer, ForeignKey("genome_assemblies.id"), nullable=False
-    )  # noqa E501
+    # assembly_id = Column(
+    #     Integer, ForeignKey("genome_assemblies.id"), nullable=False
+    # )  # noqa E501
+    # assembly = relationship("GenomeAssembly", passive_deletes=True)
+
     chromosome = Column(String(10), nullable=True)  # '1'..'22','X','Y','MT'
-    start_pos = Column(Integer, nullable=True)
-    end_pos = Column(Integer, nullable=True)  # SNP: end_pos == start_pos
+    # start_pos = Column(Integer, nullable=True)
+    # end_pos = Column(Integer, nullable=True)  # SNP: end_pos == start_pos
 
-    reference_allele = Column(String(100), nullable=True)
-    alternate_allele = Column(String(100), nullable=True)
+    # reference_allele = Column(String(100), nullable=True)
+    # alternate_allele = Column(String(100), nullable=True)
 
     quality = Column(Numeric(3, 1), nullable=True)
 
+    entity_id = Column(
+        Integer, ForeignKey("entities.id", ondelete="CASCADE"), nullable=False
+    )  # noqa E501
+    entity = relationship("Entity", passive_deletes=True)
+
     data_source_id = Column(
         Integer,
-        ForeignKey("etl_data_sources.id", ondelete="SET NULL"),
+        ForeignKey("etl_data_sources.id", ondelete="CASCADE"),
         nullable=True,
     )
+    data_source = relationship("ETLDataSource", passive_deletes=True)
 
-    created_at = Column(DateTime, server_default=func.now(), nullable=False)
-    updated_at = Column(
-        DateTime,
-        server_default=func.now(),
-        onupdate=func.now(),
-        nullable=False,  # noqa E501
+    etl_package_id = Column(
+        Integer,
+        ForeignKey("etl_packages.id", ondelete="CASCADE"),
+        nullable=True,
     )
+    etl_package = relationship("ETLPackage", passive_deletes=True)
 
-    __table_args__ = (
-        CheckConstraint("start_pos <= end_pos", name="ck_variant_span_valid"),
-        Index(
-            "ix_var_asm_chr_start", "assembly_id", "chromosome", "start_pos"
-        ),  # noqa E501
-    )
-
-    # Relationships
-    omic_status = relationship("OmicStatus", passive_deletes=True)
-    data_source = relationship("DataSource", passive_deletes=True)
+    # __table_args__ = (
+    #     CheckConstraint(
+    #        "start_pos <= end_pos", name="ck_variant_span_valid"
+    #     ),
+    #     Index(
+    #         "ix_var_asm_chr_start", "assembly_id", "chromosome", "start_pos"
+    #     ),  # noqa E501
+    # )
 
     loci = relationship(
         "VariantLocus",
         back_populates="variant",
-        cascade="all, delete-orphan",
-        passive_deletes=True,
+        # cascade="all, delete-orphan",
+        # passive_deletes=True,
     )
-    # liftovers = relationship(
-    #     "VariantLiftedPosition",
-    #     back_populates="variant",
-    #     cascade="all, delete-orphan",   # <- corrigido (antes estava 'ascade')  # noqa E501
-    #     passive_deletes=True,
-    # )
 
 
 # --- Per-assembly locus index (accelerates position/range queries) ----------
@@ -103,51 +100,57 @@ class VariantLocus(Base):
     __tablename__ = "variant_loci"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
+
     variant_id = Column(
         Integer,
         ForeignKey("variant_masters.id", ondelete="CASCADE"),
         nullable=False,  # noqa E501
     )
+    variant = relationship(
+        "VariantMaster",
+        back_populates="loci",
+        passive_deletes=True,
+    )
+
     assembly_id = Column(
         Integer, ForeignKey("genome_assemblies.id"), nullable=False
     )  # noqa E501
+    assembly = relationship("GenomeAssembly", passive_deletes=True)
+
     chromosome = Column(String(10), nullable=False)
     start_pos = Column(Integer, nullable=False)
     end_pos = Column(Integer, nullable=False)  # SNP: end_pos == start_pos
 
     data_source_id = Column(
         Integer,
-        ForeignKey("etl_data_sources.id", ondelete="SET NULL"),
+        ForeignKey("etl_data_sources.id", ondelete="CASCADE"),
         nullable=True,
     )
-    created_at = Column(DateTime, server_default=func.now(), nullable=False)
-    updated_at = Column(
-        DateTime,
-        server_default=func.now(),
-        onupdate=func.now(),
-        nullable=False,  # noqa E501
-    )
+    data_source = relationship("ETLDataSource", passive_deletes=True)
 
-    __table_args__ = (
-        # Natural unique key for a locus mapping within an assembly
-        UniqueConstraint(
-            "variant_id",
-            "assembly_id",
-            "chromosome",
-            "start_pos",
-            "end_pos",
-            name="uq_variant_locus_natural_key",
-        ),
-        # Range-friendly indexes for queries by region
-        Index(
-            "ix_vloc_asm_chr_start", "assembly_id", "chromosome", "start_pos"
-        ),  # noqa E501
-        Index("ix_vloc_asm_chr_end", "assembly_id", "chromosome", "end_pos"),
+    etl_package_id = Column(
+        Integer,
+        ForeignKey("etl_packages.id", ondelete="CASCADE"),
+        nullable=True,
     )
+    etl_package = relationship("ETLPackage", passive_deletes=True)
 
-    variant = relationship("VariantMaster", back_populates="loci")
-    assembly = relationship("GenomeAssembly")
-    data_source = relationship("DataSource", passive_deletes=True)
+    # __table_args__ = (
+    #     # Natural unique key for a locus mapping within an assembly
+    #     UniqueConstraint(
+    #         "variant_id",
+    #         "assembly_id",
+    #         "chromosome",
+    #         "start_pos",
+    #         "end_pos",
+    #         name="uq_variant_locus_natural_key",
+    #     ),
+    #     # Range-friendly indexes for queries by region
+    #     Index(
+    #         "ix_vloc_asm_chr_start", "assembly_id", "chromosome", "start_pos"
+    #     ),  # noqa E501
+    #     Index("ix_vloc_asm_chr_end", "assembly_id", "chromosome", "end_pos"),
+    # )
 
 
 # --- Liftover cache/audit (for derived mappings or missing placements) ------

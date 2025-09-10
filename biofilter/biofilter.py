@@ -15,8 +15,13 @@ from biofilter.db.models import BiofilterMetadata
 
 
 class Biofilter:
-    def __init__(self, db_uri: str = None):
-        self.logger = Logger(log_level="DEBUG")
+    def __init__(self, db_uri: str = None, debug_mode: bool = False):
+        if debug_mode:
+            self.logger = Logger(log_level="DEBUG")
+            self.debug_mode = True
+        else:
+            self.logger = Logger()
+            self.debug_mode = False
         self.db_uri = db_uri
         self.db = None
         self._metadata = None
@@ -35,7 +40,7 @@ class Biofilter:
             self.logger.log(msn, "INFO")
             raise RuntimeError(msn)
         if not hasattr(self, "_settings"):
-            msn = "⚙️ Initializing settings..."
+            msn = "⚙️  Initializing settings..."
             self.logger.log(msn, "INFO")
             # self._settings = SettingsManager(self.biofilter.db.session)
             with self.db.get_session() as session:
@@ -113,7 +118,7 @@ class Biofilter:
 
         self.logger.log("🚀 Starting ETL update process...", "INFO")
 
-        manager = ETLManager(self.db.get_session())
+        manager = ETLManager(self.debug_mode, self.db.get_session())
 
         manager.start_process(
             source_system=source_system,
@@ -185,7 +190,9 @@ class Biofilter:
             delete_files=delete_files,
         )
 
-    def export_conflicts_to_excel(self, output_path: str = "curation_conflicts.xlsx"):  # noqa E501
+    def export_conflicts_to_excel(
+        self, output_path: str = "curation_conflicts.xlsx"
+    ):  # noqa E501
         """
         Exporta os conflitos de curadoria para um arquivo Excel.
         """
@@ -196,7 +203,9 @@ class Biofilter:
 
         self.logger.log("🔄 Resetting the ETL Process", "INFO")
 
-        manager = ConflictManager(session=self.db.get_session(), logger=self.logger)  # noqa E501
+        manager = ConflictManager(
+            session=self.db.get_session(), logger=self.logger
+        )  # noqa E501
         return manager.export_conflicts_to_excel(output_path)
 
     def import_conflicts_from_excel(

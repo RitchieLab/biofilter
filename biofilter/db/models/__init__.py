@@ -9,12 +9,13 @@ from .model_genes import (
     GeneGroupMembership,
     GeneLocation,
 )
-from .model_etl import DataSource, SourceSystem, ETLProcess, ETLLog
+from .model_etl import ETLDataSource, ETLSourceSystem, ETLPackage
 
 from .model_entities import (
     EntityGroup,
     Entity,
-    EntityName,
+    # EntityName,
+    EntityAlias,
     EntityRelationshipType,
     EntityRelationship,
 )
@@ -54,14 +55,14 @@ __all__ = [
     "GeneGroupMembership",
     "GeneLocation",
     # # ETL MODELS
-    "SourceSystem",
-    "DataSource",
-    "ETLProcess",
-    "ETLLog",
+    "ETLDataSource",
+    "ETLSourceSystem",
+    "ETLPackage",
     # # ENTITY MODELS
     "EntityGroup",
     "Entity",
-    "EntityName",
+    # "EntityName",
+    "EntityAlias",
     "EntityRelationshipType",
     "EntityRelationship",
     # CURATION MODELS

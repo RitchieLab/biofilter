@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "biofilter"
-version = "3.0.1"
+version = "3.1.0"
 description = "Biofilter Know"
 authors = ["Ritchie Lab <Software_RitchieLab@pennmedicine.upenn.edu>"]
 license = "MIT"

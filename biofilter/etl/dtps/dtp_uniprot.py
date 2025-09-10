@@ -276,7 +276,7 @@ class DTP(DTPBase, EntityQueryMixin):
                                 "source_id": source_id,
                                 "target_id": go.strip(),
                                 "source_type": "Proteomics",
-                                "target_type": "GO",
+                                "target_type": "Gene Ontology",
                                 # "relation_type": "associated_with",
                                 "relation_type": "part_of",
                             }
@@ -301,7 +301,7 @@ class DTP(DTPBase, EntityQueryMixin):
                                 "source_id": source_id,
                                 "target_id": h.strip(),
                                 "source_type": "Proteomics",
-                                "target_type": "Genes",
+                                "target_type": "Genomics",
                                 "relation_type": "encodes",
                             }
                         )
@@ -313,7 +313,7 @@ class DTP(DTPBase, EntityQueryMixin):
                                 "source_id": source_id,
                                 "target_id": r.strip(),
                                 "source_type": "Proteomics",
-                                "target_type": "transcript",
+                                "target_type": "Transcriptomics",
                                 "relation_type": "has_transcript",
                             }
                         )

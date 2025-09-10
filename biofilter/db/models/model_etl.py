@@ -9,10 +9,25 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     Enum,
+    JSON,
 )
 
 
-class SourceSystem(Base):
+def get_etl_status_enum(name: str):
+    return Enum(
+        "pending",
+        "running",
+        "completed",
+        "failed",
+        "not-applicable",
+        "up-to-date",
+        name=name,
+        create_constraint=True,
+        validate_strings=True,
+    )  # noqa E501
+
+
+class ETLSourceSystem(Base):
     """Represents a data source provider, such as NCBI, UniProt, etc."""
 
     __tablename__ = "etl_source_systems"
@@ -24,18 +39,20 @@ class SourceSystem(Base):
     active = Column(Boolean, default=True, nullable=False)
 
     created_at = Column(DateTime, server_default=func.now(), nullable=False)
-    updated_at = Column(
-        DateTime,
-        server_default=func.now(),
-        onupdate=func.now(),
-        nullable=False,  # noqa E501
-    )
+    # updated_at = Column(
+    #     DateTime,
+    #     server_default=func.now(),
+    #     onupdate=func.now(),
+    #     nullable=False,  # noqa E501
+    # )
 
     # Relationship
-    data_sources = relationship("DataSource", back_populates="source_system")
+    data_sources = relationship(
+        "ETLDataSource", back_populates="source_system"
+    )  # noqa E501
 
 
-class DataSource(Base):
+class ETLDataSource(Base):
     """
     Represents a data source used in the ETL process.
 
@@ -76,122 +93,144 @@ class DataSource(Base):
         String(255), nullable=False
     )  # path to the DTP ETL script  # noqa E501
 
-    last_update = Column(DateTime, nullable=True)  # last successful ingestion
-    last_status = Column(
-        String(20), nullable=False, default="pending"
-    )  # status: "success", "failed", "running", "pending"
-
     active = Column(Boolean, nullable=False, default=True)
 
     created_at = Column(
         DateTime, server_default=func.now(), nullable=False
     )  # noqa E501
-    updated_at = Column(
-        DateTime,
-        server_default=func.now(),
-        onupdate=func.now(),
-        nullable=False,  # noqa E501
-    )
+    # updated_at = Column(
+    #     DateTime,
+    #     server_default=func.now(),
+    #     onupdate=func.now(),
+    #     nullable=False,  # noqa E501
+    # )
 
     # Relationships (Go Up)
-    source_system = relationship("SourceSystem", back_populates="data_sources")
+    source_system = relationship(
+        "ETLSourceSystem", back_populates="data_sources"
+    )  # noqa E501
 
     # Relationships (Go Down)
-    etl_processes = relationship(
-        "ETLProcess",
+    etl_packages = relationship(
+        "ETLPackage",
         back_populates="data_source",
         cascade="all, delete-orphan",  # noqa E501
     )  # noqa E501
 
 
-def get_etl_status_enum(name: str):
-    return Enum(
-        "pending",
-        "running",
-        "completed",
-        "failed",
-        "not_applicable",
-        name=name,
-    )  # noqa E501
-
-
-class ETLProcess(Base):
-    """
-    Tracks the ETL execution lifecycle for a given DataSource,
-    including timestamps and status per ETL stage (Extract, Transform, Load).
-
-    Supports status tracking via enums and optional content hashing for
-    raw and processed data to ensure reproducibility and integrity.
-    """
-
-    __tablename__ = "etl_process"
+class ETLPackage(Base):
+    __tablename__ = "etl_packages"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
 
     data_source_id = Column(
         Integer,
         ForeignKey("etl_data_sources.id", ondelete="CASCADE"),
+        nullable=False,  # noqa E501
+    )  # noqa E501
+    data_source = relationship("ETLDataSource", back_populates="etl_packages")
+
+    status = Column(
+        get_etl_status_enum("etl_extract_status_enum"),
         nullable=False,
+        default="pending",
     )
 
-    global_status = Column(
-        get_etl_status_enum("global_status_enum"),
-        nullable=False,
-        default="running",
-    )
+    operation_type = Column(
+        String(50), nullable=True, default="insert"
+    )  # insert, update, rollback
+    version_tag = Column(String(50), nullable=True)  # Optional snapshot tag
+    note = Column(String(255), nullable=True)
+    active = Column(Boolean, default=True)
 
     extract_start = Column(DateTime, nullable=True)
     extract_end = Column(DateTime, nullable=True)
+    extract_rows = Column(Integer, nullable=True)
+    extract_hash = Column(String(128), nullable=True)  # Raw File
     extract_status = Column(
-        get_etl_status_enum("extract_status_enum"),
+        get_etl_status_enum("etl_extract_status_enum"),
         nullable=True,
-        default="running",
+        default="pending",
     )
-
     transform_start = Column(DateTime, nullable=True)
     transform_end = Column(DateTime, nullable=True)
+    transform_rows = Column(Integer, nullable=True)
+    transform_hash = Column(String(128), nullable=True)  # Raw File
     transform_status = Column(
-        get_etl_status_enum("transform_status_enum"),
+        get_etl_status_enum("etl_extract_status_enum"),
         nullable=True,
-        default="running",
+        default="pending",
     )
-
     load_start = Column(DateTime, nullable=True)
     load_end = Column(DateTime, nullable=True)
+    load_rows = Column(Integer, nullable=True)
+    load_hash = Column(String(128), nullable=True)  # Raw File
     load_status = Column(
-        get_etl_status_enum("load_status_enum"),
+        get_etl_status_enum("etl_extract_status_enum"),
         nullable=True,
-        default="running",
+        default="pending",
     )
 
-    raw_data_hash = Column(String(128), nullable=True)
-    process_data_hash = Column(String(128), nullable=True)
+    stats = Column(JSON, nullable=True)
+    # ex: {"records_added": 1831, "warnings": 2}
 
-    # Relationship to DataSource
-    data_source = relationship("DataSource", back_populates="etl_processes")
+    created_at = Column(DateTime, server_default=func.now(), nullable=False)
 
 
-# TODO: Review this model / All log is hosting in file nowadays
-class ETLLog(Base):
-    __tablename__ = "etl_logs"
+# class ETLProcess(Base):
+#     """
+#     Tracks the ETL execution lifecycle for a given DataSource,
+#     including timestamps and status per ETL stage (Extract, Transform, Load).
 
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    # etl_process_id = Column(
-    #     Integer, ForeignKey("etl_process.id", ondelete="CASCADE"), nullable=False   # noqa: E501
-    # )
-    etl_process_id = Column(Integer, nullable=False)
-    phase = Column(String, nullable=False)  # "extract", "transform", "load"
-    action = Column(
-        String, nullable=False
-    )  # "insert", "update", "skip", "error"  # noqa: E501
-    message = Column(String(255), nullable=True)
-    # records = Column(Integer, nullable=True)
-    # entity_type = Column(String, nullable=True)
-    # entity_id = Column(Integer, nullable=True)
-    timestamp = Column(DateTime, server_default=func.now(), nullable=False)
+#     Supports status tracking via enums and optional content hashing for
+#     raw and processed data to ensure reproducibility and integrity.
+#     """
 
-    # Relacionamento com ETLProcess
-    # etl_process = relationship("ETLProcess", back_populates="etl_logs")
+#     __tablename__ = "etl_process"
+
+#     id = Column(Integer, primary_key=True, autoincrement=True)
+
+#     data_source_id = Column(
+#         Integer,
+#         ForeignKey("etl_data_sources.id", ondelete="CASCADE"),
+#         nullable=False,
+#     )
+
+#     global_status = Column(
+#         get_etl_status_enum("etl_extract_status_enum"),
+#         nullable=False,
+#         default="running",
+#     )
+
+#     extract_start = Column(DateTime, nullable=True)
+#     extract_end = Column(DateTime, nullable=True)
+#     extract_status = Column(
+#         get_etl_status_enum("extract_status_enum"),
+#         nullable=True,
+#         default="running",
+#     )
+
+#     transform_start = Column(DateTime, nullable=True)
+#     transform_end = Column(DateTime, nullable=True)
+#     transform_status = Column(
+#         get_etl_status_enum("transform_status_enum"),
+#         nullable=True,
+#         default="running",
+#     )
+
+#     load_start = Column(DateTime, nullable=True)
+#     load_end = Column(DateTime, nullable=True)
+#     load_status = Column(
+#         get_etl_status_enum("load_status_enum"),
+#         nullable=True,
+#         default="running",
+#     )
+
+#     raw_data_hash = Column(String(128), nullable=True)
+#     process_data_hash = Column(String(128), nullable=True)
+
+#     # Relationship to DataSource
+#     data_source = relationship("DataSource", back_populates="etl_processes")
 
 
 """
@@ -199,28 +238,7 @@ class ETLLog(Base):
 Developer Note - ETL Core Models
 ================================================================================
 
-This module defines the core database structures for tracking the ETL lifecycle
-of each data source integrated into the Biofilter system.
-
-Design Principles:
-
-- Relationships (`relationship()` and `ForeignKey`) are intentionally omitted
-    to maximize data ingestion throughput and reduce overhead in massive
-    workflows. IDs are stored as plain integers, prioritizing performance and
-    simplicity.
-
-- The model separates concerns:
-    - `SourceSystem`: Organizational origin of datasets (e.g. NCBI, Ensembl).
-    - `DataSource`: Specific datasets, formats, and genome versions.
-    - `ETLProcess`: Tracks the state and timing of each ETL run.
-    - `ETLLog`: Stores detailed, phase-specific logs for debugging and
-        auditing.
-
-- Each ETL process is broken into three phases:
-    - `extract`, `transform`, and `load`, each with start/end timestamps,
-        individual statuses, and optional file references.
-
-Future Directions:
+...NEED UPDATE
 
 ================================================================================
     Author: Andre Garon - Biofilter 3R

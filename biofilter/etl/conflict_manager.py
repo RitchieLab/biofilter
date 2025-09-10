@@ -7,7 +7,7 @@ from typing import Optional
 
 from biofilter.utils.logger import Logger
 
-# from biofilter.db.models.model_entities import Entity, EntityName
+# from biofilter.db.models.model_entities import Entity, EntityAlias
 # from biofilter.db.models.model_genes import Gene, OmicStatus
 # from biofilter.db.models.model_curation import (
 #     CurationConflict,
@@ -16,7 +16,7 @@ from biofilter.utils.logger import Logger
 # )  # noqa E501
 from biofilter.db.models import (
     Entity,
-    EntityName,
+    EntityAlias,
     GeneMaster,
     OmicStatus,
     CurationConflict,
@@ -286,7 +286,7 @@ class ConflictManager:
         elif resolution == ConflictResolution.merge:
             # WHAT TO DO IN THIS STRATEGY:
             # 1. Deactivate the source entity
-            # 2. Migrate the EntityNames from the source entity to the target entity                # noqa: E501
+            # 2. Migrate the EntityAliass from the source entity to the target entity                # noqa: E501
             # 3. Mark the source gene as "merged" (or merged_into)
 
             msg = f"🔀 Applying MERGE resolution: {hgnc_id} → {conflict.existing_identifier}"  # noqa: E501
@@ -320,16 +320,16 @@ class ConflictManager:
                     "WARNING",  # noqa: E501
                 )
 
-            # Migration of EntityNames from the source entity to the target gene                    # noqa: E501
+            # Migration of EntityAliass from the source entity to the target gene                    # noqa: E501
             # TODO: We are keeping the old code as is_primary, resulting in two names               # noqa: E501
             migrated = 0
             for name_obj in (
-                self.session.query(EntityName)
+                self.session.query(EntityAlias)
                 .filter_by(entity_id=source_entity.id)
                 .all()
             ):
                 exists = (
-                    self.session.query(EntityName)
+                    self.session.query(EntityAlias)
                     .filter_by(
                         entity_id=target_gene.entity_id, name=name_obj.name
                     )  # noqa: E501

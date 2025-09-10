@@ -86,6 +86,9 @@ class Database(CreateDBMixin):
 ===============================================================================
 Developer Note - Database Class
 ================================================================================
+
+IMPORT: NEED TO BE UPDATE!!
+
 This class manages the core database connection logic and session management
 for the Biofilter system. It supports both SQLite and other
 SQLAlchemy-compatible backends.

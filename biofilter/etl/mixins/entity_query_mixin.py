@@ -1,53 +1,76 @@
 from sqlalchemy.exc import IntegrityError
 from biofilter.db.models.model_entities import (
     Entity,
-    EntityName,
+    EntityAlias,
     EntityRelationship,  # noqa: E501
 )
+from biofilter.utils.utilities import string_normalization, as_list
 
 
 class EntityQueryMixin:
+
     def get_or_create_entity(
         self,
         name: str,
         group_id: int,
         data_source_id: int = 0,
+        package_id: int = None,
+        alias_type: str = None,
+        xref_source: str = None,
+        alias_norm: str = None,
+        is_active: bool = True,
     ):
         """
-        Finds or creates a master Entity based on the primary name.
+        Finds or creates a master Entity based on the primary alias details.
 
         Returns:
-            Tuple (entity_id, created): The ID of the Entity and a boolean
-            indicating whether a new entity was created.
+            Tuple (entity_id, created): ID of the Entity and a boolean flag.
         """
         clean_name = name.strip()
 
-        existing = (
-            self.session.query(EntityName).filter_by(name=clean_name).first()
-        )  # noqa E501
+        # Verifica se já existe esse alias completo
+        query = self.session.query(EntityAlias).filter_by(
+            alias_value=clean_name,
+            alias_type=alias_type,
+            xref_source=xref_source,
+            is_primary=True,
+        )
+        # TODO: Try to check conflicts (ex. FACL1)
+
+        existing = query.first()
         if existing:
             return existing.entity_id, False
 
-        # Create Entity and its primary EntityName
+        # Create a new Entity
         new_entity = Entity(
             group_id=group_id,
+            is_active=is_active,
             data_source_id=data_source_id,
+            etl_package_id=package_id,
         )
         self.session.add(new_entity)
         self.session.flush()
 
-        primary_name = EntityName(
+        # Cria o EntityAlias primário com todos os campos
+        primary_alias = EntityAlias(
             entity_id=new_entity.id,
-            name=clean_name,
-            data_source_id=data_source_id,
+            group_id=group_id,
+            alias_value=clean_name,
+            alias_type=alias_type,
+            xref_source=xref_source,
+            alias_norm=alias_norm,
             is_primary=True,
+            is_active=is_active,
+            locale="en",
+            data_source_id=data_source_id,
+            etl_package_id=package_id,
         )
-        self.session.add(primary_name)
+        self.session.add(primary_alias)
 
         try:
             self.session.commit()
             msg = f"✅ Entity '{clean_name}' created with ID {new_entity.id}"
-            self.logger.log(msg, "INFO")
+            self.logger.log(msg, "DEBUG")
             return new_entity.id, True
         except IntegrityError:
             self.session.rollback()
@@ -57,44 +80,81 @@ class EntityQueryMixin:
 
     def get_or_create_entity_name(
         self,
+        group_id: int,
         entity_id: int,
-        alt_name: str,
+        aliases: list[dict],
+        is_active: bool = True,
         data_source_id: int = 0,
-    ):
-        """
-        Adds an alias (EntityName) to an existing Entity.
+        package_id: int = None,
+    ) -> int:
+        existing = (
+            self.session.query(EntityAlias)
+            .filter_by(entity_id=entity_id)
+            .all()  # noqa E501
+        )  # noqa E501
+        existing_keys = {
+            (e.alias_value, e.alias_type, e.xref_source) for e in existing
+        }  # noqa E501
 
-        Returns:
-            True if added successfully, False if already exists or failed.
-        """
-        clean_name = alt_name.strip()
+        count_added = 0
 
-        exists = (
-            self.session.query(EntityName)
-            .filter_by(entity_id=entity_id, name=clean_name)
-            .first()
-        )
-        if exists:
-            return False
+        # Drop duplicated alias values
+        key = "alias_norm"  # or "alias_value"
+        seen = set()
+        unique, dropped = [], []
 
-        alias = EntityName(
-            entity_id=entity_id,
-            name=clean_name,
-            data_source_id=data_source_id,
-            is_primary=False,
-        )
-        self.session.add(alias)
+        for a in aliases:
+            val = (a.get(key)).strip()
+            if not val:
+                unique.append(a)
+                continue
+
+            if val in seen:
+                dropped.append(a)
+            else:
+                seen.add(val)
+                unique.append(a)
+
+        for alias in unique:
+            key = (
+                alias["alias_value"].strip(),
+                alias["alias_type"],
+                alias["xref_source"],
+            )  # noqa E501
+            if key in existing_keys:
+                continue
+
+            new_alias = EntityAlias(
+                entity_id=entity_id,
+                group_id=group_id,
+                alias_value=key[0],
+                alias_type=key[1],
+                xref_source=key[2],
+                alias_norm=alias.get("alias_norm"),
+                locale=alias.get("locale", "en"),
+                is_primary=False,
+                is_active=is_active,
+                data_source_id=data_source_id,
+                etl_package_id=package_id,
+            )
+            self.session.add(new_alias)
+            count_added += 1
 
         try:
             self.session.commit()
-            msg = f"✅ Alias '{clean_name}' added to Entity {entity_id}"
-            self.logger.log(msg, "DEBUG")
-            return True
-        except IntegrityError:
+            self.logger.log(
+                f"✅  {count_added} aliases added to Entity {entity_id}",
+                "DEBUG",  # noqa E501
+            )
+            return count_added
+        except IntegrityError as e:
             self.session.rollback()
-            msg = f"⚠️ Couldn't add alias '{clean_name}' to Entity {entity_id}"
-            self.logger.log(msg, "WARNING")
-            return False
+            self.logger.log(
+                f"⚠️  Rollback while adding aliases to Entity {entity_id}",
+                "ERROR",  # noqa E501
+            )
+            self.logger.log(f"  --> Error: {e}", "DEBUG")
+            return 0
 
     def get_or_create_entity_relationship(
         self,
@@ -102,6 +162,7 @@ class EntityQueryMixin:
         entity_2_id: int,
         relationship_type_id: int,
         data_source_id: int,
+        package_id: int = None,
     ):
         """
         Get or create an EntityRelationship.
@@ -129,20 +190,40 @@ class EntityQueryMixin:
             entity_2_id=entity_2_id,
             relationship_type_id=relationship_type_id,
             data_source_id=data_source_id,
+            etl_package_id=package_id,
         )
 
         self.session.add(rel)
 
         return True
 
-        # Do not commit here, as the commit should be done at the end of the ETL.   # noqa: E501
-        # try:
-        #     self.session.commit()
-        #     msg = f"✅ Added relationship {entity_1_id} -> {entity_2_id} (type {relationship_type_id})"  # noqa: E501
-        #     self.logger.log(msg, "DEBUG")
-        #     return True
-        # except IntegrityError:
-        #     self.session.rollback()
-        #     msg = f"⚠️ IntegrityError adding relationship {entity_1_id} -> {entity_2_id} (type {relationship_type_id})"  # noqa: E501
-        #     self.logger.log(msg, "WARNING")
-        #     return False
+    # --- THESE METHODS WILL CREATE A DICT OF ALIASES ---
+
+    # def _coerce_hgnc(self, v: str) -> str:
+    #     v = v.strip()
+    #     return v if v.upper().startswith("HGNC:") else f"HGNC:{v}"
+
+    def build_alias(self, row: dict) -> list[dict]:
+        payloads = []
+
+        for key, (atype, src, is_primary) in self.alias_schema.items():
+            for raw in as_list(row.get(key)):
+                # NOTE: If necessary, return this rule and method
+                # alias_value = (
+                #     self._coerce_hgnc(raw) if key == "hgnc_id" else raw
+                # )  # noqa E501
+                alias_value = raw
+
+                payloads.append(
+                    {
+                        "alias_value": alias_value,
+                        "alias_type": atype,
+                        "xref_source": src,
+                        "is_primary": is_primary,
+                        "alias_norm": string_normalization(alias_value),
+                        "locale": "en",
+                    }
+                )
+
+        # Drop Duplicated was transfer to add Entity Aliases Method
+        return payloads

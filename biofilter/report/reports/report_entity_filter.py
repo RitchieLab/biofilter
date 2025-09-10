@@ -1,5 +1,5 @@
 from biofilter.report.reports.base_report import ReportBase
-from biofilter.db.models import Entity, EntityName, EntityGroup  # DataSource
+from biofilter.db.models import Entity, EntityAlias, EntityGroup  # DataSource
 from sqlalchemy.orm import aliased
 from sqlalchemy import func
 import pandas as pd
@@ -21,29 +21,29 @@ class EntityFilterReport(ReportBase):
         input_lc = list(input_map.keys())
 
         # Aliases for primary name lookup
-        PrimaryName = aliased(EntityName)
+        PrimaryName = aliased(EntityAlias)
 
         # Query
 
         matches = (
             self.session.query(
-                EntityName.name.label("input_original"),
-                EntityName.name.label("input"),
-                EntityName.is_primary.label("is_primary"),
+                EntityAlias.name.label("input_original"),
+                EntityAlias.name.label("input"),
+                EntityAlias.is_primary.label("is_primary"),
                 Entity.id.label("entity_id"),
                 PrimaryName.name.label("primary_name"),
                 Entity.group_id.label("group_id"),
                 EntityGroup.name.label("group_name"),
                 Entity.has_conflict,
                 Entity.is_deactive,
-                EntityName.data_source_id,
+                EntityAlias.data_source_id,
                 # DataSource.name.label("data_source_name"),
             )
-            .join(Entity, Entity.id == EntityName.entity_id)
+            .join(Entity, Entity.id == EntityAlias.entity_id)
             .join(PrimaryName, PrimaryName.entity_id == Entity.id)
             .join(EntityGroup, Entity.group_id == EntityGroup.id, isouter=True)
             .filter(PrimaryName.is_primary.is_(True))
-            .filter(func.lower(EntityName.name).in_(input_lc))
+            .filter(func.lower(EntityAlias.name).in_(input_lc))
             .all()
         )
 

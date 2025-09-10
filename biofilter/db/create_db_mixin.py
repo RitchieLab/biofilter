@@ -45,21 +45,21 @@ class CreateDBMixin:
         self._seed_from_json(
             f"{seed_dir}/initial_source_systems.json",
             "model_etl",
-            "SourceSystem",
+            "ETLSourceSystem",
             key="source_systems",
         )
         self._seed_from_json(
             f"{seed_dir}/initial_data_sources.json",
             "model_etl",
-            "DataSource",
+            "ETLDataSource",
             key="data_sources",
         )
-        self._seed_from_json(
-            f"{seed_dir}/initial_etl_processes.json",
-            "model_etl",
-            "ETLProcess",
-            key="etl_processes",
-        )
+        # self._seed_from_json(
+        #     f"{seed_dir}/initial_etl_processes.json",
+        #     "model_etl",
+        #     "ETLProcess",
+        #     key="etl_processes",
+        # )
         self._seed_from_json(
             f"{seed_dir}/initial_entity_group.json",
             "model_entities",
@@ -119,7 +119,7 @@ class CreateDBMixin:
                         session.query(
                             import_module(
                                 "biofilter.db.models.model_etl"
-                            ).SourceSystem  # noqa E501
+                            ).ETLSourceSystem  # noqa E501
                         )
                         .filter_by(name=fk_name)
                         .first()
@@ -139,7 +139,7 @@ class CreateDBMixin:
                         session.query(
                             import_module(
                                 "biofilter.db.models.model_etl"
-                            ).DataSource  # noqa E501
+                            ).ETLDataSource  # noqa E501
                         )
                         .filter_by(name=fk_name)
                         .first()

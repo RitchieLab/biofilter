@@ -10,10 +10,8 @@ from pathlib import Path
 from biofilter.utils.file_hash import compute_file_hash
 from biofilter.etl.mixins.entity_query_mixin import EntityQueryMixin
 from biofilter.db.models import (
-    EntityGroup,
-    GeneMaster,
     GeneGroup,
-    GeneGroupMembership,
+    OmicStatus,
 )  # noqa E501
 from biofilter.etl.mixins.gene_query_mixin import GeneQueryMixin
 from biofilter.etl.mixins.base_dtp import DTPBase
@@ -30,27 +28,29 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
     def __init__(
         self,
         logger=None,
+        debug_mode=False,
         datasource=None,
-        etl_process=None,
+        package=None,
         session=None,
         use_conflict_csv=False,
     ):  # noqa: E501
         self.logger = logger
+        self.debug_mode = debug_mode
         self.data_source = datasource
-        self.etl_process = etl_process
+        self.package = package
         self.session = session
         self.use_conflict_csv = use_conflict_csv
 
         # DTP versioning
         self.dtp_name = "dtp_gene_ncbi"
-        self.dtp_version = "1.0.0"
-        self.compatible_schema_min = "3.0.0"
+        self.dtp_version = "1.1.0"
+        self.compatible_schema_min = "3.1.0"
         self.compatible_schema_max = "4.0.0"
 
     # ⬇️  --------------------------  ⬇️
     # ⬇️  ------ EXTRACT FASE ------  ⬇️
     # ⬇️  --------------------------  ⬇️
-    def extract(self, raw_dir: str, force_steps: bool):
+    def extract(self, raw_dir: str):
         """
         Downloads Genes data from NCBI. Uses the hash of 'genes_ncbi.txt' as
         reference. Only proceeds with full extraction if the hash has changed.
@@ -67,12 +67,6 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
         self.check_compatibility()
 
         source_url = self.data_source.source_url
-        if force_steps:
-            last_hash = ""
-            msg = "Ignoring hash check, forcing download"
-            self.logger.log(msg, "WARNING")
-        else:
-            last_hash = self.etl_process.raw_data_hash
 
         try:
             # Prepare download path
@@ -113,10 +107,6 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
 
             # Compute and compare hash
             current_hash = compute_file_hash(txt_path)
-            if current_hash == last_hash:
-                msg = f"⚠️  No changes detected in {txt_path}"
-                self.logger.log(msg, "INFO")
-                return False, msg, current_hash
 
             # Drop descompressed gz file
             os.remove(txt_path)
@@ -165,7 +155,7 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
             if not input_file.exists():
                 msg = f"❌ Input file not found: {input_file}"
                 self.logger.log(msg, "ERROR")
-                return None, False, msg
+                return False, msg
 
             # Output files paths
             output_file_master = output_path / "master_data"
@@ -183,7 +173,7 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
         except Exception as e:
             msg = f"❌ Error constructing paths: {str(e)}"
             self.logger.log(msg, "ERROR")
-            return None, False, msg
+            return False, msg
 
         # Start processing the source file
         # NOTE: Data has 9Gb
@@ -270,17 +260,17 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
 
             msg = f"✅ NCBI Gene transform completed: {len(output_df)} records"
             self.logger.log(msg, "INFO")
-            return None, True, msg
+            return True, msg
 
         except Exception as e:
             msg = f"❌ Transform failed: {str(e)}"
             self.logger.log(msg, "ERROR")
-            return None, False, msg
+            return False, msg
 
     # 📥  ------------------------ 📥
     # 📥  ------ LOAD FASE ------  📥
     # 📥  ------------------------ 📥
-    def load(self, df=None, processed_dir=None, chunk_size=100_000):
+    def load(self, processed_dir=None):
         """
         Load NCBI genes that are not present in HGNC, supplementing the
         Biofilter3R database.
@@ -302,125 +292,99 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
         # Check Compartibility
         self.check_compatibility()
 
-        total_genes = 0
-        total_gene_existing = 0
+        total_gene = 0  # not considered conflict genes
         total_warnings = 0
-        load_status = False
 
-        # Set DB and drop indexes
+        # VARIABLES TO LOAD PROCESS
+        if self.debug_mode:
+            start_total = time.time()
+            prev_time = start_total
+
+        # ALIASES MAP FROM PROCESS DATA FIELDS
+        self.alias_schema = {
+            "symbol": ("symbol", "NCBI", True),
+            "hgnc_id": ("code", "HGNC", None),
+            "ensembl_id": ("code", "ENSEMBL", None),
+            "entrez_id": ("code", "ENTREZ", None),
+            "full_name": ("synonym", "NCBI", None),
+            "synonyms": ("symbol", "NCBI", None),
+            "other_designations": ("synonym", "NCBI", None),
+        }
+
+        # READ PROCESSED DATA TO LOAD
         try:
-            index_specs = [
-                # ──────────────── gene_groups ────────────────
-                ("gene_groups", ["name"]),
-                # ──────────────── locus_groups ────────────────
-                ("gene_locus_groups", ["name"]),
-                # ──────────────── locus_types ────────────────
-                ("gene_locus_types", ["name"]),
-                # ──────────────── omic_status ────────────────
-                ("omic_status", ["name"]),
-                # ──────────────── genomic_regions ────────────────
-                ("gene_genomic_regions", ["label"]),
-                ("gene_genomic_regions", ["chromosome"]),
-                ("gene_genomic_regions", ["chromosome", "start", "end"]),
-                # ──────────────── genes ────────────────
-                ("gene_masters", ["entity_id"]),
-                ("gene_masters", ["hgnc_id"]),
-                ("gene_masters", ["entrez_id"]),
-                ("gene_masters", ["ensembl_id"]),
-                ("gene_masters", ["locus_group_id"]),
-                ("gene_masters", ["locus_type_id"]),
-                ("gene_masters", ["data_source_id"]),
-                ("gene_masters", ["omic_status_id"]),
-                # ──────────────── gene_group_membership ────────────────
-                ("gene_group_memberships", ["group_id"]),
-                ("gene_group_memberships", ["gene_id"]),
-                # ──────────────── gene_locations ────────────────
-                ("gene_locations", ["gene_id"]),
-                ("gene_locations", ["region_id"]),
-                ("gene_locations", ["assembly"]),
-                ("gene_locations", ["chromosome"]),
-                ("gene_locations", ["chromosome", "start", "end"]),
-                ("gene_locations", ["data_source_id"]),
-            ]
+            # Check if processed dir was set
+            if not processed_dir:
+                msg = "⚠️  processed_dir MUST be provided."
+                self.logger.log(msg, "ERROR")
+                return False, msg  # ⧮ Leaving with ERROR
 
-            index_specs_entity = [
-                # Entity
-                ("entities", ["group_id"]),
-                ("entities", ["has_conflict"]),
-                ("entities", ["is_deactive"]),
-                # EntityName
-                ("entity_names", ["entity_id"]),
-                ("entity_names", ["name"]),
-                ("entity_names", ["data_source_id"]),
-                ("entity_names", ["data_source_id", "name"]),
-                ("entity_names", ["data_source_id", "entity_id"]),
-                ("entity_names", ["entity_id", "is_primary"]),
-                # EntityRelationship
-                ("entity_relationships", ["entity_1_id"]),
-                ("entity_relationships", ["entity_2_id"]),
-                ("entity_relationships", ["relationship_type_id"]),
-                ("entity_relationships", ["data_source_id"]),
-                (
-                    "entity_relationships",
-                    ["entity_1_id", "relationship_type_id"],
-                ),  # noqa E501
-                (
-                    "entity_relationships",
-                    ["entity_1_id", "entity_2_id", "relationship_type_id"],
-                ),  # noqa E501
-                # EntityRelationshipType
-                ("entity_relationship_types", ["code"]),
-            ]
+            processed_path = os.path.join(
+                processed_dir,
+                self.data_source.source_system.name,
+                self.data_source.name,
+            )
 
-            self.db_write_mode()
-            # self.drop_indexes(index_specs) # Keep indices to improve checks
-        except Exception as e:
-            total_warnings += 1
-            msg = f"⚠️ Failed to switch DB to write mode or drop indexes: {e}"
-            self.logger.log(msg, "WARNING")
+            # Setting files names
+            processed_file_name = processed_path + "/master_data.parquet"
 
-        try:
-            # Load data
-            if df is None:
-                if not processed_dir:
-                    msg = "Either 'df' or 'processed_dir' must be provided."
-                    self.logger.log(msg, "ERROR")
-                    return total_genes, load_status, msg
-
-                processed_path = self.get_path(processed_dir)
-                processed_data = str(processed_path / "master_data.parquet")
-
-                if not os.path.exists(processed_data):
-                    msg = f"File not found: {processed_data}"
-                    self.logger.log(msg, "ERROR")
-                    return total_genes, load_status, msg
-
-                self.logger.log(
-                    f"📥 Reading data from {processed_data}", "INFO"  # noqa: E501
-                )
-                df = pd.read_parquet(processed_data, engine="pyarrow")
+            if not os.path.exists(processed_file_name):
+                msg = f"⚠️  File not found: {processed_file_name}"
+                self.logger.log(msg, "ERROR")
+                return False, msg  # ⧮ Leaving with ERROR
+            df = pd.read_parquet(processed_file_name, engine="pyarrow")
 
             # Filter only genes not curated by HGNC
+            # NOTE: We can change to consider and check!
             df = df[df["hgnc_id"].isnull()]
 
-            # Get or create EntityGroup for Genes
-            if not hasattr(self, "entity_group") or self.entity_group is None:
-                group = (
-                    self.session.query(EntityGroup)
-                    .filter_by(name="Genomics")
-                    .first()  # noqa E501
-                )  # noqa: E501
-                if not group:
-                    msg = "EntityGroup 'Genes' not found in the database."
-                    self.logger.log(msg, "ERROR")
-                    return total_genes, load_status, msg
-                self.entity_group = group.id
-                self.logger.log(
-                    f"EntityGroup ID for 'Genes' is {self.entity_group}",
-                    "DEBUG",  # noqa: E501
-                )
+            # Drop Symbol with problems
+            invalid_symbols = {"-", "unknown", "n/a"}
+            df = df[~df["symbol"].str.lower().isin(invalid_symbols)]
 
-            # Get or create GeneGroup placeholder
+            # Drop Genes without Region
+            df = df[df["map_location"] != "-"]
+
+        except Exception as e:
+            msg = f"⚠️  Failed to try read data: {e}"
+            self.logger.log(msg, "ERROR")
+            return False, msg  # ⧮ Leaving with ERROR
+
+        # GET ENTITY GROUP ID AND OMICS STATUS
+        try:
+            self.get_entity_group("Genes")
+        except Exception as e:
+            msg = f"Error on DTP to get Entity Group: {e}"
+            return False, msg  # ⧮ Leaving with ERROR
+
+        # TODO: Better Manage Control to Omics Status / Now all will be Active
+        try:
+            gene_status = (
+                self.session.query(OmicStatus).filter_by(name="active").first()
+            )
+        except Exception as e:
+            msg = f"Error on DTP to get the Omics Status: {e}"
+            return False, msg  # ⧮ Leaving with ERROR
+        if not gene_status:
+            msg = "⚠️  OmicStatus Active not found."
+            self.logger.log(msg, "ERROR")
+            return False, msg  # ⧮ Leaving with ERROR
+        gene_status_id = gene_status.id
+
+        # SET DB AND DROP INDEXES
+        try:
+            self.db_write_mode()
+            self.drop_indexes(self.get_gene_index_specs)
+            self.drop_indexes(self.get_entity_index_specs)
+        except Exception as e:
+            total_warnings += 1
+            msg = f"⚠️  Failed to switch DB to write mode or drop indexes: {e}"
+            self.logger.log(msg, "WARNING")
+            return False, msg  # ⧮ Leaving with ERROR
+
+        # NCBI DataSource no has Gene Group / Locus Group and Type
+        try:
+            # --> Gene Groups
             gene_group = (
                 self.session.query(GeneGroup)
                 .filter_by(name="NCBI Gene")
@@ -437,192 +401,243 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
                 self.logger.log(
                     f"🧬 Created GeneGroup: {gene_group.name}", "INFO"
                 )  # noqa: E501
+            gene_group_id = ["NCBI Gene"]
 
-            # Constants
-            locus_group_id = 4  # "other"
-            locus_type_id = 4  # "unknown"
+            # # --> Locus Groups
+            # locus_group_instance, status = self.get_or_create_locus_group(
+            #     name="other",
+            #     data_source_id=self.data_source.id,
+            # )  # noqa: E501
+            # locus_group_other = locus_group_instance.id  # "4 - other"
+            # if not status:
+            #     msg = "⚠️  Error on Locus Group 'other'"
+            #     self.logger.log(msg, "WARNING")
+
+            # --> Locus Types
+            locus_type_instance, status = self.get_or_create_locus_type(
+                name="unknown",
+                data_source_id=self.data_source.id,
+                package_id=self.package.id,
+            )  # noqa: E501
+            # locus_type_id = locus_type_instance.id  # "4 - unknown"
+            if not status:
+                msg = "⚠️  Error on Locus Type 'unknown' "
+                self.logger.log(msg, "WARNING")
+
+            # Positions
             start = None
             end = None
 
-            # DEBUG
-            start_total = time.time()
-            prev_time = start_total
-
-            for _, row in df.iterrows():
-                gene_master = row.get("symbol", "").strip()
-
-                # DEBUG
-                current_time = time.time()
-                # Tempo desde o início
-                elapsed_total = current_time - start_total
-                # Tempo desde a última iteração
-                elapsed_since_last = (current_time - prev_time) * 1000
-                prev_time = current_time
-                print(
-                    f"{row.name} - {gene_master} | Total: {elapsed_total:.2f}s | Δ: {elapsed_since_last:.0f}ms"  # noqa E501
-                )  # noqa E501
-
-                # Skip genes with invalid symbol
-                if not gene_master or gene_master.lower() in {
-                    "-",
-                    "unknown",
-                    "n/a",
-                }:  # noqa: E501
-                    msg = f"⚠️ Skipping gene with invalid symbol: {row.get('entrez_id')}"  # noqa: E501
-                    self.logger.log(msg, "WARNING")
-                    continue
-
-                # Extract aliases
-                aliases = []
-                for key in ["synonyms", "ensembl_id", "description"]:
-                    val = row.get(key)
-                    if not val:
-                        continue
-                    if isinstance(val, str):
-                        if key == "synonyms":
-                            val_list = [
-                                v.strip() for v in val.split("|") if v.strip()
-                            ]  # noqa: E501
-                        else:
-                            val_list = [val.strip()]
-                    elif isinstance(val, list):
-                        val_list = [
-                            v.strip() for v in val if isinstance(v, str)
-                        ]  # noqa: E501
-                    else:
-                        val_list = [str(val).strip()]
-                    aliases.extend(val_list)
-
-                # Deduplicate and clean aliases
-                aliases = list(
-                    {
-                        alias
-                        for alias in aliases
-                        if alias
-                        and alias != gene_master
-                        and alias != "-"
-                        and alias.strip()
-                    }
-                )
-
-                # Add Entity
-                entity_id, _ = self.get_or_create_entity(
-                    name=gene_master,
-                    group_id=self.entity_group,
-                    data_source_id=self.data_source.id,
-                )
-
-                # Add aliases
-                for alias in aliases:
-                    self.get_or_create_entity_name(
-                        entity_id, alias, data_source_id=self.data_source.id
-                    )
-
-                # Get region info (first entry only for now)
-                region_label = row.get("map_location")
-                chromosome = row.get("chromosome")
-
-                region_label_list = []
-                if region_label:
-                    if "|" in region_label:
-                        region_label_list = [
-                            v.strip()
-                            for v in region_label.split("|")
-                            if v.strip()  # noqa: E501
-                        ]
-                    else:
-                        region_label_list = [region_label.strip()]
-
-                region_instance = None
-                for region in region_label_list:
-                    region_instance = self.get_or_create_genomic_region(
-                        label=region,
-                        chromosome=chromosome,
-                        start=start,
-                        end=end,
-                        data_source_id=self.data_source.id,
-                    )
-
-                # Check if Gene already exists
-                existing = (
-                    self.session.query(GeneMaster)
-                    .filter_by(entity_id=entity_id, entrez_id=row["entrez_id"])
-                    .first()
-                )
-
-                if existing:
-                    total_gene_existing += 1
-                    msg = f"Gene already exists: {gene_master} (Entrez ID: {row['entrez_id']})"  # noqa: E501
-                    self.logger.log(msg, "INFO")
-                    continue
-
-                # Create Gene
-                gene_instance = GeneMaster(
-                    omic_status_id=5,  # Arbitrary placeholder status
-                    entity_id=entity_id,
-                    hgnc_status="Gene from NCBI",
-                    hgnc_id=None,
-                    entrez_id=row.get("entrez_id"),
-                    ensembl_id=row.get("ensembl_id"),
-                    data_source_id=self.data_source.id,
-                    locus_group_id=locus_group_id,
-                    locus_type_id=locus_type_id,
-                )
-                self.session.add(gene_instance)
-                self.session.flush()  # ensure gene_instance.id is available
-
-                # Add to GeneGroupMembership
-                membership = GeneGroupMembership(
-                    gene_id=gene_instance.id,
-                    group_id=gene_group.id,
-                    data_source_id=self.data_source.id,
-                )
-                self.session.add(membership)
-                # self.session.flush()
-
-                # Add GeneLocation
-                if region_instance:
-                    self.get_or_create_gene_location(
-                        gene=gene_instance,
-                        chromosome=chromosome,
-                        start=start,
-                        end=end,
-                        strand=None,
-                        region=region_instance,
-                        data_source_id=self.data_source.id,
-                    )
-
-                total_genes += 1
-
-            self.session.commit()
-
         except Exception as e:
             self.session.rollback()
-            msg = f"❌ Load failed: {str(e)}"
+            msg = f"⚠️  Error in Gene Group insert, error: '{e}'"
             self.logger.log(msg, "ERROR")
-            return 0, False, msg
+            return False, msg  # ⧮ Leaving with ERROR
+
+        # NCBI does not have this information
+        # TODO: Check how to do this
+        is_active = True
+
+        for _, row in df.iterrows():
+
+            gene_master = row.get("symbol", "").strip()
+
+            # NOTE: Use to debugging
+            # if gene_master == "FACL1":
+            #     pass
+
+            if not gene_master:
+                msg = f"⚠️  Gene Master not found in row: {row}"
+                self.logger.log(msg, "WARNING")
+                total_warnings += 1
+                # TODO: Add in ETLLOG Model
+                continue
+
+            # If in debug mode, show times
+            if self.debug_mode:
+                current_time = time.time()
+                elapsed_total = current_time - start_total
+                elapsed_since_last = (current_time - prev_time) * 1000
+                prev_time = current_time
+                msg = str(
+                    f"{row.name} - {gene_master} | Total: {elapsed_total:.2f}s | Δ: {elapsed_since_last:.0f}ms"  # noqa E501
+                )  # noqa E501
+                self.logger.log(msg, "DEBUG")
+
+            # Create a dict of Aliases
+            alias_dict = self.build_alias(row)
+
+            # Drop Alias Values invalid
+            alias_dict = [
+                a
+                for a in alias_dict
+                if str(a.get("alias_value", "")).strip() not in {"", "-"}
+            ]
+
+            # Only Primary Name
+            is_primary_alias = next(
+                (a for a in alias_dict if a.get("is_primary")), None
+            )
+            # Only Aliases Names
+            not_primary_alias = [
+                a for a in alias_dict if a != is_primary_alias
+            ]  # noqa E501
+
+            # --- CREATE THE ENTITY RECORDS ---
+
+            # Add or Get Entity
+            entity_id, _ = self.get_or_create_entity(
+                name=is_primary_alias["alias_value"],
+                group_id=self.entity_group,
+                data_source_id=self.data_source.id,
+                package_id=self.package.id,
+                alias_type=is_primary_alias["alias_type"],
+                xref_source=is_primary_alias["xref_source"],
+                alias_norm=is_primary_alias["alias_norm"],
+                is_active=is_active,
+            )
+
+            # Add or Get EntityName
+            self.get_or_create_entity_name(
+                group_id=self.entity_group,
+                entity_id=entity_id,
+                aliases=not_primary_alias,
+                is_active=is_active,
+                data_source_id=self.data_source.id,  # noqa E501
+                package_id=self.package.id,
+            )
+
+            # -- CREATE THE GENES RECORDS ---
+
+            # Define data values
+            chromosome = row.get("chromosome")
+
+            # Same Group Name from HGNC
+            if row.get("type_of_gene") == "protein-coding":
+                locus_group = "protein-coding gene"
+            else:
+                locus_group = row.get("type_of_gene")
+
+            # --> Locus Groups
+            locus_group_instance, status = self.get_or_create_locus_group(
+                name=locus_group,
+                data_source_id=self.data_source.id,
+                package_id=self.package.id,
+            )  # noqa: E501
+            if not status:
+                msg = f"⚠️  Error on Locus Group to: {gene_master}"
+                self.logger.log(msg, "WARNING")
+                total_warnings += 1
+                continue  # TODO: Add in ETLLOG Model
+
+            # --> Genes
+            gene, conflict_flag, status = self.get_or_create_gene(
+                status_id=gene_status_id,
+                symbol=gene_master,
+                hgnc_status="Gene from NCBI",
+                entity_id=entity_id,
+                chromosome=chromosome,
+                data_source_id=self.data_source.id,
+                locus_group=locus_group_instance,
+                locus_type=locus_type_instance,
+                gene_group_names=gene_group_id,
+                package_id=self.package.id,
+            )
+
+            # --> Regions
+            if gene is not None:
+                total_gene += 1
+
+                location_list = row.get("map_location", "")
+                if location_list:
+                    location_list = location_list.split("|")
+                else:
+                    location_list = []
+
+                for region_label in location_list:
+                    region_instance, status = self.get_or_create_genomic_region(  # noqa: E501
+                        label=region_label,
+                        chromosome=chromosome,
+                        start=start,
+                        end=end,
+                        data_source_id=self.data_source.id,
+                        package_id=self.package.id,
+                    )  # noqa: E501
+                    if not status:
+                        msg = f"⚠️  Error on Region to: {gene_master}"
+                        self.logger.log(msg, "WARNING")
+                        total_warnings += 1
+                        continue  # TODO: Add in ETLLOG Model
+
+                    # Add GeneLocation
+                    if region_instance:
+                        location, status = self.get_or_create_gene_location(
+                            gene=gene,
+                            chromosome=chromosome,
+                            start=start,
+                            end=end,
+                            strand=None,
+                            region=region_instance,
+                            data_source_id=self.data_source.id,
+                            package_id=self.package.id,
+                        )
+
+                    # Check if location was created successfully
+                    if not location:
+                        msg = f"⚠️  Failed to create Location for gene {gene_master}"  # noqa E501
+                        self.logger.log(msg, "WARNING")
+                        total_warnings += 1
+
+        #  ---> PROCESSED ALL PROCESS DATA ROWS
+
+        # POST INGESTION TASK
+
+        # TODO: 🚧 Conflict was desable after schame changes in 3.0.1 🚧
+        # -- PROCESS THE PENDING CONFLICTS ---
+
+        # if genes_with_pending_conflict:
+        #     conflict_df = pd.DataFrame(genes_with_pending_conflict)
+
+        #     # Se o arquivo já existir, vamos sobrescrevê-lo
+        #     if os.path.exists(conflict_file_name):
+        #         msg = f"⚠️ Overwriting existing conflict file: {conflict_file_name}"  # noqa: E501
+        #         self.logger.log(msg, "WARNING")
+
+        #     conflict_df.to_csv(conflict_file_name, index=False)
+        #     msg = f"✅ Saved {len(conflict_df)} gene conflicts to {conflict_file_name}"  # noqa: E501
+        #     self.logger.log(msg, "INFO")
+
+        #     # TODO: 🧠 Additional suggestion (optional)
+        #     # Generalize this behavior into a helper like
+        #     # save_pending_conflicts(entity_type: str, rows: List[Dict], path: str)  # noqa: E501
+        #     # to make it reusable for SNPs, Proteins, etc.
+
+        # # post-processing the resolved conflicts
+        # for row in genes_with_solved_conflict:
+        #     msg = f"Check and apply conflict rules to  {row.get('hgnc_id')}"
+        #     self.logger.log(msg, "INFO")
+
+        #     # Apply conflict resolution
+        #     self.conflict_mgr.apply_resolution(row)
 
         # Set DB to Read Mode and Create Index
         try:
-            # Drop Indexs
-            self.drop_indexes(index_specs)
-            self.drop_indexes(index_specs_entity)
-            # Stating Indexs
-            self.create_indexes(index_specs)
-            self.create_indexes(index_specs_entity)
+            self.create_indexes(self.get_gene_index_specs)
+            self.create_indexes(self.get_entity_index_specs)
             self.db_read_mode()
         except Exception as e:
             total_warnings += 1
-            msg = f"Failed to switch DB to write mode or drop indexes: {e}"
+            msg = f"⚠️  Failed to switch DB to read mode or create indexes: {e}"  # noqa E501
             self.logger.log(msg, "WARNING")
+            return False, msg  # ⧮ Leaving with ERROR
 
-        load_status = True
+        #  ---> LOAD FINISHED WITH SUCCESS
 
         if total_warnings != 0:
-            msg = f"{total_warnings} warning to analysis in log file"
+            msg = f"⚠️  {total_warnings} Warning(s) to analysis in the LOG FILE"  # noqa E501
             self.logger.log(msg, "WARNING")
 
-        msg = f"✅ Genes loaded from NCBI (not in HGNC): {total_genes} new, {total_gene_existing} existing"  # noqa: E501
+        msg = f"🧬 Loaded {total_gene} genes into database"
         self.logger.log(msg, "INFO")
 
-        return total_genes, True, msg
+        return True, msg

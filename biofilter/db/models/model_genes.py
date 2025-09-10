@@ -1,7 +1,6 @@
 from biofilter.db.base import Base
-from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey
+from sqlalchemy import Column, Integer, String, ForeignKey, Enum
 
 
 class GeneGroup(Base):
@@ -11,6 +10,12 @@ class GeneGroup(Base):
     Examples include predefined biological groups (e.g., 'HOX Cluster',
     Mitochondrial Genes'). Each group can be associated with multiple genes
     through the GeneGroupMembership table.
+
+    # To avoit N+1 query:
+    from sqlalchemy.orm import selectinload
+    group = session.query(GeneGroup).options(
+        selectinload(GeneGroup.memberships).selectinload(GeneGroupMembership.gene)
+    ).filter_by(name="HOX Cluster").first()
     """
 
     __tablename__ = "gene_groups"
@@ -18,39 +23,32 @@ class GeneGroup(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     name = Column(String(255), unique=True, nullable=False)
     description = Column(String(255), nullable=True)
+
+    # Denormalized for fast deletion/filter
     data_source_id = Column(
         Integer,
         ForeignKey("etl_data_sources.id", ondelete="CASCADE"),
-        nullable=False,
+        nullable=True,
     )
-    created_at = Column(DateTime, server_default=func.now(), nullable=False)
-    updated_at = Column(
-        DateTime,
-        server_default=func.now(),
-        onupdate=func.now(),
-        nullable=False,  # noqa E501
+    data_source = relationship("ETLDataSource", passive_deletes=True)
+
+    etl_package_id = Column(
+        Integer,
+        ForeignKey("etl_packages.id", ondelete="CASCADE"),
+        nullable=True,
     )
+    etl_package = relationship("ETLPackage", passive_deletes=True)
 
-    # Relationships (Go Up)
-    data_source = relationship("DataSource", passive_deletes=True)
-
-    # Relationships (Go Down)
-    # genes = relationship(
-    #     "GeneMaster",
-    #     secondary="gene_group_membership",
-    #     back_populates="gene_group",  # noqa E501
-    # )  # noqa E501
     memberships = relationship(
         "GeneGroupMembership",
         back_populates="group",
-        cascade="all, delete-orphan",  # noqa E501
+        cascade="all, delete-orphan",  # para que ser?
     )
 
     def __repr__(self):
         return f"<GeneGroup(name={self.name})>"
 
 
-# old LocusGroup
 class GeneLocusGroup(Base):
     """
     Represents the HGNC 'Locus Group' classification of a gene.
@@ -64,30 +62,28 @@ class GeneLocusGroup(Base):
     id = Column(Integer, primary_key=True)
     name = Column(String(50), unique=True, nullable=False)
     description = Column(String(100), nullable=True)
+
     data_source_id = Column(
         Integer,
         ForeignKey("etl_data_sources.id", ondelete="CASCADE"),
-        nullable=False,
+        nullable=True,
     )
-    created_at = Column(DateTime, server_default=func.now(), nullable=False)
-    updated_at = Column(
-        DateTime,
-        server_default=func.now(),
-        onupdate=func.now(),
-        nullable=False,  # noqa E501
-    )
+    data_source = relationship("ETLDataSource", passive_deletes=True)
 
-    # Relationships (Go Up)
-    data_source = relationship("DataSource", passive_deletes=True)
+    etl_package_id = Column(
+        Integer,
+        ForeignKey("etl_packages.id", ondelete="CASCADE"),
+        nullable=True,
+    )
+    etl_package = relationship("ETLPackage", passive_deletes=True)
 
     # Relationships (Go Down)
-    genes = relationship("GeneMaster", back_populates="gene_locus_group")
+    genes = relationship("GeneMaster", back_populates="gene_locus_group")  # noqa E501
 
     def __repr__(self):
         return f"<GeneLocusGroup(name={self.name})>"
 
 
-# Old LocusType
 class GeneLocusType(Base):
     """
     Represents the HGNC 'Locus Type' classification.
@@ -101,24 +97,23 @@ class GeneLocusType(Base):
     id = Column(Integer, primary_key=True)
     name = Column(String(50), unique=True, nullable=False)
     description = Column(String(100), nullable=True)
+
     data_source_id = Column(
         Integer,
         ForeignKey("etl_data_sources.id", ondelete="CASCADE"),
-        nullable=False,
+        nullable=True,
     )
-    created_at = Column(DateTime, server_default=func.now(), nullable=False)
-    updated_at = Column(
-        DateTime,
-        server_default=func.now(),
-        onupdate=func.now(),
-        nullable=False,  # noqa E501
-    )
+    data_source = relationship("ETLDataSource", passive_deletes=True)
 
-    # Relationships (Go Up)
-    data_source = relationship("DataSource", passive_deletes=True)
+    etl_package_id = Column(
+        Integer,
+        ForeignKey("etl_packages.id", ondelete="CASCADE"),
+        nullable=True,
+    )
+    etl_package = relationship("ETLPackage", passive_deletes=True)
 
     # Relationships (Go Down)
-    genes = relationship("GeneMaster", back_populates="gene_locus_type")
+    genes = relationship("GeneMaster", back_populates="gene_locus_type")  # noqa E501
 
     def __repr__(self):
         return f"<GeneLocusType(name={self.name})>"
@@ -129,7 +124,6 @@ class GeneLocusType(Base):
 # =============================================================================
 
 
-# Old GenomicRegion
 class GeneGenomicRegion(Base):
     """
     Represents a named cytogenetic region (e.g., '12p13.31').
@@ -146,21 +140,20 @@ class GeneGenomicRegion(Base):
     start = Column(Integer, nullable=True)
     end = Column(Integer, nullable=True)
     description = Column(String(100), nullable=True)
+
     data_source_id = Column(
         Integer,
         ForeignKey("etl_data_sources.id", ondelete="CASCADE"),
-        nullable=False,
+        nullable=True,
     )
-    created_at = Column(DateTime, server_default=func.now(), nullable=False)
-    updated_at = Column(
-        DateTime,
-        server_default=func.now(),
-        onupdate=func.now(),
-        nullable=False,  # noqa E501
-    )
+    data_source = relationship("ETLDataSource", passive_deletes=True)
 
-    # Relationships (Go Up)
-    data_source = relationship("DataSource", passive_deletes=True)
+    etl_package_id = Column(
+        Integer,
+        ForeignKey("etl_packages.id", ondelete="CASCADE"),
+        nullable=True,
+    )
+    etl_package = relationship("ETLPackage", passive_deletes=True)
 
     # Relationships (Go Down)
     locations = relationship("GeneLocation", back_populates="region")
@@ -186,50 +179,57 @@ class GeneMaster(Base):
     __tablename__ = "gene_masters"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    omic_status_id = Column(
-        Integer, ForeignKey("omic_status.id"), nullable=True
-    )  # noqa E501
 
-    entity_id = Column(
-        Integer, ForeignKey("entities.id", ondelete="CASCADE"), nullable=False
-    )  # noqa E501
+    symbol = Column(String(64), nullable=True, index=True)
 
     hgnc_status = Column(
         String(50), nullable=True
     )  # Ex: "Approved", "Symbol Approved"        # noqa E501
 
-    hgnc_id = Column(String(20), unique=True, nullable=True)
-    entrez_id = Column(String(20), nullable=True)
-    ensembl_id = Column(String(20), nullable=True)
-    # TODO: How to add just one Gene Symbol here?
+    omic_status_id = Column(
+        Integer,
+        ForeignKey("omic_status.id", ondelete="SET NULL"),
+        nullable=True,  # noqa E501
+    )  # noqa E501
+    omic_status = relationship("OmicStatus")
+
+    entity_id = Column(
+        Integer, ForeignKey("entities.id", ondelete="CASCADE"), nullable=False
+    )  # noqa E501
+    entity = relationship("Entity", passive_deletes=True)
+
+    chromosome = Column(String(5), nullable=True)
 
     data_source_id = Column(
         Integer,
         ForeignKey("etl_data_sources.id", ondelete="CASCADE"),
-        nullable=False,
+        nullable=True,
     )
-    created_at = Column(DateTime, server_default=func.now(), nullable=False)
-    updated_at = Column(
-        DateTime,
-        server_default=func.now(),
-        onupdate=func.now(),
-        nullable=False,  # noqa E501
+    data_source = relationship("ETLDataSource", passive_deletes=True)
+
+    etl_package_id = Column(
+        Integer,
+        ForeignKey("etl_packages.id", ondelete="CASCADE"),
+        nullable=True,
     )
+    etl_package = relationship("ETLPackage", passive_deletes=True)
 
     # Functional category
     locus_group_id = Column(
-        Integer, ForeignKey("gene_locus_groups.id"), nullable=True
+        Integer,
+        ForeignKey("gene_locus_groups.id", ondelete="SET NULL"),
+        nullable=True,  # noqa E501
     )  # noqa E501
-    locus_type_id = Column(
-        Integer, ForeignKey("gene_locus_types.id"), nullable=True
-    )  # noqa E501
+    gene_locus_group = relationship("GeneLocusGroup", back_populates="genes")
 
-    # Relationships (Go Down)
+    locus_type_id = Column(
+        Integer,
+        ForeignKey("gene_locus_types.id", ondelete="SET NULL"),
+        nullable=True,  # noqa E501
+    )  # noqa E501
+    gene_locus_type = relationship("GeneLocusType", back_populates="genes")
 
     # Relational M:N with functional groups
-    # genegroups = relationship(
-    #     "GeneGroup", secondary="gene_group_membership", back_populates="genes"  # noqa E501
-    # )  # noqa E501
     group_memberships = relationship(
         "GeneGroupMembership",
         back_populates="gene",
@@ -239,20 +239,9 @@ class GeneMaster(Base):
     genelocations = relationship(
         "GeneLocation", back_populates="gene", cascade="all, delete-orphan"
     )  # noqa E501
-    # variant_gene_links = relationship(
-    #     "VariantGeneRelationship",
-    #     back_populates="gene",
-    #     cascade="all, delete-orphan",  # noqa E501
-    # )  # noqa E501
-
-    # Relationships (Go Up)
-    omic_status = relationship("OmicStatus")
-    data_source = relationship("DataSource", passive_deletes=True)
-    gene_locus_group = relationship("GeneLocusGroup", back_populates="genes")
-    gene_locus_type = relationship("GeneLocusType", back_populates="genes")
 
     def __repr__(self):
-        return f"<Gene(hgnc_id={self.hgnc_id}, entity_id={self.entity_id})>"
+        return f"<Gene(entity_id={self.entity_id}, Symbol ID={self.symbol}, Status={self.hgnc_status})>"  # noqa E501
 
 
 # =============================================================================
@@ -273,25 +262,24 @@ class GeneGroupMembership(Base):
     __tablename__ = "gene_group_memberships"
 
     gene_id = Column(Integer, ForeignKey("gene_masters.id"), primary_key=True)
+    gene = relationship("GeneMaster", back_populates="group_memberships")
+
     group_id = Column(Integer, ForeignKey("gene_groups.id"), primary_key=True)
+    group = relationship("GeneGroup", back_populates="memberships")
+
     data_source_id = Column(
         Integer,
         ForeignKey("etl_data_sources.id", ondelete="CASCADE"),
-        nullable=False,
+        nullable=True,
     )
-    created_at = Column(DateTime, server_default=func.now(), nullable=False)
-    updated_at = Column(
-        DateTime,
-        server_default=func.now(),
-        onupdate=func.now(),
-        nullable=False,  # noqa E501
-    )
+    data_source = relationship("ETLDataSource", passive_deletes=True)
 
-    # Relationships (Go Up)
-    data_source = relationship("DataSource", passive_deletes=True)
-    # Relationships (Bidirectional)
-    gene = relationship("GeneMaster", back_populates="group_memberships")
-    group = relationship("GeneGroup", back_populates="memberships")
+    etl_package_id = Column(
+        Integer,
+        ForeignKey("etl_packages.id", ondelete="CASCADE"),
+        nullable=True,
+    )
+    etl_package = relationship("ETLPackage", passive_deletes=True)
 
     def __repr__(self):
         return f"<GeneGroupMembership(gene_id={self.gene_id}, group_id={self.group_id})>"  # noqa E501
@@ -314,38 +302,53 @@ class GeneLocation(Base):
     __tablename__ = "gene_locations"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    gene_id = Column(Integer, ForeignKey("gene_masters.id"), nullable=False)
+
+    gene_id = Column(
+        Integer,
+        ForeignKey("gene_masters.id", ondelete="CASCADE"),
+        nullable=False,  # noqa E501
+    )  # noqa E501
+    gene = relationship(
+        "GeneMaster", back_populates="genelocations", passive_deletes=True
+    )  # noqa E501
 
     chromosome = Column(String(5), nullable=True)
     start = Column(Integer, nullable=True)
     end = Column(Integer, nullable=True)
-    strand = Column(String(10), nullable=True)  # Ex: "+", "-"
+    strand = Column(Enum("+", "-"), nullable=True)
 
     assembly = Column(String(20), nullable=True, default="GRCh38")
+    # TODO: Create Model to Assembles
+
     region_id = Column(
-        Integer, ForeignKey("gene_genomic_regions.id"), nullable=True
+        Integer,
+        ForeignKey("gene_genomic_regions.id", ondelete="CASCADE"),
+        nullable=True,
+    )  # noqa E501
+    region = relationship(
+        "GeneGenomicRegion", back_populates="locations", passive_deletes=True
     )  # noqa E501
 
     data_source_id = Column(
         Integer,
         ForeignKey("etl_data_sources.id", ondelete="CASCADE"),
-        nullable=False,
+        nullable=True,
     )
-    created_at = Column(DateTime, server_default=func.now(), nullable=False)
-    updated_at = Column(
-        DateTime,
-        server_default=func.now(),
-        onupdate=func.now(),
-        nullable=False,  # noqa E501
-    )
+    data_source = relationship("ETLDataSource", passive_deletes=True)
 
-    # Relationships (Go Up)
-    data_source = relationship("DataSource", passive_deletes=True)
-    region = relationship("GeneGenomicRegion", back_populates="locations")
-    gene = relationship("GeneMaster", back_populates="genelocations")
+    etl_package_id = Column(
+        Integer,
+        ForeignKey("etl_packages.id", ondelete="CASCADE"),
+        nullable=True,
+    )
+    etl_package = relationship("ETLPackage", passive_deletes=True)
 
     def __repr__(self):
-        return f"<GeneLocation(gene_id={self.gene_id}, chr={self.chromosome}, start={self.start})>"  # noqa E501
+        gene_repr = f"{self.gene.symbol}" if self.gene else "None"
+        return (
+            f"<GeneLocation(gene_id={self.gene_id}, gene_symbol={gene_repr}, "
+            f"chr={self.chromosome}, start={self.start})>"
+        )
 
 
 """
