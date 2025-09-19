@@ -19,62 +19,82 @@ class EntityQueryMixin:
         xref_source: str = None,
         alias_norm: str = None,
         is_active: bool = True,
+        force_create: bool = False,
     ):
         """
-        Finds or creates a master Entity based on the primary alias details.
+        Returns the ID of an existing entity or creates a new one with its
+        primary alias.
+
+        Args:
+            force_create (bool): If True, skip the SELECT and directly create
+            the Entity + Alias.
+            name (str): Primary name (ex: rsID, Gene Symbol, etc).
+            group_id (int): FK to EntityGroup.
+            data_source_id (int): FK to DataSource.
+            package_id (int): Optional FK to Package (for traceability).
+            alias_type (str): Label for alias (ex: "rsID", "Symbol").
+            xref_source (str): Cross-reference source (ex: "dbSNP", "HGNC").
+            alias_norm (str): Optional normalized version of the alias.
+            is_active (bool): Whether this entity is active (for filters).
 
         Returns:
-            Tuple (entity_id, created): ID of the Entity and a boolean flag.
+            Tuple[int, bool]: (entity_id, is_new)
         """
-        clean_name = name.strip()
-
-        # Verifica se já existe esse alias completo
-        query = self.session.query(EntityAlias).filter_by(
-            alias_value=clean_name,
-            alias_type=alias_type,
-            xref_source=xref_source,
-            is_primary=True,
-        )
-        # TODO: Try to check conflicts (ex. FACL1)
-
-        existing = query.first()
-        if existing:
-            return existing.entity_id, False
-
-        # Create a new Entity
-        new_entity = Entity(
-            group_id=group_id,
-            is_active=is_active,
-            data_source_id=data_source_id,
-            etl_package_id=package_id,
-        )
-        self.session.add(new_entity)
-        self.session.flush()
-
-        # Cria o EntityAlias primário com todos os campos
-        primary_alias = EntityAlias(
-            entity_id=new_entity.id,
-            group_id=group_id,
-            alias_value=clean_name,
-            alias_type=alias_type,
-            xref_source=xref_source,
-            alias_norm=alias_norm,
-            is_primary=True,
-            is_active=is_active,
-            locale="en",
-            data_source_id=data_source_id,
-            etl_package_id=package_id,
-        )
-        self.session.add(primary_alias)
 
         try:
+            if not name:
+                raise ValueError("Entity name must be provided")
+
+            clean_name = name.strip()
+
+            # IF not forcing, check if exists by Alias Name
+            if not force_create:
+                query = self.session.query(EntityAlias).filter_by(
+                    alias_value=clean_name,
+                    alias_type=alias_type,
+                    xref_source=xref_source,
+                    is_primary=True,
+                )
+                # TODO: Try to check conflicts (ex. FACL1)
+
+                existing = query.first()
+                if existing:
+                    return existing.entity_id, False
+
+            # Create a new Entity
+            new_entity = Entity(
+                group_id=group_id,
+                is_active=is_active,
+                data_source_id=data_source_id,
+                etl_package_id=package_id,
+            )
+            self.session.add(new_entity)
+            self.session.flush()
+
+            # Create the primary EntityAlias
+            primary_alias = EntityAlias(
+                entity_id=new_entity.id,
+                group_id=group_id,
+                alias_value=clean_name,
+                alias_type=alias_type,
+                xref_source=xref_source,
+                alias_norm=alias_norm,
+                is_primary=True,
+                is_active=is_active,
+                locale="en",
+                data_source_id=data_source_id,
+                etl_package_id=package_id,
+            )
+            self.session.add(primary_alias)
+
             self.session.commit()
             msg = f"✅ Entity '{clean_name}' created with ID {new_entity.id}"
-            self.logger.log(msg, "DEBUG")
+            # self.logger.log(msg, "DEBUG")
             return new_entity.id, True
-        except IntegrityError:
+
+        except Exception as e:
             self.session.rollback()
-            msg = f"⚠️ Entity creation failed for: {clean_name}"
+            msg = f"⚠️ Insert Entity failed for: {clean_name} with error: {e}"
             self.logger.log(msg, "WARNING")
             return None, False
 
@@ -86,15 +106,21 @@ class EntityQueryMixin:
         is_active: bool = True,
         data_source_id: int = 0,
         package_id: int = None,
+        force_create: bool = False,
     ) -> int:
-        existing = (
-            self.session.query(EntityAlias)
-            .filter_by(entity_id=entity_id)
-            .all()  # noqa E501
-        )  # noqa E501
-        existing_keys = {
-            (e.alias_value, e.alias_type, e.xref_source) for e in existing
-        }  # noqa E501
+
+        existing_keys = {}
+
+        # IF not forcing, check if exists by Alias Name
+        if not force_create:
+            existing = (
+                self.session.query(EntityAlias)
+                .filter_by(entity_id=entity_id)
+                .all()  # noqa E501
+            )  # noqa E501
+            existing_keys = {
+                (e.alias_value, e.alias_type, e.xref_source) for e in existing
+            }  # noqa E501
 
         count_added = 0
 
@@ -160,6 +186,8 @@ class EntityQueryMixin:
         self,
         entity_1_id: int,
         entity_2_id: int,
+        entity_1_group_id: None,
+        entity_2_group_id: None,
         relationship_type_id: int,
         data_source_id: int,
         package_id: int = None,
@@ -188,6 +216,8 @@ class EntityQueryMixin:
         rel = EntityRelationship(
             entity_1_id=entity_1_id,
             entity_2_id=entity_2_id,
+            entity_1_group_id=entity_1_group_id,
+            entity_2_group_id=entity_2_group_id,
             relationship_type_id=relationship_type_id,
             data_source_id=data_source_id,
             etl_package_id=package_id,

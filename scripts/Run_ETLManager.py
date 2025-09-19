@@ -9,7 +9,7 @@ data_sources_to_process = [
     # "ensembl",
     # "gene_ncbi",
     # Proteins
-    "pfam",
+    # "pfam",
     # "uniprot",
     # Pathways
     # "reactome",
@@ -41,7 +41,7 @@ data_sources_to_process = [
     # "dbsnp_chr21",
     # "dbsnp_chr22",
     # "dbsnp_chrx",
-    # "dbsnp_chry",
+    "dbsnp_chry",
     # "dbsnp_chrmt",
     # RelationShips
     # "reactome_relationships",

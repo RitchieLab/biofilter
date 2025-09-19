@@ -121,6 +121,9 @@ class VariantLocus(Base):
     start_pos = Column(Integer, nullable=False)
     end_pos = Column(Integer, nullable=False)  # SNP: end_pos == start_pos
 
+    reference_allele = Column(String(100), nullable=True)
+    alternate_allele = Column(String(100), nullable=True)
+
     data_source_id = Column(
         Integer,
         ForeignKey("etl_data_sources.id", ondelete="CASCADE"),

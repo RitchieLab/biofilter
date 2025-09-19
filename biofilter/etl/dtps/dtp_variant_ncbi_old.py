@@ -1,6 +1,5 @@
 # dtp_variant_ncbi_v2.py
 import os
-import re
 import bz2
 import glob
 import sys
@@ -8,7 +7,6 @@ import __main__
 import time
 import pandas as pd
 import numpy as np
-import json
 from typing import Dict
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from sqlalchemy.exc import IntegrityError
@@ -25,7 +23,6 @@ from biofilter.db.models import (
     EntityRelationshipType,
 )
 from biofilter.etl.dtps.worker_dbsnp import worker_dbsnp
-from sqlalchemy import text
 
 
 class DTP(DTPBase, EntityQueryMixin):
@@ -293,33 +290,6 @@ class DTP(DTPBase, EntityQueryMixin):
             return list(x)
         return [x]
 
-    def _extract_chrom_from_ds(self, ds_name: str) -> str | None:
-        # Extrai o final após o "_"
-        raw = ds_name.lower().split("_")[-1]
-
-        # Mapeamento opcional para nomes não padronizados
-        mapping = {
-            "chrx": "X",
-            "chry": "Y",
-            "chrmt": "MT",
-            "chrm": "MT",
-        }
-
-        # Se estiver no dicionário, retorna direto
-        if raw in mapping:
-            return mapping[raw]
-
-        # Se for "chr" seguido de número, extrai
-        match = re.match(r"chr?(\d+)$", raw)
-        if match:
-            return match.group(1)
-
-        # Caso contrário, tenta retornar como está (se for válido)
-        if raw in [str(i) for i in range(1, 23)] + ["x", "y", "mt"]:
-            return raw
-
-        return None  # Não identificado
-
     # 📥  ------------------------ 📥
     # 📥  ------ LOAD FASE ------  📥
     # 📥  ------------------------ 📥
@@ -334,7 +304,6 @@ class DTP(DTPBase, EntityQueryMixin):
         # Setting variables to loader
         total_variants = 0
         total_warnings = 0
-        self.dropped_variants = []
 
         if self.debug_mode:
             start_total = time.time()
@@ -362,12 +331,23 @@ class DTP(DTPBase, EntityQueryMixin):
             self.logger.log(msg, "ERROR")
             return False, msg  # ⧮ Leaving with ERROR
 
+        # ----= Set DB and drop indexes =----
+        try:
+            self.db_write_mode()
+            self.drop_indexes(self.get_variant_index_specs)
+            self.drop_indexes(self.get_entity_index_specs)
+        except Exception as e:
+            total_warnings += 1
+            msg = f"⚠️  Failed to switch DB to write mode or drop indexes: {e}"
+            self.logger.log(msg, "WARNING")
+            return False, msg  # ⧮ Leaving with ERROR
+
         # ----= GET ENTITY GROUP (Variant and Gene) =----
         try:
             # Variant group (sets self.entity_group_id)
             self.get_entity_group("Variants")
             # Gene group (used for alias resolution)
-            gene_group = self.session.query(EntityGroup).filter_by(name="Genes").first()  # noqa E501
+            gene_group = self.session.query(EntityGroup).filter_by(name="Genes").first()
             if not gene_group:
                 raise ValueError("EntityGroup 'Genes' not found in database.")
         except Exception as e:
@@ -383,7 +363,7 @@ class DTP(DTPBase, EntityQueryMixin):
         if not relationship_type:
             relationship_type = EntityRelationshipType(
                 code="associated_with",
-                description="Auto-created by variant DTP"  # noqa E501
+                description="Auto-created by variant DTP"  # noqa R501
             )
             self.session.add(relationship_type)
             self.session.commit()
@@ -396,112 +376,76 @@ class DTP(DTPBase, EntityQueryMixin):
             a.accession: (a.chromosome or "") for a in assemblies
         }
 
-        # ---= Get exist Vars in DB by Chrom =---
-        try:
-            target_chrom = self._extract_chrom_from_ds(self.data_source.name)   # noqa E501
-            result = self.session.execute(
-                text("""
-                    SELECT variant_id
-                    FROM variant_masters
-                    WHERE chromosome = :chrom
-                """),
-                {"chrom": target_chrom},
-            )
-            self.existing_variant_ids = {str(row[0]) for row in result.fetchall()}  # noqa E501
-            msg = f"🔍 {len(self.existing_variant_ids)} variants already in DB for chr {target_chrom}"  # noqa E501
-            self.logger.log(msg, "INFO")
-
-        except Exception as e:
-            msg = f"❌ Failed to load existing variants from DB: {e}"
-            self.logger.log(msg, "ERROR")
-            self.existing_variant_ids = set()
-
-        # ----= Set DB and drop indexes =----
-        try:
-            # self.db_write_mode()
-            self.drop_indexes(self.get_variant_index_specs)
-            self.drop_indexes(self.get_entity_index_specs)
-        except Exception as e:
-            total_warnings += 1
-            msg = f"⚠️  Failed to switch DB to write mode or drop indexes: {e}"
-            self.logger.log(msg, "WARNING")
-            return False, msg  # ⧮ Leaving with ERROR
-
-        # ===== PROCESS PER FILE =====
-        # ============================
-        for data_file in files_list:
+        # ----= PROCESS PER FILE =----
+        for csv_file in files_list:
 
             try:  # if error, go next file
 
                 # -- Inside File Variables --
                 gene_links_rows = []
-                var_number = 0
 
-                self.logger.log(f"📂 Processing {data_file}", "INFO")
+                self.logger.log(f"📂 Processing {csv_file}", "INFO")
 
                 if self.debug_mode:
                     start_file = time.time()
 
                 # -- Read Data --
-                df = self._load_input_frame(data_file)
+                df = self._load_input_frame(csv_file)
                 if df.empty:
                     total_warnings += 1
-                    msg = "File is empty."
+                    msg = "DataFrame is empty."
                     self.logger.log(msg, "WARNING")
                     continue  # Go to next file
 
-                # -- Drop variants without <<rs_id>>
-                df = df[df["rs_id"].notna()].copy()
-
-                # -- Check if Variant in DB --
-                df["rs_id"] = df["rs_id"].astype(str)
-                df = df[~df["rs_id"].isin(self.existing_variant_ids)]
-                msg = f"➡️  Drop all Variants in DB, remaining: {len(df)}"
-                self.logger.log(msg, "WARNING")
-
-                # -- Add Accession and Assembly ID --
-                df["assembly_id"] = df["seq_id"].map(acc2asm_id)
-                df["chromosome"] = df["seq_id"].map(acc2chrom)
-                # Drop variants without <<valid accession>>
-                dropped_df = df[df["assembly_id"].isna()].copy()
-                if not dropped_df.empty:
-                    self.dropped_variants.append(dropped_df)
-                df = df[df["assembly_id"].notna()].copy()
-                msg = f"➡️  Drop all Variants withou valid Assembly, remaining {len(df)}"  # noqa E501
-                self.logger.log(msg, "WARNING")
-
-                # ------ PROCESS ROW / VARIANT ------
-                # -----------------------------------
+                numero = 0
+                total = len(df)
+                # Interaction to each Variant entry
                 for _, row in df.iterrows():
 
-                    if self.debug_mode:
-                        start_variant = time.time()
-
-                    # --- Set Row Variables ---
+                    # -- Inside Row Variables --
                     vlocus_buffer = []
                     seen = (
                         set()
                     )
 
-                    # --- Get Canonical Variant ID ---
-                    variant_master = row.rs_id
-                    chromossome = str(row.chromosome) if row.chromosome else None  # noqa E501
+                    # Get Canonical Variant ID
+                    variant_master = self._norm_rs(row.rs_id)
+                    if not variant_master:
+                        msg = f"Variant Master not found in row: {row}"
+                        self.logger.log(msg, "WARNING")
+                        continue  # Go to next row
+
+                    numero += 1
+                    print(f"Variant: {numero} / faltam: {total - numero} - {variant_master}")
+                    if self.debug_mode:
+                        start_variant = time.time()
+                        msg = f"Starting variant {variant_master}"
+                        self.logger.log(msg, "DEBUG")
+
+                    # Get canonical assembly ID
+                    acc = str(row["seq_id"])
+                    asm_id = acc2asm_id.get(acc)
+                    if not asm_id:
+                        total_warnings += 1
+                        msg = f"⚠️ Unknown accession (GenomeAssembly): {acc} (rs={row['rs_id']}) — Skipping Variant"  # noqa E501
+                        self.logger.log(msg, "WARNING")
+                        continue  # Go to next row
+                    chrom = acc2chrom.get(acc, "")
 
                     # ----== ENTITY DOMAIN ==----
                     # Add or Get Variant Master Entity
                     entity_id, is_new = self.get_or_create_entity(
-                        force_create=True,
                         name=variant_master,
                         group_id=self.entity_group,
                         data_source_id=self.data_source.id,
                         package_id=self.package.id,
-                        alias_type="rsID",                # TODO: CHECK W/TEAM
-                        xref_source="dbSNP",              # TODO: CHECK W/TEAM
+                        alias_type="rsID",                # TODO: REVIEW WITH TEAM
+                        xref_source="dbSNP",              # TODO: REVIEW WITH TEAM
                         alias_norm=variant_master,
                         is_active=True,
                     )
 
-                    # Always will be new!
+                    # TODO: Add variant single time
                     if not is_new:
                         continue
 
@@ -514,34 +458,40 @@ class DTP(DTPBase, EntityQueryMixin):
                     merged_list.discard(None)
                     merged_list.discard(variant_master)
                     alias_dict = []
-                    if merged_list:
-                        for old_rs in merged_list:
-                            alias_dict.append(
-                                {
-                                    "alias_value": old_rs,
-                                    "alias_type": "merged",  # TODO: CHECK W/TEAM  # noqa E501
-                                    "xref_source": "dbSNP",  # TODO: CHECK W/TEAM  # noqa E501
-                                    "is_primary": False,
-                                    "alias_norm": old_rs,
-                                    "locale": "en",
-                                }
-                            )
-                        # Add or Get EntityName
-
-                        self.get_or_create_entity_name(
-                            force_create=True,
-                            group_id=self.entity_group,
-                            entity_id=entity_id,
-                            aliases=alias_dict,
-                            is_active=False,
-                            data_source_id=self.data_source.id,
-                            package_id=self.package.id,
+                    for old_rs in merged_list:
+                        alias_dict.append(
+                            {
+                                "alias_value": old_rs,
+                                "alias_type": "merged",  # TODO: REVIEW WITH TEAM
+                                "xref_source": "dbSNP",  # TODO: REVIEW WITH TEAM
+                                "is_primary": False,
+                                "alias_norm": old_rs,
+                                "locale": "en",
+                            }
                         )
+                    # Add or Get EntityName
+                    self.get_or_create_entity_name(
+                        group_id=self.entity_group,
+                        entity_id=entity_id,
+                        aliases=alias_dict,
+                        is_active=False,
+                        data_source_id=self.data_source.id,
+                        package_id=self.package.id,
+                    )
 
                     # ----== VARIANT DOMAIN ==----
                     # -->> CREATE VARIANT MASTER OBJECT
                     # - This is the Canonical Variant)
                     # - No check if exist before add
+                    # variant_master_obj = (
+                    #     self.session.query(VariantMaster)
+                    #     .filter_by(
+                    #         variant_id=variant_master,
+                    #         data_source_id=self.data_source.id,
+                    #     )  # noqa: E501
+                    #     .first()
+                    # )
+                    # if not variant_master_obj:
                     variant_master_obj = VariantMaster(
                         variant_id=variant_master,
                         variant_type=(
@@ -550,7 +500,7 @@ class DTP(DTPBase, EntityQueryMixin):
                             else "SNP"
                         ),
                         omic_status_id="1",  # TODO It need to change?
-                        chromosome=chromossome,  # noqa E501
+                        chromosome=str(chrom) if chrom else None,
                         quality=row["quality"],
                         entity_id=entity_id,
                         data_source_id=self.data_source.id,
@@ -561,111 +511,99 @@ class DTP(DTPBase, EntityQueryMixin):
                     self.session.flush()
 
                     # -->> CREATE VARIANT LOCUS TO ALL ASSEMBLIES
-                    start = (
-                        int(row["start_pos"])
-                        if pd.notna(row["start_pos"])
-                        else None
-                    )
-                    end = (
-                        int(row["end_pos"])
-                        if pd.notna(row["end_pos"])
-                        else None
-                    )
-                    assembly_id = (
-                        int(row["assembly_id"])
-                        if pd.notna(row["assembly_id"])
-                        else None
-                    )
-
-                    def normalize_allele_list(value):
-                        # Caso esteja em string com falta de vírgula, corrige
-                        if isinstance(value, str):
-                            value = value.replace("'", "").replace("[", "").replace("]", "")  # noqa E501
-                            return value.split()
-                        elif isinstance(value, (list, np.ndarray)):
-                            return list(map(str, value))
-                        elif pd.isna(value) or value is None:
-                            return []
-                        return [str(value)]
-
-                    alternate_allele = json.dumps(normalize_allele_list(row["alt"]))  # noqa E501
-                    reference_allele = json.dumps(normalize_allele_list(row["ref"]))  # noqa E501
-
-                    key = (
-                        variant_master_obj.id,
-                        assembly_id,
-                        start,
-                        end,
-                    )  # noqa E501
-                    if key not in seen:
-                        seen.add(key)
-                        vlocus_buffer.append(
-                            VariantLocus(
-                                variant_id=variant_master_obj.id,
-                                assembly_id=assembly_id,
-                                chromosome=chromossome,
-                                start_pos=start,
-                                end_pos=end,
-                                reference_allele=reference_allele,
-                                alternate_allele=alternate_allele,
-                                data_source_id=self.data_source.id,
-                                etl_package_id=self.package.id,
-                            )
+                    # Canonical Locus
+                    canon_acc = str(row["seq_id"])
+                    assembly_id = assemblies_map.get(canon_acc)
+                    if not assembly_id:
+                        msg = f"⚠️ Unknown assembly accession: {canon_acc} (rs={row['rs_id']})",  # noqa E501
+                        self.logger.log(msg, "WARNING")
+                    else:
+                        start = (
+                            int(row["start_pos"])
+                            if pd.notna(row["start_pos"])
+                            else None
                         )
+                        end = (
+                            int(row["end_pos"])
+                            if pd.notna(row["end_pos"])
+                            else None
+                        )
+                        reference_allele = (
+                            str(row["ref"]) if row["ref"] else None
+                        )  # noqa E501
+                        alternate_allele = (
+                            str(row["alt"]) if row["alt"] else None
+                        )  # noqa E501
+                        # if start and end:
+                        key = (
+                            variant_master_obj.id,
+                            assembly_id,
+                            start,
+                            end,
+                        )  # noqa E501
+                        if key not in seen:
+                            seen.add(key)
+                            vlocus_buffer.append(
+                                VariantLocus(
+                                    variant_id=variant_master_obj.id,
+                                    assembly_id=assembly_id,
+                                    chromosome=acc2chrom.get(
+                                        canon_acc
+                                    ),  # noqa E501
+                                    start_pos=start,
+                                    end_pos=end,
+                                    reference_allele=reference_allele,
+                                    alternate_allele=alternate_allele,
+                                    data_source_id=self.data_source.id,
+                                    etl_package_id=self.package.id,
+                                )
+                            )
 
                     # Placements Locus
-                    locus_map = {}
+                    # TODO: Create a logic to add news Assemblies!
                     placements = row.get("placements") or []
                     for p in placements:
                         p_acc = p.get("seq_id")
                         if not p_acc:
                             continue
-
                         p_asm = assemblies_map.get(p_acc)
                         if not p_asm:
+                            # placements may include uncataloged NG_/NM_/contigs — ignore  # noqa E501
                             continue
-
                         p_start = p.get("start_pos")
                         p_end = p.get("end_pos")
 
-                        if pd.isna(p_start) or pd.isna(p_end):
-                            continue
+                        # p_reference_allele = (str(p.get("ref")) if p.get("ref") else None)  # noqa E501
+                        # p_alternate_allele = (str(p.get("alt")) if p.get("alt") else None)  # noqa E501
+                        p_reference_allele = str([str(p.get("ref"))] if p.get("ref") else [])  # noqa E501
+                        p_alternate_allele = str([str(p.get("alt"))] if p.get("alt") else []) # noqa E501
+                        if p_reference_allele == p_alternate_allele:
+                            continue  # Keep only variations 
 
+                        if pd.isna(p_start) or pd.isna(p_end):
+                            continue  # Keep only variants with positions
                         p_start = int(p_start)
                         p_end = int(p_end)
-
-                        key = (variant_master_obj.id, p_asm, p_start, p_end)
-                        ref = p.get("ref")
-                        alt = p.get("alt")
-
-                        if not alt or alt == ref:
+                        # Control duplications
+                        key = (
+                            variant_master_obj.id,
+                            p_asm,
+                            p_start,
+                            p_end,
+                        )  # noqa E501
+                        if key in seen:
                             continue
-
-                        if key not in locus_map:
-                            locus_map[key] = {
-                                "ref_set": set(),
-                                "alt_set": set(),
-                                "chromosome": acc2chrom.get(p_acc),
-                            }
-
-                        if ref:
-                            locus_map[key]["ref_set"].add(str(ref))
-                        if alt:
-                            locus_map[key]["alt_set"].add(str(alt))
-
-                    for (variant_id, asm_id, start, end), vals in locus_map.items():  # noqa E501
-                        ref_list = sorted(vals["ref_set"])
-                        alt_list = sorted(vals["alt_set"])
+                        seen.add(key)
 
                         vlocus_buffer.append(
                             VariantLocus(
-                                variant_id=variant_id,
-                                assembly_id=asm_id,
-                                chromosome=vals["chromosome"],
-                                start_pos=start,
-                                end_pos=end,
-                                reference_allele=json.dumps(ref_list),
-                                alternate_allele=json.dumps(alt_list),
+                                variant_id=variant_master_obj.id,
+                                assembly_id=p_asm,
+                                chromosome=acc2chrom.get(p_acc),
+                                start_pos=p_start,
+                                end_pos=p_end,
+                                reference_allele=p_reference_allele,
+                                alternate_allele=p_alternate_allele,
                                 data_source_id=self.data_source.id,
                                 etl_package_id=self.package.id,
                             )
@@ -711,7 +649,7 @@ class DTP(DTPBase, EntityQueryMixin):
                     """
 
                     # -->> CREATE LIST TO ENTITIES LINKS TO GENES (rox)
-                    # NOTE: Var x Gene will ingest in a single batch by file
+                    # NOTE: Variant x Gene will ingest in a single batch by file
                     genes_link = row.get("gene_links") or []
                     for g in genes_link:
                         gene_links_rows.append(
@@ -719,10 +657,8 @@ class DTP(DTPBase, EntityQueryMixin):
                         )  # rs, rs_entity_id, entrez_id
 
                     if self.debug_mode:
-                        var_number += 1
-                        end_variant = time.time() - start_variant
-                        # Just print to save time
-                        print(f"Proccessed: {var_number} / To Process: {len(df) - var_number} in {end_variant:.5f}s: {variant_master}")  # noqa E501
+                        msg = f"Variant {variant_master} ingested in {time.time() - start_variant}"
+                        self.logger.log(msg, "DEBUG")
 
             except Exception as e:
                 msg = f"❌ Error to add data: {str(e)}"
@@ -733,7 +669,7 @@ class DTP(DTPBase, EntityQueryMixin):
             try:
                 # Reade all rows from a file
                 if not gene_links_rows:
-                    msg = f"🔗 No variant→gene links in {data_file}", "DEBUG"
+                    msg = f"🔗 No variant→gene links in {csv_file}", "DEBUG"
                     self.logger.log(msg, "DEBUG")
                     continue  # Go to next File
 
@@ -751,8 +687,6 @@ class DTP(DTPBase, EntityQueryMixin):
                     .unique()
                     .tolist()  # noqa E501
                 )
-
-                # TODO: Talvez buscar no inicio todos os Genes do Chromossome!?
                 alias_rows = (
                     self.session.query(EntityAlias.alias_value, EntityAlias.entity_id)  # noqa E501
                     .filter(EntityAlias.alias_type == "code")
@@ -821,18 +755,18 @@ class DTP(DTPBase, EntityQueryMixin):
                         except Exception as e:
                             self.session.rollback()
                             self.logger.log(
-                                f"⚠️ commit failed inserting relationships ({os.path.basename(data_file)}): {e}",  # noqa E501
+                                f"⚠️ commit failed inserting relationships ({os.path.basename(csv_file)}): {e}",  # noqa E501
                                 "WARNING",
                             )
                         total += len(chunk)
 
                     self.logger.log(
-                        f"🔗 Inserted {total} EntityRelationship(s) from {os.path.basename(data_file)}",  # noqa E501
+                        f"🔗 Inserted {total} EntityRelationship(s) from {os.path.basename(csv_file)}",  # noqa E501
                         "INFO",
                     )
                 else:
                     self.logger.log(
-                        f"🔗 No resolvable gene entities in {os.path.basename(data_file)}",  # noqa E501
+                        f"🔗 No resolvable gene entities in {os.path.basename(csv_file)}",  # noqa E501
                         "INFO",
                     )
 
@@ -840,7 +774,7 @@ class DTP(DTPBase, EntityQueryMixin):
                 if not missing.empty:
                     missing_file = str(
                         "missing_variant_gene_entities_"
-                        + os.path.basename(data_file).replace(
+                        + os.path.basename(csv_file).replace(
                             ".parquet", ""
                         )  # noqa E501
                         + ".csv"
@@ -857,21 +791,21 @@ class DTP(DTPBase, EntityQueryMixin):
                     )
 
                 if self.debug_mode:
-                    msg = f"File {data_file} ingested in {time.time() - start_file}"  # noqa E501
+                    msg = f"File {csv_file} ingested in {time.time() - start_file}"
                     self.logger.log(msg, "DEBUG")
 
             except IntegrityError as e:
                 self.session.rollback()
                 total_warnings += 1
                 self.logger.log(
-                    f"⚠️ Integrity error while loading {os.path.basename(data_file)}: {e}",  # noqa E501
+                    f"⚠️ Integrity error while loading {os.path.basename(csv_file)}: {e}",  # noqa E501
                     "WARNING",
                 )
             except Exception as e:
                 self.session.rollback()
                 total_warnings += 1
                 self.logger.log(
-                    f"⚠️ Unexpected error while loading {os.path.basename(data_file)}: {e}",  # noqa E501
+                    f"⚠️ Unexpected error while loading {os.path.basename(csv_file)}: {e}",  # noqa E501
                     "WARNING",
                 )
 
@@ -889,13 +823,6 @@ class DTP(DTPBase, EntityQueryMixin):
             msg = f"Load process ran in {time.time() - start_total}"
             self.logger.log(msg, "DEBUG")
 
-        # - Salve all Variants Dropped in que QA Process
-        if self.dropped_variants:
-            all_dropped = pd.concat(self.dropped_variants, ignore_index=True)
-            dropped_vars_file = f"dropped_variants__package_{self.package.id}.csv"  # noqa E501
-            output_path = str(processed_path / dropped_vars_file)
-            all_dropped.to_csv(output_path, index=False)
-            self.logger.log(f"📤 Saved dropped variants to: {output_path}", "INFO")  # noqa E501
 
         if total_warnings == 0:
             msg = f"✅ Loaded {total_variants} variants from {len(files_list)} file(s)."  # noqa E501

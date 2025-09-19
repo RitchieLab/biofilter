@@ -231,8 +231,10 @@ def _pick_canonical_from_ptlp(
         }
     )
 
-    ref = "/".join(ref_alleles) if ref_alleles else ""
-    alt = "/".join(alt_alleles) if alt_alleles else ""
+    # ref = "/".join(ref_alleles) if ref_alleles else ""
+    # alt = "/".join(alt_alleles) if alt_alleles else ""
+    ref = ref_alleles if ref_alleles else []
+    alt = alt_alleles if alt_alleles else []
 
     return {
         "seq_id": acc,
@@ -438,8 +440,8 @@ def worker_dbsnp(batch, batch_id, output_dir):
                     # "chromosome": chromosome,
                     "start_pos": start_pos,
                     "end_pos": end_pos,
-                    "ref": ref,
-                    "alt": alt,
+                    "ref": canonical["ref"],
+                    "alt": canonical["alt"],
                     "placements": placements_list,
                     "merge_log": merge_log,
                     "gene_links": list(gene_ids),

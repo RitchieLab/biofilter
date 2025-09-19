@@ -105,7 +105,7 @@ class ProteinEntity(Base):
     protein_id = Column(
         Integer, ForeignKey("protein_masters.id"), nullable=False
     )  # noqa E501
-    protein_master = relationship("ProteinMaster", back_populates="protein_entity")
+    protein_master = relationship("ProteinMaster", back_populates="protein_entity")   # noqa E501
 
     is_isoform = Column(Boolean, default=False, nullable=False)
     isoform_accession = Column(String(20), nullable=True)

@@ -4,9 +4,10 @@ from pathlib import Path
 from biofilter.etl.mixins.base_dtp import DTPBase
 from biofilter.etl.mixins.entity_query_mixin import EntityQueryMixin
 from biofilter.db.models import (
-    EntityName,
+    Entity,
+    EntityAlias,
     EntityRelationshipType,
-    DataSource,
+    ETLDataSource,
 )  # noqa E501
 
 
@@ -14,27 +15,29 @@ class DTP(DTPBase, EntityQueryMixin):
     def __init__(
         self,
         logger=None,
+        debug_mode=False,
         datasource=None,
-        etl_process=None,
+        package=None,
         session=None,
         use_conflict_csv=False,
     ):  # noqa: E501
         self.logger = logger
+        self.debug_mode = debug_mode
         self.data_source = datasource
-        self.etl_process = etl_process
+        self.package = package
         self.session = session
         self.use_conflict_csv = use_conflict_csv
 
         # DTP versioning
         self.dtp_name = "dtp_reactome_relationships"
-        self.dtp_version = "1.0.0"
-        self.compatible_schema_min = "3.0.0"
+        self.dtp_version = "1.1.0"
+        self.compatible_schema_min = "3.1.0"
         self.compatible_schema_max = "4.0.0"
 
     # ⬇️  --------------------------  ⬇️
     # ⬇️  ------ EXTRACT FASE ------  ⬇️
     # ⬇️  --------------------------  ⬇️
-    def extract(self, raw_dir: str, force_steps: bool):
+    def extract(self, raw_dir: str):
         """
         This DTP is specifically for loading relationships from Reactome.
         It does not perform data extraction. To extract Reactome data, use the
@@ -45,7 +48,7 @@ class DTP(DTPBase, EntityQueryMixin):
             "Use the 'reactome' data source to extract raw data."
         )
         self.logger.log(msg, "INFO")
-        return False, msg, None
+        return True, msg, None
 
     # ⚙️  ----------------------------  ⚙️
     # ⚙️  ------ TRANSFORM FASE ------  ⚙️
@@ -61,12 +64,12 @@ class DTP(DTPBase, EntityQueryMixin):
             "Transformation should be done through the 'Reactome' data source."
         )
         self.logger.log(msg, "INFO")
-        return None, False, msg
+        return True, msg
 
     # 📥  ------------------------ 📥
     # 📥  ------ LOAD FASE ------  📥
     # 📥  ------------------------ 📥
-    def load(self, df=None, processed_dir=None, chunk_size=100_000):
+    def load(self, processed_dir=None):
         """
         Load relationships between pathways and other entities from processed file.  # noqa: E501
         """
@@ -76,100 +79,86 @@ class DTP(DTPBase, EntityQueryMixin):
         self.check_compatibility()
 
         self.logger.log(msg, "INFO")
-        load_status = False
 
         total_relationships = 0
         total_warnings = 0
         parent_source = "reactome"
 
+        # READ PROCESSED DATA TO LOAD
+        try:
+            # Check if processed dir was set
+            if not processed_dir:
+                msg = "⚠️  processed_dir MUST be provided."
+                self.logger.log(msg, "ERROR")
+                return False, msg  # ⧮ Leaving with ERROR
+
+            # The file is hosted in the parent dtp.
+            processed_path = (
+                Path(processed_dir)
+                / self.data_source.source_system.name
+                / parent_source  # noqa E501
+            )  # noqa: E501
+            processed_file_name = str(processed_path / "relationship_data.parquet")  # noqa E501
+
+            if not os.path.exists(processed_file_name):
+                msg = f"⚠️  File not found: {processed_file_name}"
+                self.logger.log(msg, "ERROR")
+                return False, msg  # ⧮ Leaving with ERROR
+
+            df = pd.read_parquet(processed_file_name, engine="pyarrow")
+
+            if df.empty:
+                msg = "DataFrame is empty."
+                self.logger.log(msg, "ERROR")
+                return False, msg
+
+            df.fillna("", inplace=True)
+
+        except Exception as e:
+            msg = f"⚠️  Failed to try read data: {e}"
+            self.logger.log(msg, "ERROR")
+            return False, msg  # ⧮ Leaving with ERROR
+
         # Set DB and drop indexes
         try:
-            index_specs_entity = [
-                # Entity
-                ("entities", ["group_id"]),
-                ("entities", ["has_conflict"]),
-                ("entities", ["is_deactive"]),
-                # EntityName
-                ("entity_names", ["entity_id"]),
-                ("entity_names", ["name"]),
-                ("entity_names", ["data_source_id"]),
-                ("entity_names", ["data_source_id", "name"]),
-                ("entity_names", ["data_source_id", "entity_id"]),
-                ("entity_names", ["entity_id", "is_primary"]),
-                # EntityRelationship
-                ("entity_relationships", ["entity_1_id"]),
-                ("entity_relationships", ["entity_2_id"]),
-                ("entity_relationships", ["relationship_type_id"]),
-                ("entity_relationships", ["data_source_id"]),
-                (
-                    "entity_relationships",
-                    ["entity_1_id", "relationship_type_id"],
-                ),  # noqa E501
-                (
-                    "entity_relationships",
-                    ["entity_1_id", "entity_2_id", "relationship_type_id"],
-                ),  # noqa E501
-                # EntityRelationshipType
-                ("entity_relationship_types", ["code"]),
-            ]
-
             self.db_write_mode()
-            # self.drop_indexes(index_specs) # Keep indices to improve checks
+            self.drop_indexes(self.get_entity_index_specs)
         except Exception as e:
             total_warnings += 1
-            msg = f"⚠️ Failed to switch DB to write mode or drop indexes: {e}"
+            msg = f"⚠️  Failed to switch DB to write mode or drop indexes: {e}"
             self.logger.log(msg, "WARNING")
+            return False, msg  # ⧮ Leaving with ERROR
 
-        # data_source_id = self.data_source.id
-
-        # This DTP doesn't transfer any data from previous processes.
-
-        # We cannot use the get_path method here, because:
-        #    The file is hosted in the parent dtp.
-        processed_path = (
-            Path(processed_dir)
-            / self.data_source.source_system.name
-            / parent_source  # noqa E501
-        )  # noqa: E501
-        processed_data = str(processed_path / "relationship_data.parquet")
-
-        if not os.path.exists(processed_data):
-            msg = f"File not found: {processed_data}"
-            self.logger.log(msg, "ERROR")
-            return total_relationships, load_status, msg
-
-        self.logger.log(
-            f"📥 Reading data in chunks from {processed_data}", "INFO"
-        )  # noqa E501
-
-        df = pd.read_parquet(processed_data, engine="pyarrow")
-
-        # Check if DataFrame is empty
-        if df.empty:
-            msg = "DataFrame is empty."
-            self.logger.log(msg, "ERROR")
-            return total_relationships, load_status, msg
+        # GET ENTITY GROUP ID AND OMICS STATUS
+        try:
+            self.get_entity_group("Pathways")
+        except Exception as e:
+            msg = f"Error on DTP to get Entity Group: {e}"
+            return False, msg  # ⧮ Leaving with ERROR
 
         # Map entity groups and relationship types to their IDs
         try:
             # Add columns for IDs and relationship type
             df["entity_1_id"] = None
             df["entity_2_id"] = None
+            df["entity_1_group_id"] = None
+            df["entity_2_group_id"] = None
             df["relationship_type_id"] = None
 
             # Use the parent source to get the DataSource ID
             # This is necessary because the Entities were loaded from the
             # Reactome data source.
             parent_ds_id = (
-                self.session.query(DataSource.id)
+                self.session.query(ETLDataSource.id)
                 .filter_by(name=parent_source)
                 .scalar()  # noqa E501
             )
 
             # Get pathway IDs from EntityName
             pathway_ids = (
-                self.session.query(EntityName.name, EntityName.entity_id)
-                .filter(EntityName.data_source_id == parent_ds_id)
+                self.session.query(EntityAlias.alias_value, EntityAlias.entity_id)  # noqa E501
+                .filter(EntityAlias.data_source_id == parent_ds_id)
+                .filter(EntityAlias.is_primary.is_(True))
                 .all()
             )
             pathway_id_map = dict(pathway_ids)
@@ -191,8 +180,8 @@ class DTP(DTPBase, EntityQueryMixin):
 
             # Query EntityName in batch
             relation_entities = (
-                self.session.query(EntityName.name, EntityName.entity_id)
-                .filter(EntityName.name.in_(relation_names_to_lookup))
+                self.session.query(EntityAlias.alias_value, EntityAlias.entity_id)  # noqa E501
+                .filter(EntityAlias.alias_value.in_(relation_names_to_lookup))
                 .all()
             )
             relation_name_to_entity_id = dict(relation_entities)
@@ -248,6 +237,23 @@ class DTP(DTPBase, EntityQueryMixin):
                 subset=["entity_1_id", "entity_2_id", "relationship_type_id"]
             )
 
+            # Fetch group_ids from Entity
+            entity_ids_used = pd.concat([
+                df_valid["entity_1_id"],
+                df_valid["entity_2_id"]
+            ]).dropna().unique().tolist()
+
+            entity_groups = (
+                self.session.query(Entity.id, Entity.group_id)
+                .filter(Entity.id.in_(entity_ids_used))
+                .all()
+            )
+            entity_group_map = dict(entity_groups)
+
+            # Map group IDs
+            df_valid["entity_1_group_id"] = df_valid["entity_1_id"].map(entity_group_map)
+            df_valid["entity_2_group_id"] = df_valid["entity_2_id"].map(entity_group_map)
+
             # Load valid relationships
             total_pathways_relations_added = 0
             total_pathways_relations_existed = 0
@@ -255,8 +261,11 @@ class DTP(DTPBase, EntityQueryMixin):
                 status = self.get_or_create_entity_relationship(
                     entity_1_id=int(row["entity_1_id"]),
                     entity_2_id=int(row["entity_2_id"]),
+                    entity_1_group_id=int(row["entity_1_group_id"]) if row["entity_1_group_id"] else None,
+                    entity_2_group_id=int(row["entity_2_group_id"]) if row["entity_2_group_id"] else None,
                     relationship_type_id=int(row["relationship_type_id"]),
                     data_source_id=self.data_source.id,
+                    package_id=self.package,
                 )
                 if status:
                     total_pathways_relations_added += 1
@@ -266,12 +275,11 @@ class DTP(DTPBase, EntityQueryMixin):
             # Commit batch
             try:
                 self.session.commit()
-                load_status = True
+                total_relationships += 1
                 msg = f"✅ {len(df_valid)} relations loaded successfully"
                 self.logger.log(msg, "INFO")
             except Exception as e:
                 self.session.rollback()
-                load_status = False
                 msg = f"❌ Error loading relations: {str(e)}"
                 self.logger.log(msg, "ERROR")
                 # return 0, load_status, msg
@@ -292,31 +300,24 @@ class DTP(DTPBase, EntityQueryMixin):
             # return len(df_valid), True, msg
 
         except Exception as e:
-            msg = f"KeyError during loading relationships: {e}"
+            msg = f"❌ ETL load_relations failed: {str(e)}"
             self.logger.log(msg, "ERROR")
-            return total_relationships, load_status, msg
+            return False, msg
 
         # Set DB to Read Mode and Create Index
         try:
-            # Drop Indexs
-            # self.drop_indexes(index_specs)
-            self.drop_indexes(index_specs_entity)
-            # Stating Indexs
-            # self.create_indexes(index_specs)
-            self.create_indexes(index_specs_entity)
+            self.create_indexes(self.get_entity_index_specs)
             self.db_read_mode()
         except Exception as e:
             total_warnings += 1
             msg = f"Failed to switch DB to write mode or drop indexes: {e}"
             self.logger.log(msg, "WARNING")
 
-        load_status = True
-
         if total_warnings != 0:
             msg = f"{total_warnings} warning to analysis in log file"
             self.logger.log(msg, "WARNING")
 
-        msg = f"✅ Relations loaded: {len(df_valid)} | Not found: {len(df_not_loaded)}"  # noqa: E501
+        msg = f"📥 Total Pathways: {total_relationships}"  # noqa E501  # noqa E501
         self.logger.log(msg, "INFO")
 
-        return len(df_valid), True, msg
+        return True, msg

@@ -268,6 +268,18 @@ class EntityRelationship(Base):
         back_populates="relationships_as_1",  # noqa E501
     )  # noqa E501
 
+    entity_1_group_id = Column(
+        Integer,
+        ForeignKey("entity_groups.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+    )
+    entity_1_group = relationship(
+        "EntityGroup",
+        foreign_keys=[entity_1_group_id],
+        passive_deletes=True
+    )
+
     entity_2_id = Column(
         Integer,
         ForeignKey("entities.id", ondelete="CASCADE"),
@@ -278,6 +290,18 @@ class EntityRelationship(Base):
         foreign_keys=[entity_2_id],
         back_populates="relationships_as_2",  # noqa E501
     )  # noqa E501
+
+    entity_2_group_id = Column(
+        Integer,
+        ForeignKey("entity_groups.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+    )
+    entity_2_group = relationship(
+        "EntityGroup",
+        foreign_keys=[entity_2_group_id],
+        passive_deletes=True
+    )
 
     relationship_type_id = Column(
         Integer,

@@ -1,4 +1,5 @@
 from sqlalchemy import text
+# import time
 
 
 class DBTuningMixin:
@@ -53,6 +54,56 @@ class DBTuningMixin:
         self.session.execute(text("PRAGMA foreign_keys = ON;"))
         self.session.commit()
 
+    # def db_read_mode(self):
+    #     """
+    #     Reset SQLite PRAGMAs to default values after bulk insert.
+    #     Uses AUTOCOMMIT + checkpoint to avoid 'database is locked'.
+    #     """
+    #     if self.session.bind.dialect.name != "sqlite":
+    #         return
+
+    #     self.logger.log("🔄 Resetting SQLite PRAGMAs to default settings", "DEBUG")
+
+    #     # garanta que não há transação ativa
+    #     try:
+    #         self.session.commit()
+    #     except Exception:
+    #         self.session.rollback()
+
+    #     # use AUTOCOMMIT para PRAGMAs que exigem exclusividade
+    #     conn = self.session.connection().execution_options(isolation_level="AUTOCOMMIT")
+
+    #     # deixe o SQLite esperar se algo ainda estiver liberando locks
+    #     conn.exec_driver_sql("PRAGMA busy_timeout=60000")
+
+    #     # se estivermos em WAL, faça checkpoint (limpa WAL e reduz chance de lock)
+    #     try:
+    #         conn.exec_driver_sql("PRAGMA wal_checkpoint(TRUNCATE)")
+    #     except Exception as e:
+    #         self.logger.log(f"⚠️ wal_checkpoint warning: {e}", "WARNING")
+
+    #     # tente trocar o journal_mode com backoff
+    #     for i in range(6):  # 0.5s, 1s, 2s, 4s, 8s, 16s
+    #         try:
+    #             mode = conn.exec_driver_sql("PRAGMA journal_mode").scalar()
+    #             if str(mode).upper() == "DELETE":
+    #                 break
+    #             newmode = conn.exec_driver_sql("PRAGMA journal_mode=DELETE").scalar()
+    #             if str(newmode).upper() == "DELETE":
+    #                 break
+    #         except Exception as e:
+    #             sleep = 0.5 * (2 ** i)
+    #             self.logger.log(f"⏳ journal_mode switch blocked ({e}). Retrying in {sleep:.1f}s...", "WARNING")
+    #             time.sleep(sleep)
+    #             continue
+    #         else:
+    #             break
+
+    #     # demais ajustes podem ser feitos sem exclusividade
+    #     conn.exec_driver_sql("PRAGMA synchronous=FULL")
+    #     conn.exec_driver_sql("PRAGMA locking_mode=NORMAL")
+    #     conn.exec_driver_sql("PRAGMA foreign_keys=ON")
+
     def create_indexes(self, index_specs: list[tuple[str, list[str]]]):
         """
         Create indexes on the database to speed up queries.
@@ -63,7 +114,7 @@ class DBTuningMixin:
         engine = self.session.bind.dialect.name
         if engine not in ("sqlite", "postgresql"):
             self.logger.log(
-                f"❌ Index creation not supported for engine: {engine}", "WARNING"
+                f"❌ Index creation not supported for engine: {engine}", "WARNING"  # noqa E501
             )  # noqa E501
             return
 
@@ -86,7 +137,7 @@ class DBTuningMixin:
         engine = self.session.bind.dialect.name
         if engine not in ("sqlite", "postgresql"):
             self.logger.log(
-                f"❌ Index removal not supported for engine: {engine}", "WARNING"
+                f"❌ Index removal not supported for engine: {engine}", "WARNING"  # noqa E501
             )  # noqa E501
             return
 
@@ -139,6 +190,21 @@ class DBTuningMixin:
             ("gene_genomic_regions", ["chromosome"]),
             ("gene_genomic_regions", ["chromosome", "start", "end"]),
             ("gene_genomic_regions", ["data_source_id"]),
+        ]
+
+    @property
+    def get_protein_index_specs(self):
+        return [
+            # protein_master
+            # ("protein_master", ["data_source_id", "protein_id"]),
+            ("protein_masters", ["protein_id"]),
+            # protein_entity
+            ("protein_entities", ["entity_id"]),
+            ("protein_entities", ["protein_id", "is_isoform"]),
+            # ("protein_entity", ["data_source_id", "entity_id"]),
+            # protein_pfam_link
+            ("protein_pfam_links", ["pfam_pk_id"]),
+            # ("protein_pfam_link", ["data_source_id"]),
         ]
 
     @property
@@ -196,69 +262,26 @@ class DBTuningMixin:
             ("pathway_masters", ["data_source_id"]),
         ]
 
-    # @property
-    # def get_gene_index_specs(self):
-    #     return [
-    #         # ──────────────── gene_groups ────────────────
-    #         ("gene_groups", ["name"]),
-    #         # ──────────────── locus_groups ────────────────
-    #         ("gene_locus_groups", ["name"]),
-    #         # ──────────────── locus_types ────────────────
-    #         ("gene_locus_types", ["name"]),
-    #         # ──────────────── Gene Symbol ────────────────
-    #         ("gene_symbol", ["symbol"]),
-    #         # ──────────────── genomic_regions ────────────────
-    #         # ("gene_genomic_regions", ["label"]),
-    #         # ("gene_genomic_regions", ["chromosome"]),
-    #         # ("gene_genomic_regions", ["chromosome", "start", "end"]),
-    #         # ──────────────── genes ────────────────
-    #         ("gene_masters", ["entity_id"]),
-    #         ("gene_masters", ["symbol"]),
-    #         # ("gene_masters", ["locus_group_id"]),
-    #         # ("gene_masters", ["locus_type_id"]),
-    #         # ("gene_masters", ["data_source_id"]),
-    #         # ("gene_masters", ["omic_status_id"]),
-    #         # ──────────────── gene_group_membership ────────────────
-    #         ("gene_group_memberships", ["group_id"]),
-    #         ("gene_group_memberships", ["gene_id"]),
-    #         # # ──────────────── gene_locations ────────────────
-    #         # ("gene_locations", ["gene_id"]),
-    #         # ("gene_locations", ["region_id"]),
-    #         # ("gene_locations", ["assembly"]),
-    #         # ("gene_locations", ["chromosome"]),
-    #         # ("gene_locations", ["chromosome", "start", "end"]),
-    #         # ("gene_locations", ["data_source_id"]),
-    #         # # ...
-    #     ]
-
-    # @property
-    # def get_entity_index_specs(self):
-
-    #     return [
-    #         # Entity
-    #         ("entities", ["group_id"]),
-    #         ("entities", ["has_conflict"]),
-    #         ("entities", ["is_deactive"]),
-    #         # EntityName
-    #         ("entity_names", ["entity_id"]),
-    #         ("entity_names", ["name"]),
-    #         ("entity_names", ["data_source_id"]),
-    #         ("entity_names", ["data_source_id", "name"]),
-    #         ("entity_names", ["data_source_id", "entity_id"]),
-    #         ("entity_names", ["entity_id", "is_primary"]),
-    #         # EntityRelationship
-    #         ("entity_relationships", ["entity_1_id"]),
-    #         ("entity_relationships", ["entity_2_id"]),
-    #         ("entity_relationships", ["relationship_type_id"]),
-    #         ("entity_relationships", ["data_source_id"]),
-    #         (
-    #             "entity_relationships",
-    #             ["entity_1_id", "relationship_type_id"],
-    #         ),  # noqa E501
-    #         (
-    #             "entity_relationships",
-    #             ["entity_1_id", "entity_2_id", "relationship_type_id"],
-    #         ),  # noqa E501
-    #         # EntityRelationshipType
-    #         ("entity_relationship_types", ["code"]),
-    #     ]
+    @property
+    def get_variant_index_specs(self):
+        return [
+            # VariantMaster
+            ("variant_masters", ["variant_id"]),  # Já deve ser unique
+            ("variant_masters", ["entity_id"]),
+            ("variant_masters", ["data_source_id"]),
+            ("variant_masters", ["etl_package_id"]),
+            ("variant_masters", ["omic_status_id"]),
+            ("variant_masters", ["chromosome"]),
+            ("variant_masters", ["variant_type"]),
+            # VariantLocus
+            ("variant_loci", ["variant_id"]),
+            ("variant_loci", ["assembly_id"]),
+            ("variant_loci", ["chromosome"]),
+            ("variant_loci", ["start_pos"]),
+            ("variant_loci", ["end_pos"]),
+            ("variant_loci", ["data_source_id"]),
+            ("variant_loci", ["etl_package_id"]),
+            ("variant_loci", ["assembly_id", "chromosome"]),
+            ("variant_loci", ["assembly_id", "chromosome", "start_pos"]),
+            ("variant_loci", ["variant_id", "assembly_id", "chromosome"]),  # unique
+        ]
