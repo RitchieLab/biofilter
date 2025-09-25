@@ -51,8 +51,11 @@ class CurationConflict(Base):
     entity_id = Column(Integer, nullable=True)
     identifier = Column(String, nullable=False)  # Ex: "HGNC:40594"
     existing_identifier = Column(String, nullable=False)  # Ex: "HGNC:58098"
-    status = Column(Enum(ConflictStatus), default=ConflictStatus.pending)
-    resolution = Column(Enum(ConflictResolution), nullable=True)
+    # status = Column(Enum(ConflictStatus), default=ConflictStatus.pending)
+    # resolution = Column(Enum(ConflictResolution), nullable=True)
+    status = Column(Enum(ConflictStatus, name="conflict_status_enum"), default=ConflictStatus.pending)
+    resolution = Column(Enum(ConflictResolution, name="conflict_resolution_enum"), nullable=True)
+
     description = Column(Text, nullable=True)
     notes = Column(Text, nullable=True)
 

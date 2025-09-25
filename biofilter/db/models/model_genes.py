@@ -315,7 +315,7 @@ class GeneLocation(Base):
     chromosome = Column(String(5), nullable=True)
     start = Column(Integer, nullable=True)
     end = Column(Integer, nullable=True)
-    strand = Column(Enum("+", "-"), nullable=True)
+    strand = Column(Enum("+", "-", name="strand_enum"), nullable=True)
 
     assembly = Column(String(20), nullable=True, default="GRCh38")
     # TODO: Create Model to Assembles
