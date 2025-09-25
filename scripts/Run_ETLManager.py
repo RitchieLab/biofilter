@@ -5,18 +5,27 @@ db_uri = "sqlite:///biofilter.db"
 # Configure below
 data_sources_to_process = [
     # Genes
+    # -----
     # "hgnc",
     # "ensembl",
     # "gene_ncbi",
+    #
     # Proteins
+    # --------
     # "pfam",
     # "uniprot",
+    #
     # Pathways
+    # --------
     # "reactome",
     # "kegg_pathways",
+    #
     # Gene Ontology
+    # -------------
     # "gene_ontology",
+    #
     # Variants
+    # --------
     # "dbsnp_sample",
     # "dbsnp_chr1",
     # "dbsnp_chr2",
@@ -41,11 +50,23 @@ data_sources_to_process = [
     # "dbsnp_chr21",
     # "dbsnp_chr22",
     # "dbsnp_chrx",
-    "dbsnp_chry",
+    # "dbsnp_chry",
     # "dbsnp_chrmt",
+    "gwas",
+    #
     # RelationShips
+    # -------------
     # "reactome_relationships",
     # "uniprot_relationships",
+    #
+    # DISEASE
+    # -------
+    # "mondo",
+    # "mondo_relationships",
+    #
+    # CHEMICAL
+    # --------
+    # "chebi",
 ]
 
 run_steps = [

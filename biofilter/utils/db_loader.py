@@ -16,6 +16,8 @@ def load_all_models():
     import_module("biofilter.db.models.model_pathways")
     import_module("biofilter.db.models.model_proteins")
     import_module("biofilter.db.models.model_go")
+    import_module("biofilter.db.models.model_diseases")
+    import_module("biofilter.db.models.model_chemicals")
 
     # NOTE: Will be removed in the future
     # import_module("biofilter.db.models.loki_models")

@@ -467,6 +467,45 @@
             "active": true,
             "dtp_version": "1.1.0",
             "schema_version": "3.1.0"
+        },
+        {
+            "source_system": "MONDO",
+            "name": "mondo",
+            "data_type": "disease",
+            "source_url": "https://purl.obolibrary.org/obo/mondo.json",
+            "format": "JSON",
+            "grch_version": "",
+            "ucschg_version": "",
+            "dtp_script": "dtp_mondo",
+            "active": true,
+            "dtp_version": "1.1.0",
+            "schema_version": "3.1.0"
+        },
+        {
+            "source_system": "EBI",
+            "name": "chebi",
+            "data_type": "chemical",
+            "source_url": "https://ftp.ebi.ac.uk/pub/databases/chebi-2/flat_files/compounds.tsv.gz",
+            "format": "tsv",
+            "grch_version": "",
+            "ucschg_version": "",
+            "dtp_script": "dtp_chebi",
+            "active": true,
+            "dtp_version": "1.1.0",
+            "schema_version": "3.1.0"
+        },
+        {
+            "source_system": "EBI",
+            "name": "gwas",
+            "data_type": "variant",
+            "source_url": "https://ftp.ebi.ac.uk/pub/databases/gwas/releases/latest/gwas-catalog-associations.tsv",
+            "format": "tsv",
+            "grch_version": "",
+            "ucschg_version": "",
+            "dtp_script": "dtp_gwas",
+            "active": true,
+            "dtp_version": "1.1.0",
+            "schema_version": "3.1.0"
         }
     ]
 } 

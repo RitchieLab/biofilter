@@ -2,8 +2,11 @@ from sqlalchemy import (
     Column,
     Integer,
     Numeric,
-    String,
+    # String,
     ForeignKey,
+    String,
+    Float,
+    Text,
     #     UniqueConstraint,
     #     Index,
     #     CheckConstraint,  # noqa E501
@@ -154,6 +157,79 @@ class VariantLocus(Base):
     #     ),  # noqa E501
     #     Index("ix_vloc_asm_chr_end", "assembly_id", "chromosome", "end_pos"),
     # )
+
+
+class VariantGWAS(Base):
+    """
+    Flat representation of GWAS Catalog associations.
+
+    This table hosts the raw + mapped data from the GWAS Catalog,
+    joined with the EFO trait mapping file. It allows queries
+    on variants, studies, and traits, even before full Entity integration.
+
+    Future: link `variant_id`, `trait_id`, and `study_id` to Entities.
+    """
+
+    __tablename__ = "variant_gwas"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+
+    # Publication / study info
+    pubmed_id = Column(String(50), index=True, nullable=True)
+    # first_author = Column(String(255), nullable=True)
+    # publication_date = Column(String(50), nullable=True)  # raw string for now
+    # journal = Column(String(255), nullable=True)
+    # study_title = Column(Text, nullable=True)
+    # link = Column(String(500), nullable=True)
+
+    # Trait / phenotype mapping
+    raw_trait = Column(String(255), nullable=True)        # "DISEASE/TRAIT" field
+    mapped_trait = Column(String(255), nullable=True)     # "EFO term"
+    mapped_trait_id = Column(String(100), nullable=True)  # "EFO/MONDO ID"
+    parent_trait = Column(String(255), nullable=True)     # Parent term
+    parent_trait_id = Column(String(100), nullable=True)  # Parent URI ID
+
+    # Variant info
+    chr_id = Column(String(10), nullable=True)
+    chr_pos = Column(Integer, nullable=True)
+    reported_gene = Column(String(255), nullable=True)
+    mapped_gene = Column(String(255), nullable=True)
+    snp_id = Column(String(50), index=True, nullable=True)  # dbSNP ID (rsID)
+    snp_risk_allele = Column(String(50), nullable=True)  # Qual a origem
+    risk_allele_frequency = Column(Float, nullable=True)
+    context = Column(String(100), nullable=True)
+    intergenic = Column(String(10), nullable=True)
+
+    # Statistics
+    p_value = Column(Float, nullable=True)
+    pvalue_mlog = Column(Float, nullable=True)
+    odds_ratio_beta = Column(String(50), nullable=True)
+    ci_text = Column(String(100), nullable=True)  # confidence interval raw
+
+    # Sample sizes
+    initial_sample_size = Column(Text, nullable=True)
+    replication_sample_size = Column(Text, nullable=True)
+
+    # Platform info
+    platform = Column(String(255), nullable=True)
+    cnv = Column(String(10), nullable=True)
+
+    # Notes
+    notes = Column(Text, nullable=True)
+
+    data_source_id = Column(
+        Integer,
+        ForeignKey("etl_data_sources.id", ondelete="CASCADE"),
+        nullable=True,
+    )
+    data_source = relationship("ETLDataSource", passive_deletes=True)
+
+    etl_package_id = Column(
+        Integer,
+        ForeignKey("etl_packages.id", ondelete="CASCADE"),
+        nullable=True,
+    )
+    etl_package = relationship("ETLPackage", passive_deletes=True)
 
 
 # --- Liftover cache/audit (for derived mappings or missing placements) ------

@@ -28,6 +28,7 @@ from .model_curation import (
 from .model_variants import (
     VariantMaster,
     VariantLocus,
+    VariantGWAS,
     # VariantLiftedPosition,
     # VariantMergeLog,
 )
@@ -40,6 +41,10 @@ from .model_proteins import (
     ProteinPfamLink,
 )
 from .model_go import GOMaster, GORelation
+
+from .model_diseases import DiseaseGroup, DiseaseGroupMembership, DiseaseMaster
+
+from .model_chemicals import ChemicalMaster, ChemicalData
 
 __all__ = [
     # # CONFIGURATION MODELS
@@ -73,6 +78,7 @@ __all__ = [
     # VARIANTS MODELS
     "VariantMaster",
     "VariantLocus",
+    "VariantGWAS"
     # "VariantLiftedPosition",
     # "VariantMergeLog",
     # PATHWAY MODELS
@@ -85,4 +91,11 @@ __all__ = [
     # GENE ONTOLOGY MODELS
     "GOMaster",
     "GORelation",
+    # DISEASE MODELS
+    "DiseaseGroup",
+    "DiseaseGroupMembership",
+    "DiseaseMaster",
+    # CHEMICAL MODELS
+    "ChemicalMaster",
+    "ChemicalData",
 ]

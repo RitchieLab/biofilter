@@ -47,6 +47,12 @@
             "description": "Kyoto Encyclopedia of Genes and Genomes, a database resource for understanding high-level functions and utilities of the biological system.",
             "homepage": "https://www.genome.jp/kegg/",
             "active": true
+        },
+        {
+            "name": "MONDO",
+            "description": "Monarch Disease Ontology (MONDO) integrates multiple disease resources (OMIM, Orphanet, ICD, DOID, etc.) into a unified ontology.",
+            "homepage": "https://mondo.monarchinitiative.org/",
+            "active": true
         }
     ]
 }

@@ -285,3 +285,41 @@ class DBTuningMixin:
             ("variant_loci", ["assembly_id", "chromosome", "start_pos"]),
             ("variant_loci", ["variant_id", "assembly_id", "chromosome"]),  # unique
         ]
+    
+    @property
+    def get_variant_gwas_index_specs(self):
+        return [
+            # VariantGWAS
+            ("variant_gwas", ["pubmed_id"]),
+            ("variant_gwas", ["snp_id"]),
+            ("variant_gwas", ["mapped_trait_id"]),
+            ("variant_gwas", ["chr_id", "chr_pos"]),
+        ]
+
+    @property
+    def get_disease_index_specs(self):
+        return [
+            # DiseaseMaster
+            ("disease_masters", ["mondo_id"]),
+            ("disease_masters", ["entity_id"]),
+            ("disease_masters", ["data_source_id"]),
+
+            # DiseaseGroupMembership
+            ("disease_group_memberships", ["disease_id"]),
+            ("disease_group_memberships", ["group_id"]),
+            ("disease_group_memberships", ["data_source_id"]),
+        ]
+
+    @property
+    def get_chemical_index_specs(self):
+        return [
+            # chemical_master
+            ("chemical_masters", ["chebi_id"]),
+            ("chemical_masters", ["entity_id"]),
+            # chemical_entities
+            ("chemical_entities", ["entity_id"]),
+            ("chemical_entities", ["chebi_id"]),
+            # chemical_aliases (opcional, mas pode acelerar buscas por xrefs)
+            ("entity_aliases", ["alias_value", "xref_source"]),
+        ]
+

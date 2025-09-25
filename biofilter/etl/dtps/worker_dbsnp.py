@@ -6,8 +6,8 @@ from pathlib import Path
 from typing import Dict, List, Any, Tuple, Optional
 import pandas as pd
 
-
-HGVS_G_POS = re.compile(r"^(.*?):g\.([\d_]+)(.*)$")  # ex: NC_000008.11:g.19956018A>G
+# ex: NC_000008.11:g.19956018A>G
+HGVS_G_POS = re.compile(r"^(.*?):g\.([\d_]+)(.*)$")
 NUC_CHANGE = re.compile(r"^[ACGT]>[ACGT]$")
 
 
