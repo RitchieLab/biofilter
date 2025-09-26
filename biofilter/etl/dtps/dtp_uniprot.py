@@ -3,6 +3,7 @@ import time  # DEBUG
 import requests
 from pathlib import Path
 import pandas as pd
+import numpy as np
 from biofilter.utils.file_hash import compute_file_hash
 from biofilter.etl.mixins.entity_query_mixin import EntityQueryMixin
 from biofilter.etl.mixins.base_dtp import DTPBase
@@ -444,6 +445,29 @@ class DTP(DTPBase, EntityQueryMixin):
         ]
         return pfam_ids if pfam_ids else None
 
+    def _coerce_text(self, value, sep="; "):
+        if value is None:
+            return None
+        # numpy array -> list
+        if isinstance(value, np.ndarray):
+            value = value.tolist()
+        # lista/tupla/conjunto -> string
+        if isinstance(value, (list, tuple, set)):
+            # remova vazios, normalize espaços e dedupe preservando ordem
+            seen = set()
+            items = []
+            for v in value:
+                s = (str(v).strip() if v is not None else "")
+                if not s: 
+                    continue
+                if s not in seen:
+                    seen.add(s)
+                    items.append(s)
+            return sep.join(items) if items else None
+        # já é escalar → str
+        return str(value).strip() or None
+
+
     # 📥  ------------------------ 📥
     # 📥  ------ LOAD FASE ------  📥
     # 📥  ------------------------ 📥
@@ -563,6 +587,7 @@ class DTP(DTPBase, EntityQueryMixin):
                 #     data_source_id=self.data_source.id,
                 # )
 
+
                 # --- ALIASES STRUCTURE ---
                 # Create a dict of Aliases
                 alias_dict = self.build_alias(row)
@@ -626,13 +651,19 @@ class DTP(DTPBase, EntityQueryMixin):
                     )  # noqa: E501
                     .first()
                 )
+                # TODO: Ajustar os campos para serem TEXT e avitar erros de array
+                location_txt = self._coerce_text(row.get("function"))
+                tissue_txt   = self._coerce_text(row.get("tissue"))
+
                 if not protein_master_obj:
                     protein_master_obj = ProteinMaster(
                         protein_id=protein_master,
-                        function=row.get("function"),
-                        location=row.get("location"),
-                        tissue_expression=row.get("tissue"),
-                        pseudogene_note=row.get("pseudogene_note"),
+                        function=self.guard_description(row.get("function")),
+                        # location=row.get("location"),
+                        # tissue_expression=row.get("tissue"),
+                        location=self.guard_description(location_txt),
+                        tissue_expression= self.guard_description(tissue_txt),
+                        pseudogene_note=self.guard_description(row.get("pseudogene_note")),
                         data_source_id=self.data_source.id,  # noqa E501
                         etl_package_id=self.package.id,
                     )

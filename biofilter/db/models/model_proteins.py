@@ -19,14 +19,14 @@ class ProteinPfam(Base):
     __tablename__ = "protein_pfams"
 
     id = Column(Integer, primary_key=True)
-    pfam_acc = Column(String(10), unique=True, index=True, nullable=False)
-    pfam_id = Column(String(20), index=True)
+    pfam_acc = Column(String(50), unique=True, index=True, nullable=False)
+    pfam_id = Column(String(50), index=True)
     description = Column(String(255))
     long_description = Column(String(255))
-    type = Column(String(10))  # Domain, Family, Repeat, etc.
+    type = Column(String(50))  # Domain, Family, Repeat, etc.
     source_database = Column(String(15))  # e.g., Prosite
-    clan_acc = Column(String(15))
-    clan_name = Column(String(15))
+    clan_acc = Column(String(50))
+    clan_name = Column(String(50))
 
     data_source_id = Column(
         Integer,
@@ -56,8 +56,8 @@ class ProteinMaster(Base):
 
     id = Column(Integer, primary_key=True)
     protein_id = Column(String(20), unique=True, index=True, nullable=False)
-    function = Column(String(255))
-    location = Column(String(100))
+    function = Column(String(255)) # TODO BUG Ajustar 3.2.0
+    location = Column(String(255)) # TODO BUG; Ajustar 3.2.0
     tissue_expression = Column(String(255))
     pseudogene_note = Column(String(255))
 

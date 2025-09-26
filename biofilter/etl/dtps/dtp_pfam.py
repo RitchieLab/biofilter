@@ -261,11 +261,13 @@ class DTP(DTPBase, EntityQueryMixin):
                         ProteinPfam(
                             pfam_acc=row.pfam_acc,
                             pfam_id=row.pfam_id,
-                            description=row.description,
+                            # description=row.description,
+                            description=self.guard_description(row.description),
                             clan_acc=row.clan_acc,
                             source_database=row.source_database,
                             type=row.type,
-                            long_description=row.long_description,
+                            # long_description=row.long_description,
+                            long_description=self.guard_description(row.long_description),
                             data_source_id=self.data_source.id,
                             etl_package_id=self.package.id,
                         )

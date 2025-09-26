@@ -3,6 +3,7 @@ import requests
 from packaging import version
 from pathlib import Path
 from typing import Optional
+from typing import Optional, Dict
 
 # from biofilter.utils.file_hash import compute_file_hash
 from biofilter.db.models import BiofilterMetadata, EntityGroup
@@ -10,6 +11,83 @@ from biofilter.etl.mixins.base_dtp_turning import DBTuningMixin
 
 
 class DTPBase(DBTuningMixin):
+
+    # ---FIX START
+
+    # --- Hotfix flags (v3.1.x) ----------------------------------------------
+    TRUNCATE_MODE_255: bool = True  # set False after 3.2.0 schema TEXT migration
+
+    # Central limits used only when TRUNCATE_MODE_255 == True
+    MAXLEN_ALIAS: int = 255          # alias_value / alias_norm / free-text aliases
+    MAXLEN_DESCRIPTION: int = 255    # generic descriptions (Pfam, GO, UniProt, etc.)
+
+    def __init__(self, *args, **kwargs):
+        # ...
+        self.trunc_metrics: Dict[str, int] = {}  # field_name -> count
+
+    # ----------------------------- Text guards -------------------------------
+
+    @staticmethod
+    def _normalize_text(s: Optional[str]) -> Optional[str]:
+        """
+        Lightweight normalization for alias_norm, etc.
+        Adjust if you need ASCII folding or more aggressive rules.
+        """
+        if s is None:
+            return None
+        return " ".join(str(s).lower().split())
+
+    # def _bump_trunc(self, field: str) -> None:
+    #     self.trunc_metrics[field] = self.trunc_metrics.get(field, 0) + 1
+    # TODO: Pensar em como implementar o super().__init__(*args, **kwargs) para as classes princiapis
+    def _bump_trunc(self, field: str) -> None:
+        if not hasattr(self, "trunc_metrics") or self.trunc_metrics is None:
+            self.trunc_metrics = {}
+        self.trunc_metrics[field] = self.trunc_metrics.get(field, 0) + 1
+
+    def safe_truncate(self, val: Optional[str], maxlen: int, field: str) -> Optional[str]:
+        """
+        Truncates `val` to `maxlen` only when TRUNCATE_MODE_255 is True.
+        Counts truncations in self.trunc_metrics.
+        """
+        if val is None:
+            return None
+        v = str(val).strip()
+        if self.TRUNCATE_MODE_255 and len(v) > maxlen:
+            self._bump_trunc(field)
+            return v[:maxlen]
+        return v
+
+    # Convenience wrappers for common cases
+    def guard_alias_value(self, s: Optional[str]) -> Optional[str]:
+        return self.safe_truncate(s, self.MAXLEN_ALIAS, "alias_value")
+
+    def guard_alias_norm(self, s: Optional[str]) -> Optional[str]:
+        n = self._normalize_text(s)
+        return self.safe_truncate(n, self.MAXLEN_ALIAS, "alias_norm")
+
+    def guard_description(self, s: Optional[str]) -> Optional[str]:
+        return self.safe_truncate(s, self.MAXLEN_DESCRIPTION, "description")
+
+    # ----------------------------- ETL hooks ---------------------------------
+
+    def _log_truncation_summary(self):
+        if not self.trunc_metrics:
+            self.logger.info("Truncation summary: none")
+            return
+        # compact, stable ordering:
+        parts = [f"{k}={v}" for k, v in sorted(self.trunc_metrics.items())]
+        self.logger.warning(f"Truncation summary: {', '.join(parts)}")
+
+    # Call this at the end of each load()
+    def finalize_load(self):
+        self._log_truncation_summary()
+        # any other common epilogue
+
+    # ---FIX END
+
+
+
     def http_download(self, url: str, landing_dir: str) -> Path:
         filename = os.path.basename(url)
         local_path = Path(landing_dir) / filename

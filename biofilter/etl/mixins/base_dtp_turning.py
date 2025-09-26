@@ -183,12 +183,12 @@ class DBTuningMixin:
             ("gene_locations", ["region_id"]),
             ("gene_locations", ["assembly"]),
             ("gene_locations", ["chromosome"]),
-            ("gene_locations", ["chromosome", "start", "end"]),
+            ("gene_locations", ["chromosome", "start_pos", "end_pos"]),
             ("gene_locations", ["data_source_id"]),
             # GeneGenomicRegion
             ("gene_genomic_regions", ["label"]),
             ("gene_genomic_regions", ["chromosome"]),
-            ("gene_genomic_regions", ["chromosome", "start", "end"]),
+            ("gene_genomic_regions", ["chromosome", "start_pos", "end_pos"]),
             ("gene_genomic_regions", ["data_source_id"]),
         ]
 

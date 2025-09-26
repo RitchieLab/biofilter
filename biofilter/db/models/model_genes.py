@@ -137,8 +137,8 @@ class GeneGenomicRegion(Base):
     id = Column(Integer, primary_key=True)
     label = Column(String(50), unique=True, nullable=False)  # Ex: "12p13.31"
     chromosome = Column(String(5), nullable=True)
-    start = Column(Integer, nullable=True)
-    end = Column(Integer, nullable=True)
+    start_pos = Column(Integer, nullable=True)
+    end_pos = Column(Integer, nullable=True)
     description = Column(String(100), nullable=True)
 
     data_source_id = Column(
@@ -313,8 +313,8 @@ class GeneLocation(Base):
     )  # noqa E501
 
     chromosome = Column(String(5), nullable=True)
-    start = Column(Integer, nullable=True)
-    end = Column(Integer, nullable=True)
+    start_pos = Column(Integer, nullable=True)
+    end_pos = Column(Integer, nullable=True)
     strand = Column(Enum("+", "-", name="strand_enum"), nullable=True)
 
     assembly = Column(String(20), nullable=True, default="GRCh38")

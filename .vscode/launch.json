@@ -57,4 +57,5 @@
             "program": "${workspaceFolder}/scripts/Query_test_01.py",
             "console": "integratedTerminal"
         }
+    ]
 }

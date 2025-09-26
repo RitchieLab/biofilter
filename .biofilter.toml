@@ -1,2 +1,2 @@
 [database]
-db_uri = "sqlite:///dev_biofilter.db"
+db_uri = "postgresql+psycopg2://bioadmin:bioadmin@localhost/biofilter"

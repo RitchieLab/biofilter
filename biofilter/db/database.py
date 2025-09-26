@@ -1,6 +1,6 @@
 import os
 from pathlib import Path
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 from biofilter.utils.logger import Logger
 from biofilter.db.create_db_mixin import CreateDBMixin
@@ -63,16 +63,39 @@ class Database(CreateDBMixin):
 
         self.connected = True
 
+    # def exists_db(self):
+    #     if not self.db_uri:
+    #         msn = "Database URI must be set before connecting."
+    #         self.logger.log(msn, "ERROR")
+    #         return False  # or: raise ValueError(msn)
+    #     if self.db_uri.startswith("sqlite:///"):
+    #         path = self.db_uri.replace("sqlite:///", "")
+    #         return Path(path).exists()
+    #     # TODO: Add support for other DBs (e.g. Postgres)
+    #     return False
     def exists_db(self):
         if not self.db_uri:
             msn = "Database URI must be set before connecting."
             self.logger.log(msn, "ERROR")
-            return False  # or: raise ValueError(msn)
+            return False
+
         if self.db_uri.startswith("sqlite:///"):
             path = self.db_uri.replace("sqlite:///", "")
             return Path(path).exists()
-        # TODO: Add support for other DBs (e.g. Postgres)
+
+        if self.db_uri.startswith("postgresql"):
+            try:
+                engine = create_engine(self.db_uri)
+                with engine.connect() as conn:
+                    conn.execute(text("SELECT 1"))
+                return True
+            except Exception as e:
+                self.logger.log(f"Could not connect to database: {e}", "ERROR")
+                return False
+
+        self.logger.log("Unsupported database type for exists_db check.", "WARNING")
         return False
+
 
     def get_session(self):
         if not self.session:

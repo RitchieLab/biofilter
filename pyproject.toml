@@ -30,6 +30,8 @@ pyarrow = "^19.0.1"
 alembic = "^1.16.4"
 toml = "^0.10.2"
 requests = "^2.32.4"
+psycopg2-binary = "^2.9.10"
+notebook = "^7.4.6"
 
 [tool.poetry.group.dev.dependencies]
 black = "^24.10.0"

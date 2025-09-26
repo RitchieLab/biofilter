@@ -337,8 +337,8 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
 
                 if location:
                     # Update
-                    location.start = row["start"]
-                    location.end = row["end"]
+                    location.start_pos = row["start"]
+                    location.end_pos = row["end"]
                     location.strand = row["strand"]
                     location.chromosome = row["chromosome"]
                     # Keep first Data Source and Package for now
@@ -348,8 +348,8 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
                     location = GeneLocation(
                         gene_id=gene.id,
                         assembly="GRCh38",
-                        start=row["start"],
-                        end=row["end"],
+                        start_pos=row["start"],
+                        end_pos=row["end"],
                         strand=row["strand"],
                         chromosome=row["chromosome"],
                         region_id=None,

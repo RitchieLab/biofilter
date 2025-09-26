@@ -308,7 +308,7 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
             "entrez_id": ("code", "ENTREZ", None),
             "full_name": ("synonym", "NCBI", None),
             "synonyms": ("symbol", "NCBI", None),
-            "other_designations": ("synonym", "NCBI", None),
+            # "other_designations": ("synonym", "NCBI", None), # TODO: To fix in 3.2.0
         }
 
         # READ PROCESSED DATA TO LOAD

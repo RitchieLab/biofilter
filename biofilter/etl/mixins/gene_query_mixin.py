@@ -146,8 +146,8 @@ class GeneQueryMixin:
             region = GeneGenomicRegion(
                 label=label_clean,
                 chromosome=chromosome,
-                start=start,
-                end=end,
+                start_pos=start,
+                end_pos=end,
                 description="",
                 data_source_id=data_source_id,
                 etl_package_id=package_id,
@@ -193,8 +193,8 @@ class GeneQueryMixin:
             .filter_by(
                 gene_id=gene.id,
                 chromosome=chromosome,
-                start=start,
-                end=end,
+                star_pos=start,
+                end_pos=end,
                 strand=strand,
                 region_id=region.id if region else None,
                 assembly=assembly,
@@ -211,8 +211,8 @@ class GeneQueryMixin:
             location = GeneLocation(
                 gene_id=gene.id,
                 chromosome=chromosome,
-                start=start,
-                end=end,
+                start_pos=start,
+                end_pos=end,
                 strand=strand,
                 region_id=region.id if region else None,
                 assembly=assembly,

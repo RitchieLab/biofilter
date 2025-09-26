@@ -1,6 +1,5 @@
 from biofilter import Biofilter
 
-# db_uri = "sqlite:///biofilter.db"
 db_uri = "postgresql+psycopg2://bioadmin:bioadmin@localhost/biofilter"
 
 # Configure below
@@ -8,9 +7,8 @@ data_sources_to_process = [
     # Genes
     # -----
     # "hgnc",
-    # "gene_ncbi",
     # "ensembl",
-    # "gene_ncbi",
+    "gene_ncbi",
     #
     # Proteins
     # --------
@@ -63,7 +61,7 @@ data_sources_to_process = [
     #
     # DISEASE
     # -------
-    "mondo",
+    # "mondo",
     # "mondo_relationships",
     #
     # CHEMICAL
@@ -73,14 +71,14 @@ data_sources_to_process = [
 
 run_steps = [
     "extract",
-    "transform",
-    "load",
+    # "transform",
+    # "load",
     # "all"
 ]  # noqa E501
 
 if __name__ == "__main__":
-    bf = Biofilter(db_uri, debug_mode=True)
-    # bf = Biofilter(db_uri)
+    # bf = Biofilter(db_uri, debug_mode=True)
+    bf = Biofilter(debug_mode=True)
 
     for source in data_sources_to_process:
         for step in run_steps:
