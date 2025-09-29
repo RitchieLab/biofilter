@@ -314,12 +314,8 @@ class DBTuningMixin:
     def get_chemical_index_specs(self):
         return [
             # chemical_master
-            ("chemical_masters", ["chebi_id"]),
+            ("chemical_masters", ["chemical_id"]),
             ("chemical_masters", ["entity_id"]),
-            # chemical_entities
-            ("chemical_entities", ["entity_id"]),
-            ("chemical_entities", ["chebi_id"]),
-            # chemical_aliases (opcional, mas pode acelerar buscas por xrefs)
-            ("entity_aliases", ["alias_value", "xref_source"]),
+            # ("chemical_data", ["chemical_id"]),
         ]
 

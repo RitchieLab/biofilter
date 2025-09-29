@@ -26,6 +26,8 @@ from biofilter.db.models import (
 )
 from biofilter.etl.dtps.worker_dbsnp import worker_dbsnp
 from sqlalchemy import text
+from sqlalchemy import any_, cast, Text, bindparam
+from sqlalchemy.dialects.postgresql import ARRAY
 
 
 class DTP(DTPBase, EntityQueryMixin):
@@ -339,6 +341,14 @@ class DTP(DTPBase, EntityQueryMixin):
         if self.debug_mode:
             start_total = time.time()
 
+        def to_str_ids(xs):
+            out = []
+            for x in xs or []:
+                if x is None: 
+                    continue
+                out.append(str(x).strip())
+            return out
+
         # ----= READ PROCESSED DATA =----
         # NOTE: # List all generated Parquet files.
         # Each file will be loaded individually in a loop.
@@ -375,11 +385,18 @@ class DTP(DTPBase, EntityQueryMixin):
             return False, msg  # ⧮ Leaving with ERROR
 
         # ----= GET RELATIONSHIP TYPE =----
+        # relationship_type = (
+        #     self.session.query(EntityRelationshipType)
+        #     # .filter(EntityRelationshipType.code == "associated_with")
+        #     .filter(code == "associated_with")
+        #     # .one_or_none()
+        # )
         relationship_type = (
             self.session.query(EntityRelationshipType)
-            .filter(EntityRelationshipType.code == "associated_with")
-            .one_or_none()
+            .filter_by(code="associated_with")
+            .first()
         )
+
         if not relationship_type:
             relationship_type = EntityRelationshipType(
                 code="associated_with",
@@ -753,13 +770,31 @@ class DTP(DTPBase, EntityQueryMixin):
                 )
 
                 # TODO: Talvez buscar no inicio todos os Genes do Chromossome!?
-                alias_rows = (
-                    self.session.query(EntityAlias.alias_value, EntityAlias.entity_id)  # noqa E501
-                    .filter(EntityAlias.alias_type == "code")
-                    .filter(EntityAlias.xref_source == "ENTREZ")
-                    .filter(EntityAlias.alias_value.in_(entrez_list))
-                    .all()
-                )
+                # alias_rows = (
+                #     self.session.query(EntityAlias.alias_value, EntityAlias.entity_id)  # noqa E501
+                #     .filter(EntityAlias.alias_type == "code")
+                #     .filter(EntityAlias.xref_source == "ENTREZ")
+                #     .filter(EntityAlias.alias_value.in_(entrez_list))
+                #     .all()
+                # )
+
+                
+                entrez_list_str = to_str_ids(entrez_list)
+
+                if not entrez_list_str:
+                    alias_rows = []
+                else:
+                    alias_rows = (
+                        self.session.query(EntityAlias.alias_value, EntityAlias.entity_id)
+                        .filter(EntityAlias.alias_type == "code", EntityAlias.xref_source == "ENTREZ")
+                        .filter(
+                            EntityAlias.alias_value == any_(
+                                cast(bindparam("vals", value=entrez_list_str), ARRAY(Text))
+                            )
+                        )
+                        .all()
+                    )
+
                 entrez2eid = {row.alias_value: row.entity_id for row in alias_rows}  # noqa E501
                 df_genes = pd.DataFrame(
                     list(entrez2eid.items()),

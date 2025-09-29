@@ -571,6 +571,9 @@ class DTP(DTPBase, EntityQueryMixin):
                                 "alias_norm": code.lower(),
                                 "is_primary": False,
                             })
+                
+                # Drop Alias Invalids
+                # not_primary_alias = [alias for alias in not_primary_alias if alias.get("xref_source") != "ICD9"]
 
                 # --- Determine OmicStatus ---
                 omic_status_id = (

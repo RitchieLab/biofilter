@@ -344,13 +344,15 @@ class DTP(DTPBase, EntityQueryMixin):
 
         # RUN LOAD BY ROW
         try:
+            n = 0
+            # for _, row in df.iterrows():
             for _, row in df.iterrows():
                 go_id = row.get("go_id")
                 name = row.get("name")
                 is_obsolete = str(row.get("is_obsolete", "")).strip().lower() == "true"  # noqa E501
 
-                if go_id == "GO:0000050":
-                    pass
+                # if go_id == "GO:0000050":
+                #     pass
 
                 # Skip entries with missing required fields
                 if not go_id or not name:
@@ -385,6 +387,11 @@ class DTP(DTPBase, EntityQueryMixin):
                     alias_norm=is_primary_alias["alias_norm"],
                     is_active=True,
                 )
+
+                if not _:
+                    n += 1
+                    print(n)
+                    continue
 
                 self.get_or_create_entity_name(
                     group_id=self.entity_group,
@@ -439,7 +446,7 @@ class DTP(DTPBase, EntityQueryMixin):
 
         # 🔁 Load GO relations (is_a / part_of / regulates)
         try:
-            rel_path = processed_path / "relations_data.parquet"
+            rel_path = processed_path + "/relations_data.parquet"
             df_rel = pd.read_parquet(rel_path, engine="pyarrow").fillna("")
 
             total_relations = 0

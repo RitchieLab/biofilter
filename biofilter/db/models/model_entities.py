@@ -156,7 +156,7 @@ class EntityAlias(Base):
     entity_group = relationship("EntityGroup", passive_deletes=True)
 
     # Alias value + semantics
-    alias_value = Column(String(255), nullable=False)
+    alias_value = Column(String(1000), nullable=False)
 
     # Allowed: 'preferred' | 'synonym' | 'code'
     alias_type = Column(String(16), nullable=False, default="synonym")
@@ -171,7 +171,7 @@ class EntityAlias(Base):
 
     # Optional normalization helpers (future-proof)
     # e.g., lowercased/stripped for stable matching
-    alias_norm = Column(String(255), nullable=True)
+    alias_norm = Column(String(1000), nullable=True)
     # e.g., 'en', 'pt'; useful for disease common names
     locale = Column(String(8), nullable=True)
 

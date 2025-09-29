@@ -265,7 +265,7 @@ class DTP(DTPBase, EntityQueryMixin):
                     entity_2_group_id=int(row["entity_2_group_id"]) if row["entity_2_group_id"] else None,
                     relationship_type_id=int(row["relationship_type_id"]),
                     data_source_id=self.data_source.id,
-                    package_id=self.package,
+                    package_id=self.package.id,
                 )
                 if status:
                     total_pathways_relations_added += 1

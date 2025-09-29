@@ -153,10 +153,12 @@ class EntityQueryMixin:
             new_alias = EntityAlias(
                 entity_id=entity_id,
                 group_id=group_id,
-                alias_value=key[0],
+                # alias_value=key[0],  # Big values from sources
+                alias_value=self.guard_description(key[0]),
                 alias_type=key[1],
                 xref_source=key[2],
-                alias_norm=alias.get("alias_norm"),
+                # alias_norm=alias.get("alias_norm"),  # Big values from sources
+                alias_norm=self.guard_description(alias.get("alias_norm")),
                 locale=alias.get("locale", "en"),
                 is_primary=False,
                 is_active=is_active,

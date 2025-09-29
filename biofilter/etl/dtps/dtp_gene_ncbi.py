@@ -282,6 +282,8 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
         - Genes are linked to a placeholder GeneGroup ("NCBI Gene").
         - Genomic regions are parsed from `map_location`.
         - Only genes with missing HGNC ID are processed.
+
+        Import: Only Genes with map_location in the source will be load
         """
 
         self.logger.log(

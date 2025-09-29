@@ -59,11 +59,11 @@ data_sources_to_process = [
     # RelationShips
     # -------------
     # "reactome_relationships",
-    # "uniprot_relationships",
+    "uniprot_relationships",
     #
     # DISEASE
     # -------
-    "mondo",
+    # "mondo",
     # "mondo_relationships",
     #
     # CHEMICAL
