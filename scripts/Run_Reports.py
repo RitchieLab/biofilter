@@ -28,7 +28,6 @@ if __name__ == "__main__":
     # )
     result = bf.report.run_report(
         "report_gene_to_snp",
-        assembly='38',
         input_data="/home/bioadmin/biofilter/scripts/gene_list.txt"
     )
 

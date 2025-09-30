@@ -24,7 +24,8 @@ class ReportManager:
                 return obj
         raise ImportError(f"No valid report class found in {name}")
 
-    def list_reports(self, verbose: bool = True) -> list[dict]:
+    # def list_reports(self, verbose: bool = True) -> list[dict]:
+    def list_reports(self, verbose: bool = True):
         """
         Lists all available reports in the system.
 
@@ -53,7 +54,9 @@ class ReportManager:
                 print(f"{n}. {r['name']}: ")
                 print(f"   {r['description']}\n")
                 # print(f" • {r['name']:<20} → {r['description']}")
-            print()
+            # print()
+            return True
+
         return reports
 
     def run_report(self, name: str, **kwargs):
