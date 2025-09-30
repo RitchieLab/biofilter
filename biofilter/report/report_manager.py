@@ -24,8 +24,16 @@ class ReportManager:
                 return obj
         raise ImportError(f"No valid report class found in {name}")
 
-    def list_reports(self):
-        """List all available report classes under report/reports"""
+    def list_reports(self, verbose: bool = True) -> list[dict]:
+        """
+        Lists all available reports in the system.
+
+        Parameters:
+            verbose (bool): If True, prints a friendly formatted table.
+
+        Returns:
+            List[Dict]: List of report metadata with name and description.
+        """
         reports = []
         for _, name, _ in pkgutil.iter_modules(reports_pkg.__path__):
             if name.startswith("report_"):
@@ -36,11 +44,33 @@ class ReportManager:
                         "description": getattr(report_class, "description", ""),
                     }
                 )
+        if verbose:
+            print("\n📄 Available Reports:")
+            print("=====================\n")
+            n = 0
+            for r in reports:
+                n += 1
+                print(f"{n}. {r['name']}: ")
+                print(f"   {r['description']}\n")
+                # print(f" • {r['name']:<20} → {r['description']}")
+            print()
         return reports
 
-    def run_report(self, name: str, as_dataframe: bool = True, **kwargs):
+    def run_report(self, name: str, **kwargs):
         report_class = self._load_report_class(name)
         report = report_class(session=self.session, logger=self.logger, **kwargs)
-        result = report.run()
-        # return report.to_dataframe(result) if as_dataframe else result
-        return result
+        result_df = report.run()
+        return result_df
+    
+    def explain(self, name: str, **kwargs):
+        report_class = self._load_report_class(name)
+        report = report_class(session=self.session, logger=self.logger, **kwargs)
+        result = report.explain()
+        print(result)
+
+    def run_example_report(self, name: str, **kwargs):
+        report_class = self._load_report_class(name)
+        kwargs.setdefault("input_data", report_class.example_input()) # Use Example
+        report = report_class(session=self.session, logger=self.logger, **kwargs)
+        result_df = report.run()
+        return result_df

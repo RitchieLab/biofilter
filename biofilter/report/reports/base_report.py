@@ -16,6 +16,15 @@ class ReportBase:
 
         return Logger(name=self.name)
 
+    @classmethod
+    def explain(cls) -> str:
+        return "No explanation provided."
+
+    @classmethod
+    def example_input(cls) -> list[str] | None:
+        return None
+
+
     def run(self):
         raise NotImplementedError("Subclasses must implement `run()`.")
 
@@ -29,6 +38,7 @@ class ReportBase:
         if isinstance(input_data, list):
             return input_data
 
+        # TODO: Criar logica para ler da Cloud ou outras fontes
         if isinstance(input_data, str):
             # Caminho para arquivo
             path = Path(input_data)
@@ -36,6 +46,7 @@ class ReportBase:
                 with path.open() as f:
                     return [line.strip() for line in f if line.strip()]
 
+            # TODO: Preciso melhorar essa logica, criando uma pasta defaul
             # Nome de lista salva (sem caminho), assumimos ./input_lists/
             default_path = Path("input_lists") / f"{input_data}.txt"
             if default_path.exists():
@@ -57,14 +68,16 @@ class ReportBase:
             Dict of Chrom : accession_id
         """
         from biofilter.db.models import GenomeAssembly
-
-        if "38" in assembly_input:
-            label = "GRCh38.p14"    # TODO: Passar isso para configuracoes
-        elif "37" in assembly_input:
-            label = "GRCh37.p13"    # TODO: Passar isso para configuracoes
-        else:
-            raise ValueError(f"Unrecognized assembly input: {assembly_input}")
-
+        try:
+            if "38" in assembly_input:
+                label = "GRCh38.p14"    # TODO: Passar isso para configuracoes
+            elif "37" in assembly_input:
+                label = "GRCh37.p13"    # TODO: Passar isso para configuracoes
+            else:
+                # raise ValueError(f"Unrecognized assembly input: {assembly_input}")
+                label = "GRCh38.p14"  # TODO: This will be default
+        except Exception as e:
+            label = "GRCh38.p14" 
 
         # Map chromosome → assembly_id
         rows = (

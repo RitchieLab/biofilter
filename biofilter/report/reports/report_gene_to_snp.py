@@ -22,6 +22,64 @@ class GeneToSNPReport(ReportBase):
     name = "gene_to_snp"
     description = "Given a list of genes, returns gene metadata and associated variants (SNPs) with positional and allelic info."
 
+    @classmethod
+    def explain(cls) -> str:
+        return """\
+🧬 GENE → SNP Report
+====================
+
+    This report takes as input a list of genes — accepted formats include:
+    - HGNC symbols (e.g., `TP53`)
+    - HGNC IDs (e.g., `HGNC:11998`)
+    - Entrez IDs (e.g., `7157`)
+    - Ensembl IDs (e.g., `ENSG00000141510`)
+    - Any other symbols
+    - Any other Names or Alias
+
+    It returns:
+    - ✅  Gene metadata (ID, symbol, alias type/source, conflict status)
+    - 🧬  Associated SNPs (from dbSNP)
+    - 📍  Genomic location (chr/start/end/accession)
+    - 🧬  Alleles (ref/alt) and quality
+    - ⚠️  Notes for duplicates or missing variants
+
+
+🧪 EXAMPLE USAGE
+================
+
+    > result = bf.report.run_report(
+        "report_gene_to_snp",
+        assembly='38',
+        input_data=["TXLNGY", "HGNC:18473", "246126", "ENSG00000131002", "HGNC:5"]
+        )
+
+
+    If you need run a Example Report:
+        > result = bf.report.run_example_report("report_gene_to_snp")
+
+
+    This returns a Pandas DataFrame with columns:
+        > print(result)
+        Index,Input Gene,HGNC Symbol,Matched Name,Alias Type,Alias Source,Gene ID,Variant ID,Variant Type,Chr,Start,End,Ref Allele,Alt Allele,Accession,Assembly,Quality,Note
+        0,246126,TXLNGY,246126,code,ENTREZ,38610,rs3900,SNV,Y,19568371.0,19568371.0,["G"]",["C"]",NC_000024.10,GRCh38.p14,8.9,
+        ...
+        3233,TXLNGY,TXLNGY,TXLNGY,symbol,HGNC,38610,,,,,,,,,,,Duplicate entity_id: mapped to same gene as another input
+
+    """
+
+    @classmethod
+    def example_input(cls) -> list[str]:
+        """
+        Returns a minimal working example of inputs for testing or tutorials.
+        """
+        return [
+            "TXLNGY",
+            "HGNC:18473",
+            "246126",
+            "ENSG00000131002",
+            "HGNC:5"
+        ]
+
     def run(self):
 
         # Read Input Genes List (Direct List or File)
@@ -277,18 +335,3 @@ class GeneToSNPReport(ReportBase):
         except Exception as e:
             self.logger.log(f"Error to prepare results: {e}", "WARNING")
             return None  
-
-"""
-bf = Biofilter("sqlite:///biofilter.db")
-
-result = bf.report.run_report(
-    "report_gene_to_snp",
-    input_data=["TP53", "ENSG00000141510", "7157"],
-    assembly="GRCh38"
-)
-
-# Acesso separado aos dois DataFrames:
-genes_df = result["genes"]
-variants_df = result["variants"]
-
-"""

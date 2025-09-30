@@ -15,17 +15,26 @@ if __name__ == "__main__":
     # Run specific report
     # df = bf.report.run_report("report_etl_status")
 
+    # result = bf.report.run_report(
+    #     "report_gene_to_snp",
+    #     assembly='38',
+    #     input_data=[
+    #         "TXLNGY",
+    #         "HGNC:18473",
+    #         "246126",
+    #         "ENSG00000131002",
+    #         "HGNC:5"
+    #     ],
+    # )
     result = bf.report.run_report(
         "report_gene_to_snp",
         assembly='38',
-        input_data=[
-            "TXLNGY",
-            "HGNC:18473",
-            "246126",
-            "ENSG00000131002",
-            "HGNC:5"
-        ],
+        input_data="/home/bioadmin/biofilter/scripts/gene_list.txt"
     )
+
+    # bf.report.explain("report_gene_to_snp")
+    # result = bf.report.run_example_report("report_gene_to_snp")
+    # bf.report.list_reports()
 
     # def flatten_allele(val):
     #     if isinstance(val, list):

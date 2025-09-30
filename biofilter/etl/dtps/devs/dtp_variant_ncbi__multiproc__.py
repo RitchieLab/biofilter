@@ -152,79 +152,47 @@ class DTP(DTPBase, EntityQueryMixin):
         max_workers = 1  # TODO: Implementar metodos melhores
 
         try:
-            # NOTE: I have problem with MP on VPS. Need review
+            futures, batch, batch_id = [], [], 0
+            with bz2.open(
+                input_file, "rt", encoding="utf-8"
+            ) as f, ProcessPoolExecutor(  # noqa E501
+                max_workers=max_workers
+            ) as ex:
+                if __name__ == "__main__" or (
+                    hasattr(__main__, "__file__") and not hasattr(sys, "ps1")
+                ):
+                    for line in f:
+                        batch.append(line)
+                        if len(batch) >= batch_size:
+                            futures.append(
+                                ex.submit(
+                                    worker_dbsnp,
+                                    batch.copy(),
+                                    batch_id,
+                                    output_dir,
+                                )
+                            )
+                            batch.clear()
+                            batch_id += 1
+                    if batch:
+                        futures.append(
+                            ex.submit(
+                                worker_dbsnp,
+                                batch.copy(),
+                                batch_id,
+                                output_dir,
+                            )
+                        )
 
-            # futures, batch, batch_id = [], [], 0
-            # with bz2.open(
-            #     input_file, "rt", encoding="utf-8"
-            # ) as f, ProcessPoolExecutor(  # noqa E501
-            #     max_workers=max_workers
-            # ) as ex:
-            #     if __name__ == "__main__" or (
-            #         hasattr(__main__, "__file__") and not hasattr(sys, "ps1")
-            #     ):
-            #         for line in f:
-            #             batch.append(line)
-            #             if len(batch) >= batch_size:
-            #                 futures.append(
-            #                     ex.submit(
-            #                         worker_dbsnp,
-            #                         batch.copy(),
-            #                         batch_id,
-            #                         output_dir,
-            #                     )
-            #                 )
-            #                 batch.clear()
-            #                 batch_id += 1
-            #         if batch:
-            #             futures.append(
-            #                 ex.submit(
-            #                     worker_dbsnp,
-            #                     batch.copy(),
-            #                     batch_id,
-            #                     output_dir,
-            #                 )
-            #             )
+                    for fut in as_completed(futures):
+                        fut.result()
+                else:
+                    self.logger.log(
+                        "⚠️ Skipping multiprocessing: not in __main__ context.",  # noqa E501
+                        "WARNING",
+                    )
 
-            #         for fut in as_completed(futures):
-            #             fut.result()
-            #     else:
-            #         self.logger.log(
-            #             "⚠️ Skipping multiprocessing: not in __main__ context.",  # noqa E501
-            #             "WARNING",
-            #         )
-
-            batch, batch_id = [], 0
-            # (opcional) pular partes já prontas p/ retomar
-            def already_done(pid: int) -> bool:
-                # ajuste se seu worker usa outro padrão de nome
-                return os.path.exists(os.path.join(output_dir, f"processed_part_{pid}.parquet"))
-
-            with bz2.open(input_file, "rt", encoding="utf-8") as f:
-                self.logger.log("🧵 Running in SERIAL mode (no multiprocessing).", "INFO")
-
-                for line in f:
-                    batch.append(line)
-                    if len(batch) >= batch_size:
-                        if not already_done(batch_id):
-                            worker_dbsnp(batch, batch_id, output_dir)  # chamada direta
-                        else:
-                            self.logger.log(f"⏭️  Skipping existing part {batch_id}", "DEBUG")
-                        batch_id += 1
-                        batch = []  # libera memória
-
-                # resto final
-                if batch:
-                    if not already_done(batch_id):
-                        worker_dbsnp(batch, batch_id, output_dir)
-                    else:
-                        self.logger.log(f"⏭️  Skipping existing part {batch_id}", "DEBUG")
-                    batch_id += 1
-                    batch = []
-
-
-            # msg = f"✅ Processing completed with {len(futures)} batches."
-            msg = f"✅ Processing completed with {batch_id} batches (serial)."
+            msg = f"✅ Processing completed with {len(futures)} batches."
             self.logger.log(msg, "INFO")
             return True, msg
 
