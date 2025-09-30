@@ -46,59 +46,31 @@ class ReportBase:
 
         raise ValueError(f"{param_name} must be a list or a path to a text file.")
     
-    def resolve_assembly(self, assembly_input: str, return_mapper: bool = False) -> int | tuple[int, dict]:
+    def resolve_assembly(self, assembly_input: str) -> tuple[int, dict]:
         """
         Normalize and resolve the assembly input to a valid assembly_id from the GenomeAssembly table.
 
         Parameters:
             assembly_input: str (e.g., '38', 'GRCh38', 'grch38.p14', '37')
-            return_mapper: if True, also return chromosome → assembly_id map
 
         Returns:
-            int: resolved assembly_id
-            OR (int, dict): if return_mapper=True
+            Dict of Chrom : accession_id
         """
         from biofilter.db.models import GenomeAssembly
 
-        normalized = str(assembly_input).lower().replace(".", "").replace("p", "").replace("grc", "").replace("h", "")
-
-        if "38" in normalized:
-            label = "GRCh38"
-        elif "37" in normalized:
-            label = "GRCh37"
+        if "38" in assembly_input:
+            label = "GRCh38.p14"    # TODO: Passar isso para configuracoes
+        elif "37" in assembly_input:
+            label = "GRCh37.p13"    # TODO: Passar isso para configuracoes
         else:
             raise ValueError(f"Unrecognized assembly input: {assembly_input}")
 
-        # Fetch the full label from the DB (e.g., GRCh38.p14)
-        version = (
-            self.session.query(GenomeAssembly.assembly)
-            .filter(GenomeAssembly.assembly.ilike(f"{label}%"))
-            .limit(1)
-            .scalar()
+
+        # Map chromosome → assembly_id
+        rows = (
+            self.session.query(GenomeAssembly.chromosome, GenomeAssembly.id)
+            .filter(GenomeAssembly.assembly_name == label)
+            .all()
         )
-
-        if not version:
-            raise ValueError(f"Genome assembly '{label}' not found in database.")
-
-        # Get one example assembly_id
-        assembly_id = (
-            self.session.query(GenomeAssembly.id)
-            .filter(GenomeAssembly.assembly == version)
-            .limit(1)
-            .scalar()
-        )
-
-        if not assembly_id:
-            raise ValueError(f"Could not resolve assembly ID for '{version}'.")
-
-        if return_mapper:
-            # Map chromosome → assembly_id
-            rows = (
-                self.session.query(GenomeAssembly.chromosome, GenomeAssembly.id)
-                .filter(GenomeAssembly.assembly == version)
-                .all()
-            )
-            chrom_to_assembly_id = {row[0]: row[1] for row in rows}
-            return assembly_id, chrom_to_assembly_id
-
-        return assembly_id
+        chrom_to_assembly_id = {row[0]: row[1] for row in rows}
+        return chrom_to_assembly_id

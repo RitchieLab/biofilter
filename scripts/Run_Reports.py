@@ -1,6 +1,7 @@
 from biofilter import Biofilter
 
-db_uri = "sqlite:///dev_biofilter.db"
+# db_uri = "sqlite:///dev_biofilter.db"
+db_uri = "postgresql+psycopg2://bioadmin:bioadmin@localhost/biofilter"
 
 if __name__ == "__main__":
 
@@ -14,21 +15,25 @@ if __name__ == "__main__":
     # Run specific report
     # df = bf.report.run_report("report_etl_status")
 
-    df = bf.report.run_report(
-        "report_entity_filter",
+    result = bf.report.run_report(
+        "report_gene_to_snp",
+        assembly='38',
         input_data=[
-            "A0A087X1C5",
-            "A0AV02",
-            "rs456",
-            "Q68D04",
-            "LOC130057800",
-            "A0av02",
-            "Cytochrome",
+            "TXLNGY",
+            "HGNC:18473",
+            "246126",
+            "ENSG00000131002",
+            "HGNC:5"
         ],
     )
-    # df = bf.report.run_report(
-    #     "report_entity_filter",
-    #     input_data=["A0av02"],
-    # )
 
-    print(df)
+    # def flatten_allele(val):
+    #     if isinstance(val, list):
+    #         return ";".join(val)
+    #     return val
+
+    # result["Ref Allele"] = result["Ref Allele"].apply(flatten_allele)
+    # result["Alt Allele"] = result["Alt Allele"].apply(flatten_allele)
+
+
+    print(result)

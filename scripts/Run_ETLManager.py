@@ -54,12 +54,12 @@ data_sources_to_process = [
     # "dbsnp_chrx",
     # "dbsnp_chry",
     # "dbsnp_chrmt",
-    # "gwas",
+    "gwas",
     #
     # RelationShips
     # -------------
     # "reactome_relationships",
-    "uniprot_relationships",
+    # "uniprot_relationships",
     #
     # DISEASE
     # -------
@@ -72,8 +72,8 @@ data_sources_to_process = [
 ]
 
 run_steps = [
-    "extract",
-    "transform",
+    # "extract",
+    # "transform",
     "load",
     # "all"
 ]  # noqa E501

@@ -177,7 +177,7 @@ class VariantGWAS(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
 
     # Publication / study info
-    pubmed_id = Column(String(50), index=True, nullable=True)
+    pubmed_id = Column(String(255), index=True, nullable=True)
     # first_author = Column(String(255), nullable=True)
     # publication_date = Column(String(50), nullable=True)  # raw string for now
     # journal = Column(String(255), nullable=True)
@@ -187,26 +187,26 @@ class VariantGWAS(Base):
     # Trait / phenotype mapping
     raw_trait = Column(String(255), nullable=True)        # "DISEASE/TRAIT" field
     mapped_trait = Column(String(255), nullable=True)     # "EFO term"
-    mapped_trait_id = Column(String(100), nullable=True)  # "EFO/MONDO ID"
+    mapped_trait_id = Column(String(255), nullable=True)  # "EFO/MONDO ID"
     parent_trait = Column(String(255), nullable=True)     # Parent term
-    parent_trait_id = Column(String(100), nullable=True)  # Parent URI ID
+    parent_trait_id = Column(String(255), nullable=True)  # Parent URI ID
 
     # Variant info
-    chr_id = Column(String(10), nullable=True)
+    chr_id = Column(String(255), nullable=True)
     chr_pos = Column(Integer, nullable=True)
     reported_gene = Column(String(255), nullable=True)
     mapped_gene = Column(String(255), nullable=True)
-    snp_id = Column(String(50), index=True, nullable=True)  # dbSNP ID (rsID)
-    snp_risk_allele = Column(String(50), nullable=True)  # Qual a origem
+    snp_id = Column(String(255), index=True, nullable=True)  # dbSNP ID (rsID)
+    snp_risk_allele = Column(String(255), nullable=True)  # Qual a origem
     risk_allele_frequency = Column(Float, nullable=True)
-    context = Column(String(100), nullable=True)
-    intergenic = Column(String(10), nullable=True)
+    context = Column(String(255), nullable=True)
+    intergenic = Column(String(255), nullable=True)
 
     # Statistics
     p_value = Column(Float, nullable=True)
     pvalue_mlog = Column(Float, nullable=True)
-    odds_ratio_beta = Column(String(50), nullable=True)
-    ci_text = Column(String(100), nullable=True)  # confidence interval raw
+    odds_ratio_beta = Column(String(255), nullable=True)
+    ci_text = Column(String(255), nullable=True)  # confidence interval raw
 
     # Sample sizes
     initial_sample_size = Column(Text, nullable=True)
@@ -214,7 +214,7 @@ class VariantGWAS(Base):
 
     # Platform info
     platform = Column(String(255), nullable=True)
-    cnv = Column(String(10), nullable=True)
+    cnv = Column(String(255), nullable=True)
 
     # Notes
     notes = Column(Text, nullable=True)

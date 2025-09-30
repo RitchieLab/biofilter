@@ -47,7 +47,7 @@
             "name": "Bio 3R - Run Reports",
             "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceFolder}/scripts/run_reports.py",
+            "program": "${workspaceFolder}/scripts/Run_Reports.py",
             "console": "integratedTerminal"
         },
         {

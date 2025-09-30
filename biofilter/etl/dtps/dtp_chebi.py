@@ -493,9 +493,9 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
                         is_active=is_active_entity,
                     )
 
-                    if not _:
-                        print(f"Jump --> {chebi_id}")
-                        continue
+                    # if not _:
+                    #     print(f"Jump --> {chebi_id}")
+                    #     continue
 
                     # --- Entity Aliases ---
                     self.get_or_create_entity_name(

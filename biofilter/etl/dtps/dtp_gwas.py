@@ -367,61 +367,131 @@ class DTP(DTPBase, EntityQueryMixin):
             return False, msg
 
 
-        def safe_float(val):
-            """
-            Convert value to float if possible, else None.
-            Handles NR, NA, empty strings, and invalid entries.
-            """
-            if pd.isna(val) or str(val).strip() in ["", "NR", "NA", "N/A", "nan"]:
-                return None
-            try:
-                return float(val)
-            except ValueError:
-                return None
+        # def safe_float(val):
+        #     """
+        #     Convert value to float if possible, else None.
+        #     Handles NR, NA, empty strings, and invalid entries.
+        #     """
+        #     if pd.isna(val) or str(val).strip() in ["", "NR", "NA", "N/A", "nan"]:
+        #         return None
+        #     try:
+        #         return float(val)
+        #     except ValueError:
+        #         return None
 
-        # Campos que devem virar float
-        float_fields = ["risk_allele_frequency", "odds_ratio_beta",
-                        "p_value", "pvalue_mlog"]
+        # # Campos que devem virar float
+        # float_fields = ["risk_allele_frequency", "odds_ratio_beta",
+        #                 "p_value", "pvalue_mlog"]
 
-        for field in float_fields:
-            if field in df.columns:
-                df[field] = df[field].apply(safe_float).astype("float64")
+        # for field in float_fields:
+        #     if field in df.columns:
+        #         df[field] = df[field].apply(safe_float).astype("float64")
+
+        # # def flatten_list(val):
+        # #     if isinstance(val, list):
+        # #         return ";".join([str(v) for v in val if v])
+        # #     return str(val) if pd.notna(val) else None
 
         # def flatten_list(val):
-        #     if isinstance(val, list):
-        #         return ";".join([str(v) for v in val if v])
-        #     return str(val) if pd.notna(val) else None
+        #     if isinstance(val, (list, np.ndarray)):
+        #         return ";".join([str(v) for v in val if v is not None and str(v) != ""])
+        #     return str(val) if pd.notna(val) and str(val) != "" else None
 
-        def flatten_list(val):
-            if isinstance(val, (list, np.ndarray)):
-                return ";".join([str(v) for v in val if v is not None and str(v) != ""])
-            return str(val) if pd.notna(val) and str(val) != "" else None
-
+        # # for col in ["mapped_trait", "mapped_trait_id", "parent_trait", "parent_trait_id"]:
+        # #     if col in df.columns:
+        # #         df[col] = df[col].apply(flatten_list)
         # for col in ["mapped_trait", "mapped_trait_id", "parent_trait", "parent_trait_id"]:
         #     if col in df.columns:
         #         df[col] = df[col].apply(flatten_list)
+
+        # df["data_source_id"] = self.data_source.id
+        # df["etl_package_id"] = self.package.id
+
+        # Helpers
+        SENTINELS = {"", "NA", "N/A", "na", "null", "None", "Nan", "nan"}
+
+        def flatten_list(val):
+            if isinstance(val, (list, np.ndarray)):
+                vals = [str(v) for v in val if v is not None and str(v) != ""]
+                return ";".join(vals) if vals else None
+            s = None if pd.isna(val) else str(val)
+            return s if s and s not in SENTINELS else None
+
+        # Campos multivalorados -> string única (se existirem)
         for col in ["mapped_trait", "mapped_trait_id", "parent_trait", "parent_trait_id"]:
             if col in df.columns:
                 df[col] = df[col].apply(flatten_list)
 
+        # Numéricos: converta com coercion (''/NA -> NaN)
+        if "risk_allele_frequency" in df.columns:
+            df["risk_allele_frequency"] = pd.to_numeric(df["risk_allele_frequency"], errors="coerce")
+
+        if "p_value" in df.columns:
+            df["p_value"] = pd.to_numeric(df["p_value"], errors="coerce")
+
+        if "pvalue_mlog" in df.columns:
+            df["pvalue_mlog"] = pd.to_numeric(df["pvalue_mlog"], errors="coerce")
+
+        # chr_pos é INTEGER no modelo
+        if "chr_pos" in df.columns:
+            df["chr_pos"] = pd.to_numeric(df["chr_pos"], errors="coerce").astype("Int64")  # pandas nullable int
+
+        # chr_id é TEXT; normalize vazios para None
+        if "chr_id" in df.columns:
+            df["chr_id"] = df["chr_id"].astype(str)
+            df.loc[df["chr_id"].isin(SENTINELS) | df["chr_id"].isna(), "chr_id"] = None
+
+        # odds_ratio_beta é String(50) no modelo -> não converter para float
+        # (se quiser, padronize para string curta)
+        if "odds_ratio_beta" in df.columns:
+            df["odds_ratio_beta"] = df["odds_ratio_beta"].astype(str)
+            df.loc[df["odds_ratio_beta"].isin(SENTINELS), "odds_ratio_beta"] = None
+            df["odds_ratio_beta"] = df["odds_ratio_beta"].str.slice(0, 50)
+
+        # Campos textuais comuns: normalize vazios para None (sem quebrar numéricos)
+        text_cols = [
+            "pubmed_id","raw_trait","mapped_trait","mapped_trait_id","parent_trait",
+            "parent_trait_id","reported_gene","mapped_gene","snp_id","snp_risk_allele",
+            "context","intergenic","ci_text","initial_sample_size","replication_sample_size",
+            "platform","cnv","notes"
+        ]
+        for col in text_cols:
+            if col in df.columns:
+                df[col] = df[col].astype(str)
+                df.loc[df[col].isin(SENTINELS) | df[col].isna(), col] = None
+
+        # IDs de sistema
         df["data_source_id"] = self.data_source.id
         df["etl_package_id"] = self.package.id
 
+        # Converta todos os NaN/NaT restantes para None (p/ psycopg2)
+        df = df.where(pd.notna(df), None)
 
-        # --- DB operations ---
+        # # --- DB operations ---
         try:
             # 1. Clear old data
             self.session.execute(text("DELETE FROM variant_gwas"))
             self.session.commit()
 
-            # 2. Prepare bulk objects
-            records = df.to_dict(orient="records")
-            objs = [VariantGWAS(**r) for r in records]
+        #     # 2. Prepare bulk objects
+        #     records = df.to_dict(orient="records")
+        #     objs = [VariantGWAS(**r) for r in records]
 
-            # 3. Bulk insert
-            self.session.bulk_save_objects(objs)
+        #     # 3. Bulk insert
+        #     self.session.bulk_save_objects(objs)
+        #     self.session.commit()
+        #     total_records = len(objs)
+
+            records = df.to_dict(orient="records")
+            
+            # NOTE: Keep only 255 per record (Rethink next versions)
+            for r in records:
+                for k, v in r.items():
+                    if isinstance(v, str) and len(v) > 255:
+                        r[k] = v[:255]  # corta para 255 caracteres
+
+            self.session.execute(VariantGWAS.__table__.insert(), records)
             self.session.commit()
-            total_records = len(objs)
 
         except Exception as e:
             self.session.rollback()

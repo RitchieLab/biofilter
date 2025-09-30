@@ -72,7 +72,7 @@ data_sources_to_process = [
 ]
 
 run_steps = [
-    "extract",
+    # "extract",
     "transform",
     "load",
     # "all"

@@ -149,7 +149,7 @@ class DTP(DTPBase, EntityQueryMixin):
 
         # parameters
         batch_size = 200_000
-        max_workers = 6
+        max_workers = 1  # TODO: Implementar metodos melhores
 
         try:
             futures, batch, batch_id = [], [], 0
