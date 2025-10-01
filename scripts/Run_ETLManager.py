@@ -1,7 +1,7 @@
 from biofilter import Biofilter
 
-# db_uri = "sqlite:///biofilter.db"
-db_uri = "postgresql+psycopg2://bioadmin:bioadmin@localhost/biofilter"
+db_uri = "sqlite:///biofilter_4.db"
+# db_uri = "postgresql+psycopg2://bioadmin:bioadmin@localhost/biofilter"
 
 # Configure below
 data_sources_to_process = [
@@ -29,7 +29,7 @@ data_sources_to_process = [
     # Variants
     # --------
     # "dbsnp_sample",
-    "dbsnp_chr1",
+    # "dbsnp_chr1",
     # "dbsnp_chr2",
     # "dbsnp_chr3",
     # "dbsnp_chr4",
@@ -65,6 +65,8 @@ data_sources_to_process = [
     # -------
     # "mondo",
     # "mondo_relationships",
+    "clingen",
+    # "omim",
     #
     # CHEMICAL
     # --------
@@ -73,8 +75,8 @@ data_sources_to_process = [
 
 run_steps = [
     # "extract",
-    "transform",
-    # "load",
+    # "transform",
+    "load",
     # "all"
 ]  # noqa E501
 

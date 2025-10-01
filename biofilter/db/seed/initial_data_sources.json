@@ -506,6 +506,32 @@
             "active": true,
             "dtp_version": "1.1.0",
             "schema_version": "3.1.0"
+        },
+        {
+            "source_system": "CLINGEN",
+            "name": "clingen",
+            "data_type": "disease relationships",
+            "source_url": "https://search.clinicalgenome.org/kb/gene-validity/download",
+            "format": "csv",
+            "grch_version": "",
+            "ucschg_version": "",
+            "dtp_script": "dtp_clingen",
+            "active": true,
+            "dtp_version": "1.1.0",
+            "schema_version": "3.1.0"
+        },
+        {
+            "source_system": "OMIM",
+            "name": "omim",
+            "data_type": "disease relationships",
+            "source_url": "https://omim.org/static/omim/data/mim2gene.txt",
+            "format": "txt",
+            "grch_version": "",
+            "ucschg_version": "",
+            "dtp_script": "dtp_omim",
+            "active": true,
+            "dtp_version": "1.1.0",
+            "schema_version": "3.1.0"
         }
     ]
-} 
+}
