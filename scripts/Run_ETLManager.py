@@ -1,7 +1,7 @@
 from biofilter import Biofilter
 
-db_uri = "sqlite:///biofilter_4.db"
-# db_uri = "postgresql+psycopg2://bioadmin:bioadmin@localhost/biofilter"
+# db_uri = "sqlite:///biofilter_4.db"
+db_uri = "postgresql+psycopg2://bioadmin:bioadmin@localhost/biofilter"
 
 # Configure below
 data_sources_to_process = [

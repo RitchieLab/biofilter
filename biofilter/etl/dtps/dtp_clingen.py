@@ -507,7 +507,6 @@ class DTP(DTPBase, EntityQueryMixin):
         - hgnc_id, gene_symbol, mondo_id, disease_label
         - moi, sop_version, classification, assertion_date, gcep, report_url
         """
-        
 
         msg = f"📥 Loading {self.data_source.name} data into the database..."
         self.logger.log(
@@ -556,106 +555,105 @@ class DTP(DTPBase, EntityQueryMixin):
             self.logger.log(msg, "ERROR")
             return False, msg  # ⧮ Leaving with ERROR
 
-        # Set DB and drop indexes
-        try:
-            # self.db_write_mode()
-            self.drop_indexes(self.get_entity_index_specs)
-        except Exception as e:
-            total_warnings += 1
-            msg = f"⚠️  Failed to switch DB to write mode or drop indexes: {e}"
-            self.logger.log(msg, "WARNING")
-            return False, msg  # ⧮ Leaving with ERROR
+        # GET ALL ENTITIES IDS
+        # 1. Get Entity Groups and Relationship Type IDs
+        gene_group_qry = (
+                self.session.query(EntityGroup)
+                .filter_by(name="Genes")
+                .first()  # noqa: E501
+            )  # noqa: E501
+        
+        disease_group_qry = (
+                self.session.query(EntityGroup)
+                .filter_by(name="Diseases")
+                .first()  # noqa: E501
+            )  # noqa: E501
+        
+        relationship_type_qry = (
+            self.session.query(EntityRelationshipType)
+                .filter_by(code="part_of")  # TODO: Change it before Production
+                .first()  # noqa: E501
+            )
 
-        # GET ENTITY GROUP ID AND OMICS STATUS
-        # --- Prepare maps ---
-        group_map = {
-            g.name.lower(): g.id
-            for g in self.session.query(EntityGroup).all()
-        }
-        gene_group_id = group_map.get("genes")
-        disease_group_id = group_map.get("diseases")
+        # 2. Unique Terms IDs
+        genes_ids = df["hgnc_id"].dropna().unique().tolist()
+        diseases_ids = df["mondo_id"].dropna().unique().tolist()
 
-        rel_type_map = {
-            rt.code.lower(): rt.id
-            for rt in self.session.query(EntityRelationshipType).all()
-        }
-
-        rel_type_id = rel_type_map.get("part_of") # TODO: Mudar aqui
-
-        # --- Clean old relationships ---
-        deleted = (
-            self.session.query(EntityRelationship)
-            .filter_by(data_source_id=self.data_source.id)
-            .delete(synchronize_session=False)
+        # 3. Query mappings
+        gene_aliases = (
+            self.session.query(
+                EntityAlias.alias_value, EntityAlias.entity_id, EntityAlias.group_id)
+                .filter(EntityAlias.alias_value.in_(genes_ids))
+                .filter(EntityAlias.group_id == gene_group_qry.id)
+                .filter(EntityAlias.xref_source == "HGNC")
+                .all()
+            )
+        disease_aliases = (
+            self.session.query(
+                EntityAlias.alias_value, EntityAlias.entity_id, EntityAlias.group_id)
+                .filter(EntityAlias.alias_value.in_(diseases_ids))
+                .filter(EntityAlias.group_id == disease_group_qry.id)
+                .filter(EntityAlias.xref_source == "MONDO")
+                .all()
         )
-        self.logger.log(f"🧹 Deleted {deleted} old ClinGen relationships", "INFO")
-        self.session.commit()
 
-        not_loaded = []
+        # 4. Map to DataFrame
+        df_genes_map = pd.DataFrame(gene_aliases, columns=["hgnc_id","entity_1_id","entity_1_group_id"])
+        df_diseases_map = pd.DataFrame(disease_aliases, columns=["mondo_id","entity_2_id","entity_2_group_id"])
 
-        # RUN LOAD BY ROW
-        for _, row in df.iterrows():
-            try:
-                gene_id = str(row["hgnc_id"])
-                disease_id = str(row["mondo_id"])
+        # 4. Merge
+        df = df.merge(df_genes_map, on="hgnc_id", how="left")
+        df = df.merge(df_diseases_map, on="mondo_id", how="left")
 
-                # Find Gene entity
-                gene_entity = (
-                    self.session.query(EntityAlias)
-                    .filter(EntityAlias.alias_value == gene_id)
-                    .filter(EntityAlias.is_active.is_(True))
-                    .filter(EntityAlias.group_id == gene_group_id)
-                    .first()
-                )
+        # 5. Add relationship_type
+        df["relationship_type_id"] = relationship_type_qry.id
 
-                # Find Disease entity
-                disease_entity = (
-                    self.session.query(EntityAlias)
-                    .filter(EntityAlias.alias_value == disease_id)
-                    .filter(EntityAlias.is_active.is_(True))
-                    .filter(EntityAlias.group_id == disease_group_id)
-                    .first()
-                )
+        # 6. Keep only final cols
+        df = df[[
+            "entity_1_id",
+            "entity_1_group_id",
+            "entity_2_id",
+            "entity_2_group_id",
+            "relationship_type_id",
+        ]]
+        df["data_source_id"] = self.data_source.id
+        df["etl_package_id"] = self.package.id
 
-                if not gene_entity or not disease_entity:
-                    not_loaded.append(row)
-                    continue
+        # Insert only valided rows
+        before = len(df)
+        df = df.dropna(
+            subset=["entity_1_id", "entity_1_group_id", "entity_2_id", "entity_2_group_id", "relationship_type_id"]
+        ).reset_index(drop=True)
+        after = len(df)
+        if (before - after) > 0:
+            msg = f"Dropped {before - after} invalid rows (missing IDs)"
+            self.logger.log(msg, "WARNING")
 
-                rel = EntityRelationship(
-                    entity_1_id=gene_entity.entity_id,
-                    entity_2_id=disease_entity.entity_id,
-                    entity_1_group_id=gene_group_id,
-                    entity_2_group_id=disease_group_id,
-                    relationship_type_id=rel_type_id,
-                    data_source_id=self.data_source.id,
-                    etl_package_id=self.package.id,
-                )
-                self.session.add(rel)
-                total_relationships += 1
-
-            except Exception as e:
-                not_loaded.append(row)
-                self.logger.log(f"⚠️ Failed row: {e}", "WARNING")
-
-        # Commit batch
+        # 7. Clean old relationships
         try:
+            # Drop Indexes
+            self.drop_indexes(self.get_entity_relationship_index_specs)
+            # Drop Data
+            deleted = (
+                self.session.query(EntityRelationship)
+                .filter_by(data_source_id=self.data_source.id)
+                .delete(synchronize_session=False)
+            )
+            self.logger.log(f"🧹 Deleted {deleted} old ClinGen relationships", "INFO")
             self.session.commit()
-            msg = f"✅ {total_relationships} ClinGen relationships loaded successfully"
-            self.logger.log(msg, "INFO")
+        except Exception as e:
+            self.session.rollback()
+            msg = f"❌ Error when delete old relationships: {e}"
+            return False, msg
+
+        # 8. Bulk insert
+        try:
+            self.session.bulk_insert_mappings(EntityRelationship, df.to_dict(orient="records"))
+            self.session.commit()
         except Exception as e:
             self.session.rollback()
             msg = f"❌ Error committing relationships: {e}"
-            self.logger.log(msg, "ERROR")
-
-        # Save not loaded if exists
-        if not_loaded:
-            df_not_loaded = pd.DataFrame(not_loaded)
-            not_loaded_path = processed_path + "/relationship_data_not_loaded.csv"
-            df_not_loaded.to_csv(not_loaded_path, index=False)
-            self.logger.log(
-                f"⚠️ {len(df_not_loaded)} ClinGen relationships skipped. See {not_loaded_path}",
-                "WARNING",
-            )
+            return False, msg
 
         # Restore DB to read mode
         try:
@@ -664,4 +662,5 @@ class DTP(DTPBase, EntityQueryMixin):
         except Exception as e:
             self.logger.log(f"⚠️ Failed to restore DB indexes: {e}", "WARNING")
 
-        return True, f"📥 Total ClinGen Relationships: {total_relationships}"
+        msg = f"📥 Total ClinGen Relationships: {total_relationships}"
+        return True, msg

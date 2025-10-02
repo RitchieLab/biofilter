@@ -238,6 +238,24 @@ class DBTuningMixin:
             # EntityRelationshipType
             ("entity_relationship_types", ["code"]),
         ]
+    
+    # Only EntityRelationship Model
+    @property
+    def get_entity_relationship_index_specs(self):
+        return [
+            # EntityRelationship
+            ("entity_relationships", ["entity_1_id"]),
+            ("entity_relationships", ["entity_2_id"]),
+            ("entity_relationships", ["relationship_type_id"]),
+            ("entity_relationships", ["data_source_id"]),
+            ("entity_relationships", ["entity_1_id", "relationship_type_id"]),
+            (
+                "entity_relationships",
+                ["entity_1_id", "entity_2_id", "relationship_type_id"],
+            ),
+            # EntityRelationshipType
+            ("entity_relationship_types", ["code"]),
+        ]
 
     @property
     def get_go_index_specs(self):

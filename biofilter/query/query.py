@@ -10,19 +10,22 @@ from biofilter.db.models import (
     # System Models
     SystemConfig,
     BiofilterMetadata,
+    GenomeAssembly,
     # Entity Models
-    Entity,
-    EntityName,
     EntityGroup,
+    Entity,
+    EntityAlias,
     EntityRelationshipType,
     EntityRelationship,
     # Curation Models
+    ConflictStatus,
+    ConflictResolution,
     CurationConflict,
+    OmicStatus,
     # ETL Models
-    SourceSystem,
-    DataSource,
-    ETLLog,
-    ETLProcess,
+    ETLDataSource,
+    ETLSourceSystem,
+    ETLPackage,
     # Gene Models
     GeneMaster,
     GeneGroup,
@@ -33,9 +36,9 @@ from biofilter.db.models import (
     GeneGroupMembership,
     GeneLocation,
     # Variant Models
-    GenomeAssembly,
     VariantMaster,
-    VariantGeneRelationship,
+    VariantLocus,
+    VariantGWAS,
     # Protein Models
     ProteinMaster,
     ProteinPfam,
@@ -46,11 +49,18 @@ from biofilter.db.models import (
     # GO Models
     GOMaster,
     GORelation,
+    # Diseases
+    DiseaseGroup,
+    DiseaseGroupMembership,
+    DiseaseMaster,
+    # Chemical
+    ChemicalMaster,
 )
 
 
 # Configure logger
 logger = logging.getLogger(__name__)
+
 logger.setLevel(logging.INFO)
 
 
@@ -72,19 +82,21 @@ class Query:
             # System
             "SystemConfig": SystemConfig,
             "BiofilterMetadata": BiofilterMetadata,
+            "GenomeAssembly": GenomeAssembly,
             # Entity
             "Entity": Entity,
-            "EntityName": EntityName,
+            "EntityAlias": EntityAlias,
             "EntityGroup": EntityGroup,
             "EntityRelationshipType": EntityRelationshipType,
             "EntityRelationship": EntityRelationship,
             # Curation
             "CurationConflict": CurationConflict,
+            "ConflictStatus": ConflictStatus,
+            "ConflictResolution": ConflictResolution,
             # ETL
-            "SourceSystem": SourceSystem,
-            "DataSource": DataSource,
-            "ETLLog": ETLLog,
-            "ETLProcess": ETLProcess,
+            "ETLSourceSystem": ETLSourceSystem,
+            "ETLDataSource": ETLDataSource,
+            "ETLPackage": ETLPackage,
             # Gene
             "GeneMaster": GeneMaster,
             "GeneGroup": GeneGroup,
@@ -95,9 +107,9 @@ class Query:
             "GeneGroupMembership": GeneGroupMembership,
             "GeneLocation": GeneLocation,
             # Variant
-            "GenomeAssembly": GenomeAssembly,
             "VariantMaster": VariantMaster,
-            "VariantGeneRelationship": VariantGeneRelationship,
+            "VariantLocus": VariantLocus,
+            "VariantGWAS": VariantGWAS,
             # Protein
             "ProteinMaster": ProteinMaster,
             "ProteinPfam": ProteinPfam,
@@ -108,6 +120,12 @@ class Query:
             # GO
             "GOMaster": GOMaster,
             "GORelation": GORelation,
+            # Disease
+            "DiseaseGroup": DiseaseGroup,
+            "DiseaseGroupMembership": DiseaseGroupMembership,
+            "DiseaseMaster": DiseaseMaster,
+            # Chemical
+            "ChemicalMaster": ChemicalMaster,
         }
 
         # Optional autocomplete access
@@ -118,19 +136,27 @@ class Query:
         """Return a model class by name."""
         return self.models.get(model_name)
 
+    # def _to_dict(self, obj) -> Dict[str, Any]:
+    #     return {
+    #         k: v
+    #         for k, v in vars(obj).items()
+    #         if not k.startswith("_sa_instance_state")  # noqa E501
+    #     }
     def _to_dict(self, obj) -> Dict[str, Any]:
-        return {
-            k: v
-            for k, v in vars(obj).items()
-            if not k.startswith("_sa_instance_state")  # noqa E501
-        }
+        if hasattr(obj, "_mapping"):  # Row object do SQLAlchemy 2.0
+            return dict(obj._mapping)
+        if hasattr(obj, "__dict__"):  # ORM object
+            return {k: v for k, v in vars(obj).items() if not k.startswith("_sa_instance_state")}
+        return {"value": obj}  # escalar simples
+
 
     def run_query(
-        self, stmt, return_df: bool = False
+        self, stmt, return_df: bool = True
     ) -> Union[List[Any], pd.DataFrame]:
         """Execute a SQLAlchemy statement and return results."""
         try:
-            result = self.session.execute(stmt).scalars().all()
+            # result = self.session.execute(stmt).scalars().all()
+            result = self.session.execute(stmt).all()
             if return_df:
                 df = pd.DataFrame([self._to_dict(r) for r in result])
                 return df
