@@ -333,6 +333,10 @@ def worker_dbsnp(batch, batch_id, output_dir):
     print(f"[PID {os.getpid()}] Processing batch {batch_id}")
     rows = []
 
+    # # DEBUG
+    # if 2 == 2:
+    #     return None
+
     for line in batch:
         try:
             rec = json.loads(line)

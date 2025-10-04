@@ -29,7 +29,7 @@ data_sources_to_process = [
     # Variants
     # --------
     # "dbsnp_sample",
-    # "dbsnp_chr1",
+    "dbsnp_chr1",
     # "dbsnp_chr2",
     # "dbsnp_chr3",
     # "dbsnp_chr4",
@@ -65,7 +65,7 @@ data_sources_to_process = [
     # -------
     # "mondo",
     # "mondo_relationships",
-    "clingen",
+    # "clingen",
     # "omim",
     #
     # CHEMICAL
