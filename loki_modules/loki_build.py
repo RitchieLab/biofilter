@@ -11,7 +11,8 @@ import tempfile
 from loki_modules import loki_db
 
 
-if __name__ == "__main__":
+# if __name__ == "__main__":
+def main():
     version = "LOKI version %s" % (loki_db.Database.getVersionString())
 
     # define arguments
@@ -345,3 +346,6 @@ if __name__ == "__main__":
                 db.optimizeDatabase()
     # if knowledge
 # __main__
+
+if __name__ == "__main__":
+    main()

@@ -45,7 +45,9 @@ class Source_gwas(loki_source.Source):
         numInc = numInvalid = 0
         setGwas = set()
         if os.path.exists("gwas_catalog_v1.0-associations.tsv"):
-            with open("gwas_catalog_v1.0-associations.tsv", "rU") as gwasFile:
+            # with open("gwas_catalog_v1.0-associations.tsv", "rU") as gwasFile:  # Python 3.11
+            with open("gwas_catalog_v1.0-associations.tsv", "r", encoding="utf-8", errors="ignore") as gwasFile:
+
                 header = next(gwasFile).rstrip()
                 cols = list(w.strip() for w in header.split("\t"))
                 try:

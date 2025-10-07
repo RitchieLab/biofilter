@@ -9,7 +9,7 @@ class Source_entrez(loki_source.Source):
 
     @classmethod
     def getVersionString(cls):
-        return "2.4 (2022-04-12)"
+        return "2.5 (2025-10-06)"
 
     # getVersionString()
 
@@ -55,7 +55,7 @@ class Source_entrez(loki_source.Source):
         # 		})
 
         self.downloadFilesFromHTTP(
-            "ftp.ncbi.nih.gov",
+            "ftp.ncbi.nlm.nih.gov",
             {
                 "Homo_sapiens.gene_info.gz": "/gene/DATA/GENE_INFO/Mammalia/Homo_sapiens.gene_info.gz",
                 "gene2refseq.gz": "/gene/DATA/gene2refseq.gz",
@@ -65,12 +65,21 @@ class Source_entrez(loki_source.Source):
                 "gene_refseq_uniprotkb_collab.gz": "/gene/DATA/gene_refseq_uniprotkb_collab.gz",
             },
         )
-        self.downloadFilesFromHTTP(
+
+
+        # self.downloadFilesFromHTTP(
+        #     "ftp.uniprot.org",
+        #     {
+        #         "HUMAN_9606_idmapping_selected.tab.gz": "/pub/databases/uniprot/current_release/knowledgebase/idmapping/by_organism/HUMAN_9606_idmapping_selected.tab.gz",
+        #     },
+        # )
+        self.downloadFilesFromHTTPS(
             "ftp.uniprot.org",
             {
                 "HUMAN_9606_idmapping_selected.tab.gz": "/pub/databases/uniprot/current_release/knowledgebase/idmapping/by_organism/HUMAN_9606_idmapping_selected.tab.gz",
             },
         )
+        # https://ftp.uniprot.org/pub/databases/uniprot/current_release/knowledgebase/idmapping/by_organism/HUMAN_9606_idmapping_selected.tab.gz
 
     # download()
 
@@ -490,7 +499,8 @@ class Source_entrez(loki_source.Source):
 
         # process unigene gene names
         self.log("processing unigene gene names ...")
-        with open("gene2unigene", "rU") as ugFile:
+        # with open("gene2unigene", "rU") as ugFile: # Replace in 3.11 Python
+        with open("gene2unigene", "r", encoding="utf-8", errors="ignore") as ugFile:
             header = ugFile.__next__().rstrip()
             if not (
                 header.startswith(

@@ -115,7 +115,9 @@ class Source_kegg(loki_source.Source):
         # process pathways
         self.log("processing pathways ...")
         pathName = {}
-        with open("list-pathway-hsa", "rU") as pathFile:
+        # with open("list-pathway-hsa", "rU") as pathFile:
+        with open("list-pathway-hsa", "r", encoding="utf-8", errors="ignore") as pathFile:
+
             for line in pathFile:
                 words = line.split("\t")
                 pathID = words[0]
@@ -153,7 +155,8 @@ class Source_kegg(loki_source.Source):
         entrezAssoc = set()
         numAssoc = 0
         if 0:
-            with open("link-hsa-pathway", "rU") as assocFile:
+            # with open("link-hsa-pathway", "rU") as assocFile:
+            with open("link-hsa-pathway", "r", encoding="utf-8", errors="ignore") as assocFile:    
                 for line in assocFile:
                     words = line.split("\t")
                     pathID = words[0]
@@ -165,7 +168,9 @@ class Source_kegg(loki_source.Source):
                     # if pathway and gene are ok
                 # foreach line in assocFile
         else:
-            with open("link-pathway-hsa", "rU") as assocFile:
+            # with open("link-pathway-hsa", "rU") as assocFile:
+            with open("link-pathway-hsa", "r", encoding="utf-8", errors="ignore") as assocFile:
+
                 for line in assocFile:
                     words = line.split("\t")
                     hsaGene = words[0]

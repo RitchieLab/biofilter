@@ -1,7 +1,7 @@
 [tool.poetry]
 name = "biofilter"
-version = "2.4.4"
-description = "Biofilter for LOKI data processing"
+version = "3.0.0"
+description = "Biofilter v3 – Legacy Edition, modernized with Poetry and APSW"
 authors = ["Ritchie Lab <Software_RitchieLab@pennmedicine.upenn.edu>"]
 license = "MIT"
 homepage = "https://ritchielab.org"
@@ -23,6 +23,7 @@ iniconfig = "2.0.0"
 packaging = "24.1"
 platformdirs = "4.3.6"
 pluggy = "1.5.0"
+wget = "^3.2"
 
 [tool.poetry.group.dev.dependencies]
 black = "^24.10.0"

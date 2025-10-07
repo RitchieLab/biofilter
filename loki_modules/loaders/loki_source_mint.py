@@ -93,7 +93,9 @@ class Source_mint(loki_source.Source):
         }
         numAssoc = numID = 0
         if os.path.exists("MINT_MiTab.txt"):
-            with open("MINT_MiTab.txt", "rU") as assocFile:
+            # with open("MINT_MiTab.txt", "rU") as assocFile:
+            with open("MINT_MiTab.txt", "r", encoding="utf-8", errors="ignore") as assocFile:
+
                 l = 0
                 for line in assocFile:
                     l += 1
@@ -188,7 +190,8 @@ class Source_mint(loki_source.Source):
                 # foreach line in assocFile
             # with assocFile
         else:  # old FTP file
-            with open(self._identifyLatestFilename(os.listdir(".")), "rU") as assocFile:
+            # with open(self._identifyLatestFilename(os.listdir(".")), "rU") as assocFile:
+            with open(self._identifyLatestFilename(os.listdir(".")), "r", encoding="utf-8", errors="ignore") as assocFile:
                 header = assocFile.next().rstrip()
                 if not header.startswith(
                     "ID interactors A (baits)\tID interactors B (preys)\tAlt. ID interactors A (baits)\tAlt. ID interactors B (preys)\tAlias(es) interactors A (baits)\tAlias(es) interactors B (preys)\tInteraction detection method(s)\tPublication 1st author(s)\tPublication Identifier(s)\tTaxid interactors A (baits)\tTaxid interactors B (preys)\tInteraction type(s)\tSource database(s)\tInteraction identifier(s)\t"

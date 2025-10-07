@@ -15,8 +15,8 @@
             "program": "${workspaceFolder}/biofilter_modules/biofilter.py",
             "args": [
                 "--verbose",
-                "--knowledge", "/Users/andrerico/Works/Sys/BIOFILTER/loki_modules/loki-20220926.db",
-                "--position-file", "/Users/andrerico/Works/Sys/BIOFILTER/data_test/input_filename",
+                "--knowledge", "/Users/andrerico/Works/bio3/biofilter/loki.db",
+                "--position-file", "/Users/andrerico/Works/bio3/biofilter/data_test/input_filename",
                 "--annotate", "position_label", "snp", "position", "gene", "upstream", "downstream",
                 "--report-invalid-input",
                 "--overwrite",
@@ -32,17 +32,50 @@
             "program": "${workspaceFolder}/biofilter_modules/biofilter.py",
             "args": [
                 "--verbose",
-                "--knowledge", "/Users/andrerico/Works/Sys/BIOFILTER/loki_modules/loki-20220926.db",
-                "--position-file", "/Users/andrerico/Works/Sys/BIOFILTER/tests/issues/l16_build_37_loki/data-in/input_filename",
+                "--knowledge", "/Users/andrerico/Works/bio3/biofilter/loki.db",
+                "--position-file", "/Users/andrerico/Works/bio3/biofilter/tests/issues/l16_build_37_loki/data-in/input_filename",
                 "--source", "kegg", "reactome", "go",
                 "--annotate", "position_label", "snp", "position", "gene", "upstream", "downstream",
                 "--report-invalid-input",
                 "--report-configuration",
                 "--overwrite",
-                "--prefix", "/Users/andrerico/Works/Sys/BIOFILTER/tests/issues/l16_build_37_loki/data-out/outcomes",
+                "--prefix", "/Users/andrerico/Works/bio3/biofilter/tests/issues/l16_build_37_loki/data-out/outcomes",
                 "--ucsc-build-version", "19"
             ],
             "console": "integratedTerminal"
+        },
+        {
+            "name": "BIOFILTER: Annotation",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/biofilter_modules/biofilter.py",
+            "args": [
+                "--verbose",
+                "--knowledge", "${workspaceFolder}/loki.db",
+                "--position-file", "${workspaceFolder}/tests/data/input_positions.txt",
+                "--source", "kegg", "reactome", "go",
+                "--annotate", "position_label", "snp", "position", "gene", "upstream", "downstream",
+                "--report-invalid-input",
+                "--report-configuration",
+                "--overwrite",
+                "--prefix", "${workspaceFolder}/tests/data/outcomes",
+                "--ucsc-build-version", "19"
+            ],
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "LOKI Build by Source",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/loki_modules/loki_build.py",
+            "args": [
+                "--verbose",
+                "--knowledge", "${workspaceFolder}/loki.db",
+                "--update", "dbsnp",
+                "--force-update"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": true
         }
     ]
 }

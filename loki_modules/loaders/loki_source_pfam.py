@@ -19,14 +19,23 @@ class Source_pfam(loki_source.Source):
         # 			'pfamA_reg_full_significant.txt.gz': '/pub/databases/Pfam/current_release/database_files/pfamA_reg_full_significant.txt.gz',
         # 			'pfamseq.txt.gz':                    '/pub/databases/Pfam/current_release/database_files/pfamseq.txt.gz',
         # 		})
-        self.downloadFilesFromHTTP(
+        # self.downloadFilesFromHTTP(
+        #     "ftp.ebi.ac.uk",
+        #     {
+        #         "pfamA.txt.gz": "/pub/databases/Pfam/current_release/database_files/pfamA.txt.gz",
+        #         "pfamA_reg_full_significant.txt.gz": "/pub/databases/Pfam/current_release/database_files/pfamA_reg_full_significant.txt.gz",
+        #         "pfamseq.txt.gz": "/pub/databases/Pfam/current_release/database_files/pfamseq.txt.gz",
+        #     },
+        # )
+        self.downloadFilesFromHTTPS(
             "ftp.ebi.ac.uk",
             {
-                "pfamA.txt.gz": "/pub/databases/Pfam/current_release/database_files/pfamA.txt.gz",
-                "pfamA_reg_full_significant.txt.gz": "/pub/databases/Pfam/current_release/database_files/pfamA_reg_full_significant.txt.gz",
-                "pfamseq.txt.gz": "/pub/databases/Pfam/current_release/database_files/pfamseq.txt.gz",
+                "pfamA.txt.gz": "/pub/databases/Pfam/releases/Pfam35.0/database_files/pfamA.txt.gz",
+                "pfamA_reg_full_significant.txt.gz": "/pub/databases/Pfam/releases/Pfam35.0/database_files/pfamA_reg_full_significant.txt.gz",
+                "pfamseq.txt.gz": "/pub/databases/Pfam/releases/Pfam35.0/database_files/pfamseq.txt.gz",
             },
         )
+
 
     # download()
 

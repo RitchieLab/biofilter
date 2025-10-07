@@ -69,7 +69,9 @@ class Source_go(loki_source.Source):
         curStanza = curID = curAnon = curObs = curName = curNS = curDef = curLinks = (
             None
         )
-        with open("go.obo", "rU") as oboFile:
+        # with open("go.obo", "rU") as oboFile: # Python 3.11
+        with open("go.obo", "r", encoding="utf-8", errors="ignore") as oboFile:
+    
             while True:
                 try:
                     line = next(oboFile).rstrip()
