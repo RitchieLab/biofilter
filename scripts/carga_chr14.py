@@ -31,7 +31,7 @@ data_sources_to_process = [
     # "dbsnp_sample",
     # "dbsnp_chr1",
     # "dbsnp_chr2",
-    "dbsnp_chr3",
+    # "dbsnp_chr3",
     # "dbsnp_chr4",
     # "dbsnp_chr5",
     # "dbsnp_chr6",
@@ -42,7 +42,7 @@ data_sources_to_process = [
     # "dbsnp_chr11",
     # "dbsnp_chr12",
     # "dbsnp_chr13",
-    # "dbsnp_chr14",
+    "dbsnp_chr14",
     # "dbsnp_chr15",
     # "dbsnp_chr16",
     # "dbsnp_chr17",
@@ -73,14 +73,14 @@ data_sources_to_process = [
 
 run_steps = [
     # "extract",
-    # "transform",
-    "load",
+    "transform",
+    # "load",
     # "all"
 ]  # noqa E501
 
 if __name__ == "__main__":
-    bf = Biofilter(db_uri, debug_mode=True)
-    # bf = Biofilter(db_uri)
+    # bf = Biofilter(db_uri, debug_mode=True)
+    bf = Biofilter(db_uri)
 
     for source in data_sources_to_process:
         for step in run_steps:

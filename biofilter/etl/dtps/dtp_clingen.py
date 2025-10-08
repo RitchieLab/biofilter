@@ -634,6 +634,8 @@ class DTP(DTPBase, EntityQueryMixin):
             # Drop Indexes
             self.drop_indexes(self.get_entity_relationship_index_specs)
             # Drop Data
+
+            # TODO / BUG: Usar o mesmo mecanismo que usamos em BioGRIP para nao eliminar dados
             deleted = (
                 self.session.query(EntityRelationship)
                 .filter_by(data_source_id=self.data_source.id)

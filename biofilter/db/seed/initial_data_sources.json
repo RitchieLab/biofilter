@@ -532,6 +532,19 @@
             "active": true,
             "dtp_version": "1.1.0",
             "schema_version": "3.1.0"
+        },
+        {
+            "source_system": "BioGRID",
+            "name": "biogrid",
+            "data_type": "relationships",
+            "source_url": "https://downloads.thebiogrid.org/Download/BioGRID/Latest-Release/BIOGRID-ALL-LATEST.mitab.zip",
+            "format": "mitab",
+            "grch_version": "",
+            "ucschg_version": "",
+            "dtp_script": "dtp_biogrid",
+            "active": true,
+            "dtp_version": "1.1.0",
+            "schema_version": "3.1.0"
         }
     ]
 }
