@@ -79,8 +79,8 @@ run_steps = [
 ]  # noqa E501
 
 if __name__ == "__main__":
-    # bf = Biofilter(db_uri, debug_mode=True)
-    bf = Biofilter(db_uri)
+    bf = Biofilter(db_uri, debug_mode=True)
+    # bf = Biofilter(db_uri)
 
     for source in data_sources_to_process:
         for step in run_steps:

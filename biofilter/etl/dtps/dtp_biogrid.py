@@ -2,8 +2,8 @@ import os
 import time  # DEBUG MODE
 import requests
 import zipfile
-import gzip
-import io
+# import gzip
+# import io
 import pandas as pd
 from pathlib import Path
 from itertools import product
@@ -509,8 +509,12 @@ class DTP(DTPBase):
             return False, msg
 
         # Create Bulk
+        chunk_size = 10_000  # 🔧 ajuste conforme o desempenho do servidor
+        total = len(df_new)
+
+        # Build relationships in chunks
         rels = []
-        for _, row in df_new.iterrows():
+        for i, row in enumerate(df_new.itertuples(index=False), start=1):
             rels.append(
                 EntityRelationship(
                     entity_1_id=int(row.entity_1_id),
@@ -523,27 +527,32 @@ class DTP(DTPBase):
                 )
             )
 
-        if not rels:
-            self.logger.log("✅ No new relationships to insert — skipping.", "INFO")
-            return True, "No new relationships"
+            # 🚀 Quando atingir o chunk_size ou o fim
+            if i % chunk_size == 0 or i == total:
+                try:
+                    self.session.bulk_save_objects(rels, return_defaults=False)
+                    self.session.commit()
+                    self.logger.log(
+                        f"💾 Inserted chunk {i // chunk_size + 1} ({len(rels):,} records)",
+                        "DEBUG"
+                    )
+                    rels.clear()  # libera memória
 
-        # Run Bulk
-        try:
-            self.session.bulk_save_objects(rels, return_defaults=False)
-            self.session.commit()
-            msg = f"Inserted {len(rels):,} new BioGRID relationships"
-            self.logger.log(msg, "SUCCESS")
-        except Exception as e:
-            self.session.rollback()
-            msg = f"❌ Error inserting relationships: {str(e)}"
-            self.logger.log(msg, "DEBUG")
-            return False, msg
+                except Exception as e:
+                    self.session.rollback()
+                    self.logger.log(
+                        f"⚠️ Error inserting chunk ending at record {i:,}: {str(e)}",
+                        "ERROR"
+                    )
+                    rels.clear()
+                    # continua o loop — não interrompe o processo
+                    continue
 
         # Create Index
-        # try:
-        #     self.create_indexes(self.get_entity_relationship_index_specs)
-        # except Exception as e:
-        #     self.logger.log(f"⚠️ Failed to restore DB indexes: {e}", "WARNING")
+        try:
+            self.create_indexes(self.get_entity_relationship_index_specs)
+        except Exception as e:
+            self.logger.log(f"⚠️ Failed to restore DB indexes: {e}", "WARNING")
 
 
         msg = f"📥 Total BioGRID Relationships: {total_relationships}"

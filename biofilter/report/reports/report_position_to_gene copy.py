@@ -1,4 +1,4 @@
-import ast
+
 import pandas as pd
 from biofilter.report.reports.base_report import ReportBase
 from sqlalchemy.orm import aliased
@@ -7,19 +7,12 @@ from sqlalchemy import or_, and_
 from biofilter.db.models import (
     VariantMaster,
     VariantLocus,
-    # Entity,
+    Entity,
     EntityAlias,
     EntityGroup,
     EntityRelationship,
-    # EntityRelationshipType,
+    EntityRelationshipType,
     GenomeAssembly,
-    GeneMaster,
-    GeneLocusGroup,
-    GeneLocusType,
-    GeneGroupMembership,
-    GeneGroup,
-    ETLDataSource,
-    ETLSourceSystem,
 )
 
 
@@ -74,7 +67,7 @@ class PositionToGeneReport(ReportBase):
             ("Y", 19568761),
             ("1", 258)
         ]
-
+    
 
     def run(self):
         # --- Step 1: Read Input ---
@@ -91,6 +84,7 @@ class PositionToGeneReport(ReportBase):
             self.logger.log("No assembly ID found for input", "WARNING")
             return None
 
+        assembly_ids = list(set(chrom_to_assembly_id.values()))
 
         # --- Step 3: Get Group IDs ---
         gene_group_id = (
@@ -136,7 +130,6 @@ class PositionToGeneReport(ReportBase):
                 self.session.query(
                     vm.entity_id.label("variant_entity_id"),
                     vm.variant_id,
-                    vm.quality,
                     vl.chromosome,
                     vl.start_pos,
                     vl.end_pos,
@@ -158,7 +151,6 @@ class PositionToGeneReport(ReportBase):
         except Exception as e:
             self.logger.log(f"Error querying variants: {e}", "WARNING")
             return None
-
 
         # --- Step 5: Get Variant-Gene Relationships ---
         try:
@@ -199,168 +191,74 @@ class PositionToGeneReport(ReportBase):
             self.logger.log(f"Error querying relationships: {e}", "WARNING")
             return None
 
-        # --- Step 6: Merge variant ↔ gene relationships ---
+        # --- Step 6: Get Gene Metadata ---
         try:
-            # Merge with variant data
-            merged_df = pd.merge(variant_df, rel_df, on="variant_entity_id", how="left")
+            gene_entity_ids = rel_df["gene_entity_id"].unique().tolist()
 
-            # Step 7: Gene Metadata
-            ea = aliased(EntityAlias)
-            gm = aliased(GeneMaster)
-            glg = aliased(GeneLocusGroup)
-            glt = aliased(GeneLocusType)
-
-            gene_ids = merged_df["gene_entity_id"].dropna().unique().tolist()
-            gene_meta_query = (
+            PrimaryAlias = aliased(EntityAlias)
+            gene_query = (
                 self.session.query(
-                    ea.entity_id.label("gene_entity_id"),
-                    ea.alias_value.label("symbol"),
-                    gm.hgnc_status,
-                    glg.name.label("locus_group"),
-                    glt.name.label("locus_type"),
+                    Entity.id.label("gene_entity_id"),
+                    PrimaryAlias.alias_value.label("gene_symbol"),
                 )
-                .join(gm, gm.entity_id == ea.entity_id)
-                .join(glg, glg.id == gm.locus_group_id)
-                .join(glt, glt.id == gm.locus_type_id)
-                .filter(ea.is_primary.is_(True))
-                .filter(ea.entity_id.in_(gene_ids))
+                .join(PrimaryAlias, PrimaryAlias.entity_id == Entity.id)
+                .filter(Entity.id.in_(gene_entity_ids))
+                .filter(PrimaryAlias.is_primary.is_(True))
             )
-            gene_meta_df = pd.read_sql(gene_meta_query.statement, self.session.bind)
 
-            # Step 8: Gene Groups (many-to-many)
-            ggm = aliased(GeneGroupMembership)
-            gg = aliased(GeneGroup)
-            group_query = (
-                self.session.query(
-                    ggm.gene_id,
-                    gg.name.label("gene_group")
-                )
-                .join(gg, gg.id == ggm.group_id)
-                .filter(ggm.gene_id.in_(gene_ids))
+            gene_df = pd.read_sql(gene_query.statement, self.session.bind)
+
+        except Exception as e:
+            self.logger.log(f"Error querying gene aliases: {e}", "WARNING")
+            gene_df = pd.DataFrame()  # Not fatal
+
+        # --- Step 7: Merge All ---
+        try:
+            # Merge rel with genes
+            merged = rel_df.merge(gene_df, on="gene_entity_id", how="left")
+            # Merge with variants
+            final_df = variant_df.merge(merged, on="variant_entity_id", how="left")
+
+            final_df["position_input"] = (
+                final_df["chromosome"].astype(str) + ":" + final_df["start_pos"].astype(str)
             )
-            group_df = pd.read_sql(group_query.statement, self.session.bind)
-            group_map = group_df.groupby("gene_id")["gene_group"].apply(list).to_dict()
 
-            # Step 9: Data source info
-            ds = aliased(ETLDataSource)
-            ss = aliased(ETLSourceSystem)
-            ds_query = (
-                self.session.query(
-                    ds.id.label("data_source_id"),
-                    ds.name.label("data_source"),
-                    ss.name.label("source_system")
-                )
-                .join(ss, ss.id == ds.source_system_id)
-                .filter(ds.id.in_(merged_df["data_source_id"].dropna().unique().tolist()))
-            )
-            ds_df = pd.read_sql(ds_query.statement, self.session.bind)
-
-            # Step 10: Final merge
-            merged_df = pd.merge(merged_df, gene_meta_df, on="gene_entity_id", how="left")
-            merged_df["gene_groups"] = merged_df["gene_entity_id"].map(group_map)
-            merged_df = pd.merge(merged_df, ds_df, on="data_source_id", how="left")
-
-            # Step 11: Cleanup and output
-            merged_df["input_key"] = merged_df["chromosome"] + ":" + merged_df["start_pos"].astype(int).astype(str)
+            column_order = [
+                "position_input",
+                "variant_id",
+                "chromosome",
+                "start_pos",
+                "end_pos",
+                "ref",
+                "alt",
+                "accession",
+                "assembly_name",
+                "gene_symbol",
+                "gene_entity_id",
+                "relationship_type_id",
+                "data_source_id",
+            ]
 
             rename_dict = {
-                "input_key": "Input Position",
+                "position_input": "Input Position",
                 "variant_id": "Variant ID",
                 "chromosome": "Chr",
                 "start_pos": "Start",
                 "end_pos": "End",
                 "ref": "Ref Allele",
                 "alt": "Alt Allele",
-                "quality": "Variant Score",
                 "accession": "Assembly Accession",
                 "assembly_name": "Assembly",
-                "symbol": "Gene Symbol",
+                "gene_symbol": "Gene Symbol",
                 "gene_entity_id": "Gene ID",
-                "hgnc_status": "HGNC Status",
-                "locus_group": "Locus Group",
-                "locus_type": "Locus Type",
-                "gene_groups": "Gene Groups",
-                "data_source": "DataSource",
-                "source_system": "SourceSystem",
+                "relationship_type_id": "Relationship Type",
+                "data_source_id": "DataSource",
             }
 
-            column_order = list(rename_dict.values())
-            merged_df = merged_df.rename(columns=rename_dict)
-            merged_df = merged_df[column_order]
-
-            # Apply better formating
-            merged_df["Ref Allele"] = merged_df["Ref Allele"].apply(self.parse_and_join)
-            merged_df["Alt Allele"] = merged_df["Alt Allele"].apply(self.parse_and_join)
-
-            merged_df["Gene Groups"] = merged_df["Gene Groups"].apply(
-                lambda x: "; ".join(x) if isinstance(x, list) else None
-            )
-            # TODO: Discusion point
-            merged_df["HGNC Status"] = merged_df["HGNC Status"].replace({   
-                "Gene from NCBI": "Provisional",
-                "unknown": None,
-            })
-
-
-            # --- Step 7: Append missing inputs as rows with note ---
-            if "Note" not in merged_df.columns:
-                merged_df["Note"] = None
-
-            input_positions_set = set([f"{chrom}:{pos}" for chrom, pos in position_list])
-            output_positions_set = set(merged_df["Input Position"].dropna().unique())
-
-            # Posições que não foram mapeadas
-            missing_positions = input_positions_set - output_positions_set
-
-            # Criar DataFrame com apenas essas posições e nota
-            if missing_positions:
-                missing_df = pd.DataFrame({
-                    "Input Position": list(missing_positions),
-                    "Note": ["No variant or gene found for this position"] * len(missing_positions)
-                })
-
-                # if not missing_df.empty:
-                #     # Opcional: Remover colunas 100% NA
-                #     missing_df = missing_df.dropna(axis=1, how='all')
-
-                # Garante que todas as colunas existam (mesmo que vazias)
-                for col in merged_df.columns:
-                    if col not in missing_df.columns:
-                        missing_df[col] = None
-
-                # Alinha as colunas
-                # missing_df = missing_df[merged_df.columns]
-                missing_df = missing_df.reindex(columns=merged_df.columns)
-                for col in merged_df.columns:
-                    if col not in missing_df.columns:
-                        missing_df[col] = pd.NA
-                    else:
-                        try:
-                            missing_df[col] = missing_df[col].astype(merged_df[col].dtype)
-                        except Exception:
-                            pass  # Ignora se não for possível converter
-
-                # Concatena com os resultados anteriores
-                merged_df = pd.concat([merged_df, missing_df], ignore_index=True)
-
-
-            # Move 'Note' to the end
-            cols = [c for c in merged_df.columns if c != "Note"] + ["Note"]
-            merged_df = merged_df[cols]
-
-
-
-            # Print informations after process
-            print(f"  ✅ Report successfully generated with {len(merged_df)} rows and {merged_df['Gene ID'].nunique()} unique genes.")
-            print("  ℹ️ Note:")
-            print("  - Variants without associated genes are annotate in the report.")
-            print("  - Some gene metadata is based on external sources (HGNC, NCBI).")
-
-            return merged_df
+            # Organize output
+            final_df = final_df[column_order].rename(columns=rename_dict)
+            return final_df
 
         except Exception as e:
-            self.logger.log(f"Error building final report: {e}", "WARNING")
+            self.logger.log(f"Error formatting output: {e}", "WARNING")
             return None
-
-
-
