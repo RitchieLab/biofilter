@@ -1,0 +1,14 @@
+cancer  My custom cancer gene sets
+GROUP lung  My lung cancer genes
+A1BG
+TP53
+BRCA1
+A1BC
+D2EF
+GROUP liver  My liver cancer genes
+G6PD
+CYP2E1
+ALB
+G3HI
+J4KL
+M5NO

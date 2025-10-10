@@ -1,0 +1,8 @@
+#snp
+rs9
+rs11
+rs12
+rs13
+rs14
+rs15
+rs16

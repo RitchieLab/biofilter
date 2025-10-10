@@ -1,0 +1,4 @@
+#namespace	name	extra
+symbol	THSD7A	first gene
+entrez_gid	26031	second gene
+ensemble_gid	ENSG00000144642	third gene

@@ -76,6 +76,24 @@
             ],
             "console": "integratedTerminal",
             "justMyCode": true
+        },
+        {
+            "name": "DEBUG BIOFILTER: Annotation SNP",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/biofilter_modules/biofilter.py",
+            "args": [
+                "--verbose",
+                "--knowledge", "${workspaceFolder}/loki.db",
+                "--snp-file", "${workspaceFolder}/tests/biofilter/data/input/input_snps.txt",
+                "--source", "kegg", "reactome", "go",
+                "--annotate", "position_label", "snp", "position", "gene", "upstream", "downstream",
+                "--report-configuration",
+                "--overwrite",
+                "--prefix", "${workspaceFolder}/tests/biofilter/data/outcome/debug_annotation_snp_",
+                "--ucsc-build-version", "19"
+            ],
+            "console": "integratedTerminal"
         }
     ]
 }

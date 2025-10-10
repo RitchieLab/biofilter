@@ -1,0 +1,4 @@
+#chr	label	distance	pos	extra
+7	rs123	-	24966446	first position
+7	rs456	-	24962419	second position
+3	rs789	-	29397015	third position

@@ -1,0 +1,8 @@
+#snp	extra   
+rs123	first snp
+456	second snp
+rs789	3_snp
+rs1001	4_snp
+rs1002	5_snp
+rs1003	6_snp
+rs1004	7_snp

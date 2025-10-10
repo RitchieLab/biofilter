@@ -1,5 +1,5 @@
 # Biofilter configuration file
-#   generated Tue, 07 Oct 2025 14:23:45
+#   generated Fri, 10 Oct 2025 14:21:03
 #   Biofilter version 2.4.4 (2024-12-01)
 #   LOKI version 3.0.0 (2025-10-06)
 
@@ -15,7 +15,7 @@ ALLOW_AMBIGUOUS_KNOWLEDGE           no
 REDUCE_AMBIGUOUS_KNOWLEDGE          no
 REPORT_LD_PROFILES                  no
 USER_DEFINED_FILTER                 no
-POSITION_FILE                       /Users/andrerico/Works/bio3/biofilter/tests/data/input_positions.txt
+SNP_FILE                            /Users/andrerico/Works/bio3/biofilter/tests/biofilter/data/input/input_snps.txt
 GENE_IDENTIFIER_TYPE                -
 ALLOW_AMBIGUOUS_GENES               no
 GROUP_IDENTIFIER_TYPE               -
@@ -41,7 +41,7 @@ PARIS_BIN_SIZE                      10000
 PARIS_DETAILS                       no
 QUIET                               no
 VERBOSE                             yes
-PREFIX                              /Users/andrerico/Works/bio3/biofilter/tests/data/outcomes
+PREFIX                              /Users/andrerico/Works/bio3/biofilter/tests/biofilter/data/outcome/annotation/test_biofilter_annotation_snp__
 OVERWRITE                           yes
 STDOUT                              no
 REPORT_INVALID_INPUT                yes

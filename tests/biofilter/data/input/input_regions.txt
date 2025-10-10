@@ -1,0 +1,4 @@
+#chr	label	start	stop	extra
+7	THSD7A	11410061	11871823	first region
+7	OSBPL3	24836158	25019759	second region
+3	RBMS3	29322802	30051885	third region
