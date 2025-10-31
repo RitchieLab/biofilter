@@ -119,6 +119,9 @@ class DTP(DTPBase, EntityQueryMixin):
                 tgt_group_id = group_map.get(tgt_group)
                 rel_type_id = rel_type_map.get(rel_type.lower())
 
+                if src_group_id == 2 and tgt_group_id == 7:
+                    pass
+
                 if not src_group_id or not tgt_group_id or not rel_type_id:
                     not_loaded.append(row)
                     continue

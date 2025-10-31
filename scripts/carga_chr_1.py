@@ -29,7 +29,7 @@ data_sources_to_process = [
     # Variants
     # --------
     # "dbsnp_sample",
-    # "dbsnp_chr1",
+    "dbsnp_chr1",
     # "dbsnp_chr2",
     # "dbsnp_chr3",
     # "dbsnp_chr4",
@@ -43,15 +43,15 @@ data_sources_to_process = [
     # "dbsnp_chr12",
     # "dbsnp_chr13",
     # "dbsnp_chr14",
-    "dbsnp_chr15",
-    "dbsnp_chr16",
-    "dbsnp_chr17",
-    "dbsnp_chr18",
-    "dbsnp_chr19",
-    "dbsnp_chr20",
-    "dbsnp_chr21",
-    "dbsnp_chr22",
-    "dbsnp_chrx",
+    # "dbsnp_chr15",
+    # "dbsnp_chr16",
+    # "dbsnp_chr17",
+    # "dbsnp_chr18",
+    # "dbsnp_chr19",
+    # "dbsnp_chr20",
+    # "dbsnp_chr21",
+    # "dbsnp_chr22",
+    # "dbsnp_chrx",
     # "dbsnp_chry",
     # "dbsnp_chrmt",
     # "gwas",
@@ -73,8 +73,8 @@ data_sources_to_process = [
 
 run_steps = [
     # "extract",
-    "transform",
-    # "load",
+    # "transform",
+    "load",
     # "all"
 ]  # noqa E501
 

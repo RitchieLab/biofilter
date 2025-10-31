@@ -1,4 +1,0 @@
-,Input Position,Variant ID,Chr,Start,End,Ref Allele,Alt Allele,Variant Score,Assembly Accession,Assembly,Gene Symbol,Gene ID,HGNC Status,Locus Group,Locus Type,Gene Groups,DataSource,SourceSystem,Note
-0,Y:19568371,rs3900,Y,19568371,19568371,G,C,8.9,NC_000024.10,GRCh38.p14,TXLNGY,38610,Approved,pseudogene,pseudogene,,dbsnp_chry,NCBI,
-1,Y:19568371,rs3900,Y,19568371,19568371,G,C,8.9,NC_000024.10,GRCh38.p14,LOC105377223,54438,Provisional,ncRNA,unknown,NCBI Gene,dbsnp_chry,NCBI,
-2,Y:19000068371,,,,,,,,,,,,,,,,,,No variant found at position

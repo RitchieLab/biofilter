@@ -482,10 +482,23 @@
             "schema_version": "3.1.0"
         },
         {
+            "source_system": "MONDO",
+            "name": "mondo_relationships",
+            "data_type": "disease",
+            "source_url": "not_applicable",
+            "format": "",
+            "grch_version": "",
+            "ucschg_version": "",
+            "dtp_script": "dtp_mondo_relationships",
+            "active": true,
+            "dtp_version": "1.1.0",
+            "schema_version": "3.1.0"
+        },
+        {
             "source_system": "EBI",
             "name": "chebi",
             "data_type": "chemical",
-            "source_url": "https://ftp.ebi.ac.uk/pub/databases/chebi-2/flat_files/compounds.tsv.gz",
+            "source_url": "https://ftp.ebi.ac.uk/pub/databases/chebi/flat_files/compounds.tsv.gz",
             "format": "tsv",
             "grch_version": "",
             "ucschg_version": "",

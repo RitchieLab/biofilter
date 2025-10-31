@@ -1,6 +1,6 @@
 from biofilter.db.base import Base
 from sqlalchemy.orm import relationship
-from sqlalchemy import Column, Integer, String, ForeignKey
+from sqlalchemy import Column, BigInteger, Integer, String, ForeignKey
 
 
 class PathwayMaster(Base):
@@ -25,7 +25,7 @@ class PathwayMaster(Base):
     description = Column(String(255), nullable=True)
 
     entity_id = Column(
-        Integer, ForeignKey("entities.id", ondelete="CASCADE"), nullable=False
+        BigInteger, ForeignKey("entities.id", ondelete="CASCADE"), nullable=False
     )  # noqa E501
     entity = relationship("Entity", passive_deletes=True)
 

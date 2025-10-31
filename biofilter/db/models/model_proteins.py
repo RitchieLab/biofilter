@@ -2,6 +2,7 @@ from biofilter.db.base import Base
 from sqlalchemy.orm import relationship
 from sqlalchemy import (
     Column,
+    BigInteger,
     Integer,
     String,
     ForeignKey,
@@ -98,7 +99,7 @@ class ProteinEntity(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
 
     entity_id = Column(
-        Integer, ForeignKey("entities.id", ondelete="CASCADE"), nullable=False
+        BigInteger, ForeignKey("entities.id", ondelete="CASCADE"), nullable=False
     )  # noqa E501
     entity = relationship("Entity", passive_deletes=True)
 

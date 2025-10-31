@@ -193,7 +193,7 @@ class GeneQueryMixin:
             .filter_by(
                 gene_id=gene.id,
                 chromosome=chromosome,
-                star_pos=start,
+                start_pos=start,
                 end_pos=end,
                 strand=strand,
                 region_id=region.id if region else None,

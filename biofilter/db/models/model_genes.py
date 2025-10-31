@@ -1,6 +1,6 @@
 from biofilter.db.base import Base
 from sqlalchemy.orm import relationship
-from sqlalchemy import Column, Integer, String, ForeignKey, Enum
+from sqlalchemy import Column, BigInteger, Integer, String, ForeignKey, Enum
 
 
 class GeneGroup(Base):
@@ -194,7 +194,7 @@ class GeneMaster(Base):
     omic_status = relationship("OmicStatus")
 
     entity_id = Column(
-        Integer, ForeignKey("entities.id", ondelete="CASCADE"), nullable=False
+        BigInteger, ForeignKey("entities.id", ondelete="CASCADE"), nullable=False
     )  # noqa E501
     entity = relationship("Entity", passive_deletes=True)
 

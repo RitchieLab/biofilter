@@ -9,6 +9,7 @@ readme = "README.md"
 
 [tool.poetry.scripts]
 biofilter = "biofilter.cli:main"
+biofilter-parquet = "biofilter.tools.parquet_exporter:cli"
 
 [tool.poetry.dependencies]
 python = "^3.10"

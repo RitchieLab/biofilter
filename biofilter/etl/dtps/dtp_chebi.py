@@ -57,7 +57,7 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
 
             # source_url = self.data_source.source_url
             # Donwload more files to extract data
-            base_url = "https://ftp.ebi.ac.uk/pub/databases/chebi-2/flat_files/"
+            base_url = "https://ftp.ebi.ac.uk/pub/databases/chebi/flat_files/"
             files = [
                 "compounds.tsv.gz",
                 "chemical_data.tsv.gz",

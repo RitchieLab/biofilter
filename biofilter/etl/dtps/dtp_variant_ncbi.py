@@ -792,14 +792,14 @@ class DTP(DTPBase, EntityQueryMixin):
                 )
 
         # Set DB to Read Mode and Create Index
-        try:
-            self.create_indexes(self.get_variant_index_specs)
-            self.create_indexes(self.get_entity_index_specs)
-            self.db_read_mode()
-        except Exception as e:
-            total_warnings += 1
-            msg = f"Failed to switch DB to write mode or drop indexes: {e}"
-            self.logger.log(msg, "WARNING")
+        # try:
+        #     self.create_indexes(self.get_variant_index_specs)
+        #     self.create_indexes(self.get_entity_index_specs)
+        #     self.db_read_mode()
+        # except Exception as e:
+        #     total_warnings += 1
+        #     msg = f"Failed to switch DB to write mode or drop indexes: {e}"
+        #     self.logger.log(msg, "WARNING")
 
         if self.debug_mode:
             msg = f"Load process ran in {time.time() - start_total}"

@@ -1,4 +1,5 @@
 from sqlalchemy import (
+    BigInteger,
     Column,
     Integer,
     Numeric,
@@ -28,7 +29,7 @@ class VariantMaster(Base):
 
     __tablename__ = "variant_masters"
 
-    id = Column(Integer, primary_key=True, autoincrement=True)
+    id = Column(BigInteger, primary_key=True, autoincrement=True)
 
     # dbSNP rsID (stable external id)
     variant_id = Column(String(100), unique=True, index=True, nullable=False)
@@ -55,8 +56,8 @@ class VariantMaster(Base):
     quality = Column(Numeric(3, 1), nullable=True)
 
     entity_id = Column(
-        Integer, ForeignKey("entities.id", ondelete="CASCADE"), nullable=False
-    )  # noqa E501
+        BigInteger, ForeignKey("entities.id", ondelete="CASCADE"), nullable=False
+    )  # noqa E501 Trocar
     entity = relationship("Entity", passive_deletes=True)
 
     data_source_id = Column(
@@ -89,6 +90,8 @@ class VariantMaster(Base):
         # passive_deletes=True,
     )
 
+# TODO:
+# Adicionar o rsID e build apenas como parametros de filtros
 
 # --- Per-assembly locus index (accelerates position/range queries) ----------
 class VariantLocus(Base):
@@ -102,13 +105,15 @@ class VariantLocus(Base):
 
     __tablename__ = "variant_loci"
 
-    id = Column(Integer, primary_key=True, autoincrement=True)
+    # id = Column(Integer, primary_key=True, autoincrement=True)
+    id = Column(BigInteger, primary_key=True, autoincrement=True)
 
     variant_id = Column(
-        Integer,
+        BigInteger,
         ForeignKey("variant_masters.id", ondelete="CASCADE"),
         nullable=False,  # noqa E501
     )
+    
     variant = relationship(
         "VariantMaster",
         back_populates="loci",
@@ -121,8 +126,8 @@ class VariantLocus(Base):
     assembly = relationship("GenomeAssembly", passive_deletes=True)
 
     chromosome = Column(String(10), nullable=False)
-    start_pos = Column(Integer, nullable=False)
-    end_pos = Column(Integer, nullable=False)  # SNP: end_pos == start_pos
+    start_pos = Column(BigInteger, nullable=False)
+    end_pos = Column(BigInteger, nullable=False)  # SNP: end_pos == start_pos
 
     # reference_allele = Column(String(100), nullable=True)
     # alternate_allele = Column(String(100), nullable=True)
@@ -174,7 +179,7 @@ class VariantGWAS(Base):
 
     __tablename__ = "variant_gwas"
 
-    id = Column(Integer, primary_key=True, autoincrement=True)
+    id = Column(BigInteger, primary_key=True, autoincrement=True)
 
     # Publication / study info
     pubmed_id = Column(String(255), index=True, nullable=True)

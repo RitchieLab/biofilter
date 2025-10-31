@@ -29,6 +29,22 @@
             "id": 6,
             "code": "has_transcript",
             "description": "..."
+        },
+        {
+            "id": 7,
+            "code": "is_a",
+            "description": "..."
+        },
+        {
+            "id": 8,
+            "code": "Disease_has_disruption",
+            "description": "..."
+        },
+        {
+            "id": 9,
+            "code": "associated_with",
+            "description": "..."
         }
+        
     ]
 }

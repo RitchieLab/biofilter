@@ -1,6 +1,6 @@
 from biofilter.db.base import Base
 from sqlalchemy.orm import relationship
-from sqlalchemy import Column, Integer, String, ForeignKey, Text, Float, Boolean
+from sqlalchemy import Column, BigInteger, Integer, String, ForeignKey, Text, Float, Boolean
 
 
 class ChemicalMaster(Base):
@@ -67,7 +67,7 @@ class ChemicalMaster(Base):
 
     # Links to the central Entity table
     entity_id = Column(
-        Integer, ForeignKey("entities.id", ondelete="CASCADE"), nullable=False
+        BigInteger, ForeignKey("entities.id", ondelete="CASCADE"), nullable=False
     )
     entity = relationship("Entity", passive_deletes=True)
 

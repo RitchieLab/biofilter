@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Enum, Text
+from sqlalchemy import Column, Integer, String, Enum, Text, BigInteger
 from sqlalchemy import ForeignKey
 
 # from sqlalchemy.orm import declarative_base
@@ -48,7 +48,7 @@ class CurationConflict(Base):
     )  # noqa E501
     data_source = relationship("ETLDataSource")
     entity_type = Column(String, nullable=False)  # Ex: "gene"
-    entity_id = Column(Integer, nullable=True)
+    entity_id = Column(BigInteger, nullable=True)
     identifier = Column(String, nullable=False)  # Ex: "HGNC:40594"
     existing_identifier = Column(String, nullable=False)  # Ex: "HGNC:58098"
     # status = Column(Enum(ConflictStatus), default=ConflictStatus.pending)

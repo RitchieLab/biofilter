@@ -3,6 +3,7 @@ from sqlalchemy.orm import relationship
 
 # from sqlalchemy.sql import func
 from sqlalchemy import (
+    BigInteger,
     Column,
     Integer,
     String,
@@ -55,7 +56,7 @@ class Entity(Base):
 
     __tablename__ = "entities"
 
-    id = Column(Integer, primary_key=True, autoincrement=True)
+    id = Column(BigInteger, primary_key=True, autoincrement=True)
     group_id = Column(
         Integer,
         ForeignKey("entity_groups.id", ondelete="SET NULL"),
@@ -137,11 +138,11 @@ class EntityAlias(Base):
 
     __tablename__ = "entity_aliases"
 
-    id = Column(Integer, primary_key=True, autoincrement=True)
+    id = Column(BigInteger, primary_key=True, autoincrement=True)
 
     # Core foreign keys
     entity_id = Column(
-        Integer,
+        BigInteger,
         ForeignKey("entities.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
@@ -255,10 +256,10 @@ class EntityRelationship(Base):
 
     __tablename__ = "entity_relationships"
 
-    id = Column(Integer, primary_key=True, autoincrement=True)
+    id = Column(BigInteger, primary_key=True, autoincrement=True)
 
     entity_1_id = Column(
-        Integer,
+        BigInteger,
         ForeignKey("entities.id", ondelete="CASCADE"),
         nullable=False,
     )
@@ -281,7 +282,7 @@ class EntityRelationship(Base):
     )
 
     entity_2_id = Column(
-        Integer,
+        BigInteger,
         ForeignKey("entities.id", ondelete="CASCADE"),
         nullable=False,
     )

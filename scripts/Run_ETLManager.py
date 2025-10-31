@@ -10,7 +10,6 @@ data_sources_to_process = [
     # "hgnc",
     # "gene_ncbi",
     # "ensembl",
-    # "gene_ncbi",
     #
     # Proteins
     # --------
@@ -29,7 +28,7 @@ data_sources_to_process = [
     # Variants
     # --------
     # "dbsnp_sample",
-    # "dbsnp_chr1",
+    "dbsnp_chr1",
     # "dbsnp_chr2",
     # "dbsnp_chr3",
     # "dbsnp_chr4",
@@ -60,7 +59,7 @@ data_sources_to_process = [
     # -------------
     # "reactome_relationships",
     # "uniprot_relationships",
-    "biogrid",
+    # "biogrid",
     #
     # DISEASE
     # -------
