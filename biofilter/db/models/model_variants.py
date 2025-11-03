@@ -3,14 +3,10 @@ from sqlalchemy import (
     Column,
     Integer,
     Numeric,
-    # String,
     ForeignKey,
     String,
     Float,
     Text,
-    #     UniqueConstraint,
-    #     Index,
-    #     CheckConstraint,  # noqa E501
 )
 from sqlalchemy.orm import relationship
 from biofilter.db.base import Base
@@ -32,7 +28,8 @@ class VariantMaster(Base):
     id = Column(BigInteger, primary_key=True, autoincrement=True)
 
     # dbSNP rsID (stable external id)
-    variant_id = Column(String(100), unique=True, index=True, nullable=False)
+    # variant_id = Column(String(100), unique=True, index=True, nullable=False)
+    rs_id = Column(String(100), unique=True, index=True, nullable=False)
 
     variant_type = Column(String(16), nullable=False, default="SNP")
 
@@ -41,17 +38,7 @@ class VariantMaster(Base):
     )  # noqa E501
     omic_status = relationship("OmicStatus", passive_deletes=True)
 
-    # assembly_id = Column(
-    #     Integer, ForeignKey("genome_assemblies.id"), nullable=False
-    # )  # noqa E501
-    # assembly = relationship("GenomeAssembly", passive_deletes=True)
-
     chromosome = Column(String(10), nullable=True)  # '1'..'22','X','Y','MT'
-    # start_pos = Column(Integer, nullable=True)
-    # end_pos = Column(Integer, nullable=True)  # SNP: end_pos == start_pos
-
-    # reference_allele = Column(String(100), nullable=True)
-    # alternate_allele = Column(String(100), nullable=True)
 
     quality = Column(Numeric(3, 1), nullable=True)
 
@@ -74,24 +61,11 @@ class VariantMaster(Base):
     )
     etl_package = relationship("ETLPackage", passive_deletes=True)
 
-    # __table_args__ = (
-    #     CheckConstraint(
-    #        "start_pos <= end_pos", name="ck_variant_span_valid"
-    #     ),
-    #     Index(
-    #         "ix_var_asm_chr_start", "assembly_id", "chromosome", "start_pos"
-    #     ),  # noqa E501
-    # )
-
     loci = relationship(
         "VariantLocus",
         back_populates="variant",
-        # cascade="all, delete-orphan",
-        # passive_deletes=True,
     )
 
-# TODO:
-# Adicionar o rsID e build apenas como parametros de filtros
 
 # --- Per-assembly locus index (accelerates position/range queries) ----------
 class VariantLocus(Base):
@@ -105,7 +79,6 @@ class VariantLocus(Base):
 
     __tablename__ = "variant_loci"
 
-    # id = Column(Integer, primary_key=True, autoincrement=True)
     id = Column(BigInteger, primary_key=True, autoincrement=True)
 
     variant_id = Column(
@@ -120,17 +93,24 @@ class VariantLocus(Base):
         passive_deletes=True,
     )
 
+    rs_id = Column(String(100), nullable=False)
+
+    entity_id = Column(
+        BigInteger, ForeignKey("entities.id", ondelete="CASCADE"), nullable=False
+    )  # noqa E501 Trocar
+    entity = relationship("Entity", passive_deletes=True)
+
+    build = Column(String(10), nullable=False) # Here add a build alias as 37, 38
+
     assembly_id = Column(
         Integer, ForeignKey("genome_assemblies.id"), nullable=False
     )  # noqa E501
     assembly = relationship("GenomeAssembly", passive_deletes=True)
 
-    chromosome = Column(String(10), nullable=False)
+    chromosome = Column(String(10), nullable=False)  # '1'..'22','X','Y','MT'
     start_pos = Column(BigInteger, nullable=False)
-    end_pos = Column(BigInteger, nullable=False)  # SNP: end_pos == start_pos
+    end_pos = Column(BigInteger, nullable=False)
 
-    # reference_allele = Column(String(100), nullable=True)
-    # alternate_allele = Column(String(100), nullable=True)
     reference_allele = Column(Text, nullable=True)
     alternate_allele = Column(Text, nullable=True)
 
@@ -147,23 +127,6 @@ class VariantLocus(Base):
         nullable=True,
     )
     etl_package = relationship("ETLPackage", passive_deletes=True)
-
-    # __table_args__ = (
-    #     # Natural unique key for a locus mapping within an assembly
-    #     UniqueConstraint(
-    #         "variant_id",
-    #         "assembly_id",
-    #         "chromosome",
-    #         "start_pos",
-    #         "end_pos",
-    #         name="uq_variant_locus_natural_key",
-    #     ),
-    #     # Range-friendly indexes for queries by region
-    #     Index(
-    #         "ix_vloc_asm_chr_start", "assembly_id", "chromosome", "start_pos"
-    #     ),  # noqa E501
-    #     Index("ix_vloc_asm_chr_end", "assembly_id", "chromosome", "end_pos"),
-    # )
 
 
 class VariantGWAS(Base):

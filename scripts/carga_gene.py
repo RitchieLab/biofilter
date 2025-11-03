@@ -7,9 +7,9 @@ db_uri = "postgresql+psycopg2://bioadmin:bioadmin@localhost/biofilter"
 data_sources_to_process = [
     # Genes
     # -----
-    # "hgnc",
-    # "gene_ncbi",
-    # "ensembl",
+    "hgnc",
+    "gene_ncbi",
+    "ensembl",
     # "gene_ncbi",
     #
     # Proteins
@@ -29,7 +29,7 @@ data_sources_to_process = [
     # Variants
     # --------
     # "dbsnp_sample",
-    "dbsnp_chr1",
+    # "dbsnp_chr1",
     # "dbsnp_chr2",
     # "dbsnp_chr3",
     # "dbsnp_chr4",
@@ -72,8 +72,8 @@ data_sources_to_process = [
 ]
 
 run_steps = [
-    # "extract",
-    # "transform",
+    "extract",
+    "transform",
     "load",
     # "all"
 ]  # noqa E501
