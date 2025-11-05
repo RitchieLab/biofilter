@@ -1,6 +1,6 @@
 # Biofilter configuration file
-#   generated Fri, 10 Oct 2025 14:21:03
-#   Biofilter version 2.4.4 (2024-12-01)
+#   generated Fri, 10 Oct 2025 15:42:09
+#   Biofilter version 3.0.0 (2025-10-10)
 #   LOKI version 3.0.0 (2025-10-06)
 
 REPORT_CONFIGURATION                yes
@@ -41,10 +41,10 @@ PARIS_BIN_SIZE                      10000
 PARIS_DETAILS                       no
 QUIET                               no
 VERBOSE                             yes
-PREFIX                              /Users/andrerico/Works/bio3/biofilter/tests/biofilter/data/outcome/annotation/test_biofilter_annotation_snp__
+PREFIX                              /Users/andrerico/Works/bio3/biofilter/tests/biofilter/data/outcome/debug_annotation_snp_
 OVERWRITE                           yes
 STDOUT                              no
-REPORT_INVALID_INPUT                yes
+REPORT_INVALID_INPUT                no
 ANNOTATE                            position_label snp position gene upstream downstream
 PARIS                               no
 ALLOW_DUPLICATE_OUTPUT              no
