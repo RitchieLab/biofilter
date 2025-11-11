@@ -446,7 +446,7 @@ class DTP(DTPBase, EntityQueryMixin):
             target_chrom = self._extract_chrom_from_ds(self.data_source.name)   # noqa E501
             result = self.session.execute(
                 text("""
-                    SELECT variant_id, entity_id
+                    SELECT rs_id, entity_id
                     FROM variant_masters
                     WHERE chromosome = :chrom
                 """),
@@ -599,7 +599,7 @@ class DTP(DTPBase, EntityQueryMixin):
                 # ---= Inserir Variants as Master in bulk =----
                 variant_objects = [
                     VariantMaster(
-                        variant_id=row.rs_id,
+                        rs_id=row.rs_id,
                         variant_type=row.variant_type,
                         omic_status_id=1,
                         chromosome=row.chromosome,
@@ -617,7 +617,7 @@ class DTP(DTPBase, EntityQueryMixin):
 
                 # --- Create Variant Master ID Column ---
                 rsid_to_variant_master_id = {
-                    variant.variant_id: variant.id for variant in variant_objects
+                    variant.rs_id: variant.id for variant in variant_objects
                 }
                 df["variant_master_id"] = df["rs_id"].map(rsid_to_variant_master_id)
 
@@ -673,9 +673,15 @@ class DTP(DTPBase, EntityQueryMixin):
                             )
                 
                     # --Inserir VariantLocus
+                    build = row.assembly
+                    build = build.replace("GRCh", "").split(".")[0]  # '38'
+                    
                     locus_records.append(
                         VariantLocus(
                             variant_id=row.variant_master_id,
+                            rs_id=row.rs_id,
+                            entity_id=row.entity_id,
+                            build=build,
                             assembly_id=row.assembly_id,
                             chromosome=row.chromosome,
                             start_pos=row.start_pos,
@@ -688,12 +694,56 @@ class DTP(DTPBase, EntityQueryMixin):
                     )
 
                     # - Processar placements (se existirem)
+                    # placements = getattr(row, "placements", []) or []
+                    # for p in placements:
+                    #     p_acc = p.get("seq_id")
+                    #     asm_id = assemblies_map.get(p_acc)
+                    #     if not asm_id:
+                    #         continue
+                    #     p_start = p.get("start_pos")
+                    #     p_end = p.get("end_pos")
+                    #     if not p_start or not p_end:
+                    #         continue
+
+                    #     ref = p.get("ref")
+                    #     alt = p.get("alt")
+                    #     if not alt or alt == ref:
+                    #         continue
+
+                    #     chrom = acc2chrom.get(p_acc)
+                    #     ref_json = json.dumps([str(ref)]) if ref else json.dumps([])
+                    #     alt_json = json.dumps([str(alt)]) if alt else json.dumps([])
+
+                    #     build = p.get("assembly")
+                    #     build = build.replace("GRCh", "").split(".")[0]
+
+                    #     placement_locus.append(
+                    #         VariantLocus(
+                    #             variant_id=row.variant_master_id,
+                    #             rs_id=row.rs_id,
+                    #             entity_id=row.entity_id,
+                    #             build=build,
+                    #             assembly_id=asm_id,
+                    #             chromosome=chrom,
+                    #             start_pos=int(p_start),
+                    #             end_pos=int(p_end),
+                    #             reference_allele=ref_json,
+                    #             alternate_allele=alt_json,
+                    #             data_source_id=self.data_source.id,
+                    #             etl_package_id=self.package.id,
+                    #         )
+                    #     )
                     placements = getattr(row, "placements", []) or []
+
+                    # Acumulador por locus: (assembly_id, chrom, start, end, ref) -> {build, alts:set}
+                    agg = {}
+
                     for p in placements:
                         p_acc = p.get("seq_id")
                         asm_id = assemblies_map.get(p_acc)
                         if not asm_id:
                             continue
+
                         p_start = p.get("start_pos")
                         p_end = p.get("end_pos")
                         if not p_start or not p_end:
@@ -701,20 +751,43 @@ class DTP(DTPBase, EntityQueryMixin):
 
                         ref = p.get("ref")
                         alt = p.get("alt")
+                        # ignorar alt vazio ou igual ao ref (sem variação)
                         if not alt or alt == ref:
                             continue
 
                         chrom = acc2chrom.get(p_acc)
+                        if not chrom:
+                            continue
+
+                        # build: "GRCh38.p14" -> "38"
+                        build = p.get("assembly") or ""
+                        build = build.replace("GRCh", "").split(".")[0]
+
+                        key = (asm_id, chrom, int(p_start), int(p_end), str(ref or ""))
+
+                        bucket = agg.get(key)
+                        if bucket is None:
+                            bucket = {"build": build, "alts": set()}
+                            agg[key] = bucket
+
+                        bucket["alts"].add(str(alt))
+
+                    # Agora, gerar UMA linha por locus com alts agregados
+                    for (asm_id, chrom, start, end, ref), bucket in agg.items():
                         ref_json = json.dumps([str(ref)]) if ref else json.dumps([])
-                        alt_json = json.dumps([str(alt)]) if alt else json.dumps([])
+                        # ordena para estabilidade determinística
+                        alt_json = json.dumps(sorted(bucket["alts"]))
 
                         placement_locus.append(
                             VariantLocus(
                                 variant_id=row.variant_master_id,
+                                rs_id=row.rs_id,
+                                entity_id=row.entity_id,
+                                build=bucket["build"],
                                 assembly_id=asm_id,
                                 chromosome=chrom,
-                                start_pos=int(p_start),
-                                end_pos=int(p_end),
+                                start_pos=start,
+                                end_pos=end,
                                 reference_allele=ref_json,
                                 alternate_allele=alt_json,
                                 data_source_id=self.data_source.id,
@@ -759,6 +832,9 @@ class DTP(DTPBase, EntityQueryMixin):
                 for loc in all_loci:
                     key = (
                         loc.variant_id,
+                        loc.rs_id,
+                        loc.entity_id,
+                        loc.build,
                         loc.assembly_id,
                         loc.chromosome,
                         loc.start_pos,
@@ -772,6 +848,8 @@ class DTP(DTPBase, EntityQueryMixin):
                         seen.add(key)
                         unique_loci.append(loc)
                 self.session.bulk_save_objects(unique_loci)
+
+                # TODO: no chromossomo Y temos dados do X
 
                 # manda para a DB
                 self.session.commit()

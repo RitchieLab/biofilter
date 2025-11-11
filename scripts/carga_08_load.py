@@ -7,9 +7,9 @@ db_uri = "postgresql+psycopg2://bioadmin:bioadmin@localhost/biofilter"
 data_sources_to_process = [
     # Genes
     # -----
-    "hgnc",
-    "gene_ncbi",
-    "ensembl",
+    # "hgnc",
+    # "gene_ncbi",
+    # "ensembl",
     # "gene_ncbi",
     #
     # Proteins
@@ -36,7 +36,7 @@ data_sources_to_process = [
     # "dbsnp_chr5",
     # "dbsnp_chr6",
     # "dbsnp_chr7",
-    # "dbsnp_chr8",
+    "dbsnp_chr8",
     # "dbsnp_chr9",
     # "dbsnp_chr10",
     # "dbsnp_chr11",
@@ -48,7 +48,7 @@ data_sources_to_process = [
     # "dbsnp_chr17",
     # "dbsnp_chr18",
     # "dbsnp_chr19",
-    # "dbsnp_chr20",
+    # "dbsnp_chr21",
     # "dbsnp_chr21",
     # "dbsnp_chr22",
     # "dbsnp_chrx",
@@ -72,15 +72,15 @@ data_sources_to_process = [
 ]
 
 run_steps = [
-    "extract",
-    "transform",
+    # "extract",
+    # "transform",
     "load",
     # "all"
 ]  # noqa E501
 
 if __name__ == "__main__":
-    # bf = Biofilter(db_uri, debug_mode=True)
-    bf = Biofilter(db_uri)
+    bf = Biofilter(db_uri, debug_mode=True)
+    # bf = Biofilter(db_uri)
 
     for source in data_sources_to_process:
         for step in run_steps:

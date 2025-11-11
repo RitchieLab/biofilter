@@ -1,6 +1,6 @@
 from biofilter import Biofilter
 
-# db_uri = "sqlite:///biofilter_4.db"
+# db_uri = "sqlite:///biofilter.db"
 db_uri = "postgresql+psycopg2://bioadmin:bioadmin@localhost/biofilter"
 
 # Configure below
@@ -10,6 +10,7 @@ data_sources_to_process = [
     # "hgnc",
     # "gene_ncbi",
     # "ensembl",
+    # "gene_ncbi",
     #
     # Proteins
     # --------
@@ -50,8 +51,8 @@ data_sources_to_process = [
     # "dbsnp_chr20",
     # "dbsnp_chr21",
     # "dbsnp_chr22",
-    # "dbsnp_chrx",
-    "dbsnp_chry",
+    "dbsnp_chrx",
+    # "dbsnp_chry",
     # "dbsnp_chrmt",
     # "gwas",
     #
@@ -59,24 +60,20 @@ data_sources_to_process = [
     # -------------
     # "reactome_relationships",
     # "uniprot_relationships",
-    # "biogrid",
     #
     # DISEASE
     # -------
     # "mondo",
     # "mondo_relationships",
-    # "clingen",
-    # "omim",
     #
     # CHEMICAL
     # --------
     # "chebi",
-
 ]
 
 run_steps = [
-    # "extract",
-    # "transform",
+    "extract",
+    "transform",
     "load",
     # "all"
 ]  # noqa E501
