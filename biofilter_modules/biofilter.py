@@ -957,7 +957,6 @@ def main():
     # foreach filter
 
     # process annotations
-    # BUG: Note Confluence: https://halllab.atlassian.net/wiki/spaces/biofilterold/pages/edit-v2/454852616?draftShareId=210842e2-b99c-4519-9030-7fa2afd0c1e1
     for types, info in typeOutputInfo["annotation"].items():
         typesF, typesA = types
         label, path, outfile = info

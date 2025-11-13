@@ -28,9 +28,10 @@ def test_biofilter_annotation_snp():
         # "--position-file", str(input_positions),
         "--snp-file", str(input_positions),
         "--source", "kegg", "reactome", "go",
-        "--annotate", "position_label", "snp", "position", "gene", "upstream", "downstream",  # noqa E501
+        "--annotate", "position_label", "snp", "position", "gene", "upstream", "downstream", # noqa E501
         "--report-invalid-input",
         "--report-configuration",
+        # "--allow_duplicate_output", "no",
         "--overwrite",
         "--prefix", str(outcomes_prefix),
         "--ucsc-build-version", "19",

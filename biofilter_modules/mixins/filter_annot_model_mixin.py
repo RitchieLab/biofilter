@@ -324,6 +324,7 @@ class FilterAnnotModelMixin:
         lenF = len(queryF["_columns"])
         sqlF = self.getQueryText(queryF, splitRowIDs=True)
         self.prepareTablesForQuery(queryF)
+
         # add each filter rowid column as a condition for annotation
         n = lenF
         conditionsA = collections.defaultdict(set)
@@ -396,9 +397,13 @@ class FilterAnnotModelMixin:
             headerF[0] = "#" + headerF[0]
             yield tuple(headerF + headerA)
             emptyA = tuple(None for c in columnsA)
+
+            idsA = set()
             for rowF in cursorF.execute(sqlF):
-                idsA = set()
+                # idsA = set() # Avoid duplicate rows
+
                 for rowA in cursorA.execute(sqlA, rowF[:-1]):
+
                     rowidA = rowA[lenA:]
                     if rowidA not in idsA:
                         idsA.update(
