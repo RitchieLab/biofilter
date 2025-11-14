@@ -14,8 +14,8 @@ data_sources_to_process = [
     #
     # Proteins
     # --------
-    # "pfam",
-    # "uniprot",
+    "pfam",
+    "uniprot",
     #
     # Pathways
     # --------
@@ -36,7 +36,7 @@ data_sources_to_process = [
     # "dbsnp_chr5",
     # "dbsnp_chr6",
     # "dbsnp_chr7",
-    "dbsnp_chr8",
+    # "dbsnp_chr8",
     # "dbsnp_chr9",
     # "dbsnp_chr10",
     # "dbsnp_chr11",
@@ -72,8 +72,8 @@ data_sources_to_process = [
 ]
 
 run_steps = [
-    # "extract",
-    # "transform",
+    "extract",
+    "transform",
     "load",
     # "all"
 ]  # noqa E501

@@ -19,8 +19,8 @@ data_sources_to_process = [
     #
     # Pathways
     # --------
-    # "reactome",
-    # "kegg_pathways",
+    "reactome",
+    "kegg_pathways",
     #
     # Gene Ontology
     # -------------
@@ -31,7 +31,7 @@ data_sources_to_process = [
     # "dbsnp_sample",
     # "dbsnp_chr1",
     # "dbsnp_chr2",
-    "dbsnp_chr3",
+    # "dbsnp_chr3",
     # "dbsnp_chr4",
     # "dbsnp_chr5",
     # "dbsnp_chr6",
@@ -72,9 +72,9 @@ data_sources_to_process = [
 ]
 
 run_steps = [
-    # "extract",
+    "extract",
     "transform",
-    # "load",
+    "load",
     # "all"
 ]  # noqa E501
 

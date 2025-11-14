@@ -34,8 +34,8 @@ data_sources_to_process = [
     # "dbsnp_chr3",
     # "dbsnp_chr4",
     # "dbsnp_chr5",
-    # "dbsnp_chr6",
-    "dbsnp_chr7",
+    "dbsnp_chr6",
+    # "dbsnp_chr7",
     # "dbsnp_chr8",
     # "dbsnp_chr9",
     # "dbsnp_chr10",
@@ -72,9 +72,9 @@ data_sources_to_process = [
 ]
 
 run_steps = [
-    "extract",
-    "transform",
-    # "load",
+    # "extract",
+    # "transform",
+    "load",
     # "all"
 ]  # noqa E501
 
