@@ -1,0 +1,76 @@
+{
+    "source_systems": [
+        {
+            "name": "NCBI",
+            "description": "National Center for Biotechnology Information",
+            "homepage": "https://www.ncbi.nlm.nih.gov/",
+            "active": true
+        },
+        {
+            "name": "HGNC",
+            "description": "HUGO Gene Nomenclature Committee",
+            "homepage": "https://www.genenames.org/",
+            "active": true
+        },
+        {
+            "name": "Ensembl",
+            "description": "Genome browser for vertebrate genomes",
+            "homepage": "https://www.ensembl.org/",
+            "active": true
+        },
+        {
+            "name": "Reactome",
+            "description": "Open-source, peer-reviewed pathway database providing curated biological pathways and reactions in human biology and other species.",
+            "homepage": "https://reactome.org/",
+            "active": true
+        },
+        {
+            "name": "UniProt",
+            "description": "Universal Protein Resource, a comprehensive protein sequence and functional information database.",
+            "homepage": "https://www.uniprot.org/",
+            "active": true
+        },
+        {
+            "name": "EBI",
+            "description": "EMBL's European Bioinformatics Institute.",
+            "homepage": "https://www.ebi.ac.uk/",
+            "active": true
+        },
+        {
+            "name": "GO",
+            "description": "GO Consortium",
+            "homepage": "https://geneontology.org/",
+            "active": true
+        },
+        {
+            "name": "KEGG",
+            "description": "Kyoto Encyclopedia of Genes and Genomes, a database resource for understanding high-level functions and utilities of the biological system.",
+            "homepage": "https://www.genome.jp/kegg/",
+            "active": true
+        },
+        {
+            "name": "MONDO",
+            "description": "Monarch Disease Ontology (MONDO) integrates multiple disease resources (OMIM, Orphanet, ICD, DOID, etc.) into a unified ontology.",
+            "homepage": "https://mondo.monarchinitiative.org/",
+            "active": true
+        },
+        {
+            "name": "CLINGEN",
+            "description": "The Clinical Genome Resource (ClinGen) is an expert-curation consortium that defines the clinical relevance of genes and variants.",
+            "homepage": "https://www.clinicalgenome.org/",
+            "active": true
+        },
+            {
+            "name": "OMIM",
+            "description": "Online Mendelian Inheritance in Man (OMIM) is a comprehensive, curated catalog of human genes and genetic phenotypes.",
+            "homepage": "https://omim.org/",
+            "active": true
+        },
+            {
+            "name": "BioGRID",
+            "description": "A curated repository of genetic and protein interaction data from multiple organisms, focusing on experimentally validated molecular interactions.",
+            "homepage": "https://thebiogrid.org/",
+            "active": true
+        }
+    ]
+}

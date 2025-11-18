@@ -1,8 +1,10 @@
 from biofilter.db.base import Base
+from biofilter.db.types import PKBigIntOrInt
 from sqlalchemy.orm import relationship
 
 # from sqlalchemy.sql import func
 from sqlalchemy import (
+    Enum,
     BigInteger,
     Column,
     Integer,
@@ -56,7 +58,9 @@ class Entity(Base):
 
     __tablename__ = "entities"
 
-    id = Column(BigInteger, primary_key=True, autoincrement=True)
+    # id = Column(BigInteger, primary_key=True, autoincrement=True)
+    id = Column(PKBigIntOrInt, primary_key=True, autoincrement=True)
+
     group_id = Column(
         Integer,
         ForeignKey("entity_groups.id", ondelete="SET NULL"),
@@ -138,7 +142,8 @@ class EntityAlias(Base):
 
     __tablename__ = "entity_aliases"
 
-    id = Column(BigInteger, primary_key=True, autoincrement=True)
+    # id = Column(BigInteger, primary_key=True, autoincrement=True)
+    id = Column(PKBigIntOrInt, primary_key=True, autoincrement=True)
 
     # Core foreign keys
     entity_id = Column(
@@ -256,7 +261,8 @@ class EntityRelationship(Base):
 
     __tablename__ = "entity_relationships"
 
-    id = Column(BigInteger, primary_key=True, autoincrement=True)
+    # id = Column(BigInteger, primary_key=True, autoincrement=True)
+    id = Column(PKBigIntOrInt, primary_key=True, autoincrement=True)
 
     entity_1_id = Column(
         BigInteger,
@@ -327,6 +333,100 @@ class EntityRelationship(Base):
         nullable=True,
     )
     etl_package = relationship("ETLPackage", passive_deletes=True)
+
+
+class EntityLocation(Base):
+    """
+    Generic genomic location for non-variant entities:
+    genes, transcripts, regulatory regions, etc.
+    """
+
+    __tablename__ = "entity_locations"
+
+    # id = Column(BigInteger, primary_key=True, autoincrement=True)
+    id = Column(PKBigIntOrInt, primary_key=True, autoincrement=True)
+
+    # Central entity
+    entity_id = Column(
+        BigInteger,
+        ForeignKey("entities.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    entity = relationship("Entity", passive_deletes=True)
+
+    # Optional: what kind of entity this location describes
+    # (Gene, Protein, Regulatory Region, CNV Region, etc.)
+    entity_group_id = Column(
+        Integer,
+        ForeignKey("entity_groups.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    entity_group = relationship(
+        "EntityGroup",
+        foreign_keys=[entity_group_id],
+        passive_deletes=True,
+    )
+
+    # Assembly-aware
+    assembly_id = Column(
+        Integer,
+        ForeignKey("genome_assemblies.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    assembly = relationship("GenomeAssembly", passive_deletes=True)
+
+    # If you really need build denormalized, keep it;
+    # otherwise I would remove it and rely on GenomeAssembly.
+    build = Column(Integer, nullable=False, index=True)
+
+    # Chromosome encoding to match SNP:
+    # 1..22 = autosomes, 23 = X, 24 = Y, 25 = MT
+    chromosome = Column(Integer, nullable=False, index=True)
+
+    start_pos = Column(BigInteger, nullable=False)
+    end_pos = Column(BigInteger, nullable=False)
+
+    strand = Column(Enum("+", "-", name="strand_enum"), nullable=True)
+
+    # Human-friendly label (e.g., cytogenetic band)
+    region_label = Column(String(50), nullable=True)  # ex: '12p13.31'
+
+    # Provenance
+    data_source_id = Column(
+        Integer,
+        ForeignKey("etl_data_sources.id", ondelete="CASCADE"),
+        nullable=True,
+    )
+    data_source = relationship("ETLDataSource", passive_deletes=True)
+
+    etl_package_id = Column(
+        Integer,
+        ForeignKey("etl_packages.id", ondelete="CASCADE"),
+        nullable=True,
+    )
+    etl_package = relationship("ETLPackage", passive_deletes=True)
+
+    __table_args__ = (
+        # Index(
+        #     "ix_entity_locations_assembly_chr_start",
+        #     "assembly_id",
+        #     "chromosome",
+        #     "start_pos",
+        # ),
+        # Index(
+        #     "ix_entity_locations_entity",
+        #     "entity_id",
+        # ),
+        # Descomentar se quiser garantir 1 location por entity+assembly
+        UniqueConstraint(
+            "entity_id",
+            "assembly_id",
+            name="uq_entity_locations_entity_assembly",
+        ),
+    )
 
 
 """

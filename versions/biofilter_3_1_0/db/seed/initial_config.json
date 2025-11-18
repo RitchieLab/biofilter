@@ -1,0 +1,44 @@
+[
+    {
+        "key": "store_all_snps",
+        "value": "true",
+        "type": "bool",
+        "description": "If true, all SNPs will be stored, even if not validated.",
+        "editable": true
+    },
+    {
+        "key": "convert_merged_snps",
+        "value": "true",
+        "type": "bool",
+        "description": "Whether to convert merged SNPs to their current RSID.",
+        "editable": true
+    },
+    {
+        "key": "download_path",
+        "value": "./biofilter_data/raw/",
+        "type": "path",
+        "description": "Path to store downloaded files.",
+        "editable": true
+    },
+    {
+        "key": "processed_path",
+        "value": "./biofilter_data/processed/",
+        "type": "path",
+        "description": "Path to store transformed files.",
+        "editable": true
+    },
+    {
+        "key": "keep_raw_files",
+        "value": "false",
+        "type": "bool",
+        "description": "If false, raw files will be deleted after processing.",
+        "editable": true
+    },
+    {
+        "key": "keep_processed_files",
+        "value": "true",
+        "type": "bool",
+        "description": "If true, processed files will be kept for auditing.",
+        "editable": true
+    }
+]

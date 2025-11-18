@@ -5,9 +5,9 @@ from .model_genes import (
     GeneGroup,
     GeneLocusGroup,
     GeneLocusType,
-    GeneGenomicRegion,
+    # GeneGenomicRegion,
     GeneGroupMembership,
-    GeneLocation,
+    # GeneLocation,
 )
 from .model_etl import ETLDataSource, ETLSourceSystem, ETLPackage
 
@@ -18,6 +18,7 @@ from .model_entities import (
     EntityAlias,
     EntityRelationshipType,
     EntityRelationship,
+    EntityLocation,
 )
 from .model_curation import (
     ConflictStatus,
@@ -26,8 +27,10 @@ from .model_curation import (
     OmicStatus,
 )
 from .model_variants import (
-    VariantMaster,
-    VariantLocus,
+    # VariantMaster,
+    # VariantLocus,
+    SNP,
+    SNPMerge,
     VariantGWAS,
     # VariantLiftedPosition,
     # VariantMergeLog,
@@ -44,7 +47,7 @@ from .model_go import GOMaster, GORelation
 
 from .model_diseases import DiseaseGroup, DiseaseGroupMembership, DiseaseMaster
 
-from .model_chemicals import ChemicalMaster  #, ChemicalData
+from .model_chemicals import ChemicalMaster
 
 __all__ = [
     # # CONFIGURATION MODELS
@@ -56,9 +59,9 @@ __all__ = [
     "GeneGroup",
     "GeneLocusGroup",
     "GeneLocusType",
-    "GeneGenomicRegion",
+    # "GeneGenomicRegion",
     "GeneGroupMembership",
-    "GeneLocation",
+    # "GeneLocation",
     # # ETL MODELS
     "ETLDataSource",
     "ETLSourceSystem",
@@ -70,14 +73,17 @@ __all__ = [
     "EntityAlias",
     "EntityRelationshipType",
     "EntityRelationship",
+    "EntityLocation",
     # CURATION MODELS
     "ConflictStatus",
     "ConflictResolution",
     "CurationConflict",
     "OmicStatus",
     # VARIANTS MODELS
-    "VariantMaster",
-    "VariantLocus",
+    # "VariantMaster",
+    # "VariantLocus",
+    "SNP",
+    "SNPMerge",
     "VariantGWAS",
     # "VariantLiftedPosition",
     # "VariantMergeLog",

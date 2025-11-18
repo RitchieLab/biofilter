@@ -1,0 +1,50 @@
+{
+    "entity_relationship_types": [
+        {
+            "id": 1,
+            "code": "part_of",
+            "description": "The entity is part of the target entity (e.g., pathway hierarchy)."
+        },
+        {
+            "id": 2,
+            "code": "in_pathway",
+            "description": "The entity (gene, protein, compound) participates in the pathway."
+        },
+        {
+            "id": 3,
+            "code": "interacts_with",
+            "description": "The entity physically or functionally interacts with the target entity."
+        },
+        {
+            "id": 4,
+            "code": "regulates",
+            "description": "The entity regulates the activity, expression, or function of the target entity."
+        },
+        {
+            "id": 5,
+            "code": "encodes",
+            "description": "The gene encodes the protein or other gene product."
+        },
+        {
+            "id": 6,
+            "code": "has_transcript",
+            "description": "..."
+        },
+        {
+            "id": 7,
+            "code": "is_a",
+            "description": "..."
+        },
+        {
+            "id": 8,
+            "code": "Disease_has_disruption",
+            "description": "..."
+        },
+        {
+            "id": 9,
+            "code": "associated_with",
+            "description": "..."
+        }
+        
+    ]
+}

@@ -1,0 +1,216 @@
+import logging
+from typing import Union, List, Dict, Optional, Any
+import pandas as pd
+from sqlalchemy.orm import Session
+from sqlalchemy import select, and_, or_, not_, func
+from sqlalchemy.exc import SQLAlchemyError
+
+# Import all models
+from biofilter.db.models import (
+    # System Models
+    SystemConfig,
+    BiofilterMetadata,
+    GenomeAssembly,
+    # Entity Models
+    EntityGroup,
+    Entity,
+    EntityAlias,
+    EntityRelationshipType,
+    EntityRelationship,
+    # Curation Models
+    ConflictStatus,
+    ConflictResolution,
+    CurationConflict,
+    OmicStatus,
+    # ETL Models
+    ETLDataSource,
+    ETLSourceSystem,
+    ETLPackage,
+    # Gene Models
+    GeneMaster,
+    GeneGroup,
+    GeneLocusGroup,
+    GeneLocusType,
+    GeneGenomicRegion,
+    OmicStatus,
+    GeneGroupMembership,
+    GeneLocation,
+    # Variant Models
+    VariantMaster,
+    VariantLocus,
+    VariantGWAS,
+    # Protein Models
+    ProteinMaster,
+    ProteinPfam,
+    ProteinPfamLink,
+    ProteinEntity,
+    # Pathway Models
+    PathwayMaster,
+    # GO Models
+    GOMaster,
+    GORelation,
+    # Diseases
+    DiseaseGroup,
+    DiseaseGroupMembership,
+    DiseaseMaster,
+    # Chemical
+    ChemicalMaster,
+)
+
+
+# Configure logger
+logger = logging.getLogger(__name__)
+
+logger.setLevel(logging.INFO)
+
+
+class Query:
+    """
+    Generic query interface for Biofilter3R.
+    Provides helpers for model access, query execution, and inspection.
+    """
+
+    def __init__(self, session: Session):
+        self.session = session
+        self.select = select
+        self.and_ = and_
+        self.or_ = or_
+        self.not_ = not_
+        self.func = func
+
+        self.models: Dict[str, Any] = {
+            # System
+            "SystemConfig": SystemConfig,
+            "BiofilterMetadata": BiofilterMetadata,
+            "GenomeAssembly": GenomeAssembly,
+            # Entity
+            "Entity": Entity,
+            "EntityAlias": EntityAlias,
+            "EntityGroup": EntityGroup,
+            "EntityRelationshipType": EntityRelationshipType,
+            "EntityRelationship": EntityRelationship,
+            # Curation
+            "CurationConflict": CurationConflict,
+            "ConflictStatus": ConflictStatus,
+            "ConflictResolution": ConflictResolution,
+            # ETL
+            "ETLSourceSystem": ETLSourceSystem,
+            "ETLDataSource": ETLDataSource,
+            "ETLPackage": ETLPackage,
+            # Gene
+            "GeneMaster": GeneMaster,
+            "GeneGroup": GeneGroup,
+            "GeneLocusGroup": GeneLocusGroup,
+            "GeneLocusType": GeneLocusType,
+            "GeneGenomicRegion": GeneGenomicRegion,
+            "OmicStatus": OmicStatus,
+            "GeneGroupMembership": GeneGroupMembership,
+            "GeneLocation": GeneLocation,
+            # Variant
+            "VariantMaster": VariantMaster,
+            "VariantLocus": VariantLocus,
+            "VariantGWAS": VariantGWAS,
+            # Protein
+            "ProteinMaster": ProteinMaster,
+            "ProteinPfam": ProteinPfam,
+            "ProteinPfamLink": ProteinPfamLink,
+            "ProteinEntity": ProteinEntity,
+            # Pathway
+            "PathwayMaster": PathwayMaster,
+            # GO
+            "GOMaster": GOMaster,
+            "GORelation": GORelation,
+            # Disease
+            "DiseaseGroup": DiseaseGroup,
+            "DiseaseGroupMembership": DiseaseGroupMembership,
+            "DiseaseMaster": DiseaseMaster,
+            # Chemical
+            "ChemicalMaster": ChemicalMaster,
+        }
+
+        # Optional autocomplete access
+        for name, model in self.models.items():
+            setattr(self, name, model)
+
+    def get_model(self, model_name: str) -> Optional[Any]:
+        """Return a model class by name."""
+        return self.models.get(model_name)
+
+    # def _to_dict(self, obj) -> Dict[str, Any]:
+    #     return {
+    #         k: v
+    #         for k, v in vars(obj).items()
+    #         if not k.startswith("_sa_instance_state")  # noqa E501
+    #     }
+    def _to_dict(self, obj) -> Dict[str, Any]:
+        if hasattr(obj, "_mapping"):  # Row object do SQLAlchemy 2.0
+            return dict(obj._mapping)
+        if hasattr(obj, "__dict__"):  # ORM object
+            return {k: v for k, v in vars(obj).items() if not k.startswith("_sa_instance_state")}
+        return {"value": obj}  # escalar simples
+
+
+    def run_query(
+        self, stmt, return_df: bool = True
+    ) -> Union[List[Any], pd.DataFrame]:
+        """Execute a SQLAlchemy statement and return results."""
+        try:
+            # result = self.session.execute(stmt).scalars().all()
+            result = self.session.execute(stmt).all()
+            if return_df:
+                df = pd.DataFrame([self._to_dict(r) for r in result])
+                return df
+            return result
+        except SQLAlchemyError as e:
+            logger.warning(f"Query failed: {e}")
+            return []
+
+    def raw_sql(self, sql: str) -> List[Any]:
+        """Run a raw SQL string and return results."""
+        try:
+            return self.session.execute(sql).fetchall()
+        except SQLAlchemyError as e:
+            logger.warning(f"Raw SQL failed: {e}")
+            return []
+
+    def list_models(self) -> List[str]:
+        """List all registered models."""
+        return list(self.models.keys())
+
+    def describe_model(
+        self, model_name: str
+    ) -> Optional[Dict[str, List[str]]]:  # noqa E501
+        """Return column and relationship info for a given model."""
+        model = self.get_model(model_name)
+        if not model:
+            logger.warning(f"Model '{model_name}' not found.")
+            return None
+        return {
+            "columns": list(model.__table__.columns.keys()),
+            "relationships": list(model.__mapper__.relationships.keys()),
+        }
+
+    def get_model_metadata(self, model_name: str) -> Optional[Dict[str, Any]]:
+        """Return detailed metadata about a model's columns and relationships."""  # noqa E501
+        model = self.get_model(model_name)
+        if not model:
+            return None
+        return {
+            "columns": {
+                col.name: {
+                    "type": str(col.type),
+                    "nullable": col.nullable,
+                    "primary_key": col.primary_key,
+                }
+                for col in model.__table__.columns
+            },
+            "relationships": list(model.__mapper__.relationships.keys()),
+        }
+
+    def query_model(self, model_name: str, **filters) -> List[Any]:
+        """Run a query on a model using keyword filters (e.g., hgnc_id='1234')."""  # noqa E501
+        model = self.get_model(model_name)
+        if not model:
+            raise ValueError(f"Model '{model_name}' not found.")
+        stmt = select(model).filter_by(**filters)
+        return self.run_query(stmt)

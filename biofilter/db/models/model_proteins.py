@@ -57,8 +57,8 @@ class ProteinMaster(Base):
 
     id = Column(Integer, primary_key=True)
     protein_id = Column(String(20), unique=True, index=True, nullable=False)
-    function = Column(String(255)) # TODO BUG Ajustar 3.2.0
-    location = Column(String(255)) # TODO BUG; Ajustar 3.2.0
+    function = Column(String(255))  # TODO BUG Ajustar 3.2.0
+    location = Column(String(255))  # TODO BUG; Ajustar 3.2.0
     tissue_expression = Column(String(255))
     pseudogene_note = Column(String(255))
 
@@ -99,7 +99,7 @@ class ProteinEntity(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
 
     entity_id = Column(
-        BigInteger, ForeignKey("entities.id", ondelete="CASCADE"), nullable=False
+        BigInteger, ForeignKey("entities.id", ondelete="CASCADE"), nullable=False  # noqa E501
     )  # noqa E501
     entity = relationship("Entity", passive_deletes=True)
 

@@ -2,33 +2,74 @@
 import os
 import re
 import bz2
+import ast
 import glob
-import sys
-import __main__
 import time
-import pandas as pd
-import numpy as np
 import json
-from typing import Dict
-from concurrent.futures import ProcessPoolExecutor, as_completed
-from sqlalchemy.exc import IntegrityError
+import pandas as pd
+from pathlib import Path
+from typing import Dict, List, Any
+
+from sqlalchemy import insert
+from sqlalchemy import insert as generic_insert
+from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.dialects.sqlite import insert as sqlite_insert
+
 from biofilter.etl.mixins.base_dtp import DTPBase
 from biofilter.etl.conflict_manager import ConflictManager
 from biofilter.etl.mixins.entity_query_mixin import EntityQueryMixin
 from biofilter.db.models import (
-    GenomeAssembly,
-    VariantMaster,
-    VariantLocus,
-    EntityGroup,
-    EntityAlias,
-    EntityRelationship,
-    EntityRelationshipType,
-    Entity,
+    SNP,
+    SNPMerge,
 )
-from biofilter.etl.dtps.worker_dbsnp import worker_dbsnp
-from sqlalchemy import text
-from sqlalchemy import any_, cast, Text, bindparam
-from sqlalchemy.dialects.postgresql import ARRAY
+
+
+def _map_seq_id_to_chrom(seq_id: str) -> int | None:
+    """
+    Map RefSeq chromosome accessions to our integer chromosome encoding.
+
+    - NC_000001.* -> 1
+    - ...
+    - NC_000022.* -> 22
+    - NC_000023.* -> 23 (X)
+    - NC_000024.* -> 24 (Y)
+    - NC_012920.* -> 25 (MT, human mitochondrial)
+    - Anything else -> None (we skip non-primary chromosomes/contigs here)
+    """
+    if not seq_id:
+        return None
+
+    s = seq_id.strip().upper()
+
+    # Chromosomes 1..24 (X=23, Y=24)
+    m = re.match(r"^NC_0*([0-9]{1,2})\.", s)
+    if m:
+        n = int(m.group(1))
+        if 1 <= n <= 22:
+            return n
+        if n == 23:
+            return 23  # X
+        if n == 24:
+            return 24  # Y
+        # outros NC_00xxx.* que não sejam cromossomos, ignorar
+        return None
+
+    # Mitochondrial sequence (human)
+    # RefSeq canonical: NC_012920.1
+    if s.startswith("NC_012920"):
+        return 25  # MT
+
+    # Alt contigs, scaffolds, etc. (NT_, NW_, etc.) -> não usamos aqui
+    return None
+
+
+def _extract_merge_log(record: dict) -> list[str]:
+    """Return list of merged rsIDs from a dbSNP record."""
+    return [
+        f"{m['merged_rsid']}"
+        for m in record.get("dbsnp1_merges", []) or []
+        if m.get("merged_rsid")
+    ]
 
 
 class DTP(DTPBase, EntityQueryMixin):
@@ -51,9 +92,9 @@ class DTP(DTPBase, EntityQueryMixin):
 
         # DTP versioning
         self.dtp_name = "dtp_variant_ncbi"
-        self.dtp_version = "1.1.0"
-        self.compatible_schema_min = "3.1.0"
-        self.compatible_schema_max = "4.0.0"
+        self.dtp_version = "1.2.0"
+        self.compatible_schema_min = "3.2.0"
+        self.compatible_schema_max = "3.2.0"
 
     # ⬇️  --------------------------  ⬇️
     # ⬇️  ------ EXTRACT FASE ------  ⬇️
@@ -71,12 +112,6 @@ class DTP(DTPBase, EntityQueryMixin):
         self.check_compatibility()
 
         source_url = self.data_source.source_url
-        # if force_steps:
-        #     last_hash = ""
-        #     msg = "Ignoring hash check."
-        #     self.logger.log(msg, "WARNING")
-        # else:
-        #     last_hash = self.etl_process.raw_data_hash
 
         try:
             # Landing path
@@ -89,17 +124,6 @@ class DTP(DTPBase, EntityQueryMixin):
             # Get hash from current md5 file
             url_md5 = f"{source_url}.md5"
             current_hash = self.get_md5_from_url_file(url_md5)
-
-            # if not current_hash:
-            #     msg = f"Failed to retrieve MD5 from {url_md5}"
-            #     self.logger.log(msg, "WARNING")
-            #     return False, msg, None
-
-            # # Compare current hash and last processed hash
-            # if current_hash == last_hash:
-            #     msg = f"No change detected in {source_url}"
-            #     self.logger.log(msg, "INFO")
-            #     return False, msg, current_hash
 
             # Download the file
             status, msg = self.http_download(source_url, landing_path)
@@ -150,79 +174,48 @@ class DTP(DTPBase, EntityQueryMixin):
 
         # parameters
         batch_size = 200_000
-        max_workers = 1  # TODO: Implementar metodos melhores
+
+        def already_done(pid: int) -> bool:
+            return os.path.exists(
+                os.path.join(
+                    output_dir,
+                    f"processed_part_{pid}.parquet"
+                )
+            )  # noqa E501
 
         try:
-            # NOTE: I have problem with MP on VPS. Need review
-
-            # futures, batch, batch_id = [], [], 0
-            # with bz2.open(
-            #     input_file, "rt", encoding="utf-8"
-            # ) as f, ProcessPoolExecutor(  # noqa E501
-            #     max_workers=max_workers
-            # ) as ex:
-            #     if __name__ == "__main__" or (
-            #         hasattr(__main__, "__file__") and not hasattr(sys, "ps1")
-            #     ):
-            #         for line in f:
-            #             batch.append(line)
-            #             if len(batch) >= batch_size:
-            #                 futures.append(
-            #                     ex.submit(
-            #                         worker_dbsnp,
-            #                         batch.copy(),
-            #                         batch_id,
-            #                         output_dir,
-            #                     )
-            #                 )
-            #                 batch.clear()
-            #                 batch_id += 1
-            #         if batch:
-            #             futures.append(
-            #                 ex.submit(
-            #                     worker_dbsnp,
-            #                     batch.copy(),
-            #                     batch_id,
-            #                     output_dir,
-            #                 )
-            #             )
-
-            #         for fut in as_completed(futures):
-            #             fut.result()
-            #     else:
-            #         self.logger.log(
-            #             "⚠️ Skipping multiprocessing: not in __main__ context.",  # noqa E501
-            #             "WARNING",
-            #         )
-
             batch, batch_id = [], 0
-            # (opcional) pular partes já prontas p/ retomar
-            def already_done(pid: int) -> bool:
-                # ajuste se seu worker usa outro padrão de nome
-                return os.path.exists(os.path.join(output_dir, f"processed_part_{pid}.parquet"))
 
             with bz2.open(input_file, "rt", encoding="utf-8") as f:
-                self.logger.log("🧵 Running in SERIAL mode (no multiprocessing).", "INFO")
 
                 for line in f:
                     batch.append(line)
                     if len(batch) >= batch_size:
                         if not already_done(batch_id):
-                            worker_dbsnp(batch, batch_id, output_dir)  # chamada direta
+                            self._process_batch(
+                                batch,
+                                batch_id,
+                                str(output_dir)
+                            )  # noqa E501
                         else:
-                            self.logger.log(f"⏭️  Skipping existing part {batch_id}", "DEBUG")
+                            self.logger.log(
+                                f"⏭️  Skipping existing part {batch_id}",
+                                "DEBUG"
+                            )  # noqa E501
                         batch_id += 1
-                        batch = []  # libera memória
+                        batch = []
 
-                # resto final
+                # Tail
                 if batch:
                     if not already_done(batch_id):
-                        worker_dbsnp(batch, batch_id, output_dir)
+                        self._process_batch(batch, batch_id, str(output_dir))
                     else:
-                        self.logger.log(f"⏭️  Skipping existing part {batch_id}", "DEBUG")
+                        self.logger.log(
+                            f"⏭️  Skipping existing part {batch_id}",
+                            "DEBUG"
+                        )  # noqa E501
                     batch_id += 1
                     batch = []
-
 
             # msg = f"✅ Processing completed with {len(futures)} batches."
             msg = f"✅ Processing completed with {batch_id} batches (serial)."
@@ -234,137 +227,571 @@ class DTP(DTPBase, EntityQueryMixin):
             self.logger.log(msg, "ERROR")
             return False, msg
 
-    # --- Support methods ---
+    def _extract_snp_positions(self, rec):
+        primary = rec.get("primary_snapshot_data") or {}
+        placements = primary.get("placements_with_allele") or []
 
-    def _to_py(self, x):
-        """Converte strings que representam listas/dicts para objeto Python."""
-        if isinstance(x, np.ndarray):
-            x = x.tolist()
-        if isinstance(x, (list, dict)) or x is None:
-            return x
+        position_37 = None
+        position_38 = None
+        ref = None
+        alt = None
+        alt_new = None
+        chrom = None  # int 1..25
 
-    def _load_input_frame(self, path: str) -> pd.DataFrame:
-        if path.endswith(".parquet"):
-            df = pd.read_parquet(path)
-        else:
-            df = pd.read_csv(path, sep=",")
-        expected = [
-            "rs_id",
-            "variant_type",
-            "build_id",
-            "seq_id",
-            "assembly",
-            "start_pos",
-            "end_pos",
-            "ref",
-            "alt",
-            "placements",
-            "merge_log",
-            "gene_links",
-            "quality",
-        ]
-        missing = [c for c in expected if c not in df.columns]
-        if missing:
-            raise ValueError(f"Input file {path} missing columns: {missing}")
+        try:
+            for p in placements:
+                pan = p.get("placement_annot") or {}
+                seq_traits = pan.get("seq_id_traits_by_assembly") or []
+                if not seq_traits:
+                    continue
 
-        for c in ["start_pos", "end_pos", "build_id"]:
-            df[c] = pd.to_numeric(df[c], errors="coerce").astype("Int64")
+                assembly_name = (seq_traits[0].get("assembly_name") or "").upper()  # noqa E501
+                seq_type = pan.get("seq_type", "")
 
-        df["placements"] = df["placements"].apply(self._to_py)
-        df["merge_log"] = df["merge_log"].apply(self._to_py)
-        df["gene_links"] = df["gene_links"].apply(self._to_py)
+                # só queremos refseq_chromosome
+                if seq_type != "refseq_chromosome":
+                    continue
 
-        # alt can come as a list of strings; normalize to string "A/T"
-        def _alt_str(x):
-            if isinstance(x, list):
-                return "/".join(
-                    sorted(
-                        {str(a) for a in x if a is not None and str(a) != ""}
-                    )  # noqa E501
+                # pegamos o seq_id pra mapear em cromossomo depois
+                # ex: "NC_000008.11" -> 8
+                alleles = p.get("alleles") or []
+
+                # primeiro, extrair ref/alt desse placement
+                local_ref = None
+                local_alt = []
+                local_pos = None
+
+                for al in alleles:
+                    spdi = (al.get("allele") or {}).get("spdi") or {}
+                    hgvs = al.get("hgvs", "") or ""
+                    pos0 = spdi.get("position")
+                    if pos0 is None:
+                        continue
+                    pos1 = pos0 + 1  # 0-based -> 1-based
+
+                    # sufixo de HGVS para saber se é ref ou alt
+                    # ex: "NC_000008.11:g.19956018="   -> ref
+                    #     "NC_000008.11:g.19956018A>G" -> alt
+                    #     "NC_000008.11:g.19956018A>T" -> alt
+                    if hgvs.endswith("="):
+                        local_ref = spdi.get("deleted_sequence") or spdi.get("inserted_sequence")  # noqa E501
+                        local_pos = pos1
+                    elif ">" in hgvs:
+                        local_alt.append(spdi.get("inserted_sequence"))
+                        local_pos = pos1
+
+                # se não conseguimos ref/alt, ignora esse placement
+                if local_pos is None or local_ref is None or local_alt is None:
+                    continue
+
+                # mapeia cromossomo a partir do seq_id (ou via tabela GenomeAssembly)  # noqa E501
+                seq_id = p.get("seq_id") or spdi.get("seq_id")
+                chrom = _map_seq_id_to_chrom(seq_id)
+                if chrom is None:
+                    continue
+
+                # guarda por build
+                if "GRCH38" in assembly_name:
+                    position_38 = local_pos
+                    ref = local_ref
+                    alt = local_alt
+                elif "GRCH37" in assembly_name:
+                    position_37 = local_pos
+                    # ref/alt devem ser iguais, mas se ainda não temos, podemos setar  # noqa E501
+                    if ref is None:
+                        ref = local_ref
+                    if alt is None:
+                        alt = local_alt
+
+                # se já temos os dois builds preenchidos, podemos encerrar cedo
+                if position_37 is not None and position_38 is not None:
+                    break
+
+            if ref is not None or alt is not None:
+
+                alt_new = "/".join(sorted(set(alt)))
+
+            return chrom, position_37, position_38, ref, alt_new
+
+        except Exception as e:
+            print(e)
+
+    # FUNCAO INTERNA DO TRANSFORM
+    def _process_batch(self, batch, batch_id: int, output_dir: str) -> None:
+        """
+        Process a batch of dbSNP JSON lines and write a Parquet part.
+
+        This replaces the external worker_dbsnp() function and keeps the logic
+        contained inside the DTP class.
+        """
+        pid = os.getpid()
+        self.logger.log(
+            f"[PID {pid}] Processing batch {batch_id} with {len(batch)} lines...",  # noqa E501
+            "DEBUG",
+        )
+
+        rows = []
+
+        for line in batch:
+            try:
+                rec = json.loads(line)
+
+                # Normalize rs_id as numeric (BigInteger)
+                raw_refsnp = rec.get("refsnp_id", None)
+                if raw_refsnp is None:
+                    continue
+                try:
+                    rs_numeric = int(raw_refsnp)
+                except (TypeError, ValueError):
+                    continue
+
+                # Keep only SNVs
+                primary = rec.get("primary_snapshot_data") or {}
+                variant_type = primary.get("variant_type", "")
+                if variant_type != "snv":
+                    continue
+
+                chrom, pos37, pos38, ref, alt = self._extract_snp_positions(rec)  # noqa E501
+                if chrom is None or (pos37 is None and pos38 is None):
+                    # não conseguimos coordenadas, pula registro
+                    continue
+
+                rows.append(
+                    {
+                        "rs_id": rs_numeric,
+                        "chromosome": chrom,
+                        "position_37": pos37,
+                        "position_38": pos38,
+                        "reference_allele": ref,
+                        "alternate_allele": alt,
+                        "merge_log": _extract_merge_log(rec),  # como lista de ints  # noqa E501
+                    }
                 )
-            if x is None:
-                return ""
-            return str(x)
 
-        df["alt"] = df["alt"].apply(_alt_str)
-        df["ref"] = df["ref"].fillna("").astype(str)
+            except Exception as e:
+                # Mantém a lógica original de "continua o loop", mas loga no logger  # noqa E501
+                self.logger.log(
+                    f"[PID {pid}] ⚠️ Error in batch {batch_id}: {e}",
+                    "WARNING",
+                )
+                continue
 
-        # In the absence of placement or empty lists, use []
-        for c in ["placements", "merge_log", "gene_links"]:
-            df[c] = df[c].apply(lambda v: v if isinstance(v, list) else [])
+        if not rows:
+            self.logger.log(
+                f"[PID {pid}] ⚠️ No rows produced for batch {batch_id}",
+                "WARNING",
+            )
+            return
 
-        return df
+        df = pd.DataFrame(rows)
 
-    def _norm_rs(self, x: str) -> str | None:
-        if not x:
-            return None
-        s = str(x).strip()
-        # Accept "RS123", "rs123", "  rs123  "
-        if s.lower().startswith("rs") and s[2:].isdigit():
-            return f"rs{int(s[2:])}"
-        # Some dumps come with just the number
-        if s.isdigit():
-            return f"rs{int(s)}"
-        return None
+        output_dir = Path(output_dir)
+        output_dir.mkdir(parents=True, exist_ok=True)
+        out_path = output_dir / f"processed_part_{batch_id}.parquet"
+        out_path_csv = output_dir / f"processed_part_{batch_id}.csv"
 
-    def _norm_chr(s: str | None) -> str | None:
-        if not s:
-            return None
-        x = str(s).strip().upper()
-        if x.startswith("CHR"):
-            x = x[3:]
-        if x in {"23", "X"}:
-            return "X"
-        if x in {"24", "Y"}:
-            return "Y"
-        if x in {"M", "MT", "MITO", "MITOCHONDRIAL"}:
-            return "MT"
-        return x  # "1".."22", "X","Y","MT"
+        df.to_parquet(out_path, index=False)
+        df.to_csv(out_path_csv, index=False)
 
-    def _ensure_list(x):
-        if x is None or (isinstance(x, float) and pd.isna(x)):
+        self.logger.log(
+            f"[PID {pid}] ✅ Finished batch {batch_id}, "
+            f"saved {len(df)} rows → {out_path}",
+            "INFO",
+        )
+
+    # FUNCoes do LOAD
+    # ---------------
+    # ---------------
+    # ---------------
+
+    # def _get_snp_insert_for_dialect(
+    #         self,
+    #         # session: Session
+    #         ):
+    #     """Return a SQLAlchemy Insert object for SNP with dialect-specific ON CONFLICT support."""  # noqa E501
+    #     dialect_name = self.session.get_bind().dialect.name
+
+    #     if dialect_name == "postgresql":
+    #         return pg_insert(SNP)
+    #     elif dialect_name == "sqlite":
+    #         return sqlite_insert(SNP)
+    #     else:
+    #         # Fallback genérico: sem on_conflict (para outros bancos, se um dia aparecer)  # noqa E501
+    #         return insert(SNP)
+
+    # def _get_snpmerge_insert_for_dialect(
+    #         self,
+    #         # session: Session
+    #         ):
+    #     """Return a SQLAlchemy Insert object for SNPMerge with dialect-specific ON CONFLICT support."""  # noqa E501
+    #     dialect_name = self.session.get_bind().dialect.name
+
+    #     if dialect_name == "postgresql":
+    #         return pg_insert(SNPMerge)
+    #     elif dialect_name == "sqlite":
+    #         return sqlite_insert(SNPMerge)
+    #     else:
+    #         return insert(SNPMerge)
+
+    def _parse_merge_log(self, raw: Any) -> List[int]:
+        """
+        Parse merge_log column to a list of numeric rsIDs (integers).
+
+        Accepted forms:
+        - "['59291991', '67359146']"
+        - []
+        - None
+        """
+        if raw is None:
             return []
-        if isinstance(x, (list, tuple, set)):
-            return list(x)
-        return [x]
 
-    def _extract_chrom_from_ds(self, ds_name: str) -> str | None:
-        # Extrai o final após o "_"
-        raw = ds_name.lower().split("_")[-1]
+        if isinstance(raw, list):
+            return [int(x) for x in raw]
 
-        # Mapeamento opcional para nomes não padronizados
-        mapping = {
-            "chrx": "X",
-            "chry": "Y",
-            "chrmt": "MT",
-            "chrm": "MT",
-        }
+        s = str(raw).strip()
+        if not s or s == "[]":
+            return []
 
-        # Se estiver no dicionário, retorna direto
-        if raw in mapping:
-            return mapping[raw]
+        try:
+            parsed = ast.literal_eval(s)
+            if isinstance(parsed, (list, tuple)):
+                out = []
+                for x in parsed:
+                    if x is None:
+                        continue
+                    xs = str(x).strip()
+                    # Remove eventual prefixo "rs"
+                    if xs.startswith("rs"):
+                        xs = xs[2:]
+                    try:
+                        out.append(int(xs))
+                    except ValueError:
+                        continue
+                return out
+        except Exception:
+            return []
 
-        # Se for "chr" seguido de número, extrai
-        match = re.match(r"chr?(\d+)$", raw)
-        if match:
-            return match.group(1)
+        return []
 
-        # Caso contrário, tenta retornar como está (se for válido)
-        if raw in [str(i) for i in range(1, 23)] + ["x", "y", "mt"]:
-            return raw
+    def _get_insert_for_dialect(self, model_cls, dialect_name):
+        if dialect_name == "sqlite":
+            return sqlite_insert(model_cls)
+        elif dialect_name == "postgresql":
+            return pg_insert(model_cls)
+        else:
+            return generic_insert(model_cls)
 
-        return None  # Não identificado
-    
-    # Keep Alleles as List of String in DB. 
-    def _normalize_allele(self, val):
-        if isinstance(val, str):
-            val = val.replace("'", "").replace("[", "").replace("]", "")
-            return json.dumps(val.split())
-        elif isinstance(val, (list, np.ndarray)):
-            return json.dumps(list(map(str, val)))
-        elif pd.isna(val) or val is None:
-            return json.dumps([])
-        return json.dumps([str(val)])
+    def upsert_snps_from_df(self, df: pd.DataFrame):
+        if df.empty:
+            return
+
+        dialect_name = self.session.get_bind().dialect.name
+
+        # Segurança para SQLite: manter bem abaixo do limite de parâmetros.
+        # 8 colunas * 100 linhas = 800 parâmetros << 999
+        if dialect_name == "sqlite":
+            chunk_size = 100
+        else:
+            # Para Postgres você pode subir isso bem mais, tipo 5000 se quiser
+            chunk_size = 1000
+
+        records: list[dict] = []
+        for _, row in df.iterrows():
+            try:
+                rs_num = int(row["rs_id"])
+            except Exception:
+                continue
+
+            records.append(
+                {
+                    "rs_id": rs_num,
+                    "chromosome": int(row["chromosome"]),
+                    "position_37": (
+                        int(row["position_37"]) if pd.notna(row["position_37"]) else None
+                    ),
+                    "position_38": (
+                        int(row["position_38"]) if pd.notna(row["position_38"]) else None
+                    ),
+                    "reference_allele": row["reference_allele"],
+                    "alternate_allele": row["alternate_allele"],
+                    "data_source_id": self.data_source.id,
+                    "etl_package_id": self.package.id,
+                }
+            )
+
+        if not records:
+            return
+
+        insert_cls = self._get_insert_for_dialect(SNP, dialect_name)
+
+        for start in range(0, len(records), chunk_size):
+            chunk = records[start: start + chunk_size]
+
+            stmt = insert_cls.values(chunk)
+
+            if dialect_name in ("sqlite", "postgresql"):
+                stmt = stmt.on_conflict_do_update(
+                    index_elements=["rs_id"],
+                    set_={
+                        "chromosome": stmt.excluded.chromosome,
+                        "position_37": stmt.excluded.position_37,
+                        "position_38": stmt.excluded.position_38,
+                        "reference_allele": stmt.excluded.reference_allele,
+                        "alternate_allele": stmt.excluded.alternate_allele,
+                        "data_source_id": stmt.excluded.data_source_id,
+                        "etl_package_id": stmt.excluded.etl_package_id,
+                    },
+                )
+
+            self.session.execute(stmt)
+
+        self.session.flush()
+        # """
+        # Bulk UPSERT for SNP chunk.
+
+        # - Primary key: rs_id
+        # - Update positions / alleles / provenance if record already exists.
+        # """
+        # if df.empty:
+        #     return
+
+        # insert_cls = self._get_snp_insert_for_dialect()
+
+        # # Prepare records
+        # records: List[Dict[str, Any]] = []
+        # for _, row in df.iterrows():
+        #     try:
+        #         rs_id = int(row["rs_id"])
+        #     except Exception:
+        #         continue
+
+        #     try:
+        #         chrom = int(row["chromosome"])
+        #     except Exception:
+        #         continue
+
+        #     pos37 = row.get("position_37")
+        #     pos38 = row.get("position_38")
+
+        #     # Allow NaN from pandas
+        #     pos37 = None if pd.isna(pos37) else int(pos37)
+        #     pos38 = None if pd.isna(pos38) else int(pos38)
+
+        #     ref = row.get("reference_allele")
+        #     ref = None if pd.isna(ref) else str(ref)
+
+        #     # alt = self._parse_alt_value(row.get("alternate_allele"))
+        #     alt = row.get("alternate_allele")
+
+        #     rec = {
+        #         "rs_id": rs_id,
+        #         "chromosome": chrom,
+        #         "position_37": pos37,
+        #         "position_38": pos38,
+        #         "reference_allele": ref,
+        #         "alternate_allele": alt,
+        #         "data_source_id": self.data_source.id,
+        #         "etl_package_id": self.package.id,
+        #     }
+        #     records.append(rec)
+
+        # if not records:
+        #     return
+
+        # stmt = insert_cls.values(records)
+
+        # # ON CONFLICT (rs_id) DO UPDATE
+        # dialect_name = self.session.get_bind().dialect.name
+        # if dialect_name in ("postgresql", "sqlite"):
+        #     stmt = stmt.on_conflict_do_update(
+        #         index_elements=["rs_id"],
+        #         set_={
+        #             "chromosome": stmt.excluded.chromosome,
+        #             "position_37": stmt.excluded.position_37,
+        #             "position_38": stmt.excluded.position_38,
+        #             "reference_allele": stmt.excluded.reference_allele,
+        #             "alternate_allele": stmt.excluded.alternate_allele,
+        #             "data_source_id": stmt.excluded.data_source_id,
+        #             "etl_package_id": stmt.excluded.etl_package_id,
+        #         },
+        #     )
+        # # em outros dialetos, seria apenas INSERT; não é o caso agora
+
+        # self.session.execute(stmt)
+        # self.session.flush()
+
+    def _get_snpmerge_insert_for_dialect(self):
+        dialect_name = self.session.get_bind().dialect.name
+        if dialect_name == "sqlite":
+            return sqlite_insert(SNPMerge)
+        elif dialect_name == "postgresql":
+            return pg_insert(SNPMerge)
+        else:
+            return generic_insert(SNPMerge)
+
+    def _upsert_snpmerge_from_df(self, df: pd.DataFrame) -> None:
+        """
+        Bulk UPSERT/INSERT for SNPMerge based on 'merge_log' + 'rs_id'.
+
+        For each row in df:
+            - 'rs_id' = canonical rsID (int)
+            - 'merge_log' = list of obsolete rsIDs (strings or ints)
+        We create one SNPMerge row per (obsolete, canonical) pair.
+
+        The operation is chunked to respect SQLite parameter limits and
+        still work efficiently on PostgreSQL.
+        """
+        if df.empty:
+            return
+
+        dialect_name = self.session.get_bind().dialect.name
+
+        # Safe chunk sizes: keep SQLite below ~999 parameters
+        # Each row has 4 columns → 4 * 100 = 400 params, well below the limit.
+        if dialect_name == "sqlite":
+            chunk_size = 100
+        else:
+            # For PostgreSQL we can use a larger chunk size
+            chunk_size = 1000
+
+        insert_cls = self._get_snpmerge_insert_for_dialect()
+
+        records: List[Dict[str, Any]] = []
+
+        for _, row in df.iterrows():
+            try:
+                canonical = int(row["rs_id"])
+            except Exception:
+                continue
+
+            merge_list = row.get("merge_log")
+            # if not merge_list:
+            #     continue
+
+            for obsolete in merge_list:
+                records.append(
+                    {
+                        "rs_obsolete_id": int(obsolete),
+                        "rs_canonical_id": canonical,
+                        "data_source_id": self.data_source.id,
+                        "etl_package_id": self.package.id,
+                    }
+                )
+
+        # for _, row in df.iterrows():
+        #     # canonical rsID
+        #     try:
+        #         canonical = int(row["rs_id"])
+        #     except Exception:
+        #         continue
+
+        #     merge_list = row.get("merge_log")
+
+        #     # Normalize merge_list to a simple Python list
+        #     if merge_list is None or (isinstance(merge_list, float) and pd.isna(merge_list)):
+        #         continue
+
+        #     # Parquet / pandas podem vir como np.ndarray ou lista de strings
+        #     if isinstance(merge_list, np.ndarray):
+        #         merge_list = merge_list.tolist()
+
+        #     if not isinstance(merge_list, (list, tuple)):
+        #         # Caso muito estranho, ignora
+        #         continue
+
+        #     for obsolete in merge_list:
+        #         if obsolete is None or obsolete == "":
+        #             continue
+        #         try:
+        #             obsolete_int = int(obsolete)
+        #         except Exception:
+        #             continue
+
+        #         records.append(
+        #             {
+        #                 "rs_obsolete_id": obsolete_int,
+        #                 "rs_canonical_id": canonical,
+        #                 "data_source_id": self.data_source.id,
+        #                 "etl_package_id": self.package.id,
+        #             }
+        #         )
+
+        if not records:
+            return
+
+        # Process in chunks to avoid "too many SQL variables" on SQLite
+        for start in range(0, len(records), chunk_size):
+            chunk = records[start: start + chunk_size]
+            if not chunk:
+                continue
+
+            stmt = insert_cls.values(chunk)
+
+            if dialect_name in ("postgresql", "sqlite"):
+                # ON CONFLICT (rs_obsolete_id, rs_canonical_id) DO NOTHING
+                stmt = stmt.on_conflict_do_nothing(
+                    index_elements=["rs_obsolete_id", "rs_canonical_id"]
+                )
+
+            self.session.execute(stmt)
+
+        # Single flush at the end
+        self.session.flush()
+
+    # def _upsert_snpmerge_chunk(
+    #     self,
+    #     # session: Session,
+    #     df: pd.DataFrame,
+    #     # data_source_id: Optional[int],
+    #     # etl_package_id: Optional[int],
+    # ):
+    #     """
+    #     Bulk UPSERT/INSERT for SNPMerge based on 'merge_log' + 'rs_id'.
+
+    #     Para cada linha:
+    #     - rs_id atual = canonical
+    #     - merge_log = lista de rs obsoletos que apontam para canonical
+    #     """
+    #     if df.empty:
+    #         return
+
+    #     insert_cls = self._get_snpmerge_insert_for_dialect()
+
+    #     records: List[Dict[str, Any]] = []
+    #     for _, row in df.iterrows():
+    #         try:
+    #             canonical = int(row["rs_id"])
+    #         except Exception:
+    #             continue
+
+    #         merge_list = row.get("merge_log")
+    #         # if not merge_list:
+    #         #     continue
+
+    #         for obsolete in merge_list:
+    #             records.append(
+    #                 {
+    #                     "rs_obsolete_id": int(obsolete),
+    #                     "rs_canonical_id": canonical,
+    #                     "data_source_id": self.data_source.id,
+    #                     "etl_package_id": self.package.id,
+    #                 }
+    #             )
+
+    #     if not records:
+    #         return
+
+    #     stmt = insert_cls.values(records)
+
+    #     dialect_name = self.session.get_bind().dialect.name
+    #     if dialect_name in ("postgresql", "sqlite"):
+    #         # ON CONFLICT (rs_obsolete_id, rs_canonical_id) DO NOTHING
+    #         stmt = stmt.on_conflict_do_nothing(
+    #             index_elements=["rs_obsolete_id", "rs_canonical_id"]
+    #         )
+
+    #     self.session.execute(stmt)
+    #     self.session.flush()
 
     # 📥  ------------------------ 📥
     # 📥  ------ LOAD FASE ------  📥
@@ -380,6 +807,8 @@ class DTP(DTPBase, EntityQueryMixin):
         # Setting variables to loader
         total_variants = 0
         total_warnings = 0
+        total_snps = 0
+        self.LOAD_CHUNK_SIZE = 50_000
         self.dropped_variants = []
 
         if self.debug_mode:
@@ -407,489 +836,75 @@ class DTP(DTPBase, EntityQueryMixin):
             self.logger.log(msg, "ERROR")
             return False, msg  # ⧮ Leaving with ERROR
 
-        # ----= GET ENTITY GROUP (Variant and Gene) =----
+        # Set DB and drop indexes
         try:
-            # Variant group (sets self.entity_group_id)
-            self.get_entity_group("Variants")
-            # Gene group (used for alias resolution)
-            gene_group = self.session.query(EntityGroup).filter_by(name="Genes").first()  # noqa E501
-            if not gene_group:
-                raise ValueError("EntityGroup 'Genes' not found in database.")
-        except Exception as e:
-            msg = f"Error on DTP to get Entity Group: {e}"
-            return False, msg  # ⧮ Leaving with ERROR
-
-        # ----= GET RELATIONSHIP TYPE =----
-        relationship_type = (
-            self.session.query(EntityRelationshipType)
-            .filter_by(code="associated_with")
-            .first()
-        )
-        if not relationship_type:
-            relationship_type = EntityRelationshipType(
-                code="associated_with",
-                description="Auto-created by variant DTP"  # noqa E501
-            )
-            self.session.add(relationship_type)
-            self.session.commit()
-
-        # ---= GET ASSEMBLIES =----
-        assemblies = self.session.query(GenomeAssembly).all()
-        assemblies_map = {asm.accession: asm.id for asm in assemblies}
-        acc2asm_id: Dict[str, int] = {a.accession: a.id for a in assemblies}
-        acc2chrom: Dict[str, str] = {
-            a.accession: (a.chromosome or "") for a in assemblies
-        }
-
-        # ---= Get exist Vars in DB by Chrom =---
-        try:
-            target_chrom = self._extract_chrom_from_ds(self.data_source.name)   # noqa E501
-            result = self.session.execute(
-                text("""
-                    SELECT rs_id, entity_id
-                    FROM variant_masters
-                    WHERE chromosome = :chrom
-                """),
-                {"chrom": target_chrom},
-            )
-            if result:
-                self.existing_variants_dict = dict(result.fetchall())
-                msg = f"🔍 {len(self.existing_variants_dict)} variants already in DB for chr {target_chrom}"  # noqa E501
-                self.logger.log(msg, "INFO")
-
-        except Exception as e:
-            msg = f"❌ Failed to load existing variants from DB: {e}"
-            self.logger.log(msg, "WARNING")
-            self.existing_variant_ids = set()
-
-        # ---= Get Dict of Genes by Entrez ID and Entity ID =---
-        try:
-            result_gene = self.session.execute(
-                text("""
-                    SELECT alias_value, entity_id
-                    FROM entity_aliases
-                    WHERE group_id = :group
-                    AND alias_type = 'code'
-                    AND xref_source = 'ENTREZ'
-                """),
-                {"group": gene_group.id},
-            )
-            if result_gene:
-                self.gene_lookup_dict = dict(result_gene.fetchall())
-
-        except Exception as e:
-            # NOTE: Future we can run without genes
-            msg = f"❌ Failed to create a list of Genes: {e}"
-            return False, msg
-
-        # ----= Set DB and drop indexes =----
-        try:
-            # self.db_write_mode()
-            self.drop_indexes(self.get_variant_index_specs)
-            self.drop_indexes(self.get_entity_index_specs)
+            self.db_write_mode()
+            self.drop_indexes(self.get_snp_index_specs)
         except Exception as e:
             total_warnings += 1
             msg = f"⚠️  Failed to switch DB to write mode or drop indexes: {e}"
             self.logger.log(msg, "WARNING")
-            return False, msg
+            return False, msg  # ⧮ Leaving with ERROR
 
         # ===== PROCESS PER FILE =====
         # ============================
         for data_file in files_list:
-            
-            try:  # if error, go next file
-                if self.debug_mode:
-                    start_file = time.time()
 
-                # ----= Setting File Variables =----
-                gene_links_rows = []
-                var_number = 0
-                var_drop_number = 0
+            try:
                 self.logger.log(f"📂 Processing {data_file}", "INFO")
+                # df_data = self._load_input_frame(data_file)
+                df_data = pd.read_parquet(data_file, engine="pyarrow")
 
-                # ----= Read Data =----
-                df = self._load_input_frame(data_file)
-                if df.empty:
-                    total_warnings += 1
-                    msg = "File is empty."
-                    self.logger.log(msg, "WARNING")
-                    continue  # Go to next file
-
-                # -- Drop variants without <<rs_id>>
-                nb = len(df)
-                df = df[df["rs_id"].notna()].copy()
-                df["rs_id"] = df["rs_id"].astype(str)
-                nf = nb - len(df)
-                if nf > 0:
-                    var_drop_number += nf
-                    msg = f"{nf} variants dropped because they are missing an rs_id"
-                    self.logger.log(msg, "WARNING")
-
-                # -- Check if Variant in DB --
-                # Add Varaint Entity ID column with previous DB records
-                df["entity_id"] = df["rs_id"].map(self.existing_variants_dict).astype("Int64")
-                n_existing = df["entity_id"].notna().sum()
-                n_new = df["entity_id"].isna().sum()
-                df = df[df["entity_id"].isna()].copy()
-
-                if n_existing > 0:
-                    self.logger.log(f"Found {n_existing} already in DB, {n_new} new variants to process", "WARNING")
-                    var_drop_number += n_existing
-                if df.empty:
-                    self.logger.log("No more variants to ingest — skipping to next file", "WARNING")
-                    continue
-                
-                # -- Add Accession and Assembly ID --
-                df["assembly_id"] = df["seq_id"].map(acc2asm_id)
-                df["chromosome"] = df["seq_id"].map(acc2chrom)
-
-                # -- Drop variants without <<valid accession>> --
-                # NOTE: Future create a list of drop variant with reason
-                # dropped_df = df[df["assembly_id"].isna()].copy()
-                # if not dropped_df.empty:
-                #     self.dropped_variants.append(dropped_df)
-                nb = len(df)
-                df = df[df["assembly_id"].notna()].copy()
-                nf = nb - len(df)
-                if nf > 0:
-                    var_drop_number += nf
-                    msg = f"{nf} variants dropped without valid Assembly, remaining {len(df)}"  # noqa E501
-                    self.logger.log(msg, "WARNING")
-                if df.empty:
-                    self.logger.log("No more variants to ingest — skipping to next file", "WARNING")
-                    continue
-
-                # ----= Map Gene Entrez ID --> Gene Entity ID =----
-                def map_entrez_to_entity(entrez_list, gene_dict):
-                    return [gene_dict.get(str(e)) for e in entrez_list if str(e) in gene_dict]
-                df["gene_entity_ids"] = df["gene_links"].apply(
-                    lambda lst: map_entrez_to_entity(lst, self.gene_lookup_dict)
+                # SNP UPSERT
+                # before_snps = total_snps
+                # self._upsert_snp_chunk(
+                self.upsert_snps_from_df(
+                    # session=self.session,
+                    df=df_data,
+                    # data_source_id=self.data_source.id,
+                    # etl_package_id=self.package.id,
                 )
+                # total_snps += len(chunk)
 
-                # ----= Normalizing columns before ingestion =----
-                df["ref_json"] = df["ref"].apply(self._normalize_allele)
-                df["alt_json"] = df["alt"].apply(self._normalize_allele)
+                # SNPMerge UPSERT/INSERT
+                # before_merges = total_merges
+                self._upsert_snpmerge_from_df(
+                    # session=self.session,
+                    df=df_data,
+                    # ddata_source_id=self.data_source.id,
+                    # etl_package_id=self.package.id,
+                )
+                # Não sabemos exatamente quantos merges entraram
+                # se quiser, dá pra contar dentro do helper.
 
-                df["start_pos"] = df["start_pos"].apply(lambda x: int(x) if pd.notna(x) else None)
-                df["end_pos"] = df["end_pos"].apply(lambda x: int(x) if pd.notna(x) else None)
-                df["assembly_id"] = df["assembly_id"].apply(lambda x: int(x) if pd.notna(x) else None)
+                # self.logger.log(
+                #     f"   ↳ chunk processed: {len(chunk)} rows "
+                #     f"(SNP total ~{total_snps})",
+                #     "DEBUG",
+                # )
 
-                # ===== START DATABASE INSERTION =====
-                # ====================================
-
-                # ----= Insert Variants as Entities in bulk (use add_all to get id) =----
-                entities_to_insert = [
-                    Entity(
-                        group_id=self.entity_group,
-                        has_conflict=False,
-                        is_active=True,
-                        data_source_id=self.data_source.id,
-                        etl_package_id=self.package.id
-                    )
-                    for _ in df.itertuples()
-                ]
-                # --- Check if all was inserted ---
-                assert len(df) == len(entities_to_insert), "Mismatch between DataFrame and inserted Entities"
-                self.session.add_all(entities_to_insert)
-                self.session.flush()
-                
-                # --- Create Variant Entity ID Column ---
-                df["entity_id"] = [ent.id for ent in entities_to_insert]
-
-                # ---= Inserir Variants as Master in bulk =----
-                variant_objects = [
-                    VariantMaster(
-                        rs_id=row.rs_id,
-                        variant_type=row.variant_type,
-                        omic_status_id=1,
-                        chromosome=row.chromosome,
-                        quality=row.quality,
-                        entity_id=row.entity_id,
-                        data_source_id=self.data_source.id,
-                        etl_package_id=self.package.id,
-                    )
-                    for row in df.itertuples()
-                ]
-                # --- Check if all was inserted ---
-                assert len(df) == len(variant_objects), "Mismatch between DataFrame and inserted Variant Master"
-                self.session.add_all(variant_objects)
-                self.session.flush()
-
-                # --- Create Variant Master ID Column ---
-                rsid_to_variant_master_id = {
-                    variant.rs_id: variant.id for variant in variant_objects
-                }
-                df["variant_master_id"] = df["rs_id"].map(rsid_to_variant_master_id)
-
-                # BUG: Parei aqui!
-                
-                # INSERIR ALIAS
-                merged_aliases_to_insert = []
-                aliases_to_insert = []
-                locus_records = []
-                placement_locus = []
-                relationships_to_insert = []
-
-                # UNIQUE INTERACTION TO ALL MODELS
-                for row in df.itertuples():
-                    
-                    # 1. ENTITY ALIASES
-                    # Alias Variant Primary
-                    aliases_to_insert.append(
-                        EntityAlias(
-                            entity_id=row.entity_id,
-                            group_id=self.entity_group,
-                            alias_value=row.rs_id,
-                            alias_type="rsID",
-                            xref_source="dbSNP",
-                            is_primary=True,
-                            is_active=True,
-                            alias_norm=row.rs_id.lower(),
-                            data_source_id=self.data_source.id,
-                            etl_package_id=self.package.id,
-                        )
-                    )
-
-                    # Alias Variants Merged
-                    merged = getattr(row, "merge_log", []) or []
-                    if isinstance(merged, str):
-                        merged = json.loads(merged)
-                    if merged:
-                        for merged_rsid in merged:
-                            # if merged_rsid != row.rs_id:  # just case
-                            merged_aliases_to_insert.append(
-                                EntityAlias(
-                                    entity_id=row.entity_id,
-                                    group_id=self.entity_group,
-                                    alias_value=merged_rsid,
-                                    alias_type="merged",
-                                    xref_source="dbSNP",
-                                    is_primary=False,
-                                    is_active=False,
-                                    alias_norm=merged_rsid.lower(),
-                                    data_source_id=self.data_source.id,
-                                    etl_package_id=self.package.id,
-                                )
-                            )
-                
-                    # --Inserir VariantLocus
-                    build = row.assembly
-                    build = build.replace("GRCh", "").split(".")[0]  # '38'
-                    
-                    locus_records.append(
-                        VariantLocus(
-                            variant_id=row.variant_master_id,
-                            rs_id=row.rs_id,
-                            entity_id=row.entity_id,
-                            build=build,
-                            assembly_id=row.assembly_id,
-                            chromosome=row.chromosome,
-                            start_pos=row.start_pos,
-                            end_pos=row.end_pos,
-                            reference_allele=row.ref_json,
-                            alternate_allele=row.alt_json,
-                            data_source_id=self.data_source.id,
-                            etl_package_id=self.package.id,
-                        )
-                    )
-
-                    # - Processar placements (se existirem)
-                    # placements = getattr(row, "placements", []) or []
-                    # for p in placements:
-                    #     p_acc = p.get("seq_id")
-                    #     asm_id = assemblies_map.get(p_acc)
-                    #     if not asm_id:
-                    #         continue
-                    #     p_start = p.get("start_pos")
-                    #     p_end = p.get("end_pos")
-                    #     if not p_start or not p_end:
-                    #         continue
-
-                    #     ref = p.get("ref")
-                    #     alt = p.get("alt")
-                    #     if not alt or alt == ref:
-                    #         continue
-
-                    #     chrom = acc2chrom.get(p_acc)
-                    #     ref_json = json.dumps([str(ref)]) if ref else json.dumps([])
-                    #     alt_json = json.dumps([str(alt)]) if alt else json.dumps([])
-
-                    #     build = p.get("assembly")
-                    #     build = build.replace("GRCh", "").split(".")[0]
-
-                    #     placement_locus.append(
-                    #         VariantLocus(
-                    #             variant_id=row.variant_master_id,
-                    #             rs_id=row.rs_id,
-                    #             entity_id=row.entity_id,
-                    #             build=build,
-                    #             assembly_id=asm_id,
-                    #             chromosome=chrom,
-                    #             start_pos=int(p_start),
-                    #             end_pos=int(p_end),
-                    #             reference_allele=ref_json,
-                    #             alternate_allele=alt_json,
-                    #             data_source_id=self.data_source.id,
-                    #             etl_package_id=self.package.id,
-                    #         )
-                    #     )
-                    placements = getattr(row, "placements", []) or []
-
-                    # Acumulador por locus: (assembly_id, chrom, start, end, ref) -> {build, alts:set}
-                    agg = {}
-
-                    for p in placements:
-                        p_acc = p.get("seq_id")
-                        asm_id = assemblies_map.get(p_acc)
-                        if not asm_id:
-                            continue
-
-                        p_start = p.get("start_pos")
-                        p_end = p.get("end_pos")
-                        if not p_start or not p_end:
-                            continue
-
-                        ref = p.get("ref")
-                        alt = p.get("alt")
-                        # ignorar alt vazio ou igual ao ref (sem variação)
-                        if not alt or alt == ref:
-                            continue
-
-                        chrom = acc2chrom.get(p_acc)
-                        if not chrom:
-                            continue
-
-                        # build: "GRCh38.p14" -> "38"
-                        build = p.get("assembly") or ""
-                        build = build.replace("GRCh", "").split(".")[0]
-
-                        key = (asm_id, chrom, int(p_start), int(p_end), str(ref or ""))
-
-                        bucket = agg.get(key)
-                        if bucket is None:
-                            bucket = {"build": build, "alts": set()}
-                            agg[key] = bucket
-
-                        bucket["alts"].add(str(alt))
-
-                    # Agora, gerar UMA linha por locus com alts agregados
-                    for (asm_id, chrom, start, end, ref), bucket in agg.items():
-                        ref_json = json.dumps([str(ref)]) if ref else json.dumps([])
-                        # ordena para estabilidade determinística
-                        alt_json = json.dumps(sorted(bucket["alts"]))
-
-                        placement_locus.append(
-                            VariantLocus(
-                                variant_id=row.variant_master_id,
-                                rs_id=row.rs_id,
-                                entity_id=row.entity_id,
-                                build=bucket["build"],
-                                assembly_id=asm_id,
-                                chromosome=chrom,
-                                start_pos=start,
-                                end_pos=end,
-                                reference_allele=ref_json,
-                                alternate_allele=alt_json,
-                                data_source_id=self.data_source.id,
-                                etl_package_id=self.package.id,
-                            )
-                        )
-
-                    # Gene - Varaiants Links
-
-                    # Pode ser string separada por vírgula, lista de ints ou até NaN
-                    gene_ids = getattr(row, "gene_entity_ids", []) or []
-                    # # Converte se for string (ex: "123,456")
-                    # if isinstance(gene_ids, str):
-                    #     gene_ids = [int(g.strip()) for g in gene_ids.split(",") if g.strip().isdigit()]
-                    # Garante lista
-                    # if not isinstance(gene_ids, list):
-                    #     continue
-
-                    for gene_entity_id in gene_ids:
-                        relationships_to_insert.append(
-                            EntityRelationship(
-                                entity_1_id=row.entity_id,  # Variant Entity ID
-                                entity_1_group_id=self.entity_group,
-                                entity_2_id=gene_entity_id,
-                                entity_2_group_id=gene_group.id,
-                                relationship_type_id=relationship_type.id,
-                                data_source_id=self.data_source.id,
-                                etl_package_id=self.package.id,
-                            )
-                        )
-
-                # Insert all List to DB
-                self.session.bulk_save_objects(aliases_to_insert)      
-                self.session.bulk_save_objects(merged_aliases_to_insert)
-                if relationships_to_insert:
-                    self.session.bulk_save_objects(relationships_to_insert)
-
-                all_loci = locus_records + placement_locus
-                # Eliminar duplicados (pela chave natural)
-                seen = set()
-                unique_loci = []
-                for loc in all_loci:
-                    key = (
-                        loc.variant_id,
-                        loc.rs_id,
-                        loc.entity_id,
-                        loc.build,
-                        loc.assembly_id,
-                        loc.chromosome,
-                        loc.start_pos,
-                        loc.end_pos,
-                        loc.reference_allele,
-                        loc.alternate_allele,
-                        loc.data_source_id,
-                        loc.etl_package_id,
-                    )
-                    if key not in seen:
-                        seen.add(key)
-                        unique_loci.append(loc)
-                self.session.bulk_save_objects(unique_loci)
-
-                # TODO: no chromossomo Y temos dados do X
-
-                # manda para a DB
                 self.session.commit()
-
-            except IntegrityError as e:
-                self.session.rollback()
-                total_warnings += 1
                 self.logger.log(
-                    f"⚠️ Integrity error while loading {os.path.basename(data_file)}: {e}",  # noqa E501
-                    "WARNING",
+                    f"✅ SNP load finished. Approx. {total_snps} rows processed.",   # noqa E501
+                    "INFO",
                 )
             except Exception as e:
                 self.session.rollback()
-                total_warnings += 1
-                self.logger.log(
-                    f"⚠️ Unexpected error while loading {os.path.basename(data_file)}: {e}",  # noqa E501
-                    "WARNING",
-                )
+                self.logger.log(f"❌ SNP load failed: {e}", "ERROR")
+                raise
 
         # Set DB to Read Mode and Create Index
-        # try:
-        #     self.create_indexes(self.get_variant_index_specs)
-        #     self.create_indexes(self.get_entity_index_specs)
-        #     self.db_read_mode()
-        # except Exception as e:
-        #     total_warnings += 1
-        #     msg = f"Failed to switch DB to write mode or drop indexes: {e}"
-        #     self.logger.log(msg, "WARNING")
+        try:
+            self.create_indexes(self.get_snp_index_specs)
+            self.db_read_mode()
+        except Exception as e:
+            total_warnings += 1
+            msg = f"Failed to switch DB to write mode or drop indexes: {e}"
+            self.logger.log(msg, "WARNING")
 
         if self.debug_mode:
             msg = f"Load process ran in {time.time() - start_total}"
             self.logger.log(msg, "DEBUG")
-
-        # - Salve all Variants Dropped in que QA Process
-        if self.dropped_variants:
-            all_dropped = pd.concat(self.dropped_variants, ignore_index=True)
-            dropped_vars_file = f"dropped_variants__package_{self.package.id}.csv"  # noqa E501
-            output_path = str(processed_path / dropped_vars_file)
-            all_dropped.to_csv(output_path, index=False)
-            self.logger.log(f"📤 Saved dropped variants to: {output_path}", "INFO")  # noqa E501
 
         if total_warnings == 0:
             msg = f"✅ Loaded {total_variants} variants from {len(files_list)} file(s)."  # noqa E501

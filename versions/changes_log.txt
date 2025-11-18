@@ -1,0 +1,3 @@
+entra o modelo de EntityLocations e sai as localizacoes no Genes.
+
+PROBLEMA PARA RESOLVER, AS localizacoes que estamos carregando nao estao batendo com o que ha nas fontes.

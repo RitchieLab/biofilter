@@ -327,7 +327,7 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
 
             # NOTE: Use to debugging
             if gene_master == "FACL1":
-                pass
+                ...
 
             if not gene_master:
                 msg = f"⚠️  Gene Master not found in row: {row}"
@@ -401,10 +401,10 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
             chromosome = self.extract_chromosome(row.get("location"))
             locus_group_name = row.get("locus_group")
             locus_type_name = row.get("locus_type")
-            region_label = row.get("location")
+            # region_label = row.get("location")
             # TODO: How to get Start and End information in HGNC Source System?
-            start = row.get("start")
-            end = row.get("end")
+            # start = row.get("start")
+            # end = row.get("end")
 
             # --> Locus Groups
             locus_group_instance, status = self.get_or_create_locus_group(
@@ -430,20 +430,20 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
                 total_warnings += 1
                 continue  # TODO: Add in ETLLOG Model
 
-            # --> Regions
-            region_instance, status = self.get_or_create_genomic_region(
-                label=region_label,
-                chromosome=chromosome,
-                start=start,
-                end=end,
-                data_source_id=self.data_source.id,
-                package_id=self.package.id,
-            )  # noqa: E501
-            if not status:
-                msg = f"⚠️  Error on Region to: {gene_master}"
-                self.logger.log(msg, "WARNING")
-                total_warnings += 1
-                continue  # TODO: Add in ETLLOG Model
+            # # --> Regions
+            # region_instance, status = self.get_or_create_genomic_region(
+            #     label=region_label,
+            #     chromosome=chromosome,
+            #     start=start,
+            #     end=end,
+            #     data_source_id=self.data_source.id,
+            #     package_id=self.package.id,
+            # )  # noqa: E501
+            # if not status:
+            #     msg = f"⚠️  Error on Region to: {gene_master}"
+            #     self.logger.log(msg, "WARNING")
+            #     total_warnings += 1
+            #     continue  # TODO: Add in ETLLOG Model
 
             group_names_list = self.parse_gene_groups(row.get("gene_group"))
 
@@ -467,31 +467,31 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
                 # Add to the list of genes with resolved conflicts
                 genes_with_pending_conflict.append(row)
 
-            if gene is not None:
-                total_gene += 1
+            # if gene is not None:
+            #     total_gene += 1
 
-                location, status = self.get_or_create_gene_location(
-                    gene=gene,
-                    chromosome=chromosome,
-                    start=row.get("start"),
-                    end=row.get("end"),
-                    strand=row.get("strand"),
-                    region=region_instance,
-                    data_source_id=self.data_source.id,
-                    package_id=self.package.id,
-                )
-                if not status:
-                    msg = f"⚠️  Error on Gene Location insert to: {gene_master}"  # noqa E501
-                    self.logger.log(msg, "WARNING")
-                    msg = f"⮐  Applied rollback to {gene_master} gene"
-                    self.logger.log(msg, "WARNING")
-                    total_warnings += 1
-                    continue  # TODO: Add in ETLLOG Model
+            #     location, status = self.get_or_create_gene_location(
+            #         gene=gene,
+            #         chromosome=chromosome,
+            #         start=row.get("start"),
+            #         end=row.get("end"),
+            #         strand=row.get("strand"),
+            #         region=region_instance,
+            #         data_source_id=self.data_source.id,
+            #         package_id=self.package.id,
+            #     )
+            #     if not status:
+            #         msg = f"⚠️  Error on Gene Location insert to: {gene_master}"  # noqa E501
+            #         self.logger.log(msg, "WARNING")
+            #         msg = f"⮐  Applied rollback to {gene_master} gene"
+            #         self.logger.log(msg, "WARNING")
+            #         total_warnings += 1
+            #         continue  # TODO: Add in ETLLOG Model
 
-            # Check if location was created successfully
-            if not location:
-                msg = f"⚠️  Failed to create Location for gene {gene_master}"
-                self.logger.log(msg, "WARNING")
+            # # Check if location was created successfully
+            # if not location:
+            #     msg = f"⚠️  Failed to create Location for gene {gene_master}"
+            #     self.logger.log(msg, "WARNING")
 
         #  ---> PROCESSED ALL PROCESS DATA ROWS
 

@@ -1,0 +1,34 @@
+{
+    "omic_status": [
+        {
+            "id": 1,
+            "name": "active",
+            "description": "Entity is active and usable in analyses"
+        },
+        {
+            "id": 2,
+            "name": "deactive",
+            "description": "Entity is active and usable in analyses"
+        },
+        {
+            "id": 3,
+            "name": "merged",
+            "description": "Entity was merged into another one"
+        },
+        {
+            "id": 4,
+            "name": "deleted",
+            "description": "Entity was removed or invalidated"
+        },
+        {
+            "id": 5,
+            "name": "conflict",
+            "description": "Entity is under curation due to conflicting data"
+        },
+        {
+            "id": 6,
+            "name": "not_defined",
+            "description": "Not defined"
+        }
+    ]
+}

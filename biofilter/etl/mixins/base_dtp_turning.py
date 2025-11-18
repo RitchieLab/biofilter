@@ -178,18 +178,18 @@ class DBTuningMixin:
             ("gene_group_memberships", ["gene_id"]),
             ("gene_group_memberships", ["group_id"]),
             ("gene_group_memberships", ["data_source_id"]),
-            # GeneLocation
-            ("gene_locations", ["gene_id"]),
-            ("gene_locations", ["region_id"]),
-            ("gene_locations", ["assembly"]),
-            ("gene_locations", ["chromosome"]),
-            ("gene_locations", ["chromosome", "start_pos", "end_pos"]),
-            ("gene_locations", ["data_source_id"]),
-            # GeneGenomicRegion
-            ("gene_genomic_regions", ["label"]),
-            ("gene_genomic_regions", ["chromosome"]),
-            ("gene_genomic_regions", ["chromosome", "start_pos", "end_pos"]),
-            ("gene_genomic_regions", ["data_source_id"]),
+            # # GeneLocation
+            # ("gene_locations", ["gene_id"]),
+            # ("gene_locations", ["region_id"]),
+            # ("gene_locations", ["assembly"]),
+            # ("gene_locations", ["chromosome"]),
+            # ("gene_locations", ["chromosome", "start_pos", "end_pos"]),
+            # ("gene_locations", ["data_source_id"]),
+            # # GeneGenomicRegion
+            # ("gene_genomic_regions", ["label"]),
+            # ("gene_genomic_regions", ["chromosome"]),
+            # ("gene_genomic_regions", ["chromosome", "start_pos", "end_pos"]),
+            # ("gene_genomic_regions", ["data_source_id"]),
         ]
 
     @property
@@ -256,6 +256,40 @@ class DBTuningMixin:
             # EntityRelationshipType
             ("entity_relationship_types", ["code"]),
         ]
+    
+    @property
+    def get_entity_location_index_specs(self):
+        """
+        Index specs for the EntityLocation model.
+
+        These are consumed by the ETL index manager to create/drop
+        indexes around heavy loads.
+        """
+        return [
+            # Core lookups
+            ("entity_locations", ["entity_id"]),
+            ("entity_locations", ["assembly_id"]),
+            ("entity_locations", ["chromosome"]),
+            ("entity_locations", ["build"]),
+
+            # Region-style queries: "give me everything in chr N for this assembly"
+            ("entity_locations", ["assembly_id", "chromosome"]),
+            ("entity_locations", ["assembly_id", "chromosome", "start_pos"]),
+            (
+                "entity_locations",
+                ["assembly_id", "chromosome", "start_pos", "end_pos"],
+            ),
+
+            # Fast uniqueness / existence check (matches the UniqueConstraint)
+            ("entity_locations", ["entity_id", "assembly_id"]),
+
+            # ETL housekeeping
+            ("entity_locations", ["data_source_id"]),
+            ("entity_locations", ["etl_package_id"]),
+
+            # Optional: if you foresee queries like "all genes in region '12p13.31'"
+            # ("entity_locations", ["region_label"]),
+        ]
 
     @property
     def get_go_index_specs(self):
@@ -281,29 +315,46 @@ class DBTuningMixin:
         ]
 
     @property
-    def get_variant_index_specs(self):
+    def get_snp_index_specs(self):
+        """
+        Return a list of (table_name, [column_names]) to be used when
+        creating indexes for SNP-related tables.
+
+        This is used by the DB bootstrap / migration helper to create
+        indexes in both SQLite and PostgreSQL.
+        """
         return [
-            # VariantMaster
-            ("variant_masters", ["variant_id"]),  # Já deve ser unique
-            ("variant_masters", ["entity_id"]),
-            ("variant_masters", ["data_source_id"]),
-            ("variant_masters", ["etl_package_id"]),
-            ("variant_masters", ["omic_status_id"]),
-            ("variant_masters", ["chromosome"]),
-            ("variant_masters", ["variant_type"]),
-            # VariantLocus
-            ("variant_loci", ["variant_id"]),
-            ("variant_loci", ["assembly_id"]),
-            ("variant_loci", ["chromosome"]),
-            ("variant_loci", ["start_pos"]),
-            ("variant_loci", ["end_pos"]),
-            ("variant_loci", ["data_source_id"]),
-            ("variant_loci", ["etl_package_id"]),
-            ("variant_loci", ["assembly_id", "chromosome"]),
-            ("variant_loci", ["assembly_id", "chromosome", "start_pos"]),
-            ("variant_loci", ["variant_id", "assembly_id", "chromosome"]),  # unique
+            # --- SNP main table ---
+            # PK (rs_id) is already indexed by default, but we keep it
+            # here for explicitness and for helper symmetry.
+            ("snps", ["rs_id"]),  # natural primary key
+
+            # Common query patterns: by chromosome and position in each build
+            ("snps", ["chromosome"]),
+            ("snps", ["position_37"]),
+            ("snps", ["position_38"]),
+            ("snps", ["chromosome", "position_37"]),
+            ("snps", ["chromosome", "position_38"]),
+
+            # Provenance filters (ETL / source system scoping)
+            ("snps", ["data_source_id"]),
+            ("snps", ["etl_package_id"]),
+
+            # --- SNP merge table ---
+            # Composite primary key: (rs_obsolete_id, rs_canonical_id)
+            # PK also creates an index, but we expose them individually as well
+            # for common lookup patterns.
+            ("snp_merges", ["rs_obsolete_id"]),   # obsolete -> canonical
+            ("snp_merges", ["rs_canonical_id"]),  # canonical -> all obsolete
+
+            # Provenance for merges
+            ("snp_merges", ["data_source_id"]),
+            ("snp_merges", ["etl_package_id"]),
+
+            # (Optional) explicit composite index (even though PK already exists). # noqa E501
+            ("snp_merges", ["rs_obsolete_id", "rs_canonical_id"]),
         ]
-    
+
     @property
     def get_variant_gwas_index_specs(self):
         return [

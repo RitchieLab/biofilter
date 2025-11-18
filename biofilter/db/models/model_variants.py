@@ -2,7 +2,6 @@ from sqlalchemy import (
     BigInteger,
     Column,
     Integer,
-    Numeric,
     ForeignKey,
     String,
     Float,
@@ -10,43 +9,36 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import relationship
 from biofilter.db.base import Base
+from biofilter.db.types import PKBigIntOrInt
 
 
-# --- Lookup: status (current, merged, withdrawn, suspect, etc.) -------------
-# --- Canonical variant (one row per rsID) -----------------------------------
-class VariantMaster(Base):
-    """
-    Canonical variant (rsID) representation.
+class SNP(Base):
 
-    - One row per stable dbSNP rsID
-    - Stores canonical assembly, alleles, and quality
-    - Linked to Entity for cross-domain relations
-    """
+    __tablename__ = "snps"
 
-    __tablename__ = "variant_masters"
+    # Natural primary key: numeric rsID (e.g., 123456 for rs123456)
+    rs_id = Column(BigInteger, primary_key=True)
+    # This is not necessary here
+    # id = Column(PKBigIntOrInt, primary_key=True, autoincrement=True)
 
-    id = Column(BigInteger, primary_key=True, autoincrement=True)
+    # Chromosome encoding:
+    #   1..22 = autosomes
+    #   23    = X
+    #   24    = Y
+    #   25    = MT
+    chromosome = Column(Integer, nullable=False)
 
-    # dbSNP rsID (stable external id)
-    # variant_id = Column(String(100), unique=True, index=True, nullable=False)
-    rs_id = Column(String(100), unique=True, index=True, nullable=False)
+    # This version works only with SNV (no range).
+    # Position in each build is optional: if the SNP is missing in a build,
+    # the corresponding position is NULL.
+    position_37 = Column(BigInteger, nullable=True)
+    position_38 = Column(BigInteger, nullable=True)
 
-    variant_type = Column(String(16), nullable=False, default="SNP")
+    # SNV alleles. We allow some extra room for edge cases.
+    reference_allele = Column(String(4), nullable=True)
+    alternate_allele = Column(String(16), nullable=True)
 
-    omic_status_id = Column(
-        Integer, ForeignKey("omic_status.id"), nullable=True
-    )  # noqa E501
-    omic_status = relationship("OmicStatus", passive_deletes=True)
-
-    chromosome = Column(String(10), nullable=True)  # '1'..'22','X','Y','MT'
-
-    quality = Column(Numeric(3, 1), nullable=True)
-
-    entity_id = Column(
-        BigInteger, ForeignKey("entities.id", ondelete="CASCADE"), nullable=False
-    )  # noqa E501 Trocar
-    entity = relationship("Entity", passive_deletes=True)
-
+    # Provenance
     data_source_id = Column(
         Integer,
         ForeignKey("etl_data_sources.id", ondelete="CASCADE"),
@@ -61,59 +53,16 @@ class VariantMaster(Base):
     )
     etl_package = relationship("ETLPackage", passive_deletes=True)
 
-    loci = relationship(
-        "VariantLocus",
-        back_populates="variant",
-    )
 
+class SNPMerge(Base):
 
-# --- Per-assembly locus index (accelerates position/range queries) ----------
-class VariantLocus(Base):
-    """
-    Per-assembly locus index for a variant.
+    __tablename__ = "snp_merges"
 
-    - Stores coordinates (assembly, chr, start, end)
-    - Supports multiple placements across assemblies
-    - Optimized for fast position/range queries
-    """
+    # Composite natural primary key
+    rs_obsolete_id = Column(BigInteger, primary_key=True)
+    rs_canonical_id = Column(BigInteger, primary_key=True)
 
-    __tablename__ = "variant_loci"
-
-    id = Column(BigInteger, primary_key=True, autoincrement=True)
-
-    variant_id = Column(
-        BigInteger,
-        ForeignKey("variant_masters.id", ondelete="CASCADE"),
-        nullable=False,  # noqa E501
-    )
-    
-    variant = relationship(
-        "VariantMaster",
-        back_populates="loci",
-        passive_deletes=True,
-    )
-
-    rs_id = Column(String(100), nullable=False)
-
-    entity_id = Column(
-        BigInteger, ForeignKey("entities.id", ondelete="CASCADE"), nullable=False
-    )  # noqa E501 Trocar
-    entity = relationship("Entity", passive_deletes=True)
-
-    build = Column(String(10), nullable=False) # Here add a build alias as 37, 38
-
-    assembly_id = Column(
-        Integer, ForeignKey("genome_assemblies.id"), nullable=False
-    )  # noqa E501
-    assembly = relationship("GenomeAssembly", passive_deletes=True)
-
-    chromosome = Column(String(10), nullable=False)  # '1'..'22','X','Y','MT'
-    start_pos = Column(BigInteger, nullable=False)
-    end_pos = Column(BigInteger, nullable=False)
-
-    reference_allele = Column(Text, nullable=True)
-    alternate_allele = Column(Text, nullable=True)
-
+    # Provenance
     data_source_id = Column(
         Integer,
         ForeignKey("etl_data_sources.id", ondelete="CASCADE"),
@@ -128,6 +77,126 @@ class VariantLocus(Base):
     )
     etl_package = relationship("ETLPackage", passive_deletes=True)
 
+
+# =====================================================================
+# V 3.2.0: Disabled Variants as Entities and develop SNP Model to start
+# # --- Lookup: status (current, merged, withdrawn, suspect, etc.) ----
+# # --- Canonical variant (one row per rsID) --------------------------
+# class VariantMaster(Base):
+#     """
+#     Canonical variant (rsID) representation.
+
+#     - One row per stable dbSNP rsID
+#     - Stores canonical assembly, alleles, and quality
+#     - Linked to Entity for cross-domain relations
+#     """
+
+#     __tablename__ = "variant_masters"
+
+#     id = Column(BigInteger, primary_key=True, autoincrement=True)
+
+#     # dbSNP rsID (stable external id)
+#     # variant_id = Column(String(100), unique=True, index=True, nullable=False)  # noqa E501
+#     rs_id = Column(String(100), unique=True, index=True, nullable=False)
+
+#     variant_type = Column(String(16), nullable=False, default="SNP")
+
+#     omic_status_id = Column(
+#         Integer, ForeignKey("omic_status.id"), nullable=True
+#     )  # noqa E501
+#     omic_status = relationship("OmicStatus", passive_deletes=True)
+
+#     chromosome = Column(String(10), nullable=True)  # '1'..'22','X','Y','MT'
+
+#     quality = Column(Numeric(3, 1), nullable=True)
+
+#     entity_id = Column(
+#         BigInteger, ForeignKey("entities.id", ondelete="CASCADE"), nullable=False  # noqa E501
+#     )  # noqa E501 Trocar
+#     entity = relationship("Entity", passive_deletes=True)
+
+#     data_source_id = Column(
+#         Integer,
+#         ForeignKey("etl_data_sources.id", ondelete="CASCADE"),
+#         nullable=True,
+#     )
+#     data_source = relationship("ETLDataSource", passive_deletes=True)
+
+#     etl_package_id = Column(
+#         Integer,
+#         ForeignKey("etl_packages.id", ondelete="CASCADE"),
+#         nullable=True,
+#     )
+#     etl_package = relationship("ETLPackage", passive_deletes=True)
+
+#     loci = relationship(
+#         "VariantLocus",
+#         back_populates="variant",
+#     )
+
+
+# # --- Per-assembly locus index (accelerates position/range queries) ----------  # noqa E501
+# class VariantLocus(Base):
+#     """
+#     Per-assembly locus index for a variant.
+
+#     - Stores coordinates (assembly, chr, start, end)
+#     - Supports multiple placements across assemblies
+#     - Optimized for fast position/range queries
+#     """
+
+#     __tablename__ = "variant_loci"
+
+#     id = Column(BigInteger, primary_key=True, autoincrement=True)
+
+#     variant_id = Column(
+#         BigInteger,
+#         ForeignKey("variant_masters.id", ondelete="CASCADE"),
+#         nullable=False,  # noqa E501
+#     )
+
+#     variant = relationship(
+#         "VariantMaster",
+#         back_populates="loci",
+#         passive_deletes=True,
+#     )
+
+#     rs_id = Column(String(100), nullable=False)
+
+#     entity_id = Column(
+#         BigInteger, ForeignKey("entities.id", ondelete="CASCADE"), nullable=False  # noqa E501
+#     )  # noqa E501 Trocar
+#     entity = relationship("Entity", passive_deletes=True)
+
+#     build = Column(String(10), nullable=False) # Here add a build alias as 37, 38  # noqa E501
+
+#     assembly_id = Column(
+#         Integer, ForeignKey("genome_assemblies.id"), nullable=False
+#     )  # noqa E501
+#     assembly = relationship("GenomeAssembly", passive_deletes=True)
+
+#     chromosome = Column(String(10), nullable=False)  # '1'..'22','X','Y','MT'
+#     start_pos = Column(BigInteger, nullable=False)
+#     end_pos = Column(BigInteger, nullable=False)
+
+#     reference_allele = Column(Text, nullable=True)
+#     alternate_allele = Column(Text, nullable=True)
+
+#     data_source_id = Column(
+#         Integer,
+#         ForeignKey("etl_data_sources.id", ondelete="CASCADE"),
+#         nullable=True,
+#     )
+#     data_source = relationship("ETLDataSource", passive_deletes=True)
+
+#     etl_package_id = Column(
+#         Integer,
+#         ForeignKey("etl_packages.id", ondelete="CASCADE"),
+#         nullable=True,
+#     )
+#     etl_package = relationship("ETLPackage", passive_deletes=True)
+# V 3.2.0: Disabled Variants as Entities and develop a simple model to start performance  # noqa E501
+# ======================================================================================  # noqa E501
 
 class VariantGWAS(Base):
     """
@@ -142,18 +211,19 @@ class VariantGWAS(Base):
 
     __tablename__ = "variant_gwas"
 
-    id = Column(BigInteger, primary_key=True, autoincrement=True)
+    # id = Column(BigInteger, primary_key=True, autoincrement=True)
+    id = Column(PKBigIntOrInt, primary_key=True, autoincrement=True)
 
     # Publication / study info
     pubmed_id = Column(String(255), index=True, nullable=True)
     # first_author = Column(String(255), nullable=True)
-    # publication_date = Column(String(50), nullable=True)  # raw string for now
+    # publication_date = Column(String(50), nullable=True)  # raw string for now  # noqa E501
     # journal = Column(String(255), nullable=True)
     # study_title = Column(Text, nullable=True)
     # link = Column(String(500), nullable=True)
 
     # Trait / phenotype mapping
-    raw_trait = Column(String(255), nullable=True)        # "DISEASE/TRAIT" field
+    raw_trait = Column(String(255), nullable=True)        # "DISEASE/TRAIT" field  # noqa E501
     mapped_trait = Column(String(255), nullable=True)     # "EFO term"
     mapped_trait_id = Column(String(255), nullable=True)  # "EFO/MONDO ID"
     parent_trait = Column(String(255), nullable=True)     # Parent term
@@ -317,36 +387,3 @@ class VariantGWAS(Base):
 
 #     variant = relationship("Variant", back_populates="gene_links")
 #     # gene = relationship("GeneMaster", back_populates="variant_gene_links")  # defina no GeneMaster  # noqa E501
-
-
-# --- (Opcional) Annotations (effects/ClinVar/phenotypes) ---------------------
-# Adicione quando for integrar efeitos e clinvar
-# class VariantAnnotation(Base):
-#     """
-#     Optional: functional/clinical annotations per variant.
-#     For transcript-level details, add a separate table keyed by transcript_id.    # noqa E501
-#     """
-
-#     __tablename__ = "variant_annotations"
-
-#     id = Column(Integer, primary_key=True, autoincrement=True)
-#     variant_id = Column(
-#         Integer, ForeignKey("variants.id", ondelete="CASCADE"), nullable=False  # noqa E501
-#     )
-
-#     gene_id = Column(Integer, ForeignKey("gene_masters.id"), nullable=True)
-#     transcript_id = Column(String(64), nullable=True)
-
-#     effect = Column(String(64), nullable=True)  # missense, synonymous, ...
-#     consequence = Column(String(64), nullable=True)  # e.g., splice_acceptor_variant  # noqa E501
-#     clinical_significance = Column(
-#         String(64), nullable=True
-#     )  # pathogenic, likely_benign...
-#     phenotype = Column(String(128), nullable=True)  # disease/trait label
-#     source = Column(String(32), nullable=True)  # ClinVar, gnomAD, Ensembl-VEP...  # noqa E501
-
-#     created_at = Column(DateTime, server_default=func.now(), nullable=False)
-#     updated_at = Column(
-#         DateTime, server_default=func.now(), onupdate=func.now(), nullable=False  # noqa E501
-#     )
-#     Index("ix_vann_variant", "variant_id")

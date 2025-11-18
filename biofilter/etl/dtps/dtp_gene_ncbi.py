@@ -547,48 +547,48 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
             )
 
             # --> Regions
-            if gene is not None:
-                total_gene += 1
+            # if gene is not None:
+            #     total_gene += 1
 
-                location_list = row.get("map_location", "")
-                if location_list:
-                    location_list = location_list.split("|")
-                else:
-                    location_list = []
+            #     location_list = row.get("map_location", "")
+            #     if location_list:
+            #         location_list = location_list.split("|")
+            #     else:
+            #         location_list = []
 
-                for region_label in location_list:
-                    region_instance, status = self.get_or_create_genomic_region(  # noqa: E501
-                        label=region_label,
-                        chromosome=chromosome,
-                        start=start,
-                        end=end,
-                        data_source_id=self.data_source.id,
-                        package_id=self.package.id,
-                    )  # noqa: E501
-                    if not status:
-                        msg = f"⚠️  Error on Region to: {gene_master}"
-                        self.logger.log(msg, "WARNING")
-                        total_warnings += 1
-                        continue  # TODO: Add in ETLLOG Model
+                # for region_label in location_list:
+                #     region_instance, status = self.get_or_create_genomic_region(  # noqa: E501
+                #         label=region_label,
+                #         chromosome=chromosome,
+                #         start=start,
+                #         end=end,
+                #         data_source_id=self.data_source.id,
+                #         package_id=self.package.id,
+                #     )  # noqa: E501
+                #     if not status:
+                #         msg = f"⚠️  Error on Region to: {gene_master}"
+                #         self.logger.log(msg, "WARNING")
+                #         total_warnings += 1
+                #         continue  # TODO: Add in ETLLOG Model
 
-                    # Add GeneLocation
-                    if region_instance:
-                        location, status = self.get_or_create_gene_location(
-                            gene=gene,
-                            chromosome=chromosome,
-                            start=start,
-                            end=end,
-                            strand=None,
-                            region=region_instance,
-                            data_source_id=self.data_source.id,
-                            package_id=self.package.id,
-                        )
+                #     # Add GeneLocation
+                #     if region_instance:
+                #         location, status = self.get_or_create_gene_location(
+                #             gene=gene,
+                #             chromosome=chromosome,
+                #             start=start,
+                #             end=end,
+                #             strand=None,
+                #             region=region_instance,
+                #             data_source_id=self.data_source.id,
+                #             package_id=self.package.id,
+                #         )
 
-                    # Check if location was created successfully
-                    if not location:
-                        msg = f"⚠️  Failed to create Location for gene {gene_master}"  # noqa E501
-                        self.logger.log(msg, "WARNING")
-                        total_warnings += 1
+                #     # Check if location was created successfully
+                #     if not location:
+                #         msg = f"⚠️  Failed to create Location for gene {gene_master}"  # noqa E501
+                #         self.logger.log(msg, "WARNING")
+                #         total_warnings += 1
 
         #  ---> PROCESSED ALL PROCESS DATA ROWS
 
