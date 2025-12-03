@@ -10,7 +10,7 @@ data_sources_to_process = [
     # -----
     # "hgnc",
     # "gene_ncbi",
-    "ensembl",
+    # "ensembl",
     #
     # Proteins
     # --------
@@ -52,7 +52,7 @@ data_sources_to_process = [
     # "dbsnp_chr21",
     # "dbsnp_chr22",
     # "dbsnp_chrx",
-    # "dbsnp_chry",
+    "dbsnp_chry",
     # "dbsnp_chrmt",
     # "gwas",
     #
