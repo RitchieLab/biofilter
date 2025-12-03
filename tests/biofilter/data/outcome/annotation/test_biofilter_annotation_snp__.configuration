@@ -1,5 +1,5 @@
 # Biofilter configuration file
-#   generated Thu, 13 Nov 2025 12:22:32
+#   generated Thu, 13 Nov 2025 12:29:33
 #   Biofilter version 3.0.0 (2025-10-10)
 #   LOKI version 3.0.0 (2025-10-06)
 
@@ -45,6 +45,6 @@ PREFIX                              /Users/andrerico/Works/bio3/biofilter/tests/
 OVERWRITE                           yes
 STDOUT                              no
 REPORT_INVALID_INPUT                yes
-ANNOTATE                            position_label snp position gene upstream downstream
+ANNOTATE                            position_label snp position gene
 PARIS                               no
 ALLOW_DUPLICATE_OUTPUT              no
