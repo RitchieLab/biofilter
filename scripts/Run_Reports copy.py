@@ -16,22 +16,15 @@ if __name__ == "__main__":
 
     result = bf.report.run_report(
         "report_gene_to_snp",
-        input_data="/home/bioadmin/biofilter/scripts/gene_list.txt"
+        input_data="/home/bioadmin/biofilter/scripts/gene_list.txt",
     )
 
     result = bf.report.run_report(
         "report_gene_to_snp",
-        assembly='38',
-        input_data=[
-            "TXLNGY",
-            "HGNC:18473",
-            "246126",
-            "ENSG00000131002",
-            "HGNC:5"
-        ],
+        assembly="38",
+        input_data=["TXLNGY", "HGNC:18473", "246126", "ENSG00000131002", "HGNC:5"],
     )
-    
-    
+
     # List reports
     # print(bf.report.list_reports())
 
@@ -45,6 +38,5 @@ if __name__ == "__main__":
 
     # result["Ref Allele"] = result["Ref Allele"].apply(flatten_allele)
     # result["Alt Allele"] = result["Alt Allele"].apply(flatten_allele)
-
 
     print(result)

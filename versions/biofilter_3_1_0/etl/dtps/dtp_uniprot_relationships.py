@@ -102,7 +102,9 @@ class DTP(DTPBase, EntityQueryMixin):
                 / self.data_source.source_system.name
                 / parent_source  # noqa E501
             )  # noqa: E501
-            processed_file_name = str(processed_path / "relationship_data.parquet")  # noqa E501
+            processed_file_name = str(
+                processed_path / "relationship_data.parquet"
+            )  # noqa E501
 
             if not os.path.exists(processed_file_name):
                 msg = f"⚠️  File not found: {processed_file_name}"

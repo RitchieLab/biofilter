@@ -10,7 +10,6 @@ import pandas as pd
 from pathlib import Path
 from typing import Dict, List, Any
 
-from sqlalchemy import insert
 from sqlalchemy import insert as generic_insert
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
@@ -19,8 +18,8 @@ from biofilter.etl.mixins.base_dtp import DTPBase
 from biofilter.etl.conflict_manager import ConflictManager
 from biofilter.etl.mixins.entity_query_mixin import EntityQueryMixin
 from biofilter.db.models import (
-    SNP,
-    SNPMerge,
+    VariantSNP,
+    VariantSNPMerge,
 )
 
 
@@ -40,7 +39,6 @@ def _map_seq_id_to_chrom(seq_id: str) -> int | None:
         return None
 
     s = seq_id.strip().upper()
-
     # Chromosomes 1..24 (X=23, Y=24)
     m = re.match(r"^NC_0*([0-9]{1,2})\.", s)
     if m:
@@ -51,15 +49,14 @@ def _map_seq_id_to_chrom(seq_id: str) -> int | None:
             return 23  # X
         if n == 24:
             return 24  # Y
-        # outros NC_00xxx.* que não sejam cromossomos, ignorar
+        # ignorer other NC_00xxx.* that is not chromosomes
         return None
 
     # Mitochondrial sequence (human)
     # RefSeq canonical: NC_012920.1
     if s.startswith("NC_012920"):
         return 25  # MT
-
-    # Alt contigs, scaffolds, etc. (NT_, NW_, etc.) -> não usamos aqui
+    # Alt contigs, scaffolds, etc. (NT_, NW_, etc.) -> will not use here
     return None
 
 
@@ -177,10 +174,7 @@ class DTP(DTPBase, EntityQueryMixin):
 
         def already_done(pid: int) -> bool:
             return os.path.exists(
-                os.path.join(
-                    output_dir,
-                    f"processed_part_{pid}.parquet"
-                )
+                os.path.join(output_dir, f"processed_part_{pid}.parquet")
             )  # noqa E501
 
         try:
@@ -193,14 +187,11 @@ class DTP(DTPBase, EntityQueryMixin):
                     if len(batch) >= batch_size:
                         if not already_done(batch_id):
                             self._process_batch(
-                                batch,
-                                batch_id,
-                                str(output_dir)
+                                batch, batch_id, str(output_dir)
                             )  # noqa E501
                         else:
                             self.logger.log(
-                                f"⏭️  Skipping existing part {batch_id}",
-                                "DEBUG"
+                                f"⏭️  Skipping existing part {batch_id}", "DEBUG"  # noqa E501
                             )  # noqa E501
                         batch_id += 1
                         batch = []
@@ -211,8 +202,7 @@ class DTP(DTPBase, EntityQueryMixin):
                         self._process_batch(batch, batch_id, str(output_dir))
                     else:
                         self.logger.log(
-                            f"⏭️  Skipping existing part {batch_id}",
-                            "DEBUG"
+                            f"⏭️  Skipping existing part {batch_id}", "DEBUG"
                         )  # noqa E501
                     batch_id += 1
                     batch = []
@@ -226,6 +216,9 @@ class DTP(DTPBase, EntityQueryMixin):
             msg = f"❌ ETL transform failed: {str(e)}"
             self.logger.log(msg, "ERROR")
             return False, msg
+
+    #  Support functions to TRANSFORM FASE  #
+    # --------------------------------------#
 
     def _extract_snp_positions(self, rec):
         primary = rec.get("primary_snapshot_data") or {}
@@ -245,18 +238,20 @@ class DTP(DTPBase, EntityQueryMixin):
                 if not seq_traits:
                     continue
 
-                assembly_name = (seq_traits[0].get("assembly_name") or "").upper()  # noqa E501
+                assembly_name = (
+                    seq_traits[0].get("assembly_name") or ""
+                ).upper()  # noqa E501
                 seq_type = pan.get("seq_type", "")
 
-                # só queremos refseq_chromosome
+                # only refseq_chromosome
                 if seq_type != "refseq_chromosome":
                     continue
 
-                # pegamos o seq_id pra mapear em cromossomo depois
+                # Retrieve the seq_id to map it to the chromosome later
                 # ex: "NC_000008.11" -> 8
                 alleles = p.get("alleles") or []
 
-                # primeiro, extrair ref/alt desse placement
+                # Extract ref/alt from this placement
                 local_ref = None
                 local_alt = []
                 local_pos = None
@@ -269,46 +264,47 @@ class DTP(DTPBase, EntityQueryMixin):
                         continue
                     pos1 = pos0 + 1  # 0-based -> 1-based
 
-                    # sufixo de HGVS para saber se é ref ou alt
+                    # sufix HGVS to know if is ref ou alt
                     # ex: "NC_000008.11:g.19956018="   -> ref
                     #     "NC_000008.11:g.19956018A>G" -> alt
                     #     "NC_000008.11:g.19956018A>T" -> alt
                     if hgvs.endswith("="):
-                        local_ref = spdi.get("deleted_sequence") or spdi.get("inserted_sequence")  # noqa E501
+                        local_ref = spdi.get("deleted_sequence") or spdi.get(
+                            "inserted_sequence"
+                        )  # noqa E501
                         local_pos = pos1
                     elif ">" in hgvs:
                         local_alt.append(spdi.get("inserted_sequence"))
                         local_pos = pos1
 
-                # se não conseguimos ref/alt, ignora esse placement
+                # if not get ref/alt, ignore this placement
                 if local_pos is None or local_ref is None or local_alt is None:
                     continue
 
-                # mapeia cromossomo a partir do seq_id (ou via tabela GenomeAssembly)  # noqa E501
+                # map chromossome from seq_id (or by GenomeAssembly table)
                 seq_id = p.get("seq_id") or spdi.get("seq_id")
                 chrom = _map_seq_id_to_chrom(seq_id)
                 if chrom is None:
                     continue
 
-                # guarda por build
+                # keep by build
                 if "GRCH38" in assembly_name:
                     position_38 = local_pos
                     ref = local_ref
                     alt = local_alt
                 elif "GRCH37" in assembly_name:
                     position_37 = local_pos
-                    # ref/alt devem ser iguais, mas se ainda não temos, podemos setar  # noqa E501
+                    # ref/al must be same, but set it if not yet
                     if ref is None:
                         ref = local_ref
                     if alt is None:
                         alt = local_alt
 
-                # se já temos os dois builds preenchidos, podemos encerrar cedo
+                # stop if both build were figure out
                 if position_37 is not None and position_38 is not None:
                     break
 
             if ref is not None or alt is not None:
-
                 alt_new = "/".join(sorted(set(alt)))
 
             return chrom, position_37, position_38, ref, alt_new
@@ -316,7 +312,6 @@ class DTP(DTPBase, EntityQueryMixin):
         except Exception as e:
             print(e)
 
-    # FUNCAO INTERNA DO TRANSFORM
     def _process_batch(self, batch, batch_id: int, output_dir: str) -> None:
         """
         Process a batch of dbSNP JSON lines and write a Parquet part.
@@ -351,9 +346,11 @@ class DTP(DTPBase, EntityQueryMixin):
                 if variant_type != "snv":
                     continue
 
-                chrom, pos37, pos38, ref, alt = self._extract_snp_positions(rec)  # noqa E501
+                chrom, pos37, pos38, ref, alt = self._extract_snp_positions(
+                    rec
+                )  # noqa E501
                 if chrom is None or (pos37 is None and pos38 is None):
-                    # não conseguimos coordenadas, pula registro
+                    # jump if do not have coordenates
                     continue
 
                 rows.append(
@@ -364,12 +361,11 @@ class DTP(DTPBase, EntityQueryMixin):
                         "position_38": pos38,
                         "reference_allele": ref,
                         "alternate_allele": alt,
-                        "merge_log": _extract_merge_log(rec),  # como lista de ints  # noqa E501
+                        "merge_log": _extract_merge_log(rec),
                     }
                 )
 
             except Exception as e:
-                # Mantém a lógica original de "continua o loop", mas loga no logger  # noqa E501
                 self.logger.log(
                     f"[PID {pid}] ⚠️ Error in batch {batch_id}: {e}",
                     "WARNING",
@@ -391,407 +387,15 @@ class DTP(DTPBase, EntityQueryMixin):
         out_path_csv = output_dir / f"processed_part_{batch_id}.csv"
 
         df.to_parquet(out_path, index=False)
-        df.to_csv(out_path_csv, index=False)
+        if self.debug_mode:
+            # Save in CSV format to debug
+            df.to_csv(out_path_csv, index=False)
 
         self.logger.log(
             f"[PID {pid}] ✅ Finished batch {batch_id}, "
             f"saved {len(df)} rows → {out_path}",
             "INFO",
         )
-
-    # FUNCoes do LOAD
-    # ---------------
-    # ---------------
-    # ---------------
-
-    # def _get_snp_insert_for_dialect(
-    #         self,
-    #         # session: Session
-    #         ):
-    #     """Return a SQLAlchemy Insert object for SNP with dialect-specific ON CONFLICT support."""  # noqa E501
-    #     dialect_name = self.session.get_bind().dialect.name
-
-    #     if dialect_name == "postgresql":
-    #         return pg_insert(SNP)
-    #     elif dialect_name == "sqlite":
-    #         return sqlite_insert(SNP)
-    #     else:
-    #         # Fallback genérico: sem on_conflict (para outros bancos, se um dia aparecer)  # noqa E501
-    #         return insert(SNP)
-
-    # def _get_snpmerge_insert_for_dialect(
-    #         self,
-    #         # session: Session
-    #         ):
-    #     """Return a SQLAlchemy Insert object for SNPMerge with dialect-specific ON CONFLICT support."""  # noqa E501
-    #     dialect_name = self.session.get_bind().dialect.name
-
-    #     if dialect_name == "postgresql":
-    #         return pg_insert(SNPMerge)
-    #     elif dialect_name == "sqlite":
-    #         return sqlite_insert(SNPMerge)
-    #     else:
-    #         return insert(SNPMerge)
-
-    def _parse_merge_log(self, raw: Any) -> List[int]:
-        """
-        Parse merge_log column to a list of numeric rsIDs (integers).
-
-        Accepted forms:
-        - "['59291991', '67359146']"
-        - []
-        - None
-        """
-        if raw is None:
-            return []
-
-        if isinstance(raw, list):
-            return [int(x) for x in raw]
-
-        s = str(raw).strip()
-        if not s or s == "[]":
-            return []
-
-        try:
-            parsed = ast.literal_eval(s)
-            if isinstance(parsed, (list, tuple)):
-                out = []
-                for x in parsed:
-                    if x is None:
-                        continue
-                    xs = str(x).strip()
-                    # Remove eventual prefixo "rs"
-                    if xs.startswith("rs"):
-                        xs = xs[2:]
-                    try:
-                        out.append(int(xs))
-                    except ValueError:
-                        continue
-                return out
-        except Exception:
-            return []
-
-        return []
-
-    def _get_insert_for_dialect(self, model_cls, dialect_name):
-        if dialect_name == "sqlite":
-            return sqlite_insert(model_cls)
-        elif dialect_name == "postgresql":
-            return pg_insert(model_cls)
-        else:
-            return generic_insert(model_cls)
-
-    def upsert_snps_from_df(self, df: pd.DataFrame):
-        if df.empty:
-            return
-
-        dialect_name = self.session.get_bind().dialect.name
-
-        # Segurança para SQLite: manter bem abaixo do limite de parâmetros.
-        # 8 colunas * 100 linhas = 800 parâmetros << 999
-        if dialect_name == "sqlite":
-            chunk_size = 100
-        else:
-            # Para Postgres você pode subir isso bem mais, tipo 5000 se quiser
-            chunk_size = 1000
-
-        records: list[dict] = []
-        for _, row in df.iterrows():
-            try:
-                rs_num = int(row["rs_id"])
-            except Exception:
-                continue
-
-            records.append(
-                {
-                    "rs_id": rs_num,
-                    "chromosome": int(row["chromosome"]),
-                    "position_37": (
-                        int(row["position_37"]) if pd.notna(row["position_37"]) else None
-                    ),
-                    "position_38": (
-                        int(row["position_38"]) if pd.notna(row["position_38"]) else None
-                    ),
-                    "reference_allele": row["reference_allele"],
-                    "alternate_allele": row["alternate_allele"],
-                    "data_source_id": self.data_source.id,
-                    "etl_package_id": self.package.id,
-                }
-            )
-
-        if not records:
-            return
-
-        insert_cls = self._get_insert_for_dialect(SNP, dialect_name)
-
-        for start in range(0, len(records), chunk_size):
-            chunk = records[start: start + chunk_size]
-
-            stmt = insert_cls.values(chunk)
-
-            if dialect_name in ("sqlite", "postgresql"):
-                stmt = stmt.on_conflict_do_update(
-                    index_elements=["rs_id"],
-                    set_={
-                        "chromosome": stmt.excluded.chromosome,
-                        "position_37": stmt.excluded.position_37,
-                        "position_38": stmt.excluded.position_38,
-                        "reference_allele": stmt.excluded.reference_allele,
-                        "alternate_allele": stmt.excluded.alternate_allele,
-                        "data_source_id": stmt.excluded.data_source_id,
-                        "etl_package_id": stmt.excluded.etl_package_id,
-                    },
-                )
-
-            self.session.execute(stmt)
-
-        self.session.flush()
-        # """
-        # Bulk UPSERT for SNP chunk.
-
-        # - Primary key: rs_id
-        # - Update positions / alleles / provenance if record already exists.
-        # """
-        # if df.empty:
-        #     return
-
-        # insert_cls = self._get_snp_insert_for_dialect()
-
-        # # Prepare records
-        # records: List[Dict[str, Any]] = []
-        # for _, row in df.iterrows():
-        #     try:
-        #         rs_id = int(row["rs_id"])
-        #     except Exception:
-        #         continue
-
-        #     try:
-        #         chrom = int(row["chromosome"])
-        #     except Exception:
-        #         continue
-
-        #     pos37 = row.get("position_37")
-        #     pos38 = row.get("position_38")
-
-        #     # Allow NaN from pandas
-        #     pos37 = None if pd.isna(pos37) else int(pos37)
-        #     pos38 = None if pd.isna(pos38) else int(pos38)
-
-        #     ref = row.get("reference_allele")
-        #     ref = None if pd.isna(ref) else str(ref)
-
-        #     # alt = self._parse_alt_value(row.get("alternate_allele"))
-        #     alt = row.get("alternate_allele")
-
-        #     rec = {
-        #         "rs_id": rs_id,
-        #         "chromosome": chrom,
-        #         "position_37": pos37,
-        #         "position_38": pos38,
-        #         "reference_allele": ref,
-        #         "alternate_allele": alt,
-        #         "data_source_id": self.data_source.id,
-        #         "etl_package_id": self.package.id,
-        #     }
-        #     records.append(rec)
-
-        # if not records:
-        #     return
-
-        # stmt = insert_cls.values(records)
-
-        # # ON CONFLICT (rs_id) DO UPDATE
-        # dialect_name = self.session.get_bind().dialect.name
-        # if dialect_name in ("postgresql", "sqlite"):
-        #     stmt = stmt.on_conflict_do_update(
-        #         index_elements=["rs_id"],
-        #         set_={
-        #             "chromosome": stmt.excluded.chromosome,
-        #             "position_37": stmt.excluded.position_37,
-        #             "position_38": stmt.excluded.position_38,
-        #             "reference_allele": stmt.excluded.reference_allele,
-        #             "alternate_allele": stmt.excluded.alternate_allele,
-        #             "data_source_id": stmt.excluded.data_source_id,
-        #             "etl_package_id": stmt.excluded.etl_package_id,
-        #         },
-        #     )
-        # # em outros dialetos, seria apenas INSERT; não é o caso agora
-
-        # self.session.execute(stmt)
-        # self.session.flush()
-
-    def _get_snpmerge_insert_for_dialect(self):
-        dialect_name = self.session.get_bind().dialect.name
-        if dialect_name == "sqlite":
-            return sqlite_insert(SNPMerge)
-        elif dialect_name == "postgresql":
-            return pg_insert(SNPMerge)
-        else:
-            return generic_insert(SNPMerge)
-
-    def _upsert_snpmerge_from_df(self, df: pd.DataFrame) -> None:
-        """
-        Bulk UPSERT/INSERT for SNPMerge based on 'merge_log' + 'rs_id'.
-
-        For each row in df:
-            - 'rs_id' = canonical rsID (int)
-            - 'merge_log' = list of obsolete rsIDs (strings or ints)
-        We create one SNPMerge row per (obsolete, canonical) pair.
-
-        The operation is chunked to respect SQLite parameter limits and
-        still work efficiently on PostgreSQL.
-        """
-        if df.empty:
-            return
-
-        dialect_name = self.session.get_bind().dialect.name
-
-        # Safe chunk sizes: keep SQLite below ~999 parameters
-        # Each row has 4 columns → 4 * 100 = 400 params, well below the limit.
-        if dialect_name == "sqlite":
-            chunk_size = 100
-        else:
-            # For PostgreSQL we can use a larger chunk size
-            chunk_size = 1000
-
-        insert_cls = self._get_snpmerge_insert_for_dialect()
-
-        records: List[Dict[str, Any]] = []
-
-        for _, row in df.iterrows():
-            try:
-                canonical = int(row["rs_id"])
-            except Exception:
-                continue
-
-            merge_list = row.get("merge_log")
-            # if not merge_list:
-            #     continue
-
-            for obsolete in merge_list:
-                records.append(
-                    {
-                        "rs_obsolete_id": int(obsolete),
-                        "rs_canonical_id": canonical,
-                        "data_source_id": self.data_source.id,
-                        "etl_package_id": self.package.id,
-                    }
-                )
-
-        # for _, row in df.iterrows():
-        #     # canonical rsID
-        #     try:
-        #         canonical = int(row["rs_id"])
-        #     except Exception:
-        #         continue
-
-        #     merge_list = row.get("merge_log")
-
-        #     # Normalize merge_list to a simple Python list
-        #     if merge_list is None or (isinstance(merge_list, float) and pd.isna(merge_list)):
-        #         continue
-
-        #     # Parquet / pandas podem vir como np.ndarray ou lista de strings
-        #     if isinstance(merge_list, np.ndarray):
-        #         merge_list = merge_list.tolist()
-
-        #     if not isinstance(merge_list, (list, tuple)):
-        #         # Caso muito estranho, ignora
-        #         continue
-
-        #     for obsolete in merge_list:
-        #         if obsolete is None or obsolete == "":
-        #             continue
-        #         try:
-        #             obsolete_int = int(obsolete)
-        #         except Exception:
-        #             continue
-
-        #         records.append(
-        #             {
-        #                 "rs_obsolete_id": obsolete_int,
-        #                 "rs_canonical_id": canonical,
-        #                 "data_source_id": self.data_source.id,
-        #                 "etl_package_id": self.package.id,
-        #             }
-        #         )
-
-        if not records:
-            return
-
-        # Process in chunks to avoid "too many SQL variables" on SQLite
-        for start in range(0, len(records), chunk_size):
-            chunk = records[start: start + chunk_size]
-            if not chunk:
-                continue
-
-            stmt = insert_cls.values(chunk)
-
-            if dialect_name in ("postgresql", "sqlite"):
-                # ON CONFLICT (rs_obsolete_id, rs_canonical_id) DO NOTHING
-                stmt = stmt.on_conflict_do_nothing(
-                    index_elements=["rs_obsolete_id", "rs_canonical_id"]
-                )
-
-            self.session.execute(stmt)
-
-        # Single flush at the end
-        self.session.flush()
-
-    # def _upsert_snpmerge_chunk(
-    #     self,
-    #     # session: Session,
-    #     df: pd.DataFrame,
-    #     # data_source_id: Optional[int],
-    #     # etl_package_id: Optional[int],
-    # ):
-    #     """
-    #     Bulk UPSERT/INSERT for SNPMerge based on 'merge_log' + 'rs_id'.
-
-    #     Para cada linha:
-    #     - rs_id atual = canonical
-    #     - merge_log = lista de rs obsoletos que apontam para canonical
-    #     """
-    #     if df.empty:
-    #         return
-
-    #     insert_cls = self._get_snpmerge_insert_for_dialect()
-
-    #     records: List[Dict[str, Any]] = []
-    #     for _, row in df.iterrows():
-    #         try:
-    #             canonical = int(row["rs_id"])
-    #         except Exception:
-    #             continue
-
-    #         merge_list = row.get("merge_log")
-    #         # if not merge_list:
-    #         #     continue
-
-    #         for obsolete in merge_list:
-    #             records.append(
-    #                 {
-    #                     "rs_obsolete_id": int(obsolete),
-    #                     "rs_canonical_id": canonical,
-    #                     "data_source_id": self.data_source.id,
-    #                     "etl_package_id": self.package.id,
-    #                 }
-    #             )
-
-    #     if not records:
-    #         return
-
-    #     stmt = insert_cls.values(records)
-
-    #     dialect_name = self.session.get_bind().dialect.name
-    #     if dialect_name in ("postgresql", "sqlite"):
-    #         # ON CONFLICT (rs_obsolete_id, rs_canonical_id) DO NOTHING
-    #         stmt = stmt.on_conflict_do_nothing(
-    #             index_elements=["rs_obsolete_id", "rs_canonical_id"]
-    #         )
-
-    #     self.session.execute(stmt)
-    #     self.session.flush()
 
     # 📥  ------------------------ 📥
     # 📥  ------ LOAD FASE ------  📥
@@ -807,7 +411,7 @@ class DTP(DTPBase, EntityQueryMixin):
         # Setting variables to loader
         total_variants = 0
         total_warnings = 0
-        total_snps = 0
+        # total_snps = 0
         self.LOAD_CHUNK_SIZE = 50_000
         self.dropped_variants = []
 
@@ -852,42 +456,24 @@ class DTP(DTPBase, EntityQueryMixin):
 
             try:
                 self.logger.log(f"📂 Processing {data_file}", "INFO")
-                # df_data = self._load_input_frame(data_file)
                 df_data = pd.read_parquet(data_file, engine="pyarrow")
 
                 # SNP UPSERT
-                # before_snps = total_snps
-                # self._upsert_snp_chunk(
-                self.upsert_snps_from_df(
-                    # session=self.session,
+                self._upsert_snps_from_df(
                     df=df_data,
-                    # data_source_id=self.data_source.id,
-                    # etl_package_id=self.package.id,
                 )
-                # total_snps += len(chunk)
 
                 # SNPMerge UPSERT/INSERT
-                # before_merges = total_merges
                 self._upsert_snpmerge_from_df(
-                    # session=self.session,
                     df=df_data,
-                    # ddata_source_id=self.data_source.id,
-                    # etl_package_id=self.package.id,
                 )
-                # Não sabemos exatamente quantos merges entraram
-                # se quiser, dá pra contar dentro do helper.
-
-                # self.logger.log(
-                #     f"   ↳ chunk processed: {len(chunk)} rows "
-                #     f"(SNP total ~{total_snps})",
-                #     "DEBUG",
-                # )
 
                 self.session.commit()
                 self.logger.log(
-                    f"✅ SNP load finished. Approx. {total_snps} rows processed.",   # noqa E501
+                    f"Processed {data_file}",
                     "INFO",
                 )
+
             except Exception as e:
                 self.session.rollback()
                 self.logger.log(f"❌ SNP load failed: {e}", "ERROR")
@@ -914,3 +500,201 @@ class DTP(DTPBase, EntityQueryMixin):
             msg = f"Loaded {total_variants} variants with {total_warnings} warning(s). Check logs."  # noqa E501
             self.logger.log(msg, "WARNING")
             return True, msg
+
+    #  Support functions to TRANSFORM FASE  #
+    # --------------------------------------#
+
+    def _parse_merge_log(self, raw: Any) -> List[int]:
+        """
+        Parse merge_log column to a list of numeric rsIDs (integers).
+
+        Accepted forms:
+        - "['59291991', '67359146']"
+        - []
+        - None
+        """
+        if raw is None:
+            return []
+
+        if isinstance(raw, list):
+            return [int(x) for x in raw]
+
+        s = str(raw).strip()
+        if not s or s == "[]":
+            return []
+
+        try:
+            parsed = ast.literal_eval(s)
+            if isinstance(parsed, (list, tuple)):
+                out = []
+                for x in parsed:
+                    if x is None:
+                        continue
+                    xs = str(x).strip()
+                    # Remove prefix "rs"
+                    if xs.startswith("rs"):
+                        xs = xs[2:]
+                    try:
+                        out.append(int(xs))
+                    except ValueError:
+                        continue
+                return out
+        except Exception:
+            return []
+        return []
+
+    def _get_insert_for_dialect(self, model_cls, dialect_name):
+        if dialect_name == "sqlite":
+            return sqlite_insert(model_cls)
+        elif dialect_name == "postgresql":
+            return pg_insert(model_cls)
+        else:
+            return generic_insert(model_cls)
+
+    def _upsert_snps_from_df(self, df: pd.DataFrame):
+        if df.empty:
+            return
+
+        dialect_name = self.session.get_bind().dialect.name
+
+        # Security for SQLite: keep well below the parameter limit.
+        # 8 columns * 100 rows = 800 parameters << 999
+        if dialect_name == "sqlite":
+            chunk_size = 100
+        else:
+            # For Postgres, you can upload more records without problems.
+            chunk_size = 1000
+
+        records: list[dict] = []
+        for _, row in df.iterrows():
+            try:
+                rs_num = int(row["rs_id"])
+            except Exception:
+                continue
+
+            records.append(
+                {
+                    "rs_id": rs_num,
+                    "chromosome": int(row["chromosome"]),
+                    "position_37": (
+                        int(row["position_37"])
+                        if pd.notna(row["position_37"])
+                        else None  # noqa E501
+                    ),
+                    "position_38": (
+                        int(row["position_38"])
+                        if pd.notna(row["position_38"])
+                        else None  # noqa E501
+                    ),
+                    "reference_allele": row["reference_allele"],
+                    "alternate_allele": row["alternate_allele"],
+                    "data_source_id": self.data_source.id,
+                    "etl_package_id": self.package.id,
+                }
+            )
+
+        if not records:
+            return
+
+        insert_cls = self._get_insert_for_dialect(VariantSNP, dialect_name)
+
+        for start in range(0, len(records), chunk_size):
+            chunk = records[start: start + chunk_size]
+
+            stmt = insert_cls.values(chunk)
+
+            if dialect_name in ("sqlite", "postgresql"):
+                stmt = stmt.on_conflict_do_update(
+                    index_elements=["rs_id"],
+                    set_={
+                        "chromosome": stmt.excluded.chromosome,
+                        "position_37": stmt.excluded.position_37,
+                        "position_38": stmt.excluded.position_38,
+                        "reference_allele": stmt.excluded.reference_allele,
+                        "alternate_allele": stmt.excluded.alternate_allele,
+                        "data_source_id": stmt.excluded.data_source_id,
+                        "etl_package_id": stmt.excluded.etl_package_id,
+                    },
+                )
+
+            self.session.execute(stmt)
+
+        self.session.flush()
+
+    def _get_snpmerge_insert_for_dialect(self):
+        dialect_name = self.session.get_bind().dialect.name
+        if dialect_name == "sqlite":
+            return sqlite_insert(VariantSNPMerge)
+        elif dialect_name == "postgresql":
+            return pg_insert(VariantSNPMerge)
+        else:
+            return generic_insert(VariantSNPMerge)
+
+    def _upsert_snpmerge_from_df(self, df: pd.DataFrame) -> None:
+        """
+        Bulk UPSERT/INSERT for SNPMerge based on 'merge_log' + 'rs_id'.
+
+        For each row in df:
+            - 'rs_id' = canonical rsID (int)
+            - 'merge_log' = list of obsolete rsIDs (strings or ints)
+        We create one SNPMerge row per (obsolete, canonical) pair.
+
+        The operation is chunked to respect SQLite parameter limits and
+        still work efficiently on PostgreSQL.
+        """
+        if df.empty:
+            return
+
+        dialect_name = self.session.get_bind().dialect.name
+
+        # Safe chunk sizes: keep SQLite below ~999 parameters
+        # Each row has 4 columns → 4 * 100 = 400 params, well below the limit.
+        if dialect_name == "sqlite":
+            chunk_size = 100
+        else:
+            # For PostgreSQL we can use a larger chunk size
+            chunk_size = 1000
+
+        insert_cls = self._get_snpmerge_insert_for_dialect()
+
+        records: List[Dict[str, Any]] = []
+
+        for _, row in df.iterrows():
+            try:
+                canonical = int(row["rs_id"])
+            except Exception:
+                continue
+
+            merge_list = row.get("merge_log")
+
+            for obsolete in merge_list:
+                records.append(
+                    {
+                        "rs_obsolete_id": int(obsolete),
+                        "rs_canonical_id": canonical,
+                        "data_source_id": self.data_source.id,
+                        "etl_package_id": self.package.id,
+                    }
+                )
+
+        if not records:
+            return
+
+        # Process in chunks to avoid "too many SQL variables" on SQLite
+        for start in range(0, len(records), chunk_size):
+            chunk = records[start: start + chunk_size]
+            if not chunk:
+                continue
+
+            stmt = insert_cls.values(chunk)
+
+            if dialect_name in ("postgresql", "sqlite"):
+                # ON CONFLICT (rs_obsolete_id, rs_canonical_id) DO NOTHING
+                stmt = stmt.on_conflict_do_nothing(
+                    index_elements=["rs_obsolete_id", "rs_canonical_id"]
+                )
+
+            self.session.execute(stmt)
+
+        # Single flush at the end
+        self.session.flush()

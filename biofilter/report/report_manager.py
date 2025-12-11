@@ -64,7 +64,7 @@ class ReportManager:
         report = report_class(session=self.session, logger=self.logger, **kwargs)
         result_df = report.run()
         return result_df
-    
+
     def explain(self, name: str, **kwargs):
         report_class = self._load_report_class(name)
         report = report_class(session=self.session, logger=self.logger, **kwargs)
@@ -73,7 +73,7 @@ class ReportManager:
 
     def run_example_report(self, name: str, **kwargs):
         report_class = self._load_report_class(name)
-        kwargs.setdefault("input_data", report_class.example_input()) # Use Example
+        kwargs.setdefault("input_data", report_class.example_input())  # Use Example
         report = report_class(session=self.session, logger=self.logger, **kwargs)
         result_df = report.run()
         return result_df

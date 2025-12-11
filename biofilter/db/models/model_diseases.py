@@ -8,6 +8,7 @@ class DiseaseGroup(Base):
     Reference table for disease subsets (tags).
     Example: rare, gard_rare, nord_rare, otar.
     """
+
     __tablename__ = "disease_groups"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -39,6 +40,7 @@ class DiseaseGroupMembership(Base):
     Linking table between DiseaseMaster and DiseaseGroup.
     One disease can have multiple groups, and each group can apply to many diseases.
     """
+
     __tablename__ = "disease_group_memberships"
 
     id = Column(Integer, primary_key=True, autoincrement=True)

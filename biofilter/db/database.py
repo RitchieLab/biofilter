@@ -96,7 +96,6 @@ class Database(CreateDBMixin):
         self.logger.log("Unsupported database type for exists_db check.", "WARNING")
         return False
 
-
     def get_session(self):
         if not self.session:
             msn = "⚠️ Database not connected. Call connect() first."

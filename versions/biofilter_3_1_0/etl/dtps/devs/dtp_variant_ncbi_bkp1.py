@@ -33,6 +33,7 @@ from sqlalchemy.dialects.postgresql import ARRAY
 This bkp was before change load module to dropp all previvous VariantLocus
 """
 
+
 class DTP(DTPBase, EntityQueryMixin):
     def __init__(
         self,
@@ -198,13 +199,18 @@ class DTP(DTPBase, EntityQueryMixin):
             #         )
 
             batch, batch_id = [], 0
+
             # (opcional) pular partes já prontas p/ retomar
             def already_done(pid: int) -> bool:
                 # ajuste se seu worker usa outro padrão de nome
-                return os.path.exists(os.path.join(output_dir, f"processed_part_{pid}.parquet"))
+                return os.path.exists(
+                    os.path.join(output_dir, f"processed_part_{pid}.parquet")
+                )
 
             with bz2.open(input_file, "rt", encoding="utf-8") as f:
-                self.logger.log("🧵 Running in SERIAL mode (no multiprocessing).", "INFO")
+                self.logger.log(
+                    "🧵 Running in SERIAL mode (no multiprocessing).", "INFO"
+                )
 
                 for line in f:
                     batch.append(line)
@@ -212,7 +218,9 @@ class DTP(DTPBase, EntityQueryMixin):
                         if not already_done(batch_id):
                             worker_dbsnp(batch, batch_id, output_dir)  # chamada direta
                         else:
-                            self.logger.log(f"⏭️  Skipping existing part {batch_id}", "DEBUG")
+                            self.logger.log(
+                                f"⏭️  Skipping existing part {batch_id}", "DEBUG"
+                            )
                         batch_id += 1
                         batch = []  # libera memória
 
@@ -221,10 +229,11 @@ class DTP(DTPBase, EntityQueryMixin):
                     if not already_done(batch_id):
                         worker_dbsnp(batch, batch_id, output_dir)
                     else:
-                        self.logger.log(f"⏭️  Skipping existing part {batch_id}", "DEBUG")
+                        self.logger.log(
+                            f"⏭️  Skipping existing part {batch_id}", "DEBUG"
+                        )
                     batch_id += 1
                     batch = []
-
 
             # msg = f"✅ Processing completed with {len(futures)} batches."
             msg = f"✅ Processing completed with {batch_id} batches (serial)."
@@ -379,7 +388,7 @@ class DTP(DTPBase, EntityQueryMixin):
         def to_str_ids(xs):
             out = []
             for x in xs or []:
-                if x is None: 
+                if x is None:
                     continue
                 out.append(str(x).strip())
             return out
@@ -412,7 +421,9 @@ class DTP(DTPBase, EntityQueryMixin):
             # Variant group (sets self.entity_group_id)
             self.get_entity_group("Variants")
             # Gene group (used for alias resolution)
-            gene_group = self.session.query(EntityGroup).filter_by(name="Genes").first()  # noqa E501
+            gene_group = (
+                self.session.query(EntityGroup).filter_by(name="Genes").first()
+            )  # noqa E501
             if not gene_group:
                 raise ValueError("EntityGroup 'Genes' not found in database.")
         except Exception as e:
@@ -435,7 +446,7 @@ class DTP(DTPBase, EntityQueryMixin):
         if not relationship_type:
             relationship_type = EntityRelationshipType(
                 code="associated_with",
-                description="Auto-created by variant DTP"  # noqa E501
+                description="Auto-created by variant DTP",  # noqa E501
             )
             self.session.add(relationship_type)
             self.session.commit()
@@ -450,16 +461,22 @@ class DTP(DTPBase, EntityQueryMixin):
 
         # ---= Get exist Vars in DB by Chrom =---
         try:
-            target_chrom = self._extract_chrom_from_ds(self.data_source.name)   # noqa E501
+            target_chrom = self._extract_chrom_from_ds(
+                self.data_source.name
+            )  # noqa E501
             result = self.session.execute(
-                text("""
+                text(
+                    """
                     SELECT variant_id
                     FROM variant_masters
                     WHERE chromosome = :chrom
-                """),
+                """
+                ),
                 {"chrom": target_chrom},
             )
-            self.existing_variant_ids = {str(row[0]) for row in result.fetchall()}  # noqa E501
+            self.existing_variant_ids = {
+                str(row[0]) for row in result.fetchall()
+            }  # noqa E501
             msg = f"🔍 {len(self.existing_variant_ids)} variants already in DB for chr {target_chrom}"  # noqa E501
             self.logger.log(msg, "INFO")
 
@@ -531,13 +548,13 @@ class DTP(DTPBase, EntityQueryMixin):
 
                     # --- Set Row Variables ---
                     vlocus_buffer = []
-                    seen = (
-                        set()
-                    )
+                    seen = set()
 
                     # --- Get Canonical Variant ID ---
                     variant_master = row.rs_id
-                    chromossome = str(row.chromosome) if row.chromosome else None  # noqa E501
+                    chromossome = (
+                        str(row.chromosome) if row.chromosome else None
+                    )  # noqa E501
 
                     # ----== ENTITY DOMAIN ==----
                     # Add or Get Variant Master Entity
@@ -547,8 +564,8 @@ class DTP(DTPBase, EntityQueryMixin):
                         group_id=self.entity_group,
                         data_source_id=self.data_source.id,
                         package_id=self.package.id,
-                        alias_type="rsID",                # TODO: CHECK W/TEAM
-                        xref_source="dbSNP",              # TODO: CHECK W/TEAM
+                        alias_type="rsID",  # TODO: CHECK W/TEAM
+                        xref_source="dbSNP",  # TODO: CHECK W/TEAM
                         alias_norm=variant_master,
                         is_active=True,
                     )
@@ -614,15 +631,9 @@ class DTP(DTPBase, EntityQueryMixin):
 
                     # -->> CREATE VARIANT LOCUS TO ALL ASSEMBLIES
                     start = (
-                        int(row["start_pos"])
-                        if pd.notna(row["start_pos"])
-                        else None
+                        int(row["start_pos"]) if pd.notna(row["start_pos"]) else None
                     )
-                    end = (
-                        int(row["end_pos"])
-                        if pd.notna(row["end_pos"])
-                        else None
-                    )
+                    end = int(row["end_pos"]) if pd.notna(row["end_pos"]) else None
                     assembly_id = (
                         int(row["assembly_id"])
                         if pd.notna(row["assembly_id"])
@@ -632,7 +643,9 @@ class DTP(DTPBase, EntityQueryMixin):
                     def normalize_allele_list(value):
                         # Caso esteja em string com falta de vírgula, corrige
                         if isinstance(value, str):
-                            value = value.replace("'", "").replace("[", "").replace("]", "")  # noqa E501
+                            value = (
+                                value.replace("'", "").replace("[", "").replace("]", "")
+                            )  # noqa E501
                             return value.split()
                         elif isinstance(value, (list, np.ndarray)):
                             return list(map(str, value))
@@ -640,8 +653,12 @@ class DTP(DTPBase, EntityQueryMixin):
                             return []
                         return [str(value)]
 
-                    alternate_allele = json.dumps(normalize_allele_list(row["alt"]))  # noqa E501
-                    reference_allele = json.dumps(normalize_allele_list(row["ref"]))  # noqa E501
+                    alternate_allele = json.dumps(
+                        normalize_allele_list(row["alt"])
+                    )  # noqa E501
+                    reference_allele = json.dumps(
+                        normalize_allele_list(row["ref"])
+                    )  # noqa E501
 
                     key = (
                         variant_master_obj.id,
@@ -705,7 +722,12 @@ class DTP(DTPBase, EntityQueryMixin):
                         if alt:
                             locus_map[key]["alt_set"].add(str(alt))
 
-                    for (variant_id, asm_id, start, end), vals in locus_map.items():  # noqa E501
+                    for (
+                        variant_id,
+                        asm_id,
+                        start,
+                        end,
+                    ), vals in locus_map.items():  # noqa E501
                         ref_list = sorted(vals["ref_set"])
                         alt_list = sorted(vals["alt_set"])
 
@@ -774,7 +796,9 @@ class DTP(DTPBase, EntityQueryMixin):
                         var_number += 1
                         end_variant = time.time() - start_variant
                         # Just print to save time
-                        print(f"Proccessed: {var_number} / To Process: {len(df) - var_number} in {end_variant:.5f}s: {variant_master}")  # noqa E501
+                        print(
+                            f"Proccessed: {var_number} / To Process: {len(df) - var_number} in {end_variant:.5f}s: {variant_master}"
+                        )  # noqa E501
 
             except Exception as e:
                 msg = f"❌ Error to add data: {str(e)}"
@@ -813,24 +837,34 @@ class DTP(DTPBase, EntityQueryMixin):
                 #     .all()
                 # )
 
-                
                 entrez_list_str = to_str_ids(entrez_list)
 
                 if not entrez_list_str:
                     alias_rows = []
                 else:
                     alias_rows = (
-                        self.session.query(EntityAlias.alias_value, EntityAlias.entity_id)
-                        .filter(EntityAlias.alias_type == "code", EntityAlias.xref_source == "ENTREZ")
+                        self.session.query(
+                            EntityAlias.alias_value, EntityAlias.entity_id
+                        )
                         .filter(
-                            EntityAlias.alias_value == any_(
-                                cast(bindparam("vals", value=entrez_list_str), ARRAY(Text))
+                            EntityAlias.alias_type == "code",
+                            EntityAlias.xref_source == "ENTREZ",
+                        )
+                        .filter(
+                            EntityAlias.alias_value
+                            == any_(
+                                cast(
+                                    bindparam("vals", value=entrez_list_str),
+                                    ARRAY(Text),
+                                )
                             )
                         )
                         .all()
                     )
 
-                entrez2eid = {row.alias_value: row.entity_id for row in alias_rows}  # noqa E501
+                entrez2eid = {
+                    row.alias_value: row.entity_id for row in alias_rows
+                }  # noqa E501
                 df_genes = pd.DataFrame(
                     list(entrez2eid.items()),
                     columns=["entrez_id_str", "gene_entity_id"],
@@ -851,9 +885,7 @@ class DTP(DTPBase, EntityQueryMixin):
                 ].copy()  # noqa E501
 
                 if not found.empty:
-                    found["rs_entity_id"] = found[
-                        "rs_entity_id"
-                    ].astype(  # noqa E501
+                    found["rs_entity_id"] = found["rs_entity_id"].astype(  # noqa E501
                         int
                     )
                     found["gene_entity_id"] = found[
@@ -962,10 +994,14 @@ class DTP(DTPBase, EntityQueryMixin):
         # - Salve all Variants Dropped in que QA Process
         if self.dropped_variants:
             all_dropped = pd.concat(self.dropped_variants, ignore_index=True)
-            dropped_vars_file = f"dropped_variants__package_{self.package.id}.csv"  # noqa E501
+            dropped_vars_file = (
+                f"dropped_variants__package_{self.package.id}.csv"  # noqa E501
+            )
             output_path = str(processed_path / dropped_vars_file)
             all_dropped.to_csv(output_path, index=False)
-            self.logger.log(f"📤 Saved dropped variants to: {output_path}", "INFO")  # noqa E501
+            self.logger.log(
+                f"📤 Saved dropped variants to: {output_path}", "INFO"
+            )  # noqa E501
 
         if total_warnings == 0:
             msg = f"✅ Loaded {total_variants} variants from {len(files_list)} file(s)."  # noqa E501

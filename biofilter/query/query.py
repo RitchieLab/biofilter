@@ -146,13 +146,14 @@ class Query:
         if hasattr(obj, "_mapping"):  # Row object do SQLAlchemy 2.0
             return dict(obj._mapping)
         if hasattr(obj, "__dict__"):  # ORM object
-            return {k: v for k, v in vars(obj).items() if not k.startswith("_sa_instance_state")}
+            return {
+                k: v
+                for k, v in vars(obj).items()
+                if not k.startswith("_sa_instance_state")
+            }
         return {"value": obj}  # escalar simples
 
-
-    def run_query(
-        self, stmt, return_df: bool = True
-    ) -> Union[List[Any], pd.DataFrame]:
+    def run_query(self, stmt, return_df: bool = True) -> Union[List[Any], pd.DataFrame]:
         """Execute a SQLAlchemy statement and return results."""
         try:
             # result = self.session.execute(stmt).scalars().all()

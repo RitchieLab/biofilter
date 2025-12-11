@@ -2,6 +2,7 @@ import os
 import time  # DEBUG MODE
 import requests
 import zipfile
+
 # import gzip
 # import io
 import pandas as pd
@@ -15,7 +16,6 @@ from biofilter.db.models import (
     EntityAlias,
     EntityRelationshipType,
     EntityRelationship,
-
 )  # noqa E501
 
 
@@ -105,7 +105,6 @@ class DTP(DTPBase):
             self.logger.log(msg, "ERROR")
             return False, msg, None
 
-
     # ⚙️  ----------------------------  ⚙️
     # ⚙️  ------ TRANSFORM FASE ------  ⚙️
     # ⚙️  ----------------------------  ⚙️
@@ -119,7 +118,6 @@ class DTP(DTPBase):
 
         if self.debug_mode:
             start_total = time.time()
-
 
         # Check if raw_dir and processed_dir are provided
         try:
@@ -207,39 +205,153 @@ class DTP(DTPBase):
                 relations = []
 
                 # Core identifiers
-                gene_a = _extract_ids(row["Alt IDs Interactor A"], "entrez gene/locuslink")
-                gene_b = _extract_ids(row["Alt IDs Interactor B"], "entrez gene/locuslink")
+                gene_a = _extract_ids(
+                    row["Alt IDs Interactor A"], "entrez gene/locuslink"
+                )
+                gene_b = _extract_ids(
+                    row["Alt IDs Interactor B"], "entrez gene/locuslink"
+                )
                 prot_a = _extract_ids(row["Alt IDs Interactor A"], "uniprot")
                 prot_b = _extract_ids(row["Alt IDs Interactor B"], "uniprot")
-                chem_a = _extract_ids(row["Alt IDs Interactor A"], "chebi") + _extract_ids(row["Alt IDs Interactor A"], "pubchem")
-                chem_b = _extract_ids(row["Alt IDs Interactor B"], "chebi") + _extract_ids(row["Alt IDs Interactor B"], "pubchem")
+                chem_a = _extract_ids(
+                    row["Alt IDs Interactor A"], "chebi"
+                ) + _extract_ids(row["Alt IDs Interactor A"], "pubchem")
+                chem_b = _extract_ids(
+                    row["Alt IDs Interactor B"], "chebi"
+                ) + _extract_ids(row["Alt IDs Interactor B"], "pubchem")
 
                 # Metadata
-                interaction_id = str(row.get("Interaction Identifiers", "")).split("|")[0]
-                interaction_method = str(row.get("Interaction Detection Method", "")).split("(")[-1].replace(")", "")
-                interaction_type = str(row.get("Interaction Types", "")).split("(")[-1].replace(")", "")
+                interaction_id = str(row.get("Interaction Identifiers", "")).split("|")[
+                    0
+                ]
+                interaction_method = (
+                    str(row.get("Interaction Detection Method", ""))
+                    .split("(")[-1]
+                    .replace(")", "")
+                )
+                interaction_type = (
+                    str(row.get("Interaction Types", ""))
+                    .split("(")[-1]
+                    .replace(")", "")
+                )
 
                 # (1) Gene–Gene
                 for g1, g2 in product(gene_a, gene_b):
-                    relations.append(("Genes", "ENTREZ", g1, "Genes", "ENTREZ", g2, interaction_id, interaction_method, interaction_type))
+                    relations.append(
+                        (
+                            "Genes",
+                            "ENTREZ",
+                            g1,
+                            "Genes",
+                            "ENTREZ",
+                            g2,
+                            interaction_id,
+                            interaction_method,
+                            interaction_type,
+                        )
+                    )
                 # (2) Gene–Protein / Protein–Gene
                 for g, p in product(gene_a, prot_b):
-                    relations.append(("Genes", "ENTREZ", g, "Proteins", "UNIPROT", p, interaction_id, interaction_method, interaction_type))
+                    relations.append(
+                        (
+                            "Genes",
+                            "ENTREZ",
+                            g,
+                            "Proteins",
+                            "UNIPROT",
+                            p,
+                            interaction_id,
+                            interaction_method,
+                            interaction_type,
+                        )
+                    )
                 for p, g in product(prot_a, gene_b):
-                    relations.append(("Proteins", "UNIPROT", p, "Genes", "ENTREZ", g, interaction_id, interaction_method, interaction_type))
+                    relations.append(
+                        (
+                            "Proteins",
+                            "UNIPROT",
+                            p,
+                            "Genes",
+                            "ENTREZ",
+                            g,
+                            interaction_id,
+                            interaction_method,
+                            interaction_type,
+                        )
+                    )
                 # (3) Protein–Protein
                 for p1, p2 in product(prot_a, prot_b):
-                    relations.append(("Proteins", "UNIPROT", p1, "Proteins", "UNIPROT", p2, interaction_id, interaction_method, interaction_type))
+                    relations.append(
+                        (
+                            "Proteins",
+                            "UNIPROT",
+                            p1,
+                            "Proteins",
+                            "UNIPROT",
+                            p2,
+                            interaction_id,
+                            interaction_method,
+                            interaction_type,
+                        )
+                    )
                 # (4) Protein–Chemical / Chemical–Protein
                 for p, c in product(prot_a, chem_b):
-                    relations.append(("Proteins", "UNIPROT", p, "Chemicals", "CHEBI", c, interaction_id, interaction_method, interaction_type))
+                    relations.append(
+                        (
+                            "Proteins",
+                            "UNIPROT",
+                            p,
+                            "Chemicals",
+                            "CHEBI",
+                            c,
+                            interaction_id,
+                            interaction_method,
+                            interaction_type,
+                        )
+                    )
                 for c, p in product(chem_a, prot_b):
-                    relations.append(("Chemicals", "CHEBI", c, "Proteins", "UNIPROT", p, interaction_id, interaction_method, interaction_type))
+                    relations.append(
+                        (
+                            "Chemicals",
+                            "CHEBI",
+                            c,
+                            "Proteins",
+                            "UNIPROT",
+                            p,
+                            interaction_id,
+                            interaction_method,
+                            interaction_type,
+                        )
+                    )
                 # (5) Genes–Chemical / Chemical–Gene
                 for g, c in product(gene_a, chem_b):
-                    relations.append(("Genes", "ENTREZ", g, "Chemicals", "CHEBI", c, interaction_id, interaction_method, interaction_type))
+                    relations.append(
+                        (
+                            "Genes",
+                            "ENTREZ",
+                            g,
+                            "Chemicals",
+                            "CHEBI",
+                            c,
+                            interaction_id,
+                            interaction_method,
+                            interaction_type,
+                        )
+                    )
                 for c, g in product(chem_a, gene_b):
-                    relations.append(("Chemicals", "CHEBI", c, "Genes", "ENTREZ", g, interaction_id, interaction_method, interaction_type))
+                    relations.append(
+                        (
+                            "Chemicals",
+                            "CHEBI",
+                            c,
+                            "Genes",
+                            "ENTREZ",
+                            g,
+                            interaction_id,
+                            interaction_method,
+                            interaction_type,
+                        )
+                    )
 
                 return relations
 
@@ -249,15 +361,26 @@ class DTP(DTPBase):
                 expanded.extend(_parse_biogrid_line(row))
 
             # Convert to DataFrame
-            df_expanded = pd.DataFrame(expanded, columns=[
-                "group_a", "source_a", "value_a",
-                "group_b", "source_b", "value_b",
-                "interaction_id", "interaction_method", "interaction_type"
-            ])
+            df_expanded = pd.DataFrame(
+                expanded,
+                columns=[
+                    "group_a",
+                    "source_a",
+                    "value_a",
+                    "group_b",
+                    "source_b",
+                    "value_b",
+                    "interaction_id",
+                    "interaction_method",
+                    "interaction_type",
+                ],
+            )
 
             # Drop duplicates and export
-            df_expanded = df_expanded.drop_duplicates()  
-            df_expanded.to_parquet(output_file_master.with_suffix(".parquet"), index=False)
+            df_expanded = df_expanded.drop_duplicates()
+            df_expanded.to_parquet(
+                output_file_master.with_suffix(".parquet"), index=False
+            )
 
             if self.debug_mode:
                 df_expanded.to_csv(output_file_master.with_suffix(".csv"), index=False)
@@ -276,12 +399,10 @@ class DTP(DTPBase):
             # self.logger.log(msg, "ERROR")
             return False, msg
 
-
     # 📥  ------------------------ 📥
     # 📥  ------ LOAD FASE ------  📥
     # 📥  ------------------------ 📥
     def load(self, processed_dir=None):
-
         """
         Loads BioGRID relationships into the database.
         Matches Entities by alias and creates EntityRelationship rows.
@@ -339,9 +460,18 @@ class DTP(DTPBase):
         # 1. Map EntityGroup IDs
         try:
             group_map = {
-                "Genes": self.session.query(EntityGroup).filter_by(name="Genes").first().id,
-                "Proteins": self.session.query(EntityGroup).filter_by(name="Proteins").first().id,
-                "Chemicals": self.session.query(EntityGroup).filter_by(name="Chemicals").first().id,
+                "Genes": self.session.query(EntityGroup)
+                .filter_by(name="Genes")
+                .first()
+                .id,
+                "Proteins": self.session.query(EntityGroup)
+                .filter_by(name="Proteins")
+                .first()
+                .id,
+                "Chemicals": self.session.query(EntityGroup)
+                .filter_by(name="Chemicals")
+                .first()
+                .id,
             }
             df["entity_1_group_id"] = df["group_a"].map(group_map)
             df["entity_2_group_id"] = df["group_b"].map(group_map)
@@ -353,8 +483,10 @@ class DTP(DTPBase):
         # 2. Map Entity IDs
         # 2.1 Genes Maps
         try:
-            genes = df.loc[df["group_a"].eq("Genes"), "value_a"].unique().tolist() + \
-                    df.loc[df["group_b"].eq("Genes"), "value_b"].unique().tolist()
+            genes = (
+                df.loc[df["group_a"].eq("Genes"), "value_a"].unique().tolist()
+                + df.loc[df["group_b"].eq("Genes"), "value_b"].unique().tolist()
+            )
 
             gene_aliases = (
                 self.session.query(EntityAlias.alias_value, EntityAlias.entity_id)
@@ -364,16 +496,20 @@ class DTP(DTPBase):
                 .filter(EntityAlias.alias_value.in_(genes))
                 .all()
             )
-            df_gene_map = pd.DataFrame(gene_aliases, columns=["alias_value", "entity_id"])
+            df_gene_map = pd.DataFrame(
+                gene_aliases, columns=["alias_value", "entity_id"]
+            )
         except Exception as e:
             msg = f"⚠️  Failed to map Genes Entity data: {e}"
             self.logger.log(msg, "DEBUG")
             return False, msg  # ⧮ Leaving with ERROR
-        
+
         # 2.2 Proteins Maps
         try:
-            proteins = df.loc[df["group_a"].eq("Proteins"), "value_a"].unique().tolist() + \
-            df.loc[df["group_b"].eq("Proteins"), "value_b"].unique().tolist()
+            proteins = (
+                df.loc[df["group_a"].eq("Proteins"), "value_a"].unique().tolist()
+                + df.loc[df["group_b"].eq("Proteins"), "value_b"].unique().tolist()
+            )
 
             protein_aliases = (
                 self.session.query(EntityAlias.alias_value, EntityAlias.entity_id)
@@ -382,7 +518,9 @@ class DTP(DTPBase):
                 .filter(EntityAlias.alias_value.in_(proteins))
                 .all()
             )
-            df_protein_map = pd.DataFrame(protein_aliases, columns=["alias_value", "entity_id"])
+            df_protein_map = pd.DataFrame(
+                protein_aliases, columns=["alias_value", "entity_id"]
+            )
         except Exception as e:
             msg = f"⚠️  Failed to map Proteins Entity data: {e}"
             self.logger.log(msg, "DEBUG")
@@ -390,8 +528,10 @@ class DTP(DTPBase):
 
         # 2.3 Chemicals Maps
         try:
-            chems = df.loc[df["group_a"].eq("Chemicals"), "value_a"].unique().tolist() + \
-            df.loc[df["group_b"].eq("Chemicas"), "value_b"].unique().tolist()
+            chems = (
+                df.loc[df["group_a"].eq("Chemicals"), "value_a"].unique().tolist()
+                + df.loc[df["group_b"].eq("Chemicas"), "value_b"].unique().tolist()
+            )
             chem_aliases = (
                 self.session.query(EntityAlias.alias_value, EntityAlias.entity_id)
                 .filter(EntityAlias.group_id == group_map["Chemicals"])
@@ -399,12 +539,14 @@ class DTP(DTPBase):
                 .filter(EntityAlias.alias_value.in_(chems))
                 .all()
             )
-            df_chem_map = pd.DataFrame(chem_aliases, columns=["alias_value", "entity_id"])
+            df_chem_map = pd.DataFrame(
+                chem_aliases, columns=["alias_value", "entity_id"]
+            )
         except Exception as e:
             msg = f"⚠️  Failed to map Chemicals Entity data: {e}"
             self.logger.log(msg, "DEBUG")
             return False, msg  # ⧮ Leaving with ERROR
-        
+
         # 2.4 Merge all Entities IDs
         map_dict = {}
         for d in [df_gene_map, df_protein_map, df_chem_map]:
@@ -415,7 +557,11 @@ class DTP(DTPBase):
 
         # 3. Map Relationship Type ID
         # TODO: Improve Relation types
-        rel_type = self.session.query(EntityRelationshipType).filter_by(code="interacts_with").first()
+        rel_type = (
+            self.session.query(EntityRelationshipType)
+            .filter_by(code="interacts_with")
+            .first()
+        )
 
         # ----= CLEAN DATA =----
         # Slitting in two dfs (to load and with missing ID to check)
@@ -437,7 +583,6 @@ class DTP(DTPBase):
             msg = f"⚠️  Failed to keep only valid ID to load: {e}"
             self.logger.log(msg, "DEBUG")
             return False, msg  # ⧮ Leaving with ERROR
-        
 
         # ----= CHECK PREVIOUS DATA IN DB =----
         # --------------------------------------
@@ -468,7 +613,9 @@ class DTP(DTPBase):
             #     (r.entity_1_id, r.entity_2_id)
             #     for r in existing
             # }
-            existing_set = {normalize_pair(r.entity_1_id, r.entity_2_id) for r in existing}
+            existing_set = {
+                normalize_pair(r.entity_1_id, r.entity_2_id) for r in existing
+            }
             msg = f"📊 Found {len(existing_set):,} existing relationships"
             self.logger.log(msg, "DEBUG")
 
@@ -496,11 +643,10 @@ class DTP(DTPBase):
             self.logger.log(msg, "DEBUG")
             return False, msg  # ⧮ Leaving with ERROR
 
-
         # ----= INSERT DATA IN DB =----
         # --------------------------------------
 
-        # Drop Indexes  
+        # Drop Indexes
         try:
             self.drop_indexes(self.get_entity_relationship_index_specs)
         except Exception as e:
@@ -534,7 +680,7 @@ class DTP(DTPBase):
                     self.session.commit()
                     self.logger.log(
                         f"💾 Inserted chunk {i // chunk_size + 1} ({len(rels):,} records)",
-                        "DEBUG"
+                        "DEBUG",
                     )
                     rels.clear()  # libera memória
 
@@ -542,7 +688,7 @@ class DTP(DTPBase):
                     self.session.rollback()
                     self.logger.log(
                         f"⚠️ Error inserting chunk ending at record {i:,}: {str(e)}",
-                        "ERROR"
+                        "ERROR",
                     )
                     rels.clear()
                     # continua o loop — não interrompe o processo
@@ -553,7 +699,6 @@ class DTP(DTPBase):
             self.create_indexes(self.get_entity_relationship_index_specs)
         except Exception as e:
             self.logger.log(f"⚠️ Failed to restore DB indexes: {e}", "WARNING")
-
 
         msg = f"📥 Total BioGRID Relationships: {total_relationships}"
         return True, msg

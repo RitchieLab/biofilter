@@ -234,7 +234,9 @@ class DTP(DTPBase, EntityQueryMixin):
             # Compond Fields as Lists
             for col in ["alt_ids", "consider", "synonyms", "xrefs"]:
                 df_terms[col] = df_terms[col].apply(
-                    lambda x: x if isinstance(x, list) else (None if pd.isna(x) else [x])  # noqa E501
+                    lambda x: (
+                        x if isinstance(x, list) else (None if pd.isna(x) else [x])
+                    )  # noqa E501
                 )
 
             df_rel = pd.DataFrame(relations)
@@ -349,7 +351,9 @@ class DTP(DTPBase, EntityQueryMixin):
             for _, row in df.iterrows():
                 go_id = row.get("go_id")
                 name = row.get("name")
-                is_obsolete = str(row.get("is_obsolete", "")).strip().lower() == "true"  # noqa E501
+                is_obsolete = (
+                    str(row.get("is_obsolete", "")).strip().lower() == "true"
+                )  # noqa E501
 
                 # if go_id == "GO:0000050":
                 #     pass

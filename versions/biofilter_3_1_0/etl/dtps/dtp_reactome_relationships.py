@@ -98,7 +98,9 @@ class DTP(DTPBase, EntityQueryMixin):
                 / self.data_source.source_system.name
                 / parent_source  # noqa E501
             )  # noqa: E501
-            processed_file_name = str(processed_path / "relationship_data.parquet")  # noqa E501
+            processed_file_name = str(
+                processed_path / "relationship_data.parquet"
+            )  # noqa E501
 
             if not os.path.exists(processed_file_name):
                 msg = f"⚠️  File not found: {processed_file_name}"
@@ -156,7 +158,9 @@ class DTP(DTPBase, EntityQueryMixin):
 
             # Get pathway IDs from EntityName
             pathway_ids = (
-                self.session.query(EntityAlias.alias_value, EntityAlias.entity_id)  # noqa E501
+                self.session.query(
+                    EntityAlias.alias_value, EntityAlias.entity_id
+                )  # noqa E501
                 .filter(EntityAlias.data_source_id == parent_ds_id)
                 .filter(EntityAlias.is_primary.is_(True))
                 .all()
@@ -180,7 +184,9 @@ class DTP(DTPBase, EntityQueryMixin):
 
             # Query EntityName in batch
             relation_entities = (
-                self.session.query(EntityAlias.alias_value, EntityAlias.entity_id)  # noqa E501
+                self.session.query(
+                    EntityAlias.alias_value, EntityAlias.entity_id
+                )  # noqa E501
                 .filter(EntityAlias.alias_value.in_(relation_names_to_lookup))
                 .all()
             )
@@ -238,10 +244,12 @@ class DTP(DTPBase, EntityQueryMixin):
             )
 
             # Fetch group_ids from Entity
-            entity_ids_used = pd.concat([
-                df_valid["entity_1_id"],
-                df_valid["entity_2_id"]
-            ]).dropna().unique().tolist()
+            entity_ids_used = (
+                pd.concat([df_valid["entity_1_id"], df_valid["entity_2_id"]])
+                .dropna()
+                .unique()
+                .tolist()
+            )
 
             entity_groups = (
                 self.session.query(Entity.id, Entity.group_id)
@@ -251,8 +259,12 @@ class DTP(DTPBase, EntityQueryMixin):
             entity_group_map = dict(entity_groups)
 
             # Map group IDs
-            df_valid["entity_1_group_id"] = df_valid["entity_1_id"].map(entity_group_map)
-            df_valid["entity_2_group_id"] = df_valid["entity_2_id"].map(entity_group_map)
+            df_valid["entity_1_group_id"] = df_valid["entity_1_id"].map(
+                entity_group_map
+            )
+            df_valid["entity_2_group_id"] = df_valid["entity_2_id"].map(
+                entity_group_map
+            )
 
             # Load valid relationships
             total_pathways_relations_added = 0
@@ -261,8 +273,16 @@ class DTP(DTPBase, EntityQueryMixin):
                 status = self.get_or_create_entity_relationship(
                     entity_1_id=int(row["entity_1_id"]),
                     entity_2_id=int(row["entity_2_id"]),
-                    entity_1_group_id=int(row["entity_1_group_id"]) if row["entity_1_group_id"] else None,
-                    entity_2_group_id=int(row["entity_2_group_id"]) if row["entity_2_group_id"] else None,
+                    entity_1_group_id=(
+                        int(row["entity_1_group_id"])
+                        if row["entity_1_group_id"]
+                        else None
+                    ),
+                    entity_2_group_id=(
+                        int(row["entity_2_group_id"])
+                        if row["entity_2_group_id"]
+                        else None
+                    ),
                     relationship_type_id=int(row["relationship_type_id"]),
                     data_source_id=self.data_source.id,
                     package_id=self.package.id,

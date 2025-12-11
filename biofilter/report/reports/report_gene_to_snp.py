@@ -9,8 +9,7 @@ from biofilter.db.models import (
     EntityRelationship,
     VariantMaster,
     VariantLocus,
-    GenomeAssembly
-
+    GenomeAssembly,
 )
 
 from sqlalchemy.orm import aliased
@@ -72,13 +71,7 @@ class GeneToSNPReport(ReportBase):
         """
         Returns a minimal working example of inputs for testing or tutorials.
         """
-        return [
-            "TXLNGY",
-            "HGNC:18473",
-            "246126",
-            "ENSG00000131002",
-            "HGNC:5"
-        ]
+        return ["TXLNGY", "HGNC:18473", "246126", "ENSG00000131002", "HGNC:5"]
 
     def run(self):
 
@@ -108,9 +101,12 @@ class GeneToSNPReport(ReportBase):
             .scalar()
         )
         if not gene_group_id or not variant_group_id:
-            self.logger.log("EntityGroup 'Genes' or 'Variants' not found in the database.", "WARNING")
+            self.logger.log(
+                "EntityGroup 'Genes' or 'Variants' not found in the database.",
+                "WARNING",
+            )
             return None
-            
+
         # ---------------------------------------------------------------------
         # QUERY 1: Resolve input genes via EntityAlias (case-insensitive match)
         # Aliases
@@ -140,22 +136,26 @@ class GeneToSNPReport(ReportBase):
             gene_df = pd.DataFrame(gene_query.all())
             if gene_df.empty:
                 raise ValueError("No genes found.")
-        
+
             # Return input information
             gene_df["input_gene"] = gene_df["entity_norm"].map(input_map)
 
             # Parse duplicated Entities
             # Agrupar por entity_id e manter apenas a primeira ocorrência
-            unique_genes_df = gene_df.drop_duplicates(subset=["entity_id"], keep="first").copy()
+            unique_genes_df = gene_df.drop_duplicates(
+                subset=["entity_id"], keep="first"
+            ).copy()
 
             # Obter os demais como duplicatas
             duplicates_df = gene_df[~gene_df.index.isin(unique_genes_df.index)].copy()
             if not duplicates_df.empty:
                 # Adicionar nota de duplicação (opcional)
-                duplicates_df["note"] = "Duplicate entity_id: mapped to same gene as another input"
+                duplicates_df["note"] = (
+                    "Duplicate entity_id: mapped to same gene as another input"
+                )
 
             gene_ids = unique_genes_df["entity_id"].unique().tolist()  # List of Genes
-        
+
         except Exception as e:
             self.logger.log(f"Error on Entity Query to get Genes: {e}", "WARNING")
             return None
@@ -164,31 +164,25 @@ class GeneToSNPReport(ReportBase):
         # QUERY 2: Find variants linked to these genes via EntityRelationship
         try:
             # Subquery 1: gene -> variant
-            q1 = (
-                select(
-                    EntityRelationship.entity_1_id.label("gene_entity_id"),
-                    EntityRelationship.entity_2_id.label("variant_entity_id"),
-                    EntityRelationship.relationship_type_id,
-                    EntityRelationship.data_source_id,
-                )
-                .where(
-                    EntityRelationship.entity_1_id.in_(gene_ids),
-                    EntityRelationship.entity_2_group_id == variant_group_id,
-                )
+            q1 = select(
+                EntityRelationship.entity_1_id.label("gene_entity_id"),
+                EntityRelationship.entity_2_id.label("variant_entity_id"),
+                EntityRelationship.relationship_type_id,
+                EntityRelationship.data_source_id,
+            ).where(
+                EntityRelationship.entity_1_id.in_(gene_ids),
+                EntityRelationship.entity_2_group_id == variant_group_id,
             )
 
             # Subquery 2: variant -> gene (Inverse)
-            q2 = (
-                select(
-                    EntityRelationship.entity_2_id.label("gene_entity_id"),
-                    EntityRelationship.entity_1_id.label("variant_entity_id"),
-                    EntityRelationship.relationship_type_id,
-                    EntityRelationship.data_source_id,
-                )
-                .where(
-                    EntityRelationship.entity_2_id.in_(gene_ids),
-                    EntityRelationship.entity_1_group_id == variant_group_id,
-                )
+            q2 = select(
+                EntityRelationship.entity_2_id.label("gene_entity_id"),
+                EntityRelationship.entity_1_id.label("variant_entity_id"),
+                EntityRelationship.relationship_type_id,
+                EntityRelationship.data_source_id,
+            ).where(
+                EntityRelationship.entity_2_id.in_(gene_ids),
+                EntityRelationship.entity_1_group_id == variant_group_id,
             )
 
             # Union of queries
@@ -199,7 +193,9 @@ class GeneToSNPReport(ReportBase):
                 return None
 
         except Exception as e:
-            self.logger.log(f"Error on Entity Relationship to get Variants: {e}", "WARNING")
+            self.logger.log(
+                f"Error on Entity Relationship to get Variants: {e}", "WARNING"
+            )
             return None
 
         # ---------------------------------------------------------------------
@@ -231,17 +227,21 @@ class GeneToSNPReport(ReportBase):
                 .join(vl, vl.variant_id == vm.id)
                 .join(ga, ga.id == vl.assembly_id)
                 .filter(vm.entity_id.in_(variant_entity_ids))
-                .filter(vl.assembly_id.in_(assembly_ids))  # Restringe aos assembly_ids válidos
+                .filter(
+                    vl.assembly_id.in_(assembly_ids)
+                )  # Restringe aos assembly_ids válidos
             )
 
             variant_df = pd.read_sql(variant_query.statement, self.session.bind)
             if variant_df.empty:
-                self.logger.log("No variant metadata found for selected assembly.", "WARNING")
+                self.logger.log(
+                    "No variant metadata found for selected assembly.", "WARNING"
+                )
                 return None
-            
+
         except Exception as e:
             self.logger.log(f"Error Variants Master Data: {e}", "WARNING")
-            return None  
+            return None
 
         # ---------------------------------------------------------------------
         # Prepare Output Report
@@ -254,11 +254,13 @@ class GeneToSNPReport(ReportBase):
                 results_df,
                 left_on="entity_id",
                 right_on="gene_entity_id",
-                how="left"  # garante que todas as linhas de unique_genes_df sejam mantidas
+                how="left",  # garante que todas as linhas de unique_genes_df sejam mantidas
             )
             # Após o merge, adicionar nota para genes sem variants
             results_df["note"] = None
-            results_df.loc[results_df["variant_id"].isna(), "note"] = "No variants found in system"
+            results_df.loc[results_df["variant_id"].isna(), "note"] = (
+                "No variants found in system"
+            )
 
             # 3 - Concat Duplicates Genes
             if not duplicates_df.empty:
@@ -267,40 +269,37 @@ class GeneToSNPReport(ReportBase):
             results_df.drop(
                 columns=[
                     "entity_norm",
-                    "group_id", 
-                    "group_name", 
-                    "has_conflict", 
+                    "group_id",
+                    "group_name",
+                    "has_conflict",
                     "is_active",
                     "variant_entity_id",
                     "gene_entity_id",
                     "relationship_type_id",
                     "data_source_id",
                 ],
-                inplace=True
+                inplace=True,
             )
 
             # Org Resuls
             column_order = [
-                "input_gene",     # Gene buscado
-                "symbol",         # Nome oficial
-                "entity_value",   # Alias correspondente
-                "alias_type",     # Tipo do alias (ex: synonym)
-                "xref_source",    # Fonte do alias
-
-                "entity_id",      # ID interno do gene
-                "variant_id",     # ID da variante
-                "variant_type",   # Tipo da variante (SNP, etc)
-                "chromosome",     # Cromossomo
-                "start_pos",      # Posição inicial
-                "end_pos",        # Posição final
-                "ref",            # Alelo de referência
-                "alt",            # Alelo alternativo
-
-                "accession",      # Accession do assembly
+                "input_gene",  # Gene buscado
+                "symbol",  # Nome oficial
+                "entity_value",  # Alias correspondente
+                "alias_type",  # Tipo do alias (ex: synonym)
+                "xref_source",  # Fonte do alias
+                "entity_id",  # ID interno do gene
+                "variant_id",  # ID da variante
+                "variant_type",  # Tipo da variante (SNP, etc)
+                "chromosome",  # Cromossomo
+                "start_pos",  # Posição inicial
+                "end_pos",  # Posição final
+                "ref",  # Alelo de referência
+                "alt",  # Alelo alternativo
+                "accession",  # Accession do assembly
                 "assembly_name",  # Nome do assembly
-                "quality",        # Qualidade (se houver)
-
-                "note",           # Observação (ex: duplicated, not found)
+                "quality",  # Qualidade (se houver)
+                "note",  # Observação (ex: duplicated, not found)
             ]
 
             rename_dict = {
@@ -334,4 +333,4 @@ class GeneToSNPReport(ReportBase):
 
         except Exception as e:
             self.logger.log(f"Error to prepare results: {e}", "WARNING")
-            return None  
+            return None

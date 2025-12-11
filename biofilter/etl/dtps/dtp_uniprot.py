@@ -412,7 +412,9 @@ class DTP(DTPBase, EntityQueryMixin):
             "up:comment[@type='subcellular location']/up:subcellularLocation/up:location",  # noqa E501
             ns,
         )
-        results = [loc.text.strip() for loc in locs if loc is not None and loc.text]  # noqa E501
+        results = [
+            loc.text.strip() for loc in locs if loc is not None and loc.text
+        ]  # noqa E501
         return results if results else None
 
     def _get_db_ids(self, entry, db_type, ns):
@@ -429,7 +431,9 @@ class DTP(DTPBase, EntityQueryMixin):
 
     def _get_isoform_ids(self, entry, ns):
         isoform_ids = []
-        alt_products = entry.find("up:comment[@type='alternative products']", ns)  # noqa E501
+        alt_products = entry.find(
+            "up:comment[@type='alternative products']", ns
+        )  # noqa E501
         if alt_products is not None:
             for iso in alt_products.findall("up:isoform", ns):
                 iso_id = iso.find("up:id", ns)
@@ -457,8 +461,8 @@ class DTP(DTPBase, EntityQueryMixin):
             seen = set()
             items = []
             for v in value:
-                s = (str(v).strip() if v is not None else "")
-                if not s: 
+                s = str(v).strip() if v is not None else ""
+                if not s:
                     continue
                 if s not in seen:
                     seen.add(s)
@@ -466,7 +470,6 @@ class DTP(DTPBase, EntityQueryMixin):
             return sep.join(items) if items else None
         # já é escalar → str
         return str(value).strip() or None
-
 
     # 📥  ------------------------ 📥
     # 📥  ------ LOAD FASE ------  📥
@@ -587,7 +590,6 @@ class DTP(DTPBase, EntityQueryMixin):
                 #     data_source_id=self.data_source.id,
                 # )
 
-
                 # --- ALIASES STRUCTURE ---
                 # Create a dict of Aliases
                 alias_dict = self.build_alias(row)
@@ -653,7 +655,7 @@ class DTP(DTPBase, EntityQueryMixin):
                 )
                 # TODO: Ajustar os campos para serem TEXT e avitar erros de array
                 location_txt = self._coerce_text(row.get("function"))
-                tissue_txt   = self._coerce_text(row.get("tissue"))
+                tissue_txt = self._coerce_text(row.get("tissue"))
 
                 if not protein_master_obj:
                     protein_master_obj = ProteinMaster(
@@ -662,8 +664,10 @@ class DTP(DTPBase, EntityQueryMixin):
                         # location=row.get("location"),
                         # tissue_expression=row.get("tissue"),
                         location=self.guard_description(location_txt),
-                        tissue_expression= self.guard_description(tissue_txt),
-                        pseudogene_note=self.guard_description(row.get("pseudogene_note")),
+                        tissue_expression=self.guard_description(tissue_txt),
+                        pseudogene_note=self.guard_description(
+                            row.get("pseudogene_note")
+                        ),
                         data_source_id=self.data_source.id,  # noqa E501
                         etl_package_id=self.package.id,
                     )

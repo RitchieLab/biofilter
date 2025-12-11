@@ -185,7 +185,7 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
             records = []
             with gzip.open(input_file, "rt") as f:
                 for line in f:
-                    
+
                     record = {}
                     chrom = None
                     source = None
@@ -305,7 +305,7 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
         insert_cls = self._get_entity_location_insert_for_dialect()
 
         for start in range(0, len(records), chunk_size):
-            chunk = records[start: start + chunk_size]
+            chunk = records[start : start + chunk_size]
 
             stmt = insert_cls.values(chunk)
 
@@ -327,7 +327,7 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
                 )
 
             self.session.execute(stmt)
-        
+
         self.session.flush()
 
         #     result = self.session.execute(stmt)
@@ -416,9 +416,7 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
                 self.data_source.source_system.name,
                 self.data_source.name,
             )
-            processed_file_name = os.path.join(
-                processed_path, "master_data.parquet"
-            )
+            processed_file_name = os.path.join(processed_path, "master_data.parquet")
 
             if not os.path.exists(processed_file_name):
                 msg = f"⚠️ File not found: {processed_file_name}"
@@ -452,9 +450,7 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
                 )
 
             if df.empty:
-                msg = (
-                    "⚠️ All rows were removed after dropping invalid gene_symbol/chromosome."
-                )
+                msg = "⚠️ All rows were removed after dropping invalid gene_symbol/chromosome."
                 self.logger.log(msg, "WARNING")
                 return False, msg
 
@@ -602,11 +598,11 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
                 created += 1
 
             self._upsert_entity_location_dict(
-                    # session=self.session,
-                    records=records,
-                    # data_source_id=self.data_source.id,
-                    # etl_package_id=self.package.id,
-                )
+                # session=self.session,
+                records=records,
+                # data_source_id=self.data_source.id,
+                # etl_package_id=self.package.id,
+            )
 
         except Exception as e:
             self.session.rollback()
@@ -621,9 +617,7 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
             self.create_indexes(self.get_entity_location_index_specs)
             self.db_read_mode()
         except Exception as e:
-            msg = (
-                f"⚠️ Failed to switch DB to read mode or create indexes: {e}"
-            )
+            msg = f"⚠️ Failed to switch DB to read mode or create indexes: {e}"
             self.logger.log(msg, "WARNING")
             return False, msg
 
@@ -633,7 +627,6 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
         )
         self.logger.log(msg, "INFO")
         return True, msg
-
 
         # def load(self, processed_dir=None):
         #     """
@@ -710,7 +703,6 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
         #     msg = f"⚠️  Failed to try read data: {e}"
         #     self.logger.log(msg, "ERROR")
         #     return False, msg  # ⧮ Leaving with ERROR
-
 
         # # SET DB AND DROP INDEXES
         # try:

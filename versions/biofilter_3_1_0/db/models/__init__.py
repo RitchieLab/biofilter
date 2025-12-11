@@ -44,7 +44,7 @@ from .model_go import GOMaster, GORelation
 
 from .model_diseases import DiseaseGroup, DiseaseGroupMembership, DiseaseMaster
 
-from .model_chemicals import ChemicalMaster  #, ChemicalData
+from .model_chemicals import ChemicalMaster  # , ChemicalData
 
 __all__ = [
     # # CONFIGURATION MODELS

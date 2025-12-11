@@ -1,4 +1,5 @@
 from sqlalchemy import text
+
 # import time
 
 
@@ -114,7 +115,8 @@ class DBTuningMixin:
         engine = self.session.bind.dialect.name
         if engine not in ("sqlite", "postgresql"):
             self.logger.log(
-                f"❌ Index creation not supported for engine: {engine}", "WARNING"  # noqa E501
+                f"❌ Index creation not supported for engine: {engine}",
+                "WARNING",  # noqa E501
             )  # noqa E501
             return
 
@@ -137,7 +139,8 @@ class DBTuningMixin:
         engine = self.session.bind.dialect.name
         if engine not in ("sqlite", "postgresql"):
             self.logger.log(
-                f"❌ Index removal not supported for engine: {engine}", "WARNING"  # noqa E501
+                f"❌ Index removal not supported for engine: {engine}",
+                "WARNING",  # noqa E501
             )  # noqa E501
             return
 
@@ -238,7 +241,7 @@ class DBTuningMixin:
             # EntityRelationshipType
             ("entity_relationship_types", ["code"]),
         ]
-    
+
     # Only EntityRelationship Model
     @property
     def get_entity_relationship_index_specs(self):
@@ -303,7 +306,7 @@ class DBTuningMixin:
             ("variant_loci", ["assembly_id", "chromosome", "start_pos"]),
             ("variant_loci", ["variant_id", "assembly_id", "chromosome"]),  # unique
         ]
-    
+
     @property
     def get_variant_gwas_index_specs(self):
         return [
@@ -321,7 +324,6 @@ class DBTuningMixin:
             ("disease_masters", ["mondo_id"]),
             ("disease_masters", ["entity_id"]),
             ("disease_masters", ["data_source_id"]),
-
             # DiseaseGroupMembership
             ("disease_group_memberships", ["disease_id"]),
             ("disease_group_memberships", ["group_id"]),
@@ -336,4 +338,3 @@ class DBTuningMixin:
             ("chemical_masters", ["entity_id"]),
             # ("chemical_data", ["chemical_id"]),
         ]
-

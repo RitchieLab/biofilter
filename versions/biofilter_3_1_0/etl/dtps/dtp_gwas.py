@@ -9,9 +9,7 @@ from biofilter.utils.file_hash import compute_file_hash
 from biofilter.etl.mixins.entity_query_mixin import EntityQueryMixin
 from biofilter.etl.conflict_manager import ConflictManager
 from biofilter.etl.mixins.base_dtp import DTPBase
-from biofilter.db.models import (
-    VariantGWAS
-)  # noqa E501
+from biofilter.db.models import VariantGWAS  # noqa E501
 
 
 class DTP(DTPBase, EntityQueryMixin):
@@ -60,7 +58,7 @@ class DTP(DTPBase, EntityQueryMixin):
                 "gwas-catalog-associations.tsv",
                 "gwas-efo-trait-mappings.tsv",
                 # There are other files to use in future.
-                ]  # noqa E501
+            ]  # noqa E501
 
             landing_path = os.path.join(
                 raw_dir,
@@ -104,8 +102,7 @@ class DTP(DTPBase, EntityQueryMixin):
     # ⚙️  ------ TRANSFORM FASE ------  ⚙️
     # ⚙️  ----------------------------  ⚙️
     def transform(self, raw_dir: str, processed_dir: str):
-        """
-        """
+        """ """
 
         msg = f"⚙️ Starting transform of {self.data_source.name}..."
         self.logger.log(msg, "INFO")
@@ -145,7 +142,9 @@ class DTP(DTPBase, EntityQueryMixin):
                 "OR or BETA": str,
             }
 
-            gwas_catalog = pd.read_csv(input_file, sep="\t", dtype=dtype_map, low_memory=False)
+            gwas_catalog = pd.read_csv(
+                input_file, sep="\t", dtype=dtype_map, low_memory=False
+            )
 
             # --- Normalize numeric fields ---
             gwas_catalog["CHR_POS"] = (
@@ -163,7 +162,9 @@ class DTP(DTPBase, EntityQueryMixin):
             )
 
             # P-VALUE em float (quando possível)
-            gwas_catalog["P-VALUE"] = pd.to_numeric(gwas_catalog["P-VALUE"], errors="coerce")
+            gwas_catalog["P-VALUE"] = pd.to_numeric(
+                gwas_catalog["P-VALUE"], errors="coerce"
+            )
             # gwas_catalog = gwas_catalog.rename(columns={"..": "..", "..": ".."})
 
             # --- Mapping Traits ---
@@ -189,8 +190,12 @@ class DTP(DTPBase, EntityQueryMixin):
                     return ""
                 return uri.split("/")[-1].replace("_", ":").upper()
 
-            gwas_trait_mapping["efo_id"] = gwas_trait_mapping["EFO URI"].map(normalize_uri)
-            gwas_trait_mapping["parent_id"] = gwas_trait_mapping["Parent URI"].map(normalize_uri)
+            gwas_trait_mapping["efo_id"] = gwas_trait_mapping["EFO URI"].map(
+                normalize_uri
+            )
+            gwas_trait_mapping["parent_id"] = gwas_trait_mapping["Parent URI"].map(
+                normalize_uri
+            )
 
             gwas_trait_mapping = gwas_trait_mapping[
                 ["Disease trait", "EFO term", "Parent term", "efo_id", "parent_id"]
@@ -205,22 +210,23 @@ class DTP(DTPBase, EntityQueryMixin):
                 "efo_id": lambda x: list(set(x.dropna().astype(str))),
                 "parent_id": lambda x: list(set(x.dropna().astype(str))),
             }
-            gwas_trait_mapping_grouped = (
-                gwas_trait_mapping.groupby("Disease trait", as_index=False)
-                .agg(agg_cols)
-            )
+            gwas_trait_mapping_grouped = gwas_trait_mapping.groupby(
+                "Disease trait", as_index=False
+            ).agg(agg_cols)
 
             # --- Merge with GWAS Catalog ---
             merged = gwas_catalog.merge(
                 gwas_trait_mapping_grouped,
                 left_on="DISEASE/TRAIT",
                 right_on="Disease trait",
-                how="left"   # keep all GWAS Catalog rows
+                how="left",  # keep all GWAS Catalog rows
             )
 
             # Garantir que colunas ausentes virem listas vazias
             for col in ["EFO term", "Parent term", "efo_id", "parent_id"]:
-                merged[col] = merged[col].apply(lambda x: x if isinstance(x, list) else [])
+                merged[col] = merged[col].apply(
+                    lambda x: x if isinstance(x, list) else []
+                )
 
             # # Keep only Columns to load
             merged = merged[
@@ -274,12 +280,12 @@ class DTP(DTPBase, EntityQueryMixin):
                 "efo_id": "mapped_trait_id",
                 "Parent term": "parent_trait",
                 "parent_id": "parent_trait_id",
-                "CHR_ID":  "chr_id",
+                "CHR_ID": "chr_id",
                 "CHR_POS": "chr_pos",
                 "REPORTED GENE(S)": "reported_gene",
-                "MAPPED_GENE":  "mapped_gene",
+                "MAPPED_GENE": "mapped_gene",
                 "SNPS": "snp_id",
-                "STRONGEST SNP-RISK ALLELE":  "snp_risk_allele",
+                "STRONGEST SNP-RISK ALLELE": "snp_risk_allele",
                 "RISK ALLELE FREQUENCY": "risk_allele_frequency",
                 "CONTEXT": "context",
                 "INTERGENIC": "intergenic",
@@ -366,7 +372,6 @@ class DTP(DTPBase, EntityQueryMixin):
             self.logger.log(msg, "ERROR")
             return False, msg
 
-
         # def safe_float(val):
         #     """
         #     Convert value to float if possible, else None.
@@ -418,13 +423,20 @@ class DTP(DTPBase, EntityQueryMixin):
             return s if s and s not in SENTINELS else None
 
         # Campos multivalorados -> string única (se existirem)
-        for col in ["mapped_trait", "mapped_trait_id", "parent_trait", "parent_trait_id"]:
+        for col in [
+            "mapped_trait",
+            "mapped_trait_id",
+            "parent_trait",
+            "parent_trait_id",
+        ]:
             if col in df.columns:
                 df[col] = df[col].apply(flatten_list)
 
         # Numéricos: converta com coercion (''/NA -> NaN)
         if "risk_allele_frequency" in df.columns:
-            df["risk_allele_frequency"] = pd.to_numeric(df["risk_allele_frequency"], errors="coerce")
+            df["risk_allele_frequency"] = pd.to_numeric(
+                df["risk_allele_frequency"], errors="coerce"
+            )
 
         if "p_value" in df.columns:
             df["p_value"] = pd.to_numeric(df["p_value"], errors="coerce")
@@ -434,7 +446,9 @@ class DTP(DTPBase, EntityQueryMixin):
 
         # chr_pos é INTEGER no modelo
         if "chr_pos" in df.columns:
-            df["chr_pos"] = pd.to_numeric(df["chr_pos"], errors="coerce").astype("Int64")  # pandas nullable int
+            df["chr_pos"] = pd.to_numeric(df["chr_pos"], errors="coerce").astype(
+                "Int64"
+            )  # pandas nullable int
 
         # chr_id é TEXT; normalize vazios para None
         if "chr_id" in df.columns:
@@ -450,10 +464,24 @@ class DTP(DTPBase, EntityQueryMixin):
 
         # Campos textuais comuns: normalize vazios para None (sem quebrar numéricos)
         text_cols = [
-            "pubmed_id","raw_trait","mapped_trait","mapped_trait_id","parent_trait",
-            "parent_trait_id","reported_gene","mapped_gene","snp_id","snp_risk_allele",
-            "context","intergenic","ci_text","initial_sample_size","replication_sample_size",
-            "platform","cnv","notes"
+            "pubmed_id",
+            "raw_trait",
+            "mapped_trait",
+            "mapped_trait_id",
+            "parent_trait",
+            "parent_trait_id",
+            "reported_gene",
+            "mapped_gene",
+            "snp_id",
+            "snp_risk_allele",
+            "context",
+            "intergenic",
+            "ci_text",
+            "initial_sample_size",
+            "replication_sample_size",
+            "platform",
+            "cnv",
+            "notes",
         ]
         for col in text_cols:
             if col in df.columns:
@@ -473,17 +501,17 @@ class DTP(DTPBase, EntityQueryMixin):
             self.session.execute(text("DELETE FROM variant_gwas"))
             self.session.commit()
 
-        #     # 2. Prepare bulk objects
-        #     records = df.to_dict(orient="records")
-        #     objs = [VariantGWAS(**r) for r in records]
+            #     # 2. Prepare bulk objects
+            #     records = df.to_dict(orient="records")
+            #     objs = [VariantGWAS(**r) for r in records]
 
-        #     # 3. Bulk insert
-        #     self.session.bulk_save_objects(objs)
-        #     self.session.commit()
-        #     total_records = len(objs)
+            #     # 3. Bulk insert
+            #     self.session.bulk_save_objects(objs)
+            #     self.session.commit()
+            #     total_records = len(objs)
 
             records = df.to_dict(orient="records")
-            
+
             # NOTE: Keep only 255 per record (Rethink next versions)
             for r in records:
                 for k, v in r.items():

@@ -1,4 +1,3 @@
-
 import pandas as pd
 from biofilter.report.reports.base_report import ReportBase
 from sqlalchemy.orm import aliased
@@ -20,10 +19,9 @@ class PositionToGeneReport(ReportBase):
     group = "Annotation"
     name = "position_to_gene"
     description = (
-    "Given a genomic position (chromosome, position), "
-    "returns matching variants with allelic and gene information."
+        "Given a genomic position (chromosome, position), "
+        "returns matching variants with allelic and gene information."
     )
-
 
     @classmethod
     def explain(cls) -> str:
@@ -62,12 +60,7 @@ class PositionToGeneReport(ReportBase):
         """
         Returns a sample input list of chromosome-position pairs.
         """
-        return [
-            ("Y", 19568371),
-            ("Y", 19568761),
-            ("1", 258)
-        ]
-    
+        return [("Y", 19568371), ("Y", 19568761), ("1", 258)]
 
     def run(self):
         # --- Step 1: Read Input ---
@@ -123,7 +116,9 @@ class PositionToGeneReport(ReportBase):
                     )
 
             if not conditions:
-                self.logger.log("No conditions could be built from input positions.", "WARNING")
+                self.logger.log(
+                    "No conditions could be built from input positions.", "WARNING"
+                )
                 return None
 
             variant_query = (
@@ -157,29 +152,23 @@ class PositionToGeneReport(ReportBase):
             variant_entity_ids = variant_df["variant_entity_id"].unique().tolist()
 
             # Direct and inverse relationships
-            q1 = (
-                select(
-                    EntityRelationship.entity_1_id.label("variant_entity_id"),
-                    EntityRelationship.entity_2_id.label("gene_entity_id"),
-                    EntityRelationship.relationship_type_id,
-                    EntityRelationship.data_source_id,
-                )
-                .where(
-                    EntityRelationship.entity_1_id.in_(variant_entity_ids),
-                    EntityRelationship.entity_2_group_id == gene_group_id,
-                )
+            q1 = select(
+                EntityRelationship.entity_1_id.label("variant_entity_id"),
+                EntityRelationship.entity_2_id.label("gene_entity_id"),
+                EntityRelationship.relationship_type_id,
+                EntityRelationship.data_source_id,
+            ).where(
+                EntityRelationship.entity_1_id.in_(variant_entity_ids),
+                EntityRelationship.entity_2_group_id == gene_group_id,
             )
-            q2 = (
-                select(
-                    EntityRelationship.entity_2_id.label("variant_entity_id"),
-                    EntityRelationship.entity_1_id.label("gene_entity_id"),
-                    EntityRelationship.relationship_type_id,
-                    EntityRelationship.data_source_id,
-                )
-                .where(
-                    EntityRelationship.entity_2_id.in_(variant_entity_ids),
-                    EntityRelationship.entity_1_group_id == gene_group_id,
-                )
+            q2 = select(
+                EntityRelationship.entity_2_id.label("variant_entity_id"),
+                EntityRelationship.entity_1_id.label("gene_entity_id"),
+                EntityRelationship.relationship_type_id,
+                EntityRelationship.data_source_id,
+            ).where(
+                EntityRelationship.entity_2_id.in_(variant_entity_ids),
+                EntityRelationship.entity_1_group_id == gene_group_id,
             )
 
             rel_df = pd.read_sql(union_all(q1, q2), self.session.bind)
@@ -220,7 +209,9 @@ class PositionToGeneReport(ReportBase):
             final_df = variant_df.merge(merged, on="variant_entity_id", how="left")
 
             final_df["position_input"] = (
-                final_df["chromosome"].astype(str) + ":" + final_df["start_pos"].astype(str)
+                final_df["chromosome"].astype(str)
+                + ":"
+                + final_df["start_pos"].astype(str)
             )
 
             column_order = [

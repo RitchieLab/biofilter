@@ -35,7 +35,6 @@ class DTP(DTPBase, EntityQueryMixin):
         self.compatible_schema_min = "3.1.0"
         self.compatible_schema_max = "4.0.0"
 
-
     # ⬇️  --------------------------  ⬇️
     # ⬇️  ------ EXTRACT FASE ------  ⬇️
     # ⬇️  --------------------------  ⬇️
@@ -85,8 +84,7 @@ class DTP(DTPBase, EntityQueryMixin):
 
         # --- Prepare maps ---
         group_map = {
-            g.name.lower(): g.id
-            for g in self.session.query(EntityGroup).all()
+            g.name.lower(): g.id for g in self.session.query(EntityGroup).all()
         }
         rel_type_map = {
             rt.code.lower(): rt.id

@@ -4,6 +4,7 @@ import os
 import re
 import ast
 
+
 class ReportBase:
     name: str = "unnamed_report"
     description: str = "No description provided"
@@ -26,7 +27,6 @@ class ReportBase:
     @classmethod
     def example_input(cls) -> list[str] | None:
         return None
-
 
     def run(self):
         raise NotImplementedError("Subclasses must implement `run()`.")
@@ -59,7 +59,6 @@ class ReportBase:
             raise FileNotFoundError(f"List file not found: {input_data}")
 
         raise ValueError(f"{param_name} must be a list or a path to a text file.")
-    
 
     # New Functions
     def resolve_position_list(self, input_data_raw):
@@ -74,7 +73,9 @@ class ReportBase:
         elif isinstance(input_data_raw, list):
             entries = input_data_raw
         else:
-            self.logger.log("Invalid input_data format. Expected list or file path.", "ERROR")
+            self.logger.log(
+                "Invalid input_data format. Expected list or file path.", "ERROR"
+            )
             return []
 
         positions = []
@@ -122,7 +123,6 @@ class ReportBase:
 
     """
 
-
     def resolve_assembly(self, assembly_input: str) -> tuple[int, dict]:
         """
         Normalize and resolve the assembly input to a valid assembly_id from the GenomeAssembly table.
@@ -134,16 +134,17 @@ class ReportBase:
             Dict of Chrom : accession_id
         """
         from biofilter.db.models import GenomeAssembly
+
         try:
             if "38" in assembly_input:
-                label = "GRCh38.p14"    # TODO: Passar isso para configuracoes
+                label = "GRCh38.p14"  # TODO: Passar isso para configuracoes
             elif "37" in assembly_input:
-                label = "GRCh37.p13"    # TODO: Passar isso para configuracoes
+                label = "GRCh37.p13"  # TODO: Passar isso para configuracoes
             else:
                 # raise ValueError(f"Unrecognized assembly input: {assembly_input}")
                 label = "GRCh38.p14"  # TODO: This will be default
         except Exception as e:
-            label = "GRCh38.p14" 
+            label = "GRCh38.p14"
 
         # Map chromosome → assembly_id
         rows = (
@@ -153,6 +154,7 @@ class ReportBase:
         )
         chrom_to_assembly_id = {row[0]: row[1] for row in rows}
         return chrom_to_assembly_id
+
     # def resolve_assembly(self, assembly_input: str, return_mapper: bool = False) -> int | tuple[int, dict]:
     #     """
     #     Normalize and resolve the assembly input to a valid assembly_id from the GenomeAssembly table.

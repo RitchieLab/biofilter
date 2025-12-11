@@ -50,14 +50,13 @@ if __name__ == "__main__":
 
     # print(result)
 
-
     # ----= POSITIONS TO GENES =----
     # ------------------------------
 
     # Run Report
     result = bf.report.run_report(
         "report_position_to_gene",
-        assembly='38',
+        assembly="38",
         input_data=[
             ("Y", 19568371),
             ("Y", 19000068371),

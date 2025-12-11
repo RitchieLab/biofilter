@@ -86,7 +86,7 @@ class VariantLocus(Base):
         ForeignKey("variant_masters.id", ondelete="CASCADE"),
         nullable=False,  # noqa E501
     )
-    
+
     variant = relationship(
         "VariantMaster",
         back_populates="loci",
@@ -100,7 +100,7 @@ class VariantLocus(Base):
     )  # noqa E501 Trocar
     entity = relationship("Entity", passive_deletes=True)
 
-    build = Column(String(10), nullable=False) # Here add a build alias as 37, 38
+    build = Column(String(10), nullable=False)  # Here add a build alias as 37, 38
 
     assembly_id = Column(
         Integer, ForeignKey("genome_assemblies.id"), nullable=False
@@ -153,10 +153,10 @@ class VariantGWAS(Base):
     # link = Column(String(500), nullable=True)
 
     # Trait / phenotype mapping
-    raw_trait = Column(String(255), nullable=True)        # "DISEASE/TRAIT" field
-    mapped_trait = Column(String(255), nullable=True)     # "EFO term"
+    raw_trait = Column(String(255), nullable=True)  # "DISEASE/TRAIT" field
+    mapped_trait = Column(String(255), nullable=True)  # "EFO term"
     mapped_trait_id = Column(String(255), nullable=True)  # "EFO/MONDO ID"
-    parent_trait = Column(String(255), nullable=True)     # Parent term
+    parent_trait = Column(String(255), nullable=True)  # Parent term
     parent_trait_id = Column(String(255), nullable=True)  # Parent URI ID
 
     # Variant info

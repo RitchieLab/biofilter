@@ -19,18 +19,18 @@ from tqdm import tqdm
 @dataclass
 class ExportConfig:
     db_uri: str
-    table: Optional[str] = None           # use table OR sql
-    sql: Optional[str] = None             # SELECT ... (opcional)
-    columns: Optional[List[str]] = None   # restringe colunas
-    where: Optional[str] = None           # WHERE extra (sem 'WHERE')
-    order_by: Optional[str] = None        # ORDER BY cols
+    table: Optional[str] = None  # use table OR sql
+    sql: Optional[str] = None  # SELECT ... (opcional)
+    columns: Optional[List[str]] = None  # restringe colunas
+    where: Optional[str] = None  # WHERE extra (sem 'WHERE')
+    order_by: Optional[str] = None  # ORDER BY cols
     chunksize: int = 500_000
     out_dir: str = "./export_parquet"
     partition_by: Optional[List[str]] = None  # ex.: ["assembly_id","chromosome"]
-    existing: str = "overwrite_or_ignore"     # or "overwrite_or_ignore"
-    compression: str = "zstd"                 # parquet compression
-    row_group_size: int = 128 * 1024          # ~128k rows por row-group (ajuste)
-    log_every: int = 1                        # imprime a cada N chunks
+    existing: str = "overwrite_or_ignore"  # or "overwrite_or_ignore"
+    compression: str = "zstd"  # parquet compression
+    row_group_size: int = 128 * 1024  # ~128k rows por row-group (ajuste)
+    log_every: int = 1  # imprime a cada N chunks
 
 
 def _mk_logger() -> logging.Logger:
@@ -106,18 +106,28 @@ def export_to_parquet(cfg: ExportConfig):
 
             total_rows += len(df)
             if i % cfg.log_every == 0:
-                logger.info("Chunk %d - rows written: %d (total: %d)", i, len(df), total_rows)
+                logger.info(
+                    "Chunk %d - rows written: %d (total: %d)", i, len(df), total_rows
+                )
 
     elapsed = time.time() - t0
-    logger.info("Export finished: %d rows in %.1fs (%.1f K rows/s)",
-                total_rows, elapsed, (total_rows / max(elapsed, 1)) / 1e3)
+    logger.info(
+        "Export finished: %d rows in %.1fs (%.1f K rows/s)",
+        total_rows,
+        elapsed,
+        (total_rows / max(elapsed, 1)) / 1e3,
+    )
 
 
 def cli():
     p = argparse.ArgumentParser(
         description="Biofilter3R Parquet Exporter (generic, partition-aware)"
     )
-    p.add_argument("--db-uri", required=True, help="SQLAlchemy URI (e.g., postgresql+psycopg2://user:pass@host:5432/db)")
+    p.add_argument(
+        "--db-uri",
+        required=True,
+        help="SQLAlchemy URI (e.g., postgresql+psycopg2://user:pass@host:5432/db)",
+    )
     src = p.add_mutually_exclusive_group(required=True)
     src.add_argument("--table", help="Table name (schema.table or table)")
     src.add_argument("--sql", help="Custom SELECT (without trailing semicolon)")
@@ -128,9 +138,11 @@ def cli():
     p.add_argument("--chunksize", type=int, default=500_000)
     p.add_argument("--out-dir", required=True)
     p.add_argument("--partition-by", help="Comma-separated list of partition columns")
-    p.add_argument("--existing", default="overwrite_or_ignore", choices=["overwrite_or_ignore"])
+    p.add_argument(
+        "--existing", default="overwrite_or_ignore", choices=["overwrite_or_ignore"]
+    )
     p.add_argument("--compression", default="zstd")
-    p.add_argument("--row-group-size", type=int, default=128*1024)
+    p.add_argument("--row-group-size", type=int, default=128 * 1024)
     p.add_argument("--log-every", type=int, default=1)
 
     args = p.parse_args()
@@ -144,7 +156,11 @@ def cli():
         order_by=args.order_by,
         chunksize=args.chunksize,
         out_dir=args.out_dir,
-        partition_by=[c.strip() for c in args.partition_by.split(",")] if args.partition_by else None,
+        partition_by=(
+            [c.strip() for c in args.partition_by.split(",")]
+            if args.partition_by
+            else None
+        ),
         existing=args.existing,
         compression=args.compression,
         row_group_size=args.row_group_size,

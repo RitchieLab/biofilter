@@ -8,7 +8,7 @@ db_uri = "sqlite:///dev_biofilter.db"
 data_sources_to_process = [
     # Genes
     # -----
-    # "hgnc",
+    "hgnc",
     # "gene_ncbi",
     # "ensembl",
     #
@@ -52,7 +52,7 @@ data_sources_to_process = [
     # "dbsnp_chr21",
     # "dbsnp_chr22",
     # "dbsnp_chrx",
-    "dbsnp_chry",
+    # "dbsnp_chry",
     # "dbsnp_chrmt",
     # "gwas",
     #
@@ -72,7 +72,6 @@ data_sources_to_process = [
     # CHEMICAL
     # --------
     # "chebi",
-
 ]
 
 run_steps = [
@@ -123,9 +122,7 @@ if __name__ == "__main__":
             print(msg)
 
     end_time = time.time() - start_total
-    msg = str(
-        f"job Time Total: {end_time:.2f}s"  # noqa E501
-    )  # noqa E501
+    msg = str(f"job Time Total: {end_time:.2f}s")  # noqa E501  # noqa E501
     print(msg)
 
     print("✅ All ETL tasks finished.")

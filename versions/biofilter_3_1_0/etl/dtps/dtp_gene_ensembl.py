@@ -280,7 +280,8 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
             removed = initial_rows - len(df)
             if removed > 0:
                 self.logger.log(
-                    f"ℹ️ Dropped {removed} rows with missing gene_symbol", "DEBUG"  # noqa E501
+                    f"ℹ️ Dropped {removed} rows with missing gene_symbol",
+                    "DEBUG",  # noqa E501
                 )  # noqa E501
 
             if df.empty:

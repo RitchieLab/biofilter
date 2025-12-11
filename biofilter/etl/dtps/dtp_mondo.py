@@ -14,7 +14,7 @@ from biofilter.db.models import (
     OmicStatus,
     DiseaseGroup,
     DiseaseGroupMembership,
-    DiseaseMaster
+    DiseaseMaster,
 )  # noqa E501
 
 
@@ -95,8 +95,6 @@ class DTP(DTPBase, EntityQueryMixin):
             self.logger.log(msg, "ERROR")
             return False, msg, None
 
-
-
     def _normalize_mondo_id(self, node_id: str) -> str:
         """
         Convert MONDO IRIs to compact form (MONDO:0000722).
@@ -106,7 +104,6 @@ class DTP(DTPBase, EntityQueryMixin):
         if node_id.startswith("http://purl.obolibrary.org/obo/MONDO_"):
             return node_id.replace("http://purl.obolibrary.org/obo/MONDO_", "MONDO:")
         return node_id  # keep as-is if already compact or different ontology
-
 
     # def _normalize_id(self, uri: str):
     #     """
@@ -173,7 +170,6 @@ class DTP(DTPBase, EntityQueryMixin):
 
         return None, None, None
 
-
     def _map_entity_group(self, prefix: str):
         """
         Map ontology prefix to Biofilter3R entity group.
@@ -190,7 +186,6 @@ class DTP(DTPBase, EntityQueryMixin):
         }
         return mapping.get(prefix.upper(), "Unknown")
 
-
     def _map_predicate(self, pred_uri: str):
         """
         Map predicate URI to simplified relation type.
@@ -204,7 +199,6 @@ class DTP(DTPBase, EntityQueryMixin):
         }
         return mapping.get(pred_uri, pred_uri)  # fallback = raw
 
-
     def _transform_edges(self, mondo, output_path):
         """
         Extract and normalize MONDO edges into CSV for Biofilter3R.
@@ -214,11 +208,20 @@ class DTP(DTPBase, EntityQueryMixin):
 
         with open(rel_file, "w", newline="") as rf:
             writer = csv.writer(rf)
-            writer.writerow([
-                "entity1_id", "entity1_group", "entity1_prefix", "entity1_alias",
-                "entity2_id", "entity2_group", "entity2_prefix", "entity2_alias",
-                "relation_type", "data_source"
-            ])
+            writer.writerow(
+                [
+                    "entity1_id",
+                    "entity1_group",
+                    "entity1_prefix",
+                    "entity1_alias",
+                    "entity2_id",
+                    "entity2_group",
+                    "entity2_prefix",
+                    "entity2_alias",
+                    "relation_type",
+                    "data_source",
+                ]
+            )
 
             for e in edges:
                 subj = e.get("sub")
@@ -238,11 +241,20 @@ class DTP(DTPBase, EntityQueryMixin):
                 group2 = self._map_entity_group(prefix2)
                 relation_type = self._map_predicate(pred)
 
-                writer.writerow([
-                    code1, group1, prefix1, alias1,
-                    code2, group2, prefix2, alias2,
-                    relation_type, "MONDO"
-                ])
+                writer.writerow(
+                    [
+                        code1,
+                        group1,
+                        prefix1,
+                        alias1,
+                        code2,
+                        group2,
+                        prefix2,
+                        alias2,
+                        relation_type,
+                        "MONDO",
+                    ]
+                )
 
     # ⚙️  ----------------------------  ⚙️
     # ⚙️  ------ TRANSFORM FASE ------  ⚙️
@@ -303,23 +315,27 @@ class DTP(DTPBase, EntityQueryMixin):
                     if "definition" in n.get("meta", {}):
                         description = n["meta"]["definition"].get("val")
 
-                    synonyms = [s.get("val") for s in n.get("meta", {}).get("synonyms", [])]
+                    synonyms = [
+                        s.get("val") for s in n.get("meta", {}).get("synonyms", [])
+                    ]
                     xrefs = [x.get("val") for x in n.get("meta", {}).get("xrefs", [])]
                     subsets = [
                         s.replace("http://purl.obolibrary.org/obo/mondo#", "")
                         for s in n.get("meta", {}).get("subsets", [])
                     ]
 
-                    master_records.append({
-                        "mondo_id": node_id,
-                        "label": n.get("lbl"),
-                        "description": description,
-                        "iri": n.get("iri"),
-                        "is_obsolete": n.get("meta", {}).get("deprecated", False),
-                        "synonyms": synonyms,
-                        "xrefs": xrefs,
-                        "subsets": subsets,
-                    })
+                    master_records.append(
+                        {
+                            "mondo_id": node_id,
+                            "label": n.get("lbl"),
+                            "description": description,
+                            "iri": n.get("iri"),
+                            "is_obsolete": n.get("meta", {}).get("deprecated", False),
+                            "synonyms": synonyms,
+                            "xrefs": xrefs,
+                            "subsets": subsets,
+                        }
+                    )
             except Exception as e:
                 print(e)
 
@@ -341,23 +357,29 @@ class DTP(DTPBase, EntityQueryMixin):
                 group2 = self._map_entity_group(prefix2)
                 relation_type = self._map_predicate(pred)
 
-                rel_records.append({
-                    # "entity1_id": code1,
-                    "term1_group": group1,
-                    "term1_prefix": prefix1,
-                    "term1_code": alias1,
-                    # "entity2_id": code2,
-                    "term2_group": group2,
-                    "term2_prefix": prefix2,
-                    "term2_code": alias2,
-                    "relation_type": relation_type,
-                })
+                rel_records.append(
+                    {
+                        # "entity1_id": code1,
+                        "term1_group": group1,
+                        "term1_prefix": prefix1,
+                        "term1_code": alias1,
+                        # "entity2_id": code2,
+                        "term2_group": group2,
+                        "term2_prefix": prefix2,
+                        "term2_code": alias2,
+                        "relation_type": relation_type,
+                    }
+                )
 
             df_rels = pd.DataFrame(rel_records)
 
             # Save both
-            df_master.to_parquet(output_path / "master_data.parquet", index=False)  # noqa E501
-            df_rels.to_parquet(output_path / "relationship_data.parquet", index=False)  # noqa E501
+            df_master.to_parquet(
+                output_path / "master_data.parquet", index=False
+            )  # noqa E501
+            df_rels.to_parquet(
+                output_path / "relationship_data.parquet", index=False
+            )  # noqa E501
 
             if self.debug_mode:
                 df_master.to_csv(output_path / "master_data.csv", index=False)
@@ -564,20 +586,24 @@ class DTP(DTPBase, EntityQueryMixin):
                             prefix, code = None, x
 
                         if prefix and code:
-                            not_primary_alias.append({
-                                "alias_value": code,
-                                "alias_type": "code",
-                                "xref_source": prefix,
-                                "alias_norm": code.lower(),
-                                "is_primary": False,
-                            })
-                
+                            not_primary_alias.append(
+                                {
+                                    "alias_value": code,
+                                    "alias_type": "code",
+                                    "xref_source": prefix,
+                                    "alias_norm": code.lower(),
+                                    "is_primary": False,
+                                }
+                            )
+
                 # Drop Alias Invalids
                 # not_primary_alias = [alias for alias in not_primary_alias if alias.get("xref_source") != "ICD9"]
 
                 # --- Determine OmicStatus ---
                 omic_status_id = (
-                    status_map["deactive"].id if row.get("is_obsolete") else status_map["active"].id
+                    status_map["deactive"].id
+                    if row.get("is_obsolete")
+                    else status_map["active"].id
                 )
                 is_active_entity = False if row.get("is_obsolete") else True
 
@@ -606,7 +632,9 @@ class DTP(DTPBase, EntityQueryMixin):
                 # --- Disease Master ---
                 disease_master_obj = (
                     self.session.query(DiseaseMaster)
-                    .filter_by(disease_id=disease_master, data_source_id=self.data_source.id)
+                    .filter_by(
+                        disease_id=disease_master, data_source_id=self.data_source.id
+                    )
                     .first()
                 )
 
@@ -637,7 +665,9 @@ class DTP(DTPBase, EntityQueryMixin):
                     if group_id:
                         link = (
                             self.session.query(DiseaseGroupMembership)
-                            .filter_by(disease_id=disease_master_obj.id, group_id=group_id)
+                            .filter_by(
+                                disease_id=disease_master_obj.id, group_id=group_id
+                            )
                             .first()
                         )
                         if not link:

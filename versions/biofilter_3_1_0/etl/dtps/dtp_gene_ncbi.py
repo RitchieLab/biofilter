@@ -557,13 +557,15 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
                     location_list = []
 
                 for region_label in location_list:
-                    region_instance, status = self.get_or_create_genomic_region(  # noqa: E501
-                        label=region_label,
-                        chromosome=chromosome,
-                        start=start,
-                        end=end,
-                        data_source_id=self.data_source.id,
-                        package_id=self.package.id,
+                    region_instance, status = (
+                        self.get_or_create_genomic_region(  # noqa: E501
+                            label=region_label,
+                            chromosome=chromosome,
+                            start=start,
+                            end=end,
+                            data_source_id=self.data_source.id,
+                            package_id=self.package.id,
+                        )
                     )  # noqa: E501
                     if not status:
                         msg = f"⚠️  Error on Region to: {gene_master}"

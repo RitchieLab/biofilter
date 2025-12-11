@@ -18,8 +18,8 @@ class DTPBase(DBTuningMixin):
     TRUNCATE_MODE_255: bool = True  # set False after 3.2.0 schema TEXT migration
 
     # Central limits used only when TRUNCATE_MODE_255 == True
-    MAXLEN_ALIAS: int = 255          # alias_value / alias_norm / free-text aliases
-    MAXLEN_DESCRIPTION: int = 255    # generic descriptions (Pfam, GO, UniProt, etc.)
+    MAXLEN_ALIAS: int = 255  # alias_value / alias_norm / free-text aliases
+    MAXLEN_DESCRIPTION: int = 255  # generic descriptions (Pfam, GO, UniProt, etc.)
 
     def __init__(self, *args, **kwargs):
         # ...
@@ -45,7 +45,9 @@ class DTPBase(DBTuningMixin):
             self.trunc_metrics = {}
         self.trunc_metrics[field] = self.trunc_metrics.get(field, 0) + 1
 
-    def safe_truncate(self, val: Optional[str], maxlen: int, field: str) -> Optional[str]:
+    def safe_truncate(
+        self, val: Optional[str], maxlen: int, field: str
+    ) -> Optional[str]:
         """
         Truncates `val` to `maxlen` only when TRUNCATE_MODE_255 is True.
         Counts truncations in self.trunc_metrics.
@@ -85,8 +87,6 @@ class DTPBase(DBTuningMixin):
         # any other common epilogue
 
     # ---FIX END
-
-
 
     def http_download(self, url: str, landing_dir: str) -> Path:
         filename = os.path.basename(url)

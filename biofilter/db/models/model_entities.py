@@ -282,9 +282,7 @@ class EntityRelationship(Base):
         index=True,
     )
     entity_1_group = relationship(
-        "EntityGroup",
-        foreign_keys=[entity_1_group_id],
-        passive_deletes=True
+        "EntityGroup", foreign_keys=[entity_1_group_id], passive_deletes=True
     )
 
     entity_2_id = Column(
@@ -305,9 +303,7 @@ class EntityRelationship(Base):
         index=True,
     )
     entity_2_group = relationship(
-        "EntityGroup",
-        foreign_keys=[entity_2_group_id],
-        passive_deletes=True
+        "EntityGroup", foreign_keys=[entity_2_group_id], passive_deletes=True
     )
 
     relationship_type_id = Column(

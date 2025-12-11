@@ -74,10 +74,14 @@ class DTP(DTPBase, EntityQueryMixin):
 
             def _infer_extension_from_headers(headers: dict) -> str:
                 ctype = headers.get("Content-Type", "").lower()
-                if "text/csv" in ctype: return ".csv"
-                if "tsv" in ctype: return ".tsv"
-                if "json" in ctype: return ".json"
-                if "text/plain" in ctype: return ".txt"
+                if "text/csv" in ctype:
+                    return ".csv"
+                if "tsv" in ctype:
+                    return ".tsv"
+                if "json" in ctype:
+                    return ".json"
+                if "text/plain" in ctype:
+                    return ".txt"
                 return ""
 
             def _filename_from_content_disposition(headers: dict) -> str | None:
@@ -85,11 +89,19 @@ class DTP(DTPBase, EntityQueryMixin):
                 m = re.search(r'filename\s*=\s*"([^"]+)"', cd)
                 return m.group(1) if m else None
 
-            def _safe_download(url: str, out_dir: str, max_retries: int = 3, backoff_sec: float = 1.5) -> str:
+            def _safe_download(
+                url: str, out_dir: str, max_retries: int = 3, backoff_sec: float = 1.5
+            ) -> str:
                 last_exc = None
                 for attempt in range(1, max_retries + 1):
                     try:
-                        r = requests.get(url, stream=True, timeout=90, headers=HEADERS, allow_redirects=True)
+                        r = requests.get(
+                            url,
+                            stream=True,
+                            timeout=90,
+                            headers=HEADERS,
+                            allow_redirects=True,
+                        )
                         r.raise_for_status()
 
                         # Prefer server-provided filename; fallback = last path segment + inferred ext
@@ -176,7 +188,9 @@ class DTP(DTPBase, EntityQueryMixin):
                 # Strip date suffix if present (keep original extension)
                 if re.search(r"-\d{4}-\d{2}-\d{2}(\.[A-Za-z0-9]+)?$", fname):
                     _, ext2 = os.path.splitext(fname)
-                    path_final = os.path.join(dirname, os.path.splitext(canonical_name)[0] + (ext2 or ext))
+                    path_final = os.path.join(
+                        dirname, os.path.splitext(canonical_name)[0] + (ext2 or ext)
+                    )
                 else:
                     path_final = os.path.join(dirname, canonical_name)
 
@@ -190,7 +204,9 @@ class DTP(DTPBase, EntityQueryMixin):
 
             # ---- In your loop over endpoints, use the mapping + fixups ----
             base_url = "https://search.clinicalgenome.org/kb/"
-            landing_path = os.path.join(raw_dir, self.data_source.source_system.name, self.data_source.name)
+            landing_path = os.path.join(
+                raw_dir, self.data_source.source_system.name, self.data_source.name
+            )
             os.makedirs(landing_path, exist_ok=True)
 
             downloaded_files = []
@@ -203,14 +219,18 @@ class DTP(DTPBase, EntityQueryMixin):
                     # Normalize/rename to canonical final name:
                     final_path = _normalize_to_canonical(tmp_path, canonical_name)
                     downloaded_files.append(final_path)
-                    self.logger.log(f"✅ Fetched {ep} → {os.path.basename(final_path)}", "INFO")
+                    self.logger.log(
+                        f"✅ Fetched {ep} → {os.path.basename(final_path)}", "INFO"
+                    )
                 except Exception as e:
                     msg = f"❌ Failed to download '{ep}': {e}"
                     self.logger.log(msg, "ERROR")
                     return False, msg, None
 
             # Pick the canonical gene-validity file for hashing:
-            summary_path = os.path.join(landing_path, CANONICAL["gene-validity/download"])
+            summary_path = os.path.join(
+                landing_path, CANONICAL["gene-validity/download"]
+            )
             if not os.path.exists(summary_path):
                 msg = "❌ Expected ClinGen Gene-Disease Summary file was not found after normalization."
                 self.logger.log(msg, "ERROR")
@@ -225,7 +245,6 @@ class DTP(DTPBase, EntityQueryMixin):
             msg = f"❌ ETL extract failed: {str(e)}"
             self.logger.log(msg, "ERROR")
             return False, msg, None
-
 
     # ⚙️  ----------------------------  ⚙️
     # ⚙️  ------ TRANSFORM FASE ------  ⚙️
@@ -319,7 +338,12 @@ class DTP(DTPBase, EntityQueryMixin):
             x = (x or "").strip()
             if not x:
                 return None
-            for fmt in ("%Y-%m-%dT%H:%M:%S.%fZ", "%Y-%m-%dT%H:%M:%S.%f", "%Y-%m-%d", "%m/%d/%Y"):
+            for fmt in (
+                "%Y-%m-%dT%H:%M:%S.%fZ",
+                "%Y-%m-%dT%H:%M:%S.%f",
+                "%Y-%m-%d",
+                "%m/%d/%Y",
+            ):
                 try:
                     return datetime.strptime(x, fmt).date().isoformat()
                 except Exception:
@@ -344,14 +368,24 @@ class DTP(DTPBase, EntityQueryMixin):
             # Read raw with no header first
             raw = pd.read_csv(csv_path, header=None, dtype=str, keep_default_na=False)
             # Identify the line where the true header appears (contains 'GENE SYMBOL')
-            header_row_idx = raw.index[raw.apply(lambda r: (r == "GENE SYMBOL").any(), axis=1)]
+            header_row_idx = raw.index[
+                raw.apply(lambda r: (r == "GENE SYMBOL").any(), axis=1)
+            ]
             if len(header_row_idx) == 0:
-                raise ValueError("Header row with 'GENE SYMBOL' not found in validity curations file.")
+                raise ValueError(
+                    "Header row with 'GENE SYMBOL' not found in validity curations file."
+                )
             header_idx = int(header_row_idx[0])
             header = raw.iloc[header_idx].tolist()
 
             # Re-read using the discovered header line
-            df = pd.read_csv(csv_path, skiprows=header_idx + 1, names=header, dtype=str, keep_default_na=False)
+            df = pd.read_csv(
+                csv_path,
+                skiprows=header_idx + 1,
+                names=header,
+                dtype=str,
+                keep_default_na=False,
+            )
 
             # Select and rename columns
             colmap = {
@@ -368,14 +402,19 @@ class DTP(DTPBase, EntityQueryMixin):
             }
             missing = [c for c in colmap.keys() if c not in df.columns]
             if missing:
-                raise ValueError(f"Missing expected columns in validity curations: {missing}")
+                raise ValueError(
+                    f"Missing expected columns in validity curations: {missing}"
+                )
 
             df = df[list(colmap.keys())].rename(columns=colmap)
 
             # Normalize identifiers
             df["hgnc_id"] = df["hgnc_id"].str.strip()
             df["mondo_id"] = df["mondo_id"].str.strip()
-            df = df[df["hgnc_id"].str.startswith("HGNC:") & df["mondo_id"].str.startswith("MONDO:")]
+            df = df[
+                df["hgnc_id"].str.startswith("HGNC:")
+                & df["mondo_id"].str.startswith("MONDO:")
+            ]
 
             # Normalize MOI / SOP
             df["moi"] = df["moi"].str.strip()
@@ -418,13 +457,23 @@ class DTP(DTPBase, EntityQueryMixin):
             import pandas as pd
 
             raw = pd.read_csv(csv_path, header=None, dtype=str, keep_default_na=False)
-            header_row_idx = raw.index[raw.apply(lambda r: (r == "gene_symbol").any(), axis=1)]
+            header_row_idx = raw.index[
+                raw.apply(lambda r: (r == "gene_symbol").any(), axis=1)
+            ]
             if len(header_row_idx) == 0:
-                raise ValueError("Header row with 'gene_symbol' not found in summary report.")
+                raise ValueError(
+                    "Header row with 'gene_symbol' not found in summary report."
+                )
             header_idx = int(header_row_idx[0])
             header = raw.iloc[header_idx].tolist()
 
-            df = pd.read_csv(csv_path, skiprows=header_idx + 1, names=header, dtype=str, keep_default_na=False)
+            df = pd.read_csv(
+                csv_path,
+                skiprows=header_idx + 1,
+                names=header,
+                dtype=str,
+                keep_default_na=False,
+            )
 
             # Keep a curated subset that mirrors validity relationships, plus extra fields
             cols = [
@@ -439,13 +488,18 @@ class DTP(DTPBase, EntityQueryMixin):
             ]
             missing = [c for c in cols if c not in df.columns]
             if missing:
-                raise ValueError(f"Missing expected columns in summary report: {missing}")
+                raise ValueError(
+                    f"Missing expected columns in summary report: {missing}"
+                )
 
             df = df[cols].copy()
             # Normalize identifiers
             df["hgnc_id"] = df["hgnc_id"].str.strip()
             df["mondo_id"] = df["mondo_id"].str.strip()
-            df = df[df["hgnc_id"].str.startswith("HGNC:") & df["mondo_id"].str.startswith("MONDO:")]
+            df = df[
+                df["hgnc_id"].str.startswith("HGNC:")
+                & df["mondo_id"].str.startswith("MONDO:")
+            ]
 
             # Optional: explode compound fields separated by '|'
             # For a flat summary parquet, we keep as-is (pipe-separated strings)
@@ -458,15 +512,26 @@ class DTP(DTPBase, EntityQueryMixin):
             # 1) Gene–Disease Validity (preferred input)
             if F_GDV.exists():
                 df_validity = load_gene_disease_validity_curations(F_GDV)
-                _write_output(df_validity, OUT_GDV, f"✅ Wrote gene_disease_validity to {OUT_GDV.with_suffix('.parquet')}")
+                _write_output(
+                    df_validity,
+                    OUT_GDV,
+                    f"✅ Wrote gene_disease_validity to {OUT_GDV.with_suffix('.parquet')}",
+                )
                 total_outputs += 1
             else:
-                self.logger.log(f"⚠️  Missing file: {F_GDV.name} (validity curations). Skipping.", "WARNING")
+                self.logger.log(
+                    f"⚠️  Missing file: {F_GDV.name} (validity curations). Skipping.",
+                    "WARNING",
+                )
 
             # 2) Curation Activity Summary (optional enrichment)
             if F_SUM.exists():
                 df_summary = load_curation_activity_summary(F_SUM)
-                _write_output(df_summary, OUT_SUM, f"✅ Wrote curation_activity_summary to {OUT_SUM.with_suffix('.parquet')}")
+                _write_output(
+                    df_summary,
+                    OUT_SUM,
+                    f"✅ Wrote curation_activity_summary to {OUT_SUM.with_suffix('.parquet')}",
+                )
                 total_outputs += 1
             else:
                 self.logger.log(f"ℹ️  Optional file not found: {F_SUM.name}.", "INFO")
@@ -476,7 +541,11 @@ class DTP(DTPBase, EntityQueryMixin):
                 # Many times dosage CSV already has a clean header on the first row.
                 # If needed, add a header-detection routine similar to the ones above.
                 df_dos = pd.read_csv(F_DOS, dtype=str, keep_default_na=False)
-                _write_output(df_dos, OUT_DOS, f"✅ Wrote gene_dosage to {OUT_DOS.with_suffix('.parquet')}")
+                _write_output(
+                    df_dos,
+                    OUT_DOS,
+                    f"✅ Wrote gene_dosage to {OUT_DOS.with_suffix('.parquet')}",
+                )
                 total_outputs += 1
             else:
                 self.logger.log(f"ℹ️  Optional file not found: {F_DOS.name}.", "INFO")
@@ -494,7 +563,6 @@ class DTP(DTPBase, EntityQueryMixin):
             msg = f"❌ Transform failed: {str(e)}"
             self.logger.log(msg, "ERROR")
             return False, msg
-
 
     # 📥  ------------------------ 📥
     # 📥  ------ LOAD FASE ------  📥
@@ -534,7 +602,9 @@ class DTP(DTPBase, EntityQueryMixin):
                 self.data_source.name,
             )
             # processed_file_name = processed_path + "/master_data.parquet"
-            processed_file_name = processed_path + "/gene_disease_validity.parquet"  # NOTE: We can change it!
+            processed_file_name = (
+                processed_path + "/gene_disease_validity.parquet"
+            )  # NOTE: We can change it!
 
             if not os.path.exists(processed_file_name):
                 msg = f"⚠️  File not found: {processed_file_name}"
@@ -558,22 +628,22 @@ class DTP(DTPBase, EntityQueryMixin):
         # GET ALL ENTITIES IDS
         # 1. Get Entity Groups and Relationship Type IDs
         gene_group_qry = (
-                self.session.query(EntityGroup)
-                .filter_by(name="Genes")
-                .first()  # noqa: E501
-            )  # noqa: E501
-        
+            self.session.query(EntityGroup)
+            .filter_by(name="Genes")
+            .first()  # noqa: E501
+        )  # noqa: E501
+
         disease_group_qry = (
-                self.session.query(EntityGroup)
-                .filter_by(name="Diseases")
-                .first()  # noqa: E501
-            )  # noqa: E501
-        
+            self.session.query(EntityGroup)
+            .filter_by(name="Diseases")
+            .first()  # noqa: E501
+        )  # noqa: E501
+
         relationship_type_qry = (
             self.session.query(EntityRelationshipType)
-                .filter_by(code="part_of")  # TODO: Change it before Production
-                .first()  # noqa: E501
-            )
+            .filter_by(code="part_of")  # TODO: Change it before Production
+            .first()  # noqa: E501
+        )
 
         # 2. Unique Terms IDs
         genes_ids = df["hgnc_id"].dropna().unique().tolist()
@@ -582,24 +652,30 @@ class DTP(DTPBase, EntityQueryMixin):
         # 3. Query mappings
         gene_aliases = (
             self.session.query(
-                EntityAlias.alias_value, EntityAlias.entity_id, EntityAlias.group_id)
-                .filter(EntityAlias.alias_value.in_(genes_ids))
-                .filter(EntityAlias.group_id == gene_group_qry.id)
-                .filter(EntityAlias.xref_source == "HGNC")
-                .all()
+                EntityAlias.alias_value, EntityAlias.entity_id, EntityAlias.group_id
             )
+            .filter(EntityAlias.alias_value.in_(genes_ids))
+            .filter(EntityAlias.group_id == gene_group_qry.id)
+            .filter(EntityAlias.xref_source == "HGNC")
+            .all()
+        )
         disease_aliases = (
             self.session.query(
-                EntityAlias.alias_value, EntityAlias.entity_id, EntityAlias.group_id)
-                .filter(EntityAlias.alias_value.in_(diseases_ids))
-                .filter(EntityAlias.group_id == disease_group_qry.id)
-                .filter(EntityAlias.xref_source == "MONDO")
-                .all()
+                EntityAlias.alias_value, EntityAlias.entity_id, EntityAlias.group_id
+            )
+            .filter(EntityAlias.alias_value.in_(diseases_ids))
+            .filter(EntityAlias.group_id == disease_group_qry.id)
+            .filter(EntityAlias.xref_source == "MONDO")
+            .all()
         )
 
         # 4. Map to DataFrame
-        df_genes_map = pd.DataFrame(gene_aliases, columns=["hgnc_id","entity_1_id","entity_1_group_id"])
-        df_diseases_map = pd.DataFrame(disease_aliases, columns=["mondo_id","entity_2_id","entity_2_group_id"])
+        df_genes_map = pd.DataFrame(
+            gene_aliases, columns=["hgnc_id", "entity_1_id", "entity_1_group_id"]
+        )
+        df_diseases_map = pd.DataFrame(
+            disease_aliases, columns=["mondo_id", "entity_2_id", "entity_2_group_id"]
+        )
 
         # 4. Merge
         df = df.merge(df_genes_map, on="hgnc_id", how="left")
@@ -609,20 +685,28 @@ class DTP(DTPBase, EntityQueryMixin):
         df["relationship_type_id"] = relationship_type_qry.id
 
         # 6. Keep only final cols
-        df = df[[
-            "entity_1_id",
-            "entity_1_group_id",
-            "entity_2_id",
-            "entity_2_group_id",
-            "relationship_type_id",
-        ]]
+        df = df[
+            [
+                "entity_1_id",
+                "entity_1_group_id",
+                "entity_2_id",
+                "entity_2_group_id",
+                "relationship_type_id",
+            ]
+        ]
         df["data_source_id"] = self.data_source.id
         df["etl_package_id"] = self.package.id
 
         # Insert only valided rows
         before = len(df)
         df = df.dropna(
-            subset=["entity_1_id", "entity_1_group_id", "entity_2_id", "entity_2_group_id", "relationship_type_id"]
+            subset=[
+                "entity_1_id",
+                "entity_1_group_id",
+                "entity_2_id",
+                "entity_2_group_id",
+                "relationship_type_id",
+            ]
         ).reset_index(drop=True)
         after = len(df)
         if (before - after) > 0:
@@ -650,7 +734,9 @@ class DTP(DTPBase, EntityQueryMixin):
 
         # 8. Bulk insert
         try:
-            self.session.bulk_insert_mappings(EntityRelationship, df.to_dict(orient="records"))
+            self.session.bulk_insert_mappings(
+                EntityRelationship, df.to_dict(orient="records")
+            )
             self.session.commit()
         except Exception as e:
             self.session.rollback()

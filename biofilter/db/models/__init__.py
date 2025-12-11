@@ -29,8 +29,8 @@ from .model_curation import (
 from .model_variants import (
     # VariantMaster,
     # VariantLocus,
-    SNP,
-    SNPMerge,
+    VariantSNP,
+    VariantSNPMerge,
     VariantGWAS,
     # VariantLiftedPosition,
     # VariantMergeLog,
@@ -82,8 +82,8 @@ __all__ = [
     # VARIANTS MODELS
     # "VariantMaster",
     # "VariantLocus",
-    "SNP",
-    "SNPMerge",
+    "VariantSNP",
+    "VariantSNPMerge",
     "VariantGWAS",
     # "VariantLiftedPosition",
     # "VariantMergeLog",

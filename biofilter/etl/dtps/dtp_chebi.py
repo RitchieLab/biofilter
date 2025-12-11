@@ -64,7 +64,7 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
                 "secondary_ids.tsv.gz",
                 "database_accession.tsv.gz",
                 "source.tsv.gz",
-                ]  # noqa E501
+            ]  # noqa E501
 
             landing_path = os.path.join(
                 raw_dir,
@@ -146,7 +146,9 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
                 self.logger.log(msg, "ERROR")
                 return False, msg
             compounds = pd.read_csv(input_file, sep="\t", compression="gzip")
-            compounds = compounds.rename(columns={"chebi_accession": "chebi_id", "name": "label"})
+            compounds = compounds.rename(
+                columns={"chebi_accession": "chebi_id", "name": "label"}
+            )
 
             # --- Chemical Data ---
             input_file = input_path / "chemical_data.tsv.gz"
@@ -157,22 +159,16 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
             chemical_data = pd.read_csv(input_file, sep="\t", compression="gzip")
 
             # Join on compound_id vs CHEBI:XXX
-            compounds["compound_id"] = compounds["chebi_id"].str.replace("CHEBI:", "").astype(int)
-            merged = pd.merge(
-                compounds,
-                chemical_data,
-                how="left",
-                on="compound_id"
+            compounds["compound_id"] = (
+                compounds["chebi_id"].str.replace("CHEBI:", "").astype(int)
             )
+            merged = pd.merge(compounds, chemical_data, how="left", on="compound_id")
 
-            status_map = {
-                1: "active",
-                3: "active",
-                9: "active",
-                4: "deactive"
-            }
+            status_map = {1: "active", 3: "active", 9: "active", 4: "deactive"}
 
-            merged["omic_status"] = merged["status_id_x"].map(status_map).fillna("deactive")
+            merged["omic_status"] = (
+                merged["status_id_x"].map(status_map).fillna("deactive")
+            )
 
             # --- Secondary IDs Data -
             # NOTE: Temos o arquivo Names.tsv que podemos expandir para Alias se necessario.
@@ -183,8 +179,8 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
                 return False, msg
             df_secondary = pd.read_csv(input_file, sep="\t", compression="gzip")
             # Padronizar para CHEBI:xxxx
-            df_secondary["secondary_id"] = df_secondary["secondary_id"].astype(str).apply(
-                lambda x: f"CHEBI:{x}"
+            df_secondary["secondary_id"] = (
+                df_secondary["secondary_id"].astype(str).apply(lambda x: f"CHEBI:{x}")
             )
             # Agrupar por compound_id
             df_secondary_grouped = (
@@ -193,11 +189,7 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
                 .reset_index()
             )
             # Merge com o merged principal
-            merged = merged.merge(
-                df_secondary_grouped,
-                how="left",
-                on="compound_id"
-            )
+            merged = merged.merge(df_secondary_grouped, how="left", on="compound_id")
 
             # Renomear coluna
             merged.rename(columns={"secondary_id": "secondary_ids"}, inplace=True)
@@ -212,8 +204,8 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
                 return False, msg
             df_xref = pd.read_csv(input_file, sep="\t", compression="gzip")
             # Padronizar para CHEBI:xxxx
-            df_xref["chem_id"] = df_xref["compound_id"].astype(str).apply(
-                lambda x: f"CHEBI:{x}"
+            df_xref["chem_id"] = (
+                df_xref["compound_id"].astype(str).apply(lambda x: f"CHEBI:{x}")
             )
             """
             id	    compound_id	    accession_number	type	        status_id	source_id
@@ -239,7 +231,7 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
                 df_source[["id", "name", "prefix"]],
                 left_on="source_id",
                 right_on="id",
-                how="left"
+                how="left",
             )
 
             # Criar colunas auxiliares
@@ -256,7 +248,7 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
                     "alias_norm": row["alias_value"].lower(),
                     "is_primary": False,
                 },
-                axis=1
+                axis=1,
             )
 
             # Agrupar por CHEBI:xxx → lista de dicionários
@@ -269,33 +261,34 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
 
             # Merge no df principal
             merged = merged.merge(
-                df_xref_grouped,
-                how="left",
-                left_on="chebi_id",
-                right_on="chem_id"
+                df_xref_grouped, how="left", left_on="chebi_id", right_on="chem_id"
             )
 
             # Se não houver aliases_extra, garantir lista vazia
-            merged["aliases_extra"] = merged["aliases_extra"].apply(lambda x: x if isinstance(x, list) else [])
+            merged["aliases_extra"] = merged["aliases_extra"].apply(
+                lambda x: x if isinstance(x, list) else []
+            )
 
             # Select only useful cols
-            merged = merged[[
-                "chebi_id",
-                "omic_status",
-                "label",
-                "definition",
-                "source",
-                "ascii_name",
-                "status_id",
-                "formula",
-                "charge",
-                "mass",
-                "monoisotopic_mass",
-                "structure_id",
-                "is_autogenerated",
-                "secondary_ids",
-                "aliases_extra",
-            ]]
+            merged = merged[
+                [
+                    "chebi_id",
+                    "omic_status",
+                    "label",
+                    "definition",
+                    "source",
+                    "ascii_name",
+                    "status_id",
+                    "formula",
+                    "charge",
+                    "mass",
+                    "monoisotopic_mass",
+                    "structure_id",
+                    "is_autogenerated",
+                    "secondary_ids",
+                    "aliases_extra",
+                ]
+            ]
 
             # Save one master file
             merged.to_parquet(output_path / "master_data.parquet", index=False)
@@ -436,15 +429,16 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
         for col in numeric_fields:
             df[col] = pd.to_numeric(df[col], errors="coerce").replace({np.nan: None})
 
-
         # Boolean normalization
         df["is_autogenerated"] = (
             df["is_autogenerated"]
             .astype(str)
             .str.upper()
-            .replace({"TRUE": True, "FALSE": False, "NAN": None, "NONE": None, "": None})
+            .replace(
+                {"TRUE": True, "FALSE": False, "NAN": None, "NONE": None, "": None}
+            )
         )
- 
+
         try:
             failed_records = []
 
@@ -456,7 +450,9 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
 
                     # --- Aliases ---
                     alias_dict = self.build_alias(row)
-                    is_primary_alias = next((a for a in alias_dict if a.get("is_primary")), None)
+                    is_primary_alias = next(
+                        (a for a in alias_dict if a.get("is_primary")), None
+                    )
                     not_primary_alias = [a for a in alias_dict if a != is_primary_alias]
 
                     aliases_extra = row.get("aliases_extra", [])
@@ -470,7 +466,11 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
                             not_primary_alias.append(alias)
 
                     # Drop Alias Invalids
-                    not_primary_alias = [alias for alias in not_primary_alias if alias.get("xref_source") != "PubMed"]
+                    not_primary_alias = [
+                        alias
+                        for alias in not_primary_alias
+                        if alias.get("xref_source") != "PubMed"
+                    ]
 
                     # --- Status ---
                     status_id = row.get("status_id")
@@ -510,7 +510,9 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
                     # --- Chemical Master ---
                     chem_master = (
                         self.session.query(ChemicalMaster)
-                        .filter_by(chemical_id=chebi_id, data_source_id=self.data_source.id)
+                        .filter_by(
+                            chemical_id=chebi_id, data_source_id=self.data_source.id
+                        )
                         .first()
                     )
                     if not chem_master:
@@ -561,14 +563,16 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
                 except Exception as inner_e:
                     self.session.rollback()
                     failed_records.append((row.get("chebi_id"), str(inner_e)))
-                    self.logger.log(f"⚠️ Skipped {row.get('chebi_id')} due to error: {inner_e}", "WARNING")
+                    self.logger.log(
+                        f"⚠️ Skipped {row.get('chebi_id')} due to error: {inner_e}",
+                        "WARNING",
+                    )
 
         except Exception as e:
             self.session.rollback()
             msg = f"❌ Critical error during load: {e}"
             self.logger.log(msg, "ERROR")
             return False, msg
-
 
         # Set DB to Read Mode and Create Index
         try:
@@ -588,4 +592,3 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
         self.logger.log(msg, "INFO")
 
         return True, msg
-

@@ -194,7 +194,9 @@ class GeneMaster(Base):
     omic_status = relationship("OmicStatus")
 
     entity_id = Column(
-        BigInteger, ForeignKey("entities.id", ondelete="CASCADE"), nullable=False  # noqa E501
+        BigInteger,
+        ForeignKey("entities.id", ondelete="CASCADE"),
+        nullable=False,  # noqa E501
     )  # noqa E501
     entity = relationship("Entity", passive_deletes=True)
 

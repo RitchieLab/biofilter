@@ -172,7 +172,9 @@ class DTP(DTPBase, EntityQueryMixin):
             )  # noqa: E501
 
             if self.debug_mode:
-                df.to_csv(output_file_master.with_suffix(".csv"), index=False)  # noqa: E501
+                df.to_csv(
+                    output_file_master.with_suffix(".csv"), index=False
+                )  # noqa: E501
 
             self.logger.log(
                 f"✅ KEGG pathways transformed to CSV at {output_path}", "INFO"

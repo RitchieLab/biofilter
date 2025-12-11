@@ -1,4 +1,5 @@
 from sqlalchemy import text
+
 # import time
 
 
@@ -114,7 +115,8 @@ class DBTuningMixin:
         engine = self.session.bind.dialect.name
         if engine not in ("sqlite", "postgresql"):
             self.logger.log(
-                f"❌ Index creation not supported for engine: {engine}", "WARNING"  # noqa E501
+                f"❌ Index creation not supported for engine: {engine}",
+                "WARNING",  # noqa E501
             )  # noqa E501
             return
 
@@ -137,7 +139,8 @@ class DBTuningMixin:
         engine = self.session.bind.dialect.name
         if engine not in ("sqlite", "postgresql"):
             self.logger.log(
-                f"❌ Index removal not supported for engine: {engine}", "WARNING"  # noqa E501
+                f"❌ Index removal not supported for engine: {engine}",
+                "WARNING",  # noqa E501
             )  # noqa E501
             return
 
@@ -238,7 +241,7 @@ class DBTuningMixin:
             # EntityRelationshipType
             ("entity_relationship_types", ["code"]),
         ]
-    
+
     # Only EntityRelationship Model
     @property
     def get_entity_relationship_index_specs(self):
@@ -256,7 +259,7 @@ class DBTuningMixin:
             # EntityRelationshipType
             ("entity_relationship_types", ["code"]),
         ]
-    
+
     @property
     def get_entity_location_index_specs(self):
         """
@@ -271,7 +274,6 @@ class DBTuningMixin:
             ("entity_locations", ["assembly_id"]),
             ("entity_locations", ["chromosome"]),
             ("entity_locations", ["build"]),
-
             # Region-style queries: "give me everything in chr N for this assembly"
             ("entity_locations", ["assembly_id", "chromosome"]),
             ("entity_locations", ["assembly_id", "chromosome", "start_pos"]),
@@ -279,14 +281,11 @@ class DBTuningMixin:
                 "entity_locations",
                 ["assembly_id", "chromosome", "start_pos", "end_pos"],
             ),
-
             # Fast uniqueness / existence check (matches the UniqueConstraint)
             ("entity_locations", ["entity_id", "assembly_id"]),
-
             # ETL housekeeping
             ("entity_locations", ["data_source_id"]),
             ("entity_locations", ["etl_package_id"]),
-
             # Optional: if you foresee queries like "all genes in region '12p13.31'"
             # ("entity_locations", ["region_label"]),
         ]
@@ -327,32 +326,27 @@ class DBTuningMixin:
             # --- SNP main table ---
             # PK (rs_id) is already indexed by default, but we keep it
             # here for explicitness and for helper symmetry.
-            ("snps", ["rs_id"]),  # natural primary key
-
+            ("variant_snps", ["rs_id"]),  # natural primary key
             # Common query patterns: by chromosome and position in each build
-            ("snps", ["chromosome"]),
-            ("snps", ["position_37"]),
-            ("snps", ["position_38"]),
-            ("snps", ["chromosome", "position_37"]),
-            ("snps", ["chromosome", "position_38"]),
-
+            ("variant_snps", ["chromosome"]),
+            ("variant_snps", ["position_37"]),
+            ("variant_snps", ["position_38"]),
+            ("variant_snps", ["chromosome", "position_37"]),
+            ("variant_snps", ["chromosome", "position_38"]),
             # Provenance filters (ETL / source system scoping)
-            ("snps", ["data_source_id"]),
-            ("snps", ["etl_package_id"]),
-
+            ("variant_snps", ["data_source_id"]),
+            ("variant_snps", ["etl_package_id"]),
             # --- SNP merge table ---
             # Composite primary key: (rs_obsolete_id, rs_canonical_id)
             # PK also creates an index, but we expose them individually as well
             # for common lookup patterns.
-            ("snp_merges", ["rs_obsolete_id"]),   # obsolete -> canonical
-            ("snp_merges", ["rs_canonical_id"]),  # canonical -> all obsolete
-
+            ("variant_snp_merges", ["rs_obsolete_id"]),
+            ("variant_snp_merges", ["rs_canonical_id"]),
             # Provenance for merges
-            ("snp_merges", ["data_source_id"]),
-            ("snp_merges", ["etl_package_id"]),
-
+            ("variant_snp_merges", ["data_source_id"]),
+            ("variant_snp_merges", ["etl_package_id"]),
             # (Optional) explicit composite index (even though PK already exists). # noqa E501
-            ("snp_merges", ["rs_obsolete_id", "rs_canonical_id"]),
+            ("variant_snp_merges", ["rs_obsolete_id", "rs_canonical_id"]),
         ]
 
     @property
@@ -372,7 +366,6 @@ class DBTuningMixin:
             ("disease_masters", ["mondo_id"]),
             ("disease_masters", ["entity_id"]),
             ("disease_masters", ["data_source_id"]),
-
             # DiseaseGroupMembership
             ("disease_group_memberships", ["disease_id"]),
             ("disease_group_memberships", ["group_id"]),
@@ -387,4 +380,3 @@ class DBTuningMixin:
             ("chemical_masters", ["entity_id"]),
             # ("chemical_data", ["chemical_id"]),
         ]
-

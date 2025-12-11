@@ -267,7 +267,9 @@ class DTP(DTPBase, EntityQueryMixin):
                             source_database=row.source_database,
                             type=row.type,
                             # long_description=row.long_description,
-                            long_description=self.guard_description(row.long_description),
+                            long_description=self.guard_description(
+                                row.long_description
+                            ),
                             data_source_id=self.data_source.id,
                             etl_package_id=self.package.id,
                         )
