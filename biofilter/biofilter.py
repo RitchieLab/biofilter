@@ -2,36 +2,77 @@
 import json
 from pathlib import Path
 
-# from functools import cached_property
+# Internal Classes
 from biofilter.db.database import Database
-from biofilter.core.settings_manager import SettingsManager
-from biofilter.utils.logger import Logger
+from biofilter.db.models import BiofilterMetadata
+
 from biofilter.etl.etl_manager import ETLManager
 from biofilter.etl.conflict_manager import ConflictManager
+
+from biofilter.core.settings_manager import SettingsManager
+from biofilter.utils.logger import Logger
+from biofilter.utils.config import BiofilterConfig
 from biofilter.utils.model_explorer import ModelExplorer
 from biofilter.utils.migrate import run_migration
+
 from biofilter.report.report_manager import ReportManager
-from biofilter.db.models import BiofilterMetadata
+from biofilter.query import Query, SchemaExplorer
 
 
 class Biofilter:
     def __init__(self, db_uri: str = None, debug_mode: bool = False):
+        self.version = "3.2.0"
+        
         if debug_mode:
             self.logger = Logger(log_level="DEBUG")
             self.debug_mode = True
         else:
             self.logger = Logger()
             self.debug_mode = False
-        self.db_uri = db_uri
         self.db = None
         self._metadata = None
         # self._settings = None
-        self._report = None  # Lazy-load: Report Manager
-        self._etl = None  # Lazy-load: ETL Manager
-        self._conflict = None  # Lazy-load: Conflict Manager
+        self._report = None     # Lazy-load: Report Manager
+        self._query = None      # Lazy-load: Query Manager
+        self._schema = None     # Lazy-load: Query Manager
+        self._etl = None        # Lazy-load: ETL Manager
+        self._conflict = None   # Lazy-load: Conflict Manager
 
+        # Starting Sttings
+        try:
+            self.config = BiofilterConfig()
+            config_path = str(self.config.path)
+        except FileNotFoundError:
+            # Fallback: empty config, rely on defaults
+            self.logger.log(
+                "🔧 Configuration file not found. This may lead to unexpected behavior or failures.",
+                "WARNING",
+            )
+            config_path = None
+            self.config = None  # or some minimal stub
+
+        # --- Boot banner ---
+        self._log_boot_banner(config_path)
+
+        # DB Prioridade:
+        # 1. Value from constructor
+        # 2. Value from .biofilter.toml
+        # 3. Fallback local
+        self.db_uri = db_uri or self.config.db_uri or "sqlite:///biofilter.db"
         if self.db_uri:
             self.connect_db()
+
+    def _log_boot_banner(self, config_path: str | None):
+        self.logger.log("════════════════════════════════════", "INFO")
+        self.logger.log(f"🚀 Initializing Biofilter3R", "INFO")
+        self.logger.log(f"   • Version: {self.version}", "INFO")
+        self.logger.log(f"   • Debug mode: {self.debug_mode}", "INFO")
+        if config_path:
+            self.logger.log(f"   • Config: {config_path}", "INFO")
+        else:
+            self.logger.log("   • Config: <none> (using defaults)", "INFO")
+        self.logger.log("════════════════════════════════════", "INFO")
+
 
     @property
     def settings(self):
@@ -60,17 +101,6 @@ class Biofilter:
     @property
     def metadata(self):
         return self.get_metadata()
-
-    @property
-    def report(self):
-        if self._report is None:
-            if not self.db:
-                raise RuntimeError("You must connect to a database first.")
-            self._report = ReportManager(
-                session=self.db.get_session(),
-                logger=self.logger,
-            )
-        return self._report
 
     def create_new_project(self, db_uri: str, overwrite=False):
         """Create a new Biofilter project database and connect to it."""
@@ -234,3 +264,38 @@ class Biofilter:
     def migrate(self):
         # run_migration(self.db.session)
         run_migration(self.db.session, self.db.db_uri)
+
+
+    # ----------------------------------
+    # QUERY
+    # ----------------------------------
+    @property
+    def query(self) -> Query:
+        """Lazy-load Query interface."""
+        if self._query is None:
+            self._query = Query(self.db.get_session())
+        return self._query
+
+    # ----------------------------------
+    # SCHEMA EXPLORER
+    # ----------------------------------
+    @property
+    def schema(self) -> SchemaExplorer:
+        """Lazy-load Schema Explorer interface."""
+        if self._schema is None:
+            self._schema = SchemaExplorer(self.query)
+        return self._schema
+
+    # ----------------------------------
+    # REPORT
+    # ----------------------------------
+    @property
+    def report(self):
+        if self._report is None:
+            if not self.db:
+                raise RuntimeError("You must connect to a database first.")
+            self._report = ReportManager(
+                session=self.db.get_session(),
+                logger=self.logger,
+            )
+        return self._report

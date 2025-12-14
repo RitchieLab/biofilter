@@ -2,8 +2,10 @@ import os
 from pathlib import Path
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.engine.url import make_url
 from biofilter.utils.logger import Logger
 from biofilter.db.create_db_mixin import CreateDBMixin
+import time
 
 
 class Database(CreateDBMixin):
@@ -43,36 +45,43 @@ class Database(CreateDBMixin):
         self.db_uri = self._normalize_uri(self.db_uri)
 
         if check_exists and not self.exists_db():
-            msn = f"Database not found at {self.db_uri}"
+            msn = f"❌ Database not found at {self.db_uri}"
             self.logger.log(msn, "ERROR")
             raise ValueError(msn)
+
+        start = time.perf_counter()
 
         self.engine = create_engine(self.db_uri, future=True)
         self.session = sessionmaker(bind=self.engine, future=True)
 
-        # Be sure that setting is correct.
-        # if self.session.bind.dialect.name == "sqlite":
-        #     self.session.execute(text("PRAGMA journal_mode = DELETE;"))
-        #     self.session.execute(text("PRAGMA foreign_keys = ON;"))
-        #     self.session.commit()
-        # if self.engine.dialect.name == "sqlite":
-        #     with self.Session() as s:
-        #         s.execute(text("PRAGMA journal_mode = DELETE;"))
-        #         s.execute(text("PRAGMA foreign_keys = ON;"))
-        #         s.commit()
+        elapsed_ms = (time.perf_counter() - start) * 1000
+
+        # Safe URI information (no username/password)
+        try:
+            url = make_url(self.db_uri)
+
+            if url.drivername.startswith("sqlite"):
+                engine_name = url.drivername
+                host = "local file"
+                db_name = url.database
+            else:
+                engine_name = url.drivername
+                host = url.host or "<unknown>"
+                db_name = url.database
+        except Exception:
+            engine_name = "<unknown>"
+            host = "<unknown>"
+            db_name = "<unknown>"
+  
+        self.logger.log(f"🔌 Database connection established", "INFO")
+        self.logger.log(f"   • Engine: {engine_name}", "INFO")
+        self.logger.log(f"   • Host:   {host}", "INFO")
+        self.logger.log(f"   • DB:     {db_name}", "INFO")
+        self.logger.log(f"   • Time:   {elapsed_ms:.1f} ms", "INFO")
+        self.logger.log("════════════════════════════════════", "INFO")
 
         self.connected = True
 
-    # def exists_db(self):
-    #     if not self.db_uri:
-    #         msn = "Database URI must be set before connecting."
-    #         self.logger.log(msn, "ERROR")
-    #         return False  # or: raise ValueError(msn)
-    #     if self.db_uri.startswith("sqlite:///"):
-    #         path = self.db_uri.replace("sqlite:///", "")
-    #         return Path(path).exists()
-    #     # TODO: Add support for other DBs (e.g. Postgres)
-    #     return False
     def exists_db(self):
         if not self.db_uri:
             msn = "Database URI must be set before connecting."

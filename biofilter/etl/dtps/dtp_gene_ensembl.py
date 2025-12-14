@@ -526,6 +526,7 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
             # 4) Prepare records for bulk insert / upsert into EntityLocation
             # ------------------------------------------------------------------
             records = []
+            seen_keys = set()
 
             for _, row in df.iterrows():
                 symbol = str(row["gene_symbol"] or "").strip()
@@ -571,6 +572,17 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
                 try:
                     start_pos = int(row["start"])
                     end_pos = int(row["end"])
+                    loc_key = (gene.entity_id, assembly.id)
+                    if loc_key in seen_keys:
+                        self.logger.log(
+                            f"⚠️ Duplicate location for gene {symbol}, chrom={chrom_raw}: "
+                            f"start={row.get('start')}, end={row.get('end')}",
+                            "WARNING",
+                        )
+                        continue
+
+                    seen_keys.add(loc_key)
+
                 except Exception:
                     skipped += 1
                     self.logger.log(
@@ -598,10 +610,7 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
                 created += 1
 
             self._upsert_entity_location_dict(
-                # session=self.session,
                 records=records,
-                # data_source_id=self.data_source.id,
-                # etl_package_id=self.package.id,
             )
 
         except Exception as e:

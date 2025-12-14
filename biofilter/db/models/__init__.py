@@ -32,6 +32,7 @@ from .model_variants import (
     VariantSNP,
     VariantSNPMerge,
     VariantGWAS,
+    VariantGWASSNP,
     # VariantLiftedPosition,
     # VariantMergeLog,
 )
@@ -85,6 +86,7 @@ __all__ = [
     "VariantSNP",
     "VariantSNPMerge",
     "VariantGWAS",
+    "VariantGWASSNP",
     # "VariantLiftedPosition",
     # "VariantMergeLog",
     # PATHWAY MODELS

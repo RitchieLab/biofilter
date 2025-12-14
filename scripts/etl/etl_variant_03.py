@@ -1,14 +1,14 @@
 import time
 from biofilter import Biofilter
 
-db_uri = "sqlite:///dev_biofilter.db"
-# db_uri = "postgresql+psycopg2://bioadmin:bioadmin@localhost/biofilter"
+# db_uri = "sqlite:///dev_biofilter.db"
+db_uri = "postgresql+psycopg2://bioadmin:bioadmin@localhost/biofilter"
 
 # Configure below
 data_sources_to_process = [
     # Genes
     # -----
-    "hgnc",
+    # "hgnc",
     # "gene_ncbi",
     # "ensembl",
     #
@@ -31,7 +31,7 @@ data_sources_to_process = [
     # "dbsnp_sample",
     # "dbsnp_chr1",
     # "dbsnp_chr2",
-    # "dbsnp_chr3",
+    "dbsnp_chr3",
     # "dbsnp_chr4",
     # "dbsnp_chr5",
     # "dbsnp_chr6",
@@ -82,8 +82,8 @@ run_steps = [
 ]  # noqa E501
 
 if __name__ == "__main__":
-    bf = Biofilter(db_uri, debug_mode=True)
-    # bf = Biofilter(db_uri)
+    # bf = Biofilter(db_uri, debug_mode=True)
+    bf = Biofilter(db_uri)
 
     start_total = time.time()
 

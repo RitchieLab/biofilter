@@ -1,16 +1,23 @@
 import os
 import time  # DEBUG MODE
 import requests
+import zipfile
+import shutil
 import pandas as pd
 import numpy as np
+import re
+from sqlalchemy.orm import joinedload
 from pathlib import Path
 from sqlalchemy import text
 from biofilter.utils.file_hash import compute_file_hash
 from biofilter.etl.mixins.entity_query_mixin import EntityQueryMixin
 from biofilter.etl.conflict_manager import ConflictManager
 from biofilter.etl.mixins.base_dtp import DTPBase
-from biofilter.db.models import VariantGWAS  # noqa E501
+from biofilter.db.models import VariantGWAS, VariantGWASSNP  # noqa E501
 
+"""
+# 1.2.0: Replace file to new ZIP format in dez/2025
+"""
 
 class DTP(DTPBase, EntityQueryMixin):
     def __init__(
@@ -32,7 +39,7 @@ class DTP(DTPBase, EntityQueryMixin):
 
         # DTP versioning
         self.dtp_name = "dtp_gwas"
-        self.dtp_version = "1.1.0"
+        self.dtp_version = "1.2.0"
         self.compatible_schema_min = "3.1.0"
         self.compatible_schema_max = "4.0.0"
 
@@ -54,11 +61,9 @@ class DTP(DTPBase, EntityQueryMixin):
             # source_url = self.data_source.source_url
             # Donwload more files to extract data
             base_url = "https://ftp.ebi.ac.uk/pub/databases/gwas/releases/latest/"
-            files = [
-                "gwas-catalog-associations.tsv",
-                "gwas-efo-trait-mappings.tsv",
-                # There are other files to use in future.
-            ]  # noqa E501
+
+            associations_zip_name = "gwas-catalog-associations-full.zip"
+            efo_tsv_name = "gwas-efo-trait-mappings.tsv"
 
             landing_path = os.path.join(
                 raw_dir,
@@ -67,28 +72,79 @@ class DTP(DTPBase, EntityQueryMixin):
             )
             os.makedirs(landing_path, exist_ok=True)
 
-            downloaded_files = []
-            for f in files:
-                url = base_url + f
-                out_file = landing_path + "/" + f
+            # 1) Download EFO mappings (TSV simples)
+            efo_url = base_url + efo_tsv_name
+            efo_out = os.path.join(landing_path, efo_tsv_name)
+
+            try:
+                self.logger.log(f"⬇️ Downloading {efo_url} ...", "INFO")
+                r = requests.get(efo_url, stream=True)
+                r.raise_for_status()
+                with open(efo_out, "wb") as handle:
+                    for chunk in r.iter_content(chunk_size=8192):
+                        handle.write(chunk)
+            except Exception as e:
+                msg = f"❌ Failed to download {efo_tsv_name}: {e}"
+                self.logger.log(msg, "ERROR")
+                return False, msg, None
+
+            # 2) Download associations ZIP
+            zip_url = base_url + associations_zip_name
+            zip_path = os.path.join(landing_path, associations_zip_name)
+
+            try:
+                self.logger.log(f"⬇️ Downloading {zip_url} ...", "INFO")
+                r = requests.get(zip_url, stream=True)
+                r.raise_for_status()
+                with open(zip_path, "wb") as handle:
+                    for chunk in r.iter_content(chunk_size=8192):
+                        handle.write(chunk)
+            except Exception as e:
+                msg = f"❌ Failed to download {associations_zip_name}: {e}"
+                self.logger.log(msg, "ERROR")
+                return False, msg, None
+
+            # 3) Extract TSV and rename
+            associations_tsv_final = os.path.join(
+                landing_path,
+                "gwas-catalog-associations.tsv",
+            )
+
+            try:
+                with zipfile.ZipFile(zip_path, "r") as zf:
+                    # Get first .tsv in the zip
+                    members = [m for m in zf.namelist() if m.lower().endswith(".tsv")]
+                    if not members:
+                        raise RuntimeError(
+                            f"No TSV file found inside {associations_zip_name}"
+                        )
+
+                    inner_tsv = members[0]
+                    self.logger.log(
+                        f"📦 Extracting {inner_tsv} from ZIP into "
+                        f"{associations_tsv_final}",
+                        "INFO",
+                    )
+
+                    with zf.open(inner_tsv) as src, open(
+                        associations_tsv_final, "wb"
+                    ) as dst:
+                        shutil.copyfileobj(src, dst)
+
+                # Remove zip file
                 try:
-                    self.logger.log(f"⬇️ Downloading {url} ...", "INFO")
-                    r = requests.get(url, stream=True)
-                    r.raise_for_status()
-                    with open(out_file, "wb") as handle:
-                        for chunk in r.iter_content(chunk_size=8192):
-                            handle.write(chunk)
-                    downloaded_files.append(str(out_file))
-                except Exception as e:
-                    msg = f"❌ Failed to download {f}: {e}"
-                    self.logger.log(msg, "ERROR")
-                    return False, msg, None
+                    os.remove(zip_path)
+                except OSError:
+                    pass
 
-            # Compute file hash to Compound File
-            file_path = landing_path + "/gwas-catalog-associations.tsv"
-            current_hash = compute_file_hash(file_path)
+            except Exception as e:
+                msg = f"❌ Failed to extract TSV from {associations_zip_name}: {e}"
+                self.logger.log(msg, "ERROR")
+                return False, msg, None
 
-            msg = f"✅ CheBI files downloaded to {landing_path}"
+            current_hash = compute_file_hash(associations_tsv_final)
+
+            msg = f"✅ GWAS Catalog files downloaded to {landing_path}"
             self.logger.log(msg, "INFO")
 
             return True, msg, current_hash
@@ -365,12 +421,24 @@ class DTP(DTPBase, EntityQueryMixin):
                 self.logger.log(msg, "ERROR")
                 return False, msg
 
-            df.fillna("", inplace=True)
+            # df.fillna("", inplace=True)
+            str_cols = df.select_dtypes(include=["object"]).columns
+            df[str_cols] = df[str_cols].fillna("")
 
         except Exception as e:
             msg = f"⚠️ Failed to read processed data: {e}"
             self.logger.log(msg, "ERROR")
             return False, msg
+        
+        # SET DB AND DROP INDEXES
+        try:
+            self.db_write_mode()
+            self.drop_indexes(self.get_variant_gwas_index_specs)
+        except Exception as e:
+            total_warnings += 1
+            msg = f"⚠️  Failed to switch DB to write mode or drop indexes: {e}"
+            self.logger.log(msg, "WARNING")
+            return False, msg  # ⧮ Leaving with ERROR
 
         # def safe_float(val):
         #     """
@@ -498,21 +566,25 @@ class DTP(DTPBase, EntityQueryMixin):
         # # --- DB operations ---
         try:
             # 1. Clear old data
-            self.session.execute(text("DELETE FROM variant_gwas"))
+
+            dialect = self.session.get_bind().dialect.name
+            if dialect == "postgresql":
+                self.session.execute(text(
+                    "TRUNCATE variant_gwas_snp RESTART IDENTITY CASCADE"
+                ))
+                self.session.execute(text(
+                    "TRUNCATE variant_gwas RESTART IDENTITY CASCADE"
+                ))
+
+            else:  # SQLite (or others)
+                self.session.execute(text("DELETE FROM variant_gwas_snp"))
+                self.session.execute(text("DELETE FROM variant_gwas"))
             self.session.commit()
-
-            #     # 2. Prepare bulk objects
-            #     records = df.to_dict(orient="records")
-            #     objs = [VariantGWAS(**r) for r in records]
-
-            #     # 3. Bulk insert
-            #     self.session.bulk_save_objects(objs)
-            #     self.session.commit()
-            #     total_records = len(objs)
 
             records = df.to_dict(orient="records")
 
             # NOTE: Keep only 255 per record (Rethink next versions)
+            # TODO: consider using explicit column lengths instead of blind 255 cut
             for r in records:
                 for k, v in r.items():
                     if isinstance(v, str) and len(v) > 255:
@@ -520,6 +592,87 @@ class DTP(DTPBase, EntityQueryMixin):
 
             self.session.execute(VariantGWAS.__table__.insert(), records)
             self.session.commit()
+
+
+            """
+            Rebuilds the VariantGWASSNP helper table from VariantGWAS.snp_id
+            using pure SQLAlchemy / Python logic (DB-agnostic).
+            """
+
+            self.logger.log(
+                "🧹 Cleaning and rebuilding variant_gwas_snp helper table for this data source...",
+                "INFO",
+            )
+
+            # 2) Rebuild helper rows from VariantGWAS.snp_id
+            q = (
+                self.session.query(VariantGWAS)
+                # .filter(VariantGWAS.data_source_id == self.data_source.id)
+            )
+
+            batch = []
+            total_rows = 0
+            total_snps = 0
+            BATCH_SIZE = 1000
+
+            for vg in q.yield_per(1000):
+                if not vg.snp_id:
+                    continue
+
+                # Split on "x", "X", ",", ";" with optional spaces
+                parts = re.split(r"\s*[xX,;]\s*", vg.snp_id)
+                rank = 0
+
+                for token in parts:
+                    token = token.strip()
+                    if not token:
+                        continue
+
+                    # Accept forms like "rs12345" (case-insensitive)
+                    if not re.match(r"^[rR][sS]\d+$", token):
+                        # If needed, log in DEBUG only
+                        # self.logger.log(f"Skipping non-rs token '{token}' in snp_id='{vg.snp_id}'", "DEBUG")
+                        continue
+
+                    try:
+                        numeric_id = int(token[2:])  # strip "rs"
+                    except ValueError:
+                        self.logger.log(
+                            f"⚠️ Failed to parse rs-number from '{token}' (snp_id='{vg.snp_id}')",
+                            "WARNING",
+                        )
+                        continue
+
+                    helper = VariantGWASSNP(
+                        variant_gwas_id=vg.id,
+                        snp_id=numeric_id,
+                        snp_label=token,
+                        snp_rank=rank,
+                    )
+                    batch.append(helper)
+                    total_snps += 1
+                    rank += 1
+
+                total_rows += 1
+
+                if len(batch) >= BATCH_SIZE:
+                    self.session.bulk_save_objects(batch)
+                    self.session.flush()
+                    batch.clear()
+
+            # Flush remaining
+            if batch:
+                self.session.bulk_save_objects(batch)
+                self.session.flush()
+                batch.clear()
+
+            self.session.commit()
+
+            self.logger.log(
+                f"✅ Rebuilt variant_gwas_snp: {total_snps} SNP links from {total_rows} GWAS rows "
+                f"for data_source_id={self.data_source.id}",
+                "INFO",
+            )
 
         except Exception as e:
             self.session.rollback()

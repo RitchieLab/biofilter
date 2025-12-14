@@ -169,6 +169,44 @@ class VariantGWAS(Base):
     )
     etl_package = relationship("ETLPackage", passive_deletes=True)
 
+    snp_links = relationship(
+        "VariantGWASSNP",
+        back_populates="variant_gwas",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+    )
+
+
+class VariantGWASSNP(Base):
+    """
+    Helper table indexing rsIDs for VariantGWAS rows.
+
+    Each row corresponds to one SNP extracted from the original
+    GWAS Catalog `SNPS` field. This allows fast lookup of GWAS
+    associations by numeric rsID, even when the original record
+    lists multiple SNPs (e.g. "rs6934929 x rs7276462").
+    """
+
+    __tablename__ = "variant_gwas_snp"
+
+    id = Column(PKBigIntOrInt, primary_key=True, autoincrement=True)
+
+    variant_gwas_id = Column(
+        PKBigIntOrInt,
+        ForeignKey("variant_gwas.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+
+    snp_id = Column(BigInteger, nullable=False, index=True)
+    snp_label = Column(String(50), nullable=True)
+    snp_rank = Column(Integer, nullable=True)
+
+    variant_gwas = relationship(
+        "VariantGWAS",
+        back_populates="snp_links",
+    )
+
 
 # =====================================================================
 # V 3.2.0: Disabled Variants as Entities and develop SNP Model to start

@@ -1,11 +1,13 @@
 import logging
-from typing import Union, List, Dict, Optional, Any
 import pandas as pd
-from sqlalchemy.orm import Session
-from sqlalchemy import select, and_, or_, not_, func
-from sqlalchemy.exc import SQLAlchemyError
+from typing import Union, List, Dict, Optional, Any
 
-# Import all models
+import pandas as pd
+from sqlalchemy.orm import Session, aliased
+from sqlalchemy import select, and_, or_, not_, func, text
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.inspection import inspect as sqla_inspect
+
 from biofilter.db.models import (
     # System Models
     SystemConfig,
@@ -17,6 +19,7 @@ from biofilter.db.models import (
     EntityAlias,
     EntityRelationshipType,
     EntityRelationship,
+    EntityLocation,
     # Curation Models
     ConflictStatus,
     ConflictResolution,
@@ -31,14 +34,12 @@ from biofilter.db.models import (
     GeneGroup,
     GeneLocusGroup,
     GeneLocusType,
-    GeneGenomicRegion,
-    OmicStatus,
     GeneGroupMembership,
-    GeneLocation,
     # Variant Models
-    VariantMaster,
-    VariantLocus,
+    VariantSNP,
+    VariantSNPMerge,
     VariantGWAS,
+    VariantGWASSNP,
     # Protein Models
     ProteinMaster,
     ProteinPfam,
@@ -57,11 +58,7 @@ from biofilter.db.models import (
     ChemicalMaster,
 )
 
-
-# Configure logger
-logger = logging.getLogger(__name__)
-
-logger.setLevel(logging.INFO)
+from biofilter.utils.logger import Logger
 
 
 class Query:
@@ -72,12 +69,17 @@ class Query:
 
     def __init__(self, session: Session):
         self.session = session
+        self.logger = Logger()
+
+        # Methods from SQLAchemy
         self.select = select
         self.and_ = and_
         self.or_ = or_
         self.not_ = not_
         self.func = func
+        self.aliased = aliased
 
+        # Registry of models available to reports and ad-hoc queries
         self.models: Dict[str, Any] = {
             # System
             "SystemConfig": SystemConfig,
@@ -89,10 +91,12 @@ class Query:
             "EntityGroup": EntityGroup,
             "EntityRelationshipType": EntityRelationshipType,
             "EntityRelationship": EntityRelationship,
+            "EntityLocation": EntityLocation,
             # Curation
             "CurationConflict": CurationConflict,
             "ConflictStatus": ConflictStatus,
             "ConflictResolution": ConflictResolution,
+            "OmicStatus": OmicStatus,
             # ETL
             "ETLSourceSystem": ETLSourceSystem,
             "ETLDataSource": ETLDataSource,
@@ -102,14 +106,12 @@ class Query:
             "GeneGroup": GeneGroup,
             "GeneLocusGroup": GeneLocusGroup,
             "GeneLocusType": GeneLocusType,
-            "GeneGenomicRegion": GeneGenomicRegion,
-            "OmicStatus": OmicStatus,
             "GeneGroupMembership": GeneGroupMembership,
-            "GeneLocation": GeneLocation,
             # Variant
-            "VariantMaster": VariantMaster,
-            "VariantLocus": VariantLocus,
+            "VariantSNP": VariantSNP,
+            "VariantSNPMerge": VariantSNPMerge,
             "VariantGWAS": VariantGWAS,
+            "VariantGWASSNP": VariantGWASSNP,
             # Protein
             "ProteinMaster": ProteinMaster,
             "ProteinPfam": ProteinPfam,
@@ -128,90 +130,126 @@ class Query:
             "ChemicalMaster": ChemicalMaster,
         }
 
-        # Optional autocomplete access
+        # Optional autocomplete-style access: query.GeneMaster, query.Entity, etc.
         for name, model in self.models.items():
             setattr(self, name, model)
 
-    def get_model(self, model_name: str) -> Optional[Any]:
-        """Return a model class by name."""
-        return self.models.get(model_name)
+    # def __call__(self, stmt, return_df=True):
+    #     return self.run_query(stmt, return_df)
 
-    # def _to_dict(self, obj) -> Dict[str, Any]:
-    #     return {
-    #         k: v
-    #         for k, v in vars(obj).items()
-    #         if not k.startswith("_sa_instance_state")  # noqa E501
-    #     }
-    def _to_dict(self, obj) -> Dict[str, Any]:
-        if hasattr(obj, "_mapping"):  # Row object do SQLAlchemy 2.0
-            return dict(obj._mapping)
-        if hasattr(obj, "__dict__"):  # ORM object
+    def _to_dict(self, obj: Any) -> Dict[str, Any]:
+        """Convert SQLAlchemy Row / ORM object / scalar into a flat dict."""
+
+        # --- Case 1: SQLAlchemy Row (2.0) ---
+        if hasattr(obj, "_mapping"):
+            mapping = obj._mapping
+
+            # If we have a single column / model in the Row
+            if len(mapping) == 1:
+                value = list(mapping.values())[0]
+
+                # Single ORM instance → expand to columns
+                if hasattr(value, "__table__"):
+                    mapper = sqla_inspect(value.__class__)
+                    return {col.key: getattr(value, col.key) for col in mapper.columns}
+
+                # Single scalar → wrap as 'value'
+                return {"value": value}
+
+            # Multiple entries in the Row: flatten each
+            flat: Dict[str, Any] = {}
+            for key, value in mapping.items():
+                if hasattr(value, "__table__"):  # ORM instance
+                    mapper = sqla_inspect(value.__class__)
+                    for col in mapper.columns:
+                        flat[f"{key}_{col.key}"] = getattr(value, col.key)
+                else:
+                    flat[key] = value
+            return flat
+
+        # --- Case 2: plain tuple ---
+        if isinstance(obj, tuple):
+            return {f"col_{i}": v for i, v in enumerate(obj)}
+
+        # --- Case 3: direct ORM object (from scalars().all(), for example) ---
+        if hasattr(obj, "__table__"):
+            mapper = sqla_inspect(obj.__class__)
+            return {col.key: getattr(obj, col.key) for col in mapper.columns}
+
+        # --- Case 4: simple scalar ---
+        if hasattr(obj, "__dict__"):
+            # generic Python object – best effort
             return {
                 k: v
                 for k, v in vars(obj).items()
                 if not k.startswith("_sa_instance_state")
             }
-        return {"value": obj}  # escalar simples
 
-    def run_query(self, stmt, return_df: bool = True) -> Union[List[Any], pd.DataFrame]:
-        """Execute a SQLAlchemy statement and return results."""
+        return {"value": obj}
+
+    def _get_model(self, model_name: str) -> Optional[Any]:
+        """Return a model class by name (or None if not found)."""
+        return self.models.get(model_name)
+
+    def get(self, model_name: str, **filters) -> pd.DataFrame:
+        """
+        Run a simple equality-based query using keyword filters and return a DataFrame.
+
+        Example:
+            bf.query.get("GeneMaster", symbol="A1BG")
+
+        Notes:
+        - This helper intentionally supports only equality filters.
+        - For joins, IN queries, ranges, and more advanced logic, use `run_model(select(...))`.
+        """
         try:
-            # result = self.session.execute(stmt).scalars().all()
+            model = model_name
+            if isinstance(model_name, str):
+                model = self._get_model(model_name)
+
+            if model is None:
+                raise ValueError(f"Model '{model_name}' not found.")
+
+            stmt = select(model).filter_by(**filters)
+            return self.run_model(stmt)
+
+        except (ValueError, SQLAlchemyError) as e:
+            self.logger.log(str(e), "ERROR")
+            return pd.DataFrame()
+
+    def run_model(self, stmt) -> pd.DataFrame:
+        """
+        Execute a SQLAlchemy statement (ORM/Core) and return a pandas DataFrame.
+
+        Intended for interactive exploration in notebooks: always returns a DataFrame
+        and logs errors instead of raising, so exploration is resilient.
+        """
+        if hasattr(stmt, "__table__"):   # user passed a model class
+            stmt = select(stmt)
+            # ex: bf.query.model(bf.query.GeneMaster).head()
+
+        try:
             result = self.session.execute(stmt).all()
-            if return_df:
-                df = pd.DataFrame([self._to_dict(r) for r in result])
-                return df
-            return result
+            data = [self._to_dict(r) for r in result]
+            return pd.DataFrame(data)
         except SQLAlchemyError as e:
-            logger.warning(f"Query failed: {e}")
-            return []
+            self.session.rollback()
+            self.logger.log(str(e), "ERROR")
+            return pd.DataFrame()
 
-    def raw_sql(self, sql: str) -> List[Any]:
-        """Run a raw SQL string and return results."""
+    def run_sql(self, sql: str) -> pd.DataFrame:
+        """
+        Execute raw SQL and return a pandas DataFrame.
+
+        Intended for advanced/debug usage. Prefer SQLAlchemy statements whenever possible.
+        """
         try:
-            return self.session.execute(sql).fetchall()
+            result = self.session.execute(text(sql)).all()
+            data = [self._to_dict(r) for r in result]
+            return pd.DataFrame(data)
         except SQLAlchemyError as e:
-            logger.warning(f"Raw SQL failed: {e}")
-            return []
+            self.session.rollback()
+            self.logger.log(str(e), "ERROR")
+            return pd.DataFrame()
 
-    def list_models(self) -> List[str]:
-        """List all registered models."""
-        return list(self.models.keys())
 
-    def describe_model(
-        self, model_name: str
-    ) -> Optional[Dict[str, List[str]]]:  # noqa E501
-        """Return column and relationship info for a given model."""
-        model = self.get_model(model_name)
-        if not model:
-            logger.warning(f"Model '{model_name}' not found.")
-            return None
-        return {
-            "columns": list(model.__table__.columns.keys()),
-            "relationships": list(model.__mapper__.relationships.keys()),
-        }
-
-    def get_model_metadata(self, model_name: str) -> Optional[Dict[str, Any]]:
-        """Return detailed metadata about a model's columns and relationships."""  # noqa E501
-        model = self.get_model(model_name)
-        if not model:
-            return None
-        return {
-            "columns": {
-                col.name: {
-                    "type": str(col.type),
-                    "nullable": col.nullable,
-                    "primary_key": col.primary_key,
-                }
-                for col in model.__table__.columns
-            },
-            "relationships": list(model.__mapper__.relationships.keys()),
-        }
-
-    def query_model(self, model_name: str, **filters) -> List[Any]:
-        """Run a query on a model using keyword filters (e.g., hgnc_id='1234')."""  # noqa E501
-        model = self.get_model(model_name)
-        if not model:
-            raise ValueError(f"Model '{model_name}' not found.")
-        stmt = select(model).filter_by(**filters)
-        return self.run_query(stmt)

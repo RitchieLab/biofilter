@@ -5,25 +5,25 @@
             "name": "Bio 3R - Create Project",
             "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceFolder}/scripts/Start_Project.py",
+            "program": "${workspaceFolder}/scripts/runs_debugs/Start_Project.py",
             "console": "integratedTerminal",
             "envFile": "${workspaceFolder}/.env",
-            // "python": "/home/bioadmin/.cache/pypoetry/virtualenvs/biofilter-MOydzFp4-py3.11/bin/python"
+            "python": "/home/bioadmin/.cache/pypoetry/virtualenvs/biofilter-MOydzFp4-py3.11/bin/python"
         },
         {
             "name": "Bio 3R - Run ETLManager",
             "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceFolder}/scripts/Run_ETLManager.py",
+            "program": "${workspaceFolder}/scripts/runs_debugs/Run_ETLManager.py",
             "console": "integratedTerminal",
             "envFile": "${workspaceFolder}/.env",
-            // "python": "/home/bioadmin/.cache/pypoetry/virtualenvs/biofilter-MOydzFp4-py3.11/bin/python"
+            "python": "/home/bioadmin/.cache/pypoetry/virtualenvs/biofilter-MOydzFp4-py3.11/bin/python"
         },
         {
             "name": "Bio 3R - Reset ETLManager",
             "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceFolder}/scripts/Run_ETLManager_reset.py",
+            "program": "${workspaceFolder}/scripts/runs_debugs/Run_ETLManager_reset.py",
             "console": "integratedTerminal",
             "envFile": "${workspaceFolder}/.env"
         },
@@ -31,21 +31,21 @@
             "name": "Bio 3R - Conflict_Manager",
             "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceFolder}/scripts/Run_ConflictManager.py",
+            "program": "${workspaceFolder}/scripts/runs_debugs/Run_ConflictManager.py",
             "console": "integratedTerminal"
         },
         {
             "name": "Bio 3R - Conflict_ETL_LOAD",
             "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceFolder}/scripts/Run_ETLManager_conflict.py",
+            "program": "${workspaceFolder}/scripts/runs_debugs/Run_ETLManager_conflict.py",
             "console": "integratedTerminal"
         },
         {
             "name": "Bio 3R - Model Explorer",
             "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceFolder}/scripts/debug_runner.py",
+            "program": "${workspaceFolder}/scripts/runs_debugs/debug_runner.py",
             "console": "integratedTerminal",
             "envFile": "${workspaceFolder}/.env"
         },
@@ -53,7 +53,7 @@
             "name": "Bio 3R - Run Reports",
             "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceFolder}/scripts/Run_Reports.py",
+            "program": "${workspaceFolder}/scripts/runs_debugs/Run_Reports.py",
             "console": "integratedTerminal",
             "envFile": "${workspaceFolder}/.env",
             "python": "/home/bioadmin/.cache/pypoetry/virtualenvs/biofilter-MOydzFp4-py3.11/bin/python"
@@ -62,7 +62,7 @@
             "name": "Bio 3R - Query 01",
             "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceFolder}/scripts/Query_test_01.py",
+            "program": "${workspaceFolder}/scripts/runs_debugs/Query_test_01.py",
             "console": "integratedTerminal",
             "envFile": "${workspaceFolder}/.env"
         }

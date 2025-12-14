@@ -1,2 +1,18 @@
 [database]
 db_uri = "postgresql+psycopg2://bioadmin:bioadmin@localhost/biofilter"
+echo_sql = false         # opcional, útil para debug
+auto_create = false      # permitir criar DB automaticamente se faltar
+
+[etl]
+data_root = "./biofilter_data"
+allow_parallel = true
+max_workers = 8
+
+[reports]
+default_output_format = "dataframe"  # csv|parquet|df
+warn_on_empty = true
+
+[logging]
+level = "INFO"            # DEBUG | INFO | WARNING | ERROR | CRITICAL
+log_to_file = true
+log_file = "./biofilter.log"

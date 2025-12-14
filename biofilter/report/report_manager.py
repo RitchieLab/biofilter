@@ -11,8 +11,12 @@ class ReportManager:
     def __init__(self, session: Session, logger: Logger):
         self.session = session
         self.logger = logger
+        # self._cache: dict[str, type[ReportBase]] = {}
 
     def _load_report_class(self, name: str):
+        # if module_name in self._cache:
+        #     return self._cache[module_name]
+        
         module = importlib.import_module(f"biofilter.report.reports.{name}")
         for attr in dir(module):
             obj = getattr(module, attr)
@@ -23,8 +27,24 @@ class ReportManager:
             ):
                 return obj
         raise ImportError(f"No valid report class found in {name}")
+    
+    def _resolve_report_module(self, identifier: str) -> str:
+        # 1) If already a module name
+        if identifier.startswith("report_"):
+            return identifier
 
-    # def list_reports(self, verbose: bool = True) -> list[dict]:
+        # 2) Otherwise, match by report_class.name
+        for _, mod_name, _ in pkgutil.iter_modules(reports_pkg.__path__):
+            if mod_name.startswith("report_"):
+                cls = self._load_report_class(mod_name)
+                if cls.name == identifier:
+                    return mod_name
+
+        raise ValueError(f"Report not found: {identifier}")
+
+    # ----------------------------------
+    # LIST ALL REPORTS
+    # ----------------------------------
     def list_reports(self, verbose: bool = True):
         """
         Lists all available reports in the system.
@@ -55,12 +75,20 @@ class ReportManager:
                 print(f"   {r['description']}\n")
                 # print(f" • {r['name']:<20} → {r['description']}")
             # print()
-            return True
+            # return True
+            return reports
 
         return reports
 
+    # ----------------------------------
+    # RUN ONE REPORT
+    # ----------------------------------
     def run_report(self, name: str, **kwargs):
-        report_class = self._load_report_class(name)
+
+        module_name = self._resolve_report_module(name)
+        report_class = self._load_report_class(module_name)
+        # report_class = self._load_report_class(name)
+
         report = report_class(session=self.session, logger=self.logger, **kwargs)
         result_df = report.run()
         return result_df
