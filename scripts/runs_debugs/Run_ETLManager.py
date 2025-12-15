@@ -10,7 +10,7 @@ data_sources_to_process = [
     # -----
     # "hgnc",
     # "gene_ncbi",
-    # "ensembl",
+    "ensembl",
     #
     # Proteins
     # --------
@@ -54,7 +54,7 @@ data_sources_to_process = [
     # "dbsnp_chrx",
     # "dbsnp_chry",
     # "dbsnp_chrmt",
-    "gwas",
+    # "gwas",
     #
     # RelationShips
     # -------------
@@ -100,7 +100,7 @@ if __name__ == "__main__":
                     bf.update(
                         data_sources=[source],
                         run_steps=[step],
-                        force_steps=[step],
+                        # force_steps=[step],
                     )
                 except Exception as e:
                     print(f"❌ Error processing {source} [{step}]: {e}")

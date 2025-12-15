@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from sqlalchemy.orm import Session
-from sqlalchemy import func
 from pathlib import Path
 import os
 import re
@@ -164,32 +163,3 @@ class ReportBase:
             return "/".join(str(a) for a in alleles)
 
         return str(alleles) if alleles is not None else None
-
-    # CASE SENSITIVE ****
-    def _as_list(self, value: Any) -> Optional[List[str]]:
-        if value is None:
-            return None
-        if isinstance(value, (list, tuple, set)):
-            return [str(v) for v in value if v is not None and str(v).strip()]
-        s = str(value).strip()
-        return [s] if s else None
-
-    def _where_in_ci(self, stmt, column, values):
-        """
-        Case-insensitive WHERE IN for any DB (Postgres/SQLite).
-        """
-        values_list = self._as_list(values)
-        if not values_list:
-            return stmt
-        values_norm = [v.strip().lower() for v in values_list]
-        return stmt.where(func.lower(column).in_(values_norm))
-    
-    def _filter_ci(self, query, column, values):
-        if not values:
-            return query
-
-        if isinstance(values, str):
-            values = [values]
-
-        values = [v.strip().lower() for v in values if v]
-        return query.filter(func.lower(column).in_(values))

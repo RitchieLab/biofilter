@@ -283,6 +283,7 @@ class DBTuningMixin:
             ),
             # Fast uniqueness / existence check (matches the UniqueConstraint)
             ("entity_locations", ["entity_id", "assembly_id"]),
+            ("entity_locations", ["build", "chromosome", "start_pos", "end_pos"]),
             # ETL housekeeping
             ("entity_locations", ["data_source_id"]),
             ("entity_locations", ["etl_package_id"]),
