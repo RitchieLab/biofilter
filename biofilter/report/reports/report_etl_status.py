@@ -1,5 +1,5 @@
 import pandas as pd
-from sqlalchemy import func
+from sqlalchemy import select, and_, func
 from biofilter.report.reports.base_report import ReportBase
 from biofilter.db.models import ETLPackage, ETLDataSource, ETLSourceSystem
 
@@ -36,10 +36,11 @@ as stale (not aligned with latest extract).
         # ----------------------------
         # 1) Pull packages + metadata
         # ----------------------------
-        q = (
-            self.session.query(
+        stmt = (
+            select(
                 ETLSourceSystem.id.label("source_system_id"),
                 ETLSourceSystem.name.label("source_system"),
+
                 ETLDataSource.id.label("data_source_id"),
                 ETLDataSource.name.label("data_source"),
                 ETLDataSource.data_type.label("data_type"),
@@ -48,41 +49,45 @@ as stale (not aligned with latest extract).
                 ETLDataSource.schema_version.label("schema_version"),
                 ETLDataSource.active.label("data_source_active"),
                 ETLSourceSystem.active.label("source_system_active"),
+
                 ETLPackage.id.label("etl_package_id"),
                 ETLPackage.created_at,
                 ETLPackage.status,
                 ETLPackage.operation_type,
                 ETLPackage.note,
+
                 ETLPackage.extract_status,
                 ETLPackage.extract_start,
                 ETLPackage.extract_end,
                 ETLPackage.extract_hash,
+
                 ETLPackage.transform_status,
                 ETLPackage.transform_start,
                 ETLPackage.transform_end,
                 ETLPackage.transform_hash,
+
                 ETLPackage.load_status,
                 ETLPackage.load_start,
                 ETLPackage.load_end,
                 ETLPackage.load_hash,
+
                 ETLPackage.stats,
             )
+            .select_from(ETLPackage)
             .join(ETLDataSource, ETLDataSource.id == ETLPackage.data_source_id)
             .join(ETLSourceSystem, ETLSourceSystem.id == ETLDataSource.source_system_id)
         )
 
         if only_active:
-            q = q.filter(ETLDataSource.active.is_(True), ETLSourceSystem.active.is_(True))
+            stmt = stmt.where(
+                and_(ETLDataSource.active.is_(True), ETLSourceSystem.active.is_(True))
+            )
 
-        # case-insensitive filters
-        q = self._filter_ci(q, ETLSourceSystem.name, source_system)
-        q = self._filter_ci(q, ETLDataSource.name, data_sources)
+        # case-insensitive filters (compatible with str or list[str])
+        stmt = self._filter_ci(stmt, ETLSourceSystem.name, source_system)
+        stmt = self._filter_ci(stmt, ETLDataSource.name, data_sources)
 
-        rows = q.all()
-        if not rows:
-            return pd.DataFrame()
-
-        df = pd.DataFrame(rows)
+        df = pd.read_sql(stmt, self.session.bind)
 
         # ----------------------------
         # 2) Define what "GOOD" means

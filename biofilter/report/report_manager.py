@@ -203,6 +203,17 @@ class ReportManager:
             print(text)
         else:
             return text
+        
+    def example_input(self, identifier: str, print_output: bool = True) -> str:
+        """
+        Return 
+        """
+        cls = self.get_report_class(identifier)
+        text = cls.example_input()
+        if print_output:
+            print(text)
+        else:
+            return text
 
     def run_example(self, identifier: str, **kwargs):
         """

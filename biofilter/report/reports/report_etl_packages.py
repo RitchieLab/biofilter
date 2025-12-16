@@ -120,18 +120,46 @@ Recommended usage:
 
             df = pd.read_sql(stmt, self.session.bind)
 
+            # # Optional: derive simple duration metrics (minutes)
+            # for stage in ["extract", "transform", "load"]:
+            #     start_col = f"{stage}_start"
+            #     end_col = f"{stage}_end"
+            #     duration_col = f"{stage}_minutes"
+
+            #     if start_col in df.columns and end_col in df.columns:
+            #         df[duration_col] = (
+            #             (df[end_col] - df[start_col])
+            #             .dt.total_seconds()
+            #             .div(60)
+            #         )
             # Optional: derive simple duration metrics (minutes)
+            now = pd.Timestamp.now()
+
             for stage in ["extract", "transform", "load"]:
                 start_col = f"{stage}_start"
                 end_col = f"{stage}_end"
                 duration_col = f"{stage}_minutes"
 
                 if start_col in df.columns and end_col in df.columns:
+
+                    # Ensure datetime dtype (safe even if already datetime)
+                    df[start_col] = pd.to_datetime(df[start_col], errors="coerce")
+                    df[end_col] = pd.to_datetime(df[end_col], errors="coerce")
+
+                    # Use end if present, otherwise "now" ONLY if start exists
+                    effective_end = df[end_col].where(
+                        df[end_col].notna(),
+                        now
+                    )
+
                     df[duration_col] = (
-                        (df[end_col] - df[start_col])
+                        (effective_end - df[start_col])
                         .dt.total_seconds()
                         .div(60)
                     )
+
+                    # If start is NULL → duration must be NULL
+                    df.loc[df[start_col].isna(), duration_col] = None
 
             return df
 
