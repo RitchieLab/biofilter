@@ -25,6 +25,24 @@ class ETLPackagesReport(ReportBase):
         "transform / load statuses, timestamps, row counts, hashes, and stats."
     )
 
+    # -----------------------------
+    # Helpers / Schema contract
+    # -----------------------------
+    @classmethod
+    def available_columns(cls) -> list[str]:
+        """
+        Internal column keys that can be requested via output_columns=[...].
+        (These are stable keys; display names can be changed later.)
+        """
+        return [
+            # input / match
+            "...",
+
+            # provenance
+            "data_source",
+            "source_system",
+        ]
+       
     @classmethod
     def explain(cls) -> str:
         return """\

@@ -1,4 +1,8 @@
 # import os
+from __future__ import annotations
+
+from typing import Iterable, Optional, Union
+
 import json
 from pathlib import Path
 
@@ -125,6 +129,76 @@ class Biofilter:
             self.db_uri = new_uri
         self.db = Database(self.db_uri)
 
+    # -------------------------------------------
+    # UPDATE INTERFACES  / ETL MANAGEMENT METHODS
+    # -------------------------------------------
+
+    # Create Indexes
+    # -------------------------------------------
+    def rebuild_indexes(
+        self,
+        groups: Optional[Union[str, Iterable[str]]] = None,
+        drop_only: bool = False,
+        drop_first: bool = True,
+        set_write_mode: bool = True,
+        set_read_mode: bool = True,
+    ) -> tuple[bool, str]:
+        """
+        Rebuild (drop/create) database indexes for selected index groups.
+
+        Parameters
+        ----------
+        groups:
+            Which index groups to process.
+            - None: rebuild all groups
+            - str: single group name (e.g. "genes", "protein", "variants")
+            - Iterable[str]: multiple group names (e.g. ["gene", "protein"])
+        drop_only:
+            If True, only drops indexes and returns.
+        drop_first:
+            If True, drops indexes before creating them.
+        set_write_mode / set_read_mode:
+            Enables DB tuning hooks (SQLite PRAGMAs). No-op on Postgres.
+
+        Examples
+        --------
+        bf.rebuild_indexes()  # all groups
+        bf.rebuild_indexes("genes")
+        bf.rebuild_indexes(["genes", "proteins"], drop_first=True)
+        bf.rebuild_indexes("variant", drop_only=True)
+        """
+        if not self.db:
+            msg = "Database not connected. Use connect_db() first."
+            self.logger.log(msg, "ERROR")
+            raise RuntimeError(msg)
+
+        # Normalize groups -> list[str] | None
+        if groups is None:
+            index_group = None
+        elif isinstance(groups, str):
+            index_group = [groups]
+        else:
+            index_group = list(groups)
+
+        self.logger.log("🧱 Starting index rebuild...", "INFO")
+
+        manager = ETLManager(self.debug_mode, self.db.get_session())
+
+        ok, msg = manager.rebuild_indexes(
+            index_group=index_group,
+            drop_only=drop_only,
+            drop_first=drop_first,
+            set_write_mode=set_write_mode,
+            set_read_mode=set_read_mode,
+        )
+
+        level = "INFO" if ok else "WARNING"
+        self.logger.log(msg, level)
+
+        return ok, msg
+
+    # Update Data Sources
+    # -------------------------------------------
     def update(
         self,
         source_system: list = None,

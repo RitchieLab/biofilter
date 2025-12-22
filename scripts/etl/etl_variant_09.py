@@ -75,8 +75,8 @@ data_sources_to_process = [
 ]
 
 run_steps = [
-    "extract",
-    "transform",
+    # "extract",
+    # "transform",
     "load",
     # "all"
 ]  # noqa E501

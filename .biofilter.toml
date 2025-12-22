@@ -1,7 +1,7 @@
 [database]
 db_uri = "postgresql+psycopg2://bioadmin:bioadmin@localhost/biofilter"
-echo_sql = false         # opcional, útil para debug
-auto_create = false      # permitir criar DB automaticamente se faltar
+echo_sql = false         # opcional, util for debug
+auto_create = false      # Create DB if didnt exist yet
 
 [etl]
 data_root = "./biofilter_data"

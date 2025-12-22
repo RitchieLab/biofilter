@@ -1,9 +1,11 @@
+from __future__ import annotations
+
 import os
 import shutil
 import glob
 import json
 import importlib
-from typing import Union, List, Optional
+from typing import Callable, Iterable, Sequence, Any, Union, List, Optional
 from datetime import datetime
 
 # from collections.abc import Iterable
@@ -17,6 +19,9 @@ from biofilter.db.models import (
     ETLSourceSystem,
     # ETLLog,
 )  # noqa: E501
+from biofilter.etl.mixins.base_dtp_turning import DBTuningMixin
+
+# IndexSpecFn = Callable[[], list[tuple[str, list[str]]]]  # seu formato atual
 
 ETL_TABLE_PREFIX = "etl_"
 PURGE_ORDER_OVERRIDE = [
@@ -38,6 +43,136 @@ class ETLManager:
         self.debug_mode = debug_mode
         self.session = session
         self.logger = Logger()
+
+    # ----------------------------------
+    # CREATE AND DROP TABLE INDEXES
+    # ----------------------------------
+    def rebuild_indexes(
+        self,
+        index_group: Optional[Iterable[str]] = None,
+        drop_only: bool = False,
+        drop_first: bool = True,
+        set_write_mode: bool = True,
+        set_read_mode: bool = True,
+    ) -> tuple[bool, str]:
+        
+        """
+        Use the DTP Mixin to access methods to run these functions
+        """
+
+        tuning = DBTuningMixin()._bind_db_tuning(self.session, self.logger)
+
+        INDEX_GROUP_CATALOG = {
+            "entity": tuning.get_entity_index_specs,
+            "entity_relationship": tuning.get_entity_relationship_index_specs,
+            "entity_location": tuning.get_entity_location_index_specs,
+            "gene": tuning.get_gene_index_specs,
+            "variant": tuning.get_snp_index_specs,
+            "protein": tuning.get_protein_index_specs,
+            "go": tuning.get_go_index_specs,
+            "pathway": tuning.get_pathway_index_specs,
+            "gwas": tuning.get_variant_gwas_index_specs,
+            "disease": tuning.get_disease_index_specs,
+            "chemical": tuning.get_chemical_index_specs,
+        }
+
+        ALIASES = {
+            "entity": "entity",
+            "entities": "entity",
+            "entity_relationship": "entity_relationship",
+            "entity_location": "entity_location",
+            "go": "go",
+            "pathway": "pathway",
+            "pathways": "pathway",
+            "gwas": "gwas",
+            "disease": "disease",
+            "diseases": "disease",
+            "chemical": "chemical",
+            "chemicals": "chemical",
+            "gene": "gene",
+            "genes": "gene",
+            "variant": "variant",
+            "variants": "variant",
+            "protein": "protein",
+            "proteins": "protein",
+        }
+
+        # Resolve requested groups
+        if not index_group:
+            selected = INDEX_GROUP_CATALOG
+        else:
+            selected = {}
+            invalid = []
+            for g in index_group:
+                key = ALIASES.get(str(g).strip().lower())
+                if key and key in INDEX_GROUP_CATALOG:
+                    selected[key] = INDEX_GROUP_CATALOG[key]
+                else:
+                    invalid.append(g)
+
+            if invalid:
+                self.logger.log(
+                    f"⚠️ Unknown index groups ignored: {invalid}. "
+                    f"Valid groups: {sorted(INDEX_GROUP_CATALOG.keys())}",
+                    "WARNING",
+                )
+
+        if not selected:
+            msg = "❌ No valid index groups selected. Nothing to do."
+            self.logger.log(msg, "ERROR")
+            return False, msg
+
+        total_warnings = 0
+        msg = "OK"
+
+        if set_write_mode:
+            tuning.db_write_mode()
+
+        # Drop phase
+        if drop_only or drop_first:
+            self.logger.log("🧹 Dropping indexes...", "INFO")
+            for group_name, spec_fn in selected.items():
+                specs = spec_fn
+                if not specs:
+                    continue
+                try:
+                    tuning.drop_indexes(specs)
+                except Exception as e:
+                    total_warnings += 1
+                    msg = f"⚠️ Failed to drop indexes for {group_name}: {e}"
+                    self.logger.log(msg, "WARNING")
+
+            if drop_only:
+                if set_read_mode:
+                    tuning.db_read_mode()
+                final = f"✅ Dropped indexes with {total_warnings} warning(s)."
+                level = "WARNING" if total_warnings else "INFO"
+                self.logger.log(final, level)
+                return (total_warnings == 0), final
+
+        # Create phase
+        self.logger.log("🏗️ Creating indexes...", "INFO")
+        for group_name, spec_fn in selected.items():
+            specs = spec_fn
+            if not specs:
+                continue
+            try:
+                self.logger.log(f"🏗️ Creating indexes for {group_name}...", "INFO")
+                tuning.create_indexes(specs)
+            except Exception as e:
+                total_warnings += 1
+                msg = f"⚠️ Failed to create indexes for {group_name}: {e}"
+                self.logger.log(msg, "WARNING")
+
+        if set_read_mode:
+            tuning.db_read_mode()
+
+        final = f"✅ Index rebuild finished with {total_warnings} warning(s)."
+        level = "WARNING" if total_warnings else "INFO"
+        self.logger.log(final, level)
+
+        return True, final
+
 
     # TODO: Pensar nesse metodo, pois agora teremos os Packages e podemos estornar por eles ou o DataSource todo.
     # def restart_etl_process(

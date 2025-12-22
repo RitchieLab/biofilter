@@ -73,21 +73,15 @@ Rules:
 - SNP lookup uses VariantSNP and overlaps are computed using build 38 coordinates (position_38).
 - VariantSNP contains both position_38 and position_37; the report can display both.
 
-Performance strategy:
-- For small inputs, runs one indexed query per gene range (fast for <= ~50 genes).
-- For larger inputs, groups by chromosome and runs ONE query per chromosome partition
-  using [min(w_start), max(w_end)] and then matches per gene in pandas.
-
 Parameters:
 - input_data: list[str] or path to .txt file (required)
 - window_bp: int >= 0 (default: 1000). Extends the gene region +/- window_bp (build 38).
-- assembly: "37" | "38" | None (default None). OUTPUT-ONLY:
-    - None: show both 'SNP Pos (Build 38)' and 'SNP Pos (Build 37)'
-    - "38": show only 'SNP Pos (Build 38)'
-    - "37": show only 'SNP Pos (Build 37)'
+- assembly: "37" | "38" | None (default None).
+    NOTE: assembly is OUTPUT-ONLY:
+      - None: show both 'SNP Pos (Build 38)' and 'SNP Pos (Build 37)'
+      - "38": show only 'SNP Pos (Build 38)'
+      - "37": show only 'SNP Pos (Build 37)'
 - output_columns: optional list[str] of DISPLAY NAMES (see available_columns()).
-- strategy: "auto" | "per_gene" | "per_chr" (default "auto")
-- per_gene_threshold: int (default 50). Used when strategy="auto".
 
 Usage:
     df = bf.report.run(
@@ -95,8 +89,18 @@ Usage:
         input_data=["TP53", "HGNC:11998"],
         window_bp=5000,
         assembly=None,
-        strategy="auto",
-        output_columns=["HGNC Symbol", "Variant ID", "SNP Pos (Build 38)", "Note"],
+        output_columns=[
+            "Input Gene",
+            "HGNC Symbol",
+            "Gene Chr (23:X/24:Y)",
+            "Gene Start (Build 38)",
+            "Gene End (Build 38)",
+            "Variant Type",
+            "Variant ID",
+            "SNP Pos (Build 38)",
+            "SNP Pos (Build 37)",
+            "Note",
+        ],
     )
 """
 
@@ -156,28 +160,17 @@ Usage:
                 )
                 return pd.DataFrame()
 
-        # perf params
-        strategy = str(self.params.get("strategy", "auto")).strip().lower()
-        if strategy not in ("auto", "per_gene", "per_chr"):
-            self.logger.log("strategy must be one of: auto, per_gene, per_chr. Using auto.", "WARNING")
-            strategy = "auto"
-
-        per_gene_threshold = self.params.get("per_gene_threshold", 50)
-        try:
-            per_gene_threshold = int(per_gene_threshold)
-            if per_gene_threshold < 1:
-                raise ValueError()
-        except Exception:
-            per_gene_threshold = 50
-
         # -----------------------------
         # Resolve Gene group id
         # -----------------------------
-        gene_group_id = (
-            self.session.query(EntityGroup.id)
-            .filter(EntityGroup.name.ilike("Genes"))
-            .scalar()
-        )
+                # Avoid idle in transaction
+        bind = self.session.get_bind()
+        with bind.connect() as conn:
+            gene_group_id = (
+                self.session.query(EntityGroup.id)
+                .filter(EntityGroup.name.ilike("Genes"))
+                .scalar()
+            )
         if not gene_group_id:
             self.logger.log("EntityGroup 'Genes' not found in the database.", "ERROR")
             return pd.DataFrame()
@@ -197,6 +190,7 @@ Usage:
                 PrimaryAlias.alias_value.label("symbol"),
                 Entity.has_conflict,
                 Entity.is_active,
+                # scoring fields to select "best" input per entity_id
                 PrimaryAlias.is_primary.label("primary_is_primary"),
             )
             .join(Entity, Entity.id == EntityAlias.entity_id)
@@ -206,9 +200,11 @@ Usage:
             .filter(EntityAlias.alias_norm.in_(input_list))
         )
 
+        # Avoid idle in transaction (execute outside Session transaction)
         bind = self.session.get_bind()
         with bind.connect() as conn:
             gene_df = pd.read_sql(gene_query.statement, conn)
+        # gene_df = pd.DataFrame(gene_query.all())
 
         if gene_df.empty:
             self.logger.log("No genes matched the input list.", "WARNING")
@@ -217,6 +213,7 @@ Usage:
         gene_df["input_gene"] = gene_df["entity_norm"].map(input_map)
         gene_df["input_rank"] = gene_df["entity_norm"].map(input_order)
 
+        # Priority: primary/preferred first, then first input order
         gene_df["priority_rank"] = (
             gene_df["primary_is_primary"]
             .fillna(False)
@@ -228,6 +225,7 @@ Usage:
         )
 
         unique_genes_df = gene_df.drop_duplicates(subset=["entity_id"], keep="first").copy()
+
         duplicates_df = gene_df[~gene_df.index.isin(unique_genes_df.index)].copy()
         if not duplicates_df.empty:
             duplicates_df["note"] = "Duplicate entity_id: mapped to same gene as another input"
@@ -248,50 +246,118 @@ Usage:
             )
             .filter(EntityLocation.entity_id.in_(gene_entity_ids))
             .filter(EntityLocation.build == 38)
-            .filter(EntityLocation.start_pos.isnot(None))
-            .filter(EntityLocation.end_pos.isnot(None))
         )
 
+        # Avoid idle in transaction
+        bind = self.session.get_bind()
         with bind.connect() as conn:
             loc_df = pd.read_sql(loc_stmt.statement, conn)
+        # loc_df = pd.DataFrame(loc_stmt.all())
 
         if loc_df.empty:
             self.logger.log("No gene locations found for build=38.", "WARNING")
             out = unique_genes_df.copy()
-            out["note"] = out.get("note", pd.NA)
-            return self._finalize_output(out, assembly=assembly, output_columns=output_columns)
-
-        # windowed ranges
-        loc_df["w_start"] = (pd.to_numeric(loc_df["gene_start_38"], errors="coerce") - window_bp).clip(lower=0)
-        loc_df["w_end"] = (pd.to_numeric(loc_df["gene_end_38"], errors="coerce") + window_bp)
-
-        # choose strategy
-        n_genes = int(loc_df["gene_entity_id"].nunique())
-        if strategy == "auto":
-            chosen = "per_gene" if n_genes <= per_gene_threshold else "per_chr"
-        else:
-            chosen = strategy
+            out["note"] = out.get("note", None)
+            return self._finalize_output(
+                out,
+                assembly=assembly,
+                output_columns=output_columns,
+            )
 
         # -----------------------------
-        # QUERY 3: Fetch SNPs using chosen strategy
+        # QUERY 3: SNP overlap by build 38 coordinates (always)
         # -----------------------------
-        if chosen == "per_gene":
-            snp_df = self._fetch_snps_per_gene(loc_df, bind)
-        else:
-            snp_df = self._fetch_snps_per_chr(loc_df, bind)
+        # snp_stmt = (
+        #     self.session.query(
+        #         EntityLocation.entity_id.label("gene_entity_id"),
+        #         VariantSNP.source_type.label("source_type"),
+        #         VariantSNP.source_id.label("source_id"),
+        #         VariantSNP.chromosome.label("snp_chr"),
+        #         VariantSNP.position_38.label("snp_pos_38"),
+        #         VariantSNP.position_37.label("snp_pos_37"),
+        #         VariantSNP.reference_allele.label("ref"),
+        #         VariantSNP.alternate_allele.label("alt"),
+        #         ETLDataSource.name.label("data_source"),
+        #         ETLSourceSystem.name.label("source_system"),
+        #     )
+        #     .select_from(EntityLocation)
+        #     .join(
+        #         VariantSNP,
+        #         and_(
+        #             # 🔒 Garantias mínimas de sanidade
+        #             EntityLocation.start_pos.isnot(None),
+        #             EntityLocation.end_pos.isnot(None),
 
-        # Add provenance for returned SNPs (optional, but in your columns contract)
-        if not snp_df.empty:
-            # join provenance in SQL (cheaper than pandas join on large df? depends)
-            # We'll do a lightweight pandas merge here if data_source_id exists.
-            # If you didn't select data_source_id, we select DataSource/SourceSystem in SQL in the fetch methods.
-            pass
+        #             # 🔑 Join por cromossomo (partition key)
+        #             VariantSNP.chromosome == EntityLocation.chromosome,
+
+        #             # 🔍 Overlap sempre usando build 38
+        #             VariantSNP.position_38.isnot(None),
+        #             VariantSNP.position_38 >= (EntityLocation.start_pos - window_bp),
+        #             VariantSNP.position_38 <= (EntityLocation.end_pos + window_bp),
+        #         ),
+        #     )
+        #     .outerjoin(ETLDataSource, ETLDataSource.id == VariantSNP.data_source_id)
+        #     .outerjoin(ETLSourceSystem, ETLSourceSystem.id == ETLDataSource.source_system_id)
+        #     .filter(EntityLocation.entity_id.in_(gene_entity_ids))
+        #     .filter(EntityLocation.build == 38)
+        # )
+
+        # # Avoid idle in transaction
+        # bind = self.session.get_bind()
+        # with bind.connect() as conn:
+        #     snp_df = pd.read_sql(snp_stmt.statement, conn)
+        # # snp_df = pd.DataFrame(snp_stmt.all())
+        # # snp_df can be empty (valid case)
+        loc_w = (
+            select(
+                EntityLocation.entity_id.label("gene_entity_id"),
+                EntityLocation.chromosome.label("gene_chr"),
+                (EntityLocation.start_pos - window_bp).label("w_start"),
+                (EntityLocation.end_pos + window_bp).label("w_end"),
+            )
+            .where(
+                EntityLocation.entity_id.in_(gene_entity_ids),
+                EntityLocation.build == 38,
+                EntityLocation.start_pos.isnot(None),
+                EntityLocation.end_pos.isnot(None),
+            )
+        ).subquery()
+
+        snp_stmt = (
+            self.session.query(
+                loc_w.c.gene_entity_id,
+                VariantSNP.source_type,
+                VariantSNP.source_id,
+                VariantSNP.chromosome.label("snp_chr"),
+                VariantSNP.position_38.label("snp_pos_38"),
+                VariantSNP.position_37.label("snp_pos_37"),
+                VariantSNP.reference_allele.label("ref"),
+                VariantSNP.alternate_allele.label("alt"),
+            )
+            .select_from(loc_w)
+            .join(
+                VariantSNP,
+                and_(
+                    VariantSNP.chromosome == loc_w.c.gene_chr,
+                    VariantSNP.position_38.isnot(None),
+                    VariantSNP.position_38 >= loc_w.c.w_start,
+                    VariantSNP.position_38 <= loc_w.c.w_end,
+                ),
+            )
+        )
+        # Avoid idle in transaction
+        bind = self.session.get_bind()
+        with bind.connect() as conn:
+            snp_df = pd.read_sql(snp_stmt.statement, conn)
+        # snp_df = pd.DataFrame(snp_stmt.all())
+        # snp_df can be empty (valid case)
 
         # -----------------------------
         # Build final output (internal cols)
         # -----------------------------
         out_df = unique_genes_df.merge(
-            loc_df.drop(columns=["w_start", "w_end"], errors="ignore"),
+            loc_df,
             left_on="entity_id",
             right_on="gene_entity_id",
             how="left",
@@ -314,7 +380,7 @@ Usage:
             ]:
                 out_df[c] = pd.NA
 
-        # Notes
+        # Notes for genes with no SNPs
         out_df["note"] = out_df.get("note", pd.NA)
         out_df.loc[out_df["source_id"].isna(), "note"] = out_df.loc[out_df["source_id"].isna(), "note"].fillna(
             "No SNPs found overlapping the gene region"
@@ -325,128 +391,11 @@ Usage:
             dup_aligned = duplicates_df.reindex(columns=out_df.columns, fill_value=pd.NA)
             out_df = pd.concat([out_df, dup_aligned], ignore_index=True)
 
-        return self._finalize_output(out_df, assembly=assembly, output_columns=output_columns)
-
-    # -----------------------------
-    # SNP fetch strategies
-    # -----------------------------
-    def _fetch_snps_per_gene(self, loc_df: pd.DataFrame, bind) -> pd.DataFrame:
-        """
-        One indexed query per gene range.
-        Best for small number of genes.
-        """
-        rows = []
-        with bind.connect() as conn:
-            # iterate deterministically
-            for r in loc_df[["gene_entity_id", "gene_chr", "w_start", "w_end"]].itertuples(index=False):
-                gene_entity_id = int(r.gene_entity_id)
-                chr_ = int(r.gene_chr)
-                w_start = int(r.w_start)
-                w_end = int(r.w_end)
-
-                stmt = (
-                    select(
-                        VariantSNP.chromosome.label("snp_chr"),
-                        VariantSNP.source_type.label("source_type"),
-                        VariantSNP.source_id.label("source_id"),
-                        VariantSNP.position_38.label("snp_pos_38"),
-                        VariantSNP.position_37.label("snp_pos_37"),
-                        VariantSNP.reference_allele.label("ref"),
-                        VariantSNP.alternate_allele.label("alt"),
-                        ETLDataSource.name.label("data_source"),
-                        ETLSourceSystem.name.label("source_system"),
-                    )
-                    .select_from(VariantSNP)
-                    .outerjoin(ETLDataSource, ETLDataSource.id == VariantSNP.data_source_id)
-                    .outerjoin(ETLSourceSystem, ETLSourceSystem.id == ETLDataSource.source_system_id)
-                    .where(
-                        VariantSNP.chromosome == chr_,
-                        VariantSNP.position_38.isnot(None),
-                        VariantSNP.position_38 >= w_start,
-                        VariantSNP.position_38 <= w_end,
-                    )
-                )
-                df_one = pd.read_sql(stmt, conn)
-                if not df_one.empty:
-                    df_one["gene_entity_id"] = gene_entity_id
-                    rows.append(df_one)
-
-        if not rows:
-            return pd.DataFrame()
-
-        return pd.concat(rows, ignore_index=True)
-
-    def _fetch_snps_per_chr(self, loc_df: pd.DataFrame, bind) -> pd.DataFrame:
-        """
-        One query per chromosome partition:
-          - fetch all SNPs in [min(w_start), max(w_end)]
-          - match to genes in pandas
-        Best for larger inputs.
-        """
-        out_parts = []
-
-        # group ranges by chromosome
-        for chr_, g in loc_df.groupby("gene_chr", sort=True):
-            try:
-                chr_int = int(chr_)
-            except Exception:
-                continue
-
-            w_min = int(pd.to_numeric(g["w_start"], errors="coerce").min())
-            w_max = int(pd.to_numeric(g["w_end"], errors="coerce").max())
-            if w_min > w_max:
-                continue
-
-            stmt = (
-                select(
-                    VariantSNP.chromosome.label("snp_chr"),
-                    VariantSNP.source_type.label("source_type"),
-                    VariantSNP.source_id.label("source_id"),
-                    VariantSNP.position_38.label("snp_pos_38"),
-                    VariantSNP.position_37.label("snp_pos_37"),
-                    VariantSNP.reference_allele.label("ref"),
-                    VariantSNP.alternate_allele.label("alt"),
-                    ETLDataSource.name.label("data_source"),
-                    ETLSourceSystem.name.label("source_system"),
-                )
-                .select_from(VariantSNP)
-                .outerjoin(ETLDataSource, ETLDataSource.id == VariantSNP.data_source_id)
-                .outerjoin(ETLSourceSystem, ETLSourceSystem.id == ETLDataSource.source_system_id)
-                .where(
-                    VariantSNP.chromosome == chr_int,
-                    VariantSNP.position_38.isnot(None),
-                    VariantSNP.position_38 >= w_min,
-                    VariantSNP.position_38 <= w_max,
-                )
-            )
-
-            with bind.connect() as conn:
-                snps_chr = pd.read_sql(stmt, conn)
-
-            if snps_chr.empty:
-                continue
-
-            # match snps to each gene in this chromosome group
-            snps_chr["snp_pos_38"] = pd.to_numeric(snps_chr["snp_pos_38"], errors="coerce")
-
-            matches = []
-            for rr in g[["gene_entity_id", "w_start", "w_end"]].itertuples(index=False):
-                gene_entity_id = int(rr.gene_entity_id)
-                w_start = int(rr.w_start)
-                w_end = int(rr.w_end)
-                m = snps_chr[(snps_chr["snp_pos_38"] >= w_start) & (snps_chr["snp_pos_38"] <= w_end)]
-                if not m.empty:
-                    mm = m.copy()
-                    mm["gene_entity_id"] = gene_entity_id
-                    matches.append(mm)
-
-            if matches:
-                out_parts.append(pd.concat(matches, ignore_index=True))
-
-        if not out_parts:
-            return pd.DataFrame()
-
-        return pd.concat(out_parts, ignore_index=True)
+        return self._finalize_output(
+            out_df,
+            assembly=assembly,
+            output_columns=output_columns,
+        )
 
     # -----------------------------
     # Output formatting
@@ -460,6 +409,7 @@ Usage:
         if df is None or df.empty:
             return pd.DataFrame()
 
+        # Map internal -> display names
         rename = {
             "input_gene": "Input Gene",
             "entity_value": "Matched Name",
@@ -493,7 +443,7 @@ Usage:
         elif assembly == "37":
             df = df.drop(columns=["SNP Pos (Build 38)"], errors="ignore")
 
-        # Convert int-like columns to integer-formatted strings, preserving NA
+        # Convert int-like columns to "integer-formatted strings" (no .0), preserving NA
         int_like_display_cols = [
             "Gene Build",
             "Gene Chr (23:X/24:Y)",
@@ -512,10 +462,15 @@ Usage:
         # Filter columns if requested (DISPLAY NAMES)
         if output_columns is not None:
             keep = [c for c in output_columns if c in df.columns]
+            # Always keep Note if present (helpful for duplicates/no SNP)
             if "Note" in df.columns and "Note" not in keep:
                 keep.append("Note")
             df = df[keep]
+
+        # Default ordering: use display column contract (but skip columns not present)
+        ordered_cols = [c for c in self.available_columns() if c in df.columns]
+        # If user filtered, preserve user order (already in df)
+        if output_columns is not None:
             return df
 
-        ordered_cols = [c for c in self.available_columns() if c in df.columns]
         return df[ordered_cols]

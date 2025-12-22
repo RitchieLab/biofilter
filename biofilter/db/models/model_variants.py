@@ -6,6 +6,8 @@ from sqlalchemy import (
     String,
     Float,
     Text,
+    UniqueConstraint,
+    PrimaryKeyConstraint,
 )
 from sqlalchemy.orm import relationship
 from biofilter.db.base import Base
@@ -29,30 +31,63 @@ Future releases may reintroduce richer variant Entity modeling when VEP
 annotation layers are fully established.
 """
 
+# # This model has rsID as PK because the group asked to keep only dbSNP as Source
+# # and now they need more sources
+# class VariantSNP(Base):
+#     __tablename__ = "variant_snps"
 
+#     # Natural primary key: numeric rsID (e.g., 123456 for rs123456)
+#     rs_id = Column(BigInteger, primary_key=True)
+#     # This is not necessary here
+#     # id = Column(PKBigIntOrInt, primary_key=True, autoincrement=True)
+
+#     # Chromosome encoding:
+#     #   1..22 = autosomes
+#     #   23    = X
+#     #   24    = Y
+#     #   25    = MT
+#     chromosome = Column(Integer, nullable=False)
+
+#     # This version works only with SNV (no range).
+#     # Position in each build is optional: if the SNP is missing in a build,
+#     # the corresponding position is NULL.
+#     position_37 = Column(BigInteger, nullable=True)
+#     position_38 = Column(BigInteger, nullable=True)
+
+#     # SNV alleles. We allow some extra room for edge cases.
+#     reference_allele = Column(String(4), nullable=True)
+#     alternate_allele = Column(String(16), nullable=True)
+
+#     # Provenance
+#     data_source_id = Column(
+#         Integer,
+#         ForeignKey("etl_data_sources.id", ondelete="CASCADE"),
+#         nullable=True,
+#     )
+#     data_source = relationship("ETLDataSource", passive_deletes=True)
+
+#     etl_package_id = Column(
+#         Integer,
+#         ForeignKey("etl_packages.id", ondelete="CASCADE"),
+#         nullable=True,
+#     )
+#     etl_package = relationship("ETLPackage", passive_deletes=True)
 class VariantSNP(Base):
-
     __tablename__ = "variant_snps"
 
-    # Natural primary key: numeric rsID (e.g., 123456 for rs123456)
-    rs_id = Column(BigInteger, primary_key=True)
-    # This is not necessary here
-    # id = Column(PKBigIntOrInt, primary_key=True, autoincrement=True)
-
-    # Chromosome encoding:
-    #   1..22 = autosomes
-    #   23    = X
-    #   24    = Y
-    #   25    = MT
+    # Partition key
     chromosome = Column(Integer, nullable=False)
 
-    # This version works only with SNV (no range).
-    # Position in each build is optional: if the SNP is missing in a build,
-    # the corresponding position is NULL.
+    # Identity / autoincrement (works well on Postgres; SQLite will emulate)
+    id = Column(PKBigIntOrInt, autoincrement=True, nullable=False)
+
+    source_type = Column(String(20), nullable=False)   # e.g. "rs"
+    source_id = Column(BigInteger, nullable=False)     # numeric part (e.g. 123 for rs123)
+
     position_37 = Column(BigInteger, nullable=True)
     position_38 = Column(BigInteger, nullable=True)
+    position_other = Column(BigInteger, nullable=True)
 
-    # SNV alleles. We allow some extra room for edge cases.
     reference_allele = Column(String(4), nullable=True)
     alternate_allele = Column(String(16), nullable=True)
 
@@ -71,6 +106,17 @@ class VariantSNP(Base):
     )
     etl_package = relationship("ETLPackage", passive_deletes=True)
 
+    __table_args__ = (
+        # Must include the partition key in PK on Postgres
+        PrimaryKeyConstraint("chromosome", "id", name="pk_variant_snps"),
+        # Uniqueness that matches your lookup semantics and partitioning
+        UniqueConstraint(
+            "chromosome", "source_type", "source_id",
+            name="uq_variant_snps_chr_source"
+        ),
+    )
+
+    # IMPORT: This model is create table by DB management because partitions
 
 class VariantSNPMerge(Base):
 

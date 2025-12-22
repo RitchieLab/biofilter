@@ -9,6 +9,14 @@ class DBTuningMixin:
     Currently supports SQLite and creates indexes for SQLite/PostgreSQL.
     """
 
+    def _bind_db_tuning(self, session, logger):
+        """
+        Call DBTuningMixin direct from other class
+        """
+        self.session = session
+        self.logger = logger
+        return self
+
     def db_write_mode(self):
         """
         Apply SQLite-specific PRAGMA settings to optimize for bulk insert.
@@ -327,16 +335,20 @@ class DBTuningMixin:
             # --- SNP main table ---
             # PK (rs_id) is already indexed by default, but we keep it
             # here for explicitness and for helper symmetry.
-            ("variant_snps", ["rs_id"]),  # natural primary key
+            # ("variant_snps", ["rs_id"]),  # natural primary key
+            # ("variant_snps", ["source_id"]),
+            ("variant_snps", ["source_type", "source_id"]),
             # Common query patterns: by chromosome and position in each build
-            ("variant_snps", ["chromosome"]),
-            ("variant_snps", ["position_37"]),
-            ("variant_snps", ["position_38"]),
+            # ("variant_snps", ["chromosome"]),
+            # ("variant_snps", ["position_37"]),
+            # ("variant_snps", ["position_38"]),
             ("variant_snps", ["chromosome", "position_37"]),
             ("variant_snps", ["chromosome", "position_38"]),
             # Provenance filters (ETL / source system scoping)
-            ("variant_snps", ["data_source_id"]),
-            ("variant_snps", ["etl_package_id"]),
+            # ("variant_snps", ["data_source_id"]),
+            # ("variant_snps", ["etl_package_id"]),
+            ("variant_snps", ["data_source_id", "chromosome"]),
+            ("variant_snps", ["etl_package_id", "chromosome"]),
             # --- SNP merge table ---
             # Composite primary key: (rs_obsolete_id, rs_canonical_id)
             # PK also creates an index, but we expose them individually as well
@@ -368,7 +380,7 @@ class DBTuningMixin:
     def get_disease_index_specs(self):
         return [
             # DiseaseMaster
-            ("disease_masters", ["mondo_id"]),
+            ("disease_masters", ["disease_id"]),
             ("disease_masters", ["entity_id"]),
             ("disease_masters", ["data_source_id"]),
             # DiseaseGroupMembership

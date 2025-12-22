@@ -481,8 +481,9 @@ class DTP(DTPBase, EntityQueryMixin):
 
         # Set DB to Read Mode and Create Index
         try:
-            self.create_indexes(self.get_snp_index_specs)
-            self.db_read_mode()
+            # self.create_indexes(self.get_snp_index_specs)
+            # self.db_read_mode()
+            print("--> Indixe desativados")
         except Exception as e:
             total_warnings += 1
             msg = f"Failed to switch DB to write mode or drop indexes: {e}"
@@ -566,28 +567,24 @@ class DTP(DTPBase, EntityQueryMixin):
             chunk_size = 1000
 
         records: list[dict] = []
-        for _, row in df.iterrows():
+        # for _, row in df.iterrows():
+        for row in df.itertuples(index=False):
             try:
-                rs_num = int(row["rs_id"])
+                rs_num = int(row.rs_id)
+                chrom = int(row.chromosome)
             except Exception:
                 continue
 
             records.append(
                 {
-                    "rs_id": rs_num,
-                    "chromosome": int(row["chromosome"]),
-                    "position_37": (
-                        int(row["position_37"])
-                        if pd.notna(row["position_37"])
-                        else None  # noqa E501
-                    ),
-                    "position_38": (
-                        int(row["position_38"])
-                        if pd.notna(row["position_38"])
-                        else None  # noqa E501
-                    ),
-                    "reference_allele": row["reference_allele"],
-                    "alternate_allele": row["alternate_allele"],
+                    "source_id": rs_num,
+                    "source_type": "rs",
+                    "chromosome": chrom,
+                    "position_37": int(row.position_37) if pd.notna(row.position_37) else None,
+                    "position_38": int(row.position_38) if pd.notna(row.position_38) else None,
+                    "position_other": None,
+                    "reference_allele": row.reference_allele,
+                    "alternate_allele": row.alternate_allele,
                     "data_source_id": self.data_source.id,
                     "etl_package_id": self.package.id,
                 }
@@ -605,11 +602,13 @@ class DTP(DTPBase, EntityQueryMixin):
 
             if dialect_name in ("sqlite", "postgresql"):
                 stmt = stmt.on_conflict_do_update(
-                    index_elements=["rs_id"],
+                    # index_elements=["rs_id"],
+                    index_elements=["chromosome", "source_type", "source_id"],
                     set_={
                         "chromosome": stmt.excluded.chromosome,
                         "position_37": stmt.excluded.position_37,
                         "position_38": stmt.excluded.position_38,
+                        "position_other": stmt.excluded.position_other,
                         "reference_allele": stmt.excluded.reference_allele,
                         "alternate_allele": stmt.excluded.alternate_allele,
                         "data_source_id": stmt.excluded.data_source_id,
@@ -698,3 +697,28 @@ class DTP(DTPBase, EntityQueryMixin):
 
         # Single flush at the end
         self.session.flush()
+
+
+# # Como fica dentro do DTP
+
+# # Você mantém o bloco atual, mas vira algo bem menor:
+# ok, msg = self.etl_manager.rebuild_indexes(
+#     index_spec_fns=[self.get_gene_index_specs, self.get_entity_index_specs],
+#     drop_first=False,          # aqui seria só recriar no final
+#     set_write_mode=False,      # no final geralmente não precisa
+#     set_read_mode=True,
+#     label="Genes+Entity",
+# )
+# if not ok:
+#     total_warnings += 1
+
+# # E para o “pré-load drop”:
+# ok, msg = self.etl_manager.rebuild_indexes(
+#     index_spec_fns=[self.get_gene_index_specs, self.get_entity_index_specs],
+#     drop_first=True,
+#     set_write_mode=True,
+#     set_read_mode=False,   # vai continuar em write mode durante load
+#     label="Pre-load drop",
+# )
+# if not ok:
+#     return False, msg

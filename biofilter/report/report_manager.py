@@ -189,9 +189,25 @@ class ReportManager:
         try:
             report = self.get_report(identifier, **kwargs)
             return report.run()
+        # except Exception as e:
+        #     self.logger.log(f"Report '{identifier}' failed: {e}", "ERROR")
+        #     raise
+        # 3.2.0: Avoit idle in transation in Postgres
         except Exception as e:
             self.logger.log(f"Report '{identifier}' failed: {e}", "ERROR")
+            # Ensure we don't keep an aborted transaction open
+            try:
+                self.session.rollback()
+            except Exception:
+                pass
             raise
+        finally:
+            # Ensure no "idle in transaction" after SELECTs
+            try:
+                self.session.rollback()
+            except Exception:
+                pass
+
 
     def explain(self, identifier: str, print_output: bool = True) -> str:
         """
@@ -214,6 +230,17 @@ class ReportManager:
             print(text)
         else:
             return text
+    
+    def available_columns(self, identifier: str, print_output: bool = True) -> str:
+        """
+        Return 
+        """
+        cls = self.get_report_class(identifier)
+        text = cls.available_columns()
+        if print_output:
+            print(text)
+        else:
+            return text
 
     def run_example(self, identifier: str, **kwargs):
         """
@@ -221,4 +248,4 @@ class ReportManager:
         """
         cls = self.get_report_class(identifier)
         kwargs.setdefault("input_data", cls.example_input())
-        return self.run_report(identifier, **kwargs)
+        return self.run(identifier, **kwargs)
