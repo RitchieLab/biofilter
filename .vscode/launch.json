@@ -74,6 +74,14 @@
             "program": "${workspaceFolder}/scripts/runs_debugs/Query_test_01.py",
             "console": "integratedTerminal",
             "envFile": "${workspaceFolder}/.env"
+        },
+        {
+            "name": "Bio 3R - Run Reports - External",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/scripts/runs_debugs/Run_Reports.py",
+            "console": "integratedTerminal",
+            "envFile": "${workspaceFolder}/.env",
         }
     ]
 }

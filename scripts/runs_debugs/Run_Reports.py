@@ -10,10 +10,10 @@ from biofilter import Biofilter
 
 
 # db_uri = "sqlite:///dev_biofilter.db"
-db_uri = "postgresql+psycopg2://bioadmin:bioadmin@localhost/biofilter"
+# db_uri = "postgresql+psycopg2://bioadmin:bioadmin@localhost/biofilter"
 # db_uri = "postgresql+psycopg2://bioadmin:Penn%402025@109.199.114.191:5432/biofilter?sslmode=require"
 
-
+db_uri = "postgresql+psycopg://bioadmin:bioadmin@109.199.114.191:5432/biofilter?sslmode=require"
 
 bf = Biofilter(db_uri)
 

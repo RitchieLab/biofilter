@@ -1,8 +1,8 @@
 [tool.poetry]
 name = "biofilter"
 version = "3.2.0"
-description = "Biofilter Know"
-authors = ["Ritchie Lab <Software_RitchieLab@pennmedicine.upenn.edu>"]
+description = "Biofilter3R: cloud-ready biological knowledge system"
+authors = ["Andre Rico <andreluis.rico@pennmedicine.upenn.edu>"]
 license = "MIT"
 homepage = "https://ritchielab.org"
 readme = "README.md"
