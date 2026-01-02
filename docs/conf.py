@@ -12,7 +12,7 @@ sys.path.insert(0, os.path.abspath(".."))
 project = 'Biofilter'
 copyright = '2024, Ritchie Lab'
 author = 'Ritchie Lab'
-release = '2.4.4'
+release = '3.0.0'
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
