@@ -183,11 +183,3 @@ University of Pennsylvania
 
 Distributed under the original Biofilter license.
 See `LICENSE` file for details.
-
-
-
----
-
-## Development Documentation in:
-
-https://ritchielab.github.io/biofilter/
