@@ -1,12 +1,15 @@
 CHANGELOG
 
-2.4.4 (2025-01-08)
-- Reorganized code into functional packages
-- Developed unit tests
-- Added tools to support the project, such as black, phinx, poetry, pytest, and tox
-- Migrated setup.py configuration to Poetry, applying all dependencies
-- Fixed inconsistencies to ensure compatibility with Python versions 3.10 to 3.12
-- Added technical documentation for the project
+3.0.0 (2025-12-29)
+- Biofilter is now installed via PyPI as **`biofilter-loki`**
+- Biofilter is executed directly using the `biofilter` command (no longer via `python biofilter.py`)
+- Improved compatibility with Python **3.10–3.12**
+- Updated and consolidated user documentation, including a new Biofilter Manual (v3.0.0)
+- Reorganized the codebase into functional packages
+- Migrated build and packaging from `setup.py` to **Poetry**
+- Added unit tests and improved test coverage
+- Integrated modern development tools (black, pytest, tox)
+- Fixed multiple bugs and inconsistencies
 
 2.4.3 (2023-09-15)
 - updated from Python2 to Python3 
