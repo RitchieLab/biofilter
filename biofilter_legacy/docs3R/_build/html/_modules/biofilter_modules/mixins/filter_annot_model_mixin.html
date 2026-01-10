@@ -1,0 +1,1072 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>biofilter_modules.mixins.filter_annot_model_mixin &mdash; Biofilter 2.4.4 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=b1e24531"></script>
+      <script src="../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            Biofilter
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <!-- Local TOC -->
+              <div class="local-toc"></div>
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">Biofilter</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">biofilter_modules.mixins.filter_annot_model_mixin</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for biofilter_modules.mixins.filter_annot_model_mixin</h1><div class="highlight"><pre>
+<span></span><span class="c1"># #################################################</span>
+<span class="c1"># FILTERING, ANNOTATION &amp; MODELING MIXIN</span>
+<span class="c1"># #################################################</span>
+<span class="kn">import</span> <span class="nn">itertools</span>
+<span class="kn">import</span> <span class="nn">collections</span>
+<span class="kn">import</span> <span class="nn">string</span>
+
+
+<div class="viewcode-block" id="FilterAnnotModelMixin">
+<a class="viewcode-back" href="../../../biofilter_modules.mixins.html#biofilter_modules.FilterAnnotModelMixin">[docs]</a>
+<span class="k">class</span> <span class="nc">FilterAnnotModelMixin</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Mixin class for managing filtering, annotation, and modeling in a LOKI.</span>
+
+<span class="sd">    This class provides methods for generating filtered output, annotated</span>
+<span class="sd">    output, and gene models based on user input and database queries. It</span>
+<span class="sd">    includes methods for identifying candidate biopolymers and groups for</span>
+<span class="sd">    modeling, as well as generating gene models and output based on user-</span>
+<span class="sd">    defined filters and parameters.</span>
+
+<span class="sd">    IMPLEMENTED METHODS:</span>
+<span class="sd">    - [_populateColumnsFromTypes]:</span>
+<span class="sd">        Populates lists of columns and headers based on provided data types.</span>
+<span class="sd">    - [generateFilterOutput]:</span>
+<span class="sd">        Generates filter output based on provided data types.</span>
+<span class="sd">    - [generateAnnotationOutput]:</span>
+<span class="sd">        Generates annotated output by applying additional annotations to an</span>
+<span class="sd">        initial filtered dataset.</span>
+<span class="sd">    - [identifyCandidateModelBiopolymers]:</span>
+<span class="sd">        Identifies candidate biopolymers for models based on applicable</span>
+<span class="sd">        filters.</span>
+<span class="sd">    - [identifyCandidateModelGroups]:</span>
+<span class="sd">        Identifies candidate model groups based on specified filters and</span>
+<span class="sd">        criteria.</span>
+<span class="sd">    - [getGeneModels]:</span>
+<span class="sd">        Generates and returns gene models based on defined filters and</span>
+<span class="sd">        parameters.</span>
+<span class="sd">    - [generateModelOutput]:</span>
+<span class="sd">        Generates and returns output models by combining and expanding</span>
+<span class="sd">        specified column types.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">_populateColumnsFromTypes</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">types</span><span class="p">,</span> <span class="n">columns</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">header</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">ids</span><span class="o">=</span><span class="kc">None</span>
+    <span class="p">):</span>  <span class="c1"># noqa E501</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Populates lists of columns and headers based on provided data types.</span>
+
+<span class="sd">        This method accepts a list of data types (`types`) and expands</span>
+<span class="sd">        `columns` and `header` lists according to recognized types. It maps</span>
+<span class="sd">        specific types to their respective columns and headers for use in a</span>
+<span class="sd">        query. Unrecognized types trigger an exception.</span>
+
+<span class="sd">        Parameters:</span>
+<span class="sd">        - types (list): A list of strings representing data types to be mapped</span>
+<span class="sd">            to columns and headers.</span>
+<span class="sd">        - columns (list, optional): A list of columns that will be extended</span>
+<span class="sd">            with names associated with the provided types. If not provided, a</span>
+<span class="sd">            new list is created.</span>
+<span class="sd">        - header (list, optional): A list of headers that will be extended</span>
+<span class="sd">            with titles associated with the provided types. If not provided, a</span>
+<span class="sd">            new list is created.</span>
+<span class="sd">        - ids (list, optional): Currently unused, accepted for potential</span>
+<span class="sd">            future expansion. If not provided, a new list is created.</span>
+
+<span class="sd">        Behavior:</span>
+<span class="sd">        - The method iterates over each type in `types` and maps it to</span>
+<span class="sd">            relevant columns and headers.</span>
+<span class="sd">        - Specific types, such as &#39;snp&#39;, &#39;position&#39;, &#39;gene&#39;, etc., add related</span>
+<span class="sd">            columns and headers.</span>
+<span class="sd">        - Input types like &#39;snpinput&#39; and &#39;positioninput&#39; are mapped to</span>
+<span class="sd">            generic columns and headers.</span>
+<span class="sd">        - For unrecognized types, the method raises an exception to prevent</span>
+<span class="sd">            unexpected behavior.</span>
+<span class="sd">        - If a type exists in `_queryColumnSources`, it is directly added to</span>
+<span class="sd">            `header` and `columns`.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">        - columns (list): The updated list of columns with names corresponding</span>
+
+<span class="sd">        Usage Example:</span>
+<span class="sd">        - `_populateColumnsFromTypes([&#39;snp&#39;, &#39;gene&#39;])` adds columns related to</span>
+<span class="sd">            SNPs and genes to `columns` and `header` lists.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">columns</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">columns</span> <span class="o">=</span> <span class="nb">list</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">header</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">header</span> <span class="o">=</span> <span class="nb">list</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">ids</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">ids</span> <span class="o">=</span> <span class="nb">list</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="n">types</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">t</span> <span class="o">==</span> <span class="s2">&quot;snp&quot;</span><span class="p">:</span>
+                <span class="n">header</span><span class="o">.</span><span class="n">extend</span><span class="p">([</span><span class="s2">&quot;snp&quot;</span><span class="p">])</span>
+                <span class="n">columns</span><span class="o">.</span><span class="n">extend</span><span class="p">([</span><span class="s2">&quot;snp_label&quot;</span><span class="p">])</span>
+            <span class="k">elif</span> <span class="n">t</span> <span class="o">==</span> <span class="s2">&quot;position&quot;</span><span class="p">:</span>
+                <span class="n">header</span><span class="o">.</span><span class="n">extend</span><span class="p">([</span><span class="s2">&quot;chr&quot;</span><span class="p">,</span> <span class="s2">&quot;position&quot;</span><span class="p">,</span> <span class="s2">&quot;pos&quot;</span><span class="p">])</span>
+                <span class="n">columns</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span>
+                    <span class="p">[</span><span class="s2">&quot;position_chr&quot;</span><span class="p">,</span> <span class="s2">&quot;position_label&quot;</span><span class="p">,</span> <span class="s2">&quot;position_pos&quot;</span><span class="p">]</span>
+                <span class="p">)</span>  <span class="c1"># oddball .map file format</span>
+            <span class="k">elif</span> <span class="n">t</span> <span class="o">==</span> <span class="s2">&quot;gene&quot;</span><span class="p">:</span>
+                <span class="n">header</span><span class="o">.</span><span class="n">extend</span><span class="p">([</span><span class="s2">&quot;gene&quot;</span><span class="p">])</span>
+                <span class="n">columns</span><span class="o">.</span><span class="n">extend</span><span class="p">([</span><span class="s2">&quot;gene_label&quot;</span><span class="p">])</span>
+            <span class="k">elif</span> <span class="n">t</span> <span class="o">==</span> <span class="s2">&quot;generegion&quot;</span><span class="p">:</span>
+                <span class="n">header</span><span class="o">.</span><span class="n">extend</span><span class="p">([</span><span class="s2">&quot;chr&quot;</span><span class="p">,</span> <span class="s2">&quot;gene&quot;</span><span class="p">,</span> <span class="s2">&quot;start&quot;</span><span class="p">,</span> <span class="s2">&quot;stop&quot;</span><span class="p">])</span>
+                <span class="n">columns</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span>
+                    <span class="p">[</span>
+                        <span class="s2">&quot;biopolymer_chr&quot;</span><span class="p">,</span>
+                        <span class="s2">&quot;gene_label&quot;</span><span class="p">,</span>
+                        <span class="s2">&quot;biopolymer_start&quot;</span><span class="p">,</span>
+                        <span class="s2">&quot;biopolymer_stop&quot;</span><span class="p">,</span>
+                    <span class="p">]</span>
+                <span class="p">)</span>
+            <span class="k">elif</span> <span class="n">t</span> <span class="o">==</span> <span class="s2">&quot;upstream&quot;</span><span class="p">:</span>
+                <span class="n">header</span><span class="o">.</span><span class="n">extend</span><span class="p">([</span><span class="s2">&quot;upstream&quot;</span><span class="p">,</span> <span class="s2">&quot;distance&quot;</span><span class="p">])</span>
+                <span class="n">columns</span><span class="o">.</span><span class="n">extend</span><span class="p">([</span><span class="s2">&quot;upstream_label&quot;</span><span class="p">,</span> <span class="s2">&quot;upstream_distance&quot;</span><span class="p">])</span>
+            <span class="k">elif</span> <span class="n">t</span> <span class="o">==</span> <span class="s2">&quot;downstream&quot;</span><span class="p">:</span>
+                <span class="n">header</span><span class="o">.</span><span class="n">extend</span><span class="p">([</span><span class="s2">&quot;downstream&quot;</span><span class="p">,</span> <span class="s2">&quot;distance&quot;</span><span class="p">])</span>
+                <span class="n">columns</span><span class="o">.</span><span class="n">extend</span><span class="p">([</span><span class="s2">&quot;downstream_label&quot;</span><span class="p">,</span> <span class="s2">&quot;downstream_distance&quot;</span><span class="p">])</span>
+            <span class="k">elif</span> <span class="n">t</span> <span class="o">==</span> <span class="s2">&quot;region&quot;</span><span class="p">:</span>
+                <span class="n">header</span><span class="o">.</span><span class="n">extend</span><span class="p">([</span><span class="s2">&quot;chr&quot;</span><span class="p">,</span> <span class="s2">&quot;region&quot;</span><span class="p">,</span> <span class="s2">&quot;start&quot;</span><span class="p">,</span> <span class="s2">&quot;stop&quot;</span><span class="p">])</span>
+                <span class="n">columns</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span>
+                    <span class="p">[</span>
+                        <span class="s2">&quot;region_chr&quot;</span><span class="p">,</span>
+                        <span class="s2">&quot;region_label&quot;</span><span class="p">,</span>
+                        <span class="s2">&quot;region_start&quot;</span><span class="p">,</span>
+                        <span class="s2">&quot;region_stop&quot;</span><span class="p">,</span>
+                    <span class="p">]</span>  <span class="c1"># noqa E501</span>
+                <span class="p">)</span>
+            <span class="k">elif</span> <span class="n">t</span> <span class="o">==</span> <span class="s2">&quot;group&quot;</span><span class="p">:</span>
+                <span class="n">header</span><span class="o">.</span><span class="n">extend</span><span class="p">([</span><span class="s2">&quot;group&quot;</span><span class="p">])</span>
+                <span class="n">columns</span><span class="o">.</span><span class="n">extend</span><span class="p">([</span><span class="s2">&quot;group_label&quot;</span><span class="p">])</span>
+            <span class="k">elif</span> <span class="n">t</span> <span class="o">==</span> <span class="s2">&quot;source&quot;</span><span class="p">:</span>
+                <span class="n">header</span><span class="o">.</span><span class="n">extend</span><span class="p">([</span><span class="s2">&quot;source&quot;</span><span class="p">])</span>
+                <span class="n">columns</span><span class="o">.</span><span class="n">extend</span><span class="p">([</span><span class="s2">&quot;source_label&quot;</span><span class="p">])</span>
+            <span class="k">elif</span> <span class="n">t</span> <span class="o">==</span> <span class="s2">&quot;gwas&quot;</span><span class="p">:</span>
+                <span class="n">header</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span>
+                    <span class="p">[</span>
+                        <span class="s2">&quot;trait&quot;</span><span class="p">,</span>
+                        <span class="s2">&quot;snps&quot;</span><span class="p">,</span>
+                        <span class="s2">&quot;OR/beta&quot;</span><span class="p">,</span>
+                        <span class="s2">&quot;allele95%CI&quot;</span><span class="p">,</span>
+                        <span class="s2">&quot;riskAfreq&quot;</span><span class="p">,</span>
+                        <span class="s2">&quot;pubmed&quot;</span><span class="p">,</span>
+                    <span class="p">]</span>  <span class="c1"># noqa E501</span>
+                <span class="p">)</span>
+                <span class="n">columns</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span>
+                    <span class="p">[</span>
+                        <span class="s2">&quot;gwas_trait&quot;</span><span class="p">,</span>
+                        <span class="s2">&quot;gwas_snps&quot;</span><span class="p">,</span>
+                        <span class="s2">&quot;gwas_orbeta&quot;</span><span class="p">,</span>
+                        <span class="s2">&quot;gwas_allele95ci&quot;</span><span class="p">,</span>
+                        <span class="s2">&quot;gwas_riskAfreq&quot;</span><span class="p">,</span>
+                        <span class="s2">&quot;gwas_pubmed&quot;</span><span class="p">,</span>
+                    <span class="p">]</span>
+                <span class="p">)</span>
+            <span class="k">elif</span> <span class="n">t</span> <span class="o">==</span> <span class="s2">&quot;snpinput&quot;</span><span class="p">:</span>
+                <span class="n">header</span><span class="o">.</span><span class="n">extend</span><span class="p">([</span><span class="s2">&quot;user_input&quot;</span><span class="p">])</span>
+                <span class="n">columns</span><span class="o">.</span><span class="n">extend</span><span class="p">([</span><span class="s2">&quot;snp_label&quot;</span><span class="p">])</span>
+            <span class="k">elif</span> <span class="n">t</span> <span class="o">==</span> <span class="s2">&quot;positioninput&quot;</span><span class="p">:</span>
+                <span class="n">header</span><span class="o">.</span><span class="n">extend</span><span class="p">([</span><span class="s2">&quot;user_input&quot;</span><span class="p">])</span>
+                <span class="n">columns</span><span class="o">.</span><span class="n">extend</span><span class="p">([</span><span class="s2">&quot;position_label&quot;</span><span class="p">])</span>
+            <span class="k">elif</span> <span class="n">t</span> <span class="o">==</span> <span class="s2">&quot;geneinput&quot;</span><span class="p">:</span>
+                <span class="n">header</span><span class="o">.</span><span class="n">extend</span><span class="p">([</span><span class="s2">&quot;user_input&quot;</span><span class="p">])</span>
+                <span class="n">columns</span><span class="o">.</span><span class="n">extend</span><span class="p">([</span><span class="s2">&quot;gene_label&quot;</span><span class="p">])</span>
+            <span class="k">elif</span> <span class="n">t</span> <span class="o">==</span> <span class="s2">&quot;regioninput&quot;</span><span class="p">:</span>
+                <span class="n">header</span><span class="o">.</span><span class="n">extend</span><span class="p">([</span><span class="s2">&quot;user_input&quot;</span><span class="p">])</span>
+                <span class="n">columns</span><span class="o">.</span><span class="n">extend</span><span class="p">([</span><span class="s2">&quot;region_label&quot;</span><span class="p">])</span>
+            <span class="k">elif</span> <span class="n">t</span> <span class="o">==</span> <span class="s2">&quot;groupinput&quot;</span><span class="p">:</span>
+                <span class="n">header</span><span class="o">.</span><span class="n">extend</span><span class="p">([</span><span class="s2">&quot;user_input&quot;</span><span class="p">])</span>
+                <span class="n">columns</span><span class="o">.</span><span class="n">extend</span><span class="p">([</span><span class="s2">&quot;group_label&quot;</span><span class="p">])</span>
+            <span class="k">elif</span> <span class="n">t</span> <span class="o">==</span> <span class="s2">&quot;sourceinput&quot;</span><span class="p">:</span>
+                <span class="n">header</span><span class="o">.</span><span class="n">extend</span><span class="p">([</span><span class="s2">&quot;user_input&quot;</span><span class="p">])</span>
+                <span class="n">columns</span><span class="o">.</span><span class="n">extend</span><span class="p">([</span><span class="s2">&quot;source_label&quot;</span><span class="p">])</span>
+            <span class="k">elif</span> <span class="n">t</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_queryColumnSources</span><span class="p">:</span>
+                <span class="n">header</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">t</span><span class="p">)</span>
+                <span class="n">columns</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">t</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span><span class="s2">&quot;ERROR: unsupported output type &#39;</span><span class="si">%s</span><span class="s2">&#39;&quot;</span> <span class="o">%</span> <span class="n">t</span><span class="p">)</span>
+        <span class="c1"># foreach types</span>
+        <span class="k">return</span> <span class="n">columns</span>
+
+<div class="viewcode-block" id="FilterAnnotModelMixin.generateFilterOutput">
+<a class="viewcode-back" href="../../../biofilter_modules.mixins.html#biofilter_modules.FilterAnnotModelMixin.generateFilterOutput">[docs]</a>
+    <span class="k">def</span> <span class="nf">generateFilterOutput</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">types</span><span class="p">,</span> <span class="n">applyOffset</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Generates filter output based on provided data types.</span>
+
+<span class="sd">        This method sets up and executes a filtered SQL query based on a list</span>
+<span class="sd">        of data `types`. It utilizes `_populateColumnsFromTypes` to define</span>
+<span class="sd">        query columns and headers, then constructs a query using `buildQuery`.</span>
+<span class="sd">        If additional filters apply, a secondary query is built to incorporate</span>
+<span class="sd">        user knowledge.</span>
+
+<span class="sd">        Parameters:</span>
+<span class="sd">        - types (list): List of strings representing data types to be filtered</span>
+<span class="sd">            and included in the query.</span>
+<span class="sd">        - applyOffset (bool, optional): Determines whether position values</span>
+<span class="sd">            should be adjusted with an offset if necessary.</span>
+
+<span class="sd">        Behavior:</span>
+<span class="sd">        - Initializes `header` and `columns` lists, expanding them with</span>
+<span class="sd">            `_populateColumnsFromTypes` based on provided types.</span>
+<span class="sd">        - Raises an exception if the column list is empty, as at least one</span>
+<span class="sd">            column is required for the query.</span>
+<span class="sd">        - Adds a `#` marker to the first `header` item to designate it as a</span>
+<span class="sd">            header.</span>
+<span class="sd">        - Calls `buildQuery` to create the primary SQL query with</span>
+<span class="sd">            `focus=&#39;main&#39;` and `mode=&#39;filter&#39;`.</span>
+<span class="sd">        - If additional user input filters are present (`_inputFilters`), a</span>
+<span class="sd">            secondary query is created,</span>
+<span class="sd">        applying user knowledge to refine the results.</span>
+<span class="sd">        - Returns an iterator that combines the header and query results,</span>
+<span class="sd">            using `generateQueryResults`.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">        - itertools.chain: An iterator yielding the header as a tuple followed</span>
+<span class="sd">            by query results.</span>
+
+<span class="sd">        Usage Example:</span>
+<span class="sd">        - `generateFilterOutput([&#39;snp&#39;, &#39;gene&#39;])` generates a query output for</span>
+<span class="sd">            SNP and gene data,</span>
+<span class="sd">        including a header row and subsequent results.</span>
+
+<span class="sd">        Exceptions:</span>
+<span class="sd">        - Raises an exception if `header` and `columns` are empty, indicating</span>
+<span class="sd">            an attempt to filter with no valid columns.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">header</span> <span class="o">=</span> <span class="nb">list</span><span class="p">()</span>
+        <span class="n">columns</span> <span class="o">=</span> <span class="nb">list</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_populateColumnsFromTypes</span><span class="p">(</span><span class="n">types</span><span class="p">,</span> <span class="n">columns</span><span class="p">,</span> <span class="n">header</span><span class="p">)</span>
+        <span class="c1"># No need to check for empty columns, as we always have at least one</span>
+        <span class="c1"># No test case for this</span>
+        <span class="c1"># if not (header and columns):</span>
+        <span class="c1">#     raise Exception(&quot;filtering with empty column list&quot;)</span>
+        <span class="n">header</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;#&quot;</span> <span class="o">+</span> <span class="n">header</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">query</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">buildQuery</span><span class="p">(</span>
+            <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;filter&quot;</span><span class="p">,</span>
+            <span class="n">focus</span><span class="o">=</span><span class="s2">&quot;main&quot;</span><span class="p">,</span>
+            <span class="n">select</span><span class="o">=</span><span class="n">columns</span><span class="p">,</span>
+            <span class="n">applyOffset</span><span class="o">=</span><span class="n">applyOffset</span><span class="p">,</span>  <span class="c1"># noqa E501</span>
+        <span class="p">)</span>  <span class="c1"># noqa E501</span>
+        <span class="n">query2</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_inputFilters</span><span class="p">[</span><span class="s2">&quot;user&quot;</span><span class="p">][</span><span class="s2">&quot;source&quot;</span><span class="p">]:</span>
+            <span class="n">query2</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">buildQuery</span><span class="p">(</span>
+                <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;filter&quot;</span><span class="p">,</span>
+                <span class="n">focus</span><span class="o">=</span><span class="s2">&quot;main&quot;</span><span class="p">,</span>
+                <span class="n">select</span><span class="o">=</span><span class="n">columns</span><span class="p">,</span>
+                <span class="n">applyOffset</span><span class="o">=</span><span class="n">applyOffset</span><span class="p">,</span>
+                <span class="n">userKnowledge</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+            <span class="p">)</span>
+        <span class="k">return</span> <span class="n">itertools</span><span class="o">.</span><span class="n">chain</span><span class="p">(</span>
+            <span class="p">[</span><span class="nb">tuple</span><span class="p">(</span><span class="n">header</span><span class="p">)],</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">generateQueryResults</span><span class="p">(</span>
+                <span class="n">query</span><span class="p">,</span>
+                <span class="n">allowDupes</span><span class="o">=</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_options</span><span class="o">.</span><span class="n">allow_duplicate_output</span> <span class="o">==</span> <span class="s2">&quot;yes&quot;</span><span class="p">),</span>
+                <span class="n">query2</span><span class="o">=</span><span class="n">query2</span><span class="p">,</span>
+            <span class="p">),</span>
+        <span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="FilterAnnotModelMixin.generateAnnotationOutput">
+<a class="viewcode-back" href="../../../biofilter_modules.mixins.html#biofilter_modules.FilterAnnotModelMixin.generateAnnotationOutput">[docs]</a>
+    <span class="k">def</span> <span class="nf">generateAnnotationOutput</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">typesF</span><span class="p">,</span> <span class="n">typesA</span><span class="p">,</span> <span class="n">applyOffset</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Generate annotated output by applying additional annotations to an</span>
+<span class="sd">        initial filtered dataset.</span>
+
+<span class="sd">        This method performs an initial filtering query followed by an</span>
+<span class="sd">        annotation query, allowing additional data to be appended based on</span>
+<span class="sd">        matching conditions. The initial query (`queryF`) retrieves a base set</span>
+<span class="sd">        of data, and the second query (`queryA`) applies annotations according</span>
+<span class="sd">        to the filtered results.</span>
+
+<span class="sd">        Parameters:</span>
+<span class="sd">        - typesF (list): List of data types for the initial filter query.</span>
+<span class="sd">        - typesA (list): List of data types for annotation.</span>
+<span class="sd">        - applyOffset (bool, optional): Indicates if position values should</span>
+<span class="sd">            include an offset if needed.</span>
+
+<span class="sd">        Behavior:</span>
+<span class="sd">        - Creates `queryF`, a filtering query based on `typesF`, and generates</span>
+<span class="sd">            the associated SQL (`sqlF`).</span>
+<span class="sd">        - Generates `conditionsA`, conditions based on `rowid` columns from</span>
+<span class="sd">            `queryF`, for the annotation query.</span>
+<span class="sd">        - Creates `queryA`, the annotation query based on `typesA`, including</span>
+<span class="sd">            conditions from `conditionsA`.</span>
+<span class="sd">        - Executes `sqlF` to retrieve filtered data and, for each result,</span>
+<span class="sd">            executes `sqlA` to obtain matching annotations.</span>
+<span class="sd">        - Annotations are returned based on unique matches, considering</span>
+<span class="sd">            `_options.allow_duplicate_output` to determine duplicate</span>
+<span class="sd">            allowances.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">        - Yields (tuple): Rows of results with columns from both the filter</span>
+<span class="sd">            and annotation queries. Each row consists of the filtered data</span>
+<span class="sd">            tuple followed by the corresponding annotation data, with `None`</span>
+<span class="sd">            filling where no annotations exist.</span>
+
+<span class="sd">        Example:</span>
+<span class="sd">        - `generateAnnotationOutput([&#39;snp&#39;, &#39;gene&#39;], [&#39;position&#39;, &#39;region&#39;])`</span>
+<span class="sd">            retrieves data based on SNP and gene, with annotations for</span>
+<span class="sd">            position and region.</span>
+
+<span class="sd">        Exceptions:</span>
+<span class="sd">        - Raises an exception if `headerF` and `columnsF` or `headerA` and</span>
+<span class="sd">            `columnsA` are empty, as this indicates an attempt to query</span>
+<span class="sd">            without valid columns.</span>
+
+<span class="sd">        Notes:</span>
+<span class="sd">        - The output header is marked with `#` on the first item to indicate a</span>
+<span class="sd">            file header.</span>
+<span class="sd">        - Executes an SQL query plan for debugging if `_options.debug_query`</span>
+<span class="sd">            is enabled.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># TODO user knowledge</span>
+        <span class="c1"># build a baseline filtering query</span>
+        <span class="n">headerF</span> <span class="o">=</span> <span class="nb">list</span><span class="p">()</span>
+        <span class="n">columnsF</span> <span class="o">=</span> <span class="nb">list</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_populateColumnsFromTypes</span><span class="p">(</span><span class="n">typesF</span><span class="p">,</span> <span class="n">columnsF</span><span class="p">,</span> <span class="n">headerF</span><span class="p">)</span>
+        <span class="c1"># No need to check for empty columns, as we always have at least one</span>
+        <span class="c1"># No test case for this</span>
+        <span class="c1"># if not (headerF and columnsF):</span>
+        <span class="c1">#     raise Exception(&quot;annotation with no starting columns&quot;)</span>
+        <span class="n">queryF</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">buildQuery</span><span class="p">(</span>
+            <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;filter&quot;</span><span class="p">,</span>
+            <span class="n">focus</span><span class="o">=</span><span class="s2">&quot;main&quot;</span><span class="p">,</span>
+            <span class="n">select</span><span class="o">=</span><span class="n">columnsF</span><span class="p">,</span>
+            <span class="n">applyOffset</span><span class="o">=</span><span class="n">applyOffset</span><span class="p">,</span>  <span class="c1"># noqa E501</span>
+        <span class="p">)</span>
+        <span class="n">lenF</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">queryF</span><span class="p">[</span><span class="s2">&quot;_columns&quot;</span><span class="p">])</span>
+        <span class="n">sqlF</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">getQueryText</span><span class="p">(</span><span class="n">queryF</span><span class="p">,</span> <span class="n">splitRowIDs</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">prepareTablesForQuery</span><span class="p">(</span><span class="n">queryF</span><span class="p">)</span>
+        <span class="c1"># add each filter rowid column as a condition for annotation</span>
+        <span class="n">n</span> <span class="o">=</span> <span class="n">lenF</span>
+        <span class="n">conditionsA</span> <span class="o">=</span> <span class="n">collections</span><span class="o">.</span><span class="n">defaultdict</span><span class="p">(</span><span class="nb">set</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">alias</span><span class="p">,</span> <span class="n">cols</span> <span class="ow">in</span> <span class="n">queryF</span><span class="p">[</span><span class="s2">&quot;_rowid&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="k">for</span> <span class="n">col</span> <span class="ow">in</span> <span class="n">cols</span><span class="p">:</span>
+                <span class="n">n</span> <span class="o">+=</span> <span class="mi">1</span>
+                <span class="n">conditionsA</span><span class="p">[(</span><span class="n">alias</span><span class="p">,</span> <span class="n">col</span><span class="p">)]</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s2">&quot;= ?</span><span class="si">%d</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">n</span><span class="p">)</span>
+
+        <span class="c1"># build the annotation query</span>
+        <span class="n">headerA</span> <span class="o">=</span> <span class="nb">list</span><span class="p">()</span>
+        <span class="n">columnsA</span> <span class="o">=</span> <span class="nb">list</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_populateColumnsFromTypes</span><span class="p">(</span><span class="n">typesA</span><span class="p">,</span> <span class="n">columnsA</span><span class="p">,</span> <span class="n">headerA</span><span class="p">)</span>
+        <span class="c1"># No need to check for empty columns, as we always have at least one</span>
+        <span class="c1"># No test case for this</span>
+        <span class="c1"># if not (headerA and columnsA):</span>
+        <span class="c1">#     raise Exception(&quot;annotation with no extra columns&quot;)</span>
+        <span class="n">queryA</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">buildQuery</span><span class="p">(</span>
+            <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;annotate&quot;</span><span class="p">,</span>
+            <span class="n">focus</span><span class="o">=</span><span class="s2">&quot;alt&quot;</span><span class="p">,</span>
+            <span class="n">select</span><span class="o">=</span><span class="n">columnsA</span><span class="p">,</span>
+            <span class="n">where</span><span class="o">=</span><span class="n">conditionsA</span><span class="p">,</span>
+            <span class="n">applyOffset</span><span class="o">=</span><span class="n">applyOffset</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="n">lenA</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">queryA</span><span class="p">[</span><span class="s2">&quot;_columns&quot;</span><span class="p">])</span>
+        <span class="n">sqlA</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">getQueryText</span><span class="p">(</span>
+            <span class="n">queryA</span><span class="p">,</span> <span class="n">noRowIDs</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">sortRowIDs</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">splitRowIDs</span><span class="o">=</span><span class="kc">True</span>
+        <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">prepareTablesForQuery</span><span class="p">(</span><span class="n">queryA</span><span class="p">)</span>
+
+        <span class="c1"># generate filtered results and annotate each of them</span>
+        <span class="n">cursorF</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_loki</span><span class="o">.</span><span class="n">_db</span><span class="o">.</span><span class="n">cursor</span><span class="p">()</span>
+        <span class="n">cursorA</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_loki</span><span class="o">.</span><span class="n">_db</span><span class="o">.</span><span class="n">cursor</span><span class="p">()</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_options</span><span class="o">.</span><span class="n">debug_query</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span><span class="s2">&quot;========== annotation : filter step ==========</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span><span class="n">sqlF</span> <span class="o">+</span> <span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">cursorF</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="s2">&quot;EXPLAIN QUERY PLAN &quot;</span> <span class="o">+</span> <span class="n">sqlF</span><span class="p">):</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">row</span><span class="p">)</span> <span class="o">+</span> <span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span><span class="s2">&quot;========== annotation : annotate step ==========</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span><span class="n">sqlA</span> <span class="o">+</span> <span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="n">emptyF</span> <span class="o">=</span> <span class="p">(</span><span class="mi">0</span><span class="p">,)</span> <span class="o">*</span> <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">queryF</span><span class="p">[</span><span class="s2">&quot;_columns&quot;</span><span class="p">])</span> <span class="o">+</span> <span class="nb">len</span><span class="p">(</span><span class="n">queryF</span><span class="p">[</span><span class="s2">&quot;_rowid&quot;</span><span class="p">]))</span>
+            <span class="k">for</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">cursorF</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="s2">&quot;EXPLAIN QUERY PLAN &quot;</span> <span class="o">+</span> <span class="n">sqlA</span><span class="p">,</span> <span class="n">emptyF</span><span class="p">):</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">row</span><span class="p">)</span> <span class="o">+</span> <span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">_options</span><span class="o">.</span><span class="n">allow_duplicate_output</span> <span class="o">==</span> <span class="s2">&quot;yes&quot;</span><span class="p">:</span>
+            <span class="n">headerF</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;#&quot;</span> <span class="o">+</span> <span class="n">headerF</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="k">yield</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">headerF</span> <span class="o">+</span> <span class="n">headerA</span><span class="p">)</span>
+            <span class="n">lastF</span> <span class="o">=</span> <span class="kc">None</span>
+            <span class="n">emptyA</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="kc">None</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">columnsA</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">rowF</span> <span class="ow">in</span> <span class="n">cursorF</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="n">sqlF</span><span class="p">):</span>
+                <span class="k">if</span> <span class="n">lastF</span> <span class="o">!=</span> <span class="n">rowF</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]:</span>
+                    <span class="n">lastF</span> <span class="o">=</span> <span class="n">rowF</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+                    <span class="n">idsA</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+                    <span class="k">for</span> <span class="n">rowA</span> <span class="ow">in</span> <span class="n">cursorA</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="n">sqlA</span><span class="p">,</span> <span class="n">rowF</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">]):</span>
+                        <span class="n">rowidA</span> <span class="o">=</span> <span class="n">rowA</span><span class="p">[</span><span class="n">lenA</span><span class="p">:]</span>
+                        <span class="k">if</span> <span class="n">rowidA</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">idsA</span><span class="p">:</span>
+                            <span class="n">idsA</span><span class="o">.</span><span class="n">update</span><span class="p">(</span>
+                                <span class="n">itertools</span><span class="o">.</span><span class="n">product</span><span class="p">(</span>
+                                    <span class="o">*</span><span class="p">(</span>
+                                        <span class="p">(</span><span class="n">v</span><span class="p">,)</span> <span class="k">if</span> <span class="n">v</span> <span class="o">==</span> <span class="s2">&quot;&quot;</span> <span class="k">else</span> <span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)</span>
+                                        <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">rowidA</span>  <span class="c1"># noqa E501</span>
+                                    <span class="p">)</span>  <span class="c1"># noqa E501</span>
+                                <span class="p">)</span>
+                            <span class="p">)</span>
+                            <span class="k">yield</span> <span class="n">rowF</span><span class="p">[:</span><span class="n">lenF</span><span class="p">]</span> <span class="o">+</span> <span class="n">rowA</span><span class="p">[:</span><span class="n">lenA</span><span class="p">]</span>
+                    <span class="c1"># foreach annotation result</span>
+                    <span class="k">if</span> <span class="ow">not</span> <span class="n">idsA</span><span class="p">:</span>
+                        <span class="k">yield</span> <span class="n">rowF</span><span class="p">[:</span><span class="n">lenF</span><span class="p">]</span> <span class="o">+</span> <span class="n">emptyA</span>
+                <span class="c1"># if filter result is new</span>
+            <span class="c1"># foreach filter result</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">headerF</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;#&quot;</span> <span class="o">+</span> <span class="n">headerF</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="k">yield</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">headerF</span> <span class="o">+</span> <span class="n">headerA</span><span class="p">)</span>
+            <span class="n">emptyA</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="kc">None</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">columnsA</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">rowF</span> <span class="ow">in</span> <span class="n">cursorF</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="n">sqlF</span><span class="p">):</span>
+                <span class="n">idsA</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+                <span class="k">for</span> <span class="n">rowA</span> <span class="ow">in</span> <span class="n">cursorA</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="n">sqlA</span><span class="p">,</span> <span class="n">rowF</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">]):</span>
+                    <span class="n">rowidA</span> <span class="o">=</span> <span class="n">rowA</span><span class="p">[</span><span class="n">lenA</span><span class="p">:]</span>
+                    <span class="k">if</span> <span class="n">rowidA</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">idsA</span><span class="p">:</span>
+                        <span class="n">idsA</span><span class="o">.</span><span class="n">update</span><span class="p">(</span>
+                            <span class="n">itertools</span><span class="o">.</span><span class="n">product</span><span class="p">(</span>
+                                <span class="o">*</span><span class="p">((</span><span class="n">v</span><span class="p">,)</span> <span class="k">if</span> <span class="n">v</span> <span class="o">==</span> <span class="s2">&quot;&quot;</span> <span class="k">else</span> <span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)</span> <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">rowidA</span><span class="p">)</span>
+                            <span class="p">)</span>
+                        <span class="p">)</span>
+                        <span class="c1"># return annotation results</span>
+                        <span class="k">yield</span> <span class="n">rowF</span><span class="p">[:</span><span class="n">lenF</span><span class="p">]</span> <span class="o">+</span> <span class="n">rowA</span><span class="p">[:</span><span class="n">lenA</span><span class="p">]</span>
+                <span class="c1"># foreach annotation result</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">idsA</span><span class="p">:</span>
+                    <span class="k">yield</span> <span class="n">rowF</span><span class="p">[:</span><span class="n">lenF</span><span class="p">]</span> <span class="o">+</span> <span class="n">emptyA</span></div>
+
+            <span class="c1"># if filter result is new</span>
+            <span class="c1"># foreach filter result</span>
+
+<div class="viewcode-block" id="FilterAnnotModelMixin.identifyCandidateModelBiopolymers">
+<a class="viewcode-back" href="../../../biofilter_modules.mixins.html#biofilter_modules.FilterAnnotModelMixin.identifyCandidateModelBiopolymers">[docs]</a>
+    <span class="k">def</span> <span class="nf">identifyCandidateModelBiopolymers</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Identifies candidate biopolymers for models, both primary and</span>
+<span class="sd">        alternative, based on applicable filters.</span>
+
+<span class="sd">        This method resets candidate tables and applies filters to identify</span>
+<span class="sd">        biopolymers that may be relevant for modeling, separating them into</span>
+<span class="sd">        primary and alternative candidates. Identified candidates are inserted</span>
+<span class="sd">        into the `main_biopolymer` and `alt_biopolymer` tables within the</span>
+<span class="sd">        `cand` database, each with a status indicator (`flag`).</span>
+
+<span class="sd">        Steps:</span>
+<span class="sd">        1. Resets candidate tables (`main_biopolymer` and `alt_biopolymer`)</span>
+<span class="sd">            and prepares them for updates.</span>
+<span class="sd">        2. Identifies primary candidates (in the `main` scope) if applicable</span>
+<span class="sd">            filters are set:</span>
+<span class="sd">            - Builds a query to retrieve relevant biopolymer IDs</span>
+<span class="sd">                (or only gene IDs, if `_onlyGeneModels` is configured).</span>
+<span class="sd">            - Executes the query and inserts the results into the</span>
+<span class="sd">                `cand.main_biopolymer` table.</span>
+<span class="sd">            - Updates the `cand.main_biopolymer` filter to indicate that</span>
+<span class="sd">                primary candidates have been identified.</span>
+<span class="sd">        3. Identifies alternative candidates (in the `alt` scope) if</span>
+<span class="sd">            applicable filters are set:</span>
+<span class="sd">            - Constructs and executes a query similar to that for primary</span>
+<span class="sd">                candidates.</span>
+<span class="sd">            - Inserts identified alternative candidates into</span>
+<span class="sd">                `cand.alt_biopolymer`.</span>
+<span class="sd">            - Updates the `cand.alt_biopolymer` filter to reflect that</span>
+<span class="sd">                alternative candidates have been identified.</span>
+
+<span class="sd">        Notes:</span>
+<span class="sd">        - Uses `INSERT OR IGNORE` to prevent duplicates when inserting</span>
+<span class="sd">            candidates.</span>
+<span class="sd">        - Logs progress to report the count of identified candidates.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">cursor</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_loki</span><span class="o">.</span><span class="n">_db</span><span class="o">.</span><span class="n">cursor</span><span class="p">()</span>
+
+        <span class="c1"># reset candidate tables</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_inputFilters</span><span class="p">[</span><span class="s2">&quot;cand&quot;</span><span class="p">][</span><span class="s2">&quot;main_biopolymer&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">prepareTableForUpdate</span><span class="p">(</span><span class="s2">&quot;cand&quot;</span><span class="p">,</span> <span class="s2">&quot;main_biopolymer&quot;</span><span class="p">)</span>
+        <span class="n">cursor</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="s2">&quot;DELETE FROM `cand`.`main_biopolymer`&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_inputFilters</span><span class="p">[</span><span class="s2">&quot;cand&quot;</span><span class="p">][</span><span class="s2">&quot;alt_biopolymer&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="n">cursor</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="s2">&quot;DELETE FROM `cand`.`alt_biopolymer`&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">prepareTableForUpdate</span><span class="p">(</span><span class="s2">&quot;cand&quot;</span><span class="p">,</span> <span class="s2">&quot;alt_biopolymer&quot;</span><span class="p">)</span>
+
+        <span class="c1"># identify main candidiates from applicable filters</span>
+        <span class="k">if</span> <span class="nb">sum</span><span class="p">(</span>
+            <span class="n">filters</span>
+            <span class="k">for</span> <span class="n">table</span><span class="p">,</span> <span class="n">filters</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_inputFilters</span><span class="p">[</span><span class="s2">&quot;main&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">items</span><span class="p">()</span>
+            <span class="k">if</span> <span class="n">table</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;group&quot;</span><span class="p">,</span> <span class="s2">&quot;source&quot;</span><span class="p">)</span>
+        <span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="s2">&quot;identifying main model candidiates ...&quot;</span><span class="p">)</span>
+            <span class="n">query</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">buildQuery</span><span class="p">(</span>
+                <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;modelgene&quot;</span><span class="p">,</span>
+                <span class="n">focus</span><span class="o">=</span><span class="s2">&quot;main&quot;</span><span class="p">,</span>
+                <span class="n">select</span><span class="o">=</span><span class="p">[</span>
+                    <span class="s2">&quot;gene_id&quot;</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_onlyGeneModels</span> <span class="k">else</span> <span class="s2">&quot;biopolymer_id&quot;</span>
+                <span class="p">],</span>  <span class="c1"># noqa E501</span>
+            <span class="p">)</span>
+            <span class="n">sql</span> <span class="o">=</span> <span class="s2">&quot;INSERT OR IGNORE INTO `cand`.`main_biopolymer` (biopolymer_id, flag) VALUES (?,0)&quot;</span>  <span class="c1"># noqa E501</span>
+            <span class="n">cursor</span><span class="o">.</span><span class="n">executemany</span><span class="p">(</span>
+                <span class="n">sql</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">generateQueryResults</span><span class="p">(</span><span class="n">query</span><span class="p">,</span> <span class="n">allowDupes</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+            <span class="p">)</span>  <span class="c1"># noqa E501</span>
+            <span class="n">numCand</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span>
+                <span class="n">row</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+                <span class="k">for</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">cursor</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span>
+                    <span class="s2">&quot;SELECT COUNT() FROM `cand`.`main_biopolymer`&quot;</span>
+                <span class="p">)</span>
+            <span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="s2">&quot; OK: </span><span class="si">%d</span><span class="s2"> candidates</span><span class="se">\n</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">numCand</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_inputFilters</span><span class="p">[</span><span class="s2">&quot;cand&quot;</span><span class="p">][</span><span class="s2">&quot;main_biopolymer&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="mi">1</span>
+        <span class="c1"># if any main filters other than group/source</span>
+
+        <span class="c1"># identify alt candidiates from applicable filters</span>
+        <span class="k">if</span> <span class="nb">sum</span><span class="p">(</span>
+            <span class="n">filters</span>
+            <span class="k">for</span> <span class="n">table</span><span class="p">,</span> <span class="n">filters</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_inputFilters</span><span class="p">[</span><span class="s2">&quot;alt&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">items</span><span class="p">()</span>
+            <span class="k">if</span> <span class="n">table</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;group&quot;</span><span class="p">,</span> <span class="s2">&quot;source&quot;</span><span class="p">)</span>
+        <span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="s2">&quot;identifying alternate model candidiates ...&quot;</span><span class="p">)</span>
+            <span class="n">query</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">buildQuery</span><span class="p">(</span>
+                <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;modelgene&quot;</span><span class="p">,</span>
+                <span class="n">focus</span><span class="o">=</span><span class="s2">&quot;alt&quot;</span><span class="p">,</span>
+                <span class="n">select</span><span class="o">=</span><span class="p">[</span>
+                    <span class="s2">&quot;gene_id&quot;</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_onlyGeneModels</span> <span class="k">else</span> <span class="s2">&quot;biopolymer_id&quot;</span>
+                <span class="p">],</span>  <span class="c1"># noqa E501</span>
+            <span class="p">)</span>
+            <span class="n">sql</span> <span class="o">=</span> <span class="s2">&quot;INSERT OR IGNORE INTO `cand`.`alt_biopolymer` (biopolymer_id, flag) VALUES (?,0)&quot;</span>  <span class="c1"># noqa E501</span>
+            <span class="n">cursor</span><span class="o">.</span><span class="n">executemany</span><span class="p">(</span>
+                <span class="n">sql</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">generateQueryResults</span><span class="p">(</span><span class="n">query</span><span class="p">,</span> <span class="n">allowDupes</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+            <span class="p">)</span>  <span class="c1"># noqa E501</span>
+            <span class="n">numCand</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span>
+                <span class="n">row</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+                <span class="k">for</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">cursor</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span>
+                    <span class="s2">&quot;SELECT COUNT() FROM `cand`.`alt_biopolymer`&quot;</span>
+                <span class="p">)</span>  <span class="c1"># noqa E501</span>
+            <span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="s2">&quot; OK: </span><span class="si">%d</span><span class="s2"> candidates</span><span class="se">\n</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">numCand</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_inputFilters</span><span class="p">[</span><span class="s2">&quot;cand&quot;</span><span class="p">][</span><span class="s2">&quot;alt_biopolymer&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="mi">1</span></div>
+
+        <span class="c1"># if any alt filters other than group/source</span>
+
+<div class="viewcode-block" id="FilterAnnotModelMixin.identifyCandidateModelGroups">
+<a class="viewcode-back" href="../../../biofilter_modules.mixins.html#biofilter_modules.FilterAnnotModelMixin.identifyCandidateModelGroups">[docs]</a>
+    <span class="k">def</span> <span class="nf">identifyCandidateModelGroups</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Identify candidate model groups based on specified filters and</span>
+<span class="sd">        criteria.</span>
+
+<span class="sd">        This method filters and organizes candidate groups in the database</span>
+<span class="sd">        based on conditions applied in the contexts &#39;main&#39;, &#39;alt&#39;, and &#39;cand&#39;,</span>
+<span class="sd">        ensuring they meet the criteria for modeling.</span>
+
+<span class="sd">        Steps:</span>
+<span class="sd">        1. Resets the `cand.group` table, removing previous entries and</span>
+<span class="sd">        initializing candidate flags.</span>
+<span class="sd">        2. Identifies candidate groups based on filters in the &#39;main&#39; context:</span>
+<span class="sd">        - Builds a query with `buildQuery` to retrieve group IDs.</span>
+<span class="sd">        - If `cand.group` has entries, updates candidate flags; otherwise,</span>
+<span class="sd">            inserts new records.</span>
+<span class="sd">        - Removes entries that do not meet candidate flag criteria.</span>
+<span class="sd">        3. Identifies candidate groups based on filters in the &#39;alt&#39; context:</span>
+<span class="sd">        - Follows the same process as &#39;main&#39; candidates to set flags and insert</span>
+<span class="sd">            candidates as needed.</span>
+<span class="sd">        4. Applies group size criteria (in the &#39;cand&#39; context):</span>
+<span class="sd">        - Constructs a query to group candidates by unique biopolymers or genes</span>
+<span class="sd">            depending on `self._onlyGeneModels`.</span>
+<span class="sd">        - Adds `HAVING` conditions to ensure groups contain at least two</span>
+<span class="sd">            distinct elements and optionally limits the maximum group size</span>
+<span class="sd">            (`self._options.maximum_model_group_size`).</span>
+<span class="sd">        5. Executes the query and inserts or updates candidate groups.</span>
+<span class="sd">        6. Updates `cand.group` to mark identified groups and logs the total</span>
+<span class="sd">            count of candidates.</span>
+
+<span class="sd">        Exceptions:</span>
+<span class="sd">        - May raise exceptions if `generateQueryResults` fails to retrieve</span>
+<span class="sd">            data.</span>
+
+<span class="sd">        Logs:</span>
+<span class="sd">        - Logs progress and results, including a final count of identified</span>
+<span class="sd">            groups.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="s2">&quot;identifying candidiate model groups ...&quot;</span><span class="p">)</span>
+        <span class="n">cursor</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_loki</span><span class="o">.</span><span class="n">_db</span><span class="o">.</span><span class="n">cursor</span><span class="p">()</span>
+
+        <span class="c1"># reset candidate table</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_inputFilters</span><span class="p">[</span><span class="s2">&quot;cand&quot;</span><span class="p">][</span><span class="s2">&quot;group&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">prepareTableForUpdate</span><span class="p">(</span><span class="s2">&quot;cand&quot;</span><span class="p">,</span> <span class="s2">&quot;group&quot;</span><span class="p">)</span>
+        <span class="n">cursor</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="s2">&quot;DELETE FROM `cand`.`group`&quot;</span><span class="p">)</span>
+
+        <span class="c1"># identify candidiates from applicable main filters</span>
+        <span class="k">if</span> <span class="nb">sum</span><span class="p">(</span>
+            <span class="n">filters</span>
+            <span class="k">for</span> <span class="n">table</span><span class="p">,</span> <span class="n">filters</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_inputFilters</span><span class="p">[</span><span class="s2">&quot;main&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">items</span><span class="p">()</span>
+            <span class="k">if</span> <span class="n">table</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;group&quot;</span><span class="p">,</span> <span class="s2">&quot;source&quot;</span><span class="p">)</span>
+        <span class="p">):</span>
+            <span class="n">query</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">buildQuery</span><span class="p">(</span>
+                <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;modelgroup&quot;</span><span class="p">,</span> <span class="n">focus</span><span class="o">=</span><span class="s2">&quot;main&quot;</span><span class="p">,</span> <span class="n">select</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;group_id&quot;</span><span class="p">]</span>
+            <span class="p">)</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_inputFilters</span><span class="p">[</span><span class="s2">&quot;cand&quot;</span><span class="p">][</span><span class="s2">&quot;group&quot;</span><span class="p">]:</span>
+                <span class="n">cursor</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="s2">&quot;UPDATE `cand`.`group` SET flag = 0&quot;</span><span class="p">)</span>
+                <span class="n">sql</span> <span class="o">=</span> <span class="s2">&quot;UPDATE `cand`.`group` SET flag = 1 WHERE group_id = ?&quot;</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">sql</span> <span class="o">=</span> <span class="s2">&quot;INSERT OR IGNORE INTO `cand`.`group` (group_id, flag) VALUES (?,0)&quot;</span>  <span class="c1"># noqa E501</span>
+            <span class="n">cursor</span><span class="o">.</span><span class="n">executemany</span><span class="p">(</span>
+                <span class="n">sql</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">generateQueryResults</span><span class="p">(</span><span class="n">query</span><span class="p">,</span> <span class="n">allowDupes</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+            <span class="p">)</span>  <span class="c1"># noqa E501</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_inputFilters</span><span class="p">[</span><span class="s2">&quot;cand&quot;</span><span class="p">][</span><span class="s2">&quot;group&quot;</span><span class="p">]:</span>
+                <span class="n">cursor</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="s2">&quot;DELETE FROM `cand`.`group` WHERE flag = 0&quot;</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_inputFilters</span><span class="p">[</span><span class="s2">&quot;cand&quot;</span><span class="p">][</span><span class="s2">&quot;group&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="mi">1</span>
+        <span class="c1"># if any main group/source filters</span>
+
+        <span class="c1"># identify candidiates from applicable alt filters</span>
+        <span class="k">if</span> <span class="nb">sum</span><span class="p">(</span>
+            <span class="n">filters</span>
+            <span class="k">for</span> <span class="n">table</span><span class="p">,</span> <span class="n">filters</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_inputFilters</span><span class="p">[</span><span class="s2">&quot;alt&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">items</span><span class="p">()</span>
+            <span class="k">if</span> <span class="n">table</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;group&quot;</span><span class="p">,</span> <span class="s2">&quot;source&quot;</span><span class="p">)</span>
+        <span class="p">):</span>
+            <span class="n">query</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">buildQuery</span><span class="p">(</span>
+                <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;modelgroup&quot;</span><span class="p">,</span> <span class="n">focus</span><span class="o">=</span><span class="s2">&quot;alt&quot;</span><span class="p">,</span> <span class="n">select</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;group_id&quot;</span><span class="p">]</span>
+            <span class="p">)</span>  <span class="c1"># noqa E501</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_inputFilters</span><span class="p">[</span><span class="s2">&quot;cand&quot;</span><span class="p">][</span><span class="s2">&quot;group&quot;</span><span class="p">]:</span>
+                <span class="n">cursor</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="s2">&quot;UPDATE `cand`.`group` SET flag = 0&quot;</span><span class="p">)</span>
+                <span class="n">sql</span> <span class="o">=</span> <span class="s2">&quot;UPDATE `cand`.`group` SET flag = 1 WHERE group_id = ?&quot;</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">sql</span> <span class="o">=</span> <span class="s2">&quot;INSERT OR IGNORE INTO `cand`.`group` (group_id, flag) VALUES (?,0)&quot;</span>  <span class="c1"># noqa E501</span>
+            <span class="n">cursor</span><span class="o">.</span><span class="n">executemany</span><span class="p">(</span>
+                <span class="n">sql</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">generateQueryResults</span><span class="p">(</span><span class="n">query</span><span class="p">,</span> <span class="n">allowDupes</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+            <span class="p">)</span>  <span class="c1"># noqa E501</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_inputFilters</span><span class="p">[</span><span class="s2">&quot;cand&quot;</span><span class="p">][</span><span class="s2">&quot;group&quot;</span><span class="p">]:</span>
+                <span class="n">cursor</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="s2">&quot;DELETE FROM `cand`.`group` WHERE flag = 0&quot;</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_inputFilters</span><span class="p">[</span><span class="s2">&quot;cand&quot;</span><span class="p">][</span><span class="s2">&quot;group&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="mi">1</span>
+        <span class="c1"># if any main group/source filters</span>
+
+        <span class="c1"># identify candidiates by size</span>
+        <span class="n">query</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">buildQuery</span><span class="p">(</span>
+            <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;modelgroup&quot;</span><span class="p">,</span>
+            <span class="n">focus</span><span class="o">=</span><span class="s2">&quot;cand&quot;</span><span class="p">,</span>
+            <span class="n">select</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;group_id&quot;</span><span class="p">],</span>
+            <span class="n">having</span><span class="o">=</span><span class="p">{</span>
+                <span class="p">(</span><span class="s2">&quot;gene_id&quot;</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_onlyGeneModels</span> <span class="k">else</span> <span class="s2">&quot;biopolymer_id&quot;</span><span class="p">):</span> <span class="p">{</span>
+                    <span class="s2">&quot;!= 0&quot;</span>
+                <span class="p">}</span>  <span class="c1"># noqa E501</span>
+            <span class="p">},</span>
+        <span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_inputFilters</span><span class="p">[</span><span class="s2">&quot;cand&quot;</span><span class="p">][</span><span class="s2">&quot;group&quot;</span><span class="p">]:</span>
+            <span class="n">cursor</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="s2">&quot;UPDATE `cand`.`group` SET flag = 0&quot;</span><span class="p">)</span>
+            <span class="n">sql</span> <span class="o">=</span> <span class="s2">&quot;UPDATE `cand`.`group` SET flag = 1 WHERE group_id = ?&quot;</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">sql</span> <span class="o">=</span> <span class="s2">&quot;INSERT OR IGNORE INTO `cand`.`group` (group_id, flag) VALUES (?,0)&quot;</span>  <span class="c1"># noqa E501</span>
+        <span class="c1"># _queryColumnSources[col] = list[ tuple(alias,rowid,expression,?conditions),... ] # noqa E501</span>
+        <span class="k">for</span> <span class="n">source</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_queryColumnSources</span><span class="p">[</span><span class="s2">&quot;group_id&quot;</span><span class="p">]:</span>
+            <span class="k">if</span> <span class="n">source</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="ow">in</span> <span class="n">query</span><span class="p">[</span><span class="s2">&quot;FROM&quot;</span><span class="p">]:</span>
+                <span class="n">query</span><span class="p">[</span><span class="s2">&quot;GROUP BY&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                    <span class="s2">&quot;</span><span class="si">{0}</span><span class="s2">.</span><span class="si">{1}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">source</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">source</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+                <span class="p">)</span>  <span class="c1"># noqa E501</span>
+                <span class="k">break</span>
+        <span class="k">for</span> <span class="n">source</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_queryColumnSources</span><span class="p">[</span>
+            <span class="s2">&quot;gene_id&quot;</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_onlyGeneModels</span> <span class="k">else</span> <span class="s2">&quot;biopolymer_id&quot;</span>
+        <span class="p">]:</span>
+            <span class="k">if</span> <span class="n">source</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="ow">in</span> <span class="n">query</span><span class="p">[</span><span class="s2">&quot;FROM&quot;</span><span class="p">]:</span>
+                <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_options</span><span class="o">.</span><span class="n">maximum_model_group_size</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+                    <span class="n">query</span><span class="p">[</span><span class="s2">&quot;HAVING&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">add</span><span class="p">(</span>
+                        <span class="s2">&quot;(COUNT(DISTINCT </span><span class="si">%s</span><span class="s2">) BETWEEN 2 AND </span><span class="si">%d</span><span class="s2">)&quot;</span>
+                        <span class="o">%</span> <span class="p">(</span><span class="n">source</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">_options</span><span class="o">.</span><span class="n">maximum_model_group_size</span><span class="p">)</span>
+                    <span class="p">)</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">query</span><span class="p">[</span><span class="s2">&quot;HAVING&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">add</span><span class="p">(</span>
+                        <span class="s2">&quot;COUNT(DISTINCT </span><span class="si">%s</span><span class="s2">) &gt;= 2&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">source</span><span class="p">[</span><span class="mi">2</span><span class="p">],)</span>
+                    <span class="p">)</span>  <span class="c1"># noqa E501</span>
+                <span class="k">break</span>
+        <span class="n">cursor</span><span class="o">.</span><span class="n">executemany</span><span class="p">(</span>
+            <span class="n">sql</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">generateQueryResults</span><span class="p">(</span><span class="n">query</span><span class="p">,</span> <span class="n">allowDupes</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="p">)</span>  <span class="c1"># noqa E501</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_inputFilters</span><span class="p">[</span><span class="s2">&quot;cand&quot;</span><span class="p">][</span><span class="s2">&quot;group&quot;</span><span class="p">]:</span>
+            <span class="n">cursor</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="s2">&quot;DELETE FROM `cand`.`group` WHERE flag = 0&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_inputFilters</span><span class="p">[</span><span class="s2">&quot;cand&quot;</span><span class="p">][</span><span class="s2">&quot;group&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="mi">1</span>
+
+        <span class="n">numCand</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span>
+            <span class="n">row</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="k">for</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">cursor</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="s2">&quot;SELECT COUNT() FROM `cand`.`group`&quot;</span><span class="p">)</span>  <span class="c1"># noqa E501</span>
+        <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="s2">&quot; OK: </span><span class="si">%d</span><span class="s2"> groups</span><span class="se">\n</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">numCand</span><span class="p">)</span></div>
+
+
+    <span class="c1"># identifyCandidateModelGroups()</span>
+
+<div class="viewcode-block" id="FilterAnnotModelMixin.getGeneModels">
+<a class="viewcode-back" href="../../../biofilter_modules.mixins.html#biofilter_modules.FilterAnnotModelMixin.getGeneModels">[docs]</a>
+    <span class="k">def</span> <span class="nf">getGeneModels</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Generates and returns gene models based on defined filters and</span>
+<span class="sd">        parameters.</span>
+
+<span class="sd">        This method first checks if gene models have already been generated;</span>
+<span class="sd">        if not, it identifies candidate biopolymers and groups as model</span>
+<span class="sd">        components. It then constructs and executes a query to retrieve gene</span>
+<span class="sd">        models, applying grouping and sorting conditions based on biopolymers,</span>
+<span class="sd">        source, and group, using minimum and maximum score and count parameters</span>
+<span class="sd">        defined in options.</span>
+
+<span class="sd">        Steps:</span>
+<span class="sd">        1. Checks if gene models (`_geneModels`) have already been computed.</span>
+<span class="sd">        2. If models are not yet generated:</span>
+<span class="sd">            - Calls `identifyCandidateModelBiopolymers` and</span>
+<span class="sd">                `identifyCandidateModelGroups` to identify candidate</span>
+<span class="sd">                biopolymers and groups.</span>
+<span class="sd">            - Constructs a `buildQuery` query to select models, including</span>
+<span class="sd">                biopolymer, source, and group IDs.</span>
+<span class="sd">            - Defines grouping columns for biopolymers (using `MIN` and `MAX`</span>
+<span class="sd">                to prevent duplicates) and</span>
+<span class="sd">            distinct counts for `source_id` and `group_id`.</span>
+<span class="sd">            - Applies `HAVING` filters to ensure only models with the minimum</span>
+<span class="sd">                score (`minimum_model_score`)</span>
+<span class="sd">            are included.</span>
+<span class="sd">            - Adds sorting and count limit options to restrict the number of</span>
+<span class="sd">                models returned (`maximum_model_count`).</span>
+<span class="sd">        3. Executes the query and stores results in `_geneModels`, logging the</span>
+<span class="sd">            number of models generated.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            list: A list of generated gene models.</span>
+
+<span class="sd">        Logs:</span>
+<span class="sd">            - Logs the progress of model generation and the total count of</span>
+<span class="sd">            models computed.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># generate the models if we haven&#39;t already</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_geneModels</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="c1"># find all model component candidiates</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">identifyCandidateModelBiopolymers</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">identifyCandidateModelGroups</span><span class="p">()</span>
+
+            <span class="c1"># build model query</span>
+            <span class="n">formatter</span> <span class="o">=</span> <span class="n">string</span><span class="o">.</span><span class="n">Formatter</span><span class="p">()</span>
+            <span class="n">query</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">buildQuery</span><span class="p">(</span>
+                <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;model&quot;</span><span class="p">,</span>
+                <span class="n">focus</span><span class="o">=</span><span class="s2">&quot;cand&quot;</span><span class="p">,</span>
+                <span class="n">select</span><span class="o">=</span><span class="p">[</span>
+                    <span class="s2">&quot;biopolymer_id_L&quot;</span><span class="p">,</span>
+                    <span class="s2">&quot;biopolymer_id_R&quot;</span><span class="p">,</span>
+                    <span class="s2">&quot;source_id&quot;</span><span class="p">,</span>
+                    <span class="s2">&quot;group_id&quot;</span><span class="p">,</span>
+                <span class="p">],</span>  <span class="c1"># noqa E501</span>
+            <span class="p">)</span>
+            <span class="n">query</span><span class="p">[</span><span class="s2">&quot;GROUP BY&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                <span class="n">formatter</span><span class="o">.</span><span class="n">vformat</span><span class="p">(</span>
+                    <span class="s2">&quot;MIN(</span><span class="si">{biopolymer_id_L}</span><span class="s2">, </span><span class="si">{biopolymer_id_R}</span><span class="s2">)&quot;</span><span class="p">,</span>
+                    <span class="n">args</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+                    <span class="n">kwargs</span><span class="o">=</span><span class="n">query</span><span class="p">[</span><span class="s2">&quot;SELECT&quot;</span><span class="p">],</span>
+                <span class="p">)</span>
+            <span class="p">)</span>
+            <span class="n">query</span><span class="p">[</span><span class="s2">&quot;GROUP BY&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                <span class="n">formatter</span><span class="o">.</span><span class="n">vformat</span><span class="p">(</span>
+                    <span class="s2">&quot;MAX(</span><span class="si">{biopolymer_id_L}</span><span class="s2">, </span><span class="si">{biopolymer_id_R}</span><span class="s2">)&quot;</span><span class="p">,</span>
+                    <span class="n">args</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+                    <span class="n">kwargs</span><span class="o">=</span><span class="n">query</span><span class="p">[</span><span class="s2">&quot;SELECT&quot;</span><span class="p">],</span>
+                <span class="p">)</span>
+            <span class="p">)</span>
+            <span class="n">query</span><span class="p">[</span><span class="s2">&quot;SELECT&quot;</span><span class="p">][</span><span class="s2">&quot;biopolymer_id_L&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="s2">&quot;MIN(</span><span class="si">%s</span><span class="s2">)&quot;</span> <span class="o">%</span> <span class="n">query</span><span class="p">[</span><span class="s2">&quot;SELECT&quot;</span><span class="p">][</span><span class="s2">&quot;biopolymer_id_L&quot;</span><span class="p">]</span>
+            <span class="p">)</span>
+            <span class="n">query</span><span class="p">[</span><span class="s2">&quot;SELECT&quot;</span><span class="p">][</span><span class="s2">&quot;biopolymer_id_R&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="s2">&quot;MAX(</span><span class="si">%s</span><span class="s2">)&quot;</span> <span class="o">%</span> <span class="n">query</span><span class="p">[</span><span class="s2">&quot;SELECT&quot;</span><span class="p">][</span><span class="s2">&quot;biopolymer_id_R&quot;</span><span class="p">]</span>
+            <span class="p">)</span>
+            <span class="n">query</span><span class="p">[</span><span class="s2">&quot;SELECT&quot;</span><span class="p">][</span><span class="s2">&quot;source_id&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="s2">&quot;COUNT(DISTINCT </span><span class="si">%s</span><span class="s2">)&quot;</span> <span class="o">%</span> <span class="n">query</span><span class="p">[</span><span class="s2">&quot;SELECT&quot;</span><span class="p">][</span><span class="s2">&quot;source_id&quot;</span><span class="p">]</span>
+            <span class="p">)</span>
+            <span class="n">query</span><span class="p">[</span><span class="s2">&quot;SELECT&quot;</span><span class="p">][</span><span class="s2">&quot;group_id&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="s2">&quot;COUNT(DISTINCT </span><span class="si">%s</span><span class="s2">)&quot;</span> <span class="o">%</span> <span class="n">query</span><span class="p">[</span><span class="s2">&quot;SELECT&quot;</span><span class="p">][</span><span class="s2">&quot;group_id&quot;</span><span class="p">]</span>
+            <span class="p">)</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_options</span><span class="o">.</span><span class="n">minimum_model_score</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="n">query</span><span class="p">[</span><span class="s2">&quot;HAVING&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">add</span><span class="p">(</span>
+                    <span class="s2">&quot;</span><span class="si">%s</span><span class="s2"> &gt;= </span><span class="si">%d</span><span class="s2">&quot;</span>
+                    <span class="o">%</span> <span class="p">(</span>
+                        <span class="n">query</span><span class="p">[</span><span class="s2">&quot;SELECT&quot;</span><span class="p">][</span><span class="s2">&quot;source_id&quot;</span><span class="p">],</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">_options</span><span class="o">.</span><span class="n">minimum_model_score</span><span class="p">,</span>
+                    <span class="p">)</span>  <span class="c1"># noqa E501</span>
+                <span class="p">)</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_options</span><span class="o">.</span><span class="n">sort_models</span> <span class="o">==</span> <span class="s2">&quot;yes&quot;</span><span class="p">:</span>
+                <span class="n">query</span><span class="p">[</span><span class="s2">&quot;ORDER BY&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                    <span class="n">formatter</span><span class="o">.</span><span class="n">vformat</span><span class="p">(</span>
+                        <span class="s2">&quot;</span><span class="si">{source_id}</span><span class="s2"> DESC&quot;</span><span class="p">,</span> <span class="n">args</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">kwargs</span><span class="o">=</span><span class="n">query</span><span class="p">[</span><span class="s2">&quot;SELECT&quot;</span><span class="p">]</span>
+                    <span class="p">)</span>
+                <span class="p">)</span>
+                <span class="n">query</span><span class="p">[</span><span class="s2">&quot;ORDER BY&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                    <span class="n">formatter</span><span class="o">.</span><span class="n">vformat</span><span class="p">(</span>
+                        <span class="s2">&quot;</span><span class="si">{group_id}</span><span class="s2"> DESC&quot;</span><span class="p">,</span> <span class="n">args</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">kwargs</span><span class="o">=</span><span class="n">query</span><span class="p">[</span><span class="s2">&quot;SELECT&quot;</span><span class="p">]</span>
+                    <span class="p">)</span>
+                <span class="p">)</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_options</span><span class="o">.</span><span class="n">maximum_model_count</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="n">query</span><span class="p">[</span><span class="s2">&quot;LIMIT&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_options</span><span class="o">.</span><span class="n">maximum_model_count</span>
+
+            <span class="c1"># execute query and store models</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_geneModels</span> <span class="o">=</span> <span class="nb">list</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="s2">&quot;calculating baseline models ...&quot;</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_geneModels</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">generateQueryResults</span><span class="p">(</span><span class="n">query</span><span class="p">,</span> <span class="n">allowDupes</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+            <span class="p">)</span>  <span class="c1"># the GROUP BY already prevents duplicates</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="s2">&quot; OK: </span><span class="si">%d</span><span class="s2"> models</span><span class="se">\n</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_geneModels</span><span class="p">))</span>
+        <span class="c1"># if no models yet</span>
+
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_geneModels</span></div>
+
+
+    <span class="c1"># getGeneModels()</span>
+
+<div class="viewcode-block" id="FilterAnnotModelMixin.generateModelOutput">
+<a class="viewcode-back" href="../../../biofilter_modules.mixins.html#biofilter_modules.FilterAnnotModelMixin.generateModelOutput">[docs]</a>
+    <span class="k">def</span> <span class="nf">generateModelOutput</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">typesL</span><span class="p">,</span> <span class="n">typesR</span><span class="p">,</span> <span class="n">applyOffset</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Generates and returns output models by combining and expanding</span>
+<span class="sd">        specified column types.</span>
+
+<span class="sd">        This method creates models based on `typesL` and `typesR` column types,</span>
+<span class="sd">        expanding each input column combination to produce paired models. It</span>
+<span class="sd">        supports pairwise knowledge if required. When `all_pairwise_models` is</span>
+<span class="sd">        disabled, existing gene models are used to limit generated pairs;</span>
+<span class="sd">        otherwise, all combinations are generated.</span>
+
+<span class="sd">        Parameters:</span>
+<span class="sd">        - `typesL`: List of column types for the left side of the model</span>
+<span class="sd">            expansion.</span>
+<span class="sd">        - `typesR`: List of column types for the right side of the model</span>
+<span class="sd">            expansion.</span>
+<span class="sd">        - `applyOffset`: (optional) Determines whether a positional offset</span>
+<span class="sd">            should be applied to the data.</span>
+
+<span class="sd">        Steps:</span>
+<span class="sd">        1. Sets a limit on the maximum number of models (if defined) and</span>
+<span class="sd">            retrieves gene models if required.</span>
+<span class="sd">        2. Constructs SQL queries for the left and right sides of the models</span>
+<span class="sd">            using the provided column types.</span>
+<span class="sd">        3. Checks if `debug_query` is enabled to log SQL query plans and</span>
+<span class="sd">            statements.</span>
+<span class="sd">        4. Executes queries to generate model combinations:</span>
+<span class="sd">        - When `all_pairwise_models` is disabled, expands each gene-gene pair.</span>
+<span class="sd">        - When `all_pairwise_models` is enabled, generates all combinations of</span>
+<span class="sd">            `typesL` and `typesR`.</span>
+<span class="sd">        5. Returns an iterator with model output headers and rows, limited to</span>
+<span class="sd">            a maximum number if specified.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">        - An iterator containing the generated output header and model rows.</span>
+
+<span class="sd">        Logging:</span>
+<span class="sd">        - Logs SQL queries and diagnostic results when `debug_query` is</span>
+<span class="sd">            enabled, to assist with debugging and viewing SQL execution plans.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># TODO user knowledge</span>
+        <span class="n">cursor</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_loki</span><span class="o">.</span><span class="n">_db</span><span class="o">.</span><span class="n">cursor</span><span class="p">()</span>
+        <span class="n">limit</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_options</span><span class="o">.</span><span class="n">maximum_model_count</span><span class="p">)</span>
+
+        <span class="c1"># if we&#39;ll need baseline gene models, generate them first</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_options</span><span class="o">.</span><span class="n">all_pairwise_models</span> <span class="o">!=</span> <span class="s2">&quot;yes&quot;</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">getGeneModels</span><span class="p">()</span>
+
+        <span class="c1"># build queries for left- and right-hand model expansion</span>
+        <span class="n">headerL</span> <span class="o">=</span> <span class="nb">list</span><span class="p">()</span>
+        <span class="n">columnsL</span> <span class="o">=</span> <span class="nb">list</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_populateColumnsFromTypes</span><span class="p">(</span><span class="n">typesL</span><span class="p">,</span> <span class="n">columnsL</span><span class="p">,</span> <span class="n">headerL</span><span class="p">)</span>
+        <span class="n">headerR</span> <span class="o">=</span> <span class="nb">list</span><span class="p">()</span>
+        <span class="n">columnsR</span> <span class="o">=</span> <span class="nb">list</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_populateColumnsFromTypes</span><span class="p">(</span><span class="n">typesR</span><span class="p">,</span> <span class="n">columnsR</span><span class="p">,</span> <span class="n">headerR</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span><span class="n">headerL</span> <span class="ow">and</span> <span class="n">columnsL</span> <span class="ow">and</span> <span class="n">headerR</span> <span class="ow">and</span> <span class="n">columnsR</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span><span class="s2">&quot;model generation with empty column list&quot;</span><span class="p">)</span>
+        <span class="n">headerL</span> <span class="o">=</span> <span class="nb">list</span><span class="p">((</span><span class="s2">&quot;</span><span class="si">%s</span><span class="s2">1&quot;</span> <span class="o">%</span> <span class="n">h</span><span class="p">)</span> <span class="k">for</span> <span class="n">h</span> <span class="ow">in</span> <span class="n">headerL</span><span class="p">)</span>
+        <span class="n">headerL</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;#&quot;</span> <span class="o">+</span> <span class="n">headerL</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">headerR</span> <span class="o">=</span> <span class="nb">list</span><span class="p">((</span><span class="s2">&quot;</span><span class="si">%s</span><span class="s2">2&quot;</span> <span class="o">%</span> <span class="n">h</span><span class="p">)</span> <span class="k">for</span> <span class="n">h</span> <span class="ow">in</span> <span class="n">headerR</span><span class="p">)</span>
+        <span class="n">conditionsL</span> <span class="o">=</span> <span class="n">conditionsR</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="c1"># for knowledge-supported models, add the conditions for expanding</span>
+        <span class="c1"># from base models</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_options</span><span class="o">.</span><span class="n">all_pairwise_models</span> <span class="o">!=</span> <span class="s2">&quot;yes&quot;</span><span class="p">:</span>
+            <span class="n">conditionsL</span> <span class="o">=</span> <span class="p">{</span>
+                <span class="p">(</span><span class="s2">&quot;gene_id&quot;</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_onlyGeneModels</span> <span class="k">else</span> <span class="s2">&quot;biopolymer_id&quot;</span><span class="p">):</span> <span class="p">{</span>
+                    <span class="s2">&quot;= (CASE WHEN 1 THEN ?1 ELSE 0*?2*?3*?4 END)&quot;</span>
+                <span class="p">}</span>
+            <span class="p">}</span>
+            <span class="n">conditionsR</span> <span class="o">=</span> <span class="p">{</span>
+                <span class="p">(</span><span class="s2">&quot;gene_id&quot;</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_onlyGeneModels</span> <span class="k">else</span> <span class="s2">&quot;biopolymer_id&quot;</span><span class="p">):</span> <span class="p">{</span>
+                    <span class="s2">&quot;= (CASE WHEN 1 THEN ?2 ELSE 0*?1*?3*?4 END)&quot;</span>
+                <span class="p">}</span>
+            <span class="p">}</span>
+        <span class="n">queryL</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">buildQuery</span><span class="p">(</span>
+            <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;filter&quot;</span><span class="p">,</span>
+            <span class="n">focus</span><span class="o">=</span><span class="s2">&quot;main&quot;</span><span class="p">,</span>
+            <span class="n">select</span><span class="o">=</span><span class="n">columnsL</span><span class="p">,</span>
+            <span class="n">having</span><span class="o">=</span><span class="n">conditionsL</span><span class="p">,</span>
+            <span class="n">applyOffset</span><span class="o">=</span><span class="n">applyOffset</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="n">sqlL</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">getQueryText</span><span class="p">(</span><span class="n">queryL</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">prepareTablesForQuery</span><span class="p">(</span><span class="n">queryL</span><span class="p">)</span>
+        <span class="n">queryR</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">buildQuery</span><span class="p">(</span>
+            <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;filter&quot;</span><span class="p">,</span>
+            <span class="n">focus</span><span class="o">=</span><span class="s2">&quot;alt&quot;</span><span class="p">,</span>
+            <span class="n">select</span><span class="o">=</span><span class="n">columnsR</span><span class="p">,</span>
+            <span class="n">having</span><span class="o">=</span><span class="n">conditionsR</span><span class="p">,</span>
+            <span class="n">applyOffset</span><span class="o">=</span><span class="n">applyOffset</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="n">sqlR</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">getQueryText</span><span class="p">(</span><span class="n">queryR</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">prepareTablesForQuery</span><span class="p">(</span><span class="n">queryR</span><span class="p">)</span>
+
+        <span class="c1"># debug or execute model expansion</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_options</span><span class="o">.</span><span class="n">debug_query</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">sqlL</span> <span class="o">+</span> <span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="s2">&quot;-----</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">cursor</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span>
+                <span class="s2">&quot;EXPLAIN QUERY PLAN &quot;</span> <span class="o">+</span> <span class="n">sqlL</span><span class="p">,</span>
+                <span class="p">(</span>
+                    <span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">4</span><span class="p">)</span>
+                    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_options</span><span class="o">.</span><span class="n">all_pairwise_models</span> <span class="o">!=</span> <span class="s2">&quot;yes&quot;</span>
+                    <span class="k">else</span> <span class="kc">None</span>  <span class="c1"># noqa E501</span>
+                <span class="p">),</span>  <span class="c1"># noqa E501</span>
+            <span class="p">):</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">row</span><span class="p">)</span> <span class="o">+</span> <span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+
+            <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="s2">&quot;=====</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+
+            <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">sqlR</span> <span class="o">+</span> <span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="s2">&quot;-----</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">cursor</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span>
+                <span class="s2">&quot;EXPLAIN QUERY PLAN &quot;</span> <span class="o">+</span> <span class="n">sqlR</span><span class="p">,</span>
+                <span class="p">(</span>
+                    <span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">4</span><span class="p">)</span>
+                    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_options</span><span class="o">.</span><span class="n">all_pairwise_models</span> <span class="o">!=</span> <span class="s2">&quot;yes&quot;</span>
+                    <span class="k">else</span> <span class="kc">None</span>  <span class="c1"># noqa E501</span>
+                <span class="p">),</span>  <span class="c1"># noqa E501</span>
+            <span class="p">):</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">row</span><span class="p">)</span> <span class="o">+</span> <span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">_options</span><span class="o">.</span><span class="n">all_pairwise_models</span> <span class="o">!=</span> <span class="s2">&quot;yes&quot;</span><span class="p">:</span>
+            <span class="c1"># expand each gene-gene model</span>
+            <span class="n">diffTypes</span> <span class="o">=</span> <span class="n">typesL</span> <span class="o">!=</span> <span class="n">typesR</span>
+            <span class="n">headerR</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;score(src-grp)&quot;</span><span class="p">)</span>
+            <span class="k">yield</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">headerL</span> <span class="o">+</span> <span class="n">headerR</span><span class="p">)</span>
+            <span class="n">modelIDs</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+            <span class="k">for</span> <span class="n">model</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">getGeneModels</span><span class="p">():</span>
+                <span class="n">score</span> <span class="o">=</span> <span class="p">(</span><span class="s2">&quot;</span><span class="si">%d</span><span class="s2">-</span><span class="si">%d</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">model</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span> <span class="n">model</span><span class="p">[</span><span class="mi">3</span><span class="p">]),)</span>
+                <span class="c1"># store the expanded right-hand side, then pair them all with</span>
+                <span class="c1"># the expanded left-hand side</span>
+                <span class="n">listR</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">cursor</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="n">sqlR</span><span class="p">,</span> <span class="n">model</span><span class="p">))</span>
+                <span class="k">for</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">cursor</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="n">sqlL</span><span class="p">,</span> <span class="n">model</span><span class="p">):</span>
+                    <span class="k">for</span> <span class="n">modelR</span> <span class="ow">in</span> <span class="n">listR</span><span class="p">:</span>
+                        <span class="n">modelID</span> <span class="o">=</span> <span class="p">(</span>
+                            <span class="p">(</span><span class="n">row</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">],</span> <span class="n">modelR</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span>
+                            <span class="k">if</span> <span class="p">(</span><span class="n">diffTypes</span> <span class="ow">or</span> <span class="p">(</span><span class="n">row</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">&lt;=</span> <span class="n">modelR</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]))</span>
+                            <span class="k">else</span> <span class="p">(</span><span class="n">modelR</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">],</span> <span class="n">row</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span>
+                        <span class="p">)</span>
+                        <span class="k">if</span> <span class="p">(</span><span class="n">diffTypes</span> <span class="ow">or</span> <span class="p">(</span><span class="n">row</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">!=</span> <span class="n">modelR</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]))</span> <span class="ow">and</span> <span class="p">(</span>
+                            <span class="n">modelID</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">modelIDs</span>
+                        <span class="p">):</span>
+                            <span class="n">modelIDs</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">modelID</span><span class="p">)</span>
+                            <span class="k">yield</span> <span class="n">row</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="n">modelR</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="n">score</span>
+                            <span class="k">if</span> <span class="n">limit</span> <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="n">modelIDs</span><span class="p">)</span> <span class="o">&gt;=</span> <span class="n">limit</span><span class="p">:</span>
+                                <span class="k">return</span>
+                    <span class="c1"># foreach right-hand</span>
+                <span class="c1"># foreach left-hand</span>
+            <span class="c1"># foreach model</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">yield</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">headerL</span> <span class="o">+</span> <span class="n">headerR</span><span class="p">)</span>
+            <span class="n">n</span> <span class="o">=</span> <span class="mi">0</span>
+
+            <span class="c1"># first query the right-hand side results and store them</span>
+            <span class="n">listR</span> <span class="o">=</span> <span class="nb">list</span><span class="p">()</span>
+            <span class="n">rowIDs</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+            <span class="k">for</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">cursor</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="n">sqlR</span><span class="p">):</span>
+                <span class="k">if</span> <span class="n">row</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">rowIDs</span><span class="p">:</span>
+                    <span class="n">rowIDs</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">row</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span>
+                    <span class="n">listR</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">row</span><span class="p">)</span>
+            <span class="k">del</span> <span class="n">rowIDs</span>
+
+            <span class="c1"># now query the left-hand side results and pair each with the</span>
+            <span class="c1"># stored right-hand sides</span>
+            <span class="n">rowIDs</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+            <span class="n">diffCols</span> <span class="o">=</span> <span class="n">columnsL</span> <span class="o">!=</span> <span class="n">columnsR</span>
+            <span class="k">for</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">cursor</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="n">sqlL</span><span class="p">):</span>
+                <span class="k">if</span> <span class="n">row</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">rowIDs</span><span class="p">:</span>
+                    <span class="n">rowIDs</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">row</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span>
+                    <span class="k">for</span> <span class="n">modelR</span> <span class="ow">in</span> <span class="n">listR</span><span class="p">:</span>
+                        <span class="k">if</span> <span class="n">diffCols</span> <span class="ow">or</span> <span class="n">row</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">!=</span> <span class="n">modelR</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]:</span>
+                            <span class="n">n</span> <span class="o">+=</span> <span class="mi">1</span>
+                            <span class="k">yield</span> <span class="n">row</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="n">modelR</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+                            <span class="k">if</span> <span class="n">limit</span> <span class="ow">and</span> <span class="n">n</span> <span class="o">&gt;=</span> <span class="n">limit</span><span class="p">:</span>
+                                <span class="k">return</span>
+            <span class="k">del</span> <span class="n">rowIDs</span></div>
+</div>
+
+        <span class="c1"># if debug/normal/pairwise</span>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Ritchie Lab.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

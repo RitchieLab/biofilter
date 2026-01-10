@@ -1,0 +1,1128 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>biofilter_modules.biofilter &mdash; Biofilter 2.4.4 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=b1e24531"></script>
+      <script src="../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            Biofilter
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <!-- Local TOC -->
+              <div class="local-toc"></div>
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">Biofilter</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">biofilter_modules.biofilter</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for biofilter_modules.biofilter</h1><div class="highlight"><pre>
+<span></span><span class="ch">#!/usr/bin/env python</span>
+
+<span class="kn">import</span> <span class="nn">codecs</span>
+<span class="kn">import</span> <span class="nn">collections</span>
+<span class="kn">import</span> <span class="nn">itertools</span>
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">random</span>
+
+<span class="kn">import</span> <span class="nn">sys</span>
+<span class="kn">import</span> <span class="nn">time</span>
+
+<span class="kn">from</span> <span class="nn">biofilter_class</span> <span class="kn">import</span> <span class="n">Biofilter</span>
+<span class="kn">from</span> <span class="nn">argparse_config</span> <span class="kn">import</span> <span class="n">get_parser</span>
+<span class="kn">from</span> <span class="nn">arg_utils</span> <span class="kn">import</span> <span class="n">OrderedNamespace</span>
+<span class="kn">from</span> <span class="nn">arg_utils</span> <span class="kn">import</span> <span class="n">parseCFile</span>
+
+<span class="kn">from</span> <span class="nn">loki_modules</span> <span class="kn">import</span> <span class="n">loki_db</span>  <span class="c1"># noqa E402</span>
+
+
+<div class="viewcode-block" id="main">
+<a class="viewcode-back" href="../../biofilter_modules.html#biofilter_modules.biofilter.main">[docs]</a>
+<span class="k">def</span> <span class="nf">main</span><span class="p">():</span>
+    <span class="c1"># Factory function that returns a logging lambda for the specified module</span>
+    <span class="k">def</span> <span class="nf">cbMake</span><span class="p">(</span><span class="n">modtype</span><span class="p">):</span>
+        <span class="k">return</span> <span class="k">lambda</span> <span class="n">line</span><span class="p">,</span> <span class="n">err</span><span class="p">:</span> <span class="n">cbLog</span><span class="p">[</span><span class="n">modtype</span><span class="p">]</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span>
+            <span class="p">[</span>
+                <span class="c1"># Error message, defaulting to &#39;(unknown error)&#39;</span>
+                <span class="sa">f</span><span class="s2">&quot;# </span><span class="si">{</span><span class="n">err</span><span class="w"> </span><span class="ow">or</span><span class="w"> </span><span class="s1">&#39;(unknown error)&#39;</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span>
+                <span class="c1"># Line where the error occurred, with trailing wp removed</span>
+                <span class="nb">str</span><span class="p">(</span><span class="n">line</span><span class="p">)</span><span class="o">.</span><span class="n">rstrip</span><span class="p">(),</span>
+            <span class="p">]</span>
+        <span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">encodeString</span><span class="p">(</span><span class="n">string</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">utf8</span><span class="p">(</span><span class="n">string</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+
+    <span class="k">def</span> <span class="nf">encodeLine</span><span class="p">(</span><span class="n">line</span><span class="p">,</span> <span class="n">term</span><span class="o">=</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">utf8</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%s%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">line</span><span class="p">,</span> <span class="n">term</span><span class="p">))[</span><span class="mi">0</span><span class="p">]</span>
+
+    <span class="k">def</span> <span class="nf">encodeRow</span><span class="p">(</span><span class="n">row</span><span class="p">,</span> <span class="n">term</span><span class="o">=</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">delim</span><span class="o">=</span><span class="s2">&quot;</span><span class="se">\t</span><span class="s2">&quot;</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">utf8</span><span class="p">(</span>
+            <span class="s2">&quot;</span><span class="si">%s%s</span><span class="s2">&quot;</span>
+            <span class="o">%</span> <span class="p">(</span>
+                <span class="p">(</span>
+                    <span class="n">delim</span><span class="o">.</span><span class="n">join</span><span class="p">(</span>
+                        <span class="p">(</span>
+                            <span class="n">col</span>
+                            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">col</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span>
+                            <span class="k">else</span> <span class="nb">str</span><span class="p">(</span><span class="s2">&quot;&quot;</span> <span class="k">if</span> <span class="n">col</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">col</span><span class="p">)</span>  <span class="c1"># noqa E501</span>
+                        <span class="p">)</span>  <span class="c1"># noqa E501</span>
+                        <span class="k">for</span> <span class="n">col</span> <span class="ow">in</span> <span class="n">row</span>
+                    <span class="p">)</span>
+                <span class="p">),</span>
+                <span class="n">term</span><span class="p">,</span>
+            <span class="p">)</span>
+        <span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+
+    <span class="n">version</span> <span class="o">=</span> <span class="s2">&quot;Biofilter version </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">Biofilter</span><span class="o">.</span><span class="n">getVersionString</span><span class="p">())</span>
+
+    <span class="c1"># Initialize the argument parser with predefined configuration options and</span>
+    <span class="c1"># help text. The &#39;get_parser&#39; function provides a parser configured for</span>
+    <span class="c1"># this application version.</span>
+    <span class="n">parser</span> <span class="o">=</span> <span class="n">get_parser</span><span class="p">(</span><span class="n">version</span><span class="p">)</span>
+
+    <span class="c1"># if there are no arguments, just print usage and exit</span>
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">sys</span><span class="o">.</span><span class="n">argv</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mi">2</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="n">version</span><span class="p">)</span>
+        <span class="nb">print</span>
+        <span class="n">parser</span><span class="o">.</span><span class="n">print_usage</span><span class="p">()</span>
+        <span class="nb">print</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Use -h for details.&quot;</span><span class="p">)</span>
+        <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span>
+
+    <span class="c1"># Initialize &#39;options&#39; with default argument values using an empty</span>
+    <span class="c1"># argument list and a custom OrderedNamespace to store arguments in the</span>
+    <span class="c1"># order they are added. This setup allows additional programmatic</span>
+    <span class="c1"># manipulation before processing user input.</span>
+    <span class="n">options</span> <span class="o">=</span> <span class="n">parser</span><span class="o">.</span><span class="n">parse_args</span><span class="p">(</span><span class="n">args</span><span class="o">=</span><span class="p">[],</span> <span class="n">namespace</span><span class="o">=</span><span class="n">OrderedNamespace</span><span class="p">())</span>
+
+    <span class="c1"># Parse command-line arguments once to ensure all options and custom types</span>
+    <span class="c1"># (e.g., `yesno`) are processed. Then, iterate through configuration files,</span>
+    <span class="c1"># if any, using the parsed arguments.</span>
+    <span class="k">for</span> <span class="n">cfName</span> <span class="ow">in</span> <span class="n">parser</span><span class="o">.</span><span class="n">parse_args</span><span class="p">()</span><span class="o">.</span><span class="n">configuration</span><span class="p">:</span>
+        <span class="c1"># Parse configuration files and override command-line options if needed</span>
+        <span class="n">parseCFile</span><span class="p">(</span><span class="n">cfName</span><span class="p">,</span> <span class="n">parser</span><span class="p">,</span> <span class="n">options</span><span class="p">)</span>
+
+    <span class="c1"># Parse command-line arguments into the existing `options` object, allowing</span>
+    <span class="c1"># command-line arguments to override settings from configuration files.</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">parse_args</span><span class="p">(</span><span class="n">namespace</span><span class="o">=</span><span class="n">options</span><span class="p">)</span>
+
+    <span class="c1"># Instantiate the Biofilter class with the parsed options. This step</span>
+    <span class="c1"># initializes the Biofilter object with the provided configuration.</span>
+    <span class="n">bio</span> <span class="o">=</span> <span class="n">Biofilter</span><span class="p">(</span><span class="n">options</span><span class="p">)</span>
+
+    <span class="c1"># Define an empty list for use in filtering and annotation operations.</span>
+    <span class="n">empty</span> <span class="o">=</span> <span class="nb">list</span><span class="p">()</span>
+
+    <span class="c1"># identify all the reports we need to output</span>
+    <span class="n">typeOutputPath</span> <span class="o">=</span> <span class="n">collections</span><span class="o">.</span><span class="n">OrderedDict</span><span class="p">()</span>
+    <span class="n">typeOutputPath</span><span class="p">[</span><span class="s2">&quot;report&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">collections</span><span class="o">.</span><span class="n">OrderedDict</span><span class="p">()</span>
+
+    <span class="k">if</span> <span class="n">options</span><span class="o">.</span><span class="n">report_configuration</span> <span class="o">==</span> <span class="s2">&quot;yes&quot;</span><span class="p">:</span>
+        <span class="n">typeOutputPath</span><span class="p">[</span><span class="s2">&quot;report&quot;</span><span class="p">][</span><span class="s2">&quot;configuration&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="n">options</span><span class="o">.</span><span class="n">prefix</span> <span class="o">+</span> <span class="s2">&quot;.configuration&quot;</span>
+        <span class="p">)</span>  <span class="c1"># noqa E501</span>
+    <span class="k">if</span> <span class="n">options</span><span class="o">.</span><span class="n">report_gene_name_stats</span> <span class="o">==</span> <span class="s2">&quot;yes&quot;</span><span class="p">:</span>
+        <span class="n">typeOutputPath</span><span class="p">[</span><span class="s2">&quot;report&quot;</span><span class="p">][</span><span class="s2">&quot;gene name statistics&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="n">options</span><span class="o">.</span><span class="n">prefix</span> <span class="o">+</span> <span class="s2">&quot;.gene-names&quot;</span>
+        <span class="p">)</span>
+    <span class="k">if</span> <span class="n">options</span><span class="o">.</span><span class="n">report_group_name_stats</span> <span class="o">==</span> <span class="s2">&quot;yes&quot;</span><span class="p">:</span>
+        <span class="n">typeOutputPath</span><span class="p">[</span><span class="s2">&quot;report&quot;</span><span class="p">][</span><span class="s2">&quot;group name statistics&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="n">options</span><span class="o">.</span><span class="n">prefix</span> <span class="o">+</span> <span class="s2">&quot;.group-names&quot;</span>
+        <span class="p">)</span>
+    <span class="k">if</span> <span class="n">options</span><span class="o">.</span><span class="n">report_ld_profiles</span> <span class="o">==</span> <span class="s2">&quot;yes&quot;</span><span class="p">:</span>
+        <span class="n">typeOutputPath</span><span class="p">[</span><span class="s2">&quot;report&quot;</span><span class="p">][</span><span class="s2">&quot;LD profiles&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="n">options</span><span class="o">.</span><span class="n">prefix</span> <span class="o">+</span> <span class="s2">&quot;.ld-profiles&quot;</span>
+        <span class="p">)</span>  <span class="c1"># noqa E501</span>
+
+    <span class="c1"># define invalid input handlers, if requested</span>
+    <span class="n">typeOutputPath</span><span class="p">[</span><span class="s2">&quot;invalid&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">collections</span><span class="o">.</span><span class="n">OrderedDict</span><span class="p">()</span>
+    <span class="n">cb</span> <span class="o">=</span> <span class="n">collections</span><span class="o">.</span><span class="n">defaultdict</span><span class="p">(</span><span class="nb">bool</span><span class="p">)</span>
+    <span class="n">cbLog</span> <span class="o">=</span> <span class="n">collections</span><span class="o">.</span><span class="n">OrderedDict</span><span class="p">()</span>
+
+    <span class="k">if</span> <span class="n">options</span><span class="o">.</span><span class="n">report_invalid_input</span> <span class="o">==</span> <span class="s2">&quot;yes&quot;</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">itype</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">&quot;SNP&quot;</span><span class="p">,</span> <span class="s2">&quot;position&quot;</span><span class="p">,</span> <span class="s2">&quot;region&quot;</span><span class="p">,</span> <span class="s2">&quot;gene&quot;</span><span class="p">,</span> <span class="s2">&quot;group&quot;</span><span class="p">,</span> <span class="s2">&quot;source&quot;</span><span class="p">]:</span>
+            <span class="k">for</span> <span class="n">mod</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">&quot;&quot;</span><span class="p">,</span> <span class="s2">&quot;alt-&quot;</span><span class="p">]:</span>
+                <span class="n">typeOutputPath</span><span class="p">[</span><span class="s2">&quot;invalid&quot;</span><span class="p">][</span><span class="n">mod</span> <span class="o">+</span> <span class="n">itype</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
+                    <span class="n">options</span><span class="o">.</span><span class="n">prefix</span> <span class="o">+</span> <span class="s2">&quot;.invalid.&quot;</span> <span class="o">+</span> <span class="n">mod</span> <span class="o">+</span> <span class="n">itype</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span>
+                <span class="p">)</span>
+                <span class="n">cbLog</span><span class="p">[</span><span class="n">mod</span> <span class="o">+</span> <span class="n">itype</span><span class="p">]</span> <span class="o">=</span> <span class="nb">list</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">itype</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">&quot;userknowledge&quot;</span><span class="p">]:</span>
+            <span class="n">typeOutputPath</span><span class="p">[</span><span class="s2">&quot;invalid&quot;</span><span class="p">][</span><span class="n">itype</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="n">options</span><span class="o">.</span><span class="n">prefix</span> <span class="o">+</span> <span class="s2">&quot;.invalid.&quot;</span> <span class="o">+</span> <span class="n">itype</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span>
+            <span class="p">)</span>
+            <span class="n">cbLog</span><span class="p">[</span><span class="n">itype</span><span class="p">]</span> <span class="o">=</span> <span class="nb">list</span><span class="p">()</span>
+    <span class="c1"># if report invalid input</span>
+
+    <span class="c1"># identify all the filtering results we need to output</span>
+    <span class="n">typeOutputPath</span><span class="p">[</span><span class="s2">&quot;filter&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">collections</span><span class="o">.</span><span class="n">OrderedDict</span><span class="p">()</span>
+    <span class="k">for</span> <span class="n">types</span> <span class="ow">in</span> <span class="n">options</span><span class="o">.</span><span class="n">filter</span> <span class="ow">or</span> <span class="n">empty</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">types</span><span class="p">:</span>
+            <span class="n">typeOutputPath</span><span class="p">[</span><span class="s2">&quot;filter&quot;</span><span class="p">][</span><span class="nb">tuple</span><span class="p">(</span><span class="n">types</span><span class="p">)]</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="n">options</span><span class="o">.</span><span class="n">prefix</span> <span class="o">+</span> <span class="s2">&quot;.&quot;</span> <span class="o">+</span> <span class="s2">&quot;-&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">types</span><span class="p">)</span>
+            <span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># ignore empty filters</span>
+            <span class="k">pass</span>
+    <span class="c1"># foreach requested filter</span>
+
+    <span class="c1"># identify all the annotation results we need to output</span>
+    <span class="n">typeOutputPath</span><span class="p">[</span><span class="s2">&quot;annotation&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">collections</span><span class="o">.</span><span class="n">OrderedDict</span><span class="p">()</span>
+
+    <span class="k">if</span> <span class="n">options</span><span class="o">.</span><span class="n">snp</span> <span class="ow">or</span> <span class="n">options</span><span class="o">.</span><span class="n">snp_file</span><span class="p">:</span>
+        <span class="n">userInputType</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;snpinput&quot;</span><span class="p">]</span>
+    <span class="k">elif</span> <span class="n">options</span><span class="o">.</span><span class="n">position_file</span> <span class="ow">or</span> <span class="n">options</span><span class="o">.</span><span class="n">position</span><span class="p">:</span>
+        <span class="n">userInputType</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;positioninput&quot;</span><span class="p">]</span>
+    <span class="k">elif</span> <span class="n">options</span><span class="o">.</span><span class="n">gene</span> <span class="ow">or</span> <span class="n">options</span><span class="o">.</span><span class="n">gene_file</span> <span class="ow">or</span> <span class="n">options</span><span class="o">.</span><span class="n">gene_search</span><span class="p">:</span>
+        <span class="n">userInputType</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;geneinput&quot;</span><span class="p">]</span>
+    <span class="k">elif</span> <span class="n">options</span><span class="o">.</span><span class="n">region</span> <span class="ow">or</span> <span class="n">options</span><span class="o">.</span><span class="n">region_file</span><span class="p">:</span>
+        <span class="n">userInputType</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;regioninput&quot;</span><span class="p">]</span>
+    <span class="k">elif</span> <span class="n">options</span><span class="o">.</span><span class="n">group</span> <span class="ow">or</span> <span class="n">options</span><span class="o">.</span><span class="n">group_file</span> <span class="ow">or</span> <span class="n">options</span><span class="o">.</span><span class="n">group_search</span><span class="p">:</span>
+        <span class="n">userInputType</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;groupinput&quot;</span><span class="p">]</span>
+    <span class="k">elif</span> <span class="n">options</span><span class="o">.</span><span class="n">source</span> <span class="ow">or</span> <span class="n">options</span><span class="o">.</span><span class="n">source_file</span><span class="p">:</span>
+        <span class="n">userInputType</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;sourceinput&quot;</span><span class="p">]</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">userInputType</span> <span class="o">=</span> <span class="p">[]</span>
+
+    <span class="k">for</span> <span class="n">types</span> <span class="ow">in</span> <span class="n">options</span><span class="o">.</span><span class="n">annotate</span> <span class="ow">or</span> <span class="n">empty</span><span class="p">:</span>
+        <span class="n">n</span> <span class="o">=</span> <span class="n">types</span><span class="o">.</span><span class="n">count</span><span class="p">(</span><span class="s2">&quot;:&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">n</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span>
+                <span class="s2">&quot;ERROR: cannot annotate &#39;</span><span class="si">%s</span><span class="s2">&#39;, only two sets of outputs are allowed</span><span class="se">\n</span><span class="s2">&quot;</span>  <span class="c1"># noqa E501</span>
+                <span class="o">%</span> <span class="p">(</span><span class="s2">&quot; &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">types</span><span class="p">),)</span>
+            <span class="p">)</span>
+        <span class="k">elif</span> <span class="n">n</span><span class="p">:</span>
+            <span class="n">i</span> <span class="o">=</span> <span class="n">types</span><span class="o">.</span><span class="n">index</span><span class="p">(</span><span class="s2">&quot;:&quot;</span><span class="p">)</span>
+            <span class="n">typesF</span> <span class="o">=</span> <span class="n">userInputType</span> <span class="o">+</span> <span class="n">types</span><span class="p">[:</span><span class="n">i</span><span class="p">]</span>
+            <span class="n">typesA</span> <span class="o">=</span> <span class="n">types</span><span class="p">[</span><span class="n">i</span> <span class="o">+</span> <span class="mi">1</span> <span class="p">:</span> <span class="kc">None</span><span class="p">]</span>  <span class="c1"># noqa E203</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">typesF</span> <span class="o">=</span> <span class="n">userInputType</span> <span class="o">+</span> <span class="n">types</span><span class="p">[</span><span class="mi">0</span><span class="p">:</span><span class="mi">1</span><span class="p">]</span>
+            <span class="n">typesA</span> <span class="o">=</span> <span class="n">types</span><span class="p">[</span><span class="mi">1</span><span class="p">:</span><span class="kc">None</span><span class="p">]</span>
+
+        <span class="k">if</span> <span class="n">typesF</span> <span class="ow">and</span> <span class="n">typesA</span><span class="p">:</span>
+            <span class="n">typeOutputPath</span><span class="p">[</span><span class="s2">&quot;annotation&quot;</span><span class="p">][(</span><span class="nb">tuple</span><span class="p">(</span><span class="n">typesF</span><span class="p">),</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">typesA</span><span class="p">))]</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="n">options</span><span class="o">.</span><span class="n">prefix</span>
+                <span class="o">+</span> <span class="s2">&quot;.&quot;</span>
+                <span class="o">+</span> <span class="s2">&quot;-&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">typesF</span><span class="p">[</span><span class="mi">1</span><span class="p">:])</span>
+                <span class="o">+</span> <span class="s2">&quot;.&quot;</span>
+                <span class="o">+</span> <span class="s2">&quot;-&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">typesA</span><span class="p">)</span>  <span class="c1"># noqa E501</span>
+            <span class="p">)</span>
+        <span class="k">elif</span> <span class="n">typesF</span><span class="p">:</span>
+            <span class="n">bio</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
+                <span class="s2">&quot;WARNING: annotating &#39;</span><span class="si">%s</span><span class="s2">&#39; is equivalent to filtering &#39;</span><span class="si">%s</span><span class="s2">&#39;</span><span class="se">\n</span><span class="s2">&quot;</span>
+                <span class="o">%</span> <span class="p">(</span><span class="s2">&quot; &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">types</span><span class="p">),</span> <span class="s2">&quot; &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">typesF</span><span class="p">))</span>
+            <span class="p">)</span>
+            <span class="n">typeOutputPath</span><span class="p">[</span><span class="s2">&quot;filter&quot;</span><span class="p">][</span><span class="nb">tuple</span><span class="p">(</span><span class="n">typesF</span><span class="p">)]</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="n">options</span><span class="o">.</span><span class="n">prefix</span> <span class="o">+</span> <span class="s2">&quot;.&quot;</span> <span class="o">+</span> <span class="s2">&quot;-&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">typesF</span><span class="p">)</span>
+            <span class="p">)</span>
+        <span class="k">elif</span> <span class="n">typesA</span><span class="p">:</span>
+            <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span>
+                <span class="s2">&quot;ERROR: cannot annotate &#39;</span><span class="si">%s</span><span class="s2">&#39; with no starting point</span><span class="se">\n</span><span class="s2">&quot;</span>
+                <span class="o">%</span> <span class="p">(</span><span class="s2">&quot; &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">types</span><span class="p">),)</span>
+            <span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># ignore empty annotations</span>
+            <span class="k">pass</span>
+    <span class="c1"># foreach requested annotation</span>
+
+    <span class="c1"># identify all the model results we need to output</span>
+    <span class="n">typeOutputPath</span><span class="p">[</span><span class="s2">&quot;models&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">collections</span><span class="o">.</span><span class="n">OrderedDict</span><span class="p">()</span>
+    <span class="k">for</span> <span class="n">types</span> <span class="ow">in</span> <span class="n">options</span><span class="o">.</span><span class="n">model</span> <span class="ow">or</span> <span class="n">empty</span><span class="p">:</span>
+        <span class="n">n</span> <span class="o">=</span> <span class="n">types</span><span class="o">.</span><span class="n">count</span><span class="p">(</span><span class="s2">&quot;:&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">n</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span>
+                <span class="s2">&quot;ERROR: cannot model &#39;</span><span class="si">%s</span><span class="s2">&#39;, only two sets of outputs are allowed</span><span class="se">\n</span><span class="s2">&quot;</span>  <span class="c1"># noqa E501</span>
+                <span class="o">%</span> <span class="p">(</span><span class="s2">&quot; &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">types</span><span class="p">),)</span>
+            <span class="p">)</span>
+        <span class="k">elif</span> <span class="n">n</span><span class="p">:</span>
+            <span class="n">i</span> <span class="o">=</span> <span class="n">types</span><span class="o">.</span><span class="n">index</span><span class="p">(</span><span class="s2">&quot;:&quot;</span><span class="p">)</span>
+            <span class="n">typesL</span> <span class="o">=</span> <span class="n">types</span><span class="p">[:</span><span class="n">i</span><span class="p">]</span>
+            <span class="n">typesR</span> <span class="o">=</span> <span class="n">types</span><span class="p">[</span><span class="n">i</span> <span class="o">+</span> <span class="mi">1</span> <span class="p">:</span> <span class="kc">None</span><span class="p">]</span>  <span class="c1"># noqa E203</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">typesL</span> <span class="o">=</span> <span class="n">typesR</span> <span class="o">=</span> <span class="n">types</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span><span class="n">typesL</span> <span class="ow">or</span> <span class="n">typesR</span><span class="p">):</span>
+            <span class="c1"># ignore empty models</span>
+            <span class="k">pass</span>
+        <span class="k">elif</span> <span class="ow">not</span> <span class="p">(</span><span class="n">typesL</span> <span class="ow">and</span> <span class="n">typesR</span><span class="p">):</span>
+            <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span>
+                <span class="s2">&quot;ERROR: cannot model &#39;</span><span class="si">%s</span><span class="s2">&#39;, both sides require at least one output type</span><span class="se">\n</span><span class="s2">&quot;</span>  <span class="c1"># noqa E501</span>
+                <span class="o">%</span> <span class="s2">&quot; &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">types</span><span class="p">)</span>
+            <span class="p">)</span>
+        <span class="k">elif</span> <span class="n">typesL</span> <span class="o">==</span> <span class="n">typesR</span><span class="p">:</span>
+            <span class="n">typeOutputPath</span><span class="p">[</span><span class="s2">&quot;models&quot;</span><span class="p">][(</span><span class="nb">tuple</span><span class="p">(</span><span class="n">typesL</span><span class="p">),</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">typesR</span><span class="p">))]</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="n">options</span><span class="o">.</span><span class="n">prefix</span> <span class="o">+</span> <span class="s2">&quot;.&quot;</span> <span class="o">+</span> <span class="s2">&quot;-&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">typesL</span><span class="p">)</span> <span class="o">+</span> <span class="s2">&quot;.models&quot;</span>
+            <span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">typeOutputPath</span><span class="p">[</span><span class="s2">&quot;models&quot;</span><span class="p">][(</span><span class="nb">tuple</span><span class="p">(</span><span class="n">typesL</span><span class="p">),</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">typesR</span><span class="p">))]</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="n">options</span><span class="o">.</span><span class="n">prefix</span>
+                <span class="o">+</span> <span class="s2">&quot;.&quot;</span>
+                <span class="o">+</span> <span class="s2">&quot;-&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">typesL</span><span class="p">)</span>
+                <span class="o">+</span> <span class="s2">&quot;.&quot;</span>
+                <span class="o">+</span> <span class="s2">&quot;-&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">typesR</span><span class="p">)</span>
+                <span class="o">+</span> <span class="s2">&quot;.models&quot;</span>
+            <span class="p">)</span>
+    <span class="c1"># foreach requested model</span>
+
+    <span class="c1"># identify all the PARIS result files we need to output</span>
+    <span class="n">typeOutputPath</span><span class="p">[</span><span class="s2">&quot;paris&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">collections</span><span class="o">.</span><span class="n">OrderedDict</span><span class="p">()</span>
+    <span class="k">if</span> <span class="n">options</span><span class="o">.</span><span class="n">paris</span> <span class="o">==</span> <span class="s2">&quot;yes&quot;</span><span class="p">:</span>
+        <span class="n">typeOutputPath</span><span class="p">[</span><span class="s2">&quot;paris&quot;</span><span class="p">][</span><span class="s2">&quot;summary&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">options</span><span class="o">.</span><span class="n">prefix</span> <span class="o">+</span> <span class="s2">&quot;.paris-summary&quot;</span>
+        <span class="k">if</span> <span class="n">options</span><span class="o">.</span><span class="n">paris_details</span> <span class="o">==</span> <span class="s2">&quot;yes&quot;</span><span class="p">:</span>
+            <span class="n">typeOutputPath</span><span class="p">[</span><span class="s2">&quot;paris&quot;</span><span class="p">][</span><span class="s2">&quot;detail&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="n">options</span><span class="o">.</span><span class="n">prefix</span> <span class="o">+</span> <span class="s2">&quot;.paris-detail&quot;</span>
+            <span class="p">)</span>  <span class="c1"># noqa E501</span>
+
+    <span class="c1"># verify that all output files are unique, writeable and nonexistant</span>
+    <span class="c1"># (unless overwriting)</span>
+    <span class="n">typeOutputInfo</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">()</span>
+    <span class="n">pathUsed</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">()</span>
+    <span class="k">for</span> <span class="n">outtype</span><span class="p">,</span> <span class="n">outputPath</span> <span class="ow">in</span> <span class="n">typeOutputPath</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="n">typeOutputInfo</span><span class="p">[</span><span class="n">outtype</span><span class="p">]</span> <span class="o">=</span> <span class="n">collections</span><span class="o">.</span><span class="n">OrderedDict</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">output</span><span class="p">,</span> <span class="n">path</span> <span class="ow">in</span> <span class="n">outputPath</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="k">if</span> <span class="n">outtype</span> <span class="o">==</span> <span class="s2">&quot;report&quot;</span><span class="p">:</span>
+                <span class="n">label</span> <span class="o">=</span> <span class="s2">&quot;</span><span class="si">%s</span><span class="s2"> report&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">output</span><span class="p">,)</span>
+            <span class="k">elif</span> <span class="n">outtype</span> <span class="o">==</span> <span class="s2">&quot;invalid&quot;</span><span class="p">:</span>
+                <span class="n">label</span> <span class="o">=</span> <span class="s2">&quot;invalid </span><span class="si">%s</span><span class="s2"> input report&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">output</span><span class="p">,)</span>
+            <span class="k">elif</span> <span class="n">outtype</span> <span class="o">==</span> <span class="s2">&quot;filter&quot;</span><span class="p">:</span>
+                <span class="n">label</span> <span class="o">=</span> <span class="s2">&quot;&#39;</span><span class="si">%s</span><span class="s2">&#39; filter&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="s2">&quot; &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">output</span><span class="p">),)</span>
+            <span class="k">elif</span> <span class="n">outtype</span> <span class="o">==</span> <span class="s2">&quot;annotation&quot;</span><span class="p">:</span>
+                <span class="n">label</span> <span class="o">=</span> <span class="s2">&quot;&#39;</span><span class="si">%s</span><span class="s2"> : </span><span class="si">%s</span><span class="s2">&#39; annotation&quot;</span> <span class="o">%</span> <span class="p">(</span>
+                    <span class="s2">&quot; &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">output</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">1</span><span class="p">:]),</span>
+                    <span class="s2">&quot; &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">output</span><span class="p">[</span><span class="mi">1</span><span class="p">]),</span>
+                <span class="p">)</span>
+            <span class="k">elif</span> <span class="n">outtype</span> <span class="o">==</span> <span class="s2">&quot;models&quot;</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">output</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="n">output</span><span class="p">[</span><span class="mi">1</span><span class="p">]:</span>
+                    <span class="n">label</span> <span class="o">=</span> <span class="s2">&quot;&#39;</span><span class="si">%s</span><span class="s2">&#39; models&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="s2">&quot; &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">output</span><span class="p">[</span><span class="mi">0</span><span class="p">]),)</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">label</span> <span class="o">=</span> <span class="s2">&quot;&#39;</span><span class="si">%s</span><span class="s2"> : </span><span class="si">%s</span><span class="s2">&#39; models&quot;</span> <span class="o">%</span> <span class="p">(</span>
+                        <span class="s2">&quot; &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">output</span><span class="p">[</span><span class="mi">0</span><span class="p">]),</span>
+                        <span class="s2">&quot; &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">output</span><span class="p">[</span><span class="mi">1</span><span class="p">]),</span>
+                    <span class="p">)</span>
+            <span class="k">elif</span> <span class="n">outtype</span> <span class="o">==</span> <span class="s2">&quot;paris&quot;</span><span class="p">:</span>
+                <span class="n">label</span> <span class="o">=</span> <span class="s2">&quot;PARIS </span><span class="si">%s</span><span class="s2"> report&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">output</span><span class="p">,)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span><span class="s2">&quot;unexpected output type&quot;</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="n">options</span><span class="o">.</span><span class="n">debug_logic</span> <span class="o">==</span> <span class="s2">&quot;yes&quot;</span><span class="p">:</span>
+                <span class="n">bio</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
+                    <span class="s2">&quot;</span><span class="si">%s</span><span class="s2"> will be written to &#39;</span><span class="si">%s</span><span class="s2">&#39;</span><span class="se">\n</span><span class="s2">&quot;</span>
+                    <span class="o">%</span> <span class="p">(</span>
+                        <span class="n">label</span><span class="p">,</span>
+                        <span class="p">(</span><span class="s2">&quot;&lt;stdout&gt;&quot;</span> <span class="k">if</span> <span class="n">options</span><span class="o">.</span><span class="n">stdout</span> <span class="o">==</span> <span class="s2">&quot;yes&quot;</span> <span class="k">else</span> <span class="n">path</span><span class="p">),</span>
+                    <span class="p">)</span>  <span class="c1"># noqa E501</span>
+                <span class="p">)</span>
+
+            <span class="k">if</span> <span class="n">options</span><span class="o">.</span><span class="n">stdout</span> <span class="o">==</span> <span class="s2">&quot;yes&quot;</span><span class="p">:</span>
+                <span class="n">path</span> <span class="o">=</span> <span class="s2">&quot;&lt;stdout&gt;&quot;</span>
+            <span class="k">elif</span> <span class="n">path</span> <span class="ow">in</span> <span class="n">pathUsed</span><span class="p">:</span>
+                <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span>
+                    <span class="s2">&quot;ERROR: cannot write </span><span class="si">%s</span><span class="s2"> to &#39;</span><span class="si">%s</span><span class="s2">&#39;, file is already reserved for </span><span class="si">%s</span><span class="se">\n</span><span class="s2">&quot;</span>  <span class="c1"># noqa E501</span>
+                    <span class="o">%</span> <span class="p">(</span><span class="n">label</span><span class="p">,</span> <span class="n">path</span><span class="p">,</span> <span class="n">pathUsed</span><span class="p">[</span><span class="n">path</span><span class="p">])</span>
+                <span class="p">)</span>
+            <span class="k">elif</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">path</span><span class="p">):</span>
+                <span class="k">if</span> <span class="n">options</span><span class="o">.</span><span class="n">overwrite</span> <span class="o">==</span> <span class="s2">&quot;yes&quot;</span><span class="p">:</span>
+                    <span class="n">bio</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
+                        <span class="s2">&quot;WARNING: </span><span class="si">%s</span><span class="s2"> file &#39;</span><span class="si">%s</span><span class="s2">&#39; already exists and will be overwritten</span><span class="se">\n</span><span class="s2">&quot;</span>  <span class="c1"># noqa E501</span>
+                        <span class="o">%</span> <span class="p">(</span><span class="n">label</span><span class="p">,</span> <span class="n">path</span><span class="p">)</span>
+                    <span class="p">)</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span>
+                        <span class="s2">&quot;ERROR: </span><span class="si">%s</span><span class="s2"> file &#39;</span><span class="si">%s</span><span class="s2">&#39; already exists, must specify --overwrite or a different --prefix</span><span class="se">\n</span><span class="s2">&quot;</span>  <span class="c1"># noqa E501</span>
+                        <span class="o">%</span> <span class="p">(</span><span class="n">label</span><span class="p">,</span> <span class="n">path</span><span class="p">)</span>
+                    <span class="p">)</span>
+            <span class="n">pathUsed</span><span class="p">[</span><span class="n">path</span><span class="p">]</span> <span class="o">=</span> <span class="n">label</span>
+            <span class="n">file</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="n">sys</span><span class="o">.</span><span class="n">stdout</span>
+                <span class="k">if</span> <span class="n">options</span><span class="o">.</span><span class="n">stdout</span> <span class="o">==</span> <span class="s2">&quot;yes&quot;</span>
+                <span class="k">else</span> <span class="p">(</span><span class="nb">open</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="s2">&quot;wb&quot;</span><span class="p">)</span> <span class="k">if</span> <span class="n">outtype</span> <span class="o">!=</span> <span class="s2">&quot;invalid&quot;</span> <span class="k">else</span> <span class="kc">None</span><span class="p">)</span>
+            <span class="p">)</span>
+            <span class="n">typeOutputInfo</span><span class="p">[</span><span class="n">outtype</span><span class="p">][</span><span class="n">output</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">label</span><span class="p">,</span> <span class="n">path</span><span class="p">,</span> <span class="n">file</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">outtype</span> <span class="o">==</span> <span class="s2">&quot;invalid&quot;</span><span class="p">:</span>
+                <span class="n">cb</span><span class="p">[</span><span class="n">output</span><span class="p">]</span> <span class="o">=</span> <span class="n">cbMake</span><span class="p">(</span><span class="n">output</span><span class="p">)</span>
+        <span class="c1"># foreach output of type</span>
+    <span class="c1"># foreach output type</span>
+
+    <span class="c1"># attach the knowledge file, if provided</span>
+    <span class="k">if</span> <span class="n">options</span><span class="o">.</span><span class="n">knowledge</span><span class="p">:</span>
+        <span class="n">dbPath</span> <span class="o">=</span> <span class="n">options</span><span class="o">.</span><span class="n">knowledge</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">dbPath</span><span class="p">):</span>
+            <span class="n">cwdDir</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span>
+                <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">realpath</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">abspath</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">getcwd</span><span class="p">()))</span>
+            <span class="p">)</span>  <span class="c1"># noqa E501</span>
+            <span class="n">myDir</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span>
+                <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">realpath</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">abspath</span><span class="p">(</span><span class="vm">__file__</span><span class="p">))</span>
+            <span class="p">)</span>  <span class="c1"># noqa E501</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">samefile</span><span class="p">(</span><span class="n">cwdDir</span><span class="p">,</span> <span class="n">myDir</span><span class="p">):</span>
+                <span class="n">dbPath</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">myDir</span><span class="p">,</span> <span class="n">options</span><span class="o">.</span><span class="n">knowledge</span><span class="p">)</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">dbPath</span><span class="p">):</span>
+                    <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span>
+                        <span class="s2">&quot;ERROR: knowledge database file &#39;</span><span class="si">%s</span><span class="s2">&#39; not found in &#39;</span><span class="si">%s</span><span class="s2">&#39; or &#39;</span><span class="si">%s</span><span class="s2">&#39;&quot;</span>  <span class="c1"># noqa E501</span>
+                        <span class="o">%</span> <span class="p">(</span><span class="n">options</span><span class="o">.</span><span class="n">knowledge</span><span class="p">,</span> <span class="n">cwdDir</span><span class="p">,</span> <span class="n">myDir</span><span class="p">)</span>
+                    <span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span>
+                    <span class="s2">&quot;ERROR: knowledge database file &#39;</span><span class="si">%s</span><span class="s2">&#39; not found&quot;</span>
+                    <span class="o">%</span> <span class="p">(</span><span class="n">options</span><span class="o">.</span><span class="n">knowledge</span><span class="p">)</span>
+                <span class="p">)</span>
+        <span class="n">bio</span><span class="o">.</span><span class="n">attachDatabaseFile</span><span class="p">(</span><span class="n">dbPath</span><span class="p">)</span>
+    <span class="c1"># if knowledge</span>
+
+    <span class="c1"># verify the replication fingerprint, if requested</span>
+    <span class="n">sourceVerify</span> <span class="o">=</span> <span class="n">collections</span><span class="o">.</span><span class="n">defaultdict</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="p">[</span><span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">])</span>
+    <span class="k">for</span> <span class="n">source</span><span class="p">,</span> <span class="n">version</span> <span class="ow">in</span> <span class="n">options</span><span class="o">.</span><span class="n">verify_source_loader</span> <span class="ow">or</span> <span class="n">empty</span><span class="p">:</span>
+        <span class="n">sourceVerify</span><span class="p">[</span><span class="n">source</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="n">version</span>
+    <span class="k">for</span> <span class="n">source</span><span class="p">,</span> <span class="n">option</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">options</span><span class="o">.</span><span class="n">verify_source_option</span> <span class="ow">or</span> <span class="n">empty</span><span class="p">:</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">sourceVerify</span><span class="p">[</span><span class="n">source</span><span class="p">][</span><span class="mi">1</span><span class="p">]:</span>
+            <span class="n">sourceVerify</span><span class="p">[</span><span class="n">source</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">()</span>
+        <span class="n">sourceVerify</span><span class="p">[</span><span class="n">source</span><span class="p">][</span><span class="mi">1</span><span class="p">][</span><span class="n">option</span><span class="p">]</span> <span class="o">=</span> <span class="n">value</span>
+    <span class="k">for</span> <span class="n">source</span><span class="p">,</span> <span class="n">file</span><span class="p">,</span> <span class="n">date</span><span class="p">,</span> <span class="n">size</span><span class="p">,</span> <span class="n">md5</span> <span class="ow">in</span> <span class="n">options</span><span class="o">.</span><span class="n">verify_source_file</span> <span class="ow">or</span> <span class="n">empty</span><span class="p">:</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">sourceVerify</span><span class="p">[</span><span class="n">source</span><span class="p">][</span><span class="mi">2</span><span class="p">]:</span>
+            <span class="n">sourceVerify</span><span class="p">[</span><span class="n">source</span><span class="p">][</span><span class="mi">2</span><span class="p">]</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">()</span>
+        <span class="n">sourceVerify</span><span class="p">[</span><span class="n">source</span><span class="p">][</span><span class="mi">2</span><span class="p">][</span><span class="n">file</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">date</span><span class="p">,</span> <span class="nb">int</span><span class="p">(</span><span class="n">size</span><span class="p">),</span> <span class="n">md5</span><span class="p">)</span>
+    <span class="k">if</span> <span class="p">(</span>
+        <span class="n">sourceVerify</span>
+        <span class="ow">or</span> <span class="n">options</span><span class="o">.</span><span class="n">verify_biofilter_version</span>
+        <span class="ow">or</span> <span class="n">options</span><span class="o">.</span><span class="n">verify_loki_version</span>  <span class="c1"># noqa E501</span>
+    <span class="p">):</span>  <span class="c1"># noqa E501</span>
+        <span class="n">bio</span><span class="o">.</span><span class="n">logPush</span><span class="p">(</span><span class="s2">&quot;verifying replication fingerprint ...</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">options</span><span class="o">.</span><span class="n">verify_biofilter_version</span> <span class="ow">and</span> <span class="p">(</span>
+            <span class="n">options</span><span class="o">.</span><span class="n">verify_biofilter_version</span> <span class="o">!=</span> <span class="n">Biofilter</span><span class="o">.</span><span class="n">getVersionString</span><span class="p">()</span>
+        <span class="p">):</span>
+            <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span>
+                <span class="s2">&quot;ERROR: configuration requires Biofilter version </span><span class="si">%s</span><span class="s2">, but this is version </span><span class="si">%s</span><span class="se">\n</span><span class="s2">&quot;</span>  <span class="c1"># noqa E501</span>
+                <span class="o">%</span> <span class="p">(</span>
+                    <span class="n">options</span><span class="o">.</span><span class="n">verify_biofilter_version</span><span class="p">,</span>
+                    <span class="n">Biofilter</span><span class="o">.</span><span class="n">getVersionString</span><span class="p">(),</span>
+                <span class="p">)</span>  <span class="c1"># noqa E501</span>
+            <span class="p">)</span>
+        <span class="k">if</span> <span class="n">options</span><span class="o">.</span><span class="n">verify_loki_version</span> <span class="ow">and</span> <span class="p">(</span>
+            <span class="n">options</span><span class="o">.</span><span class="n">verify_loki_version</span> <span class="o">!=</span> <span class="n">loki_db</span><span class="o">.</span><span class="n">Database</span><span class="o">.</span><span class="n">getVersionString</span><span class="p">()</span>
+        <span class="p">):</span>
+            <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span>
+                <span class="s2">&quot;ERROR: configuration requires LOKI version </span><span class="si">%s</span><span class="s2">, but this is version </span><span class="si">%s</span><span class="se">\n</span><span class="s2">&quot;</span>  <span class="c1"># noqa E501</span>
+                <span class="o">%</span> <span class="p">(</span>
+                    <span class="n">options</span><span class="o">.</span><span class="n">verify_loki_version</span><span class="p">,</span>
+                    <span class="n">loki_db</span><span class="o">.</span><span class="n">Database</span><span class="o">.</span><span class="n">getVersionString</span><span class="p">(),</span>
+                <span class="p">)</span>  <span class="c1"># noqa E501</span>
+            <span class="p">)</span>
+        <span class="k">for</span> <span class="n">source</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">sourceVerify</span><span class="p">):</span>
+            <span class="n">verify</span> <span class="o">=</span> <span class="n">sourceVerify</span><span class="p">[</span><span class="n">source</span><span class="p">]</span>
+            <span class="n">sourceID</span> <span class="o">=</span> <span class="n">bio</span><span class="o">.</span><span class="n">_loki</span><span class="o">.</span><span class="n">getSourceID</span><span class="p">(</span><span class="n">source</span><span class="p">)</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">sourceID</span><span class="p">:</span>
+                <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span>
+                    <span class="s2">&quot;ERROR: cannot verify </span><span class="si">%s</span><span class="s2"> fingerprint, knowledge database contains no such source</span><span class="se">\n</span><span class="s2">&quot;</span>  <span class="c1"># noqa E501</span>
+                    <span class="o">%</span> <span class="p">(</span><span class="n">source</span><span class="p">,)</span>
+                <span class="p">)</span>
+            <span class="n">version</span> <span class="o">=</span> <span class="n">bio</span><span class="o">.</span><span class="n">_loki</span><span class="o">.</span><span class="n">getSourceIDVersion</span><span class="p">(</span><span class="n">sourceID</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">verify</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="ow">and</span> <span class="n">verify</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">!=</span> <span class="n">version</span><span class="p">:</span>
+                <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span>
+                    <span class="s2">&quot;ERROR: configuration requires </span><span class="si">%s</span><span class="s2"> loader version </span><span class="si">%s</span><span class="s2">, but knowledge database reports version </span><span class="si">%s</span><span class="se">\n</span><span class="s2">&quot;</span>  <span class="c1"># noqa E501</span>
+                    <span class="o">%</span> <span class="p">(</span><span class="n">source</span><span class="p">,</span> <span class="n">verify</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">version</span><span class="p">)</span>
+                <span class="p">)</span>
+            <span class="k">if</span> <span class="n">verify</span><span class="p">[</span><span class="mi">1</span><span class="p">]:</span>
+                <span class="n">options</span> <span class="o">=</span> <span class="n">bio</span><span class="o">.</span><span class="n">_loki</span><span class="o">.</span><span class="n">getSourceIDOptions</span><span class="p">(</span><span class="n">sourceID</span><span class="p">)</span>
+                <span class="k">for</span> <span class="n">opt</span><span class="p">,</span> <span class="n">val</span> <span class="ow">in</span> <span class="n">verify</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+                    <span class="k">if</span> <span class="n">opt</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">options</span> <span class="ow">or</span> <span class="n">val</span> <span class="o">!=</span> <span class="n">options</span><span class="p">[</span><span class="n">opt</span><span class="p">]:</span>
+                        <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span>
+                            <span class="s2">&quot;ERROR: configuration requires </span><span class="si">%s</span><span class="s2"> loader option </span><span class="si">%s</span><span class="s2"> = </span><span class="si">%s</span><span class="s2">, but knowledge database reports setting = </span><span class="si">%s</span><span class="se">\n</span><span class="s2">&quot;</span>  <span class="c1"># noqa E501</span>
+                            <span class="o">%</span> <span class="p">(</span><span class="n">source</span><span class="p">,</span> <span class="n">opt</span><span class="p">,</span> <span class="n">val</span><span class="p">,</span> <span class="n">options</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">opt</span><span class="p">))</span>
+                        <span class="p">)</span>
+            <span class="k">if</span> <span class="n">verify</span><span class="p">[</span><span class="mi">2</span><span class="p">]:</span>
+                <span class="n">files</span> <span class="o">=</span> <span class="n">bio</span><span class="o">.</span><span class="n">_loki</span><span class="o">.</span><span class="n">getSourceIDFiles</span><span class="p">(</span><span class="n">sourceID</span><span class="p">)</span>
+                <span class="k">for</span> <span class="n">file</span><span class="p">,</span> <span class="n">meta</span> <span class="ow">in</span> <span class="n">verify</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+                    <span class="k">if</span> <span class="n">file</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">files</span><span class="p">:</span>
+                        <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span>
+                            <span class="s2">&quot;ERROR: configuration requires a specific fingerprint for </span><span class="si">%s</span><span class="s2"> file &#39;</span><span class="si">%s</span><span class="s2">&#39;, but knowledge database reports no such file</span><span class="se">\n</span><span class="s2">&quot;</span>  <span class="c1"># noqa E501</span>
+                            <span class="o">%</span> <span class="p">(</span><span class="n">source</span><span class="p">,</span> <span class="n">file</span><span class="p">)</span>
+                        <span class="p">)</span>
+                    <span class="c1"># size and hash should be sufficient comparisons, and some</span>
+                    <span class="c1"># sources (KEGG,PharmGKB) don&#39;t provide data file</span>
+                    <span class="c1"># timestamps anyway</span>
+                    <span class="c1"># elif meta[0] != files[file][0]:</span>
+                    <span class="c1"># 	sys.exit(&quot;ERROR: configuration requires %s file &#39;%s&#39;</span>
+                    <span class="c1"># modification date &#39;%s&#39;, but knowledge database reports</span>
+                    <span class="c1"># &#39;%s&#39;\n&quot; % (source,file,meta[0],files[file][0]))</span>
+                    <span class="k">elif</span> <span class="n">meta</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">!=</span> <span class="n">files</span><span class="p">[</span><span class="n">file</span><span class="p">][</span><span class="mi">1</span><span class="p">]:</span>
+                        <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span>
+                            <span class="s2">&quot;ERROR: configuration requires </span><span class="si">%s</span><span class="s2"> file &#39;</span><span class="si">%s</span><span class="s2">&#39; size </span><span class="si">%s</span><span class="s2">, but knowledge database reports </span><span class="si">%s</span><span class="se">\n</span><span class="s2">&quot;</span>  <span class="c1"># noqa E501</span>
+                            <span class="o">%</span> <span class="p">(</span><span class="n">source</span><span class="p">,</span> <span class="n">file</span><span class="p">,</span> <span class="n">meta</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">files</span><span class="p">[</span><span class="n">file</span><span class="p">][</span><span class="mi">1</span><span class="p">])</span>
+                        <span class="p">)</span>
+                    <span class="k">elif</span> <span class="n">meta</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="o">!=</span> <span class="n">files</span><span class="p">[</span><span class="n">file</span><span class="p">][</span><span class="mi">2</span><span class="p">]:</span>
+                        <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span>
+                            <span class="s2">&quot;ERROR: configuration requires </span><span class="si">%s</span><span class="s2"> file &#39;</span><span class="si">%s</span><span class="s2">&#39; hash &#39;</span><span class="si">%s</span><span class="s2">&#39;, but knowledge database reports &#39;</span><span class="si">%s</span><span class="s2">&#39;</span><span class="se">\n</span><span class="s2">&quot;</span>  <span class="c1"># noqa E501</span>
+                            <span class="o">%</span> <span class="p">(</span><span class="n">source</span><span class="p">,</span> <span class="n">file</span><span class="p">,</span> <span class="n">meta</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span> <span class="n">files</span><span class="p">[</span><span class="n">file</span><span class="p">][</span><span class="mi">2</span><span class="p">])</span>
+                        <span class="p">)</span>
+        <span class="c1"># foreach source</span>
+        <span class="n">bio</span><span class="o">.</span><span class="n">logPop</span><span class="p">(</span><span class="s2">&quot;... OK</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="c1"># if verify replication fingerprint</span>
+
+    <span class="c1"># set default region_match_percent/bases</span>
+    <span class="k">if</span> <span class="p">(</span><span class="n">options</span><span class="o">.</span><span class="n">region_match_bases</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">)</span> <span class="ow">and</span> <span class="p">(</span>
+        <span class="n">options</span><span class="o">.</span><span class="n">region_match_percent</span> <span class="ow">is</span> <span class="kc">None</span>
+    <span class="p">):</span>  <span class="c1"># noqa E501</span>
+        <span class="n">bio</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
+            <span class="s2">&quot;WARNING: ignoring default region match percent (100) in favor of user-specified region match bases (</span><span class="si">%d</span><span class="s2">)</span><span class="se">\n</span><span class="s2">&quot;</span>  <span class="c1"># noqa E501</span>
+            <span class="o">%</span> <span class="n">options</span><span class="o">.</span><span class="n">region_match_bases</span>
+        <span class="p">)</span>
+        <span class="n">options</span><span class="o">.</span><span class="n">region_match_percent</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">options</span><span class="o">.</span><span class="n">region_match_bases</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">options</span><span class="o">.</span><span class="n">region_match_bases</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="k">if</span> <span class="n">options</span><span class="o">.</span><span class="n">region_match_percent</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">options</span><span class="o">.</span><span class="n">region_match_percent</span> <span class="o">=</span> <span class="mf">100.0</span>
+    <span class="c1"># if rmb/rmp</span>
+
+    <span class="c1"># set the PRNG seed, if requested</span>
+    <span class="k">if</span> <span class="n">options</span><span class="o">.</span><span class="n">random_number_generator_seed</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">seed</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">options</span><span class="o">.</span><span class="n">random_number_generator_seed</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
+            <span class="n">seed</span> <span class="o">=</span> <span class="n">options</span><span class="o">.</span><span class="n">random_number_generator_seed</span> <span class="ow">or</span> <span class="kc">None</span>
+        <span class="n">bio</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
+            <span class="s2">&quot;random number generator seed: </span><span class="si">%s</span><span class="se">\n</span><span class="s2">&quot;</span>
+            <span class="o">%</span> <span class="p">(</span><span class="nb">repr</span><span class="p">(</span><span class="n">seed</span><span class="p">)</span> <span class="k">if</span> <span class="p">(</span><span class="n">seed</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">)</span> <span class="k">else</span> <span class="s2">&quot;&lt;system default&gt;&quot;</span><span class="p">,)</span>
+        <span class="p">)</span>
+        <span class="n">random</span><span class="o">.</span><span class="n">seed</span><span class="p">(</span><span class="n">seed</span><span class="p">)</span>
+    <span class="c1"># if rngs</span>
+
+    <span class="c1"># report the genome build, if requested</span>
+    <span class="n">grchBuildDB</span><span class="p">,</span> <span class="n">ucscBuildDB</span> <span class="o">=</span> <span class="n">bio</span><span class="o">.</span><span class="n">getDatabaseGenomeBuilds</span><span class="p">()</span>
+    <span class="k">if</span> <span class="n">options</span><span class="o">.</span><span class="n">report_genome_build</span> <span class="o">==</span> <span class="s2">&quot;yes&quot;</span><span class="p">:</span>
+        <span class="n">bio</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
+            <span class="s2">&quot;knowledge database genome build: GRCh</span><span class="si">%s</span><span class="s2"> / UCSC hg</span><span class="si">%s</span><span class="se">\n</span><span class="s2">&quot;</span>
+            <span class="o">%</span> <span class="p">(</span><span class="n">grchBuildDB</span> <span class="ow">or</span> <span class="s2">&quot;?&quot;</span><span class="p">,</span> <span class="n">ucscBuildDB</span> <span class="ow">or</span> <span class="s2">&quot;?&quot;</span><span class="p">)</span>
+        <span class="p">)</span>
+    <span class="c1"># if genome build</span>
+
+    <span class="c1"># parse input genome build version(s)</span>
+    <span class="n">grchBuildUser</span><span class="p">,</span> <span class="n">ucscBuildUser</span> <span class="o">=</span> <span class="n">bio</span><span class="o">.</span><span class="n">getInputGenomeBuilds</span><span class="p">(</span>
+        <span class="n">options</span><span class="o">.</span><span class="n">grch_build_version</span><span class="p">,</span> <span class="n">options</span><span class="o">.</span><span class="n">ucsc_build_version</span>
+    <span class="p">)</span>
+    <span class="k">if</span> <span class="n">grchBuildUser</span> <span class="ow">or</span> <span class="n">ucscBuildUser</span><span class="p">:</span>
+        <span class="n">bio</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
+            <span class="s2">&quot;user input genome build: GRCh</span><span class="si">%s</span><span class="s2"> / UCSC hg</span><span class="si">%s</span><span class="se">\n</span><span class="s2">&quot;</span>
+            <span class="o">%</span> <span class="p">(</span><span class="n">grchBuildUser</span> <span class="ow">or</span> <span class="s2">&quot;?&quot;</span><span class="p">,</span> <span class="n">ucscBuildUser</span> <span class="ow">or</span> <span class="s2">&quot;?&quot;</span><span class="p">)</span>
+        <span class="p">)</span>
+
+    <span class="c1"># define output helper functions</span>
+    <span class="n">utf8</span> <span class="o">=</span> <span class="n">codecs</span><span class="o">.</span><span class="n">getencoder</span><span class="p">(</span><span class="s2">&quot;utf8&quot;</span><span class="p">)</span>
+
+    <span class="c1"># process reports</span>
+    <span class="k">for</span> <span class="n">report</span><span class="p">,</span> <span class="n">info</span> <span class="ow">in</span> <span class="n">typeOutputInfo</span><span class="p">[</span><span class="s2">&quot;report&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="n">label</span><span class="p">,</span> <span class="n">path</span><span class="p">,</span> <span class="n">outfile</span> <span class="o">=</span> <span class="n">info</span>
+        <span class="n">bio</span><span class="o">.</span><span class="n">logPush</span><span class="p">(</span><span class="s2">&quot;writing </span><span class="si">%s</span><span class="s2"> to &#39;</span><span class="si">%s</span><span class="s2">&#39; ...</span><span class="se">\n</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">label</span><span class="p">,</span> <span class="n">path</span><span class="p">))</span>
+        <span class="k">if</span> <span class="n">report</span> <span class="o">==</span> <span class="s2">&quot;configuration&quot;</span><span class="p">:</span>
+            <span class="n">outfile</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">encodeLine</span><span class="p">(</span><span class="s2">&quot;# Biofilter configuration file&quot;</span><span class="p">))</span>
+            <span class="n">outfile</span><span class="o">.</span><span class="n">write</span><span class="p">(</span>
+                <span class="n">encodeLine</span><span class="p">(</span>
+                    <span class="s2">&quot;#   generated </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">time</span><span class="o">.</span><span class="n">strftime</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%a</span><span class="s2">, </span><span class="si">%d</span><span class="s2"> %b %Y %H:%M:%S&quot;</span><span class="p">)</span>
+                <span class="p">)</span>  <span class="c1"># noqa E501</span>
+            <span class="p">)</span>
+            <span class="n">outfile</span><span class="o">.</span><span class="n">write</span><span class="p">(</span>
+                <span class="n">encodeLine</span><span class="p">(</span>
+                    <span class="s2">&quot;#   Biofilter version </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">Biofilter</span><span class="o">.</span><span class="n">getVersionString</span><span class="p">()</span>
+                <span class="p">)</span>  <span class="c1"># noqa E501</span>
+            <span class="p">)</span>
+            <span class="n">outfile</span><span class="o">.</span><span class="n">write</span><span class="p">(</span>
+                <span class="n">encodeLine</span><span class="p">(</span>
+                    <span class="s2">&quot;#   LOKI version </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">loki_db</span><span class="o">.</span><span class="n">Database</span><span class="o">.</span><span class="n">getVersionString</span><span class="p">()</span>
+                <span class="p">)</span>  <span class="c1"># noqa E501</span>
+            <span class="p">)</span>
+            <span class="n">outfile</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">encodeLine</span><span class="p">(</span><span class="s2">&quot;&quot;</span><span class="p">))</span>
+            <span class="k">if</span> <span class="n">options</span><span class="o">.</span><span class="n">report_replication_fingerprint</span> <span class="o">==</span> <span class="s2">&quot;yes&quot;</span><span class="p">:</span>
+                <span class="n">outfile</span><span class="o">.</span><span class="n">write</span><span class="p">(</span>
+                    <span class="n">encodeLine</span><span class="p">(</span>
+                        <span class="s1">&#39;</span><span class="si">%-35s</span><span class="s1"> &quot;</span><span class="si">%s</span><span class="s1">&quot;&#39;</span>
+                        <span class="o">%</span> <span class="p">(</span>
+                            <span class="s2">&quot;VERIFY_BIOFILTER_VERSION&quot;</span><span class="p">,</span>
+                            <span class="n">Biofilter</span><span class="o">.</span><span class="n">getVersionString</span><span class="p">(),</span>
+                        <span class="p">)</span>
+                    <span class="p">)</span>
+                <span class="p">)</span>
+                <span class="n">outfile</span><span class="o">.</span><span class="n">write</span><span class="p">(</span>
+                    <span class="n">encodeLine</span><span class="p">(</span>
+                        <span class="s1">&#39;</span><span class="si">%-35s</span><span class="s1"> &quot;</span><span class="si">%s</span><span class="s1">&quot;&#39;</span>
+                        <span class="o">%</span> <span class="p">(</span>
+                            <span class="s2">&quot;VERIFY_LOKI_VERSION&quot;</span><span class="p">,</span>
+                            <span class="n">loki_db</span><span class="o">.</span><span class="n">Database</span><span class="o">.</span><span class="n">getVersionString</span><span class="p">(),</span>
+                        <span class="p">)</span>
+                    <span class="p">)</span>
+                <span class="p">)</span>
+                <span class="k">for</span> <span class="n">source</span><span class="p">,</span> <span class="n">fingerprint</span> <span class="ow">in</span> <span class="n">bio</span><span class="o">.</span><span class="n">getSourceFingerprints</span><span class="p">()</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+                    <span class="n">outfile</span><span class="o">.</span><span class="n">write</span><span class="p">(</span>
+                        <span class="n">encodeLine</span><span class="p">(</span>
+                            <span class="s1">&#39;</span><span class="si">%-35s</span><span class="s1"> </span><span class="si">%s</span><span class="s1"> &quot;</span><span class="si">%s</span><span class="s1">&quot;&#39;</span>
+                            <span class="o">%</span> <span class="p">(</span><span class="s2">&quot;VERIFY_SOURCE_LOADER&quot;</span><span class="p">,</span> <span class="n">source</span><span class="p">,</span> <span class="n">fingerprint</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+                        <span class="p">)</span>
+                    <span class="p">)</span>
+                    <span class="k">for</span> <span class="n">srcopt</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">fingerprint</span><span class="p">[</span><span class="mi">1</span><span class="p">]):</span>
+                        <span class="n">outfile</span><span class="o">.</span><span class="n">write</span><span class="p">(</span>
+                            <span class="n">encodeLine</span><span class="p">(</span>
+                                <span class="s2">&quot;</span><span class="si">%-35s</span><span class="s2"> </span><span class="si">%s</span><span class="s2"> </span><span class="si">%s</span><span class="s2"> &quot;</span>
+                                <span class="o">%</span> <span class="p">(</span><span class="s2">&quot;VERIFY_SOURCE_OPTION&quot;</span><span class="p">,</span> <span class="n">source</span><span class="p">,</span> <span class="n">srcopt</span><span class="p">),</span>
+                                <span class="n">term</span><span class="o">=</span><span class="s2">&quot;&quot;</span><span class="p">,</span>
+                            <span class="p">)</span>
+                        <span class="p">)</span>
+                        <span class="n">outfile</span><span class="o">.</span><span class="n">write</span><span class="p">(</span>
+                            <span class="n">encodeRow</span><span class="p">(</span><span class="n">fingerprint</span><span class="p">[</span><span class="mi">1</span><span class="p">][</span><span class="n">srcopt</span><span class="p">],</span> <span class="n">delim</span><span class="o">=</span><span class="s2">&quot; &quot;</span><span class="p">)</span>
+                        <span class="p">)</span>  <span class="c1"># noqa E501</span>
+                    <span class="k">for</span> <span class="n">srcfile</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">fingerprint</span><span class="p">[</span><span class="mi">2</span><span class="p">]):</span>
+                        <span class="n">outfile</span><span class="o">.</span><span class="n">write</span><span class="p">(</span>
+                            <span class="n">encodeLine</span><span class="p">(</span>
+                                <span class="s1">&#39;</span><span class="si">%-35s</span><span class="s1"> </span><span class="si">%s</span><span class="s1"> &quot;</span><span class="si">%s</span><span class="s1">&quot; &#39;</span>
+                                <span class="o">%</span> <span class="p">(</span><span class="s2">&quot;VERIFY_SOURCE_FILE&quot;</span><span class="p">,</span> <span class="n">source</span><span class="p">,</span> <span class="n">srcfile</span><span class="p">),</span>
+                                <span class="n">term</span><span class="o">=</span><span class="s2">&quot;&quot;</span><span class="p">,</span>
+                            <span class="p">)</span>
+                        <span class="p">)</span>
+                        <span class="n">outfile</span><span class="o">.</span><span class="n">write</span><span class="p">(</span>
+                            <span class="n">encodeRow</span><span class="p">(</span>
+                                <span class="p">(</span>
+                                    <span class="p">(</span><span class="s1">&#39;&quot;</span><span class="si">%s</span><span class="s1">&quot;&#39;</span> <span class="o">%</span> <span class="n">col</span><span class="p">)</span>
+                                    <span class="k">for</span> <span class="n">col</span> <span class="ow">in</span> <span class="n">fingerprint</span><span class="p">[</span><span class="mi">2</span><span class="p">][</span><span class="n">srcfile</span><span class="p">]</span>  <span class="c1"># noqa E501</span>
+                                <span class="p">),</span>  <span class="c1"># noqa E501</span>
+                                <span class="n">delim</span><span class="o">=</span><span class="s2">&quot; &quot;</span><span class="p">,</span>
+                            <span class="p">)</span>
+                        <span class="p">)</span>
+                    <span class="n">outfile</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">encodeLine</span><span class="p">(</span><span class="s2">&quot;&quot;</span><span class="p">))</span>
+            <span class="k">for</span> <span class="n">opt</span> <span class="ow">in</span> <span class="n">options</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">opt</span> <span class="ow">in</span> <span class="p">(</span>
+                    <span class="s2">&quot;configuration&quot;</span><span class="p">,</span>
+                    <span class="s2">&quot;verify_source_loader&quot;</span><span class="p">,</span>
+                    <span class="s2">&quot;verify_source_option&quot;</span><span class="p">,</span>
+                    <span class="s2">&quot;verify_source_file&quot;</span><span class="p">,</span>
+                <span class="p">)</span> <span class="ow">or</span> <span class="ow">not</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">options</span><span class="p">,</span> <span class="n">opt</span><span class="p">):</span>
+                    <span class="k">continue</span>
+                <span class="n">val</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">options</span><span class="p">,</span> <span class="n">opt</span><span class="p">)</span>
+                <span class="k">if</span> <span class="nb">type</span><span class="p">(</span><span class="n">val</span><span class="p">)</span> <span class="ow">is</span> <span class="nb">bool</span><span class="p">:</span>  <span class="c1"># --end-of-line, --debug-*</span>
+                    <span class="k">continue</span>
+                <span class="n">opt</span> <span class="o">=</span> <span class="s2">&quot;</span><span class="si">%-35s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">opt</span><span class="o">.</span><span class="n">upper</span><span class="p">()</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;-&quot;</span><span class="p">,</span> <span class="s2">&quot;_&quot;</span><span class="p">)</span>
+                <span class="c1"># three possibilities: simple value, list of simple values, or</span>
+                <span class="c1"># list of lists of simple values</span>
+                <span class="k">if</span> <span class="p">(</span>
+                    <span class="nb">isinstance</span><span class="p">(</span><span class="n">val</span><span class="p">,</span> <span class="nb">list</span><span class="p">)</span>
+                    <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="n">val</span><span class="p">)</span>
+                    <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">val</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="nb">list</span><span class="p">)</span>  <span class="c1"># noqa E501</span>
+                <span class="p">):</span>  <span class="c1"># noqa E501</span>
+                    <span class="k">for</span> <span class="n">subvals</span> <span class="ow">in</span> <span class="n">val</span><span class="p">:</span>
+                        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">subvals</span><span class="p">):</span>
+                            <span class="n">outfile</span><span class="o">.</span><span class="n">write</span><span class="p">(</span>
+                                <span class="n">encodeRow</span><span class="p">(</span>
+                                    <span class="n">itertools</span><span class="o">.</span><span class="n">chain</span><span class="p">([</span><span class="n">opt</span><span class="p">],</span> <span class="n">subvals</span><span class="p">),</span> <span class="n">delim</span><span class="o">=</span><span class="s2">&quot; &quot;</span>
+                                <span class="p">)</span>  <span class="c1"># noqa E501</span>
+                            <span class="p">)</span>
+                        <span class="k">else</span><span class="p">:</span>
+                            <span class="n">outfile</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">encodeLine</span><span class="p">(</span><span class="n">opt</span><span class="p">))</span>
+                <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">val</span><span class="p">,</span> <span class="nb">list</span><span class="p">):</span>
+                    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">val</span><span class="p">):</span>
+                        <span class="n">outfile</span><span class="o">.</span><span class="n">write</span><span class="p">(</span>
+                            <span class="n">encodeRow</span><span class="p">(</span><span class="n">itertools</span><span class="o">.</span><span class="n">chain</span><span class="p">([</span><span class="n">opt</span><span class="p">],</span> <span class="n">val</span><span class="p">),</span> <span class="n">delim</span><span class="o">=</span><span class="s2">&quot; &quot;</span><span class="p">)</span>
+                        <span class="p">)</span>  <span class="c1"># noqa E501</span>
+                    <span class="k">else</span><span class="p">:</span>
+                        <span class="n">outfile</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">encodeLine</span><span class="p">(</span><span class="n">opt</span><span class="p">))</span>
+                <span class="k">elif</span> <span class="n">val</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                    <span class="n">outfile</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">encodeRow</span><span class="p">([</span><span class="n">opt</span><span class="p">,</span> <span class="n">val</span><span class="p">],</span> <span class="n">delim</span><span class="o">=</span><span class="s2">&quot; &quot;</span><span class="p">))</span>
+            <span class="c1"># foreach option</span>
+        <span class="k">elif</span> <span class="n">report</span> <span class="o">==</span> <span class="s2">&quot;gene name statistics&quot;</span><span class="p">:</span>
+            <span class="n">outfile</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">encodeRow</span><span class="p">([</span><span class="s2">&quot;#type&quot;</span><span class="p">,</span> <span class="s2">&quot;names&quot;</span><span class="p">,</span> <span class="s2">&quot;unique&quot;</span><span class="p">,</span> <span class="s2">&quot;ambiguous&quot;</span><span class="p">]))</span>
+            <span class="k">for</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">bio</span><span class="o">.</span><span class="n">generateGeneNameStats</span><span class="p">():</span>
+                <span class="n">outfile</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">encodeRow</span><span class="p">(</span><span class="n">row</span><span class="p">))</span>
+        <span class="k">elif</span> <span class="n">report</span> <span class="o">==</span> <span class="s2">&quot;group name statistics&quot;</span><span class="p">:</span>
+            <span class="n">outfile</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">encodeRow</span><span class="p">([</span><span class="s2">&quot;#type&quot;</span><span class="p">,</span> <span class="s2">&quot;names&quot;</span><span class="p">,</span> <span class="s2">&quot;unique&quot;</span><span class="p">,</span> <span class="s2">&quot;ambiguous&quot;</span><span class="p">]))</span>
+            <span class="k">for</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">bio</span><span class="o">.</span><span class="n">generateGroupNameStats</span><span class="p">():</span>
+                <span class="n">outfile</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">encodeRow</span><span class="p">(</span><span class="n">row</span><span class="p">))</span>
+        <span class="k">elif</span> <span class="n">report</span> <span class="o">==</span> <span class="s2">&quot;LD profiles&quot;</span><span class="p">:</span>
+            <span class="n">outfile</span><span class="o">.</span><span class="n">write</span><span class="p">(</span>
+                <span class="n">encodeRow</span><span class="p">([</span><span class="s2">&quot;#ldprofile&quot;</span><span class="p">,</span> <span class="s2">&quot;description&quot;</span><span class="p">,</span> <span class="s2">&quot;metric&quot;</span><span class="p">,</span> <span class="s2">&quot;value&quot;</span><span class="p">])</span>
+            <span class="p">)</span>  <span class="c1"># noqa E501</span>
+            <span class="k">for</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">bio</span><span class="o">.</span><span class="n">generateLDProfiles</span><span class="p">():</span>
+                <span class="n">outfile</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">encodeRow</span><span class="p">(</span><span class="n">row</span><span class="p">))</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span><span class="s2">&quot;unexpected report type&quot;</span><span class="p">)</span>
+        <span class="c1"># which report</span>
+        <span class="k">if</span> <span class="n">outfile</span> <span class="o">!=</span> <span class="n">sys</span><span class="o">.</span><span class="n">stdout</span><span class="p">:</span>
+            <span class="n">outfile</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+        <span class="n">bio</span><span class="o">.</span><span class="n">logPop</span><span class="p">(</span><span class="s2">&quot;... OK</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="c1"># foreach report</span>
+
+    <span class="c1"># load user-defined knowledge, if any</span>
+    <span class="k">for</span> <span class="n">path</span> <span class="ow">in</span> <span class="n">options</span><span class="o">.</span><span class="n">user_defined_knowledge</span> <span class="ow">or</span> <span class="n">empty</span><span class="p">:</span>
+        <span class="n">bio</span><span class="o">.</span><span class="n">loadUserKnowledgeFile</span><span class="p">(</span>
+            <span class="n">path</span><span class="p">,</span>
+            <span class="n">options</span><span class="o">.</span><span class="n">gene_identifier_type</span><span class="p">,</span>
+            <span class="n">errorCallback</span><span class="o">=</span><span class="n">cb</span><span class="p">[</span><span class="s2">&quot;userknowledge&quot;</span><span class="p">],</span>  <span class="c1"># noqa E501</span>
+        <span class="p">)</span>
+    <span class="k">if</span> <span class="n">options</span><span class="o">.</span><span class="n">user_defined_filter</span> <span class="o">!=</span> <span class="s2">&quot;no&quot;</span><span class="p">:</span>
+        <span class="n">bio</span><span class="o">.</span><span class="n">applyUserKnowledgeFilter</span><span class="p">((</span><span class="n">options</span><span class="o">.</span><span class="n">user_defined_filter</span> <span class="o">==</span> <span class="s2">&quot;group&quot;</span><span class="p">))</span>
+
+    <span class="c1"># APPLY PRIMARY FILTERS</span>
+    <span class="c1"># Based on the input arguments provided in the command, this block will</span>
+    <span class="c1"># add all argument values (provided directly or via a file) to tables in</span>
+    <span class="c1"># the temporary databases `main` and `alt`.</span>
+    <span class="c1"># For example, if the user provides a file containing a list of positions</span>
+    <span class="c1"># using the &quot;--position-file&quot; argument, the content of the file will be</span>
+    <span class="c1"># added to the `main.locus` table.</span>
+
+    <span class="k">for</span> <span class="n">snpList</span> <span class="ow">in</span> <span class="n">options</span><span class="o">.</span><span class="n">snp</span> <span class="ow">or</span> <span class="n">empty</span><span class="p">:</span>
+        <span class="n">bio</span><span class="o">.</span><span class="n">intersectInputSNPs</span><span class="p">(</span>
+            <span class="s2">&quot;main&quot;</span><span class="p">,</span>
+            <span class="n">bio</span><span class="o">.</span><span class="n">generateRSesFromText</span><span class="p">(</span>
+                <span class="n">snpList</span><span class="p">,</span> <span class="n">separator</span><span class="o">=</span><span class="s2">&quot;:&quot;</span><span class="p">,</span> <span class="n">errorCallback</span><span class="o">=</span><span class="n">cb</span><span class="p">[</span><span class="s2">&quot;SNP&quot;</span><span class="p">]</span>
+            <span class="p">),</span>  <span class="c1"># noqa E501</span>
+            <span class="n">errorCallback</span><span class="o">=</span><span class="n">cb</span><span class="p">[</span><span class="s2">&quot;SNP&quot;</span><span class="p">],</span>
+        <span class="p">)</span>
+    <span class="k">for</span> <span class="n">snpFileList</span> <span class="ow">in</span> <span class="n">options</span><span class="o">.</span><span class="n">snp_file</span> <span class="ow">or</span> <span class="n">empty</span><span class="p">:</span>
+        <span class="n">bio</span><span class="o">.</span><span class="n">intersectInputSNPs</span><span class="p">(</span>
+            <span class="s2">&quot;main&quot;</span><span class="p">,</span>
+            <span class="n">bio</span><span class="o">.</span><span class="n">generateRSesFromRSFiles</span><span class="p">(</span><span class="n">snpFileList</span><span class="p">,</span> <span class="n">errorCallback</span><span class="o">=</span><span class="n">cb</span><span class="p">[</span><span class="s2">&quot;SNP&quot;</span><span class="p">]),</span>
+            <span class="n">errorCallback</span><span class="o">=</span><span class="n">cb</span><span class="p">[</span><span class="s2">&quot;SNP&quot;</span><span class="p">],</span>
+        <span class="p">)</span>
+    <span class="k">for</span> <span class="n">positionList</span> <span class="ow">in</span> <span class="n">options</span><span class="o">.</span><span class="n">position</span> <span class="ow">or</span> <span class="n">empty</span><span class="p">:</span>
+        <span class="n">bio</span><span class="o">.</span><span class="n">intersectInputLoci</span><span class="p">(</span>
+            <span class="s2">&quot;main&quot;</span><span class="p">,</span>
+            <span class="n">bio</span><span class="o">.</span><span class="n">generateLiftOverLoci</span><span class="p">(</span>
+                <span class="n">ucscBuildUser</span><span class="p">,</span>
+                <span class="n">ucscBuildDB</span><span class="p">,</span>
+                <span class="n">bio</span><span class="o">.</span><span class="n">generateLociFromText</span><span class="p">(</span>
+                    <span class="n">positionList</span><span class="p">,</span>
+                    <span class="n">separator</span><span class="o">=</span><span class="s2">&quot;:&quot;</span><span class="p">,</span>
+                    <span class="n">applyOffset</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                    <span class="n">errorCallback</span><span class="o">=</span><span class="n">cb</span><span class="p">[</span><span class="s2">&quot;position&quot;</span><span class="p">],</span>
+                <span class="p">),</span>
+                <span class="n">errorCallback</span><span class="o">=</span><span class="n">cb</span><span class="p">[</span><span class="s2">&quot;position&quot;</span><span class="p">],</span>
+            <span class="p">),</span>
+            <span class="n">errorCallback</span><span class="o">=</span><span class="n">cb</span><span class="p">[</span><span class="s2">&quot;position&quot;</span><span class="p">],</span>
+        <span class="p">)</span>
+    <span class="k">for</span> <span class="n">positionFileList</span> <span class="ow">in</span> <span class="n">options</span><span class="o">.</span><span class="n">position_file</span> <span class="ow">or</span> <span class="n">empty</span><span class="p">:</span>
+        <span class="n">bio</span><span class="o">.</span><span class="n">intersectInputLoci</span><span class="p">(</span>
+            <span class="s2">&quot;main&quot;</span><span class="p">,</span>
+            <span class="n">bio</span><span class="o">.</span><span class="n">generateLiftOverLoci</span><span class="p">(</span>
+                <span class="n">ucscBuildUser</span><span class="p">,</span>
+                <span class="n">ucscBuildDB</span><span class="p">,</span>
+                <span class="n">bio</span><span class="o">.</span><span class="n">generateLociFromMapFiles</span><span class="p">(</span>
+                    <span class="n">positionFileList</span><span class="p">,</span>
+                    <span class="n">applyOffset</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                    <span class="n">errorCallback</span><span class="o">=</span><span class="n">cb</span><span class="p">[</span><span class="s2">&quot;position&quot;</span><span class="p">],</span>  <span class="c1"># noqa E501</span>
+                <span class="p">),</span>
+                <span class="n">errorCallback</span><span class="o">=</span><span class="n">cb</span><span class="p">[</span><span class="s2">&quot;position&quot;</span><span class="p">],</span>
+            <span class="p">),</span>
+            <span class="n">errorCallback</span><span class="o">=</span><span class="n">cb</span><span class="p">[</span><span class="s2">&quot;position&quot;</span><span class="p">],</span>
+        <span class="p">)</span>
+    <span class="k">for</span> <span class="n">geneList</span> <span class="ow">in</span> <span class="n">options</span><span class="o">.</span><span class="n">gene</span> <span class="ow">or</span> <span class="n">empty</span><span class="p">:</span>
+        <span class="n">bio</span><span class="o">.</span><span class="n">intersectInputGenes</span><span class="p">(</span>
+            <span class="s2">&quot;main&quot;</span><span class="p">,</span>
+            <span class="n">bio</span><span class="o">.</span><span class="n">generateNamesFromText</span><span class="p">(</span>
+                <span class="n">geneList</span><span class="p">,</span>
+                <span class="n">options</span><span class="o">.</span><span class="n">gene_identifier_type</span><span class="p">,</span>
+                <span class="n">separator</span><span class="o">=</span><span class="s2">&quot;:&quot;</span><span class="p">,</span>
+                <span class="n">errorCallback</span><span class="o">=</span><span class="n">cb</span><span class="p">[</span><span class="s2">&quot;gene&quot;</span><span class="p">],</span>
+            <span class="p">),</span>
+            <span class="n">errorCallback</span><span class="o">=</span><span class="n">cb</span><span class="p">[</span><span class="s2">&quot;gene&quot;</span><span class="p">],</span>
+        <span class="p">)</span>
+    <span class="k">for</span> <span class="n">geneFileList</span> <span class="ow">in</span> <span class="n">options</span><span class="o">.</span><span class="n">gene_file</span> <span class="ow">or</span> <span class="n">empty</span><span class="p">:</span>
+        <span class="n">bio</span><span class="o">.</span><span class="n">intersectInputGenes</span><span class="p">(</span>
+            <span class="s2">&quot;main&quot;</span><span class="p">,</span>
+            <span class="n">bio</span><span class="o">.</span><span class="n">generateNamesFromNameFiles</span><span class="p">(</span>
+                <span class="n">geneFileList</span><span class="p">,</span>
+                <span class="n">options</span><span class="o">.</span><span class="n">gene_identifier_type</span><span class="p">,</span>
+                <span class="n">errorCallback</span><span class="o">=</span><span class="n">cb</span><span class="p">[</span><span class="s2">&quot;gene&quot;</span><span class="p">],</span>  <span class="c1"># noqa E501</span>
+            <span class="p">),</span>
+            <span class="n">errorCallback</span><span class="o">=</span><span class="n">cb</span><span class="p">[</span><span class="s2">&quot;gene&quot;</span><span class="p">],</span>
+        <span class="p">)</span>
+    <span class="k">for</span> <span class="n">geneSearch</span> <span class="ow">in</span> <span class="n">options</span><span class="o">.</span><span class="n">gene_search</span> <span class="ow">or</span> <span class="n">empty</span><span class="p">:</span>
+        <span class="n">bio</span><span class="o">.</span><span class="n">intersectInputGeneSearch</span><span class="p">(</span>
+            <span class="s2">&quot;main&quot;</span><span class="p">,</span> <span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="p">(</span><span class="n">encodeString</span><span class="p">(</span><span class="n">s</span><span class="p">),)</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">geneSearch</span><span class="p">)</span>
+        <span class="p">)</span>
+    <span class="k">for</span> <span class="n">regionList</span> <span class="ow">in</span> <span class="n">options</span><span class="o">.</span><span class="n">region</span> <span class="ow">or</span> <span class="n">empty</span><span class="p">:</span>
+        <span class="n">bio</span><span class="o">.</span><span class="n">intersectInputRegions</span><span class="p">(</span>
+            <span class="s2">&quot;main&quot;</span><span class="p">,</span>
+            <span class="n">bio</span><span class="o">.</span><span class="n">generateLiftOverRegions</span><span class="p">(</span>
+                <span class="n">ucscBuildUser</span><span class="p">,</span>
+                <span class="n">ucscBuildDB</span><span class="p">,</span>
+                <span class="n">bio</span><span class="o">.</span><span class="n">generateRegionsFromText</span><span class="p">(</span>
+                    <span class="n">regionList</span><span class="p">,</span>
+                    <span class="n">separator</span><span class="o">=</span><span class="s2">&quot;:&quot;</span><span class="p">,</span>
+                    <span class="n">applyOffset</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                    <span class="n">errorCallback</span><span class="o">=</span><span class="n">cb</span><span class="p">[</span><span class="s2">&quot;region&quot;</span><span class="p">],</span>
+                <span class="p">),</span>
+                <span class="n">errorCallback</span><span class="o">=</span><span class="n">cb</span><span class="p">[</span><span class="s2">&quot;region&quot;</span><span class="p">],</span>
+            <span class="p">),</span>
+            <span class="n">errorCallback</span><span class="o">=</span><span class="n">cb</span><span class="p">[</span><span class="s2">&quot;region&quot;</span><span class="p">],</span>
+        <span class="p">)</span>
+    <span class="k">for</span> <span class="n">regionFileList</span> <span class="ow">in</span> <span class="n">options</span><span class="o">.</span><span class="n">region_file</span> <span class="ow">or</span> <span class="n">empty</span><span class="p">:</span>
+        <span class="n">bio</span><span class="o">.</span><span class="n">intersectInputRegions</span><span class="p">(</span>
+            <span class="s2">&quot;main&quot;</span><span class="p">,</span>
+            <span class="n">bio</span><span class="o">.</span><span class="n">generateLiftOverRegions</span><span class="p">(</span>
+                <span class="n">ucscBuildUser</span><span class="p">,</span>
+                <span class="n">ucscBuildDB</span><span class="p">,</span>
+                <span class="n">bio</span><span class="o">.</span><span class="n">generateRegionsFromFiles</span><span class="p">(</span>
+                    <span class="n">regionFileList</span><span class="p">,</span>
+                    <span class="n">applyOffset</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                    <span class="n">errorCallback</span><span class="o">=</span><span class="n">cb</span><span class="p">[</span><span class="s2">&quot;region&quot;</span><span class="p">],</span>  <span class="c1"># noqa E501</span>
+                <span class="p">),</span>
+                <span class="n">errorCallback</span><span class="o">=</span><span class="n">cb</span><span class="p">[</span><span class="s2">&quot;region&quot;</span><span class="p">],</span>
+            <span class="p">),</span>
+            <span class="n">errorCallback</span><span class="o">=</span><span class="n">cb</span><span class="p">[</span><span class="s2">&quot;region&quot;</span><span class="p">],</span>
+        <span class="p">)</span>
+    <span class="k">for</span> <span class="n">groupList</span> <span class="ow">in</span> <span class="n">options</span><span class="o">.</span><span class="n">group</span> <span class="ow">or</span> <span class="n">empty</span><span class="p">:</span>
+        <span class="n">bio</span><span class="o">.</span><span class="n">intersectInputGroups</span><span class="p">(</span>
+            <span class="s2">&quot;main&quot;</span><span class="p">,</span>
+            <span class="n">bio</span><span class="o">.</span><span class="n">generateNamesFromText</span><span class="p">(</span>
+                <span class="n">groupList</span><span class="p">,</span>
+                <span class="n">options</span><span class="o">.</span><span class="n">group_identifier_type</span><span class="p">,</span>
+                <span class="n">separator</span><span class="o">=</span><span class="s2">&quot;:&quot;</span><span class="p">,</span>
+                <span class="n">errorCallback</span><span class="o">=</span><span class="n">cb</span><span class="p">[</span><span class="s2">&quot;group&quot;</span><span class="p">],</span>
+            <span class="p">),</span>
+            <span class="n">errorCallback</span><span class="o">=</span><span class="n">cb</span><span class="p">[</span><span class="s2">&quot;group&quot;</span><span class="p">],</span>
+        <span class="p">)</span>
+    <span class="k">for</span> <span class="n">groupFileList</span> <span class="ow">in</span> <span class="n">options</span><span class="o">.</span><span class="n">group_file</span> <span class="ow">or</span> <span class="n">empty</span><span class="p">:</span>
+        <span class="n">bio</span><span class="o">.</span><span class="n">intersectInputGroups</span><span class="p">(</span>
+            <span class="s2">&quot;main&quot;</span><span class="p">,</span>
+            <span class="n">bio</span><span class="o">.</span><span class="n">generateNamesFromNameFiles</span><span class="p">(</span>
+                <span class="n">groupFileList</span><span class="p">,</span>
+                <span class="n">options</span><span class="o">.</span><span class="n">group_identifier_type</span><span class="p">,</span>
+                <span class="n">errorCallback</span><span class="o">=</span><span class="n">cb</span><span class="p">[</span><span class="s2">&quot;group&quot;</span><span class="p">],</span>  <span class="c1"># noqa E501</span>
+            <span class="p">),</span>
+            <span class="n">errorCallback</span><span class="o">=</span><span class="n">cb</span><span class="p">[</span><span class="s2">&quot;group&quot;</span><span class="p">],</span>
+        <span class="p">)</span>
+    <span class="k">for</span> <span class="n">groupSearch</span> <span class="ow">in</span> <span class="n">options</span><span class="o">.</span><span class="n">group_search</span> <span class="ow">or</span> <span class="n">empty</span><span class="p">:</span>
+        <span class="n">bio</span><span class="o">.</span><span class="n">intersectInputGroupSearch</span><span class="p">(</span>
+            <span class="s2">&quot;main&quot;</span><span class="p">,</span> <span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="p">(</span><span class="n">encodeString</span><span class="p">(</span><span class="n">s</span><span class="p">),)</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">groupSearch</span><span class="p">)</span>
+        <span class="p">)</span>
+    <span class="k">for</span> <span class="n">sourceList</span> <span class="ow">in</span> <span class="n">options</span><span class="o">.</span><span class="n">source</span> <span class="ow">or</span> <span class="n">empty</span><span class="p">:</span>
+        <span class="n">bio</span><span class="o">.</span><span class="n">intersectInputSources</span><span class="p">(</span>
+            <span class="s2">&quot;main&quot;</span><span class="p">,</span> <span class="n">sourceList</span><span class="p">,</span> <span class="n">errorCallback</span><span class="o">=</span><span class="n">cb</span><span class="p">[</span><span class="s2">&quot;source&quot;</span><span class="p">]</span>
+        <span class="p">)</span>  <span class="c1"># noqa E501</span>
+    <span class="k">for</span> <span class="n">sourceFile</span> <span class="ow">in</span> <span class="n">itertools</span><span class="o">.</span><span class="n">chain</span><span class="p">(</span><span class="o">*</span><span class="p">(</span><span class="n">options</span><span class="o">.</span><span class="n">source_file</span> <span class="ow">or</span> <span class="n">empty</span><span class="p">)):</span>
+        <span class="n">bio</span><span class="o">.</span><span class="n">intersectInputSources</span><span class="p">(</span>
+            <span class="s2">&quot;main&quot;</span><span class="p">,</span>
+            <span class="n">itertools</span><span class="o">.</span><span class="n">chain</span><span class="p">(</span><span class="o">*</span><span class="p">(</span><span class="n">line</span> <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="nb">open</span><span class="p">(</span><span class="n">sourceFile</span><span class="p">,</span> <span class="s2">&quot;r&quot;</span><span class="p">))),</span>
+            <span class="n">errorCallback</span><span class="o">=</span><span class="n">cb</span><span class="p">[</span><span class="s2">&quot;source&quot;</span><span class="p">],</span>
+        <span class="p">)</span>
+
+    <span class="c1"># APPLY ALTERNATE FILTERS</span>
+    <span class="k">for</span> <span class="n">snpList</span> <span class="ow">in</span> <span class="n">options</span><span class="o">.</span><span class="n">alt_snp</span> <span class="ow">or</span> <span class="n">empty</span><span class="p">:</span>
+        <span class="n">bio</span><span class="o">.</span><span class="n">intersectInputSNPs</span><span class="p">(</span>
+            <span class="s2">&quot;alt&quot;</span><span class="p">,</span>
+            <span class="n">bio</span><span class="o">.</span><span class="n">generateRSesFromText</span><span class="p">(</span>
+                <span class="n">snpList</span><span class="p">,</span> <span class="n">separator</span><span class="o">=</span><span class="s2">&quot;:&quot;</span><span class="p">,</span> <span class="n">errorCallback</span><span class="o">=</span><span class="n">cb</span><span class="p">[</span><span class="s2">&quot;alt-SNP&quot;</span><span class="p">]</span>
+            <span class="p">),</span>
+            <span class="n">errorCallback</span><span class="o">=</span><span class="n">cb</span><span class="p">[</span><span class="s2">&quot;alt-SNP&quot;</span><span class="p">],</span>
+        <span class="p">)</span>
+    <span class="k">for</span> <span class="n">snpFileList</span> <span class="ow">in</span> <span class="n">options</span><span class="o">.</span><span class="n">alt_snp_file</span> <span class="ow">or</span> <span class="n">empty</span><span class="p">:</span>
+        <span class="n">bio</span><span class="o">.</span><span class="n">intersectInputSNPs</span><span class="p">(</span>
+            <span class="s2">&quot;alt&quot;</span><span class="p">,</span>
+            <span class="n">bio</span><span class="o">.</span><span class="n">generateRSesFromRSFiles</span><span class="p">(</span>
+                <span class="n">snpFileList</span><span class="p">,</span> <span class="n">errorCallback</span><span class="o">=</span><span class="n">cb</span><span class="p">[</span><span class="s2">&quot;alt-SNP&quot;</span><span class="p">]</span>
+            <span class="p">),</span>  <span class="c1"># noqa E501</span>
+            <span class="n">errorCallback</span><span class="o">=</span><span class="n">cb</span><span class="p">[</span><span class="s2">&quot;alt-SNP&quot;</span><span class="p">],</span>
+        <span class="p">)</span>
+    <span class="k">for</span> <span class="n">positionList</span> <span class="ow">in</span> <span class="n">options</span><span class="o">.</span><span class="n">alt_position</span> <span class="ow">or</span> <span class="n">empty</span><span class="p">:</span>
+        <span class="n">bio</span><span class="o">.</span><span class="n">intersectInputLoci</span><span class="p">(</span>
+            <span class="s2">&quot;alt&quot;</span><span class="p">,</span>
+            <span class="n">bio</span><span class="o">.</span><span class="n">generateLiftOverLoci</span><span class="p">(</span>
+                <span class="n">ucscBuildUser</span><span class="p">,</span>
+                <span class="n">ucscBuildDB</span><span class="p">,</span>
+                <span class="n">bio</span><span class="o">.</span><span class="n">generateLociFromText</span><span class="p">(</span>
+                    <span class="n">positionList</span><span class="p">,</span>
+                    <span class="n">separator</span><span class="o">=</span><span class="s2">&quot;:&quot;</span><span class="p">,</span>
+                    <span class="n">applyOffset</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                    <span class="n">errorCallback</span><span class="o">=</span><span class="n">cb</span><span class="p">[</span><span class="s2">&quot;alt-position&quot;</span><span class="p">],</span>
+                <span class="p">),</span>
+                <span class="n">errorCallback</span><span class="o">=</span><span class="n">cb</span><span class="p">[</span><span class="s2">&quot;alt-position&quot;</span><span class="p">],</span>
+            <span class="p">),</span>
+            <span class="n">errorCallback</span><span class="o">=</span><span class="n">cb</span><span class="p">[</span><span class="s2">&quot;alt-position&quot;</span><span class="p">],</span>
+        <span class="p">)</span>
+    <span class="k">for</span> <span class="n">positionFileList</span> <span class="ow">in</span> <span class="n">options</span><span class="o">.</span><span class="n">alt_position_file</span> <span class="ow">or</span> <span class="n">empty</span><span class="p">:</span>
+        <span class="n">bio</span><span class="o">.</span><span class="n">intersectInputLoci</span><span class="p">(</span>
+            <span class="s2">&quot;alt&quot;</span><span class="p">,</span>
+            <span class="n">bio</span><span class="o">.</span><span class="n">generateLiftOverLoci</span><span class="p">(</span>
+                <span class="n">ucscBuildUser</span><span class="p">,</span>
+                <span class="n">ucscBuildDB</span><span class="p">,</span>
+                <span class="n">bio</span><span class="o">.</span><span class="n">generateLociFromMapFiles</span><span class="p">(</span>
+                    <span class="n">positionFileList</span><span class="p">,</span>
+                    <span class="n">applyOffset</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                    <span class="n">errorCallback</span><span class="o">=</span><span class="n">cb</span><span class="p">[</span><span class="s2">&quot;alt-position&quot;</span><span class="p">],</span>  <span class="c1"># noqa E501</span>
+                <span class="p">),</span>
+                <span class="n">errorCallback</span><span class="o">=</span><span class="n">cb</span><span class="p">[</span><span class="s2">&quot;alt-position&quot;</span><span class="p">],</span>
+            <span class="p">),</span>
+            <span class="n">errorCallback</span><span class="o">=</span><span class="n">cb</span><span class="p">[</span><span class="s2">&quot;alt-position&quot;</span><span class="p">],</span>
+        <span class="p">)</span>
+    <span class="k">for</span> <span class="n">geneList</span> <span class="ow">in</span> <span class="n">options</span><span class="o">.</span><span class="n">alt_gene</span> <span class="ow">or</span> <span class="n">empty</span><span class="p">:</span>
+        <span class="n">bio</span><span class="o">.</span><span class="n">intersectInputGenes</span><span class="p">(</span>
+            <span class="s2">&quot;alt&quot;</span><span class="p">,</span>
+            <span class="n">bio</span><span class="o">.</span><span class="n">generateNamesFromText</span><span class="p">(</span>
+                <span class="n">geneList</span><span class="p">,</span>
+                <span class="n">options</span><span class="o">.</span><span class="n">gene_identifier_type</span><span class="p">,</span>
+                <span class="n">separator</span><span class="o">=</span><span class="s2">&quot;:&quot;</span><span class="p">,</span>
+                <span class="n">errorCallback</span><span class="o">=</span><span class="n">cb</span><span class="p">[</span><span class="s2">&quot;alt-gene&quot;</span><span class="p">],</span>
+            <span class="p">),</span>
+            <span class="n">errorCallback</span><span class="o">=</span><span class="n">cb</span><span class="p">[</span><span class="s2">&quot;alt-gene&quot;</span><span class="p">],</span>
+        <span class="p">)</span>
+    <span class="k">for</span> <span class="n">geneFileList</span> <span class="ow">in</span> <span class="n">options</span><span class="o">.</span><span class="n">alt_gene_file</span> <span class="ow">or</span> <span class="n">empty</span><span class="p">:</span>
+        <span class="n">bio</span><span class="o">.</span><span class="n">intersectInputGenes</span><span class="p">(</span>
+            <span class="s2">&quot;alt&quot;</span><span class="p">,</span>
+            <span class="n">bio</span><span class="o">.</span><span class="n">generateNamesFromNameFiles</span><span class="p">(</span>
+                <span class="n">geneFileList</span><span class="p">,</span>
+                <span class="n">options</span><span class="o">.</span><span class="n">gene_identifier_type</span><span class="p">,</span>
+                <span class="n">errorCallback</span><span class="o">=</span><span class="n">cb</span><span class="p">[</span><span class="s2">&quot;alt-gene&quot;</span><span class="p">],</span>  <span class="c1"># noqa E501</span>
+            <span class="p">),</span>
+            <span class="n">errorCallback</span><span class="o">=</span><span class="n">cb</span><span class="p">[</span><span class="s2">&quot;alt-gene&quot;</span><span class="p">],</span>
+        <span class="p">)</span>
+    <span class="k">for</span> <span class="n">geneSearch</span> <span class="ow">in</span> <span class="n">options</span><span class="o">.</span><span class="n">alt_gene_search</span> <span class="ow">or</span> <span class="n">empty</span><span class="p">:</span>
+        <span class="n">bio</span><span class="o">.</span><span class="n">intersectInputGeneSearch</span><span class="p">(</span>
+            <span class="s2">&quot;alt&quot;</span><span class="p">,</span> <span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="p">(</span><span class="n">encodeString</span><span class="p">(</span><span class="n">s</span><span class="p">),)</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">geneSearch</span><span class="p">)</span>
+        <span class="p">)</span>
+    <span class="k">for</span> <span class="n">regionList</span> <span class="ow">in</span> <span class="n">options</span><span class="o">.</span><span class="n">alt_region</span> <span class="ow">or</span> <span class="n">empty</span><span class="p">:</span>
+        <span class="n">bio</span><span class="o">.</span><span class="n">intersectInputRegions</span><span class="p">(</span>
+            <span class="s2">&quot;alt&quot;</span><span class="p">,</span>
+            <span class="n">bio</span><span class="o">.</span><span class="n">generateLiftOverRegions</span><span class="p">(</span>
+                <span class="n">ucscBuildUser</span><span class="p">,</span>
+                <span class="n">ucscBuildDB</span><span class="p">,</span>
+                <span class="n">bio</span><span class="o">.</span><span class="n">generateRegionsFromText</span><span class="p">(</span>
+                    <span class="n">regionList</span><span class="p">,</span>
+                    <span class="n">separator</span><span class="o">=</span><span class="s2">&quot;:&quot;</span><span class="p">,</span>
+                    <span class="n">applyOffset</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                    <span class="n">errorCallback</span><span class="o">=</span><span class="n">cb</span><span class="p">[</span><span class="s2">&quot;alt-region&quot;</span><span class="p">],</span>
+                <span class="p">),</span>
+                <span class="n">errorCallback</span><span class="o">=</span><span class="n">cb</span><span class="p">[</span><span class="s2">&quot;alt-region&quot;</span><span class="p">],</span>
+            <span class="p">),</span>
+            <span class="n">errorCallback</span><span class="o">=</span><span class="n">cb</span><span class="p">[</span><span class="s2">&quot;alt-region&quot;</span><span class="p">],</span>
+        <span class="p">)</span>
+    <span class="k">for</span> <span class="n">regionFileList</span> <span class="ow">in</span> <span class="n">options</span><span class="o">.</span><span class="n">alt_region_file</span> <span class="ow">or</span> <span class="n">empty</span><span class="p">:</span>
+        <span class="n">bio</span><span class="o">.</span><span class="n">intersectInputRegions</span><span class="p">(</span>
+            <span class="s2">&quot;alt&quot;</span><span class="p">,</span>
+            <span class="n">bio</span><span class="o">.</span><span class="n">generateLiftOverRegions</span><span class="p">(</span>
+                <span class="n">ucscBuildUser</span><span class="p">,</span>
+                <span class="n">ucscBuildDB</span><span class="p">,</span>
+                <span class="n">bio</span><span class="o">.</span><span class="n">generateRegionsFromFiles</span><span class="p">(</span>
+                    <span class="n">regionFileList</span><span class="p">,</span>
+                    <span class="n">applyOffset</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                    <span class="n">errorCallback</span><span class="o">=</span><span class="n">cb</span><span class="p">[</span><span class="s2">&quot;alt-region&quot;</span><span class="p">],</span>  <span class="c1"># noqa E501</span>
+                <span class="p">),</span>
+                <span class="n">errorCallback</span><span class="o">=</span><span class="n">cb</span><span class="p">[</span><span class="s2">&quot;alt-region&quot;</span><span class="p">],</span>
+            <span class="p">),</span>
+            <span class="n">errorCallback</span><span class="o">=</span><span class="n">cb</span><span class="p">[</span><span class="s2">&quot;alt-region&quot;</span><span class="p">],</span>
+        <span class="p">)</span>
+    <span class="k">for</span> <span class="n">groupList</span> <span class="ow">in</span> <span class="n">options</span><span class="o">.</span><span class="n">alt_group</span> <span class="ow">or</span> <span class="n">empty</span><span class="p">:</span>
+        <span class="n">bio</span><span class="o">.</span><span class="n">intersectInputGroups</span><span class="p">(</span>
+            <span class="s2">&quot;alt&quot;</span><span class="p">,</span>
+            <span class="n">bio</span><span class="o">.</span><span class="n">generateNamesFromText</span><span class="p">(</span>
+                <span class="n">groupList</span><span class="p">,</span>
+                <span class="n">options</span><span class="o">.</span><span class="n">group_identifier_type</span><span class="p">,</span>
+                <span class="n">separator</span><span class="o">=</span><span class="s2">&quot;:&quot;</span><span class="p">,</span>
+                <span class="n">errorCallback</span><span class="o">=</span><span class="n">cb</span><span class="p">[</span><span class="s2">&quot;alt-group&quot;</span><span class="p">],</span>
+            <span class="p">),</span>
+            <span class="n">errorCallback</span><span class="o">=</span><span class="n">cb</span><span class="p">[</span><span class="s2">&quot;alt-group&quot;</span><span class="p">],</span>
+        <span class="p">)</span>
+    <span class="k">for</span> <span class="n">groupFileList</span> <span class="ow">in</span> <span class="n">options</span><span class="o">.</span><span class="n">alt_group_file</span> <span class="ow">or</span> <span class="n">empty</span><span class="p">:</span>
+        <span class="n">bio</span><span class="o">.</span><span class="n">intersectInputGroups</span><span class="p">(</span>
+            <span class="s2">&quot;alt&quot;</span><span class="p">,</span>
+            <span class="n">bio</span><span class="o">.</span><span class="n">generateNamesFromNameFiles</span><span class="p">(</span>
+                <span class="n">groupFileList</span><span class="p">,</span>
+                <span class="n">options</span><span class="o">.</span><span class="n">group_identifier_type</span><span class="p">,</span>
+                <span class="n">errorCallback</span><span class="o">=</span><span class="n">cb</span><span class="p">[</span><span class="s2">&quot;alt-group&quot;</span><span class="p">],</span>
+            <span class="p">),</span>
+            <span class="n">errorCallback</span><span class="o">=</span><span class="n">cb</span><span class="p">[</span><span class="s2">&quot;alt-group&quot;</span><span class="p">],</span>
+        <span class="p">)</span>
+    <span class="k">for</span> <span class="n">groupSearch</span> <span class="ow">in</span> <span class="n">options</span><span class="o">.</span><span class="n">alt_group_search</span> <span class="ow">or</span> <span class="n">empty</span><span class="p">:</span>
+        <span class="n">bio</span><span class="o">.</span><span class="n">intersectInputGroupSearch</span><span class="p">(</span>
+            <span class="s2">&quot;alt&quot;</span><span class="p">,</span> <span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="p">(</span><span class="n">encodeString</span><span class="p">(</span><span class="n">s</span><span class="p">),)</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">groupSearch</span><span class="p">)</span>
+        <span class="p">)</span>
+    <span class="k">for</span> <span class="n">sourceList</span> <span class="ow">in</span> <span class="n">options</span><span class="o">.</span><span class="n">alt_source</span> <span class="ow">or</span> <span class="n">empty</span><span class="p">:</span>
+        <span class="n">bio</span><span class="o">.</span><span class="n">intersectInputSources</span><span class="p">(</span>
+            <span class="s2">&quot;alt&quot;</span><span class="p">,</span> <span class="n">sourceList</span><span class="p">,</span> <span class="n">errorCallback</span><span class="o">=</span><span class="n">cb</span><span class="p">[</span><span class="s2">&quot;alt-source&quot;</span><span class="p">]</span>
+        <span class="p">)</span>  <span class="c1"># noqa E501</span>
+    <span class="k">for</span> <span class="n">sourceFile</span> <span class="ow">in</span> <span class="n">itertools</span><span class="o">.</span><span class="n">chain</span><span class="p">(</span><span class="o">*</span><span class="p">(</span><span class="n">options</span><span class="o">.</span><span class="n">alt_source_file</span> <span class="ow">or</span> <span class="n">empty</span><span class="p">)):</span>
+        <span class="n">bio</span><span class="o">.</span><span class="n">intersectInputSources</span><span class="p">(</span>
+            <span class="s2">&quot;alt&quot;</span><span class="p">,</span>
+            <span class="n">itertools</span><span class="o">.</span><span class="n">chain</span><span class="p">(</span><span class="o">*</span><span class="p">(</span><span class="n">line</span> <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="nb">open</span><span class="p">(</span><span class="n">sourceFile</span><span class="p">,</span> <span class="s2">&quot;r&quot;</span><span class="p">))),</span>
+            <span class="n">errorCallback</span><span class="o">=</span><span class="n">cb</span><span class="p">[</span><span class="s2">&quot;alt-source&quot;</span><span class="p">],</span>
+        <span class="p">)</span>
+
+    <span class="c1"># report invalid input, if requested</span>
+    <span class="k">if</span> <span class="n">options</span><span class="o">.</span><span class="n">report_invalid_input</span> <span class="o">==</span> <span class="s2">&quot;yes&quot;</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">modtype</span><span class="p">,</span> <span class="n">lines</span> <span class="ow">in</span> <span class="n">cbLog</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="k">if</span> <span class="n">lines</span><span class="p">:</span>
+                <span class="n">path</span> <span class="o">=</span> <span class="p">(</span>
+                    <span class="s2">&quot;&lt;stdout&gt;&quot;</span>
+                    <span class="k">if</span> <span class="n">options</span><span class="o">.</span><span class="n">stdout</span> <span class="o">==</span> <span class="s2">&quot;yes&quot;</span>
+                    <span class="k">else</span> <span class="n">typeOutputInfo</span><span class="p">[</span><span class="s2">&quot;invalid&quot;</span><span class="p">][</span><span class="n">modtype</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span>
+                <span class="p">)</span>
+                <span class="n">bio</span><span class="o">.</span><span class="n">logPush</span><span class="p">(</span>
+                    <span class="s2">&quot;writing invalid </span><span class="si">%s</span><span class="s2"> input report to &#39;</span><span class="si">%s</span><span class="s2">&#39; ...</span><span class="se">\n</span><span class="s2">&quot;</span>
+                    <span class="o">%</span> <span class="p">(</span><span class="n">modtype</span><span class="p">,</span> <span class="n">path</span><span class="p">)</span>  <span class="c1"># noqa E501</span>
+                <span class="p">)</span>
+                <span class="n">outfile</span> <span class="o">=</span> <span class="p">(</span>
+                    <span class="n">sys</span><span class="o">.</span><span class="n">stdout</span> <span class="k">if</span> <span class="n">options</span><span class="o">.</span><span class="n">stdout</span> <span class="o">==</span> <span class="s2">&quot;yes&quot;</span> <span class="k">else</span> <span class="nb">open</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="s2">&quot;w&quot;</span><span class="p">)</span>
+                <span class="p">)</span>  <span class="c1"># noqa E501</span>
+                <span class="n">outfile</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">lines</span><span class="p">))</span>
+                <span class="n">outfile</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">outfile</span> <span class="o">!=</span> <span class="n">sys</span><span class="o">.</span><span class="n">stdout</span><span class="p">:</span>
+                    <span class="n">outfile</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+                <span class="n">bio</span><span class="o">.</span><span class="n">logPop</span><span class="p">(</span><span class="s2">&quot;... OK: </span><span class="si">%d</span><span class="s2"> invalid inputs</span><span class="se">\n</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">lines</span><span class="p">)</span> <span class="o">/</span> <span class="mi">2</span><span class="p">))</span>
+        <span class="c1"># foreach modifier/type</span>
+    <span class="c1"># if report invalid input</span>
+
+    <span class="c1"># process filters</span>
+    <span class="k">for</span> <span class="n">types</span><span class="p">,</span> <span class="n">info</span> <span class="ow">in</span> <span class="n">typeOutputInfo</span><span class="p">[</span><span class="s2">&quot;filter&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="n">label</span><span class="p">,</span> <span class="n">path</span><span class="p">,</span> <span class="n">outfile</span> <span class="o">=</span> <span class="n">info</span>
+        <span class="n">bio</span><span class="o">.</span><span class="n">logPush</span><span class="p">(</span><span class="s2">&quot;writing </span><span class="si">%s</span><span class="s2"> to &#39;</span><span class="si">%s</span><span class="s2">&#39; ...</span><span class="se">\n</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">label</span><span class="p">,</span> <span class="n">path</span><span class="p">))</span>
+        <span class="n">n</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span>  <span class="c1"># don&#39;t count header</span>
+        <span class="k">for</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">bio</span><span class="o">.</span><span class="n">generateFilterOutput</span><span class="p">(</span><span class="n">types</span><span class="p">,</span> <span class="n">applyOffset</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+            <span class="n">n</span> <span class="o">+=</span> <span class="mi">1</span>
+            <span class="n">outfile</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">encodeRow</span><span class="p">(</span><span class="n">row</span><span class="p">))</span>
+        <span class="k">if</span> <span class="n">outfile</span> <span class="o">!=</span> <span class="n">sys</span><span class="o">.</span><span class="n">stdout</span><span class="p">:</span>
+            <span class="n">outfile</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+        <span class="n">bio</span><span class="o">.</span><span class="n">logPop</span><span class="p">(</span><span class="s2">&quot;... OK: </span><span class="si">%d</span><span class="s2"> results</span><span class="se">\n</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">n</span><span class="p">)</span>
+    <span class="c1"># foreach filter</span>
+
+    <span class="c1"># process annotations</span>
+    <span class="k">for</span> <span class="n">types</span><span class="p">,</span> <span class="n">info</span> <span class="ow">in</span> <span class="n">typeOutputInfo</span><span class="p">[</span><span class="s2">&quot;annotation&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="n">typesF</span><span class="p">,</span> <span class="n">typesA</span> <span class="o">=</span> <span class="n">types</span>
+        <span class="n">label</span><span class="p">,</span> <span class="n">path</span><span class="p">,</span> <span class="n">outfile</span> <span class="o">=</span> <span class="n">info</span>
+        <span class="n">bio</span><span class="o">.</span><span class="n">logPush</span><span class="p">(</span><span class="s2">&quot;writing </span><span class="si">%s</span><span class="s2"> to &#39;</span><span class="si">%s</span><span class="s2">&#39; ...</span><span class="se">\n</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">label</span><span class="p">,</span> <span class="n">path</span><span class="p">))</span>
+        <span class="n">n</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span>  <span class="c1"># don&#39;t count header</span>
+        <span class="k">for</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">bio</span><span class="o">.</span><span class="n">generateAnnotationOutput</span><span class="p">(</span>
+            <span class="n">typesF</span><span class="p">,</span> <span class="n">typesA</span><span class="p">,</span> <span class="n">applyOffset</span><span class="o">=</span><span class="kc">True</span>
+        <span class="p">):</span>  <span class="c1"># noqa E501</span>
+            <span class="n">n</span> <span class="o">+=</span> <span class="mi">1</span>
+            <span class="n">outfile</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">encodeRow</span><span class="p">(</span><span class="n">row</span><span class="p">))</span>
+        <span class="k">if</span> <span class="n">outfile</span> <span class="o">!=</span> <span class="n">sys</span><span class="o">.</span><span class="n">stdout</span><span class="p">:</span>
+            <span class="n">outfile</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+        <span class="n">bio</span><span class="o">.</span><span class="n">logPop</span><span class="p">(</span><span class="s2">&quot;... OK: </span><span class="si">%d</span><span class="s2"> results</span><span class="se">\n</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">n</span><span class="p">)</span>
+    <span class="c1"># foreach annotation</span>
+
+    <span class="c1"># process models</span>
+    <span class="k">for</span> <span class="n">types</span><span class="p">,</span> <span class="n">info</span> <span class="ow">in</span> <span class="n">typeOutputInfo</span><span class="p">[</span><span class="s2">&quot;models&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="n">typesL</span><span class="p">,</span> <span class="n">typesR</span> <span class="o">=</span> <span class="n">types</span>
+        <span class="n">label</span><span class="p">,</span> <span class="n">path</span><span class="p">,</span> <span class="n">outfile</span> <span class="o">=</span> <span class="n">info</span>
+        <span class="n">bio</span><span class="o">.</span><span class="n">logPush</span><span class="p">(</span><span class="s2">&quot;writing </span><span class="si">%s</span><span class="s2"> to &#39;</span><span class="si">%s</span><span class="s2">&#39; ...</span><span class="se">\n</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">label</span><span class="p">,</span> <span class="n">path</span><span class="p">))</span>
+        <span class="n">n</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span>  <span class="c1"># don&#39;t count header</span>
+        <span class="k">for</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">bio</span><span class="o">.</span><span class="n">generateModelOutput</span><span class="p">(</span><span class="n">typesL</span><span class="p">,</span> <span class="n">typesR</span><span class="p">,</span> <span class="n">applyOffset</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+            <span class="n">n</span> <span class="o">+=</span> <span class="mi">1</span>
+            <span class="n">outfile</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">encodeRow</span><span class="p">(</span><span class="n">row</span><span class="p">))</span>
+        <span class="k">if</span> <span class="n">outfile</span> <span class="o">!=</span> <span class="n">sys</span><span class="o">.</span><span class="n">stdout</span><span class="p">:</span>
+            <span class="n">outfile</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+        <span class="n">bio</span><span class="o">.</span><span class="n">logPop</span><span class="p">(</span><span class="s2">&quot;... OK: </span><span class="si">%d</span><span class="s2"> results</span><span class="se">\n</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">n</span><span class="p">)</span>
+    <span class="c1"># foreach model</span>
+
+    <span class="c1"># process PARIS algorithm</span>
+    <span class="k">if</span> <span class="n">typeOutputInfo</span><span class="p">[</span><span class="s2">&quot;paris&quot;</span><span class="p">]:</span>
+        <span class="c1"># TODO html reports?</span>
+        <span class="n">parisGen</span> <span class="o">=</span> <span class="n">bio</span><span class="o">.</span><span class="n">generatePARISResults</span><span class="p">(</span><span class="n">ucscBuildUser</span><span class="p">,</span> <span class="n">ucscBuildDB</span><span class="p">)</span>
+        <span class="n">labelS</span><span class="p">,</span> <span class="n">pathS</span><span class="p">,</span> <span class="n">outfileS</span> <span class="o">=</span> <span class="n">typeOutputInfo</span><span class="p">[</span><span class="s2">&quot;paris&quot;</span><span class="p">][</span><span class="s2">&quot;summary&quot;</span><span class="p">]</span>
+        <span class="n">outfileD</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">if</span> <span class="s2">&quot;detail&quot;</span> <span class="ow">in</span> <span class="n">typeOutputInfo</span><span class="p">[</span><span class="s2">&quot;paris&quot;</span><span class="p">]:</span>
+            <span class="n">labelD</span><span class="p">,</span> <span class="n">pathD</span><span class="p">,</span> <span class="n">outfileD</span> <span class="o">=</span> <span class="n">typeOutputInfo</span><span class="p">[</span><span class="s2">&quot;paris&quot;</span><span class="p">][</span><span class="s2">&quot;detail&quot;</span><span class="p">]</span>
+            <span class="n">bio</span><span class="o">.</span><span class="n">logPush</span><span class="p">(</span>
+                <span class="s2">&quot;writing PARIS summary and detail to &#39;</span><span class="si">%s</span><span class="s2">&#39; and &#39;</span><span class="si">%s</span><span class="s2">&#39; ...</span><span class="se">\n</span><span class="s2">&quot;</span>
+                <span class="o">%</span> <span class="p">(</span><span class="n">pathS</span><span class="p">,</span> <span class="n">pathD</span><span class="p">)</span>
+            <span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">bio</span><span class="o">.</span><span class="n">logPush</span><span class="p">(</span><span class="s2">&quot;writing PARIS summary to &#39;</span><span class="si">%s</span><span class="s2">&#39;  ...</span><span class="se">\n</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">pathS</span><span class="p">,))</span>
+        <span class="n">header</span> <span class="o">=</span> <span class="nb">next</span><span class="p">(</span><span class="n">parisGen</span><span class="p">)</span>
+        <span class="n">outfileS</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">encodeRow</span><span class="p">(</span><span class="n">header</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">]))</span>
+        <span class="k">if</span> <span class="n">outfileD</span><span class="p">:</span>
+            <span class="n">outfileD</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">encodeRow</span><span class="p">(</span><span class="n">header</span><span class="p">[</span><span class="mi">0</span><span class="p">:</span><span class="mi">2</span><span class="p">]</span> <span class="o">+</span> <span class="n">header</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]))</span>
+        <span class="n">n</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="k">for</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">parisGen</span><span class="p">:</span>
+            <span class="n">n</span> <span class="o">+=</span> <span class="mi">1</span>
+            <span class="n">outfileS</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">encodeRow</span><span class="p">(</span><span class="n">row</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">]))</span>
+            <span class="k">if</span> <span class="n">outfileD</span><span class="p">:</span>
+                <span class="n">outfileD</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">encodeRow</span><span class="p">(</span><span class="n">row</span><span class="p">[</span><span class="mi">0</span><span class="p">:</span><span class="mi">2</span><span class="p">]</span> <span class="o">+</span> <span class="p">(</span><span class="s2">&quot;*&quot;</span><span class="p">,)</span> <span class="o">+</span> <span class="n">row</span><span class="p">[</span><span class="mi">4</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">]))</span>
+                <span class="k">for</span> <span class="n">rowD</span> <span class="ow">in</span> <span class="n">row</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]:</span>
+                    <span class="n">outfileD</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">encodeRow</span><span class="p">(</span><span class="n">row</span><span class="p">[</span><span class="mi">0</span><span class="p">:</span><span class="mi">2</span><span class="p">]</span> <span class="o">+</span> <span class="n">rowD</span><span class="p">))</span>
+        <span class="k">if</span> <span class="n">outfileS</span> <span class="o">!=</span> <span class="n">sys</span><span class="o">.</span><span class="n">stdout</span><span class="p">:</span>
+            <span class="n">outfileS</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">outfileD</span> <span class="ow">and</span> <span class="p">(</span><span class="n">outfileD</span> <span class="o">!=</span> <span class="n">sys</span><span class="o">.</span><span class="n">stdout</span><span class="p">):</span>
+            <span class="n">outfileD</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+        <span class="n">bio</span><span class="o">.</span><span class="n">logPop</span><span class="p">(</span><span class="s2">&quot;... OK: </span><span class="si">%d</span><span class="s2"> results</span><span class="se">\n</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">n</span><span class="p">)</span></div>
+
+    <span class="c1"># if PARIS</span>
+
+
+<span class="c1"># __main__</span>
+
+
+<span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s2">&quot;__main__&quot;</span><span class="p">:</span>
+    <span class="n">main</span><span class="p">()</span>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Ritchie Lab.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

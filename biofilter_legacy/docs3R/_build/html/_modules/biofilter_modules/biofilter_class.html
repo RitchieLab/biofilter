@@ -1,0 +1,302 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>biofilter_modules.biofilter_class &mdash; Biofilter 2.4.4 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=b1e24531"></script>
+      <script src="../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            Biofilter
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <!-- Local TOC -->
+              <div class="local-toc"></div>
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">Biofilter</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">biofilter_modules.biofilter_class</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for biofilter_modules.biofilter_class</h1><div class="highlight"><pre>
+<span></span><span class="c1"># #################################################</span>
+<span class="c1"># BIOFILTER CLASS</span>
+<span class="c1"># #################################################</span>
+<span class="kn">import</span> <span class="nn">sys</span>
+<span class="kn">import</span> <span class="nn">os</span>
+
+<span class="c1"># Adiciona o diretório raiz do projeto ao `sys.path`</span>
+<span class="c1"># sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), &#39;..&#39;)))  # noqa E501</span>
+
+<span class="kn">from</span> <span class="nn">mixins</span> <span class="kn">import</span> <span class="p">(</span>  <span class="c1"># noqa E402</span>
+    <span class="n">LokiDataRetrievalMixin</span><span class="p">,</span>
+    <span class="n">LoggerMixin</span><span class="p">,</span>
+    <span class="n">Schema</span><span class="p">,</span>
+    <span class="n">DatabaseManagementMixin</span><span class="p">,</span>
+    <span class="n">InputDataParsersMixin</span><span class="p">,</span>
+    <span class="n">SNPInputMixin</span><span class="p">,</span>
+    <span class="n">LocusPositionInputMixin</span><span class="p">,</span>
+    <span class="n">RegionInputMixin</span><span class="p">,</span>
+    <span class="n">GeneInputMixin</span><span class="p">,</span>
+    <span class="n">GroupInputMixin</span><span class="p">,</span>
+    <span class="n">SourceInputMixin</span><span class="p">,</span>
+    <span class="n">UserKnowledgeInputMixin</span><span class="p">,</span>
+    <span class="n">UserKnowledgeRetrievalMixin</span><span class="p">,</span>
+    <span class="n">ParisMixin</span><span class="p">,</span>
+    <span class="n">InternalQueryBuilderMixin</span><span class="p">,</span>
+    <span class="n">FilterAnnotModelMixin</span><span class="p">,</span>
+<span class="p">)</span>  <span class="c1"># noqa E402</span>
+
+<span class="kn">from</span> <span class="nn">loki_modules</span> <span class="kn">import</span> <span class="n">loki_db</span>  <span class="c1"># noqa E402</span>
+
+
+<div class="viewcode-block" id="Biofilter">
+<a class="viewcode-back" href="../../biofilter_modules.html#biofilter_modules.biofilter_class.Biofilter">[docs]</a>
+<span class="k">class</span> <span class="nc">Biofilter</span><span class="p">(</span>
+    <span class="n">LokiDataRetrievalMixin</span><span class="p">,</span>
+    <span class="n">LoggerMixin</span><span class="p">,</span>
+    <span class="n">Schema</span><span class="p">,</span>
+    <span class="n">DatabaseManagementMixin</span><span class="p">,</span>
+    <span class="n">InputDataParsersMixin</span><span class="p">,</span>
+    <span class="n">SNPInputMixin</span><span class="p">,</span>
+    <span class="n">LocusPositionInputMixin</span><span class="p">,</span>
+    <span class="n">RegionInputMixin</span><span class="p">,</span>
+    <span class="n">GeneInputMixin</span><span class="p">,</span>
+    <span class="n">GroupInputMixin</span><span class="p">,</span>
+    <span class="n">SourceInputMixin</span><span class="p">,</span>
+    <span class="n">UserKnowledgeInputMixin</span><span class="p">,</span>
+    <span class="n">UserKnowledgeRetrievalMixin</span><span class="p">,</span>
+    <span class="n">ParisMixin</span><span class="p">,</span>
+    <span class="n">InternalQueryBuilderMixin</span><span class="p">,</span>
+    <span class="n">FilterAnnotModelMixin</span><span class="p">,</span>
+<span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Biofilter is a modular class designed for managing, processing, and</span>
+<span class="sd">    querying biological data, especially genetic information. It extends</span>
+<span class="sd">    multiple mixins that each encapsulate a particular aspect of data handling,</span>
+<span class="sd">    from parsing various input formats (e.g., SNPs, loci) to managing</span>
+<span class="sd">    databases and logging activities. The class integrates schema management,</span>
+<span class="sd">    data filtering, and complex internal querying to support extensive data</span>
+<span class="sd">    workflows.</span>
+
+<span class="sd">    Attributes:</span>
+<span class="sd">    - `_schema`: Schema definitions for databases, leveraging the Schema class</span>
+<span class="sd">        and copying</span>
+<span class="sd">    main schemas to alternate filters.</span>
+<span class="sd">    - `_options`: Configuration options, defaulting to an empty, safe-to-</span>
+<span class="sd">        access object.</span>
+<span class="sd">    - `_loki`: Database instance, set with logger and configured to manage</span>
+<span class="sd">        temporary databases.</span>
+
+<span class="sd">    Mixins:</span>
+<span class="sd">    The class relies on a series of mixins that handle specialized data</span>
+<span class="sd">    operations:</span>
+<span class="sd">    - `LokiDataRetrievalMixin`: Handles data retrieval using Loki-specific</span>
+<span class="sd">        methods.</span>
+<span class="sd">    - `LoggerMixin`: Provides structured logging mechanisms.</span>
+<span class="sd">    - `Schema`: Defines schema structures used throughout the data operations.</span>
+<span class="sd">    - `DatabaseManagementMixin`: Manages database connections, tables, and</span>
+<span class="sd">        related operations.</span>
+<span class="sd">    - `InputDataParsersMixin`: Parses diverse data input types and manages</span>
+<span class="sd">        schema-specific parsing.</span>
+<span class="sd">    - Additional mixins (`SNPInputMixin`, `RegionInputMixin`, etc.): Handle</span>
+<span class="sd">        specific data types</span>
+<span class="sd">    such as SNPs, gene loci, regions, sources, and user knowledge.</span>
+
+<span class="sd">    Methods:</span>
+<span class="sd">    - `getVersionTuple`: Returns the class version information as a tuple.</span>
+<span class="sd">    - `getVersionString`: Formats and returns a readable version string.</span>
+<span class="sd">    - `__init__`: Initializes the class with options, sets up logging and</span>
+<span class="sd">        database configurations, and prepares necessary filters and schema</span>
+<span class="sd">        management.</span>
+
+<span class="sd">    Usage:</span>
+<span class="sd">    Biofilter is intended for use within bioinformatics pipelines, where</span>
+<span class="sd">    managing complex datasets and performing operations on large, structured</span>
+<span class="sd">    genetic data is required. The class supports flexible configuration</span>
+<span class="sd">    through options, streamlined database management, and robust error</span>
+<span class="sd">    handling.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="c1"># FIXME: Replace _schema with Schema.schema</span>
+    <span class="n">_schema</span> <span class="o">=</span> <span class="n">Schema</span><span class="o">.</span><span class="n">schema</span>
+    <span class="c1"># copy main schema for alternate input filters</span>
+    <span class="n">_schema</span><span class="p">[</span><span class="s2">&quot;alt&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">_schema</span><span class="p">[</span><span class="s2">&quot;main&quot;</span><span class="p">]</span>
+
+<div class="viewcode-block" id="Biofilter.getVersionTuple">
+<a class="viewcode-back" href="../../biofilter_modules.html#biofilter_modules.biofilter_class.Biofilter.getVersionTuple">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">getVersionTuple</span><span class="p">(</span><span class="bp">cls</span><span class="p">):</span>
+        <span class="c1"># tuple = (major,minor,revision,dev,build,date)</span>
+        <span class="c1"># dev must be in (&#39;a&#39;,&#39;b&#39;,&#39;rc&#39;,&#39;release&#39;) for lexicographic comparison</span>
+        <span class="k">return</span> <span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">4</span><span class="p">,</span> <span class="mi">4</span><span class="p">,</span> <span class="s2">&quot;release&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">,</span> <span class="s2">&quot;2024-12-01&quot;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Biofilter.getVersionString">
+<a class="viewcode-back" href="../../biofilter_modules.html#biofilter_modules.biofilter_class.Biofilter.getVersionString">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">getVersionString</span><span class="p">(</span><span class="bp">cls</span><span class="p">):</span>
+        <span class="n">v</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="bp">cls</span><span class="o">.</span><span class="n">getVersionTuple</span><span class="p">())</span>
+        <span class="c1"># tuple = (major,minor,revision,dev,build,date)</span>
+        <span class="c1"># dev must be &gt; &#39;rc&#39; for releases for lexicographic comparison,</span>
+        <span class="c1"># but we don&#39;t need to actually print &#39;release&#39; in the version string</span>
+        <span class="n">v</span><span class="p">[</span><span class="mi">3</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span> <span class="k">if</span> <span class="n">v</span><span class="p">[</span><span class="mi">3</span><span class="p">]</span> <span class="o">&gt;</span> <span class="s2">&quot;rc&quot;</span> <span class="k">else</span> <span class="n">v</span><span class="p">[</span><span class="mi">3</span><span class="p">]</span>
+        <span class="k">return</span> <span class="s2">&quot;</span><span class="si">%d</span><span class="s2">.</span><span class="si">%d</span><span class="s2">.</span><span class="si">%d%s%s</span><span class="s2"> (</span><span class="si">%s</span><span class="s2">)&quot;</span> <span class="o">%</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">v</span><span class="p">)</span></div>
+
+
+    <span class="c1"># #################################################</span>
+    <span class="c1"># CONSTRUCTOR</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">options</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+
+        <span class="c1"># Force options object</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">options</span><span class="p">:</span>
+<span class="w">            </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            If no options provided, creates an &#39;Empty&#39; class instance that</span>
+<span class="sd">            safely returns None for undefined attributes.</span>
+<span class="sd">            &quot;&quot;&quot;</span>
+
+            <span class="k">class</span> <span class="nc">Empty</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+                <span class="k">def</span> <span class="fm">__getattr__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">):</span>
+                    <span class="c1"># attributes default to None</span>
+                    <span class="k">if</span> <span class="n">name</span> <span class="o">==</span> <span class="s2">&quot;prefix&quot;</span><span class="p">:</span>
+                        <span class="k">return</span> <span class="s2">&quot;default_prefix&quot;</span>
+                    <span class="k">elif</span> <span class="n">name</span> <span class="o">==</span> <span class="s2">&quot;overwrite&quot;</span><span class="p">:</span>
+                        <span class="k">return</span> <span class="s2">&quot;yes&quot;</span>
+                    <span class="k">elif</span> <span class="n">name</span> <span class="o">==</span> <span class="s2">&quot;stdout&quot;</span><span class="p">:</span>
+                        <span class="k">return</span> <span class="s2">&quot;no&quot;</span>
+                    <span class="k">elif</span> <span class="n">name</span> <span class="o">==</span> <span class="s2">&quot;quiet&quot;</span><span class="p">:</span>
+                        <span class="k">return</span> <span class="s2">&quot;no&quot;</span>
+                    <span class="k">elif</span> <span class="n">name</span> <span class="o">==</span> <span class="s2">&quot;verbose&quot;</span><span class="p">:</span>
+                        <span class="k">return</span> <span class="s2">&quot;no&quot;</span>
+                    <span class="k">return</span> <span class="kc">None</span>
+
+            <span class="n">options</span> <span class="o">=</span> <span class="n">Empty</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_options</span> <span class="o">=</span> <span class="n">options</span>
+
+        <span class="c1"># # Set up logging</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_quiet</span> <span class="o">=</span> <span class="n">options</span><span class="o">.</span><span class="n">quiet</span> <span class="o">==</span> <span class="s2">&quot;yes&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_verbose</span> <span class="o">=</span> <span class="n">options</span><span class="o">.</span><span class="n">verbose</span> <span class="o">==</span> <span class="s2">&quot;yes&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_logIndent</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_logHanging</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_logFile</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">if</span> <span class="n">options</span><span class="o">.</span><span class="n">stdout</span> <span class="o">!=</span> <span class="s2">&quot;yes&quot;</span><span class="p">:</span>
+            <span class="n">logPath</span> <span class="o">=</span> <span class="n">options</span><span class="o">.</span><span class="n">prefix</span> <span class="o">+</span> <span class="s2">&quot;.log&quot;</span>
+            <span class="k">if</span> <span class="p">(</span><span class="n">options</span><span class="o">.</span><span class="n">overwrite</span> <span class="o">!=</span> <span class="s2">&quot;yes&quot;</span><span class="p">)</span> <span class="ow">and</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">logPath</span><span class="p">):</span>
+                <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span>
+                    <span class="s2">&quot;ERROR: log file &#39;</span><span class="si">%s</span><span class="s2">&#39; already exists, must specify --overwrite or a different --prefix&quot;</span>  <span class="c1"># noqa E501</span>
+                    <span class="o">%</span> <span class="n">logPath</span>
+                <span class="p">)</span>  <span class="c1"># noqa E501</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_logFile</span> <span class="o">=</span> <span class="nb">open</span><span class="p">(</span><span class="n">logPath</span><span class="p">,</span> <span class="s2">&quot;w&quot;</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_tablesDeindexed</span> <span class="o">=</span> <span class="p">{</span><span class="n">db</span><span class="p">:</span> <span class="nb">set</span><span class="p">()</span> <span class="k">for</span> <span class="n">db</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_schema</span><span class="p">}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_inputFilters</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="n">db</span><span class="p">:</span> <span class="p">{</span><span class="n">tbl</span><span class="p">:</span> <span class="mi">0</span> <span class="k">for</span> <span class="n">tbl</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_schema</span><span class="p">[</span><span class="n">db</span><span class="p">]}</span> <span class="k">for</span> <span class="n">db</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_schema</span>
+        <span class="p">}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_geneModels</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_onlyGeneModels</span> <span class="o">=</span> <span class="kc">True</span>  <span class="c1"># TODO</span>
+
+        <span class="c1"># verify loki_db version &#39;extra&#39; input support in generateLiftOver*()</span>
+        <span class="n">minLoki</span> <span class="o">=</span> <span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="s2">&quot;a&quot;</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">loki_db</span><span class="o">.</span><span class="n">Database</span><span class="o">.</span><span class="n">getVersionTuple</span><span class="p">()</span> <span class="o">&lt;</span> <span class="n">minLoki</span><span class="p">:</span>
+            <span class="c1"># sys.exit(</span>
+            <span class="c1">#     &quot;ERROR: LOKI version %d.%d.%d%s%s later required; found %s&quot;</span>
+            <span class="c1">#     % minLoki  # noqa: E501</span>
+            <span class="c1">#     + (loki_db.Database.getVersionString(),)</span>
+            <span class="c1"># )</span>
+            <span class="n">found_version</span> <span class="o">=</span> <span class="n">loki_db</span><span class="o">.</span><span class="n">Database</span><span class="o">.</span><span class="n">getVersionString</span><span class="p">()</span>
+            <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span>
+                <span class="s2">&quot;ERROR: LOKI version </span><span class="si">%d</span><span class="s2">.</span><span class="si">%d</span><span class="s2">.</span><span class="si">%d%s%s</span><span class="s2"> or later required; found </span><span class="si">%s</span><span class="s2">&quot;</span>
+                <span class="o">%</span> <span class="p">(</span>
+                    <span class="o">*</span><span class="n">minLoki</span><span class="p">,</span>
+                    <span class="n">found_version</span><span class="p">,</span>
+                <span class="p">)</span>  <span class="c1"># Desempacota minLoki e adiciona found_version</span>
+            <span class="p">)</span>
+
+        <span class="c1"># initialize instance database</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_loki</span> <span class="o">=</span> <span class="n">loki_db</span><span class="o">.</span><span class="n">Database</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_loki</span><span class="o">.</span><span class="n">setLogger</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">db</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_schema</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">db</span> <span class="o">!=</span> <span class="s2">&quot;main&quot;</span><span class="p">:</span>
+                <span class="c1"># in SQLite &#39;main&#39; is implicit, but the others must be attached as temp stores  # noqa: E501</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_loki</span><span class="o">.</span><span class="n">attachTempDatabase</span><span class="p">(</span><span class="n">db</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_loki</span><span class="o">.</span><span class="n">createDatabaseTables</span><span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_schema</span><span class="p">[</span><span class="n">db</span><span class="p">],</span> <span class="n">db</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="n">doIndecies</span><span class="o">=</span><span class="kc">True</span>
+            <span class="p">)</span>  <span class="c1"># noqa: E501</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Ritchie Lab.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

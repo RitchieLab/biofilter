@@ -1,0 +1,261 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>biofilter_modules.mixins.input_snp_mixin &mdash; Biofilter 2.4.4 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=b1e24531"></script>
+      <script src="../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            Biofilter
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <!-- Local TOC -->
+              <div class="local-toc"></div>
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">Biofilter</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">biofilter_modules.mixins.input_snp_mixin</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for biofilter_modules.mixins.input_snp_mixin</h1><div class="highlight"><pre>
+<span></span><span class="c1"># #################################################</span>
+<span class="c1"># SNP INPUT MIXIN</span>
+<span class="c1"># #################################################</span>
+
+
+<div class="viewcode-block" id="SNPInputMixin">
+<a class="viewcode-back" href="../../../biofilter_modules.mixins.html#biofilter_modules.SNPInputMixin">[docs]</a>
+<span class="k">class</span> <span class="nc">SNPInputMixin</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Provides methods for managing SNP filters in the database, allowing for</span>
+<span class="sd">    union and intersection operations on the SNP dataset to either initialize</span>
+<span class="sd">    or refine the dataset by matching with a provided list of SNP identifiers.</span>
+
+<span class="sd">    Methods:</span>
+<span class="sd">    - `unionInputSNPs`: Adds new SNPs from a provided list to the SNP dataset</span>
+<span class="sd">        in the specified database, initializing the dataset if it hasn&#39;t been</span>
+<span class="sd">        set up already.</span>
+<span class="sd">    - `intersectInputSNPs`: Refines the SNP dataset by intersecting it with a</span>
+<span class="sd">        provided list, keeping only matching SNPs.</span>
+
+<span class="sd">    If the SNP filter is not yet initialized, this method will first</span>
+<span class="sd">    initialize it with a union.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="SNPInputMixin.unionInputSNPs">
+<a class="viewcode-back" href="../../../biofilter_modules.mixins.html#biofilter_modules.SNPInputMixin.unionInputSNPs">[docs]</a>
+    <span class="k">def</span> <span class="nf">unionInputSNPs</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">db</span><span class="p">,</span> <span class="n">snps</span><span class="p">,</span> <span class="n">errorCallback</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Adds a list of SNPs to a specific SNP filter within an `snp` table in</span>
+<span class="sd">        a specified database, using `rs` identifiers and labels, and handles</span>
+<span class="sd">        cases of ambiguous or merged SNPs.</span>
+
+<span class="sd">        Parameters:</span>
+<span class="sd">        - db: Name of the database where SNPs will be added. Example: `user`.</span>
+<span class="sd">        - snps: List of tuples `[(rs, extra), ...]`, where each `rs` is the</span>
+<span class="sd">            SNP identifier and `extra` holds additional information.</span>
+<span class="sd">        - errorCallback: Optional function called in case of an error during</span>
+<span class="sd">            SNP addition.</span>
+
+<span class="sd">        Operation:</span>
+<span class="sd">        - Logs the start of the SNP addition process to the SNP filter in the</span>
+<span class="sd">            specified database (`db`).</span>
+<span class="sd">        - Calls `prepareTableForUpdate` to drop indexes from the `snp` table</span>
+<span class="sd">            before insertion to improve performance.</span>
+<span class="sd">        - Defines and executes an `INSERT INTO` SQL query to add SNPs</span>
+<span class="sd">            generated by `generateMergedFilteredSNPs`.</span>
+<span class="sd">        - Updates the `tally` dictionary to track how many SNPs were added and</span>
+<span class="sd">            how many identifiers were merged or ambiguous.</span>
+<span class="sd">        - Logs the number of SNPs added, showing counts of merged (`merge`)</span>
+<span class="sd">            and ambiguous (`many`) SNPs, if any.</span>
+<span class="sd">        - Increments the `snp` filter counter in the `db` database to mark the</span>
+<span class="sd">            addition.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">        - None. The method adds SNPs to the specified table and logs</span>
+<span class="sd">            information about the process.</span>
+
+<span class="sd">        This method enables adding and managing SNPs in an `snp` table,</span>
+<span class="sd">        applying a merging process and handling ambiguous SNPs, providing</span>
+<span class="sd">        flexibility to work with complex SNP data.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># snps=[ (rs,extra), ... ]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">logPush</span><span class="p">(</span><span class="s2">&quot;adding to </span><span class="si">%s</span><span class="s2"> SNP filter ...</span><span class="se">\n</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">db</span><span class="p">)</span>
+        <span class="n">cursor</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_loki</span><span class="o">.</span><span class="n">_db</span><span class="o">.</span><span class="n">cursor</span><span class="p">()</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">prepareTableForUpdate</span><span class="p">(</span><span class="n">db</span><span class="p">,</span> <span class="s2">&quot;snp&quot;</span><span class="p">)</span>
+        <span class="n">sql</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="s2">&quot;INSERT INTO `</span><span class="si">%s</span><span class="s2">`.`snp` (label,extra,rs) VALUES (&#39;rs&#39;||?1,?2,?3)&quot;</span>
+            <span class="o">%</span> <span class="n">db</span>  <span class="c1"># noqa E501</span>
+        <span class="p">)</span>  <span class="c1"># noqa E501</span>
+        <span class="n">tally</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">()</span>
+        <span class="n">cursor</span><span class="o">.</span><span class="n">executemany</span><span class="p">(</span>
+            <span class="n">sql</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">generateMergedFilteredSNPs</span><span class="p">(</span><span class="n">snps</span><span class="p">,</span> <span class="n">tally</span><span class="p">,</span> <span class="n">errorCallback</span><span class="p">)</span>
+        <span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">tally</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;many&quot;</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">logPop</span><span class="p">(</span>
+                <span class="s2">&quot;... OK: added </span><span class="si">%d</span><span class="s2"> SNPs (</span><span class="si">%d</span><span class="s2"> RS#s merged, </span><span class="si">%d</span><span class="s2"> ambiguous)</span><span class="se">\n</span><span class="s2">&quot;</span>
+                <span class="o">%</span> <span class="p">(</span>
+                    <span class="n">tally</span><span class="p">[</span><span class="s2">&quot;match&quot;</span><span class="p">]</span> <span class="o">+</span> <span class="n">tally</span><span class="p">[</span><span class="s2">&quot;merge&quot;</span><span class="p">]</span> <span class="o">-</span> <span class="n">tally</span><span class="p">[</span><span class="s2">&quot;many&quot;</span><span class="p">],</span>
+                    <span class="n">tally</span><span class="p">[</span><span class="s2">&quot;merge&quot;</span><span class="p">],</span>
+                    <span class="n">tally</span><span class="p">[</span><span class="s2">&quot;many&quot;</span><span class="p">],</span>
+                <span class="p">)</span>
+            <span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">logPop</span><span class="p">(</span>
+                <span class="s2">&quot;... OK: added </span><span class="si">%d</span><span class="s2"> SNPs (</span><span class="si">%d</span><span class="s2"> RS#s merged)</span><span class="se">\n</span><span class="s2">&quot;</span>
+                <span class="o">%</span> <span class="p">(</span><span class="n">tally</span><span class="p">[</span><span class="s2">&quot;match&quot;</span><span class="p">]</span> <span class="o">+</span> <span class="n">tally</span><span class="p">[</span><span class="s2">&quot;merge&quot;</span><span class="p">],</span> <span class="n">tally</span><span class="p">[</span><span class="s2">&quot;merge&quot;</span><span class="p">])</span>
+            <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_inputFilters</span><span class="p">[</span><span class="n">db</span><span class="p">][</span><span class="s2">&quot;snp&quot;</span><span class="p">]</span> <span class="o">+=</span> <span class="mi">1</span></div>
+
+
+<div class="viewcode-block" id="SNPInputMixin.intersectInputSNPs">
+<a class="viewcode-back" href="../../../biofilter_modules.mixins.html#biofilter_modules.SNPInputMixin.intersectInputSNPs">[docs]</a>
+    <span class="k">def</span> <span class="nf">intersectInputSNPs</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">db</span><span class="p">,</span> <span class="n">snps</span><span class="p">,</span> <span class="n">errorCallback</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Reduces an SNP filter in a specific database table, retaining only</span>
+<span class="sd">        SNPs present in the provided list. If the SNP filter is not yet</span>
+<span class="sd">        initialized, performs a union rather than an intersection.</span>
+
+<span class="sd">        Parameters:</span>
+<span class="sd">        - `db`: The name of the database where the `snp` table is located.</span>
+<span class="sd">        - `snps`: A list of tuples `[(rs, extra), ...]`, where `rs` is the SNP</span>
+<span class="sd">            identifier, and `extra` contains additional information.</span>
+<span class="sd">        - `errorCallback`: Optional function called in case of an error during</span>
+<span class="sd">            SNP processing.</span>
+
+<span class="sd">        Operation:</span>
+<span class="sd">        - If the SNP filter has not yet been initialized for the database</span>
+<span class="sd">            (`_inputFilters[db][&#39;snp&#39;]` is 0), it calls `unionInputSNPs` to</span>
+<span class="sd">            initialize the filter.</span>
+<span class="sd">        - Otherwise:</span>
+<span class="sd">            - Logs the start of the reduction process.</span>
+<span class="sd">            - Calls `prepareTableForQuery` to ensure the `snp` table is ready</span>
+<span class="sd">                for querying.</span>
+<span class="sd">            - Sets all SNPs in the table to &quot;not retained&quot; (`flag = 0`).</span>
+<span class="sd">            - Counts the number of SNPs before reduction (`numBefore`).</span>
+<span class="sd">            - Updates the `snp` table, setting `flag = 1` for SNPs matching</span>
+<span class="sd">                the `rs` identifiers in the `snps` list.</span>
+<span class="sd">            - Deletes SNPs that are not in the provided list, i.e., with</span>
+<span class="sd">                `flag = 0`.</span>
+<span class="sd">            - Counts the number of SNPs removed (`numDrop`).</span>
+<span class="sd">            - Logs the final count of retained SNPs, discarded SNPs, and</span>
+<span class="sd">                merged identifiers (`merge`).</span>
+<span class="sd">            - Increments the SNP filter counter for the database.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">        - Nothing. The method performs an intersection of SNPs in the</span>
+<span class="sd">            specified table and logs the outcome.</span>
+
+<span class="sd">        This function manages an SNP set in a database table by performing an</span>
+<span class="sd">        intersection between existing SNPs and a provided list, retaining only</span>
+<span class="sd">        matches.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># snps=[ (rs,extra), ... ]</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_inputFilters</span><span class="p">[</span><span class="n">db</span><span class="p">][</span><span class="s2">&quot;snp&quot;</span><span class="p">]:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">unionInputSNPs</span><span class="p">(</span><span class="n">db</span><span class="p">,</span> <span class="n">snps</span><span class="p">,</span> <span class="n">errorCallback</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">logPush</span><span class="p">(</span><span class="s2">&quot;reducing </span><span class="si">%s</span><span class="s2"> SNP filter ...</span><span class="se">\n</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">db</span><span class="p">)</span>
+        <span class="n">cursor</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_loki</span><span class="o">.</span><span class="n">_db</span><span class="o">.</span><span class="n">cursor</span><span class="p">()</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">prepareTableForQuery</span><span class="p">(</span><span class="n">db</span><span class="p">,</span> <span class="s2">&quot;snp&quot;</span><span class="p">)</span>
+        <span class="n">cursor</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="s2">&quot;UPDATE `</span><span class="si">%s</span><span class="s2">`.`snp` SET flag = 0&quot;</span> <span class="o">%</span> <span class="n">db</span><span class="p">)</span>
+        <span class="n">numBefore</span> <span class="o">=</span> <span class="n">cursor</span><span class="o">.</span><span class="n">getconnection</span><span class="p">()</span><span class="o">.</span><span class="n">changes</span><span class="p">()</span>
+        <span class="n">sql</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="s2">&quot;UPDATE `</span><span class="si">%s</span><span class="s2">`.`snp` SET flag = 1 WHERE (1 OR ?1 OR ?2) AND rs = ?3&quot;</span>
+            <span class="o">%</span> <span class="n">db</span>  <span class="c1"># noqa E501</span>
+        <span class="p">)</span>  <span class="c1"># noqa E501</span>
+        <span class="n">tally</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">()</span>
+        <span class="c1"># we don&#39;t have to do ambiguous snp filtering here because we&#39;re only</span>
+        <span class="c1"># reducing what&#39;s already loaded</span>
+        <span class="n">cursor</span><span class="o">.</span><span class="n">executemany</span><span class="p">(</span>
+            <span class="n">sql</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_loki</span><span class="o">.</span><span class="n">generateCurrentRSesByRSes</span><span class="p">(</span><span class="n">snps</span><span class="p">,</span> <span class="n">tally</span><span class="p">)</span>
+        <span class="p">)</span>  <span class="c1"># noqa E501</span>
+        <span class="n">cursor</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="s2">&quot;DELETE FROM `</span><span class="si">%s</span><span class="s2">`.`snp` WHERE flag = 0&quot;</span> <span class="o">%</span> <span class="n">db</span><span class="p">)</span>
+        <span class="n">numDrop</span> <span class="o">=</span> <span class="n">cursor</span><span class="o">.</span><span class="n">getconnection</span><span class="p">()</span><span class="o">.</span><span class="n">changes</span><span class="p">()</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">logPop</span><span class="p">(</span>
+            <span class="s2">&quot;... OK: kept </span><span class="si">%d</span><span class="s2"> SNPs (</span><span class="si">%d</span><span class="s2"> dropped, </span><span class="si">%d</span><span class="s2"> RS#s merged)</span><span class="se">\n</span><span class="s2">&quot;</span>
+            <span class="o">%</span> <span class="p">(</span><span class="n">numBefore</span> <span class="o">-</span> <span class="n">numDrop</span><span class="p">,</span> <span class="n">numDrop</span><span class="p">,</span> <span class="n">tally</span><span class="p">[</span><span class="s2">&quot;merge&quot;</span><span class="p">])</span>
+        <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_inputFilters</span><span class="p">[</span><span class="n">db</span><span class="p">][</span><span class="s2">&quot;snp&quot;</span><span class="p">]</span> <span class="o">+=</span> <span class="mi">1</span></div>
+</div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Ritchie Lab.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

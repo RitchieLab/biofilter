@@ -1,0 +1,239 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>biofilter_modules.arg_utils &mdash; Biofilter 2.4.4 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=b1e24531"></script>
+      <script src="../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            Biofilter
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <!-- Local TOC -->
+              <div class="local-toc"></div>
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">Biofilter</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">biofilter_modules.arg_utils</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for biofilter_modules.arg_utils</h1><div class="highlight"><pre>
+<span></span><span class="c1"># arg_utils.py</span>
+
+<span class="kn">import</span> <span class="nn">argparse</span>
+<span class="kn">import</span> <span class="nn">collections</span>
+<span class="kn">import</span> <span class="nn">csv</span>
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">sys</span>
+
+
+<div class="viewcode-block" id="OrderedNamespace">
+<a class="viewcode-back" href="../../biofilter_modules.html#biofilter_modules.arg_utils.OrderedNamespace">[docs]</a>
+<span class="k">class</span> <span class="nc">OrderedNamespace</span><span class="p">(</span><span class="n">argparse</span><span class="o">.</span><span class="n">Namespace</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    OrderedNamespace is a custom subclass of argparse.Namespace that maintains</span>
+<span class="sd">    the order of attribute addition.</span>
+<span class="sd">    This is particularly useful when parsing command-line arguments where the</span>
+<span class="sd">    order of arguments is significant.</span>
+<span class="sd">    Methods:</span>
+<span class="sd">        __setattr__(self, name, value):</span>
+<span class="sd">            Sets an attribute on the namespace and records the order of</span>
+<span class="sd">            addition.</span>
+<span class="sd">        __delattr__(self, name):</span>
+<span class="sd">            Deletes an attribute from the namespace and removes it from the</span>
+<span class="sd">            order tracking.</span>
+<span class="sd">        __iter__(self):</span>
+<span class="sd">            Returns an iterator over the attributes in the order they were</span>
+<span class="sd">            added.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="fm">__setattr__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">name</span> <span class="o">!=</span> <span class="s2">&quot;__OrderedDict&quot;</span><span class="p">:</span>
+            <span class="k">if</span> <span class="s2">&quot;__OrderedDict&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="vm">__dict__</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="vm">__dict__</span><span class="p">[</span><span class="s2">&quot;__OrderedDict&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">collections</span><span class="o">.</span><span class="n">OrderedDict</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="vm">__dict__</span><span class="p">[</span><span class="s2">&quot;__OrderedDict&quot;</span><span class="p">][</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="nb">super</span><span class="p">(</span><span class="n">OrderedNamespace</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="fm">__setattr__</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span>
+
+<div class="viewcode-block" id="OrderedNamespace.__delattr__">
+<a class="viewcode-back" href="../../biofilter_modules.html#biofilter_modules.arg_utils.OrderedNamespace.__delattr__">[docs]</a>
+    <span class="k">def</span> <span class="fm">__delattr__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">name</span> <span class="o">!=</span> <span class="s2">&quot;__OrderedDict&quot;</span><span class="p">:</span>
+            <span class="k">if</span> <span class="s2">&quot;__OrderedDict&quot;</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="vm">__dict__</span><span class="p">:</span>
+                <span class="k">del</span> <span class="bp">self</span><span class="o">.</span><span class="vm">__dict__</span><span class="p">[</span><span class="s2">&quot;__OrderedDict&quot;</span><span class="p">][</span><span class="n">name</span><span class="p">]</span>
+        <span class="nb">super</span><span class="p">(</span><span class="n">OrderedNamespace</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="fm">__delattr__</span><span class="p">(</span><span class="n">name</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="OrderedNamespace.__iter__">
+<a class="viewcode-back" href="../../biofilter_modules.html#biofilter_modules.arg_utils.OrderedNamespace.__iter__">[docs]</a>
+    <span class="k">def</span> <span class="fm">__iter__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="nb">iter</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="vm">__dict__</span><span class="p">[</span><span class="s2">&quot;__OrderedDict&quot;</span><span class="p">])</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="cfDialect">
+<a class="viewcode-back" href="../../biofilter_modules.html#biofilter_modules.arg_utils.cfDialect">[docs]</a>
+<span class="k">class</span> <span class="nc">cfDialect</span><span class="p">(</span><span class="n">csv</span><span class="o">.</span><span class="n">Dialect</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;CSV dialect for config files supporting quoted substrings.&quot;&quot;&quot;</span>
+
+    <span class="n">delimiter</span> <span class="o">=</span> <span class="s2">&quot; &quot;</span>
+    <span class="n">doublequote</span> <span class="o">=</span> <span class="kc">False</span>
+    <span class="n">escapechar</span> <span class="o">=</span> <span class="s2">&quot;</span><span class="se">\\</span><span class="s2">&quot;</span>
+    <span class="n">lineterminator</span> <span class="o">=</span> <span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span>
+    <span class="n">quotechar</span> <span class="o">=</span> <span class="s1">&#39;&quot;&#39;</span>
+    <span class="n">quoting</span> <span class="o">=</span> <span class="n">csv</span><span class="o">.</span><span class="n">QUOTE_MINIMAL</span>
+    <span class="n">skipinitialspace</span> <span class="o">=</span> <span class="kc">True</span></div>
+
+
+
+<div class="viewcode-block" id="parseCFile">
+<a class="viewcode-back" href="../../biofilter_modules.html#biofilter_modules.arg_utils.parseCFile">[docs]</a>
+<span class="k">def</span> <span class="nf">parseCFile</span><span class="p">(</span><span class="n">cfName</span><span class="p">,</span> <span class="n">parser</span><span class="p">,</span> <span class="n">options</span><span class="p">,</span> <span class="n">cfStack</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    This function reads and interprets a configuration file, processing</span>
+<span class="sd">    command-line options and allowing the inclusion of other configuration</span>
+<span class="sd">    files. It is used to configure arguments flexibly, supporting</span>
+<span class="sd">    configuration files with recursive references to other configuration files.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="c1"># Initialize cfStack on the first call to track included files</span>
+    <span class="k">if</span> <span class="n">cfStack</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">cfStack</span> <span class="o">=</span> <span class="p">[]</span>
+
+    <span class="c1"># 1. Control of recursion and prevention of cycles:</span>
+    <span class="c1"># cfStack keep track of the configuration files being processed to avoid</span>
+    <span class="c1"># cycles.</span>
+    <span class="n">cfAbs</span> <span class="o">=</span> <span class="s2">&quot;&lt;stdin&gt;&quot;</span> <span class="k">if</span> <span class="n">cfName</span> <span class="o">==</span> <span class="s2">&quot;-&quot;</span> <span class="k">else</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">abspath</span><span class="p">(</span><span class="n">cfName</span><span class="p">)</span>
+    <span class="c1"># Check if the current file i(cfAbs) s already in the stack, which would</span>
+    <span class="c1"># indicate a cycle. If so, the program exits with an error message.</span>
+    <span class="k">if</span> <span class="n">cfAbs</span> <span class="ow">in</span> <span class="n">cfStack</span><span class="p">:</span>
+        <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span>
+            <span class="s2">&quot;ERROR: configuration files include each other in a loop! </span><span class="si">%s</span><span class="s2">&quot;</span>
+            <span class="o">%</span> <span class="s2">&quot; -&gt; &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">cfStack</span> <span class="o">+</span> <span class="p">[</span><span class="n">cfAbs</span><span class="p">])</span>
+        <span class="p">)</span>
+    <span class="n">cfStack</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">cfAbs</span><span class="p">)</span>
+
+    <span class="c1"># 2. Reading the configuration file:</span>
+    <span class="c1"># cfHandle: Opens the file specified by cfName, or uses sys.stdin if</span>
+    <span class="c1"># cfName is &quot;-&quot;.</span>
+    <span class="n">cfHandle</span> <span class="o">=</span> <span class="n">sys</span><span class="o">.</span><span class="n">stdin</span> <span class="k">if</span> <span class="n">cfName</span> <span class="o">==</span> <span class="s2">&quot;-&quot;</span> <span class="k">else</span> <span class="nb">open</span><span class="p">(</span><span class="n">cfName</span><span class="p">,</span> <span class="s2">&quot;r&quot;</span><span class="p">)</span>
+    <span class="c1"># cfStream: Removes extra tabs and spaces from the file lines.</span>
+    <span class="n">cfStream</span> <span class="o">=</span> <span class="p">(</span><span class="n">line</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\t</span><span class="s2">&quot;</span><span class="p">,</span> <span class="s2">&quot; &quot;</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span> <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">cfHandle</span><span class="p">)</span>
+    <span class="c1"># cfLines: Filters out empty lines and comments (lines starting with #).</span>
+    <span class="n">cfLines</span> <span class="o">=</span> <span class="p">(</span><span class="n">line</span> <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">cfStream</span> <span class="k">if</span> <span class="n">line</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">line</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;#&quot;</span><span class="p">))</span>
+    <span class="c1"># cfReader: Uses csv.reader to interpret the file, allowing it to read</span>
+    <span class="c1"># arguments split by spaces, respecting quotes to preserve substrings</span>
+    <span class="c1"># (using cfDialect</span>
+    <span class="n">cfReader</span> <span class="o">=</span> <span class="n">csv</span><span class="o">.</span><span class="n">reader</span><span class="p">(</span><span class="n">cfLines</span><span class="p">,</span> <span class="n">dialect</span><span class="o">=</span><span class="n">cfDialect</span><span class="p">)</span>
+
+    <span class="c1"># 3. Parsing the configuration file:</span>
+    <span class="n">cfArgs</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">cfReader</span><span class="p">:</span>
+        <span class="c1"># To each line of the configuration file, -- is added to the beginning</span>
+        <span class="c1"># of each argument so that it is interpreted as a command-line argument</span>
+        <span class="n">line</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;--&quot;</span> <span class="o">+</span> <span class="n">line</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;_&quot;</span><span class="p">,</span> <span class="s2">&quot;-&quot;</span><span class="p">)</span>
+        <span class="c1"># If the argument is --include, the function calls itself recursively</span>
+        <span class="c1"># with the included file (defined by line[ln]), allowing the nesting of</span>
+        <span class="c1"># configuration files.</span>
+        <span class="k">if</span> <span class="n">line</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;--include&quot;</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">ln</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">line</span><span class="p">)):</span>
+                <span class="n">parseCFile</span><span class="p">(</span><span class="n">line</span><span class="p">[</span><span class="n">ln</span><span class="p">],</span> <span class="n">parser</span><span class="p">,</span> <span class="n">options</span><span class="p">,</span> <span class="n">cfStack</span><span class="p">)</span>
+        <span class="c1"># Otherwise, the arguments are added to cfArgs, and --end-of-line is</span>
+        <span class="c1"># inserted to mark the end of a line</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">cfArgs</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">line</span><span class="p">)</span>
+            <span class="n">cfArgs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;--end-of-line&quot;</span><span class="p">)</span>
+
+    <span class="c1"># 4. Closing the configuration file and parsing the arguments:</span>
+    <span class="c1"># After processing the configuration file, it is closed if it is not stdin.</span>
+    <span class="k">if</span> <span class="n">cfHandle</span> <span class="o">!=</span> <span class="n">sys</span><span class="o">.</span><span class="n">stdin</span><span class="p">:</span>
+        <span class="n">cfHandle</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+    <span class="c1"># parser_args is called in the parser with the extracted arguments, and</span>
+    <span class="c1"># options is filled with the values.</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">parse_args</span><span class="p">(</span><span class="n">args</span><span class="o">=</span><span class="n">cfArgs</span><span class="p">,</span> <span class="n">namespace</span><span class="o">=</span><span class="n">options</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">options</span><span class="o">.</span><span class="n">configuration</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span>
+            <span class="s2">&quot;unexpected argument(s): </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="s2">&quot; &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">options</span><span class="o">.</span><span class="n">configuration</span><span class="p">)</span>
+        <span class="p">)</span>  <span class="c1"># noqa: E501</span>
+    <span class="c1"># Finally, the current file is removed from cfStack, signaling the end of</span>
+    <span class="c1"># its processing.</span>
+    <span class="n">cfStack</span><span class="o">.</span><span class="n">pop</span><span class="p">()</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Ritchie Lab.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

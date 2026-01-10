@@ -1,0 +1,1154 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>biofilter_modules.mixins.input_data_parsers_mixin &mdash; Biofilter 2.4.4 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=b1e24531"></script>
+      <script src="../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            Biofilter
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <!-- Local TOC -->
+              <div class="local-toc"></div>
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">Biofilter</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">biofilter_modules.mixins.input_data_parsers_mixin</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for biofilter_modules.mixins.input_data_parsers_mixin</h1><div class="highlight"><pre>
+<span></span><span class="c1"># #################################################</span>
+<span class="c1"># INPUT DATA PARSERS AND LOOKUP HELPERS MIXIN</span>
+<span class="c1"># #################################################</span>
+<span class="kn">import</span> <span class="nn">sys</span>
+
+<span class="c1"># import codecs</span>
+
+
+<div class="viewcode-block" id="InputDataParsersMixin">
+<a class="viewcode-back" href="../../../biofilter_modules.mixins.html#biofilter_modules.InputDataParsersMixin">[docs]</a>
+<span class="k">class</span> <span class="nc">InputDataParsersMixin</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    This mixin class provides methods to parse and process various types of</span>
+<span class="sd">    genomic input data, such as SNP identifiers, loci, regions, and genome</span>
+<span class="sd">    builds. It is designed to be used as a supplemental component within a</span>
+<span class="sd">    larger bioinformatics system, enabling streamlined handling of input data</span>
+<span class="sd">    across different formats and sources.</span>
+
+<span class="sd">    MAIN FUNCTIONALITY:</span>
+<span class="sd">    - Genome Builds: Methods for retrieving compatible genome build versions.</span>
+<span class="sd">    - SNP Identification: Methods for identifying and filtering SNPs,</span>
+<span class="sd">    handling ambiguities.</span>
+<span class="sd">    - Loci Parsing: Functions for extracting genomic loci from text or map</span>
+<span class="sd">    files.</span>
+<span class="sd">    - Region Parsing: Functions to handle genomic region data across text</span>
+<span class="sd">    and file inputs.</span>
+<span class="sd">    - Name Extraction: Functions for retrieving gene or SNP names from inputs.</span>
+<span class="sd">    - User Knowledge Loading: Method to load and integrate user-provided</span>
+<span class="sd">    data like mappings or annotations.</span>
+
+<span class="sd">    IMPLEMENTED METHODS:</span>
+<span class="sd">    - [getInputGenomeBuilds]:</span>
+<span class="sd">        Retrieves genome build versions compatible with the system.</span>
+<span class="sd">    - [generateMergedFilteredSNPs]:</span>
+<span class="sd">        Searches for merged and filtered SNP identifiers, with options for</span>
+<span class="sd">        handling ambiguities.</span>
+<span class="sd">    - [generateRSesFromText]:</span>
+<span class="sd">        Extracts SNP identifiers from a text-based input source.</span>
+<span class="sd">    - [generateRSesFromRSFiles]:</span>
+<span class="sd">        Parses SNP identifiers from one or more RS files.</span>
+<span class="sd">    - [generateLociFromText]:</span>
+<span class="sd">        Extracts genomic loci from a text input source.</span>
+<span class="sd">    - [generateLociFromMapFiles]:</span>
+<span class="sd">        Parses loci data from standard map files.</span>
+<span class="sd">    - [generateLiftOverLoci]:</span>
+<span class="sd">        Converts loci data across genome builds using liftOver methods.</span>
+<span class="sd">    - [generateRegionsFromText]:</span>
+<span class="sd">        Extracts genomic regions from a text input.</span>
+<span class="sd">    - [generateRegionsFromFiles]:</span>
+<span class="sd">        Parses regions from region-based input files.</span>
+<span class="sd">    - [generateLiftOverRegions]:</span>
+<span class="sd">        Transforms genomic regions across genome builds using liftOver.</span>
+<span class="sd">    - [generateNamesFromText]:</span>
+<span class="sd">        Retrieves gene or SNP names from text input.</span>
+<span class="sd">    - [generateNamesFromNameFiles]:</span>
+<span class="sd">        Extracts gene or SNP names from dedicated name files.</span>
+<span class="sd">    - [loadUserKnowledgeFile]:</span>
+<span class="sd">        Loads user-provided knowledge data, such as mappings or annotations.</span>
+
+<span class="sd">    These methods collectively enable the system to efficiently interpret and</span>
+<span class="sd">    process diverse genomic data sources, enhancing flexibility and</span>
+<span class="sd">    integration for bioinformatics workflows.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="InputDataParsersMixin.getInputGenomeBuilds">
+<a class="viewcode-back" href="../../../biofilter_modules.mixins.html#biofilter_modules.InputDataParsersMixin.getInputGenomeBuilds">[docs]</a>
+    <span class="k">def</span> <span class="nf">getInputGenomeBuilds</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">grchBuild</span><span class="p">,</span> <span class="n">ucscBuild</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Retrieve compatible genome build versions based on specified GRCh and</span>
+<span class="sd">        UCSC builds.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># Implement functionality here</span>
+        <span class="k">if</span> <span class="n">grchBuild</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">ucscBuild</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">ucscBuild</span> <span class="o">!=</span> <span class="p">(</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">_loki</span><span class="o">.</span><span class="n">getUCSChgByGRCh</span><span class="p">(</span><span class="n">grchBuild</span><span class="p">)</span> <span class="ow">or</span> <span class="n">ucscBuild</span>
+                <span class="p">):</span>  <span class="c1"># noqa: E501</span>
+                    <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span>
+                        <span class="s2">&quot;ERROR: specified reference genome build GRCh</span><span class="si">%d</span><span class="s2"> is not known to correspond to UCSC hg</span><span class="si">%d</span><span class="s2">&quot;</span>  <span class="c1"># noqa: E501</span>
+                        <span class="o">%</span> <span class="p">(</span><span class="n">grchBuild</span><span class="p">,</span> <span class="n">ucscBuild</span><span class="p">)</span>
+                    <span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">ucscBuild</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_loki</span><span class="o">.</span><span class="n">getUCSChgByGRCh</span><span class="p">(</span><span class="n">grchBuild</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">ucscBuild</span><span class="p">:</span>
+            <span class="n">grchBuild</span> <span class="o">=</span> <span class="kc">None</span>
+            <span class="k">for</span> <span class="n">build</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_loki</span><span class="o">.</span><span class="n">generateGRChByUCSChg</span><span class="p">(</span><span class="n">ucscBuild</span><span class="p">):</span>
+                <span class="k">if</span> <span class="n">grchBuild</span><span class="p">:</span>
+                    <span class="n">grchBuild</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">grchBuild</span><span class="p">,</span> <span class="nb">int</span><span class="p">(</span><span class="n">build</span><span class="p">))</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">grchBuild</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">build</span><span class="p">)</span>
+        <span class="k">return</span> <span class="p">(</span><span class="n">grchBuild</span><span class="p">,</span> <span class="n">ucscBuild</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="InputDataParsersMixin.generateMergedFilteredSNPs">
+<a class="viewcode-back" href="../../../biofilter_modules.mixins.html#biofilter_modules.InputDataParsersMixin.generateMergedFilteredSNPs">[docs]</a>
+    <span class="k">def</span> <span class="nf">generateMergedFilteredSNPs</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">snps</span><span class="p">,</span> <span class="n">tally</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">errorCallback</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Searches for merged and filtered SNP identifiers, with an option to</span>
+<span class="sd">        eliminate ambiguity in SNPs (i.e., duplicate SNPs).</span>
+
+<span class="sd">        Parameters:</span>
+<span class="sd">        - snps: A list of tuples `[(rsInput, extra), ...]`, where `rsInput` is</span>
+<span class="sd">        the original SNP identifier and `extra` contains additional</span>
+<span class="sd">        information.</span>
+<span class="sd">        - tally (dict): An optional dictionary to store counts of merged SNPs</span>
+<span class="sd">        and SNPs with location matches.</span>
+<span class="sd">        - errorCallback (function): An optional function to log error messages</span>
+<span class="sd">        for SNPs that do not meet the matching criteria.</span>
+
+<span class="sd">        Operation:</span>
+<span class="sd">        - Calls `generateCurrentRSesByRSes`, which queries the `snp_merge`</span>
+<span class="sd">        table to retrieve updated SNP identifiers, stored in `genMerge`.</span>
+<span class="sd">        - `snp_merge` contains mappings of old SNPs to their current</span>
+<span class="sd">        identifiers.</span>
+<span class="sd">        - Checks the `allow_ambiguous_snps` setting:</span>
+<span class="sd">            - If enabled (&#39;yes&#39;), returns SNPs from `genMerge` directly</span>
+<span class="sd">            without further filtering.</span>
+<span class="sd">            - If disabled, transforms `genMerge` and passes it to</span>
+<span class="sd">            `generateSNPLociByRSes`, which queries the `snp_locus` table to</span>
+<span class="sd">            verify unique locations for each SNP, applying `minMatch` and</span>
+<span class="sd">            `maxMatch` as matching limits.</span>
+<span class="sd">        - `snp_locus` contains location information for each SNP, including</span>
+<span class="sd">        chromosome, position, and an optional validation status.</span>
+<span class="sd">        - Formats results and returns a sequence of tuples in the format</span>
+<span class="sd">        `(rsInput, extra, rsCurrent)`.</span>
+<span class="sd">        - Updates `tally` with counts of merged and located SNPs (`tallyMerge`</span>
+<span class="sd">        and `tallyLocus`) at the end, if provided.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">        - A generator of tuples `(rsInput, extra, rsCurrent)` for each valid</span>
+<span class="sd">        SNP according to ambiguity and location criteria.</span>
+
+<span class="sd">        This method serves as an abstraction layer for</span>
+<span class="sd">        `generateCurrentRSesByRSes` and `generateSNPLociByRSes`, applying</span>
+<span class="sd">        additional filters according to user settings and offering flexible</span>
+<span class="sd">        control over ambiguous and validated SNPs.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># snps=[ (rsInput,extra),... ]</span>
+        <span class="c1"># yield:[ (rsInput,extra,rsCurrent)</span>
+        <span class="n">tallyMerge</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">()</span> <span class="k">if</span> <span class="p">(</span><span class="n">tally</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">)</span> <span class="k">else</span> <span class="kc">None</span>
+        <span class="n">tallyLocus</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">()</span> <span class="k">if</span> <span class="p">(</span><span class="n">tally</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">)</span> <span class="k">else</span> <span class="kc">None</span>
+        <span class="n">genMerge</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_loki</span><span class="o">.</span><span class="n">generateCurrentRSesByRSes</span><span class="p">(</span>
+            <span class="n">snps</span><span class="p">,</span> <span class="n">tally</span><span class="o">=</span><span class="n">tallyMerge</span>
+        <span class="p">)</span>  <span class="c1"># (rs,extra) -&gt; (rsold,extra,rsnew)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_options</span><span class="o">.</span><span class="n">allow_ambiguous_snps</span> <span class="o">==</span> <span class="s2">&quot;yes&quot;</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">genMerge</span><span class="p">:</span>
+                <span class="k">yield</span> <span class="n">row</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">genMergeFormat</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">rsnew</span><span class="p">),</span> <span class="nb">str</span><span class="p">(</span><span class="n">rsold</span><span class="p">)</span> <span class="o">+</span> <span class="s2">&quot;</span><span class="se">\t</span><span class="s2">&quot;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">rsextra</span> <span class="ow">or</span> <span class="s2">&quot;&quot;</span><span class="p">))</span>
+                <span class="k">for</span> <span class="n">rsold</span><span class="p">,</span> <span class="n">rsextra</span><span class="p">,</span> <span class="n">rsnew</span> <span class="ow">in</span> <span class="n">genMerge</span>
+            <span class="p">)</span>  <span class="c1"># (rsold,extra,rsnew) -&gt; (rsnew,rsold+extra)</span>
+            <span class="n">genLocus</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_loki</span><span class="o">.</span><span class="n">generateSNPLociByRSes</span><span class="p">(</span>
+                <span class="n">genMergeFormat</span><span class="p">,</span>
+                <span class="n">minMatch</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span>
+                <span class="n">maxMatch</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+                <span class="n">validated</span><span class="o">=</span><span class="p">(</span>
+                    <span class="kc">None</span>
+                    <span class="k">if</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_options</span><span class="o">.</span><span class="n">allow_unvalidated_snp_positions</span> <span class="o">==</span> <span class="s2">&quot;yes&quot;</span><span class="p">)</span>
+                    <span class="k">else</span> <span class="kc">True</span>
+                <span class="p">),</span>
+                <span class="n">tally</span><span class="o">=</span><span class="n">tallyLocus</span><span class="p">,</span>
+                <span class="n">errorCallback</span><span class="o">=</span><span class="n">errorCallback</span><span class="p">,</span>
+            <span class="p">)</span>  <span class="c1"># (rsnew,rsold+extra) -&gt; (rsnew,rsold+extra,chr,pos)</span>
+            <span class="n">genLocusFormat</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="nb">tuple</span><span class="p">(</span><span class="n">posextra</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\t</span><span class="s2">&quot;</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span> <span class="o">+</span> <span class="p">[</span><span class="n">rs</span><span class="p">])</span>
+                <span class="k">for</span> <span class="n">rs</span><span class="p">,</span> <span class="n">posextra</span><span class="p">,</span> <span class="n">chm</span><span class="p">,</span> <span class="n">pos</span> <span class="ow">in</span> <span class="n">genLocus</span>
+            <span class="p">)</span>  <span class="c1"># (rsnew,rsold+extra,chr,pos) -&gt; (rsold,extra,rsnew)</span>
+            <span class="k">for</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">genLocusFormat</span><span class="p">:</span>
+                <span class="k">yield</span> <span class="n">row</span>
+        <span class="c1"># if allow_ambiguous_snps</span>
+        <span class="k">if</span> <span class="n">tallyMerge</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">tally</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">tallyMerge</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">tallyLocus</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">tally</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">tallyLocus</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="InputDataParsersMixin.generateRSesFromText">
+<a class="viewcode-back" href="../../../biofilter_modules.mixins.html#biofilter_modules.InputDataParsersMixin.generateRSesFromText">[docs]</a>
+    <span class="k">def</span> <span class="nf">generateRSesFromText</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">lines</span><span class="p">,</span> <span class="n">separator</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">errorCallback</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Extracts SNP identifiers (`rs`) and additional information (`extra`)</span>
+<span class="sd">        from a list of text lines, returning them as tuples for each valid</span>
+<span class="sd">        line. If there is a parsing error, an optional callback is used to log</span>
+<span class="sd">        the problematic line and index.</span>
+
+<span class="sd">        Parameters:</span>
+<span class="sd">        - lines: List of strings, where each string represents a line</span>
+<span class="sd">        containing an SNP identifier (`rs`) and optionally additional</span>
+<span class="sd">        information (`extra`).</span>
+<span class="sd">        - separator: Optional separator used to split each line into columns.</span>
+<span class="sd">        If not provided, the default `split()` separator is used.</span>
+<span class="sd">        - errorCallback: Optional function to log errors, called with the</span>
+<span class="sd">        problematic line and an error message if an exception occurs during</span>
+<span class="sd">        processing.</span>
+
+<span class="sd">        Operation:</span>
+<span class="sd">        - For each line:</span>
+<span class="sd">            - Splits the line into two columns using `split(separator, 1)`.</span>
+<span class="sd">            `cols[0]` contains the SNP identifier (`rs`), and `cols[1]` (if</span>
+<span class="sd">            present) contains additional information (`extra`).</span>
+<span class="sd">            - Attempts to directly convert `cols[0]` into an integer `rs`.</span>
+<span class="sd">            - If `cols[0]` is not a number, checks if it begins with &quot;RS&quot;</span>
+<span class="sd">            (e.g., `rs123`); if so, removes &quot;RS&quot; and converts the remainder to</span>
+<span class="sd">            a number.</span>
+<span class="sd">            - Sets `extra` as `cols[1]` if present; otherwise, sets it to</span>
+<span class="sd">            `None`.</span>
+<span class="sd">            - Returns a tuple `(rs, extra)` for each valid line.</span>
+<span class="sd">        - If an error occurs while processing a line, calls `errorCallback`</span>
+<span class="sd">        (if provided and line is not the first) with the problematic line and</span>
+<span class="sd">        the error message.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">        - A generator of tuples `(rs, extra)` for each line containing a valid</span>
+<span class="sd">        SNP identifier.</span>
+
+<span class="sd">        This method simplifies processing of text files with SNPs and allows</span>
+<span class="sd">        customized error handling for lines that do not match the expected</span>
+<span class="sd">        format.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">ld</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">lines</span><span class="p">:</span>
+            <span class="n">ld</span> <span class="o">+=</span> <span class="mi">1</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">cols</span> <span class="o">=</span> <span class="n">line</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="n">separator</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">cols</span><span class="p">:</span>
+                    <span class="k">continue</span>
+                <span class="k">try</span><span class="p">:</span>
+                    <span class="n">rs</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">cols</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+                <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="n">cols</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">upper</span><span class="p">()</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;RS&quot;</span><span class="p">):</span>
+                        <span class="n">rs</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">cols</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">2</span><span class="p">:])</span>
+                    <span class="k">else</span><span class="p">:</span>
+                        <span class="k">raise</span>
+                <span class="n">extra</span> <span class="o">=</span> <span class="n">cols</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="k">if</span> <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">cols</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">)</span> <span class="k">else</span> <span class="kc">None</span>
+                <span class="k">yield</span> <span class="p">(</span><span class="n">rs</span><span class="p">,</span> <span class="n">extra</span><span class="p">)</span>
+            <span class="k">except</span><span class="p">:</span>  <span class="c1"># noqa: E722  # pragma: no cover</span>
+                <span class="k">if</span> <span class="p">(</span><span class="n">ld</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">)</span> <span class="ow">and</span> <span class="n">errorCallback</span><span class="p">:</span>
+                    <span class="n">errorCallback</span><span class="p">(</span>
+                        <span class="n">line</span><span class="p">,</span> <span class="s2">&quot;</span><span class="si">%s</span><span class="s2"> at index </span><span class="si">%d</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">sys</span><span class="o">.</span><span class="n">exc_info</span><span class="p">()[</span><span class="mi">1</span><span class="p">]),</span> <span class="n">ld</span><span class="p">)</span>
+                    <span class="p">)</span>  <span class="c1"># noqa E501</span></div>
+
+        <span class="c1"># foreach line</span>
+
+<div class="viewcode-block" id="InputDataParsersMixin.generateRSesFromRSFiles">
+<a class="viewcode-back" href="../../../biofilter_modules.mixins.html#biofilter_modules.InputDataParsersMixin.generateRSesFromRSFiles">[docs]</a>
+    <span class="k">def</span> <span class="nf">generateRSesFromRSFiles</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">paths</span><span class="p">,</span> <span class="n">separator</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">errorCallback</span><span class="o">=</span><span class="kc">None</span>
+    <span class="p">):</span>  <span class="c1"># noqa E501</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Reads SNP identifiers (`rs`) and additional information (`extra`) from</span>
+<span class="sd">        multiple text files, returning them line by line while ignoring</span>
+<span class="sd">        comment lines. In case of an error reading a file, logs a warning</span>
+<span class="sd">        message and calls an optional error callback.</span>
+
+<span class="sd">        Parameters:</span>
+<span class="sd">        - paths: List of input file paths. If a `path` is &#39;-&#39; or empty, reads</span>
+<span class="sd">        from standard input (stdin).</span>
+<span class="sd">        - separator: Optional separator to split each line into columns when</span>
+<span class="sd">        reading SNPs. If not provided, uses the default split() method</span>
+<span class="sd">        separator.</span>
+<span class="sd">        - errorCallback: Optional function called with an error message and</span>
+<span class="sd">        file path if an error occurs when processing a file.</span>
+
+<span class="sd">        Operation:</span>
+<span class="sd">        - For each file in `paths`:</span>
+<span class="sd">        - Opens the file for reading (or uses stdin if `path` is &#39;-&#39; or empty).</span>
+<span class="sd">        - Passes the file lines to `generateRSesFromText`, skipping comment</span>
+<span class="sd">        lines (starting with &#39;#&#39;).</span>
+<span class="sd">        - For each valid line returned by `generateRSesFromText`, yields a</span>
+<span class="sd">        tuple `(rs, extra)`.</span>
+<span class="sd">        - If an error occurs while opening or reading a file, displays a</span>
+<span class="sd">        warning message and, if `errorCallback` is provided, calls it with the</span>
+<span class="sd">        file path and error message.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">        - A generator of tuples `(rs, extra)` for each valid SNP found in all</span>
+<span class="sd">        specified files.</span>
+
+<span class="sd">        This method processes a list of SNP-containing files, supports</span>
+<span class="sd">        standard text input, and allows custom error handling for problematic</span>
+<span class="sd">        files.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">for</span> <span class="n">path</span> <span class="ow">in</span> <span class="n">paths</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="k">with</span> <span class="p">(</span>
+                    <span class="n">sys</span><span class="o">.</span><span class="n">stdin</span> <span class="k">if</span> <span class="p">(</span><span class="n">path</span> <span class="o">==</span> <span class="s2">&quot;-&quot;</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">path</span><span class="p">)</span> <span class="k">else</span> <span class="nb">open</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="s2">&quot;r&quot;</span><span class="p">)</span>
+                <span class="p">)</span> <span class="k">as</span> <span class="n">file</span><span class="p">:</span>
+                    <span class="k">for</span> <span class="n">data</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">generateRSesFromText</span><span class="p">(</span>
+                        <span class="p">(</span><span class="n">line</span> <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">file</span> <span class="k">if</span> <span class="ow">not</span> <span class="n">line</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;#&quot;</span><span class="p">)),</span>
+                        <span class="n">separator</span><span class="p">,</span>
+                        <span class="n">errorCallback</span><span class="p">,</span>
+                    <span class="p">):</span>
+                        <span class="k">yield</span> <span class="n">data</span>
+                <span class="c1"># with file</span>
+            <span class="k">except</span><span class="p">:</span>  <span class="c1"># noqa: E722  # pragma: no cover</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
+                    <span class="s2">&quot;WARNING: error reading input file &#39;</span><span class="si">%s</span><span class="s2">&#39;: </span><span class="si">%s</span><span class="se">\n</span><span class="s2">&quot;</span>
+                    <span class="o">%</span> <span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">sys</span><span class="o">.</span><span class="n">exc_info</span><span class="p">()[</span><span class="mi">1</span><span class="p">]))</span>
+                <span class="p">)</span>
+                <span class="k">if</span> <span class="n">errorCallback</span><span class="p">:</span>
+                    <span class="n">errorCallback</span><span class="p">(</span><span class="s2">&quot;&lt;file&gt; </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">path</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">sys</span><span class="o">.</span><span class="n">exc_info</span><span class="p">()[</span><span class="mi">1</span><span class="p">]))</span></div>
+
+        <span class="c1"># foreach path</span>
+
+<div class="viewcode-block" id="InputDataParsersMixin.generateLociFromText">
+<a class="viewcode-back" href="../../../biofilter_modules.mixins.html#biofilter_modules.InputDataParsersMixin.generateLociFromText">[docs]</a>
+    <span class="k">def</span> <span class="nf">generateLociFromText</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">lines</span><span class="p">,</span> <span class="n">separator</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">applyOffset</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">errorCallback</span><span class="o">=</span><span class="kc">None</span>
+    <span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Extracts loci information (chromosome and position) from a list of</span>
+<span class="sd">        text lines, including optional identification of labels and additional</span>
+<span class="sd">        data. Ignores incomplete or invalid lines and allows coordinate</span>
+<span class="sd">        adjustment as needed.</span>
+
+<span class="sd">        Parameters:</span>
+<span class="sd">        - lines: A list of strings, where each string represents a line with</span>
+<span class="sd">        loci information.</span>
+<span class="sd">        - separator: Optional separator to split each line into columns. If</span>
+<span class="sd">        not provided, uses the default split() method separator.</span>
+<span class="sd">        - applyOffset (bool): Applies an offset to the coordinate based on the</span>
+<span class="sd">        base setting (`coordinate_base`) if set to True.</span>
+<span class="sd">        - errorCallback: Optional function called with an error message and</span>
+<span class="sd">        line in case of an exception during line processing.</span>
+
+<span class="sd">        Operation:</span>
+<span class="sd">        - For each line:</span>
+<span class="sd">            - Splits the line into up to five columns using `split(separator,</span>
+<span class="sd">            4)` and determines:</span>
+<span class="sd">                - `chm`: The chromosome, validated and converted to an</span>
+<span class="sd">                internal number if it begins with &quot;CHR&quot;.</span>
+<span class="sd">                - `label`: An optional identifier; if missing, it is generated</span>
+<span class="sd">                based on the chromosome and position.</span>
+<span class="sd">                - `pos`: The coordinate position; can be adjusted with</span>
+<span class="sd">                `applyOffset` and validated against &quot;NA&quot; or &quot;-&quot;.</span>
+<span class="sd">                - `extra`: Optional additional data in the fifth column, if</span>
+<span class="sd">                present.</span>
+<span class="sd">        - Returns a tuple `(label, chm, pos, extra)` for each valid line.</span>
+<span class="sd">        - If an error occurs in processing a line, calls `errorCallback` (if</span>
+<span class="sd">        provided and line is not the first) with the problematic line and</span>
+<span class="sd">        error message.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">        - A generator of tuples `(label, chm, pos, extra)` for each valid</span>
+<span class="sd">        locus found in the lines.</span>
+
+<span class="sd">        This method allows processing loci files with varying column</span>
+<span class="sd">        structures, including custom error handling and coordinate adjustment,</span>
+<span class="sd">        making it adaptable to different genomic data formats.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="c1"># parse input/output coordinate offsets</span>
+        <span class="n">offset</span> <span class="o">=</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">_options</span><span class="o">.</span><span class="n">coordinate_base</span><span class="p">)</span> <span class="k">if</span> <span class="n">applyOffset</span> <span class="k">else</span> <span class="mi">0</span>
+
+        <span class="n">ld</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">lines</span><span class="p">:</span>
+            <span class="n">ld</span> <span class="o">+=</span> <span class="mi">1</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="c1"># parse columns</span>
+                <span class="n">cols</span> <span class="o">=</span> <span class="n">line</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="n">separator</span><span class="p">,</span> <span class="mi">4</span><span class="p">)</span>
+                <span class="n">label</span> <span class="o">=</span> <span class="n">chm</span> <span class="o">=</span> <span class="n">pos</span> <span class="o">=</span> <span class="n">extra</span> <span class="o">=</span> <span class="kc">None</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">cols</span><span class="p">:</span>
+                    <span class="k">continue</span>
+                <span class="k">elif</span> <span class="nb">len</span><span class="p">(</span><span class="n">cols</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mi">2</span><span class="p">:</span>
+                    <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span><span class="s2">&quot;not enough columns&quot;</span><span class="p">)</span>
+                <span class="k">elif</span> <span class="nb">len</span><span class="p">(</span><span class="n">cols</span><span class="p">)</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
+                    <span class="n">chm</span> <span class="o">=</span> <span class="n">cols</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">upper</span><span class="p">()</span>
+                    <span class="n">pos</span> <span class="o">=</span> <span class="n">cols</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">upper</span><span class="p">()</span>
+                <span class="k">elif</span> <span class="nb">len</span><span class="p">(</span><span class="n">cols</span><span class="p">)</span> <span class="o">==</span> <span class="mi">3</span><span class="p">:</span>
+                    <span class="n">chm</span> <span class="o">=</span> <span class="n">cols</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">upper</span><span class="p">()</span>
+                    <span class="n">label</span> <span class="o">=</span> <span class="n">cols</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+                    <span class="n">pos</span> <span class="o">=</span> <span class="n">cols</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span><span class="o">.</span><span class="n">upper</span><span class="p">()</span>
+                <span class="k">elif</span> <span class="nb">len</span><span class="p">(</span><span class="n">cols</span><span class="p">)</span> <span class="o">&gt;=</span> <span class="mi">4</span><span class="p">:</span>
+                    <span class="n">chm</span> <span class="o">=</span> <span class="n">cols</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">upper</span><span class="p">()</span>
+                    <span class="n">label</span> <span class="o">=</span> <span class="n">cols</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+                    <span class="n">pos</span> <span class="o">=</span> <span class="n">cols</span><span class="p">[</span><span class="mi">3</span><span class="p">]</span><span class="o">.</span><span class="n">upper</span><span class="p">()</span>
+                    <span class="n">extra</span> <span class="o">=</span> <span class="n">cols</span><span class="p">[</span><span class="mi">4</span><span class="p">]</span> <span class="k">if</span> <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">cols</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">4</span><span class="p">)</span> <span class="k">else</span> <span class="kc">None</span>
+
+                <span class="c1"># parse, validate and convert chromosome</span>
+                <span class="k">if</span> <span class="n">chm</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;CHR&quot;</span><span class="p">):</span>
+                    <span class="n">chm</span> <span class="o">=</span> <span class="n">chm</span><span class="p">[</span><span class="mi">3</span><span class="p">:]</span>
+                <span class="k">if</span> <span class="n">chm</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_loki</span><span class="o">.</span><span class="n">chr_num</span><span class="p">:</span>
+                    <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span><span class="s2">&quot;invalid chromosome &#39;</span><span class="si">%s</span><span class="s2">&#39;&quot;</span> <span class="o">%</span> <span class="n">chm</span><span class="p">)</span>
+                <span class="n">chm</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_loki</span><span class="o">.</span><span class="n">chr_num</span><span class="p">[</span><span class="n">chm</span><span class="p">]</span>
+
+                <span class="c1"># parse and convert locus label</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">label</span><span class="p">:</span>
+                    <span class="n">label</span> <span class="o">=</span> <span class="s2">&quot;chr</span><span class="si">%s</span><span class="s2">:</span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_loki</span><span class="o">.</span><span class="n">chr_name</span><span class="p">[</span><span class="n">chm</span><span class="p">],</span> <span class="n">pos</span><span class="p">)</span>
+
+                <span class="c1"># parse and convert position</span>
+                <span class="k">if</span> <span class="p">(</span><span class="n">pos</span> <span class="o">==</span> <span class="s2">&quot;-&quot;</span><span class="p">)</span> <span class="ow">or</span> <span class="p">(</span><span class="n">pos</span> <span class="o">==</span> <span class="s2">&quot;NA&quot;</span><span class="p">):</span>
+                    <span class="n">pos</span> <span class="o">=</span> <span class="kc">None</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">pos</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">pos</span><span class="p">)</span> <span class="o">+</span> <span class="n">offset</span>
+                <span class="k">yield</span> <span class="p">(</span><span class="n">label</span><span class="p">,</span> <span class="n">chm</span><span class="p">,</span> <span class="n">pos</span><span class="p">,</span> <span class="n">extra</span><span class="p">)</span>
+            <span class="k">except</span><span class="p">:</span>  <span class="c1"># noqa: E722  # pragma: no cover</span>
+                <span class="k">if</span> <span class="p">(</span><span class="n">ld</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">)</span> <span class="ow">and</span> <span class="n">errorCallback</span><span class="p">:</span>
+                    <span class="n">errorCallback</span><span class="p">(</span>
+                        <span class="n">line</span><span class="p">,</span> <span class="s2">&quot;</span><span class="si">%s</span><span class="s2"> at index </span><span class="si">%d</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">sys</span><span class="o">.</span><span class="n">exc_info</span><span class="p">()[</span><span class="mi">1</span><span class="p">]),</span> <span class="n">ld</span><span class="p">)</span>
+                    <span class="p">)</span>  <span class="c1"># noqa E501</span></div>
+
+        <span class="c1"># foreach line</span>
+
+<div class="viewcode-block" id="InputDataParsersMixin.generateLociFromMapFiles">
+<a class="viewcode-back" href="../../../biofilter_modules.mixins.html#biofilter_modules.InputDataParsersMixin.generateLociFromMapFiles">[docs]</a>
+    <span class="k">def</span> <span class="nf">generateLociFromMapFiles</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">paths</span><span class="p">,</span> <span class="n">separator</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">applyOffset</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">errorCallback</span><span class="o">=</span><span class="kc">None</span>
+    <span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Reads loci information (chromosome and position) from multiple text</span>
+<span class="sd">        files, returning each valid line as a tuple. Ignores comment lines and</span>
+<span class="sd">        allows coordinate adjustment if needed. On file read errors, it</span>
+<span class="sd">        displays a warning and optionally calls a callback.</span>
+
+<span class="sd">        Parameters:</span>
+<span class="sd">        - paths: List of file paths to read. If a `path` is &#39;-&#39; or empty,</span>
+<span class="sd">        reads from standard input (stdin).</span>
+<span class="sd">        - separator: Optional separator to split each line into columns when</span>
+<span class="sd">        reading loci. If not provided, uses the default split() method.</span>
+<span class="sd">        - applyOffset (bool): Applies a coordinate adjustment based on</span>
+<span class="sd">        `coordinate_base` if set to True.</span>
+<span class="sd">        - errorCallback: Optional function called with an error message and</span>
+<span class="sd">        file path if an exception occurs while processing a line.</span>
+
+<span class="sd">        Operation:</span>
+<span class="sd">        - For each file in `paths`:</span>
+<span class="sd">            - Opens the file for reading (or uses stdin if `path` is &#39;-&#39; or</span>
+<span class="sd">            empty).</span>
+<span class="sd">            - Passes the file lines to `generateLociFromText`, ignoring</span>
+<span class="sd">            comment lines (starting with &#39;#&#39;).</span>
+<span class="sd">            - For each valid line returned by `generateLociFromText`,</span>
+<span class="sd">            generates a tuple `(label, chm, pos, extra)`.</span>
+<span class="sd">            - On file open or read errors, displays a warning and, if</span>
+<span class="sd">            `errorCallback` is provided, calls it with the file path and error</span>
+<span class="sd">            message.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">        - A generator of tuples `(label, chm, pos, extra)` for each valid</span>
+<span class="sd">        locus found across all files.</span>
+
+<span class="sd">        This method facilitates processing a list of files containing loci</span>
+<span class="sd">        information, applying coordinate adjustments and custom error handling</span>
+<span class="sd">        , making it suitable for genomic mapping data from diverse sources.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">for</span> <span class="n">path</span> <span class="ow">in</span> <span class="n">paths</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="k">with</span> <span class="p">(</span>
+                    <span class="n">sys</span><span class="o">.</span><span class="n">stdin</span> <span class="k">if</span> <span class="p">(</span><span class="n">path</span> <span class="o">==</span> <span class="s2">&quot;-&quot;</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">path</span><span class="p">)</span> <span class="k">else</span> <span class="nb">open</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="s2">&quot;r&quot;</span><span class="p">)</span>
+                <span class="p">)</span> <span class="k">as</span> <span class="n">file</span><span class="p">:</span>
+                    <span class="k">for</span> <span class="n">data</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">generateLociFromText</span><span class="p">(</span>
+                        <span class="p">(</span><span class="n">line</span> <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">file</span> <span class="k">if</span> <span class="ow">not</span> <span class="n">line</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;#&quot;</span><span class="p">)),</span>
+                        <span class="n">separator</span><span class="p">,</span>
+                        <span class="n">applyOffset</span><span class="p">,</span>
+                        <span class="n">errorCallback</span><span class="p">,</span>
+                    <span class="p">):</span>
+                        <span class="k">yield</span> <span class="n">data</span>
+                <span class="c1"># with file</span>
+            <span class="k">except</span><span class="p">:</span>  <span class="c1"># noqa: E722  # pragma: no cover</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
+                    <span class="s2">&quot;WARNING: error reading input file &#39;</span><span class="si">%s</span><span class="s2">&#39;: </span><span class="si">%s</span><span class="se">\n</span><span class="s2">&quot;</span>
+                    <span class="o">%</span> <span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">sys</span><span class="o">.</span><span class="n">exc_info</span><span class="p">()[</span><span class="mi">1</span><span class="p">]))</span>
+                <span class="p">)</span>
+                <span class="k">if</span> <span class="n">errorCallback</span><span class="p">:</span>
+                    <span class="n">errorCallback</span><span class="p">(</span><span class="s2">&quot;&lt;file&gt; </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">path</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">sys</span><span class="o">.</span><span class="n">exc_info</span><span class="p">()[</span><span class="mi">1</span><span class="p">]))</span></div>
+
+        <span class="c1"># foreach path</span>
+
+<div class="viewcode-block" id="InputDataParsersMixin.generateLiftOverLoci">
+<a class="viewcode-back" href="../../../biofilter_modules.mixins.html#biofilter_modules.InputDataParsersMixin.generateLiftOverLoci">[docs]</a>
+    <span class="k">def</span> <span class="nf">generateLiftOverLoci</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">ucscBuildOld</span><span class="p">,</span> <span class="n">ucscBuildNew</span><span class="p">,</span> <span class="n">loci</span><span class="p">,</span> <span class="n">errorCallback</span><span class="o">=</span><span class="kc">None</span>
+    <span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Converts a list of genomic loci between two UCSC genome versions,</span>
+<span class="sd">        using LiftOver chains if necessary to map coordinates.</span>
+
+<span class="sd">        Parameters:</span>
+<span class="sd">        - ucscBuildOld: The old UCSC genome version (e.g., `hg18`) from which</span>
+<span class="sd">        loci will be converted.</span>
+<span class="sd">        - ucscBuildNew: The new UCSC genome version (e.g., `hg38`) to which</span>
+<span class="sd">        loci will be converted.</span>
+<span class="sd">        - loci: List of loci to be converted, where each locus is a tuple</span>
+<span class="sd">        `(label, chrom, pos, extra)`.</span>
+<span class="sd">            - `label`: Identifier for the locus.</span>
+<span class="sd">            - `chrom`: Chromosome in the old version.</span>
+<span class="sd">            - `pos`: Position of the locus in the old version.</span>
+<span class="sd">            - `extra`: Additional information associated with the locus.</span>
+<span class="sd">        - errorCallback (function): Optional function called with the original</span>
+<span class="sd">        locus if an error occurs during mapping.</span>
+
+<span class="sd">        Operation:</span>
+<span class="sd">        - Checks the provided UCSC versions:</span>
+<span class="sd">            - If `ucscBuildOld` is unspecified, issues a warning and assumes</span>
+<span class="sd">            the loci are in the same version as the knowledge base.</span>
+<span class="sd">            - If `ucscBuildNew` is unspecified, issues a warning and assumes</span>
+<span class="sd">            he knowledge base version matches the input loci.</span>
+<span class="sd">            - If `ucscBuildOld` and `ucscBuildNew` differ, checks for</span>
+<span class="sd">            available mapping chains for conversion.</span>
+<span class="sd">                - If mapping chains are unavailable, the program exits with an</span>
+<span class="sd">                error message.</span>
+<span class="sd">        - If UCSC versions differ and chains are available:</span>
+<span class="sd">            - Sets up an error message for loci that cannot be mapped.</span>
+<span class="sd">            - Defines a `liftoverCallback` that calls `errorCallback` with the</span>
+<span class="sd">            original region and error message if mapping fails.</span>
+<span class="sd">            - Calls `self._loki.generateLiftOverLoci` to convert loci using</span>
+<span class="sd">            `ucscBuildOld`, `ucscBuildNew`, and the error callback.</span>
+<span class="sd">        - If `ucscBuildOld` and `ucscBuildNew` are the same or no conversion</span>
+<span class="sd">        is required, returns the original loci.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">        - A list of converted loci (or the original loci if no conversion was</span>
+<span class="sd">        necessary) in the format `(label, chrom, pos, extra)`.</span>
+
+<span class="sd">        This method provides a validation layer for converting loci between</span>
+<span class="sd">        UCSC genome versions, ensuring conversion occurs only when necessary</span>
+<span class="sd">        and mapping chains are available, with support for custom error</span>
+<span class="sd">        handling.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># loci=[ (label,chr,pos,extra), ... ]</span>
+        <span class="n">newloci</span> <span class="o">=</span> <span class="n">loci</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">ucscBuildOld</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
+                <span class="s2">&quot;WARNING: UCSC hg# build version was not specified for position input; assuming it matches the knowledge database</span><span class="se">\n</span><span class="s2">&quot;</span>  <span class="c1"># noqa: E501</span>
+            <span class="p">)</span>
+        <span class="k">elif</span> <span class="ow">not</span> <span class="n">ucscBuildNew</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
+                <span class="s2">&quot;WARNING: UCSC hg# build version of the knowledge database could not be determined; assuming it matches user input</span><span class="se">\n</span><span class="s2">&quot;</span>  <span class="c1"># noqa: E501</span>
+            <span class="p">)</span>
+        <span class="k">elif</span> <span class="n">ucscBuildOld</span> <span class="o">!=</span> <span class="n">ucscBuildNew</span><span class="p">:</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_loki</span><span class="o">.</span><span class="n">hasLiftOverChains</span><span class="p">(</span><span class="n">ucscBuildOld</span><span class="p">,</span> <span class="n">ucscBuildNew</span><span class="p">):</span>
+                <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span>
+                    <span class="s2">&quot;ERROR: knowledge database contains no chainfiles to perform liftOver from UCSC hg</span><span class="si">%s</span><span class="s2"> to hg</span><span class="si">%s</span><span class="se">\n</span><span class="s2">&quot;</span>  <span class="c1"># noqa: E501</span>
+                    <span class="o">%</span> <span class="p">(</span>
+                        <span class="c1"># oldHG or &quot;?&quot;,</span>
+                        <span class="c1"># newHG or &quot;?&quot;,</span>
+                        <span class="n">ucscBuildOld</span> <span class="ow">or</span> <span class="s2">&quot;?&quot;</span><span class="p">,</span>
+                        <span class="n">ucscBuildNew</span> <span class="ow">or</span> <span class="s2">&quot;?&quot;</span><span class="p">,</span>
+                    <span class="p">)</span>
+                <span class="p">)</span>
+            <span class="n">liftoverError</span> <span class="o">=</span> <span class="s2">&quot;dropped during liftOver from hg</span><span class="si">%s</span><span class="s2"> to hg</span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span>
+                <span class="n">ucscBuildOld</span> <span class="ow">or</span> <span class="s2">&quot;?&quot;</span><span class="p">,</span>
+                <span class="n">ucscBuildNew</span> <span class="ow">or</span> <span class="s2">&quot;?&quot;</span><span class="p">,</span>
+            <span class="p">)</span>
+
+            <span class="k">def</span> <span class="nf">liftoverCallback</span><span class="p">(</span><span class="n">region</span><span class="p">):</span>
+                <span class="n">errorCallback</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\t</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">s</span><span class="p">)</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">region</span><span class="p">),</span> <span class="n">liftoverError</span><span class="p">)</span>
+
+            <span class="c1"># liftoverCallback()</span>
+            <span class="n">newloci</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_loki</span><span class="o">.</span><span class="n">generateLiftOverLoci</span><span class="p">(</span>
+                <span class="n">ucscBuildOld</span><span class="p">,</span>
+                <span class="n">ucscBuildNew</span><span class="p">,</span>
+                <span class="n">loci</span><span class="p">,</span>
+                <span class="n">tally</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+                <span class="n">errorCallback</span><span class="o">=</span><span class="p">(</span><span class="n">liftoverCallback</span> <span class="k">if</span> <span class="n">errorCallback</span> <span class="k">else</span> <span class="kc">None</span><span class="p">),</span>
+            <span class="p">)</span>
+        <span class="c1"># if old!=new</span>
+        <span class="k">return</span> <span class="n">newloci</span></div>
+
+
+<div class="viewcode-block" id="InputDataParsersMixin.generateRegionsFromText">
+<a class="viewcode-back" href="../../../biofilter_modules.mixins.html#biofilter_modules.InputDataParsersMixin.generateRegionsFromText">[docs]</a>
+    <span class="k">def</span> <span class="nf">generateRegionsFromText</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">lines</span><span class="p">,</span> <span class="n">separator</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">applyOffset</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">errorCallback</span><span class="o">=</span><span class="kc">None</span>
+    <span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Extracts genomic region information (chromosome and position interval)</span>
+<span class="sd">        from a list of text lines, including optional label identification and</span>
+<span class="sd">        additional data. Ignores incomplete or invalid lines and allows</span>
+<span class="sd">        coordinate adjustments based on configuration.</span>
+
+<span class="sd">        Parameters:</span>
+<span class="sd">        - lines: List of strings, each representing a line with genomic region</span>
+<span class="sd">        information.</span>
+<span class="sd">        - separator: Optional separator to split each line into columns. If</span>
+<span class="sd">        not provided, uses the default split() method separator.</span>
+<span class="sd">        - applyOffset (bool): Applies an offset to coordinates based on</span>
+<span class="sd">        `coordinate_base` if set to True, adjusting `posMin` and `posMax`</span>
+<span class="sd">        depending on the coordinate system (closed or half-open).</span>
+<span class="sd">        - errorCallback: Optional function called with an error message and</span>
+<span class="sd">        line in case of an exception while processing a line.</span>
+
+<span class="sd">        Operation:</span>
+<span class="sd">        - Calculates `offsetStart` and `offsetEnd` for position adjustments</span>
+<span class="sd">        based on `coordinate_base`:</span>
+<span class="sd">            - If `applyOffset` is True and `regions_half_open` is enabled,</span>
+<span class="sd">            adjusts `offsetEnd` to consider half-open coordinates.</span>
+<span class="sd">        - For each line:</span>
+<span class="sd">            - Splits the line into up to five columns using `split(separator,</span>
+<span class="sd">            4)` and determines:</span>
+<span class="sd">                - `chm`: The chromosome, validated and converted to an</span>
+<span class="sd">                internal number if it starts with &quot;CHR&quot;.</span>
+<span class="sd">                - `posMin` and `posMax`: Start and end coordinates of the</span>
+<span class="sd">                region.</span>
+<span class="sd">                - `label`: An optional identifier; if absent, is generated</span>
+<span class="sd">                based on the chromosome and region (`chr:start-end`).</span>
+<span class="sd">                - `extra`: Optional additional data from the fifth column, if</span>
+<span class="sd">                present.</span>
+<span class="sd">            - Applies `offsetStart` and `offsetEnd` to `posMin` and `posMax`,</span>
+<span class="sd">            adjusting positions as needed.</span>
+<span class="sd">        - Returns a tuple `(label, chm, posMin, posMax, extra)` for each valid</span>
+<span class="sd">        line.</span>
+<span class="sd">        - On error processing a line, calls `errorCallback` (if provided and</span>
+<span class="sd">        not the first line) with the problematic line and error message.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">        - A generator of tuples `(label, chm, posMin, posMax, extra)` for each</span>
+<span class="sd">        valid region found in the lines.</span>
+
+<span class="sd">        This function streamlines processing of text files with genomic region</span>
+<span class="sd">        information, allowing coordinate adjustment based on configuration and</span>
+<span class="sd">        offering customized error handling.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="n">offsetStart</span> <span class="o">=</span> <span class="n">offsetEnd</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">_options</span><span class="o">.</span><span class="n">coordinate_base</span><span class="p">)</span> <span class="k">if</span> <span class="n">applyOffset</span> <span class="k">else</span> <span class="mi">0</span>
+        <span class="p">)</span>
+        <span class="k">if</span> <span class="n">applyOffset</span> <span class="ow">and</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_options</span><span class="o">.</span><span class="n">regions_half_open</span> <span class="o">==</span> <span class="s2">&quot;yes&quot;</span><span class="p">):</span>
+            <span class="n">offsetEnd</span> <span class="o">-=</span> <span class="mi">1</span>
+
+        <span class="n">ld</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">lines</span><span class="p">:</span>
+            <span class="n">ld</span> <span class="o">+=</span> <span class="mi">1</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="c1"># parse columns</span>
+                <span class="n">cols</span> <span class="o">=</span> <span class="n">line</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="n">separator</span><span class="p">,</span> <span class="mi">4</span><span class="p">)</span>
+                <span class="n">label</span> <span class="o">=</span> <span class="n">chm</span> <span class="o">=</span> <span class="n">posMin</span> <span class="o">=</span> <span class="n">posMax</span> <span class="o">=</span> <span class="n">extra</span> <span class="o">=</span> <span class="kc">None</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">cols</span><span class="p">:</span>
+                    <span class="k">continue</span>
+                <span class="k">elif</span> <span class="nb">len</span><span class="p">(</span><span class="n">cols</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mi">3</span><span class="p">:</span>
+                    <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span><span class="s2">&quot;not enough columns&quot;</span><span class="p">)</span>  <span class="c1"># NEED TEST</span>
+                <span class="k">elif</span> <span class="nb">len</span><span class="p">(</span><span class="n">cols</span><span class="p">)</span> <span class="o">==</span> <span class="mi">3</span><span class="p">:</span>
+                    <span class="n">chm</span> <span class="o">=</span> <span class="n">cols</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">upper</span><span class="p">()</span>
+                    <span class="n">posMin</span> <span class="o">=</span> <span class="n">cols</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">upper</span><span class="p">()</span>
+                    <span class="n">posMax</span> <span class="o">=</span> <span class="n">cols</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span><span class="o">.</span><span class="n">upper</span><span class="p">()</span>
+                <span class="k">elif</span> <span class="nb">len</span><span class="p">(</span><span class="n">cols</span><span class="p">)</span> <span class="o">&gt;=</span> <span class="mi">4</span><span class="p">:</span>
+                    <span class="n">chm</span> <span class="o">=</span> <span class="n">cols</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">upper</span><span class="p">()</span>
+                    <span class="n">label</span> <span class="o">=</span> <span class="n">cols</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+                    <span class="n">posMin</span> <span class="o">=</span> <span class="n">cols</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span><span class="o">.</span><span class="n">upper</span><span class="p">()</span>
+                    <span class="n">posMax</span> <span class="o">=</span> <span class="n">cols</span><span class="p">[</span><span class="mi">3</span><span class="p">]</span><span class="o">.</span><span class="n">upper</span><span class="p">()</span>
+                    <span class="n">extra</span> <span class="o">=</span> <span class="n">cols</span><span class="p">[</span><span class="mi">4</span><span class="p">]</span> <span class="k">if</span> <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">cols</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">4</span><span class="p">)</span> <span class="k">else</span> <span class="kc">None</span>
+
+                <span class="c1"># parse, validate and convert chromosome</span>
+                <span class="k">if</span> <span class="n">chm</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;CHR&quot;</span><span class="p">):</span>
+                    <span class="n">chm</span> <span class="o">=</span> <span class="n">chm</span><span class="p">[</span><span class="mi">3</span><span class="p">:]</span>
+                <span class="k">if</span> <span class="n">chm</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_loki</span><span class="o">.</span><span class="n">chr_num</span><span class="p">:</span>
+                    <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span><span class="s2">&quot;invalid chromosome &#39;</span><span class="si">%s</span><span class="s2">&#39;&quot;</span> <span class="o">%</span> <span class="n">chm</span><span class="p">)</span>
+                <span class="n">chm</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_loki</span><span class="o">.</span><span class="n">chr_num</span><span class="p">[</span><span class="n">chm</span><span class="p">]</span>
+
+                <span class="c1"># parse and convert region label</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">label</span><span class="p">:</span>
+                    <span class="n">label</span> <span class="o">=</span> <span class="s2">&quot;chr</span><span class="si">%s</span><span class="s2">:</span><span class="si">%s</span><span class="s2">-</span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">_loki</span><span class="o">.</span><span class="n">chr_name</span><span class="p">[</span><span class="n">chm</span><span class="p">],</span>
+                        <span class="n">posMin</span><span class="p">,</span>
+                        <span class="n">posMax</span><span class="p">,</span>
+                    <span class="p">)</span>  <span class="c1"># noqa E501</span>
+
+                <span class="c1"># parse and convert positions</span>
+                <span class="k">if</span> <span class="p">(</span><span class="n">posMin</span> <span class="o">==</span> <span class="s2">&quot;-&quot;</span><span class="p">)</span> <span class="ow">or</span> <span class="p">(</span><span class="n">posMin</span> <span class="o">==</span> <span class="s2">&quot;NA&quot;</span><span class="p">):</span>
+                    <span class="n">posMin</span> <span class="o">=</span> <span class="kc">None</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">posMin</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">posMin</span><span class="p">)</span> <span class="o">+</span> <span class="n">offsetStart</span>
+                <span class="k">if</span> <span class="p">(</span><span class="n">posMax</span> <span class="o">==</span> <span class="s2">&quot;-&quot;</span><span class="p">)</span> <span class="ow">or</span> <span class="p">(</span><span class="n">posMax</span> <span class="o">==</span> <span class="s2">&quot;NA&quot;</span><span class="p">):</span>
+                    <span class="n">posMax</span> <span class="o">=</span> <span class="kc">None</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">posMax</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">posMax</span><span class="p">)</span> <span class="o">+</span> <span class="n">offsetEnd</span>
+
+                <span class="k">yield</span> <span class="p">(</span><span class="n">label</span><span class="p">,</span> <span class="n">chm</span><span class="p">,</span> <span class="n">posMin</span><span class="p">,</span> <span class="n">posMax</span><span class="p">,</span> <span class="n">extra</span><span class="p">)</span>
+            <span class="k">except</span><span class="p">:</span>  <span class="c1"># noqa: E722  # pragma: no cover</span>
+                <span class="k">if</span> <span class="p">(</span><span class="n">ld</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">)</span> <span class="ow">and</span> <span class="n">errorCallback</span><span class="p">:</span>
+                    <span class="n">errorCallback</span><span class="p">(</span>
+                        <span class="n">line</span><span class="p">,</span> <span class="s2">&quot;</span><span class="si">%s</span><span class="s2"> at index </span><span class="si">%d</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">sys</span><span class="o">.</span><span class="n">exc_info</span><span class="p">()[</span><span class="mi">1</span><span class="p">]),</span> <span class="n">ld</span><span class="p">)</span>
+                    <span class="p">)</span>  <span class="c1"># noqa E501</span></div>
+
+        <span class="c1"># foreach line</span>
+
+<div class="viewcode-block" id="InputDataParsersMixin.generateRegionsFromFiles">
+<a class="viewcode-back" href="../../../biofilter_modules.mixins.html#biofilter_modules.InputDataParsersMixin.generateRegionsFromFiles">[docs]</a>
+    <span class="k">def</span> <span class="nf">generateRegionsFromFiles</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">paths</span><span class="p">,</span> <span class="n">separator</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">applyOffset</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">errorCallback</span><span class="o">=</span><span class="kc">None</span>
+    <span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Reads genomic region information (chromosome and position range) from</span>
+<span class="sd">        multiple text files, returning each valid line as a tuple. Ignores</span>
+<span class="sd">        comment lines and allows coordinate adjustments based on configuration.</span>
+
+<span class="sd">        Parameters:</span>
+<span class="sd">        - paths: List of input file paths. If `path` is &#39;-&#39; or empty, reads</span>
+<span class="sd">        from standard input (stdin).</span>
+<span class="sd">        - separator: Optional separator to split each line into columns when</span>
+<span class="sd">        reading regions. Defaults to the split() method separator if not</span>
+<span class="sd">        provided.</span>
+<span class="sd">        - applyOffset (bool): Applies a coordinate offset based on</span>
+<span class="sd">        `coordinate_base` if set to True. Adjusts `posMin` and `posMax` based</span>
+<span class="sd">        on the coordinate system (closed or half-open).</span>
+<span class="sd">        - errorCallback: Optional function called with an error message and</span>
+<span class="sd">        file path if an exception occurs while processing a line.</span>
+
+<span class="sd">        Operation:</span>
+<span class="sd">        - For each file in `paths`:</span>
+<span class="sd">        - Opens the file for reading (or uses stdin if `path` is &#39;-&#39; or empty).</span>
+<span class="sd">        - Passes the file lines to `generateRegionsFromText`, skipping comment</span>
+<span class="sd">        lines (starting with &#39;#&#39;).</span>
+<span class="sd">        - For each valid line returned by `generateRegionsFromText`, generates</span>
+<span class="sd">        a tuple `(label, chm, posMin, posMax, extra)`.</span>
+<span class="sd">        - If an error occurs when opening or reading the file, displays a</span>
+<span class="sd">        warning message, and if `errorCallback` is provided, calls it with the</span>
+<span class="sd">        file path and error message.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">        - A generator of tuples `(label, chm, posMin, posMax, extra)` for each</span>
+<span class="sd">        valid region found in all files.</span>
+
+<span class="sd">        This method facilitates processing a list of files containing genomic</span>
+<span class="sd">        region information, applying coordinate adjustments and custom error</span>
+<span class="sd">        handling, making it ideal for processing genomic mapping data from</span>
+<span class="sd">        diverse sources.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">for</span> <span class="n">path</span> <span class="ow">in</span> <span class="n">paths</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="k">with</span> <span class="p">(</span>
+                    <span class="n">sys</span><span class="o">.</span><span class="n">stdin</span> <span class="k">if</span> <span class="p">(</span><span class="n">path</span> <span class="o">==</span> <span class="s2">&quot;-&quot;</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">path</span><span class="p">)</span> <span class="k">else</span> <span class="nb">open</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="s2">&quot;r&quot;</span><span class="p">)</span>
+                <span class="p">)</span> <span class="k">as</span> <span class="n">file</span><span class="p">:</span>
+                    <span class="k">for</span> <span class="n">data</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">generateRegionsFromText</span><span class="p">(</span>
+                        <span class="p">(</span><span class="n">line</span> <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">file</span> <span class="k">if</span> <span class="ow">not</span> <span class="n">line</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;#&quot;</span><span class="p">)),</span>
+                        <span class="n">separator</span><span class="p">,</span>
+                        <span class="n">applyOffset</span><span class="p">,</span>
+                        <span class="n">errorCallback</span><span class="p">,</span>
+                    <span class="p">):</span>
+                        <span class="k">yield</span> <span class="n">data</span>
+                <span class="c1"># with file</span>
+            <span class="k">except</span><span class="p">:</span>  <span class="c1"># noqa: E722  # pragma: no cover</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
+                    <span class="s2">&quot;WARNING: error reading input file &#39;</span><span class="si">%s</span><span class="s2">&#39;: </span><span class="si">%s</span><span class="se">\n</span><span class="s2">&quot;</span>
+                    <span class="o">%</span> <span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">sys</span><span class="o">.</span><span class="n">exc_info</span><span class="p">()[</span><span class="mi">1</span><span class="p">]))</span>
+                <span class="p">)</span>
+                <span class="k">if</span> <span class="n">errorCallback</span><span class="p">:</span>
+                    <span class="n">errorCallback</span><span class="p">(</span><span class="s2">&quot;&lt;file&gt; </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">path</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">sys</span><span class="o">.</span><span class="n">exc_info</span><span class="p">()[</span><span class="mi">1</span><span class="p">]))</span></div>
+
+        <span class="c1"># foreach path</span>
+
+<div class="viewcode-block" id="InputDataParsersMixin.generateLiftOverRegions">
+<a class="viewcode-back" href="../../../biofilter_modules.mixins.html#biofilter_modules.InputDataParsersMixin.generateLiftOverRegions">[docs]</a>
+    <span class="k">def</span> <span class="nf">generateLiftOverRegions</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">ucscBuildOld</span><span class="p">,</span> <span class="n">ucscBuildNew</span><span class="p">,</span> <span class="n">regions</span><span class="p">,</span> <span class="n">errorCallback</span><span class="o">=</span><span class="kc">None</span>
+    <span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Converts a list of genomic regions between two UCSC genome versions</span>
+<span class="sd">        using mapping chains (LiftOver chains) if needed. Checks the provided</span>
+<span class="sd">        UCSC versions and, if they differ, maps the coordinates.</span>
+
+<span class="sd">        Parameters:</span>
+<span class="sd">        - ucscBuildOld: The old UCSC genome version (e.g., `hg18`) from which</span>
+<span class="sd">        regions will be converted.</span>
+<span class="sd">        - ucscBuildNew: The new UCSC genome version (e.g., `hg38`) to which</span>
+<span class="sd">        regions will be converted.</span>
+<span class="sd">        - regions: A list of regions to convert, where each region is a tuple</span>
+<span class="sd">        `(label, chrom, posMin, posMax, extra)`.</span>
+<span class="sd">            - `label`: Identifier of the region.</span>
+<span class="sd">            - `chrom`: Chromosome in the old version.</span>
+<span class="sd">            - `posMin` and `posMax`: Start and end coordinates in the old</span>
+<span class="sd">            version.</span>
+<span class="sd">            - `extra`: Additional information related to the region.</span>
+<span class="sd">        - errorCallback (function): An optional function called with the</span>
+<span class="sd">        original region if an error occurs during mapping.</span>
+
+<span class="sd">        Operation:</span>
+<span class="sd">        - Checks the provided UCSC versions:</span>
+<span class="sd">            - If `ucscBuildOld` is not specified, warns that input data</span>
+<span class="sd">            version is assumed to match the knowledge base.</span>
+<span class="sd">            - If `ucscBuildNew` is not specified, warns that knowledge base</span>
+<span class="sd">            version is assumed to match input data.</span>
+<span class="sd">            - If `ucscBuildOld` and `ucscBuildNew` are different, checks for</span>
+<span class="sd">            available mapping chains.</span>
+<span class="sd">                - If chains are unavailable, exits with an error message.</span>
+<span class="sd">        - If UCSC versions differ and chains are available:</span>
+<span class="sd">            - Defines an error message for unmappable regions.</span>
+<span class="sd">            - Sets up `liftoverCallback`, a function that calls `errorCallback`</span>
+<span class="sd">            with the original region and error message if mapping fails.</span>
+<span class="sd">            - Calls `self._loki.generateLiftOverRegions` to convert regions</span>
+<span class="sd">            using `ucscBuildOld`, `ucscBuildNew`, and the error callback.</span>
+<span class="sd">        - If `ucscBuildOld` and `ucscBuildNew` are the same or no conversion</span>
+<span class="sd">        is needed, returns the original regions.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">        - A list of converted regions (or original regions if no conversion</span>
+<span class="sd">        was necessary) in the format `(label, chrom, posMin, posMax, extra)`.</span>
+
+<span class="sd">        This method ensures the conversion of regions between UCSC genome</span>
+<span class="sd">        versions only when necessary and with available mapping chains,</span>
+<span class="sd">        allowing customized error handling.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="c1"># regions=[ (label,chr,posMin,posMax,extra), ... ]</span>
+        <span class="n">newregions</span> <span class="o">=</span> <span class="n">regions</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">ucscBuildOld</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
+                <span class="s2">&quot;WARNING: UCSC hg# build version was not specified for region input; assuming it matches the knowledge database</span><span class="se">\n</span><span class="s2">&quot;</span>  <span class="c1"># noqa: E501</span>
+            <span class="p">)</span>
+        <span class="k">elif</span> <span class="ow">not</span> <span class="n">ucscBuildNew</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
+                <span class="s2">&quot;WARNING: UCSC hg# build version of the knowledge database could not be determined; assuming it matches user input</span><span class="se">\n</span><span class="s2">&quot;</span>  <span class="c1"># noqa: E501</span>
+            <span class="p">)</span>
+        <span class="k">elif</span> <span class="n">ucscBuildOld</span> <span class="o">!=</span> <span class="n">ucscBuildNew</span><span class="p">:</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_loki</span><span class="o">.</span><span class="n">hasLiftOverChains</span><span class="p">(</span><span class="n">ucscBuildOld</span><span class="p">,</span> <span class="n">ucscBuildNew</span><span class="p">):</span>
+                <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span>
+                    <span class="s2">&quot;ERROR: knowledge database contains no chainfiles to perform liftOver from UCSC hg</span><span class="si">%s</span><span class="s2"> to hg</span><span class="si">%s</span><span class="se">\n</span><span class="s2">&quot;</span>  <span class="c1"># noqa: E501</span>
+                    <span class="o">%</span> <span class="p">(</span>
+                        <span class="n">ucscBuildOld</span> <span class="ow">or</span> <span class="s2">&quot;?&quot;</span><span class="p">,</span>
+                        <span class="n">ucscBuildNew</span> <span class="ow">or</span> <span class="s2">&quot;?&quot;</span><span class="p">,</span>
+                    <span class="p">)</span>
+                <span class="p">)</span>
+            <span class="n">liftoverError</span> <span class="o">=</span> <span class="s2">&quot;dropped during liftOver from hg</span><span class="si">%s</span><span class="s2"> to hg</span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span>
+                <span class="n">ucscBuildOld</span> <span class="ow">or</span> <span class="s2">&quot;?&quot;</span><span class="p">,</span>
+                <span class="n">ucscBuildNew</span> <span class="ow">or</span> <span class="s2">&quot;?&quot;</span><span class="p">,</span>
+            <span class="p">)</span>
+
+            <span class="k">def</span> <span class="nf">liftoverCallback</span><span class="p">(</span><span class="n">region</span><span class="p">):</span>
+                <span class="n">errorCallback</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\t</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">s</span><span class="p">)</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">region</span><span class="p">),</span> <span class="n">liftoverError</span><span class="p">)</span>
+
+            <span class="c1"># liftoverCallback()</span>
+            <span class="n">newregions</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_loki</span><span class="o">.</span><span class="n">generateLiftOverRegions</span><span class="p">(</span>
+                <span class="n">ucscBuildOld</span><span class="p">,</span>
+                <span class="n">ucscBuildNew</span><span class="p">,</span>
+                <span class="n">regions</span><span class="p">,</span>
+                <span class="n">tally</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+                <span class="n">errorCallback</span><span class="o">=</span><span class="p">(</span><span class="n">liftoverCallback</span> <span class="k">if</span> <span class="n">errorCallback</span> <span class="k">else</span> <span class="kc">None</span><span class="p">),</span>
+            <span class="p">)</span>
+        <span class="c1"># if old!=new</span>
+        <span class="k">return</span> <span class="n">newregions</span></div>
+
+
+<div class="viewcode-block" id="InputDataParsersMixin.generateNamesFromText">
+<a class="viewcode-back" href="../../../biofilter_modules.mixins.html#biofilter_modules.InputDataParsersMixin.generateNamesFromText">[docs]</a>
+    <span class="k">def</span> <span class="nf">generateNamesFromText</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">lines</span><span class="p">,</span> <span class="n">defaultNS</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">separator</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">errorCallback</span><span class="o">=</span><span class="kc">None</span>
+    <span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Extracts name and namespace information (context identifier types)</span>
+<span class="sd">        from a list of text lines. It ignores empty or invalid lines and</span>
+<span class="sd">        allows a default namespace if one is not specified.</span>
+
+<span class="sd">        Parameters:</span>
+<span class="sd">        - lines: A list of strings, each representing a line containing</span>
+<span class="sd">        information for a name and optionally a namespace (ns).</span>
+<span class="sd">        - defaultNS: Default namespace to be used if not specified in the line.</span>
+<span class="sd">        - separator: Optional separator to split each line into columns. If</span>
+<span class="sd">        not provided, the method uses the default `split()` separator.</span>
+<span class="sd">        - errorCallback: Optional function called with an error message and</span>
+<span class="sd">        the line in case of an exception while processing a line.</span>
+
+<span class="sd">        Operation:</span>
+<span class="sd">        - For each line:</span>
+<span class="sd">            - Splits the line into up to three columns using `split(separator,</span>
+<span class="sd">            2)` and determines:</span>
+<span class="sd">                - `ns`: The namespace, or uses `defaultNS` if the line</span>
+<span class="sd">                contains only a name.</span>
+<span class="sd">                - `name`: The main name, with whitespace removed.</span>
+<span class="sd">                - `extra`: Optional additional data contained in the third</span>
+<span class="sd">                column, if present.</span>
+<span class="sd">            - Returns a tuple `(ns, name, extra)` for each valid line.</span>
+<span class="sd">        - If an error occurs while processing a line, it calls `errorCallback`</span>
+<span class="sd">        (if provided and the line is not the first) with the problematic line</span>
+<span class="sd">        and error message.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">        - A generator of tuples `(ns, name, extra)` for each valid name and</span>
+<span class="sd">        namespace found in the lines.</span>
+
+<span class="sd">        This function simplifies processing text files containing names and</span>
+<span class="sd">        namespaces, with optional error handling. It provides a default</span>
+<span class="sd">        namespace when unspecified and allows flexibility in the input format.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># 		utf8 = codecs.getencoder(&#39;utf8&#39;)</span>
+        <span class="n">ld</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">lines</span><span class="p">:</span>
+            <span class="n">ld</span> <span class="o">+=</span> <span class="mi">1</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">cols</span> <span class="o">=</span> <span class="n">line</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="n">separator</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span>
+                <span class="n">ns</span> <span class="o">=</span> <span class="n">name</span> <span class="o">=</span> <span class="n">extra</span> <span class="o">=</span> <span class="kc">None</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">cols</span><span class="p">:</span>
+                    <span class="k">continue</span>
+                <span class="k">elif</span> <span class="nb">len</span><span class="p">(</span><span class="n">cols</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+                    <span class="n">ns</span> <span class="o">=</span> <span class="n">defaultNS</span>
+                    <span class="n">name</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">cols</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">strip</span><span class="p">())</span>
+                <span class="k">elif</span> <span class="nb">len</span><span class="p">(</span><span class="n">cols</span><span class="p">)</span> <span class="o">&gt;=</span> <span class="mi">2</span><span class="p">:</span>
+                    <span class="n">ns</span> <span class="o">=</span> <span class="n">cols</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+                    <span class="n">name</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">cols</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">strip</span><span class="p">())</span>
+                    <span class="n">extra</span> <span class="o">=</span> <span class="n">cols</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="k">if</span> <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">cols</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">2</span><span class="p">)</span> <span class="k">else</span> <span class="kc">None</span>
+                <span class="k">yield</span> <span class="p">(</span><span class="n">ns</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">extra</span><span class="p">)</span>
+            <span class="k">except</span><span class="p">:</span>  <span class="c1"># noqa: E722  # pragma: no cover</span>
+                <span class="k">if</span> <span class="p">(</span><span class="n">ld</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">)</span> <span class="ow">and</span> <span class="n">errorCallback</span><span class="p">:</span>
+                    <span class="n">errorCallback</span><span class="p">(</span>
+                        <span class="n">line</span><span class="p">,</span> <span class="s2">&quot;</span><span class="si">%s</span><span class="s2"> at index </span><span class="si">%d</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">sys</span><span class="o">.</span><span class="n">exc_info</span><span class="p">()[</span><span class="mi">1</span><span class="p">]),</span> <span class="n">ld</span><span class="p">)</span>
+                    <span class="p">)</span>  <span class="c1"># noqa E501</span></div>
+
+        <span class="c1"># foreach line in file</span>
+
+<div class="viewcode-block" id="InputDataParsersMixin.generateNamesFromNameFiles">
+<a class="viewcode-back" href="../../../biofilter_modules.mixins.html#biofilter_modules.InputDataParsersMixin.generateNamesFromNameFiles">[docs]</a>
+    <span class="k">def</span> <span class="nf">generateNamesFromNameFiles</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">paths</span><span class="p">,</span> <span class="n">defaultNS</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">separator</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">errorCallback</span><span class="o">=</span><span class="kc">None</span>
+    <span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Reads name and namespace information from multiple text files,</span>
+<span class="sd">        returning each valid line as a tuple. Ignores comment lines and allows</span>
+<span class="sd">        a default namespace if not specified.</span>
+
+<span class="sd">        Parameters:</span>
+<span class="sd">        - paths: List of input file paths. If `path` is &#39;-&#39; or empty, reads</span>
+<span class="sd">        from standard input (stdin).</span>
+<span class="sd">        - defaultNS: Default namespace to use if one is not specified in the</span>
+<span class="sd">        line.</span>
+<span class="sd">        - separator: Optional separator to split each line into columns. If</span>
+<span class="sd">        not provided, uses the default split() method separator.</span>
+<span class="sd">        - errorCallback: Optional function called with an error message and</span>
+<span class="sd">        file path if an exception occurs while processing a line.</span>
+
+<span class="sd">        Operation:</span>
+<span class="sd">        - For each file in `paths`:</span>
+<span class="sd">            - Opens the file for reading (or uses stdin if `path` is &#39;-&#39; or</span>
+<span class="sd">            empty).</span>
+<span class="sd">            - Passes the files lines to `generateNamesFromText`, ignoring</span>
+<span class="sd">            comment lines (those starting with &#39;#&#39;).</span>
+<span class="sd">            - For each valid line returned by `generateNamesFromText`, yields</span>
+<span class="sd">            a tuple `(ns, name, extra)`.</span>
+<span class="sd">            - If an error occurs while opening or reading the file, displays a</span>
+<span class="sd">            warning and, if `errorCallback` is provided, calls it with the</span>
+<span class="sd">            file path and error message.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">        - A generator of tuples `(ns, name, extra)` for each valid name and</span>
+<span class="sd">        namespace found across all specified files.</span>
+
+<span class="sd">        This method simplifies processing a list of files with name and</span>
+<span class="sd">        namespace information, applying a default namespace as needed and</span>
+<span class="sd">        supporting custom error handling for problematic files.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">for</span> <span class="n">path</span> <span class="ow">in</span> <span class="n">paths</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="k">with</span> <span class="p">(</span>
+                    <span class="n">sys</span><span class="o">.</span><span class="n">stdin</span> <span class="k">if</span> <span class="p">(</span><span class="n">path</span> <span class="o">==</span> <span class="s2">&quot;-&quot;</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">path</span><span class="p">)</span> <span class="k">else</span> <span class="nb">open</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="s2">&quot;r&quot;</span><span class="p">)</span>
+                <span class="p">)</span> <span class="k">as</span> <span class="n">file</span><span class="p">:</span>
+                    <span class="k">for</span> <span class="n">data</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">generateNamesFromText</span><span class="p">(</span>
+                        <span class="p">(</span><span class="n">line</span> <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">file</span> <span class="k">if</span> <span class="ow">not</span> <span class="n">line</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;#&quot;</span><span class="p">)),</span>
+                        <span class="n">defaultNS</span><span class="p">,</span>
+                        <span class="n">separator</span><span class="p">,</span>
+                        <span class="n">errorCallback</span><span class="p">,</span>
+                    <span class="p">):</span>
+                        <span class="k">yield</span> <span class="n">data</span>
+                <span class="c1"># with file</span>
+            <span class="k">except</span><span class="p">:</span>  <span class="c1"># noqa: E722  # pragma: no cover</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
+                    <span class="s2">&quot;WARNING: error reading input file &#39;</span><span class="si">%s</span><span class="s2">&#39;: </span><span class="si">%s</span><span class="se">\n</span><span class="s2">&quot;</span>
+                    <span class="o">%</span> <span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">sys</span><span class="o">.</span><span class="n">exc_info</span><span class="p">()[</span><span class="mi">1</span><span class="p">]))</span>
+                <span class="p">)</span>
+                <span class="k">if</span> <span class="n">errorCallback</span><span class="p">:</span>
+                    <span class="n">errorCallback</span><span class="p">(</span><span class="s2">&quot;&lt;file&gt; </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">path</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">sys</span><span class="o">.</span><span class="n">exc_info</span><span class="p">()[</span><span class="mi">1</span><span class="p">]))</span></div>
+
+        <span class="c1"># foreach path</span>
+
+<div class="viewcode-block" id="InputDataParsersMixin.loadUserKnowledgeFile">
+<a class="viewcode-back" href="../../../biofilter_modules.mixins.html#biofilter_modules.InputDataParsersMixin.loadUserKnowledgeFile">[docs]</a>
+    <span class="k">def</span> <span class="nf">loadUserKnowledgeFile</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">,</span> <span class="n">defaultNS</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">separator</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">errorCallback</span><span class="o">=</span><span class="kc">None</span>
+    <span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Loads data from a file and inserts user-defined groups and sources</span>
+<span class="sd">        into the `user.source` and `user.group` tables. This method processes</span>
+<span class="sd">        the file line-by-line, storing information in `user` and potentially</span>
+<span class="sd">        in `main` through additional method calls.</span>
+
+<span class="sd">        Parameters:</span>
+<span class="sd">        - path: File path for the input data to be processed. Reads from</span>
+<span class="sd">        standard input (stdin) if set to &#39;-&#39; or left empty.</span>
+<span class="sd">        - defaultNS: Default namespace to use if a namespace is not specified</span>
+<span class="sd">        for identifiers in the file.</span>
+<span class="sd">        - separator: Optional separator to split columns within each line of</span>
+<span class="sd">        the file.</span>
+<span class="sd">        - errorCallback: Optional function invoked in case of an error when</span>
+<span class="sd">        processing a line or identifying a group.</span>
+
+<span class="sd">        Operation:</span>
+<span class="sd">        - Opens the file (`file`) and reads the first line to extract the</span>
+<span class="sd">        `label` and `description` for the user source, calling `addUserSource`</span>
+<span class="sd">        to add an entry in `user.source`.</span>
+<span class="sd">        - Processes subsequent lines as instructions for groups and genes:</span>
+<span class="sd">        - If a line starts with &#39;GROUP,&#39; defines a new user group in</span>
+<span class="sd">        `user.group` with `addUserGroup`.</span>
+<span class="sd">        - Otherwise, treats lines as gene identifiers and stores them in</span>
+<span class="sd">        `namesets`.</span>
+<span class="sd">        - After each group, calls `addUserGroupBiopolymers` to insert group</span>
+<span class="sd">        genes into `user.group_biopolymer`.</span>
+<span class="sd">        - If an error occurs when opening or processing the file, displays a</span>
+<span class="sd">        warning message and calls `errorCallback` if provided.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">        - None. The method logs results and inserts data into the</span>
+<span class="sd">        `user.source`, `user.group`, and `user.group_biopolymer` tables.</span>
+
+<span class="sd">        This method allows users to define and load their data sources and</span>
+<span class="sd">        groups, organizing and managing user-defined knowledge data in the</span>
+<span class="sd">        `user` schema.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># utf8 = codecs.getencoder(&quot;utf8&quot;)</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">with</span> <span class="p">(</span>
+                <span class="n">sys</span><span class="o">.</span><span class="n">stdin</span> <span class="k">if</span> <span class="p">(</span><span class="n">path</span> <span class="o">==</span> <span class="s2">&quot;-&quot;</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">path</span><span class="p">)</span> <span class="k">else</span> <span class="nb">open</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="s2">&quot;r&quot;</span><span class="p">)</span>
+            <span class="p">)</span> <span class="k">as</span> <span class="n">file</span><span class="p">:</span>  <span class="c1"># noqa: E501</span>
+                <span class="c1"># words = utf8(file.next())[0].strip().split(separator, 1)</span>
+                <span class="n">words</span> <span class="o">=</span> <span class="nb">next</span><span class="p">(</span><span class="n">file</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="n">separator</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+                <span class="n">label</span> <span class="o">=</span> <span class="n">words</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+                <span class="n">description</span> <span class="o">=</span> <span class="n">words</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="k">if</span> <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">words</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">)</span> <span class="k">else</span> <span class="s2">&quot;&quot;</span>
+                <span class="n">usourceID</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">addUserSource</span><span class="p">(</span><span class="n">label</span><span class="p">,</span> <span class="n">description</span><span class="p">)</span>
+                <span class="n">ugroupID</span> <span class="o">=</span> <span class="n">namesets</span> <span class="o">=</span> <span class="kc">None</span>
+                <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">file</span><span class="p">:</span>
+                    <span class="c1"># words = utf8(line)[0].strip().split(separator)</span>
+                    <span class="n">words</span> <span class="o">=</span> <span class="n">line</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="n">separator</span><span class="p">)</span>
+                    <span class="c1"># if not any(word.strip() for word in words):</span>
+                    <span class="k">if</span> <span class="nb">all</span><span class="p">(</span><span class="n">word</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span> <span class="o">==</span> <span class="s2">&quot;&quot;</span> <span class="k">for</span> <span class="n">word</span> <span class="ow">in</span> <span class="n">words</span><span class="p">):</span>
+                        <span class="k">pass</span>
+                    <span class="k">elif</span> <span class="n">words</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;GROUP&quot;</span><span class="p">:</span>
+                        <span class="k">if</span> <span class="n">ugroupID</span> <span class="ow">and</span> <span class="n">namesets</span><span class="p">:</span>
+                            <span class="bp">self</span><span class="o">.</span><span class="n">addUserGroupBiopolymers</span><span class="p">(</span>
+                                <span class="n">ugroupID</span><span class="p">,</span> <span class="n">namesets</span><span class="p">,</span> <span class="n">errorCallback</span>
+                            <span class="p">)</span>
+                        <span class="n">label</span> <span class="o">=</span> <span class="n">words</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="k">if</span> <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">words</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">)</span> <span class="k">else</span> <span class="kc">None</span>
+                        <span class="n">description</span> <span class="o">=</span> <span class="s2">&quot; &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">words</span><span class="p">[</span><span class="mi">2</span><span class="p">:])</span>
+                        <span class="n">ugroupID</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">addUserGroup</span><span class="p">(</span>
+                            <span class="n">usourceID</span><span class="p">,</span> <span class="n">label</span><span class="p">,</span> <span class="n">description</span><span class="p">,</span> <span class="n">errorCallback</span>
+                        <span class="p">)</span>
+                        <span class="n">namesets</span> <span class="o">=</span> <span class="nb">list</span><span class="p">()</span>
+                    <span class="k">elif</span> <span class="n">words</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;CHILDREN&quot;</span><span class="p">:</span>
+                        <span class="k">pass</span>  <span class="c1"># TODO eventual support for group hierarchies</span>
+                    <span class="k">elif</span> <span class="n">ugroupID</span><span class="p">:</span>
+                        <span class="n">namesets</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                            <span class="nb">list</span><span class="p">((</span><span class="n">defaultNS</span><span class="p">,</span> <span class="n">w</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span> <span class="k">for</span> <span class="n">w</span> <span class="ow">in</span> <span class="n">words</span><span class="p">)</span>
+                        <span class="p">)</span>  <span class="c1"># noqa E501</span>
+                <span class="c1"># foreach line</span>
+                <span class="k">if</span> <span class="n">ugroupID</span> <span class="ow">and</span> <span class="n">namesets</span><span class="p">:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">addUserGroupBiopolymers</span><span class="p">(</span>
+                        <span class="n">ugroupID</span><span class="p">,</span> <span class="n">namesets</span><span class="p">,</span> <span class="n">errorCallback</span>
+                    <span class="p">)</span>  <span class="c1"># noqa E501</span>
+            <span class="c1"># with file</span>
+        <span class="k">except</span><span class="p">:</span>  <span class="c1"># noqa: E722  # pragma: no cover</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
+                <span class="s2">&quot;WARNING: error reading input file &#39;</span><span class="si">%s</span><span class="s2">&#39;: </span><span class="si">%s</span><span class="se">\n</span><span class="s2">&quot;</span>
+                <span class="o">%</span> <span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">sys</span><span class="o">.</span><span class="n">exc_info</span><span class="p">()[</span><span class="mi">1</span><span class="p">]))</span>
+            <span class="p">)</span>
+            <span class="k">if</span> <span class="n">errorCallback</span><span class="p">:</span>
+                <span class="n">errorCallback</span><span class="p">(</span><span class="s2">&quot;&lt;file&gt; </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">path</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">sys</span><span class="o">.</span><span class="n">exc_info</span><span class="p">()[</span><span class="mi">1</span><span class="p">]))</span></div>
+</div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Ritchie Lab.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

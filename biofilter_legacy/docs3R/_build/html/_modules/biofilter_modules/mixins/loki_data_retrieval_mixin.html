@@ -1,0 +1,396 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>biofilter_modules.mixins.loki_data_retrieval_mixin &mdash; Biofilter 2.4.4 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=b1e24531"></script>
+      <script src="../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            Biofilter
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <!-- Local TOC -->
+              <div class="local-toc"></div>
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">Biofilter</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">biofilter_modules.mixins.loki_data_retrieval_mixin</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for biofilter_modules.mixins.loki_data_retrieval_mixin</h1><div class="highlight"><pre>
+<span></span><span class="c1"># #################################################</span>
+<span class="c1"># LOKI METADATA RETRIEVAL MIXIN</span>
+<span class="c1"># #################################################</span>
+<span class="kn">import</span> <span class="nn">sys</span>
+<span class="kn">import</span> <span class="nn">collections</span>
+
+
+<div class="viewcode-block" id="LokiDataRetrievalMixin">
+<a class="viewcode-back" href="../../../biofilter_modules.mixins.html#biofilter_modules.LokiDataRetrievalMixin">[docs]</a>
+<span class="k">class</span> <span class="nc">LokiDataRetrievalMixin</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    The `LokiDataRetrievalMixin` class provides methods to retrieve specific</span>
+<span class="sd">    data and metadata from the LOKI database, serving as a modular data access</span>
+<span class="sd">    layer within a bioinformatics application. This mixin focuses on extracting</span>
+<span class="sd">    key identifiers, statistics, and profiles, enabling streamlined access to</span>
+<span class="sd">    database attributes, genome builds, and statistical data.</span>
+
+<span class="sd">    MAIN FUNCTIONALITY:</span>
+<span class="sd">    - Source Metadata: Retrieves metadata related to data sources, including</span>
+<span class="sd">    versions, options, and files.</span>
+<span class="sd">    - Gene and Group Statistics: Gathers statistics on gene and group names for</span>
+<span class="sd">    analytical and reporting purposes.</span>
+<span class="sd">    - Linkage Disequilibrium Profiles: Retrieves LD profile data for various</span>
+<span class="sd">    genetic analyses.</span>
+<span class="sd">    - Genome Builds: Fetches genome build information available in the database</span>
+<span class="sd">    for compatibility checks.</span>
+<span class="sd">    - Type and Namespace Identification: Retrieves database-specific type and</span>
+<span class="sd">    namespace IDs for consistent data management across various inputs.</span>
+
+<span class="sd">    IMPLEMENTED METHODS:</span>
+<span class="sd">    - [getSourceFingerprints]:</span>
+<span class="sd">        Retrieves metadata for each source in the database, including version,</span>
+<span class="sd">        options, and associated files.</span>
+<span class="sd">    - [generateGeneNameStats]:</span>
+<span class="sd">        Compiles and returns statistics on gene names within the database.</span>
+<span class="sd">    - [generateGroupNameStats]:</span>
+<span class="sd">        Compiles and returns statistics on group names within the database.</span>
+<span class="sd">    - [generateLDProfiles]:</span>
+<span class="sd">        Retrieves available linkage disequilibrium (LD) profiles for analysis.</span>
+<span class="sd">    - [getDatabaseGenomeBuilds]:</span>
+<span class="sd">        Fetches compatible genome build versions stored in the database.</span>
+<span class="sd">    - [getOptionTypeID]:</span>
+<span class="sd">        Retrieves the internal ID for a specified option type, exiting if the</span>
+<span class="sd">        type is unrecognized and `optional` is False.</span>
+<span class="sd">    - [getOptionNamespaceID]:</span>
+<span class="sd">        Retrieves the namespace ID associated with a given value, with an</span>
+<span class="sd">        option to exit if the namespace is unrecognized and `optional` is F.</span>
+
+<span class="sd">    The mixin organizes data retrieval for essential attributes and statistics,</span>
+<span class="sd">    providing a structured interface for bioinformatics applications to</span>
+<span class="sd">    interact efficiently with the LOKI database and manage diverse data attr.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="c1"># # #################################################</span>
+    <span class="c1"># # LOKI METADATA RETRIEVAL</span>
+
+<div class="viewcode-block" id="LokiDataRetrievalMixin.getSourceFingerprints">
+<a class="viewcode-back" href="../../../biofilter_modules.mixins.html#biofilter_modules.LokiDataRetrievalMixin.getSourceFingerprints">[docs]</a>
+    <span class="k">def</span> <span class="nf">getSourceFingerprints</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Retrieves a structured dictionary of source fingerprints, including</span>
+<span class="sd">        the version, options, and associated files for each source.</span>
+
+<span class="sd">        Operation:</span>
+<span class="sd">        1. Initialize Ordered Dictionary: Creates an ordered dictionary</span>
+<span class="sd">        (`ret`) to maintain the order of source entries.</span>
+<span class="sd">        2. Retrieve Source IDs: Gets a list of source IDs through</span>
+<span class="sd">        `self._loki.getSourceIDs()`.</span>
+<span class="sd">        3. Populate Fingerprints: For each source ID:</span>
+<span class="sd">        - Retrieves the source&#39;s version with `getSourceIDVersion`.</span>
+<span class="sd">        - Retrieves source options using `getSourceIDOptions`.</span>
+<span class="sd">        - Collects associated files with `getSourceIDFiles`.</span>
+<span class="sd">        - Each source&#39;s data is then added to the `ret` dictionary.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">        - An `OrderedDict` where each key is a source, and each value is a</span>
+<span class="sd">        tuple containing the version, options, and files associated with that</span>
+<span class="sd">        source.</span>
+
+<span class="sd">        This method provides an organized view of source data, useful for</span>
+<span class="sd">        version control, configuration checks, and data integrity validation.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">ret</span> <span class="o">=</span> <span class="n">collections</span><span class="o">.</span><span class="n">OrderedDict</span><span class="p">()</span>
+        <span class="n">sourceIDs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_loki</span><span class="o">.</span><span class="n">getSourceIDs</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">source</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">sourceIDs</span><span class="p">):</span>
+            <span class="n">ret</span><span class="p">[</span><span class="n">source</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_loki</span><span class="o">.</span><span class="n">getSourceIDVersion</span><span class="p">(</span><span class="n">sourceIDs</span><span class="p">[</span><span class="n">source</span><span class="p">]),</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_loki</span><span class="o">.</span><span class="n">getSourceIDOptions</span><span class="p">(</span><span class="n">sourceIDs</span><span class="p">[</span><span class="n">source</span><span class="p">]),</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_loki</span><span class="o">.</span><span class="n">getSourceIDFiles</span><span class="p">(</span><span class="n">sourceIDs</span><span class="p">[</span><span class="n">source</span><span class="p">]),</span>
+            <span class="p">)</span>
+        <span class="k">return</span> <span class="n">ret</span></div>
+
+
+<div class="viewcode-block" id="LokiDataRetrievalMixin.generateGeneNameStats">
+<a class="viewcode-back" href="../../../biofilter_modules.mixins.html#biofilter_modules.LokiDataRetrievalMixin.generateGeneNameStats">[docs]</a>
+    <span class="k">def</span> <span class="nf">generateGeneNameStats</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Generates and returns statistics related to gene names by leveraging</span>
+<span class="sd">        biopolymer data associated with genes.</span>
+
+<span class="sd">        Operation:</span>
+<span class="sd">        1. Retrieve Gene Type ID: Calls `self._loki.getTypeID(&quot;gene&quot;)` to</span>
+<span class="sd">        obtain the unique type ID for genes.</span>
+<span class="sd">        - If no gene type ID is found, the method terminates execution with an</span>
+<span class="sd">        error, indicating that gene data is missing in the knowledge file.</span>
+<span class="sd">        2. Generate Biopolymer Name Statistics: Uses the gene type ID to</span>
+<span class="sd">        call `generateBiopolymerNameStats`, which computes and returns</span>
+<span class="sd">        statistics on gene names.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">        - The output from `generateBiopolymerNameStats`, which includes</span>
+<span class="sd">        statistical data on gene names such as frequency and usage patterns.</span>
+
+<span class="sd">        This method provides essential statistics on gene names, assisting in</span>
+<span class="sd">        data analysis, name consistency checks, and frequency analysis.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">typeID</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_loki</span><span class="o">.</span><span class="n">getTypeID</span><span class="p">(</span><span class="s2">&quot;gene&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">typeID</span><span class="p">:</span>
+            <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="s2">&quot;ERROR: knowledge file contains no gene data&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_loki</span><span class="o">.</span><span class="n">generateBiopolymerNameStats</span><span class="p">(</span><span class="n">typeID</span><span class="o">=</span><span class="n">typeID</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="LokiDataRetrievalMixin.generateGroupNameStats">
+<a class="viewcode-back" href="../../../biofilter_modules.mixins.html#biofilter_modules.LokiDataRetrievalMixin.generateGroupNameStats">[docs]</a>
+    <span class="k">def</span> <span class="nf">generateGroupNameStats</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Generates statistical data on group names by utilizing the</span>
+<span class="sd">        `generateGroupNameStats` function within the loki database instance.</span>
+
+<span class="sd">        Operation:</span>
+<span class="sd">        - Directly calls `self._loki.generateGroupNameStats()`, leveraging the</span>
+<span class="sd">        loki database internal method to gather and return statistics</span>
+<span class="sd">        related to group names.</span>
+<span class="sd">        - This method may involve computations on group name frequency,</span>
+<span class="sd">        distribution, or other relevant metrics, depending on the loki</span>
+<span class="sd">        database&#39;s specific implementation.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">        - The output of `self._loki.generateGroupNameStats()`, which is likely</span>
+<span class="sd">        a data structure (e.g., dictionary or DataFrame) containing various</span>
+<span class="sd">        group name statistics.</span>
+
+<span class="sd">        This function is useful for analyzing patterns, trends, or anomalies</span>
+<span class="sd">        in group names within the database.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_loki</span><span class="o">.</span><span class="n">generateGroupNameStats</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="LokiDataRetrievalMixin.generateLDProfiles">
+<a class="viewcode-back" href="../../../biofilter_modules.mixins.html#biofilter_modules.LokiDataRetrievalMixin.generateLDProfiles">[docs]</a>
+    <span class="k">def</span> <span class="nf">generateLDProfiles</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Generates and yields linkage disequilibrium (LD) profiles, including</span>
+<span class="sd">        relevant metadata.</span>
+
+<span class="sd">        Operation:</span>
+<span class="sd">        1. Retrieve LD Profiles: Calls `self._loki.getLDProfiles()` to</span>
+<span class="sd">        obtain available LD profiles and their metadata.</span>
+<span class="sd">        2. Yield Profiles: Iterates through sorted LD profiles and yields</span>
+<span class="sd">        each one as a tuple.</span>
+<span class="sd">        - The tuple contains the LD profile identifier followed by its</span>
+<span class="sd">        associated metadata, skipping the first element in the profile</span>
+<span class="sd">        metadata (`ldprofiles[ld][1:]`).</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">        - A generator that yields each LD profile and its associated metadata</span>
+<span class="sd">        as a tuple.</span>
+
+<span class="sd">        This method provides a streamlined way to access LD profiles</span>
+<span class="sd">        sequentially, useful for applications needing to process each LD</span>
+<span class="sd">        profile individually without loading all data into memory at once.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">ldprofiles</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_loki</span><span class="o">.</span><span class="n">getLDProfiles</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">ld</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">ldprofiles</span><span class="p">):</span>
+            <span class="k">yield</span> <span class="p">(</span><span class="n">ld</span><span class="p">,)</span> <span class="o">+</span> <span class="n">ldprofiles</span><span class="p">[</span><span class="n">ld</span><span class="p">][</span><span class="mi">1</span><span class="p">:]</span></div>
+
+
+    <span class="c1"># # #################################################</span>
+    <span class="c1"># # LOKI DATA RETRIEVAL</span>
+
+<div class="viewcode-block" id="LokiDataRetrievalMixin.getDatabaseGenomeBuilds">
+<a class="viewcode-back" href="../../../biofilter_modules.mixins.html#biofilter_modules.LokiDataRetrievalMixin.getDatabaseGenomeBuilds">[docs]</a>
+    <span class="k">def</span> <span class="nf">getDatabaseGenomeBuilds</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Fetches the genome build identifiers in both UCSC (e.g., `hg19`,</span>
+<span class="sd">        `hg38`) and GRCh (e.g., `GRCh37`, `GRCh38`) formats.</span>
+
+<span class="sd">        Operation:</span>
+<span class="sd">        1. Retrieve UCSC Build: Fetches the UCSC genome build identifier</span>
+<span class="sd">        (e.g., `hg19`) using `getDatabaseSetting(&quot;ucschg&quot;)`. Converts the</span>
+<span class="sd">        identifier to an integer if it exists; otherwise, sets it to `None`.</span>
+<span class="sd">        2. Initialize GRCh Build: Initializes `grchBuild` to `None`. If a</span>
+<span class="sd">        valid UCSC build was retrieved:</span>
+<span class="sd">        - Iterates over possible GRCh builds generated by</span>
+<span class="sd">        `generateGRChByUCSChg`.</span>
+<span class="sd">        - Sets the first value as the initial GRCh build.</span>
+<span class="sd">        - Updates `grchBuild` to the highest version in the iteration.</span>
+<span class="sd">        3. Return Tuple: Returns a tuple `(grchBuild, ucscBuild)`, where:</span>
+<span class="sd">        - `grchBuild` is the highest GRCh build compatible with the UCSC build</span>
+<span class="sd">        , if available.</span>
+<span class="sd">        - `ucscBuild` is the UCSC genome build integer, if available.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">        - A tuple `(grchBuild, ucscBuild)` representing the GRCh and UCSC</span>
+<span class="sd">        genome build versions.</span>
+
+<span class="sd">        This method allows compatibility checks across different genome</span>
+<span class="sd">        reference builds by identifying and aligning the UCSC and GRCh build</span>
+<span class="sd">        versions for database usage.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">ucscBuild</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_loki</span><span class="o">.</span><span class="n">getDatabaseSetting</span><span class="p">(</span><span class="s2">&quot;ucschg&quot;</span><span class="p">)</span>
+        <span class="n">ucscBuild</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">ucscBuild</span><span class="p">)</span> <span class="k">if</span> <span class="p">(</span><span class="n">ucscBuild</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">)</span> <span class="k">else</span> <span class="kc">None</span>
+        <span class="n">grchBuild</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">if</span> <span class="n">ucscBuild</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">build</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_loki</span><span class="o">.</span><span class="n">generateGRChByUCSChg</span><span class="p">(</span><span class="n">ucscBuild</span><span class="p">):</span>
+                <span class="k">if</span> <span class="n">grchBuild</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                    <span class="n">grchBuild</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">build</span><span class="p">)</span>
+                    <span class="k">continue</span>
+                <span class="n">grchBuild</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">grchBuild</span><span class="p">,</span> <span class="nb">int</span><span class="p">(</span><span class="n">build</span><span class="p">))</span>
+        <span class="k">return</span> <span class="p">(</span><span class="n">grchBuild</span><span class="p">,</span> <span class="n">ucscBuild</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="LokiDataRetrievalMixin.getOptionTypeID">
+<a class="viewcode-back" href="../../../biofilter_modules.mixins.html#biofilter_modules.LokiDataRetrievalMixin.getOptionTypeID">[docs]</a>
+    <span class="k">def</span> <span class="nf">getOptionTypeID</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="n">optional</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Safely retrieves the `type_id` for a specified type, ensuring the type</span>
+<span class="sd">        exists in the `type` table. Terminates execution if the type is not</span>
+<span class="sd">        found, unless marked as optional.</span>
+
+<span class="sd">        Parameters:</span>
+<span class="sd">        - `value` (str): The name of the type whose `type_id` is to be</span>
+<span class="sd">        retrieved.</span>
+<span class="sd">        - `optional` (bool): If `True`, allows the function to return `None`</span>
+<span class="sd">        if `type_id` is not found without terminating the program. If `False`</span>
+<span class="sd">        (default), terminates execution if `type_id` is not found.</span>
+
+<span class="sd">        Operation:</span>
+<span class="sd">        1. Calls `getTypeID` on `self._loki` to fetch the `type_id` for the</span>
+<span class="sd">        specified type.</span>
+<span class="sd">        2. If `typeID` is `None` and `optional` is `False`, terminates</span>
+<span class="sd">        execution with an error message indicating the type was not found in</span>
+<span class="sd">        the database.</span>
+<span class="sd">        3. Otherwise, returns the `type_id`.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">        - `typeID`: The identifier for the specified type, or `None` if the</span>
+<span class="sd">        type is not found and `optional` is `True`.</span>
+
+<span class="sd">        Usage:</span>
+<span class="sd">        This method provides a secure way to retrieve `type_id` values, with a</span>
+<span class="sd">        safeguard to allow optional types that do not need to be present, thus</span>
+<span class="sd">        preventing critical errors in non-mandatory cases.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">typeID</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_loki</span><span class="o">.</span><span class="n">getTypeID</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span><span class="n">typeID</span> <span class="ow">or</span> <span class="n">optional</span><span class="p">):</span>
+            <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="s2">&quot;ERROR: database contains no </span><span class="si">%s</span><span class="s2"> data</span><span class="se">\n</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">value</span><span class="p">,))</span>
+        <span class="k">return</span> <span class="n">typeID</span></div>
+
+
+<div class="viewcode-block" id="LokiDataRetrievalMixin.getOptionNamespaceID">
+<a class="viewcode-back" href="../../../biofilter_modules.mixins.html#biofilter_modules.LokiDataRetrievalMixin.getOptionNamespaceID">[docs]</a>
+    <span class="k">def</span> <span class="nf">getOptionNamespaceID</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="n">optional</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Fetches the namespace ID for a specified value, handling cases where</span>
+<span class="sd">        the value may be optional or undefined.</span>
+
+<span class="sd">        Parameters:</span>
+<span class="sd">        - `value`: The identifier for which the namespace ID is required. If</span>
+<span class="sd">        the value is `&quot;-&quot;`, it is considered a primary label, and `None` is</span>
+<span class="sd">        returned.</span>
+<span class="sd">        - `optional`: A boolean flag (default `False`). When `True`, allows</span>
+<span class="sd">        for optional namespace IDs without raising an error if the ID is</span>
+<span class="sd">        undefined.</span>
+
+<span class="sd">        Operation:</span>
+<span class="sd">        1. Checks if `value` equals `&quot;-&quot;`:</span>
+<span class="sd">        - If so, returns `None` immediately, as `&quot;-&quot;` signifies primary labels.</span>
+<span class="sd">        2. Retrieves the namespace ID for `value` using</span>
+<span class="sd">        `self._loki.getNamespaceID`.</span>
+<span class="sd">        3. If `namespaceID` is `None` and `optional` is `False`, the method</span>
+<span class="sd">        exits with an error message indicating an unknown identifier type.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">        - The `namespaceID` for the given `value`, or `None` if `value` is</span>
+<span class="sd">        `&quot;-&quot;` or if the ID is optional and undefined.</span>
+
+<span class="sd">        This method is crucial for validating and retrieving IDs, especially</span>
+<span class="sd">        in contexts where namespace consistency is required.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">value</span> <span class="o">==</span> <span class="s2">&quot;-&quot;</span><span class="p">:</span>  <span class="c1"># primary labels</span>
+            <span class="k">return</span> <span class="kc">None</span>
+        <span class="n">namespaceID</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_loki</span><span class="o">.</span><span class="n">getNamespaceID</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span><span class="n">namespaceID</span> <span class="ow">or</span> <span class="n">optional</span><span class="p">):</span>
+            <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="s2">&quot;ERROR: unknown identifier type &#39;</span><span class="si">%s</span><span class="s2">&#39;</span><span class="se">\n</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">value</span><span class="p">,))</span>
+        <span class="k">return</span> <span class="n">namespaceID</span></div>
+</div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Ritchie Lab.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

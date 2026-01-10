@@ -1,0 +1,262 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>biofilter_modules.mixins.input_region_mixin &mdash; Biofilter 2.4.4 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=b1e24531"></script>
+      <script src="../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            Biofilter
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <!-- Local TOC -->
+              <div class="local-toc"></div>
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">Biofilter</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">biofilter_modules.mixins.input_region_mixin</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for biofilter_modules.mixins.input_region_mixin</h1><div class="highlight"><pre>
+<span></span><span class="c1"># #################################################</span>
+<span class="c1"># REGION INPUT MIXIN</span>
+<span class="c1"># #################################################</span>
+
+
+<div class="viewcode-block" id="RegionInputMixin">
+<a class="viewcode-back" href="../../../biofilter_modules.mixins.html#biofilter_modules.RegionInputMixin">[docs]</a>
+<span class="k">class</span> <span class="nc">RegionInputMixin</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Mixin class for managing region input filters in a Loki database.</span>
+
+<span class="sd">    IMPLEMENTED METHODS:</span>
+<span class="sd">    - [unionInputRegions]:</span>
+<span class="sd">        Adds a list of chromosomal regions to a region filter in a specific</span>
+<span class="sd">        database table.</span>
+<span class="sd">    - [intersectInputRegions]:</span>
+<span class="sd">        Reduces a region filter in a specific database table, retaining only</span>
+<span class="sd">        regions that match those in the provided list.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="RegionInputMixin.unionInputRegions">
+<a class="viewcode-back" href="../../../biofilter_modules.mixins.html#biofilter_modules.RegionInputMixin.unionInputRegions">[docs]</a>
+    <span class="k">def</span> <span class="nf">unionInputRegions</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">db</span><span class="p">,</span> <span class="n">regions</span><span class="p">,</span> <span class="n">errorCallback</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Adds a list of chromosomal regions to a region filter in a specific</span>
+<span class="sd">        database table. Uses `INSERT OR IGNORE` to continue inserting even if</span>
+<span class="sd">        data is missing or invalid.</span>
+
+<span class="sd">        Parameters:</span>
+<span class="sd">        - db: Name of the database where the `region` table is located.</span>
+<span class="sd">        - regions: List of tuples `[(label, chr, posMin, posMax, extra), ...]`</span>
+<span class="sd">        , where:</span>
+<span class="sd">            - `label`: Label of the region,</span>
+<span class="sd">            - `chr`: Chromosome identifier,</span>
+<span class="sd">            - `posMin` and `posMax`: Position range within the region,</span>
+<span class="sd">            - `extra`: Additional information.</span>
+<span class="sd">        - errorCallback: Optional function called if there&#39;s an error with the</span>
+<span class="sd">        region data input.</span>
+
+<span class="sd">        Operation:</span>
+<span class="sd">        - Logs the beginning of the process to add regions to the region</span>
+<span class="sd">        filter.</span>
+<span class="sd">        - Calls `prepareTableForUpdate` to temporarily remove indexes from the</span>
+<span class="sd">        `region` table, improving insertion performance.</span>
+<span class="sd">        - Defines an SQL `INSERT OR IGNORE` query to insert each region into</span>
+<span class="sd">        the database&#39;s `region` table.</span>
+<span class="sd">            - Uses `OR IGNORE` to avoid halting on invalid or missing data.</span>
+<span class="sd">        - Executes the query for each duplicated entry in `regions` (necessary</span>
+<span class="sd">        for `SELECT LAST_INSERT_ROWID()`).</span>
+<span class="sd">        - Counts:</span>
+<span class="sd">            - `numAdd`: Number of valid regions added.</span>
+<span class="sd">            - `numNull`: Number of ignored regions due to invalid data.</span>
+<span class="sd">        - Issues a warning if any invalid data was ignored and logs the final</span>
+<span class="sd">        count of added regions.</span>
+<span class="sd">        - Increments the `region` filter count in the database.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">        - None. The method inserts regions into the specified table and logs</span>
+<span class="sd">        information about the insertion process.</span>
+
+<span class="sd">        This function is useful for managing and adding regions to a database</span>
+<span class="sd">        table, applying an insertion process that resiliently handles missing</span>
+<span class="sd">        or incorrect data.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># regions=[ (label,chr,posMin,posMax,extra), ... ]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">logPush</span><span class="p">(</span><span class="s2">&quot;adding to </span><span class="si">%s</span><span class="s2"> region filter ...</span><span class="se">\n</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">db</span><span class="p">)</span>
+        <span class="n">cursor</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_loki</span><span class="o">.</span><span class="n">_db</span><span class="o">.</span><span class="n">cursor</span><span class="p">()</span>
+
+        <span class="c1"># use OR IGNORE to continue on data error, i.e. missing chr or pos</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">prepareTableForUpdate</span><span class="p">(</span><span class="n">db</span><span class="p">,</span> <span class="s2">&quot;region&quot;</span><span class="p">)</span>
+        <span class="n">sql</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="s2">&quot;INSERT OR IGNORE INTO `</span><span class="si">%s</span><span class="s2">`.`region` (label,chr,posMin,posMax,extra) VALUES (?1,?2,?3,?4,?5); SELECT LAST_INSERT_ROWID(),?1,?2,?3,?4,?5&quot;</span>  <span class="c1"># noqa</span>
+            <span class="o">%</span> <span class="n">db</span>
+        <span class="p">)</span>
+        <span class="n">n</span> <span class="o">=</span> <span class="n">lastID</span> <span class="o">=</span> <span class="n">numAdd</span> <span class="o">=</span> <span class="n">numNull</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="k">for</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">cursor</span><span class="o">.</span><span class="n">executemany</span><span class="p">(</span><span class="n">sql</span><span class="p">,</span> <span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="n">region</span> <span class="k">for</span> <span class="n">region</span> <span class="ow">in</span> <span class="n">regions</span><span class="p">)):</span>
+            <span class="n">n</span> <span class="o">+=</span> <span class="mi">1</span>
+            <span class="k">if</span> <span class="n">lastID</span> <span class="o">!=</span> <span class="n">row</span><span class="p">[</span><span class="mi">0</span><span class="p">]:</span>
+                <span class="n">numAdd</span> <span class="o">+=</span> <span class="mi">1</span>
+                <span class="n">lastID</span> <span class="o">=</span> <span class="n">row</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">numNull</span> <span class="o">+=</span> <span class="mi">1</span>
+                <span class="k">if</span> <span class="n">errorCallback</span><span class="p">:</span>
+                    <span class="n">errorCallback</span><span class="p">(</span>
+                        <span class="s2">&quot;</span><span class="se">\t</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">row</span><span class="p">[</span><span class="mi">1</span><span class="p">:]),</span> <span class="s2">&quot;invalid data at index </span><span class="si">%d</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">n</span><span class="p">,)</span>
+                    <span class="p">)</span>  <span class="c1"># noqa E501</span>
+        <span class="k">if</span> <span class="n">numNull</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span><span class="s2">&quot;WARNING: ignored </span><span class="si">%d</span><span class="s2"> invalid regions</span><span class="se">\n</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">numNull</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">logPop</span><span class="p">(</span><span class="s2">&quot;... OK: added </span><span class="si">%d</span><span class="s2"> regions</span><span class="se">\n</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">numAdd</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_inputFilters</span><span class="p">[</span><span class="n">db</span><span class="p">][</span><span class="s2">&quot;region&quot;</span><span class="p">]</span> <span class="o">+=</span> <span class="mi">1</span></div>
+
+
+<div class="viewcode-block" id="RegionInputMixin.intersectInputRegions">
+<a class="viewcode-back" href="../../../biofilter_modules.mixins.html#biofilter_modules.RegionInputMixin.intersectInputRegions">[docs]</a>
+    <span class="k">def</span> <span class="nf">intersectInputRegions</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">db</span><span class="p">,</span> <span class="n">regions</span><span class="p">,</span> <span class="n">errorCallback</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Reduces a region filter in a specific database table, retaining only</span>
+<span class="sd">        regions that match those in the provided list. If the `region` filter</span>
+<span class="sd">        is not yet initialized, performs a union instead of an intersection.</span>
+
+<span class="sd">        Parameters:</span>
+<span class="sd">        - db: The name of the database where the `region` table is located.</span>
+<span class="sd">        - regions: list of tuples [(label, chr, posMin, posMax, extra),]:</span>
+<span class="sd">            - `label` is the region label,</span>
+<span class="sd">            - `chr` represents the chromosome,</span>
+<span class="sd">            - `posMin` and `posMax` define the regions positional range,</span>
+<span class="sd">            - `extra` contains additional information.</span>
+<span class="sd">        - errorCallback: Optional function called in case of errors while</span>
+<span class="sd">        processing regions.</span>
+
+<span class="sd">        Operation:</span>
+<span class="sd">        - If the `region` filter is not yet initialized</span>
+<span class="sd">        (`_inputFilters[db][&#39;region&#39;]` is 0), calls `unionInputRegions`</span>
+<span class="sd">        to create the filter with all provided regions.</span>
+<span class="sd">        - Otherwise:</span>
+<span class="sd">            - Logs the beginning of the region filter reduction process.</span>
+<span class="sd">            - Calls `prepareTableForQuery` to ensure the `region` table is</span>
+<span class="sd">            ready for querying.</span>
+<span class="sd">            - Sets all regions in the table as &quot;not retained&quot; (`flag = 0`).</span>
+<span class="sd">            - Counts the number of regions before reduction (`numBefore`).</span>
+<span class="sd">            - Updates the `region` table, setting `flag = 1` for regions that</span>
+<span class="sd">            match chromosome (`chr`),</span>
+<span class="sd">            minimum position (`posMin`), and maximum position (`posMax`) in</span>
+<span class="sd">            the provided list.</span>
+<span class="sd">            - Deletes regions not present in the provided list</span>
+<span class="sd">            (i.e., with `flag = 0`).</span>
+<span class="sd">            - Counts the number of regions removed (`numDrop`).</span>
+<span class="sd">            - Logs the final count of retained regions and the number</span>
+<span class="sd">            discarded.</span>
+<span class="sd">            - Increments the filter counter for `region` in the database.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">        - None. This method performs an intersection on regions in the</span>
+<span class="sd">        specified table and logs the result.</span>
+
+<span class="sd">        This function allows for managing a set of regions in a database table</span>
+<span class="sd">        by intersecting existing records with a provided list and retaining</span>
+<span class="sd">        only matching entries.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># regions=[ (label,chr,posMin,posMax,extra), ... ]</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_inputFilters</span><span class="p">[</span><span class="n">db</span><span class="p">][</span><span class="s2">&quot;region&quot;</span><span class="p">]:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">unionInputRegions</span><span class="p">(</span><span class="n">db</span><span class="p">,</span> <span class="n">regions</span><span class="p">,</span> <span class="n">errorCallback</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">logPush</span><span class="p">(</span><span class="s2">&quot;reducing </span><span class="si">%s</span><span class="s2"> region filter ...</span><span class="se">\n</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">db</span><span class="p">)</span>
+        <span class="n">cursor</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_loki</span><span class="o">.</span><span class="n">_db</span><span class="o">.</span><span class="n">cursor</span><span class="p">()</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">prepareTableForQuery</span><span class="p">(</span><span class="n">db</span><span class="p">,</span> <span class="s2">&quot;region&quot;</span><span class="p">)</span>
+        <span class="n">cursor</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="s2">&quot;UPDATE `</span><span class="si">%s</span><span class="s2">`.`region` SET flag = 0&quot;</span> <span class="o">%</span> <span class="n">db</span><span class="p">)</span>
+        <span class="n">numBefore</span> <span class="o">=</span> <span class="n">cursor</span><span class="o">.</span><span class="n">getconnection</span><span class="p">()</span><span class="o">.</span><span class="n">changes</span><span class="p">()</span>
+        <span class="n">sql</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="s2">&quot;UPDATE `</span><span class="si">%s</span><span class="s2">`.`region` SET flag = 1 WHERE (1 OR ?1) AND chr = ?2 AND posMin = ?3 AND posMax = ?4 AND (1 OR ?5)&quot;</span>  <span class="c1"># noqa E501</span>
+            <span class="o">%</span> <span class="n">db</span>
+        <span class="p">)</span>
+        <span class="n">cursor</span><span class="o">.</span><span class="n">executemany</span><span class="p">(</span><span class="n">sql</span><span class="p">,</span> <span class="n">regions</span><span class="p">)</span>
+        <span class="n">cursor</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="s2">&quot;DELETE FROM `</span><span class="si">%s</span><span class="s2">`.`region` WHERE flag = 0&quot;</span> <span class="o">%</span> <span class="n">db</span><span class="p">)</span>
+        <span class="n">numDrop</span> <span class="o">=</span> <span class="n">cursor</span><span class="o">.</span><span class="n">getconnection</span><span class="p">()</span><span class="o">.</span><span class="n">changes</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">logPop</span><span class="p">(</span>
+            <span class="s2">&quot;... OK: kept </span><span class="si">%d</span><span class="s2"> regions (</span><span class="si">%d</span><span class="s2"> dropped)</span><span class="se">\n</span><span class="s2">&quot;</span>
+            <span class="o">%</span> <span class="p">(</span><span class="n">numBefore</span> <span class="o">-</span> <span class="n">numDrop</span><span class="p">,</span> <span class="n">numDrop</span><span class="p">)</span>  <span class="c1"># noqa E501</span>
+        <span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_inputFilters</span><span class="p">[</span><span class="n">db</span><span class="p">][</span><span class="s2">&quot;region&quot;</span><span class="p">]</span> <span class="o">+=</span> <span class="mi">1</span></div>
+</div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Ritchie Lab.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

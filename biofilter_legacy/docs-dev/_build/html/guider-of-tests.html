@@ -1,0 +1,691 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="./">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta http-equiv="x-ua-compatible" content="ie=edge">
+  <meta name="lang:clipboard.copy" content="Copy to clipboard">
+  <meta name="lang:clipboard.copied" content="Copied to clipboard">
+  <meta name="lang:search.language" content="en">
+  <meta name="lang:search.pipeline.stopwords" content="True">
+  <meta name="lang:search.pipeline.trimmer" content="True">
+  <meta name="lang:search.result.none" content="No matching documents">
+  <meta name="lang:search.result.one" content="1 matching document">
+  <meta name="lang:search.result.other" content="# matching documents">
+  <meta name="lang:search.tokenizer" content="[\s\-]+">
+
+  
+    <link href="https://fonts.gstatic.com/" rel="preconnect" crossorigin>
+    <link href="https://fonts.googleapis.com/css?family=Roboto+Mono:400,500,700|Roboto:300,400,400i,700&display=fallback" rel="stylesheet">
+
+    <style>
+      body,
+      input {
+        font-family: "Roboto", "Helvetica Neue", Helvetica, Arial, sans-serif
+      }
+
+      code,
+      kbd,
+      pre {
+        font-family: "Roboto Mono", "Courier New", Courier, monospace
+      }
+    </style>
+  
+
+  <link rel="stylesheet" href="_static/stylesheets/application.css"/>
+  <link rel="stylesheet" href="_static/stylesheets/application-palette.css"/>
+  <link rel="stylesheet" href="_static/stylesheets/application-fixes.css"/>
+  
+  <link rel="stylesheet" href="_static/fonts/material-icons.css"/>
+  
+  <meta name="theme-color" content="#3f51b5">
+  <script src="_static/javascripts/modernizr.js"></script>
+  
+  
+  
+    <title>Testing Guider &#8212; Biofilter Developer Documentation 2.4.4 documentation</title>
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=83e35b93" />
+    <link rel="stylesheet" type="text/css" href="_static/material.css?v=79c92029" />
+    <script src="_static/documentation_options.js?v=b1e24531"></script>
+    <script src="_static/doctools.js?v=9bcbadda"></script>
+    <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Coverage Guide" href="guider-of-coverage.html" />
+    <link rel="prev" title="Black Guide" href="guider-of-black.html" />
+  
+   
+
+  </head>
+  <body dir=ltr
+        data-md-color-primary=blue data-md-color-accent=light-blue>
+  
+  <svg class="md-svg">
+    <defs data-children-count="0">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" width="416" height="448" viewBox="0 0 416 448" id="__github"><path fill="currentColor" d="M160 304q0 10-3.125 20.5t-10.75 19T128 352t-18.125-8.5-10.75-19T96 304t3.125-20.5 10.75-19T128 256t18.125 8.5 10.75 19T160 304zm160 0q0 10-3.125 20.5t-10.75 19T288 352t-18.125-8.5-10.75-19T256 304t3.125-20.5 10.75-19T288 256t18.125 8.5 10.75 19T320 304zm40 0q0-30-17.25-51T296 232q-10.25 0-48.75 5.25Q229.5 240 208 240t-39.25-2.75Q130.75 232 120 232q-29.5 0-46.75 21T56 304q0 22 8 38.375t20.25 25.75 30.5 15 35 7.375 37.25 1.75h42q20.5 0 37.25-1.75t35-7.375 30.5-15 20.25-25.75T360 304zm56-44q0 51.75-15.25 82.75-9.5 19.25-26.375 33.25t-35.25 21.5-42.5 11.875-42.875 5.5T212 416q-19.5 0-35.5-.75t-36.875-3.125-38.125-7.5-34.25-12.875T37 371.5t-21.5-28.75Q0 312 0 260q0-59.25 34-99-6.75-20.5-6.75-42.5 0-29 12.75-54.5 27 0 47.5 9.875t47.25 30.875Q171.5 96 212 96q37 0 70 8 26.25-20.5 46.75-30.25T376 64q12.75 25.5 12.75 54.5 0 21.75-6.75 42 34 40 34 99.5z"/></svg>
+      
+    </defs>
+  </svg>
+  
+  <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer">
+  <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search">
+  <label class="md-overlay" data-md-component="overlay" for="__drawer"></label>
+  <a href="#guider-of-tests" tabindex="1" class="md-skip"> Skip to content </a>
+  <header class="md-header" data-md-component="header">
+  <nav class="md-header-nav md-grid">
+    <div class="md-flex navheader">
+      <div class="md-flex__cell md-flex__cell--shrink">
+        <a href="index.html" title="Biofilter Developer Documentation 2.4.4 documentation"
+           class="md-header-nav__button md-logo">
+          
+            &nbsp;
+          
+        </a>
+      </div>
+      <div class="md-flex__cell md-flex__cell--shrink">
+        <label class="md-icon md-icon--menu md-header-nav__button" for="__drawer"></label>
+      </div>
+      <div class="md-flex__cell md-flex__cell--stretch">
+        <div class="md-flex__ellipsis md-header-nav__title" data-md-component="title">
+          <span class="md-header-nav__topic">Biofilter Developer Docs</span>
+          <span class="md-header-nav__topic"> Testing Guider </span>
+        </div>
+      </div>
+      <div class="md-flex__cell md-flex__cell--shrink">
+        <label class="md-icon md-icon--search md-header-nav__button" for="__search"></label>
+        
+<div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" action="search.html" method="get" name="search">
+      <input type="text" class="md-search__input" name="q" placeholder=""Search""
+             autocapitalize="off" autocomplete="off" spellcheck="false"
+             data-md-component="query" data-md-state="active">
+      <label class="md-icon md-search__icon" for="__search"></label>
+      <button type="reset" class="md-icon md-search__icon" data-md-component="reset" tabindex="-1">
+        &#xE5CD;
+      </button>
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="result">
+          <div class="md-search-result__meta">
+            Type to start searching
+          </div>
+          <ol class="md-search-result__list"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+      </div>
+      
+        <div class="md-flex__cell md-flex__cell--shrink">
+          <div class="md-header-nav__source">
+            <a href="https://github.com/RitchieLab/biofilter" title="Go to repository" class="md-source" data-md-source="github">
+
+    <div class="md-source__icon">
+      <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 24 24" width="28" height="28">
+        <use xlink:href="#__github" width="24" height="24"></use>
+      </svg>
+    </div>
+  
+  <div class="md-source__repository">
+    Biofilter
+  </div>
+</a>
+          </div>
+        </div>
+      
+      
+  
+  <script src="_static/javascripts/version_dropdown.js"></script>
+  <script>
+    var json_loc = ""versions.json"",
+        target_loc = "../",
+        text = "Versions";
+    $( document ).ready( add_version_dropdown(json_loc, target_loc, text));
+  </script>
+  
+
+    </div>
+  </nav>
+</header>
+
+  
+  <div class="md-container">
+    
+    
+    
+  <nav class="md-tabs" data-md-component="tabs">
+    <div class="md-tabs__inner md-grid">
+      <ul class="md-tabs__list">
+          <li class="md-tabs__item"><a href="index.html" class="md-tabs__link">Biofilter Developer Documentation 2.4.4 documentation</a></li>
+      </ul>
+    </div>
+  </nav>
+    <main class="md-main">
+      <div class="md-main__inner md-grid" data-md-component="container">
+        
+          <div class="md-sidebar md-sidebar--primary" data-md-component="navigation">
+            <div class="md-sidebar__scrollwrap">
+              <div class="md-sidebar__inner">
+                <nav class="md-nav md-nav--primary" data-md-level="0">
+  <label class="md-nav__title md-nav__title--site" for="__drawer">
+    <a href="index.html" title="Biofilter Developer Documentation 2.4.4 documentation" class="md-nav__button md-logo">
+      
+        <img src="_static/" alt=" logo" width="48" height="48">
+      
+    </a>
+    <a href="index.html"
+       title="Biofilter Developer Documentation 2.4.4 documentation">Biofilter Developer Docs</a>
+  </label>
+    <div class="md-nav__source">
+      <a href="https://github.com/RitchieLab/biofilter" title="Go to repository" class="md-source" data-md-source="github">
+
+    <div class="md-source__icon">
+      <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 24 24" width="28" height="28">
+        <use xlink:href="#__github" width="24" height="24"></use>
+      </svg>
+    </div>
+  
+  <div class="md-source__repository">
+    Biofilter
+  </div>
+</a>
+    </div>
+  
+  
+
+  
+  <ul class="md-nav__list">
+    <li class="md-nav__item">
+    
+    
+      <a href="guider-of-branching.html" class="md-nav__link">Branching Structure Guide</a>
+      
+    
+    </li>
+    <li class="md-nav__item">
+    
+    
+      <a href="guider-of-poetry.html" class="md-nav__link">Poetry Guider</a>
+      
+    
+    </li>
+    <li class="md-nav__item">
+    
+    
+      <a href="guider-of-black.html" class="md-nav__link">Black Guide</a>
+      
+    
+    </li>
+    <li class="md-nav__item">
+    
+    
+    <input class="md-toggle md-nav__toggle" data-md-toggle="toc" type="checkbox" id="__toc">
+    <label class="md-nav__link md-nav__link--active" for="__toc"> Testing Guider </label>
+    
+      <a href="#" class="md-nav__link md-nav__link--active">Testing Guider</a>
+      
+        
+<nav class="md-nav md-nav--secondary">
+    <label class="md-nav__title" for="__toc">"Contents"</label>
+  <ul class="md-nav__list" data-md-scrollfix="">
+        <li class="md-nav__item"><a href="#guider-of-tests--page-root" class="md-nav__link">Testing Guider</a><nav class="md-nav">
+              <ul class="md-nav__list">
+        <li class="md-nav__item"><a href="#test-structure" class="md-nav__link">Test Structure</a>
+        </li>
+        <li class="md-nav__item"><a href="#vs-code-integration" class="md-nav__link">VS Code Integration</a><nav class="md-nav">
+              <ul class="md-nav__list">
+        <li class="md-nav__item"><a href="#configuring-vs-code-for-pytest" class="md-nav__link">Configuring VS-Code for Pytest</a>
+        </li>
+        <li class="md-nav__item"><a href="#running-tests-in-vs-code" class="md-nav__link">Running Tests in VS-Code</a>
+        </li></ul>
+            </nav>
+        </li>
+        <li class="md-nav__item"><a href="#unit-tests-and-fixtures" class="md-nav__link">Unit Tests and Fixtures</a><nav class="md-nav">
+              <ul class="md-nav__list">
+        <li class="md-nav__item"><a href="#unit-test-isolation" class="md-nav__link">Unit Test Isolation</a><nav class="md-nav">
+              <ul class="md-nav__list">
+        <li class="md-nav__item"><a href="#example-fixture" class="md-nav__link">Example Fixture</a>
+        </li></ul>
+            </nav>
+        </li></ul>
+            </nav>
+        </li>
+        <li class="md-nav__item"><a href="#integration-with-ci-cd" class="md-nav__link">Integration with CI/CD</a><nav class="md-nav">
+              <ul class="md-nav__list">
+        <li class="md-nav__item"><a href="#workflow-for-tests" class="md-nav__link">Workflow for Tests</a>
+        </li></ul>
+            </nav>
+        </li>
+        <li class="md-nav__item"><a href="#running-tests-locally" class="md-nav__link">Running Tests Locally</a><nav class="md-nav">
+              <ul class="md-nav__list">
+        <li class="md-nav__item"><a href="#run-all-tests" class="md-nav__link">Run All Tests</a>
+        </li>
+        <li class="md-nav__item"><a href="#run-specific-tests" class="md-nav__link">Run Specific Tests</a>
+        </li></ul>
+            </nav>
+        </li>
+        <li class="md-nav__item"><a href="#best-practices" class="md-nav__link">Best Practices</a>
+        </li>
+        <li class="md-nav__item"><a href="#additional-resources" class="md-nav__link">Additional Resources</a>
+        </li></ul>
+            </nav>
+        </li>
+    
+<li class="md-nav__item"><a class="md-nav__extra_link" href="_sources/guider-of-tests.rst.txt">Show Source</a> </li>
+
+  </ul>
+</nav>
+      <ul class="md-nav__list"> 
+    <li class="md-nav__item">
+    
+    
+      <a href="#test-structure" class="md-nav__link">Test Structure</a>
+      
+    
+    </li>
+    <li class="md-nav__item">
+    
+    
+      <a href="#vs-code-integration" class="md-nav__link">VS Code Integration</a>
+      
+    
+    </li>
+    <li class="md-nav__item">
+    
+    
+      <a href="#unit-tests-and-fixtures" class="md-nav__link">Unit Tests and Fixtures</a>
+      
+    
+    </li>
+    <li class="md-nav__item">
+    
+    
+      <a href="#integration-with-ci-cd" class="md-nav__link">Integration with CI/CD</a>
+      
+    
+    </li>
+    <li class="md-nav__item">
+    
+    
+      <a href="#running-tests-locally" class="md-nav__link">Running Tests Locally</a>
+      
+    
+    </li>
+    <li class="md-nav__item">
+    
+    
+      <a href="#best-practices" class="md-nav__link">Best Practices</a>
+      
+    
+    </li>
+    <li class="md-nav__item">
+    
+    
+      <a href="#additional-resources" class="md-nav__link">Additional Resources</a>
+      
+    
+    </li></ul>
+    
+    </li>
+    <li class="md-nav__item">
+    
+    
+      <a href="guider-of-coverage.html" class="md-nav__link">Coverage Guide</a>
+      
+    
+    </li>
+    <li class="md-nav__item">
+    
+    
+      <a href="guider-of-tox.html" class="md-nav__link">Tox Guide</a>
+      
+    
+    </li>
+    <li class="md-nav__item">
+    
+    
+      <a href="guider-of-sphinx.html" class="md-nav__link">Sphinx Guide</a>
+      
+    
+    </li>
+    <li class="md-nav__item">
+    
+    
+      <a href="guider-of-git.html" class="md-nav__link">GIT Guider</a>
+      
+    
+    </li>
+  </ul>
+  
+
+</nav>
+              </div>
+            </div>
+          </div>
+          <div class="md-sidebar md-sidebar--secondary" data-md-component="toc">
+            <div class="md-sidebar__scrollwrap">
+              <div class="md-sidebar__inner">
+                
+<nav class="md-nav md-nav--secondary">
+    <label class="md-nav__title" for="__toc">"Contents"</label>
+  <ul class="md-nav__list" data-md-scrollfix="">
+        <li class="md-nav__item"><a href="#guider-of-tests--page-root" class="md-nav__link">Testing Guider</a><nav class="md-nav">
+              <ul class="md-nav__list">
+        <li class="md-nav__item"><a href="#test-structure" class="md-nav__link">Test Structure</a>
+        </li>
+        <li class="md-nav__item"><a href="#vs-code-integration" class="md-nav__link">VS Code Integration</a><nav class="md-nav">
+              <ul class="md-nav__list">
+        <li class="md-nav__item"><a href="#configuring-vs-code-for-pytest" class="md-nav__link">Configuring VS-Code for Pytest</a>
+        </li>
+        <li class="md-nav__item"><a href="#running-tests-in-vs-code" class="md-nav__link">Running Tests in VS-Code</a>
+        </li></ul>
+            </nav>
+        </li>
+        <li class="md-nav__item"><a href="#unit-tests-and-fixtures" class="md-nav__link">Unit Tests and Fixtures</a><nav class="md-nav">
+              <ul class="md-nav__list">
+        <li class="md-nav__item"><a href="#unit-test-isolation" class="md-nav__link">Unit Test Isolation</a><nav class="md-nav">
+              <ul class="md-nav__list">
+        <li class="md-nav__item"><a href="#example-fixture" class="md-nav__link">Example Fixture</a>
+        </li></ul>
+            </nav>
+        </li></ul>
+            </nav>
+        </li>
+        <li class="md-nav__item"><a href="#integration-with-ci-cd" class="md-nav__link">Integration with CI/CD</a><nav class="md-nav">
+              <ul class="md-nav__list">
+        <li class="md-nav__item"><a href="#workflow-for-tests" class="md-nav__link">Workflow for Tests</a>
+        </li></ul>
+            </nav>
+        </li>
+        <li class="md-nav__item"><a href="#running-tests-locally" class="md-nav__link">Running Tests Locally</a><nav class="md-nav">
+              <ul class="md-nav__list">
+        <li class="md-nav__item"><a href="#run-all-tests" class="md-nav__link">Run All Tests</a>
+        </li>
+        <li class="md-nav__item"><a href="#run-specific-tests" class="md-nav__link">Run Specific Tests</a>
+        </li></ul>
+            </nav>
+        </li>
+        <li class="md-nav__item"><a href="#best-practices" class="md-nav__link">Best Practices</a>
+        </li>
+        <li class="md-nav__item"><a href="#additional-resources" class="md-nav__link">Additional Resources</a>
+        </li></ul>
+            </nav>
+        </li>
+    
+<li class="md-nav__item"><a class="md-nav__extra_link" href="_sources/guider-of-tests.rst.txt">Show Source</a> </li>
+
+<li id="searchbox" class="md-nav__item"></li>
+
+  </ul>
+</nav>
+              </div>
+            </div>
+          </div>
+        
+        <div class="md-content">
+          <article class="md-content__inner md-typeset" role="main">
+            
+  <section id="testing-guider">
+<h1 id="guider-of-tests--page-root">Testing Guider<a class="headerlink" href="#guider-of-tests--page-root" title="Link to this heading">¶</a></h1>
+<p>This document outlines the structure, configuration, and execution of tests in the <strong>Biofilter</strong> project using Pytest. It also explains how tests are integrated into the development workflow and the CI/CD pipeline.</p>
+<section id="test-structure">
+<h2 id="test-structure">Test Structure<a class="headerlink" href="#test-structure" title="Link to this heading">¶</a></h2>
+<p>The tests are organized into the following directories under the <code class="docutils literal notranslate"><span class="pre">tests/</span></code> folder:</p>
+<ul class="simple">
+<li><dl class="simple">
+<dt><strong>Unit Tests</strong>:</dt><dd><ul>
+<li><p>Located in <code class="docutils literal notranslate"><span class="pre">tests/unit/</span></code>.</p></li>
+<li><p>Focused on small, isolated portions of the codebase, often using fixtures to provide mock data and parameters.</p></li>
+</ul>
+</dd>
+</dl>
+</li>
+<li><dl class="simple">
+<dt><strong>Functional Tests</strong>:</dt><dd><ul>
+<li><p>Located in <code class="docutils literal notranslate"><span class="pre">tests/functions/</span></code>.</p></li>
+<li><p>Test specific functionalities to ensure they behave as expected in real-world scenarios.</p></li>
+</ul>
+</dd>
+</dl>
+</li>
+<li><dl class="simple">
+<dt><strong>Issues Tests</strong>:</dt><dd><ul>
+<li><p>Located in <code class="docutils literal notranslate"><span class="pre">tests/issues/</span></code>.</p></li>
+<li><p>Designed to replicate and debug problems reported via GitHub Issues.</p></li>
+<li><p>Create scenarios based on issue descriptions to verify fixes and identify potential regressions.</p></li>
+</ul>
+</dd>
+</dl>
+</li>
+</ul>
+</section>
+<section id="vs-code-integration">
+<h2 id="vs-code-integration">VS Code Integration<a class="headerlink" href="#vs-code-integration" title="Link to this heading">¶</a></h2>
+<section id="configuring-vs-code-for-pytest">
+<h3 id="configuring-vs-code-for-pytest">Configuring VS-Code for Pytest<a class="headerlink" href="#configuring-vs-code-for-pytest" title="Link to this heading">¶</a></h3>
+<p>To integrate Pytest into VS Code, the <code class="docutils literal notranslate"><span class="pre">settings.json</span></code> file in your project’s <code class="docutils literal notranslate"><span class="pre">.vscode/</span></code> directory is configured to use Pytest as the default test framework:</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">    </span><span class="nt">"python.testing.unittestEnabled"</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"python.testing.pytestEnabled"</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"python.testing.pytestArgs"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"tests"</span><span class="p">]</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>With this configuration, you can:</p>
+<ul class="simple">
+<li><p>Discover all tests automatically in the <code class="docutils literal notranslate"><span class="pre">tests/</span></code> folder.</p></li>
+<li><p>Run individual tests or groups of tests directly within VS Code using the built-in testing features.</p></li>
+</ul>
+</section>
+<section id="running-tests-in-vs-code">
+<h3 id="running-tests-in-vs-code">Running Tests in VS-Code<a class="headerlink" href="#running-tests-in-vs-code" title="Link to this heading">¶</a></h3>
+<ol class="arabic simple">
+<li><p>Open the Testing sidebar in VS Code (Ctrl+Shift+T or Cmd+Shift+T).</p></li>
+<li><p>All discovered tests will appear in the sidebar, organized by directories.</p></li>
+<li><p>Click the play icon next to a test or folder to run individual tests or groups of tests.</p></li>
+</ol>
+</section>
+</section>
+<section id="unit-tests-and-fixtures">
+<h2 id="unit-tests-and-fixtures">Unit Tests and Fixtures<a class="headerlink" href="#unit-tests-and-fixtures" title="Link to this heading">¶</a></h2>
+<section id="unit-test-isolation">
+<h3 id="unit-test-isolation">Unit Test Isolation<a class="headerlink" href="#unit-test-isolation" title="Link to this heading">¶</a></h3>
+<p>Unit tests focus on specific code components in isolation. To achieve this, we use <strong>fixtures</strong> that provide initial parameters, mock objects, or sample data for the tests. Fixtures help:</p>
+<ul class="simple">
+<li><p>Isolate the code being tested.</p></li>
+<li><p>Eliminate dependencies on external systems or databases.</p></li>
+<li><p>Ensure predictable, reproducible results.</p></li>
+</ul>
+<section id="example-fixture">
+<h4 id="example-fixture">Example Fixture<a class="headerlink" href="#example-fixture" title="Link to this heading">¶</a></h4>
+<p>Here’s an example of a fixture in the project:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">pytest</span>
+
+<span class="nd">@pytest</span><span class="o">.</span><span class="n">fixture</span>
+<span class="k">def</span> <span class="nf">sample_data</span><span class="p">():</span>
+    <span class="k">return</span> <span class="p">{</span>
+        <span class="s2">"param1"</span><span class="p">:</span> <span class="mi">42</span><span class="p">,</span>
+        <span class="s2">"param2"</span><span class="p">:</span> <span class="s2">"example"</span>
+    <span class="p">}</span>
+
+<span class="k">def</span> <span class="nf">test_example_function</span><span class="p">(</span><span class="n">sample_data</span><span class="p">):</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="n">example_function</span><span class="p">(</span><span class="n">sample_data</span><span class="p">[</span><span class="s2">"param1"</span><span class="p">])</span>
+    <span class="k">assert</span> <span class="n">result</span> <span class="o">==</span> <span class="n">expected_result</span>
+</pre></div>
+</div>
+</section>
+</section>
+</section>
+<section id="integration-with-ci-cd">
+<h2 id="integration-with-ci-cd">Integration with CI/CD<a class="headerlink" href="#integration-with-ci-cd" title="Link to this heading">¶</a></h2>
+<p>The Biofilter project integrates tests into the CI/CD pipeline using GitHub Actions. This ensures that every push and pull request is validated against the test suite.</p>
+<section id="workflow-for-tests">
+<h3 id="workflow-for-tests">Workflow for Tests<a class="headerlink" href="#workflow-for-tests" title="Link to this heading">¶</a></h3>
+<ol class="arabic simple">
+<li><dl class="simple">
+<dt><strong>Automated Execution</strong>:</dt><dd><ul class="simple">
+<li><p>On every commit or pull request to the <code class="docutils literal notranslate"><span class="pre">development</span></code> branch, the tests are executed in the GitHub Actions pipeline.</p></li>
+</ul>
+</dd>
+</dl>
+</li>
+<li><dl class="simple">
+<dt><strong>Coverage Reports</strong>:</dt><dd><ul class="simple">
+<li><p>Test coverage is measured during the pipeline execution and can be reviewed to identify untested code.</p></li>
+</ul>
+</dd>
+</dl>
+</li>
+<li><dl class="simple">
+<dt><strong>Failure Alerts</strong>:</dt><dd><ul class="simple">
+<li><p>If a test fails, the CI/CD pipeline is marked as failed, preventing unreviewed changes from being merged into stable branches.</p></li>
+</ul>
+</dd>
+</dl>
+</li>
+</ol>
+</section>
+</section>
+<section id="running-tests-locally">
+<h2 id="running-tests-locally">Running Tests Locally<a class="headerlink" href="#running-tests-locally" title="Link to this heading">¶</a></h2>
+<p>To run the tests locally using Pytest, use the following commands:</p>
+<section id="run-all-tests">
+<h3 id="run-all-tests">Run All Tests<a class="headerlink" href="#run-all-tests" title="Link to this heading">¶</a></h3>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>poetry<span class="w"> </span>run<span class="w"> </span>pytest
+</pre></div>
+</div>
+</section>
+<section id="run-specific-tests">
+<h3 id="run-specific-tests">Run Specific Tests<a class="headerlink" href="#run-specific-tests" title="Link to this heading">¶</a></h3>
+<ul>
+<li><p>By directory:</p>
+<blockquote>
+<div><div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>poetry<span class="w"> </span>run<span class="w"> </span>pytest<span class="w"> </span>tests/unit/
+</pre></div>
+</div>
+</div></blockquote>
+</li>
+<li><p>By file:</p>
+<blockquote>
+<div><div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>poetry<span class="w"> </span>run<span class="w"> </span>pytest<span class="w"> </span>tests/issues/test_issue_123.py
+</pre></div>
+</div>
+</div></blockquote>
+</li>
+<li><p>By individual test function:</p>
+<blockquote>
+<div><div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>poetry<span class="w"> </span>run<span class="w"> </span>pytest<span class="w"> </span>-k<span class="w"> </span><span class="s2">"test_specific_function"</span>
+</pre></div>
+</div>
+</div></blockquote>
+</li>
+</ul>
+</section>
+</section>
+<section id="best-practices">
+<h2 id="best-practices">Best Practices<a class="headerlink" href="#best-practices" title="Link to this heading">¶</a></h2>
+<ol class="arabic simple">
+<li><dl class="simple">
+<dt><strong>Isolate Unit Tests</strong>:</dt><dd><p>Use fixtures to ensure that unit tests are not dependent on external systems or complex configurations.</p>
+</dd>
+</dl>
+</li>
+<li><dl class="simple">
+<dt><strong>Link Issues Tests to GitHub</strong>:</dt><dd><p>Ensure that tests in <code class="docutils literal notranslate"><span class="pre">tests/issues/</span></code> reference the corresponding GitHub Issue for better traceability.</p>
+</dd>
+</dl>
+</li>
+<li><dl class="simple">
+<dt><strong>Run Tests Locally Before Pushing</strong>:</dt><dd><p>Always run the full test suite locally to catch errors early.</p>
+</dd>
+</dl>
+</li>
+<li><dl class="simple">
+<dt><strong>Maintain Test Coverage</strong>:</dt><dd><p>Strive for high test coverage to ensure the robustness of the codebase.</p>
+</dd>
+</dl>
+</li>
+<li><dl class="simple">
+<dt><strong>Document Test Scenarios</strong>:</dt><dd><p>Document the purpose and setup of tests, especially for complex scenarios in <code class="docutils literal notranslate"><span class="pre">tests/issues/</span></code>.</p>
+</dd>
+</dl>
+</li>
+</ol>
+</section>
+<section id="additional-resources">
+<h2 id="additional-resources">Additional Resources<a class="headerlink" href="#additional-resources" title="Link to this heading">¶</a></h2>
+<ul class="simple">
+<li><p><a class="reference external" href="https://docs.pytest.org/en/latest/">Pytest Documentation</a></p></li>
+<li><p><a class="reference external" href="https://docs.github.com/en/actions">GitHub Actions Documentation</a></p></li>
+</ul>
+</section>
+</section>
+
+
+          </article>
+        </div>
+      </div>
+    </main>
+  </div>
+  <footer class="md-footer">
+    <div class="md-footer-nav">
+      <nav class="md-footer-nav__inner md-grid">
+          
+            <a href="guider-of-black.html" title="Black Guide"
+               class="md-flex md-footer-nav__link md-footer-nav__link--prev"
+               rel="prev">
+              <div class="md-flex__cell md-flex__cell--shrink">
+                <i class="md-icon md-icon--arrow-back md-footer-nav__button"></i>
+              </div>
+              <div class="md-flex__cell md-flex__cell--stretch md-footer-nav__title">
+                <span class="md-flex__ellipsis">
+                  <span
+                      class="md-footer-nav__direction"> "Previous" </span> Black Guide </span>
+              </div>
+            </a>
+          
+          
+            <a href="guider-of-coverage.html" title="Coverage Guide"
+               class="md-flex md-footer-nav__link md-footer-nav__link--next"
+               rel="next">
+            <div class="md-flex__cell md-flex__cell--stretch md-footer-nav__title"><span
+                class="md-flex__ellipsis"> <span
+                class="md-footer-nav__direction"> "Next" </span> Coverage Guide </span>
+            </div>
+            <div class="md-flex__cell md-flex__cell--shrink"><i
+                class="md-icon md-icon--arrow-forward md-footer-nav__button"></i>
+            </div>
+          
+        </a>
+        
+      </nav>
+    </div>
+    <div class="md-footer-meta md-typeset">
+      <div class="md-footer-meta__inner md-grid">
+        <div class="md-footer-copyright">
+          <div class="md-footer-copyright__highlight">
+              &#169; Copyright 2024, Ritchie Lab.
+              
+          </div>
+            Created using
+            <a href="http://www.sphinx-doc.org/">Sphinx</a> 8.1.3.
+             and
+            <a href="https://github.com/bashtage/sphinx-material/">Material for
+              Sphinx</a>
+        </div>
+      </div>
+    </div>
+  </footer>
+  <script src="_static/javascripts/application.js"></script>
+  <script>app.initialize({version: "1.0.4", url: {base: ".."}})</script>
+  </body>
+</html>

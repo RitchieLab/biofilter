@@ -1,234 +1,238 @@
-# import toml
-import click
-import inspect
+# To drop
 
-# from pathlib import Path
-from biofilter.biofilter import Biofilter
-from biofilter.utils.version import __version__ as current_version
-from biofilter.utils.config import get_db_uri_from_config
+# import click
 
-# def get_default_db_uri():
-#     config_path = Path(".biofilter.toml")
-#     if config_path.exists():
-#         try:
-#             data = toml.load(config_path)
-#             return data.get("biofilter", {}).get("db_uri")
-#         except Exception:
-#             pass
-#     return None
+# from biofilter.biofilter import Biofilter
+# from biofilter.utils.version import __version__ as current_version
+# from biofilter.cli.common import resolve_db_uri, db_uri_option
 
 
-# === Base group ===
-@click.group(
-    help=f"""
-        Biofilter CLI - Omics Knowledge Platform
+# @click.group(
+#     help=f"""
+# Biofilter 4 CLI - Omics Knowledge Platform
 
-        🔢 Version: {current_version} \n
-        📚 Docs: https://xxxxxxxx
-    """,
-    context_settings=dict(help_option_names=["--help"]),
-)
-def main():
-    # """Biofilter CLI - Omics Knowledge Platform."""
-    pass
+# 🔢 Version: {current_version}
+# 📚 Docs: https://xxxxxxxx
+# """,
+#     context_settings=dict(help_option_names=["--help"]),
+# )
+# def main():
+#     pass
 
 
-# === Subgroup: project ===
-@main.group()
-def project():
-    """Project-level operations (setup, migration, metadata)."""
-    pass
+# # -----------------------
+# # project
+# # -----------------------
+# @main.group()
+# def project():
+#     """Project-level operations (setup, migration, metadata)."""
+#     pass
 
 
-@project.command("create")
-@click.option("--db-uri", required=True, help="Database URI")
-@click.option("--overwrite", is_flag=True, help="Overwrite if exists")
-def create_new_project(db_uri, overwrite):
-    """Create a new Biofilter project (initializes DB)."""
-    bf = Biofilter()
-    bf.create_new_project(db_uri=db_uri, overwrite=overwrite)
+# @project.command("create")
+# @click.option("--db-uri", required=True, help="Database URI")
+# @click.option("--overwrite", is_flag=True, help="Overwrite if exists")
+# def project_create(db_uri, overwrite):
+#     bf = Biofilter(debug_mode=False)
+#     bf.create_new_project(db_uri=db_uri, overwrite=overwrite)
 
 
-@project.command("migrate")
-# @click.option("--db-uri", required=True, help="Database URI to migrate")
-@click.option("--db-uri", help="Database URI to migrate")
-def migrate(db_uri):
-    """Run database migrations."""
-    if not db_uri:
-
-        db_uri = get_db_uri_from_config()
-        if not db_uri:
-            raise click.UsageError(
-                "Database URI not provided and no .biofilter.toml found.\n"
-                "Use --db-uri or create a .biofilter.toml with a [database] section."  # noqa: E501
-            )
-
-    bf = Biofilter(db_uri=db_uri)
-    bf.migrate()
+# @project.command("migrate")
+# @db_uri_option
+# def project_migrate(db_uri):
+#     db_uri = resolve_db_uri(db_uri)
+#     bf = Biofilter(db_uri=db_uri, debug_mode=False)
+#     bf.migrate()
 
 
-# === Subgroup: etl ===
-@main.group()
-def etl():
-    """Run and manage ETL pipelines."""
-    pass
+# # -----------------------
+# # etl
+# # -----------------------
+# @main.group()
+# def etl():
+#     """Run and manage ETL pipelines."""
+#     pass
 
 
-# === Helpers for dynamic registration ===
-def convert_type(param):
-    if param.annotation is bool:
-        return click.BOOL
-    elif param.annotation is int:
-        return click.INT
-    elif param.annotation is float:
-        return click.FLOAT
-    elif param.annotation in (list, list[str]):
-        return click.STRING
-    else:
-        return click.STRING
+# @etl.command("update")
+# @db_uri_option
+# @click.option(
+#     "--source-system",
+#     multiple=True,
+#     help="Source system name (repeatable). Example: --source-system HGNC",
+# )
+# @click.option(
+#     "--data-source",
+#     multiple=True,
+#     help="Data source name (repeatable). Example: --data-source hgnc_genes",
+# )
+# @click.option(
+#     "--run-step",
+#     multiple=True,
+#     type=click.Choice(["extract", "transform", "load"], case_sensitive=False),
+#     help="ETL step to run (repeatable). Default: all steps (None).",
+# )
+# @click.option(
+#     "--force-step",
+#     multiple=True,
+#     type=click.Choice(["extract", "transform", "load"], case_sensitive=False),
+#     help="ETL step to force (repeatable). Default: none.",
+# )
+# def etl_update(db_uri, source_system, data_source, run_step, force_step):
+#     db_uri = resolve_db_uri(db_uri)
+#     bf = Biofilter(db_uri=db_uri, debug_mode=False)
+
+#     bf.update(
+#         source_system=list(source_system) or None,
+#         data_sources=list(data_source) or None,
+#         run_steps=list(run_step) or None,
+#         force_steps=list(force_step) or None,
+#     )
 
 
-def auto_register_etl_commands():
-    from biofilter.biofilter import Biofilter as BiofilterClass
+# @etl.command("restart")
+# @db_uri_option
+# @click.option(
+#     "--data-source",
+#     multiple=True,
+#     help="Data source name (repeatable).",
+# )
+# @click.option(
+#     "--source-system",
+#     multiple=True,
+#     help="Source system name (repeatable).",
+# )
+# @click.option(
+#     "--delete-files",
+#     is_flag=True,
+#     help="Delete downloaded/processed files when restarting.",
+# )
+# def etl_restart(db_uri, data_source, source_system, delete_files):
+#     db_uri = resolve_db_uri(db_uri)
+#     bf = Biofilter(db_uri=db_uri, debug_mode=False)
 
-    for name, method in inspect.getmembers(
-        BiofilterClass, predicate=inspect.isfunction
-    ):  # noqa: E501
-        if name.startswith("_"):
-            continue
-        if name in ("create_new_project", "migrate", "__repr__", "connect_db"):
-            continue
-
-        sig = inspect.signature(method)
-
-        def create_cmd(method=method, sig=sig):
-            @click.pass_context
-            def command(ctx, **kwargs):
-
-                db_uri = kwargs.pop("db_uri", None)
-                if not db_uri:
-                    db_uri = get_db_uri_from_config()
-                if not db_uri:
-                    raise click.UsageError(
-                        "Missing required --db-uri. Use option or set in .biofilter.toml"
-                    )  # noqa: E501
-
-                bf = Biofilter(db_uri=db_uri)
-                result = method(bf, **kwargs)
-                if result is not None:
-                    click.echo(result)
-
-            for param in reversed(sig.parameters.values()):
-                if param.name == "self":
-                    continue
-
-                param_name = f"--{param.name.replace('_', '-')}"
-                click_type = convert_type(param)
-                is_flag = param.annotation is bool
-
-                if param.default is inspect.Parameter.empty:
-                    command = click.option(
-                        param_name,
-                        required=True,
-                        type=click_type,
-                        help=f"{param.name}",
-                    )(command)
-                else:
-                    command = click.option(
-                        param_name,
-                        default=param.default,
-                        type=click_type,
-                        is_flag=is_flag,
-                        show_default=True,
-                        help=f"{param.name}",
-                    )(command)
-
-            # Required --db-uri
-            # command = click.option(
-            #     "--db-uri",
-            #     required=True,
-            #     type=click.STRING,
-            #     help="Database URI to connect",
-            # )(command)
-            # Required --db-uri (optional if .biofilter.toml exists)
-            command = click.option(
-                "--db-uri",
-                required=False,
-                type=click.STRING,
-                help="Database URI to connect (or set in .biofilter.toml)",
-            )(command)
-
-            return command
-
-        # Register inside the `etl` group
-        etl.command(name=name)(create_cmd())
+#     bf.restart_etl(
+#         data_source=list(data_source) or None,
+#         source_system=list(source_system) or None,
+#         delete_files=delete_files,
+#     )
 
 
-# Register all ETL-related commands dynamically
-auto_register_etl_commands()
+# @etl.command("update-conflicts")
+# @db_uri_option
+# @click.option(
+#     "--source-system",
+#     multiple=True,
+#     help="Source system name (repeatable).",
+# )
+# def etl_update_conflicts(db_uri, source_system):
+#     db_uri = resolve_db_uri(db_uri)
+#     bf = Biofilter(db_uri=db_uri, debug_mode=False)
+
+#     bf.update_conflicts(source_system=list(source_system) or None)
 
 
-"""
-biofilter project create --db-uri sqlite:///biofilter.sqlite --overwrite
-biofilter project migrate --db-uri sqlite:///biofilter.sqlite
-biofilter etl update --db-uri sqlite:///biofilter.sqlite --source-system HGNC
-"""
+# # -----------------------
+# # index
+# # -----------------------
+# @main.group()
+# def index():
+#     """Index management (drop/create/rebuild)."""
+#     pass
 
 
-# === Subgroup: report ===
+# @index.command("rebuild")
+# @db_uri_option
+# @click.option(
+#     "--group",
+#     "groups",
+#     multiple=True,
+#     help="Index group (repeatable). If omitted, rebuilds all groups.",
+# )
+# @click.option("--drop-only", is_flag=True, help="Only drop indexes, do not create.")
+# @click.option("--no-drop-first", is_flag=True, help="Do not drop before creating.")
+# @click.option("--no-write-mode", is_flag=True, help="Disable DB write-mode tuning hooks.")
+# @click.option("--no-read-mode", is_flag=True, help="Disable DB read-mode tuning hooks.")
+# def index_rebuild(db_uri, groups, drop_only, no_drop_first, no_write_mode, no_read_mode):
+#     db_uri = resolve_db_uri(db_uri)
+#     bf = Biofilter(db_uri=db_uri, debug_mode=False)
+
+#     ok, msg = bf.rebuild_indexes(
+#         groups=list(groups) or None,
+#         drop_only=drop_only,
+#         drop_first=not no_drop_first,
+#         set_write_mode=not no_write_mode,
+#         set_read_mode=not no_read_mode,
+#     )
+#     if not ok:
+#         raise click.ClickException(msg)
+#     click.echo(msg)
 
 
-@main.group()
-def report():
-    """Project-level operations (setup, migration, metadata)."""
-    pass
+# # -----------------------
+# # conflicts
+# # -----------------------
+# @main.group()
+# def conflicts():
+#     """Curation conflicts import/export helpers."""
+#     pass
 
 
-@report.command("list")
-@click.option("--db-uri", required=False, help="Database URI or config file")
-def list_reports(db_uri):
-    """List available reports."""
-    if not db_uri:
-        db_uri = get_db_uri_from_config()
-        if not db_uri:
-            raise click.UsageError(
-                "Database URI not provided and no .biofilter.toml found.\n"
-                "Use --db-uri or create a .biofilter.toml with a [database] section."  # noqa: E501
-            )
-
-    bf = Biofilter(db_uri=db_uri)
-    reports = bf.report.list_reports()
-    click.echo("📊 Available Reports:")
-    for r in reports:
-        click.echo(f" - {r}")
+# @conflicts.command("export-excel")
+# @db_uri_option
+# @click.option("--output", default="curation_conflicts.xlsx", show_default=True)
+# def conflicts_export_excel(db_uri, output):
+#     db_uri = resolve_db_uri(db_uri)
+#     bf = Biofilter(db_uri=db_uri, debug_mode=False)
+#     bf.export_conflicts_to_excel(output_path=output)
+#     click.echo(f"✅ Exported to: {output}")
 
 
-@report.command("run")
-@click.option(
-    "--name", required=True, help="Report name (e.g., qry_etl_status)"
-)  # noqa: E501
-@click.option(
-    "--db-uri", required=False, help="Database URI or use .biofilter.toml"
-)  # noqa: E501
-@click.option("--as-csv", is_flag=True, help="Export to CSV")
-@click.option("--output", type=click.Path(), help="Output file path")
-def run_report(name, db_uri, as_csv, output):
-    """Run a specific report by name."""
-    if not db_uri:
-        db_uri = get_db_uri_from_config()
-        if not db_uri:
-            raise click.UsageError(
-                "Database URI not provided and no .biofilter.toml found.\n"
-                "Use --db-uri or create a .biofilter.toml with a [database] section."  # noqa: E501
-            )
+# @conflicts.command("import-excel")
+# @db_uri_option
+# @click.option("--input", "input_path", default="curation_conflicts_template.xlsx", show_default=True)
+# def conflicts_import_excel(db_uri, input_path):
+#     db_uri = resolve_db_uri(db_uri)
+#     bf = Biofilter(db_uri=db_uri, debug_mode=False)
+#     bf.import_conflicts_from_excel(input_path=input_path)
+#     click.echo(f"✅ Imported from: {input_path}")
 
-    bf = Biofilter(db_uri=db_uri)
-    result = bf.report.run_report(name=name, as_dataframe=True)
 
-    if as_csv:
-        if not output:
-            raise click.UsageError("Must provide --output with --as-csv")
-        result.to_csv(output, index=False)
-        click.echo(f"✅ Report exported to: {output}")
-    else:
-        click.echo(result.to_string(index=False))
+# # -----------------------
+# # report
+# # -----------------------
+# @main.group()
+# def report():
+#     """Run and manage reports."""
+#     pass
+
+
+# @report.command("list")
+# @db_uri_option
+# def report_list(db_uri):
+#     db_uri = resolve_db_uri(db_uri)
+#     bf = Biofilter(db_uri=db_uri, debug_mode=False)
+
+#     click.echo("📊 Available Reports:")
+#     for r in bf.report.list_reports():
+#         click.echo(f" - {r}")
+
+
+# @report.command("run")
+# @db_uri_option
+# @click.option("--name", required=True, help="Report name (e.g., qry_etl_status)")
+# @click.option("--as-csv", is_flag=True, help="Export to CSV")
+# @click.option("--output", type=click.Path(dir_okay=False), help="Output file path")
+# def report_run(db_uri, name, as_csv, output):
+#     db_uri = resolve_db_uri(db_uri)
+#     bf = Biofilter(db_uri=db_uri, debug_mode=False)
+
+#     df = bf.report.run_report(name=name, as_dataframe=True)
+
+#     if as_csv:
+#         if not output:
+#             raise click.UsageError("Must provide --output with --as-csv")
+#         df.to_csv(output, index=False)
+#         click.echo(f"✅ Report exported to: {output}")
+#     else:
+#         click.echo(df.to_string(index=False))

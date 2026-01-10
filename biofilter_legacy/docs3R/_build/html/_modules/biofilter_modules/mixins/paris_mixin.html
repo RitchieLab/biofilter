@@ -1,0 +1,731 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>biofilter_modules.mixins.paris_mixin &mdash; Biofilter 2.4.4 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=b1e24531"></script>
+      <script src="../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            Biofilter
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <!-- Local TOC -->
+              <div class="local-toc"></div>
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">Biofilter</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">biofilter_modules.mixins.paris_mixin</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for biofilter_modules.mixins.paris_mixin</h1><div class="highlight"><pre>
+<span></span><span class="c1"># #################################################</span>
+<span class="c1"># PARIS MIXIN</span>
+<span class="c1"># #################################################</span>
+<span class="kn">import</span> <span class="nn">collections</span>
+<span class="kn">import</span> <span class="nn">random</span>
+<span class="kn">import</span> <span class="nn">itertools</span>
+
+
+<div class="viewcode-block" id="ParisMixin">
+<a class="viewcode-back" href="../../../biofilter_modules.mixins.html#biofilter_modules.ParisMixin">[docs]</a>
+<span class="k">class</span> <span class="nc">ParisMixin</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Mixin class for executing the PARIS (Probabilistic Annotation Ranking for</span>
+<span class="sd">    Informative SNPs) analysis in a Loki database.</span>
+
+<span class="sd">    IMPLEMENTED METHODS:</span>
+<span class="sd">    - [getPARISPermutationScore]:</span>
+<span class="sd">        Computes a permutation score for a set of features based on comparing</span>
+<span class="sd">        the real score with scores obtained from random permutations.</span>
+<span class="sd">    - [generatePARISResults]:</span>
+<span class="sd">        Executes the PARIS analysis, mapping user-provided SNPs and regions to</span>
+<span class="sd">        identify significant genomic features and calculate their statistical</span>
+<span class="sd">        relevance.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="ParisMixin.getPARISPermutationScore">
+<a class="viewcode-back" href="../../../biofilter_modules.mixins.html#biofilter_modules.ParisMixin.getPARISPermutationScore">[docs]</a>
+    <span class="k">def</span> <span class="nf">getPARISPermutationScore</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">featureData</span><span class="p">,</span>
+        <span class="n">featureBin</span><span class="p">,</span>
+        <span class="n">binFeatures</span><span class="p">,</span>
+        <span class="n">realFeatures</span><span class="p">,</span>
+        <span class="n">numPermutations</span><span class="p">,</span>
+        <span class="n">maxScore</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span>
+    <span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Computes a permutation score for a set of features based on comparing</span>
+<span class="sd">        the real score with scores obtained from random permutations.</span>
+
+<span class="sd">        Parameters:</span>
+<span class="sd">        - featureData (dict): Contains feature data, where `featureData[f][1]`</span>
+<span class="sd">        indicates the presence of a specific attribute for feature `f`.</span>
+<span class="sd">        - featureBin (dict): Maps each feature to its respective bin.</span>
+<span class="sd">        - binFeatures (dict): Maps each bin to a list of features it contains.</span>
+<span class="sd">        - realFeatures (list): List of real features for which the score</span>
+<span class="sd">        calculation will be performed.</span>
+<span class="sd">        - numPermutations (int): Number of permutations to perform to estimate</span>
+<span class="sd">        the permutation score.</span>
+<span class="sd">        - maxScore (int, optional): An optional limit on the score, which</span>
+<span class="sd">        stops processing if the permutation score reaches this value.</span>
+
+<span class="sd">        Functionality:</span>
+<span class="sd">        - Computes `realScore`, which is the count of real features</span>
+<span class="sd">        (`realFeatures`) that have valid data in their respective bins</span>
+<span class="sd">        (`featureBin`) and a value at index 1 in `featureData`.</span>
+<span class="sd">        - If `realScore` is less than 1, returns the number of permutations</span>
+<span class="sd">        directly, as no relevant features are present.</span>
+<span class="sd">        - Defines `binDraws`, a counter that stores the number of features to</span>
+<span class="sd">        be drawn for each bin based on the bins in `realFeatures`.</span>
+<span class="sd">        - Performs `numPermutations` random samplings, calculating a</span>
+<span class="sd">        `permScore` for each:</span>
+<span class="sd">            - For each bin `b`, it performs `draws` random samples using</span>
+<span class="sd">            random.sample, count features with valid data at featureData[f][1]</span>
+<span class="sd">            - If `permScore` in a permutation is greater than or equal to</span>
+<span class="sd">            `realScore`, increments `totalScore`.</span>
+<span class="sd">            - If `totalScore` reaches `maxScore`, halts permutations early.</span>
+<span class="sd">        - Returns `totalScore`, representing the number of permutations where</span>
+<span class="sd">        the permutation score was greater than or equal to the real score.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">        - `totalScore` (int): Indicates the number of times the permuted score</span>
+<span class="sd">        was greater than or equal to the real score.</span>
+
+<span class="sd">        This method is useful for evaluating the significance of a real score</span>
+<span class="sd">        for a set of features, comparing it against a permutation-based</span>
+<span class="sd">        distribution.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">realScore</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span>
+            <span class="mi">1</span>
+            <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">realFeatures</span>
+            <span class="k">if</span> <span class="p">(</span><span class="n">featureBin</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">f</span><span class="p">)</span> <span class="ow">and</span> <span class="n">featureData</span><span class="p">[</span><span class="n">f</span><span class="p">][</span><span class="mi">1</span><span class="p">])</span>  <span class="c1"># noqa E501</span>
+        <span class="p">)</span>
+        <span class="k">if</span> <span class="n">realScore</span> <span class="o">&lt;</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">numPermutations</span>
+
+        <span class="c1"># TODO: refinement?</span>
+
+        <span class="n">_sample</span> <span class="o">=</span> <span class="n">random</span><span class="o">.</span><span class="n">sample</span>
+        <span class="n">binDraws</span> <span class="o">=</span> <span class="n">collections</span><span class="o">.</span><span class="n">Counter</span><span class="p">(</span>
+            <span class="n">featureBin</span><span class="p">[</span><span class="n">f</span><span class="p">]</span> <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">realFeatures</span> <span class="k">if</span> <span class="n">featureBin</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">f</span><span class="p">)</span>
+        <span class="p">)</span>
+        <span class="n">totalScore</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">numPermutations</span><span class="p">):</span>
+            <span class="n">permScore</span> <span class="o">=</span> <span class="mi">0</span>
+            <span class="k">for</span> <span class="n">b</span><span class="p">,</span> <span class="n">draws</span> <span class="ow">in</span> <span class="n">binDraws</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+                <span class="n">permScore</span> <span class="o">+=</span> <span class="nb">sum</span><span class="p">(</span>
+                    <span class="mi">1</span>
+                    <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">_sample</span><span class="p">(</span><span class="n">binFeatures</span><span class="p">[</span><span class="n">b</span><span class="p">],</span> <span class="n">draws</span><span class="p">)</span>
+                    <span class="k">if</span> <span class="n">featureData</span><span class="p">[</span><span class="n">f</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span>  <span class="c1"># noqa E501</span>
+                <span class="p">)</span>
+            <span class="k">if</span> <span class="n">permScore</span> <span class="o">&gt;=</span> <span class="n">realScore</span><span class="p">:</span>
+                <span class="n">totalScore</span> <span class="o">+=</span> <span class="mi">1</span>
+                <span class="k">if</span> <span class="n">maxScore</span> <span class="ow">and</span> <span class="p">(</span><span class="n">totalScore</span> <span class="o">&gt;=</span> <span class="n">maxScore</span><span class="p">):</span>
+                    <span class="k">break</span>
+        <span class="k">return</span> <span class="n">totalScore</span></div>
+
+
+<div class="viewcode-block" id="ParisMixin.generatePARISResults">
+<a class="viewcode-back" href="../../../biofilter_modules.mixins.html#biofilter_modules.ParisMixin.generatePARISResults">[docs]</a>
+    <span class="k">def</span> <span class="nf">generatePARISResults</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ucscBuildUser</span><span class="p">,</span> <span class="n">ucscBuildDB</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Executes the PARIS (Probabilistic Annotation Ranking for Informative</span>
+<span class="sd">        SNPs) analysis, mapping user-provided SNPs and regions to identify</span>
+<span class="sd">        significant genomic features and calculate their statistical relevance.</span>
+
+<span class="sd">        Parameters:</span>
+<span class="sd">        - ucscBuildUser: UCSC genome version for user-provided data.</span>
+<span class="sd">        - ucscBuildDB: UCSC genome version for the genomic knowledge database.</span>
+
+<span class="sd">        Main Steps:</span>
+<span class="sd">        1. **Data Preparation**:</span>
+<span class="sd">        - Extracts and organizes genomic regions (features) from the database,</span>
+<span class="sd">        extending region boundaries and dividing them into zones for efficient</span>
+<span class="sd">        querying.</span>
+<span class="sd">        - Configures parameters such as position margin and p-value threshold</span>
+<span class="sd">        for SNP significance.</span>
+
+<span class="sd">        2. **SNP and Region Mapping**:</span>
+<span class="sd">        - Maps SNPs and positions to determine overlaps within feature regions.</span>
+<span class="sd">        - Analyzes matches to identify SNPs/positions as valid, isolated, or</span>
+<span class="sd">        insignificant.</span>
+
+<span class="sd">        3. **Region Binning**:</span>
+<span class="sd">        - Organizes features into bins of similar size to improve permutation</span>
+<span class="sd">        calculation efficiency.</span>
+<span class="sd">        - Creates special bins for features of size 0 and 1 and adjusts</span>
+<span class="sd">        remaining bins for balanced distribution.</span>
+
+<span class="sd">        4. **Mapping of Groups and Genes**:</span>
+<span class="sd">        - Identifies and records genes and gene groups associated with the</span>
+<span class="sd">        features.</span>
+<span class="sd">        - Constructs datasets linking specific features to each gene and group</span>
+<span class="sd">        for downstream analysis.</span>
+
+<span class="sd">        5. **Permutation Calculations**:</span>
+<span class="sd">        - Computes a permutation score for each gene and group, estimating</span>
+<span class="sd">        statistical significance of features.</span>
+<span class="sd">        - Uses real matches and feature distribution to calculate a p-value.</span>
+
+<span class="sd">        6. **Result Generation**:</span>
+<span class="sd">        - Produces a table with groups, genes, and feature data, including</span>
+<span class="sd">        counts of simple and complex regions, and p-values.</span>
+<span class="sd">        - Returns:</span>
+<span class="sd">            - Group ID and name.</span>
+<span class="sd">            - Number of genes and features linked to the group.</span>
+<span class="sd">            - Counts of simple and complex regions.</span>
+<span class="sd">            - Calculated p-values from permutations.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">        - A generator yielding organized results with significant features,</span>
+<span class="sd">        regions, and statistical values for SNPs and genes relative to genomic</span>
+<span class="sd">        database knowledge.</span>
+
+<span class="sd">        Notes:</span>
+<span class="sd">        - This method is ideal for genomic studies seeking to understand SNP</span>
+<span class="sd">        and gene associations with relevant genomic regions, considering the</span>
+<span class="sd">        statistical context of identified features.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">logPush</span><span class="p">(</span><span class="s2">&quot;running PARIS ...</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">cursor</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_loki</span><span class="o">.</span><span class="n">_db</span><span class="o">.</span><span class="n">cursor</span><span class="p">()</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_inputFilters</span><span class="p">[</span><span class="s2">&quot;main&quot;</span><span class="p">][</span><span class="s2">&quot;region&quot;</span><span class="p">]:</span>
+            <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span><span class="s2">&quot;PARIS requires input feature regions&quot;</span><span class="p">)</span>
+
+        <span class="n">empty</span> <span class="o">=</span> <span class="nb">list</span><span class="p">()</span>
+        <span class="n">threshold</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_options</span><span class="o">.</span><span class="n">paris_p_value</span>
+        <span class="n">rpMargin</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_options</span><span class="o">.</span><span class="n">region_position_margin</span>
+        <span class="n">optEnforceChm</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_options</span><span class="o">.</span><span class="n">paris_enforce_input_chromosome</span> <span class="o">==</span> <span class="s2">&quot;yes&quot;</span>
+        <span class="n">optZeroPvals</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_options</span><span class="o">.</span><span class="n">paris_zero_p_values</span>
+        <span class="n">zoneSize</span> <span class="o">=</span> <span class="mi">100000</span>  <span class="c1"># in this context it doesn&#39;t have to match what the db uses  # noqa E501</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">prepareTableForUpdate</span><span class="p">(</span><span class="s2">&quot;main&quot;</span><span class="p">,</span> <span class="s2">&quot;region&quot;</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">logPush</span><span class="p">(</span><span class="s2">&quot;scanning feature regions ...</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">featureData</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">()</span>  <span class="c1"># featureData[rowid] = (size,sig)</span>
+        <span class="n">featureBounds</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="nb">dict</span><span class="p">()</span>
+        <span class="p">)</span>  <span class="c1"># featureBounds[rowid] = (rowid,chr,posMin,posMax)  # noqa E501</span>
+        <span class="n">chrZoneFeatures</span> <span class="o">=</span> <span class="n">collections</span><span class="o">.</span><span class="n">defaultdict</span><span class="p">(</span>
+            <span class="k">lambda</span><span class="p">:</span> <span class="n">collections</span><span class="o">.</span><span class="n">defaultdict</span><span class="p">(</span><span class="nb">set</span><span class="p">)</span>
+        <span class="p">)</span>  <span class="c1"># noqa E501</span>
+        <span class="n">sql</span> <span class="o">=</span> <span class="s2">&quot;SELECT rowid,chr,posMin,posMax FROM `main`.`region`&quot;</span>
+        <span class="k">for</span> <span class="n">fid</span><span class="p">,</span> <span class="n">chm</span><span class="p">,</span> <span class="n">posMin</span><span class="p">,</span> <span class="n">posMax</span> <span class="ow">in</span> <span class="n">cursor</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="n">sql</span><span class="p">):</span>
+            <span class="n">posMin</span> <span class="o">-=</span> <span class="n">rpMargin</span>
+            <span class="n">posMax</span> <span class="o">+=</span> <span class="n">rpMargin</span>
+            <span class="n">featureData</span><span class="p">[</span><span class="n">fid</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span>
+            <span class="n">featureBounds</span><span class="p">[</span><span class="n">fid</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">fid</span><span class="p">,</span> <span class="n">chm</span><span class="p">,</span> <span class="n">posMin</span><span class="p">,</span> <span class="n">posMax</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">z</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">posMin</span> <span class="o">/</span> <span class="n">zoneSize</span><span class="p">),</span> <span class="nb">int</span><span class="p">(</span><span class="n">posMax</span> <span class="o">/</span> <span class="n">zoneSize</span><span class="p">)</span> <span class="o">+</span> <span class="mi">1</span><span class="p">):</span>
+                <span class="n">chrZoneFeatures</span><span class="p">[</span><span class="n">chm</span><span class="p">][</span><span class="n">z</span><span class="p">]</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">fid</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">logPop</span><span class="p">(</span><span class="s2">&quot;... OK: </span><span class="si">%d</span><span class="s2"> regions</span><span class="se">\n</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">featureData</span><span class="p">),))</span>
+
+        <span class="k">def</span> <span class="nf">analyzeLoci</span><span class="p">(</span><span class="n">generator</span><span class="p">):</span>
+            <span class="n">numMatch</span> <span class="o">=</span> <span class="n">numSingle</span> <span class="o">=</span> <span class="n">numIgnore</span> <span class="o">=</span> <span class="mi">0</span>
+            <span class="k">for</span> <span class="n">chm</span><span class="p">,</span> <span class="n">pos</span><span class="p">,</span> <span class="n">extra</span> <span class="ow">in</span> <span class="n">generator</span><span class="p">:</span>
+                <span class="n">extra</span> <span class="o">=</span> <span class="n">extra</span><span class="o">.</span><span class="n">split</span><span class="p">()</span>
+
+                <span class="k">if</span> <span class="n">optEnforceChm</span><span class="p">:</span>
+                    <span class="k">try</span><span class="p">:</span>
+                        <span class="n">ichm</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_loki</span><span class="o">.</span><span class="n">chr_num</span><span class="p">[</span>
+                            <span class="n">extra</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+                        <span class="p">]</span>  <span class="c1"># TODO optional ichm column position</span>
+                        <span class="k">if</span> <span class="n">ichm</span> <span class="ow">and</span> <span class="p">(</span><span class="n">ichm</span> <span class="o">!=</span> <span class="n">chm</span><span class="p">):</span>
+                            <span class="k">continue</span>
+                    <span class="k">except</span><span class="p">:</span>  <span class="c1"># noqa E722</span>
+                        <span class="k">continue</span>
+                <span class="c1"># if enforce input chromosome</span>
+
+                <span class="k">try</span><span class="p">:</span>
+                    <span class="c1"># TODO optional pval column position</span>
+                    <span class="n">pval</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">extra</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">strip</span><span class="p">())</span>
+                    <span class="k">if</span> <span class="n">pval</span> <span class="o">&lt;=</span> <span class="mf">0.0</span><span class="p">:</span>
+                        <span class="k">if</span> <span class="n">optZeroPvals</span> <span class="o">==</span> <span class="s2">&quot;significant&quot;</span><span class="p">:</span>
+                            <span class="n">sig</span> <span class="o">=</span> <span class="kc">True</span>
+                        <span class="k">elif</span> <span class="n">optZeroPvals</span> <span class="o">==</span> <span class="s2">&quot;insignificant&quot;</span><span class="p">:</span>
+                            <span class="n">sig</span> <span class="o">=</span> <span class="kc">False</span>
+                        <span class="k">else</span><span class="p">:</span>
+                            <span class="n">numIgnore</span> <span class="o">+=</span> <span class="mi">1</span>
+                            <span class="k">continue</span>
+                    <span class="k">else</span><span class="p">:</span>
+                        <span class="n">sig</span> <span class="o">=</span> <span class="n">pval</span> <span class="o">&lt;=</span> <span class="n">threshold</span>  <span class="c1"># TODO &lt;= or &lt; ?</span>
+                <span class="k">except</span><span class="p">:</span>  <span class="c1"># noqa E722</span>
+                    <span class="n">sig</span> <span class="o">=</span> <span class="kc">False</span>
+
+                <span class="n">matched</span> <span class="o">=</span> <span class="kc">False</span>
+                <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">chrZoneFeatures</span><span class="p">[</span><span class="n">chm</span><span class="p">][</span><span class="n">pos</span> <span class="o">/</span> <span class="n">zoneSize</span><span class="p">]:</span>
+                    <span class="n">fid</span><span class="p">,</span> <span class="n">fchm</span><span class="p">,</span> <span class="n">fposMin</span><span class="p">,</span> <span class="n">fposMax</span> <span class="o">=</span> <span class="n">featureBounds</span><span class="p">[</span><span class="n">f</span><span class="p">]</span>
+                    <span class="k">if</span> <span class="p">(</span><span class="n">chm</span> <span class="o">==</span> <span class="n">fchm</span><span class="p">)</span> <span class="ow">and</span> <span class="p">(</span><span class="n">pos</span> <span class="o">&gt;=</span> <span class="n">fposMin</span><span class="p">)</span> <span class="ow">and</span> <span class="p">(</span><span class="n">pos</span> <span class="o">&lt;=</span> <span class="n">fposMax</span><span class="p">):</span>
+                        <span class="n">matched</span> <span class="o">=</span> <span class="kc">True</span>
+                        <span class="n">featureData</span><span class="p">[</span><span class="n">fid</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="o">+=</span> <span class="mi">1</span>
+                        <span class="k">if</span> <span class="n">sig</span><span class="p">:</span>
+                            <span class="n">featureData</span><span class="p">[</span><span class="n">fid</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span> <span class="o">+=</span> <span class="mi">1</span>
+                <span class="k">if</span> <span class="n">matched</span><span class="p">:</span>
+                    <span class="n">numMatch</span> <span class="o">+=</span> <span class="mi">1</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">numSingle</span> <span class="o">+=</span> <span class="mi">1</span>
+                    <span class="k">for</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">cursor</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span>
+                        <span class="s2">&quot;INSERT INTO `main`.`region` (label,chr,posMin,posMax) VALUES (&#39;chr&#39;|?1|&#39;:&#39;|?2, ?1, ?2, ?2); SELECT LAST_INSERT_ROWID()&quot;</span><span class="p">,</span>  <span class="c1"># noqa E501</span>
+                        <span class="p">(</span><span class="n">chm</span><span class="p">,</span> <span class="n">pos</span><span class="p">),</span>
+                    <span class="p">):</span>
+                        <span class="n">fid</span> <span class="o">=</span> <span class="n">row</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+                    <span class="n">posMin</span> <span class="o">=</span> <span class="n">pos</span> <span class="o">-</span> <span class="n">rpMargin</span>
+                    <span class="n">posMax</span> <span class="o">=</span> <span class="n">pos</span> <span class="o">+</span> <span class="n">rpMargin</span>
+                    <span class="n">featureData</span><span class="p">[</span><span class="n">fid</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span> <span class="k">if</span> <span class="n">sig</span> <span class="k">else</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span>
+                    <span class="n">featureBounds</span><span class="p">[</span><span class="n">fid</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">fid</span><span class="p">,</span> <span class="n">chm</span><span class="p">,</span> <span class="n">posMin</span><span class="p">,</span> <span class="n">posMax</span><span class="p">)</span>
+                    <span class="k">for</span> <span class="n">z</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span>
+                        <span class="nb">int</span><span class="p">(</span><span class="n">posMin</span> <span class="o">/</span> <span class="n">zoneSize</span><span class="p">),</span> <span class="nb">int</span><span class="p">(</span><span class="n">posMax</span> <span class="o">/</span> <span class="n">zoneSize</span><span class="p">)</span> <span class="o">+</span> <span class="mi">1</span>
+                    <span class="p">):</span>  <span class="c1"># noqa E501</span>
+                        <span class="n">chrZoneFeatures</span><span class="p">[</span><span class="n">chm</span><span class="p">][</span><span class="n">z</span><span class="p">]</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">fid</span><span class="p">)</span>
+            <span class="c1"># foreach position</span>
+            <span class="k">return</span> <span class="p">(</span><span class="n">numMatch</span><span class="p">,</span> <span class="n">numSingle</span><span class="p">,</span> <span class="n">numIgnore</span><span class="p">)</span>
+
+        <span class="c1"># analyzeLoci()</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_inputFilters</span><span class="p">[</span><span class="s2">&quot;main&quot;</span><span class="p">][</span><span class="s2">&quot;snp&quot;</span><span class="p">]:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">logPush</span><span class="p">(</span><span class="s2">&quot;mapping SNP results to feature regions ...</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="n">querySelect</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;position_chr&quot;</span><span class="p">,</span> <span class="s2">&quot;position_pos&quot;</span><span class="p">,</span> <span class="s2">&quot;snp_extra&quot;</span><span class="p">]</span>
+            <span class="n">queryFilter</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;main&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;snp&quot;</span><span class="p">:</span> <span class="mi">1</span><span class="p">}}</span>
+            <span class="n">query</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">buildQuery</span><span class="p">(</span>
+                <span class="s2">&quot;filter&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;main&quot;</span><span class="p">,</span>
+                <span class="n">select</span><span class="o">=</span><span class="n">querySelect</span><span class="p">,</span>
+                <span class="n">fromFilter</span><span class="o">=</span><span class="n">queryFilter</span><span class="p">,</span>
+                <span class="n">joinFilter</span><span class="o">=</span><span class="n">queryFilter</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="n">numMatch</span><span class="p">,</span> <span class="n">numSingle</span><span class="p">,</span> <span class="n">numIgnore</span> <span class="o">=</span> <span class="n">analyzeLoci</span><span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">generateQueryResults</span><span class="p">(</span><span class="n">query</span><span class="p">)</span>
+            <span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">logPop</span><span class="p">(</span>
+                <span class="s2">&quot;... OK: </span><span class="si">%d</span><span class="s2"> in feature regions, </span><span class="si">%d</span><span class="s2"> singletons (</span><span class="si">%d</span><span class="s2"> ignored)</span><span class="se">\n</span><span class="s2">&quot;</span>
+                <span class="o">%</span> <span class="p">(</span><span class="n">numMatch</span><span class="p">,</span> <span class="n">numSingle</span><span class="p">,</span> <span class="n">numIgnore</span><span class="p">)</span>
+            <span class="p">)</span>
+        <span class="c1"># if SNPs</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_inputFilters</span><span class="p">[</span><span class="s2">&quot;main&quot;</span><span class="p">][</span><span class="s2">&quot;locus&quot;</span><span class="p">]:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">logPush</span><span class="p">(</span><span class="s2">&quot;mapping position results to feature regions ...</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="n">querySelect</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;position_chr&quot;</span><span class="p">,</span> <span class="s2">&quot;position_pos&quot;</span><span class="p">,</span> <span class="s2">&quot;position_extra&quot;</span><span class="p">]</span>
+            <span class="n">queryFilter</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;main&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;locus&quot;</span><span class="p">:</span> <span class="mi">1</span><span class="p">}}</span>
+            <span class="n">query</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">buildQuery</span><span class="p">(</span>
+                <span class="s2">&quot;filter&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;main&quot;</span><span class="p">,</span>
+                <span class="n">select</span><span class="o">=</span><span class="n">querySelect</span><span class="p">,</span>
+                <span class="n">fromFilter</span><span class="o">=</span><span class="n">queryFilter</span><span class="p">,</span>
+                <span class="n">joinFilter</span><span class="o">=</span><span class="n">queryFilter</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="n">numMatch</span><span class="p">,</span> <span class="n">numSingle</span><span class="p">,</span> <span class="n">numIgnore</span> <span class="o">=</span> <span class="n">analyzeLoci</span><span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">generateQueryResults</span><span class="p">(</span><span class="n">query</span><span class="p">)</span>
+            <span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">logPop</span><span class="p">(</span>
+                <span class="s2">&quot;... OK: </span><span class="si">%d</span><span class="s2"> in feature regions, </span><span class="si">%d</span><span class="s2"> singletons (</span><span class="si">%d</span><span class="s2"> ignored)</span><span class="se">\n</span><span class="s2">&quot;</span>
+                <span class="o">%</span> <span class="p">(</span><span class="n">numMatch</span><span class="p">,</span> <span class="n">numSingle</span><span class="p">,</span> <span class="n">numIgnore</span><span class="p">)</span>
+            <span class="p">)</span>
+        <span class="c1"># if loci</span>
+
+        <span class="k">for</span> <span class="n">snpFileList</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_options</span><span class="o">.</span><span class="n">paris_snp_file</span> <span class="ow">or</span> <span class="n">empty</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">logPush</span><span class="p">(</span><span class="s2">&quot;reading SNP results ...</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="n">tallyRS</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">()</span>
+            <span class="n">tallyPos</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">()</span>
+            <span class="n">numMatch</span><span class="p">,</span> <span class="n">numSingle</span><span class="p">,</span> <span class="n">numIgnore</span> <span class="o">=</span> <span class="n">analyzeLoci</span><span class="p">(</span>
+                <span class="p">(</span>
+                    <span class="p">(</span><span class="n">chm</span><span class="p">,</span> <span class="n">pos</span><span class="p">,</span> <span class="n">posextra</span><span class="p">)</span>
+                    <span class="k">for</span> <span class="n">rs</span><span class="p">,</span> <span class="n">posextra</span><span class="p">,</span> <span class="n">chm</span><span class="p">,</span> <span class="n">pos</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_loki</span><span class="o">.</span><span class="n">generateSNPLociByRSes</span><span class="p">(</span>  <span class="c1"># noqa E501</span>
+                        <span class="p">(</span>
+                            <span class="p">(</span><span class="n">rsnew</span><span class="p">,</span> <span class="n">rsextra</span><span class="p">)</span>
+                            <span class="k">for</span> <span class="n">rsold</span><span class="p">,</span> <span class="n">rsextra</span><span class="p">,</span> <span class="n">rsnew</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_loki</span><span class="o">.</span><span class="n">generateCurrentRSesByRSes</span><span class="p">(</span>  <span class="c1"># noqa E501</span>
+                                <span class="bp">self</span><span class="o">.</span><span class="n">generateRSesFromRSFiles</span><span class="p">(</span><span class="n">snpFileList</span><span class="p">),</span>
+                                <span class="n">tally</span><span class="o">=</span><span class="n">tallyRS</span><span class="p">,</span>  <span class="c1"># noqa E501</span>
+                            <span class="p">)</span>
+                        <span class="p">),</span>
+                        <span class="n">minMatch</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+                        <span class="n">maxMatch</span><span class="o">=</span><span class="p">(</span>
+                            <span class="kc">None</span>
+                            <span class="k">if</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_options</span><span class="o">.</span><span class="n">allow_ambiguous_snps</span> <span class="o">==</span> <span class="s2">&quot;yes&quot;</span><span class="p">)</span>
+                            <span class="k">else</span> <span class="mi">1</span>  <span class="c1"># noqa E501</span>
+                        <span class="p">),</span>
+                        <span class="n">tally</span><span class="o">=</span><span class="n">tallyPos</span><span class="p">,</span>
+                    <span class="p">)</span>
+                <span class="p">)</span>
+            <span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">logPop</span><span class="p">(</span>
+                <span class="s2">&quot;... OK: </span><span class="si">%d</span><span class="s2"> in feature regions, </span><span class="si">%d</span><span class="s2"> singletons (</span><span class="si">%d</span><span class="s2"> ignored, </span><span class="si">%d</span><span class="s2"> merged, </span><span class="si">%d</span><span class="s2"> unrecognized, </span><span class="si">%d</span><span class="s2"> ambiguous)</span><span class="se">\n</span><span class="s2">&quot;</span>  <span class="c1"># noqa E501</span>
+                <span class="o">%</span> <span class="p">(</span>
+                    <span class="n">numMatch</span><span class="p">,</span>
+                    <span class="n">numSingle</span><span class="p">,</span>
+                    <span class="n">numIgnore</span><span class="p">,</span>
+                    <span class="n">tallyRS</span><span class="p">[</span><span class="s2">&quot;merge&quot;</span><span class="p">],</span>
+                    <span class="n">tallyPos</span><span class="p">[</span><span class="s2">&quot;zero&quot;</span><span class="p">],</span>
+                    <span class="n">tallyPos</span><span class="p">[</span><span class="s2">&quot;many&quot;</span><span class="p">],</span>
+                <span class="p">)</span>
+            <span class="p">)</span>
+        <span class="c1"># foreach paris_snp_file</span>
+
+        <span class="k">for</span> <span class="n">positionFileList</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_options</span><span class="o">.</span><span class="n">paris_position_file</span> <span class="ow">or</span> <span class="n">empty</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">logPush</span><span class="p">(</span><span class="s2">&quot;reading position results ...</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="n">numMatch</span><span class="p">,</span> <span class="n">numSingle</span><span class="p">,</span> <span class="n">numIgnore</span> <span class="o">=</span> <span class="n">analyzeLoci</span><span class="p">(</span>
+                <span class="p">(</span>
+                    <span class="p">(</span><span class="n">chm</span><span class="p">,</span> <span class="n">pos</span><span class="p">,</span> <span class="n">extra</span><span class="p">)</span>
+                    <span class="k">for</span> <span class="n">label</span><span class="p">,</span> <span class="n">chm</span><span class="p">,</span> <span class="n">pos</span><span class="p">,</span> <span class="n">extra</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">generateLiftOverLoci</span><span class="p">(</span>
+                        <span class="n">ucscBuildUser</span><span class="p">,</span>
+                        <span class="n">ucscBuildDB</span><span class="p">,</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">generateLociFromMapFiles</span><span class="p">(</span>
+                            <span class="n">positionFileList</span><span class="p">,</span> <span class="n">applyOffset</span><span class="o">=</span><span class="kc">True</span>
+                        <span class="p">),</span>
+                    <span class="p">)</span>
+                <span class="p">)</span>
+            <span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">logPop</span><span class="p">(</span>
+                <span class="s2">&quot;... OK: </span><span class="si">%d</span><span class="s2"> in feature regions, </span><span class="si">%d</span><span class="s2"> singletons (</span><span class="si">%d</span><span class="s2"> ignored)</span><span class="se">\n</span><span class="s2">&quot;</span>
+                <span class="o">%</span> <span class="p">(</span><span class="n">numMatch</span><span class="p">,</span> <span class="n">numSingle</span><span class="p">,</span> <span class="n">numIgnore</span><span class="p">)</span>
+            <span class="p">)</span>
+        <span class="c1"># foreach paris_position_file</span>
+
+        <span class="n">featureBounds</span> <span class="o">=</span> <span class="n">chrZoneFeatures</span> <span class="o">=</span> <span class="kc">None</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">logPush</span><span class="p">(</span><span class="s2">&quot;binning feature regions ...</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="c1"># partition features by size</span>
+        <span class="n">sizeFeatures</span> <span class="o">=</span> <span class="n">collections</span><span class="o">.</span><span class="n">defaultdict</span><span class="p">(</span><span class="nb">list</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">fid</span><span class="p">,</span> <span class="n">data</span> <span class="ow">in</span> <span class="n">featureData</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="n">sizeFeatures</span><span class="p">[</span><span class="n">data</span><span class="p">[</span><span class="mi">0</span><span class="p">]]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">fid</span><span class="p">)</span>
+        <span class="c1"># randomize within each size while building a master list in descending size order  # noqa E501</span>
+        <span class="n">listFeatures</span> <span class="o">=</span> <span class="nb">list</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">size</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">sizeFeatures</span><span class="o">.</span><span class="n">keys</span><span class="p">(),</span> <span class="n">reverse</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+            <span class="n">random</span><span class="o">.</span><span class="n">shuffle</span><span class="p">(</span><span class="n">sizeFeatures</span><span class="p">[</span><span class="n">size</span><span class="p">])</span>
+            <span class="n">listFeatures</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">sizeFeatures</span><span class="p">[</span><span class="n">size</span><span class="p">])</span>
+        <span class="n">sizeFeatures</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="c1"># bin all features of size 0 and 1 with eachother (no bin size limit)</span>
+        <span class="n">featureBin</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">()</span>
+        <span class="n">binFeatures</span> <span class="o">=</span> <span class="n">collections</span><span class="o">.</span><span class="n">defaultdict</span><span class="p">(</span><span class="nb">list</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">b</span> <span class="ow">in</span> <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">):</span>
+            <span class="k">while</span> <span class="n">listFeatures</span> <span class="ow">and</span> <span class="p">(</span><span class="n">featureData</span><span class="p">[</span><span class="n">listFeatures</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]][</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="n">b</span><span class="p">):</span>
+                <span class="n">fid</span> <span class="o">=</span> <span class="n">listFeatures</span><span class="o">.</span><span class="n">pop</span><span class="p">()</span>
+                <span class="k">assert</span> <span class="n">fid</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">featureBin</span>
+                <span class="n">featureBin</span><span class="p">[</span><span class="n">fid</span><span class="p">]</span> <span class="o">=</span> <span class="n">b</span>
+                <span class="n">binFeatures</span><span class="p">[</span><span class="n">b</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">fid</span><span class="p">)</span>
+        <span class="c1"># distribute all remaining features into bins of equal size, close to the target size  # noqa E501</span>
+        <span class="n">count</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span>
+            <span class="mi">1</span><span class="p">,</span>
+            <span class="nb">int</span><span class="p">(</span>
+                <span class="mf">0.5</span> <span class="o">+</span> <span class="nb">float</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">listFeatures</span><span class="p">))</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">_options</span><span class="o">.</span><span class="n">paris_bin_size</span>
+            <span class="p">),</span>  <span class="c1"># noqa E501</span>
+        <span class="p">)</span>
+        <span class="n">size</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">listFeatures</span><span class="p">)</span> <span class="o">/</span> <span class="n">count</span>
+        <span class="n">extra</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">listFeatures</span><span class="p">)</span> <span class="o">-</span> <span class="p">(</span><span class="n">count</span> <span class="o">*</span> <span class="n">size</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">b</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span> <span class="o">+</span> <span class="n">count</span><span class="p">):</span>
+            <span class="k">for</span> <span class="n">n</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">size</span> <span class="o">+</span> <span class="p">(</span><span class="mi">1</span> <span class="k">if</span> <span class="p">((</span><span class="n">b</span> <span class="o">-</span> <span class="mi">2</span><span class="p">)</span> <span class="o">&lt;</span> <span class="n">extra</span><span class="p">)</span> <span class="k">else</span> <span class="mi">0</span><span class="p">)):</span>
+                <span class="n">fid</span> <span class="o">=</span> <span class="n">listFeatures</span><span class="o">.</span><span class="n">pop</span><span class="p">()</span>
+                <span class="k">assert</span> <span class="n">fid</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">featureBin</span>
+                <span class="n">featureBin</span><span class="p">[</span><span class="n">fid</span><span class="p">]</span> <span class="o">=</span> <span class="n">b</span>
+                <span class="n">binFeatures</span><span class="p">[</span><span class="n">b</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">fid</span><span class="p">)</span>
+        <span class="c1"># report bin statistics</span>
+        <span class="k">for</span> <span class="n">b</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">binFeatures</span><span class="p">):</span>
+            <span class="n">numSig</span> <span class="o">=</span> <span class="n">totalSize</span> <span class="o">=</span> <span class="mi">0</span>
+            <span class="n">minSize</span> <span class="o">=</span> <span class="n">maxSize</span> <span class="o">=</span> <span class="kc">None</span>
+            <span class="k">for</span> <span class="n">data</span> <span class="ow">in</span> <span class="p">(</span><span class="n">featureData</span><span class="p">[</span><span class="n">f</span><span class="p">]</span> <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">binFeatures</span><span class="p">[</span><span class="n">b</span><span class="p">]):</span>
+                <span class="n">numSig</span> <span class="o">+=</span> <span class="mi">1</span> <span class="k">if</span> <span class="n">data</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="k">else</span> <span class="mi">0</span>
+                <span class="n">minSize</span> <span class="o">=</span> <span class="p">(</span>
+                    <span class="nb">min</span><span class="p">(</span><span class="n">minSize</span><span class="p">,</span> <span class="n">data</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span> <span class="k">if</span> <span class="p">(</span><span class="n">minSize</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">)</span> <span class="k">else</span> <span class="n">data</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+                <span class="p">)</span>  <span class="c1"># noqa E501</span>
+                <span class="n">maxSize</span> <span class="o">=</span> <span class="p">(</span>
+                    <span class="nb">max</span><span class="p">(</span><span class="n">maxSize</span><span class="p">,</span> <span class="n">data</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span> <span class="k">if</span> <span class="p">(</span><span class="n">maxSize</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">)</span> <span class="k">else</span> <span class="n">data</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+                <span class="p">)</span>  <span class="c1"># noqa E501</span>
+                <span class="n">totalSize</span> <span class="o">+=</span> <span class="n">data</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">(</span>
+                <span class="s2">&quot;bin #</span><span class="si">%d</span><span class="s2">: </span><span class="si">%d</span><span class="s2"> features (</span><span class="si">%d</span><span class="s2"> significant), size </span><span class="si">%d</span><span class="s2">..</span><span class="si">%d</span><span class="s2"> (avg </span><span class="si">%g</span><span class="s2">)</span><span class="se">\n</span><span class="s2">&quot;</span>
+                <span class="o">%</span> <span class="p">(</span>
+                    <span class="n">b</span><span class="p">,</span>
+                    <span class="nb">len</span><span class="p">(</span><span class="n">binFeatures</span><span class="p">[</span><span class="n">b</span><span class="p">]),</span>
+                    <span class="n">numSig</span><span class="p">,</span>
+                    <span class="n">minSize</span><span class="p">,</span>
+                    <span class="n">maxSize</span><span class="p">,</span>
+                    <span class="nb">float</span><span class="p">(</span><span class="n">totalSize</span><span class="p">)</span> <span class="o">/</span> <span class="nb">len</span><span class="p">(</span><span class="n">binFeatures</span><span class="p">[</span><span class="n">b</span><span class="p">]),</span>
+                <span class="p">)</span>
+            <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">logPop</span><span class="p">(</span><span class="s2">&quot;... OK</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+
+        <span class="c1"># cull empty feature regions from the db, to speed up region matching later  # noqa E501</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">logPush</span><span class="p">(</span><span class="s2">&quot;culling empty feature regions ...</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">sql</span> <span class="o">=</span> <span class="s2">&quot;DELETE FROM `main`.`region` WHERE rowid = ?&quot;</span>
+        <span class="n">cursor</span><span class="o">.</span><span class="n">executemany</span><span class="p">(</span><span class="n">sql</span><span class="p">,</span> <span class="n">itertools</span><span class="o">.</span><span class="n">izip</span><span class="p">(</span><span class="n">binFeatures</span><span class="p">[</span><span class="mi">0</span><span class="p">]))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">logPop</span><span class="p">(</span><span class="s2">&quot;... OK</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">logPush</span><span class="p">(</span><span class="s2">&quot;mapping pathway genes ...</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">queryGroupSelect</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="s2">&quot;group_id&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;group_label&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;group_description&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;gene_id&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;gene_label&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;gene_description&quot;</span><span class="p">,</span>
+        <span class="p">]</span>
+        <span class="n">queryGroupFilter</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s2">&quot;main&quot;</span><span class="p">:</span> <span class="p">{</span>
+                <span class="s2">&quot;group&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_inputFilters</span><span class="p">[</span><span class="s2">&quot;main&quot;</span><span class="p">][</span><span class="s2">&quot;group&quot;</span><span class="p">],</span>
+                <span class="s2">&quot;source&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_inputFilters</span><span class="p">[</span><span class="s2">&quot;main&quot;</span><span class="p">][</span><span class="s2">&quot;source&quot;</span><span class="p">],</span>
+            <span class="p">}</span>
+        <span class="p">}</span>
+        <span class="n">queryGroup</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">buildQuery</span><span class="p">(</span>
+            <span class="s2">&quot;filter&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;main&quot;</span><span class="p">,</span>
+            <span class="n">select</span><span class="o">=</span><span class="n">queryGroupSelect</span><span class="p">,</span>
+            <span class="n">fromFilter</span><span class="o">=</span><span class="n">queryGroupFilter</span><span class="p">,</span>
+            <span class="n">joinFilter</span><span class="o">=</span><span class="n">queryGroupFilter</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="n">queryGroupU</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_inputFilters</span><span class="p">[</span><span class="s2">&quot;user&quot;</span><span class="p">][</span><span class="s2">&quot;source&quot;</span><span class="p">]:</span>
+            <span class="n">queryGroupU</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">buildQuery</span><span class="p">(</span>
+                <span class="s2">&quot;filter&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;main&quot;</span><span class="p">,</span>
+                <span class="n">select</span><span class="o">=</span><span class="n">queryGroupSelect</span><span class="p">,</span>
+                <span class="n">fromFilter</span><span class="o">=</span><span class="n">queryGroupFilter</span><span class="p">,</span>
+                <span class="n">joinFilter</span><span class="o">=</span><span class="n">queryGroupFilter</span><span class="p">,</span>
+                <span class="n">userKnowledge</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+            <span class="p">)</span>
+        <span class="n">groupData</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">()</span>
+        <span class="n">geneData</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">()</span>
+        <span class="k">for</span> <span class="p">(</span>
+            <span class="n">uid</span><span class="p">,</span>
+            <span class="n">ulabel</span><span class="p">,</span>
+            <span class="n">udesc</span><span class="p">,</span>
+            <span class="n">gid</span><span class="p">,</span>
+            <span class="n">glabel</span><span class="p">,</span>
+            <span class="n">gdesc</span><span class="p">,</span>
+        <span class="p">)</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">generateQueryResults</span><span class="p">(</span>  <span class="c1"># noqa E501</span>
+            <span class="n">queryGroup</span><span class="p">,</span> <span class="n">allowDupes</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">query2</span><span class="o">=</span><span class="n">queryGroupU</span>
+        <span class="p">):</span>
+            <span class="k">if</span> <span class="n">uid</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">groupData</span><span class="p">:</span>
+                <span class="n">groupData</span><span class="p">[</span><span class="n">uid</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="n">ulabel</span><span class="p">,</span> <span class="n">udesc</span><span class="p">,</span> <span class="nb">set</span><span class="p">()]</span>
+            <span class="n">groupData</span><span class="p">[</span><span class="n">uid</span><span class="p">][</span><span class="mi">2</span><span class="p">]</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">gid</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">gid</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">geneData</span><span class="p">:</span>
+                <span class="n">geneData</span><span class="p">[</span><span class="n">gid</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="n">glabel</span><span class="p">,</span> <span class="n">gdesc</span><span class="p">]</span>
+        <span class="c1"># foreach group/gene pair</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">logPop</span><span class="p">(</span>
+            <span class="s2">&quot;... OK: </span><span class="si">%d</span><span class="s2"> pathways, </span><span class="si">%d</span><span class="s2"> genes</span><span class="se">\n</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">groupData</span><span class="p">),</span> <span class="nb">len</span><span class="p">(</span><span class="n">geneData</span><span class="p">))</span>
+        <span class="p">)</span>  <span class="c1"># noqa E501</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">logPush</span><span class="p">(</span><span class="s2">&quot;mapping gene features ...</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">prepareTableForQuery</span><span class="p">(</span><span class="s2">&quot;main&quot;</span><span class="p">,</span> <span class="s2">&quot;region&quot;</span><span class="p">)</span>
+        <span class="n">queryGeneSelect</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;region_id&quot;</span><span class="p">]</span>
+        <span class="n">queryGeneWhereCol</span> <span class="o">=</span> <span class="p">(</span><span class="s2">&quot;d_b&quot;</span><span class="p">,</span> <span class="s2">&quot;biopolymer_id&quot;</span><span class="p">)</span>
+        <span class="n">queryGeneWhere</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">()</span>
+        <span class="c1"># 	queryGeneWhere[(&#39;m_r&#39;,&#39;posMin&#39;)] = {&#39;&lt;= d_br.posMax&#39;} #DEBUG paris 1.1.2  # noqa E501</span>
+        <span class="n">queryGeneFilter</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;main&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;region_zone&quot;</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span> <span class="s2">&quot;region&quot;</span><span class="p">:</span> <span class="mi">1</span><span class="p">}}</span>
+        <span class="n">n</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="k">for</span> <span class="n">gid</span><span class="p">,</span> <span class="n">gdata</span> <span class="ow">in</span> <span class="n">geneData</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="n">features</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+            <span class="n">queryGeneWhere</span><span class="p">[</span><span class="n">queryGeneWhereCol</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;= </span><span class="si">%d</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">gid</span><span class="p">,)}</span>
+            <span class="n">queryGene</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">buildQuery</span><span class="p">(</span>
+                <span class="s2">&quot;filter&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;main&quot;</span><span class="p">,</span>
+                <span class="n">select</span><span class="o">=</span><span class="n">queryGeneSelect</span><span class="p">,</span>
+                <span class="n">where</span><span class="o">=</span><span class="n">queryGeneWhere</span><span class="p">,</span>
+                <span class="n">fromFilter</span><span class="o">=</span><span class="n">queryGeneFilter</span><span class="p">,</span>
+                <span class="n">joinFilter</span><span class="o">=</span><span class="n">queryGeneFilter</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="k">for</span> <span class="p">(</span><span class="n">rid</span><span class="p">,)</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">generateQueryResults</span><span class="p">(</span>
+                <span class="n">queryGene</span><span class="p">,</span> <span class="n">allowDupes</span><span class="o">=</span><span class="kc">True</span>
+            <span class="p">):</span>  <span class="c1"># noqa E501</span>
+                <span class="n">features</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">rid</span><span class="p">)</span>
+            <span class="n">n</span> <span class="o">+=</span> <span class="nb">len</span><span class="p">(</span><span class="n">features</span><span class="p">)</span>
+            <span class="n">geneData</span><span class="p">[</span><span class="n">gid</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="nb">frozenset</span><span class="p">(</span><span class="n">features</span><span class="p">))</span>
+            <span class="c1"># foreach feature</span>
+        <span class="c1"># foreach gene</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">logPop</span><span class="p">(</span><span class="s2">&quot;... OK: </span><span class="si">%d</span><span class="s2"> matched features</span><span class="se">\n</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">n</span><span class="p">,))</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">logPush</span><span class="p">(</span><span class="s2">&quot;mapping pathway features ...</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">n</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="k">for</span> <span class="n">uid</span><span class="p">,</span> <span class="n">udata</span> <span class="ow">in</span> <span class="n">groupData</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="n">features</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>  <span class="c1"># TODO: allow duplicate features (build as list)</span>
+            <span class="k">for</span> <span class="n">gid</span> <span class="ow">in</span> <span class="n">udata</span><span class="p">[</span><span class="mi">2</span><span class="p">]:</span>
+                <span class="n">features</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">geneData</span><span class="p">[</span><span class="n">gid</span><span class="p">][</span><span class="mi">2</span><span class="p">])</span>
+            <span class="n">n</span> <span class="o">+=</span> <span class="nb">len</span><span class="p">(</span><span class="n">features</span><span class="p">)</span>
+            <span class="n">groupData</span><span class="p">[</span><span class="n">uid</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="nb">frozenset</span><span class="p">(</span><span class="n">features</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">logPop</span><span class="p">(</span><span class="s2">&quot;... OK: </span><span class="si">%d</span><span class="s2"> matched features</span><span class="se">\n</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">n</span><span class="p">,))</span>
+
+        <span class="c1"># return the output generator</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">logPop</span><span class="p">(</span><span class="s2">&quot;... OK</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+
+        <span class="n">genePvalCache</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">()</span>
+
+        <span class="k">def</span> <span class="nf">renderPermuPVal</span><span class="p">(</span><span class="n">realFeatures</span><span class="p">,</span> <span class="n">geneID</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+            <span class="n">ret</span> <span class="o">=</span> <span class="n">genePvalCache</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">geneID</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">ret</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">ret</span>
+            <span class="n">maxScore</span> <span class="o">=</span> <span class="kc">None</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_options</span><span class="o">.</span><span class="n">paris_max_p_value</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">maxScore</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">_options</span><span class="o">.</span><span class="n">paris_max_p_value</span>
+                    <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">_options</span><span class="o">.</span><span class="n">paris_permutation_count</span>
+                    <span class="o">+</span> <span class="mf">0.5</span>
+                <span class="p">)</span>
+            <span class="n">realScore</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">getPARISPermutationScore</span><span class="p">(</span>
+                <span class="n">featureData</span><span class="p">,</span>
+                <span class="n">featureBin</span><span class="p">,</span>
+                <span class="n">binFeatures</span><span class="p">,</span>
+                <span class="n">realFeatures</span><span class="p">,</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_options</span><span class="o">.</span><span class="n">paris_permutation_count</span><span class="p">,</span>
+                <span class="n">maxScore</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="k">if</span> <span class="n">realScore</span> <span class="o">&lt;</span> <span class="mi">1</span><span class="p">:</span>
+                <span class="n">ret</span> <span class="o">=</span> <span class="s2">&quot;&lt; </span><span class="si">%g</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="mf">1.0</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">_options</span><span class="o">.</span><span class="n">paris_permutation_count</span><span class="p">,)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">ret</span> <span class="o">=</span> <span class="s2">&quot;</span><span class="si">%g</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span>
+                    <span class="nb">float</span><span class="p">(</span><span class="n">realScore</span><span class="p">)</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">_options</span><span class="o">.</span><span class="n">paris_permutation_count</span><span class="p">,</span>
+                <span class="p">)</span>  <span class="c1"># noqa E501</span>
+                <span class="k">if</span> <span class="n">maxScore</span> <span class="ow">and</span> <span class="p">(</span><span class="n">realScore</span> <span class="o">&gt;=</span> <span class="n">maxScore</span><span class="p">):</span>
+                    <span class="n">ret</span> <span class="o">=</span> <span class="s2">&quot;&gt;= &quot;</span> <span class="o">+</span> <span class="n">ret</span>
+            <span class="k">if</span> <span class="n">geneID</span><span class="p">:</span>
+                <span class="n">genePvalCache</span><span class="p">[</span><span class="n">geneID</span><span class="p">]</span> <span class="o">=</span> <span class="n">ret</span>
+            <span class="k">return</span> <span class="n">ret</span>
+
+        <span class="c1"># renderPermuPVal()</span>
+
+        <span class="k">yield</span> <span class="p">(</span>
+            <span class="s2">&quot;id&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;group&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;description&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;genes&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;features&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;simple&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;(sig)&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;complex&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;(sig)&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;pval&quot;</span><span class="p">,</span>
+            <span class="p">(</span>
+                <span class="s2">&quot;gene&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;features&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;simple&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;(sig)&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;complex&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;(sig)&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;pval&quot;</span><span class="p">,</span>
+            <span class="p">),</span>  <span class="c1"># noqa E501</span>
+        <span class="p">)</span>
+        <span class="k">for</span> <span class="n">uid</span><span class="p">,</span> <span class="n">udata</span> <span class="ow">in</span> <span class="n">groupData</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="k">yield</span> <span class="p">(</span>
+                <span class="n">uid</span><span class="p">,</span>
+                <span class="n">udata</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span>
+                <span class="n">udata</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span>
+                <span class="nb">len</span><span class="p">(</span><span class="n">udata</span><span class="p">[</span><span class="mi">2</span><span class="p">]),</span>
+                <span class="nb">len</span><span class="p">(</span><span class="n">udata</span><span class="p">[</span><span class="mi">3</span><span class="p">]),</span>
+                <span class="nb">sum</span><span class="p">(</span><span class="mi">1</span> <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">udata</span><span class="p">[</span><span class="mi">3</span><span class="p">]</span> <span class="k">if</span> <span class="p">(</span><span class="n">featureData</span><span class="p">[</span><span class="n">f</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="mi">1</span><span class="p">)),</span>
+                <span class="nb">sum</span><span class="p">(</span>
+                    <span class="mi">1</span>
+                    <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">udata</span><span class="p">[</span><span class="mi">3</span><span class="p">]</span>
+                    <span class="k">if</span> <span class="p">(</span><span class="n">featureData</span><span class="p">[</span><span class="n">f</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span> <span class="ow">and</span> <span class="p">(</span><span class="n">featureData</span><span class="p">[</span><span class="n">f</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="mi">1</span><span class="p">))</span>
+                <span class="p">),</span>
+                <span class="nb">sum</span><span class="p">(</span><span class="mi">1</span> <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">udata</span><span class="p">[</span><span class="mi">3</span><span class="p">]</span> <span class="k">if</span> <span class="p">(</span><span class="n">featureData</span><span class="p">[</span><span class="n">f</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">)),</span>
+                <span class="nb">sum</span><span class="p">(</span>
+                    <span class="mi">1</span>
+                    <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">udata</span><span class="p">[</span><span class="mi">3</span><span class="p">]</span>
+                    <span class="k">if</span> <span class="p">(</span><span class="n">featureData</span><span class="p">[</span><span class="n">f</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span> <span class="ow">and</span> <span class="p">(</span><span class="n">featureData</span><span class="p">[</span><span class="n">f</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">))</span>
+                <span class="p">),</span>
+                <span class="n">renderPermuPVal</span><span class="p">(</span><span class="n">udata</span><span class="p">[</span><span class="mi">3</span><span class="p">]),</span>
+                <span class="p">(</span>
+                    <span class="p">(</span>
+                        <span class="n">geneData</span><span class="p">[</span><span class="n">gid</span><span class="p">][</span><span class="mi">0</span><span class="p">],</span>
+                        <span class="nb">len</span><span class="p">(</span><span class="n">geneData</span><span class="p">[</span><span class="n">gid</span><span class="p">][</span><span class="mi">2</span><span class="p">]),</span>
+                        <span class="nb">sum</span><span class="p">(</span>
+                            <span class="mi">1</span>
+                            <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">geneData</span><span class="p">[</span><span class="n">gid</span><span class="p">][</span><span class="mi">2</span><span class="p">]</span>
+                            <span class="k">if</span> <span class="p">(</span><span class="n">featureData</span><span class="p">[</span><span class="n">f</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="mi">1</span><span class="p">)</span>  <span class="c1"># noqa E501</span>
+                        <span class="p">),</span>  <span class="c1"># noqa E501</span>
+                        <span class="nb">sum</span><span class="p">(</span>
+                            <span class="mi">1</span>
+                            <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">geneData</span><span class="p">[</span><span class="n">gid</span><span class="p">][</span><span class="mi">2</span><span class="p">]</span>
+                            <span class="k">if</span> <span class="p">(</span><span class="n">featureData</span><span class="p">[</span><span class="n">f</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span> <span class="ow">and</span> <span class="p">(</span><span class="n">featureData</span><span class="p">[</span><span class="n">f</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="mi">1</span><span class="p">))</span>
+                        <span class="p">),</span>
+                        <span class="nb">sum</span><span class="p">(</span>
+                            <span class="mi">1</span>
+                            <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">geneData</span><span class="p">[</span><span class="n">gid</span><span class="p">][</span><span class="mi">2</span><span class="p">]</span>
+                            <span class="k">if</span> <span class="p">(</span><span class="n">featureData</span><span class="p">[</span><span class="n">f</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">)</span>  <span class="c1"># noqa E501</span>
+                        <span class="p">),</span>  <span class="c1"># noqa E501</span>
+                        <span class="nb">sum</span><span class="p">(</span>
+                            <span class="mi">1</span>
+                            <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">geneData</span><span class="p">[</span><span class="n">gid</span><span class="p">][</span><span class="mi">2</span><span class="p">]</span>
+                            <span class="k">if</span> <span class="p">(</span><span class="n">featureData</span><span class="p">[</span><span class="n">f</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span> <span class="ow">and</span> <span class="p">(</span><span class="n">featureData</span><span class="p">[</span><span class="n">f</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">))</span>
+                        <span class="p">),</span>
+                        <span class="n">renderPermuPVal</span><span class="p">(</span><span class="n">geneData</span><span class="p">[</span><span class="n">gid</span><span class="p">][</span><span class="mi">2</span><span class="p">],</span> <span class="n">gid</span><span class="p">),</span>
+                    <span class="p">)</span>
+                    <span class="k">for</span> <span class="n">gid</span> <span class="ow">in</span> <span class="n">udata</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span>
+                <span class="p">),</span>
+            <span class="p">)</span></div>
+</div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Ritchie Lab.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

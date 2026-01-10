@@ -1,0 +1,342 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>biofilter_modules.mixins.schema &mdash; Biofilter 2.4.4 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=b1e24531"></script>
+      <script src="../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            Biofilter
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <!-- Local TOC -->
+              <div class="local-toc"></div>
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">Biofilter</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">biofilter_modules.mixins.schema</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for biofilter_modules.mixins.schema</h1><div class="highlight"><pre>
+<span></span><span class="c1"># schema.py</span>
+
+
+<div class="viewcode-block" id="Schema">
+<a class="viewcode-back" href="../../../biofilter_modules.mixins.html#biofilter_modules.Schema">[docs]</a>
+<span class="k">class</span> <span class="nc">Schema</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    A Schema class that defines the database schema for the Biofilter</span>
+<span class="sd">    application.</span>
+
+<span class="sd">    This class serves as a container for the database schema definition,</span>
+<span class="sd">    allowing the Biofilter class to easily access and use the structure of the</span>
+<span class="sd">    database tables needed for processing genetic and biological data.</span>
+
+<span class="sd">    Attributes:</span>
+<span class="sd">    ----------</span>
+<span class="sd">    _schema : dict</span>
+<span class="sd">        A dictionary representing the database schema. Each key at the top</span>
+<span class="sd">        level corresponds to a database category (&#39;main&#39;, &#39;user&#39;, &#39;cand&#39;.),</span>
+<span class="sd">        and within each category, there are specific tables with SQL</span>
+<span class="sd">        definitions for creating the tables, as well as other properties.</span>
+
+<span class="sd">        Example structure:</span>
+<span class="sd">        {</span>
+<span class="sd">            &#39;main&#39;: {</span>
+<span class="sd">                &#39;snp&#39;: {</span>
+<span class="sd">                    &#39;table&#39;:</span>
+<span class="sd">                    (</span>
+<span class="sd">                        rowid INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,</span>
+<span class="sd">                        label VARCHAR(32) NOT NULL,</span>
+<span class="sd">                        rs INTEGER NOT NULL,</span>
+<span class="sd">                        flag TINYINT NOT NULL DEFAULT 0,</span>
+<span class="sd">                        extra TEXT</span>
+<span class="sd">                    )</span>
+<span class="sd">                    ,</span>
+<span class="sd">                    # Additional table specifications...</span>
+<span class="sd">                },</span>
+<span class="sd">                # More tables under &#39;main&#39;...</span>
+<span class="sd">            },</span>
+<span class="sd">            # More categories (e.g., &#39;alt&#39;) with tables...</span>
+<span class="sd">        }</span>
+
+<span class="sd">    Purpose:</span>
+<span class="sd">    --------</span>
+<span class="sd">    Encapsulating the schema in this class helps keep the database structure</span>
+<span class="sd">    organized and separated from the logic within the Biofilter class,promoting</span>
+<span class="sd">    maintainability and clarity. The schema can be expanded or modified within</span>
+<span class="sd">    this file without altering the main application code in Biofilter.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">schema</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="c1"># #################################################</span>
+        <span class="c1"># main input filter tables (copied for alt)</span>
+        <span class="s2">&quot;main&quot;</span><span class="p">:</span> <span class="p">{</span>
+            <span class="s2">&quot;snp&quot;</span><span class="p">:</span> <span class="p">{</span>
+                <span class="s2">&quot;table&quot;</span><span class="p">:</span> <span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">                    (</span>
+<span class="s2">                    rowid INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,</span>
+<span class="s2">                    label VARCHAR(32) NOT NULL,</span>
+<span class="s2">                    rs INTEGER NOT NULL,</span>
+<span class="s2">                    flag TINYINT NOT NULL DEFAULT 0,</span>
+<span class="s2">                    extra TEXT</span>
+<span class="s2">                    )</span>
+<span class="s2">                &quot;&quot;&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;index&quot;</span><span class="p">:</span> <span class="p">{</span>
+                    <span class="s2">&quot;snp__rs&quot;</span><span class="p">:</span> <span class="s2">&quot;(rs)&quot;</span><span class="p">,</span>
+                <span class="p">},</span>
+            <span class="p">},</span>  <span class="c1"># main.snp</span>
+            <span class="s2">&quot;locus&quot;</span><span class="p">:</span> <span class="p">{</span>  <span class="c1"># all coordinates in LOKI are 1-based closed intervals</span>
+                <span class="s2">&quot;table&quot;</span><span class="p">:</span> <span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">                    (</span>
+<span class="s2">                    rowid INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,</span>
+<span class="s2">                    label VARCHAR(32) NOT NULL,</span>
+<span class="s2">                    chr TINYINT NOT NULL,</span>
+<span class="s2">                    pos BIGINT NOT NULL,</span>
+<span class="s2">                    flag TINYINT NOT NULL DEFAULT 0,</span>
+<span class="s2">                    extra TEXT</span>
+<span class="s2">                    )</span>
+<span class="s2">                    &quot;&quot;&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;index&quot;</span><span class="p">:</span> <span class="p">{</span>
+                    <span class="s2">&quot;locus__pos&quot;</span><span class="p">:</span> <span class="s2">&quot;(chr,pos)&quot;</span><span class="p">,</span>
+                <span class="p">},</span>
+            <span class="p">},</span>  <span class="c1"># main.locus</span>
+            <span class="s2">&quot;region&quot;</span><span class="p">:</span> <span class="p">{</span>  <span class="c1"># all coordinates in LOKI are 1-based closed intervals</span>
+                <span class="s2">&quot;table&quot;</span><span class="p">:</span> <span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">                    (</span>
+<span class="s2">                    rowid INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,</span>
+<span class="s2">                    label VARCHAR(32) NOT NULL,</span>
+<span class="s2">                    chr TINYINT NOT NULL,</span>
+<span class="s2">                    posMin BIGINT NOT NULL,</span>
+<span class="s2">                    posMax BIGINT NOT NULL,</span>
+<span class="s2">                    flag TINYINT NOT NULL DEFAULT 0,</span>
+<span class="s2">                    extra TEXT</span>
+<span class="s2">                    )</span>
+<span class="s2">                    &quot;&quot;&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;index&quot;</span><span class="p">:</span> <span class="p">{</span>
+                    <span class="s2">&quot;region__chr_min&quot;</span><span class="p">:</span> <span class="s2">&quot;(chr,posMin)&quot;</span><span class="p">,</span>
+                    <span class="s2">&quot;region__chr_max&quot;</span><span class="p">:</span> <span class="s2">&quot;(chr,posMax)&quot;</span><span class="p">,</span>
+                <span class="p">},</span>
+            <span class="p">},</span>  <span class="c1"># main.region</span>
+            <span class="s2">&quot;region_zone&quot;</span><span class="p">:</span> <span class="p">{</span>
+                <span class="s2">&quot;table&quot;</span><span class="p">:</span> <span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">                    (</span>
+<span class="s2">                    region_rowid INTEGER NOT NULL,</span>
+<span class="s2">                    chr TINYINT NOT NULL,</span>
+<span class="s2">                    zone INTEGER NOT NULL,</span>
+<span class="s2">                    PRIMARY KEY (chr,zone,region_rowid)</span>
+<span class="s2">                    )</span>
+<span class="s2">                    &quot;&quot;&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;index&quot;</span><span class="p">:</span> <span class="p">{</span>
+                    <span class="s2">&quot;region_zone__region&quot;</span><span class="p">:</span> <span class="s2">&quot;(region_rowid)&quot;</span><span class="p">,</span>
+                <span class="p">},</span>
+            <span class="p">},</span>  <span class="c1"># main.region_zone</span>
+            <span class="s2">&quot;gene&quot;</span><span class="p">:</span> <span class="p">{</span>
+                <span class="s2">&quot;table&quot;</span><span class="p">:</span> <span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">                    (</span>
+<span class="s2">                    rowid INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,</span>
+<span class="s2">                    label VARCHAR(32) NOT NULL,</span>
+<span class="s2">                    biopolymer_id INTEGER NOT NULL,</span>
+<span class="s2">                    flag TINYINT NOT NULL DEFAULT 0,</span>
+<span class="s2">                    extra TEXT</span>
+<span class="s2">                    )</span>
+<span class="s2">                    &quot;&quot;&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;index&quot;</span><span class="p">:</span> <span class="p">{</span>
+                    <span class="s2">&quot;gene__biopolymer&quot;</span><span class="p">:</span> <span class="s2">&quot;(biopolymer_id)&quot;</span><span class="p">,</span>
+                <span class="p">},</span>
+            <span class="p">},</span>  <span class="c1"># main.gene</span>
+            <span class="s2">&quot;group&quot;</span><span class="p">:</span> <span class="p">{</span>
+                <span class="s2">&quot;table&quot;</span><span class="p">:</span> <span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">                    (</span>
+<span class="s2">                    rowid INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,</span>
+<span class="s2">                    label VARCHAR(32) NOT NULL,</span>
+<span class="s2">                    group_id INTEGER NOT NULL,</span>
+<span class="s2">                    flag TINYINT NOT NULL DEFAULT 0,</span>
+<span class="s2">                    extra TEXT</span>
+<span class="s2">                    )</span>
+<span class="s2">                    &quot;&quot;&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;index&quot;</span><span class="p">:</span> <span class="p">{</span>
+                    <span class="s2">&quot;group__group_id&quot;</span><span class="p">:</span> <span class="s2">&quot;(group_id)&quot;</span><span class="p">,</span>
+                <span class="p">},</span>
+            <span class="p">},</span>  <span class="c1"># main.group</span>
+            <span class="s2">&quot;source&quot;</span><span class="p">:</span> <span class="p">{</span>
+                <span class="s2">&quot;table&quot;</span><span class="p">:</span> <span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">                    (</span>
+<span class="s2">                    rowid INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,</span>
+<span class="s2">                    label VARCHAR(32) NOT NULL,</span>
+<span class="s2">                    source_id INTEGER NOT NULL,</span>
+<span class="s2">                    flag TINYINT NOT NULL DEFAULT 0</span>
+<span class="s2">                    )</span>
+<span class="s2">                    &quot;&quot;&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;index&quot;</span><span class="p">:</span> <span class="p">{</span>
+                    <span class="s2">&quot;source__source_id&quot;</span><span class="p">:</span> <span class="s2">&quot;(source_id)&quot;</span><span class="p">,</span>
+                <span class="p">},</span>
+            <span class="p">},</span>  <span class="c1"># main.source</span>
+        <span class="p">},</span>  <span class="c1"># main</span>
+        <span class="c1">##################################################</span>
+        <span class="c1"># user data tables</span>
+        <span class="s2">&quot;user&quot;</span><span class="p">:</span> <span class="p">{</span>
+            <span class="s2">&quot;group&quot;</span><span class="p">:</span> <span class="p">{</span>
+                <span class="s2">&quot;table&quot;</span><span class="p">:</span> <span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">                    (</span>
+<span class="s2">                    group_id INTEGER PRIMARY KEY NOT NULL,</span>
+<span class="s2">                    label VARCHAR(64) NOT NULL,</span>
+<span class="s2">                    description VARCHAR(256),</span>
+<span class="s2">                    source_id INTEGER NOT NULL,</span>
+<span class="s2">                    extra TEXT</span>
+<span class="s2">                    )</span>
+<span class="s2">                    &quot;&quot;&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;index&quot;</span><span class="p">:</span> <span class="p">{</span>
+                    <span class="s2">&quot;group__label&quot;</span><span class="p">:</span> <span class="s2">&quot;(label)&quot;</span><span class="p">,</span>
+                <span class="p">},</span>
+            <span class="p">},</span>  <span class="c1"># user.group</span>
+            <span class="s2">&quot;group_group&quot;</span><span class="p">:</span> <span class="p">{</span>
+                <span class="s2">&quot;table&quot;</span><span class="p">:</span> <span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">                    (</span>
+<span class="s2">                    group_id INTEGER NOT NULL,</span>
+<span class="s2">                    related_group_id INTEGER NOT NULL,</span>
+<span class="s2">                    contains TINYINT,</span>
+<span class="s2">                    PRIMARY KEY (group_id,related_group_id)</span>
+<span class="s2">                    )</span>
+<span class="s2">                    &quot;&quot;&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;index&quot;</span><span class="p">:</span> <span class="p">{</span>
+                    <span class="s2">&quot;group_group__related&quot;</span><span class="p">:</span> <span class="s2">&quot;(related_group_id,group_id)&quot;</span><span class="p">,</span>
+                <span class="p">},</span>
+            <span class="p">},</span>  <span class="c1"># user.group_group</span>
+            <span class="s2">&quot;group_biopolymer&quot;</span><span class="p">:</span> <span class="p">{</span>
+                <span class="s2">&quot;table&quot;</span><span class="p">:</span> <span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">                    (</span>
+<span class="s2">                    group_id INTEGER NOT NULL,</span>
+<span class="s2">                    biopolymer_id INTEGER NOT NULL,</span>
+<span class="s2">                    PRIMARY KEY (group_id,biopolymer_id)</span>
+<span class="s2">                    )</span>
+<span class="s2">                    &quot;&quot;&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;index&quot;</span><span class="p">:</span> <span class="p">{</span>
+                    <span class="s2">&quot;group_biopolymer__biopolymer&quot;</span><span class="p">:</span> <span class="s2">&quot;(biopolymer_id,group_id)&quot;</span><span class="p">,</span>
+                <span class="p">},</span>
+            <span class="p">},</span>  <span class="c1"># user.group_biopolymer</span>
+            <span class="s2">&quot;source&quot;</span><span class="p">:</span> <span class="p">{</span>
+                <span class="s2">&quot;table&quot;</span><span class="p">:</span> <span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">                    (</span>
+<span class="s2">                    source_id INTEGER PRIMARY KEY NOT NULL,</span>
+<span class="s2">                    source VARCHAR(32) NOT NULL,</span>
+<span class="s2">                    description VARCHAR(256) NOT NULL</span>
+<span class="s2">                    )</span>
+<span class="s2">                    &quot;&quot;&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;index&quot;</span><span class="p">:</span> <span class="p">{},</span>
+            <span class="p">},</span>  <span class="c1"># user.source</span>
+        <span class="p">},</span>  <span class="c1"># user</span>
+        <span class="c1">##################################################</span>
+        <span class="c1"># modeling candidate tables</span>
+        <span class="s2">&quot;cand&quot;</span><span class="p">:</span> <span class="p">{</span>
+            <span class="s2">&quot;main_biopolymer&quot;</span><span class="p">:</span> <span class="p">{</span>
+                <span class="s2">&quot;table&quot;</span><span class="p">:</span> <span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">                    (</span>
+<span class="s2">                    biopolymer_id INTEGER PRIMARY KEY NOT NULL,</span>
+<span class="s2">                    flag TINYINT NOT NULL DEFAULT 0</span>
+<span class="s2">                    )</span>
+<span class="s2">                    &quot;&quot;&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;index&quot;</span><span class="p">:</span> <span class="p">{},</span>
+            <span class="p">},</span>  <span class="c1"># cand.main_biopolymer</span>
+            <span class="s2">&quot;alt_biopolymer&quot;</span><span class="p">:</span> <span class="p">{</span>
+                <span class="s2">&quot;table&quot;</span><span class="p">:</span> <span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">                    (</span>
+<span class="s2">                    biopolymer_id INTEGER PRIMARY KEY NOT NULL,</span>
+<span class="s2">                    flag TINYINT NOT NULL DEFAULT 0</span>
+<span class="s2">                    )</span>
+<span class="s2">                    &quot;&quot;&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;index&quot;</span><span class="p">:</span> <span class="p">{},</span>
+            <span class="p">},</span>  <span class="c1"># cand.alt_biopolymer</span>
+            <span class="s2">&quot;group&quot;</span><span class="p">:</span> <span class="p">{</span>
+                <span class="s2">&quot;table&quot;</span><span class="p">:</span> <span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">                    (</span>
+<span class="s2">                    group_id INTEGER PRIMARY KEY NOT NULL,</span>
+<span class="s2">                    flag TINYINT NOT NULL DEFAULT 0</span>
+<span class="s2">                    )</span>
+<span class="s2">                    &quot;&quot;&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;index&quot;</span><span class="p">:</span> <span class="p">{},</span>
+            <span class="p">},</span>  <span class="c1"># cand.group</span>
+        <span class="p">},</span>  <span class="c1"># cand</span>
+    <span class="p">}</span></div>
+
+
+
+<span class="c1"># _schema{}</span>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Ritchie Lab.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

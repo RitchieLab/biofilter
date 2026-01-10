@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "biofilter"
-version = "3.2.0"
+version = "3.2.1"
 description = "Biofilter3R: cloud-ready biological knowledge system"
 authors = ["Andre Rico <andreluis.rico@pennmedicine.upenn.edu>"]
 license = "MIT"
@@ -8,7 +8,7 @@ homepage = "https://ritchielab.org"
 readme = "README.md"
 
 [tool.poetry.scripts]
-biofilter = "biofilter.cli:main"
+biofilter = "biofilter.cli.main:main"
 biofilter-parquet = "biofilter.tools.parquet_exporter:cli"
 
 [tool.poetry.dependencies]
@@ -44,6 +44,8 @@ sphinx-rtd-theme = "^3.0.2"
 tox = "^4.23.2"
 sphinx-material = "^0.0.36"
 pylint = "^3.3.3"
+myst-parser = "^4.0.1"
+linkify-it-py = "^2.0.3"
 
 [build-system]
 requires = ["poetry-core"]
