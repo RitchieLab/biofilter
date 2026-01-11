@@ -32,3 +32,4 @@ sections in order.
 5_queries
 6_etl
 7_configuration_logs
+8_data_sources
