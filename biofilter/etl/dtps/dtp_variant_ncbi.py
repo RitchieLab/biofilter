@@ -544,13 +544,24 @@ class DTP(DTPBase, EntityQueryMixin):
             return []
         return []
 
-    def _get_insert_for_dialect(self, model_cls, dialect_name):
+    # Add 3.2.1
+    # def _get_insert_for_dialect(self, model_cls, dialect_name):
+    #     if dialect_name == "sqlite":
+    #         return sqlite_insert(model_cls)
+    #     elif dialect_name == "postgresql":
+    #         return pg_insert(model_cls)
+    #     else:
+    #         return generic_insert(model_cls)
+    def _get_insert_for_dialect(self, table_or_model, dialect_name):
+        # Always target a Table for dialect inserts
+        table = getattr(table_or_model, "__table__", table_or_model)
+
         if dialect_name == "sqlite":
-            return sqlite_insert(model_cls)
+            return sqlite_insert(table)
         elif dialect_name == "postgresql":
-            return pg_insert(model_cls)
+            return pg_insert(table)
         else:
-            return generic_insert(model_cls)
+            return generic_insert(table)
 
     def _upsert_snps_from_df(self, df: pd.DataFrame):
         if df.empty:
@@ -561,7 +572,7 @@ class DTP(DTPBase, EntityQueryMixin):
         # Security for SQLite: keep well below the parameter limit.
         # 8 columns * 100 rows = 800 parameters << 999
         if dialect_name == "sqlite":
-            chunk_size = 100
+            chunk_size = 80
         else:
             # For Postgres, you can upload more records without problems.
             chunk_size = 1000
@@ -593,7 +604,12 @@ class DTP(DTPBase, EntityQueryMixin):
         if not records:
             return
 
-        insert_cls = self._get_insert_for_dialect(VariantSNP, dialect_name)
+        # ADD 3.2.1: after we change de model
+        # insert_cls = self._get_insert_for_dialect(VariantSNP, dialect_name)
+        # insert_cls = self._get_insert_for_dialect(VariantSNP.__table__, dialect_name)
+        from biofilter.db.base import Base
+        variant_snps_table = Base.metadata.tables["variant_snps"]
+        insert_cls = self._get_insert_for_dialect(variant_snps_table, dialect_name)
 
         for start in range(0, len(records), chunk_size):
             chunk = records[start: start + chunk_size]
@@ -665,6 +681,7 @@ class DTP(DTPBase, EntityQueryMixin):
                 continue
 
             merge_list = row.get("merge_log")
+            # merge_list = self._parse_merge_log(row.get("merge_log"))
 
             for obsolete in merge_list:
                 records.append(

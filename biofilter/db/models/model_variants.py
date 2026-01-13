@@ -1,15 +1,17 @@
 from sqlalchemy import (
-    BigInteger,
-    Column,
-    Integer,
-    ForeignKey,
-    String,
     Float,
     Text,
+    Table,
+    Column,
+    Integer,
+    BigInteger,
+    String,
+    ForeignKey,
     UniqueConstraint,
     PrimaryKeyConstraint,
+    MetaData,
 )
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import registry, relationship
 from biofilter.db.base import Base
 from biofilter.db.types import PKBigIntOrInt
 
@@ -72,51 +74,135 @@ annotation layers are fully established.
 #         nullable=True,
 #     )
 #     etl_package = relationship("ETLPackage", passive_deletes=True)
-class VariantSNP(Base):
-    __tablename__ = "variant_snps"
+# class VariantSNP(Base):
+#     __tablename__ = "variant_snps"
 
-    # Partition key
-    chromosome = Column(Integer, nullable=False)
+#     # Partition key
+#     chromosome = Column(Integer, nullable=False)
 
-    # Identity / autoincrement (works well on Postgres; SQLite will emulate)
-    id = Column(PKBigIntOrInt, autoincrement=True, nullable=False)
+#     # Identity / autoincrement (works well on Postgres; SQLite will emulate)
+#     id = Column(PKBigIntOrInt, autoincrement=True, nullable=False)
 
-    source_type = Column(String(20), nullable=False)   # e.g. "rs"
-    source_id = Column(BigInteger, nullable=False)     # numeric part (e.g. 123 for rs123)
+#     source_type = Column(String(20), nullable=False)   # e.g. "rs"
+#     source_id = Column(BigInteger, nullable=False)     # numeric part (e.g. 123 for rs123)
 
-    position_37 = Column(BigInteger, nullable=True)
-    position_38 = Column(BigInteger, nullable=True)
-    position_other = Column(BigInteger, nullable=True)
+#     position_37 = Column(BigInteger, nullable=True)
+#     position_38 = Column(BigInteger, nullable=True)
+#     position_other = Column(BigInteger, nullable=True)
 
-    reference_allele = Column(String(4), nullable=True)
-    alternate_allele = Column(String(16), nullable=True)
+#     reference_allele = Column(String(4), nullable=True)
+#     alternate_allele = Column(String(16), nullable=True)
 
-    # Provenance
-    data_source_id = Column(
-        Integer,
-        ForeignKey("etl_data_sources.id", ondelete="CASCADE"),
-        nullable=True,
-    )
-    data_source = relationship("ETLDataSource", passive_deletes=True)
+#     # Provenance
+#     data_source_id = Column(
+#         Integer,
+#         ForeignKey("etl_data_sources.id", ondelete="CASCADE"),
+#         nullable=True,
+#     )
+#     data_source = relationship("ETLDataSource", passive_deletes=True)
 
-    etl_package_id = Column(
-        Integer,
-        ForeignKey("etl_packages.id", ondelete="CASCADE"),
-        nullable=True,
-    )
-    etl_package = relationship("ETLPackage", passive_deletes=True)
+#     etl_package_id = Column(
+#         Integer,
+#         ForeignKey("etl_packages.id", ondelete="CASCADE"),
+#         nullable=True,
+#     )
+#     etl_package = relationship("ETLPackage", passive_deletes=True)
 
-    __table_args__ = (
-        # Must include the partition key in PK on Postgres
-        PrimaryKeyConstraint("chromosome", "id", name="pk_variant_snps"),
-        # Uniqueness that matches your lookup semantics and partitioning
-        UniqueConstraint(
-            "chromosome", "source_type", "source_id",
-            name="uq_variant_snps_chr_source"
-        ),
-    )
+#     __table_args__ = (
+#         # Must include the partition key in PK on Postgres
+#         PrimaryKeyConstraint("chromosome", "id", name="pk_variant_snps"),
+#         # Uniqueness that matches your lookup semantics and partitioning
+#         UniqueConstraint(
+#             "chromosome", "source_type", "source_id",
+#             name="uq_variant_snps_chr_source"
+#         ),
+#     )
 
-    # IMPORT: This model is create table by DB management because partitions
+#     # IMPORT: This model is create table by DB management because partitions
+
+mapper_registry = registry()
+
+
+class VariantSNP:
+    """
+    ORM-mapped class for the 'variant_snps' table.
+
+    - SQLite: PK is (id) with autoincrement (INTEGER PRIMARY KEY).
+    - PostgreSQL: PK is (chromosome, id) to satisfy partitioning constraints.
+    NOTE: On PostgreSQL the table is created via raw DDL (partitioned),
+    and we generally use SQLAlchemy Core (Table) to write to it.
+    """
+    pass
+
+
+def map_variant_snp(engine, metadata: MetaData, model_cls=VariantSNP):
+    """
+    Ensure Table('variant_snps') exists in the provided metadata for ALL dialects.
+    Additionally, map the ORM class ONLY on SQLite.
+
+    Safe to call multiple times.
+    """
+    dialect = engine.dialect.name
+    is_sqlite = dialect == "sqlite"
+
+    # 1) Ensure Table is registered in metadata (for both SQLite and Postgres)
+    if "variant_snps" in metadata.tables:
+        variant_snps = metadata.tables["variant_snps"]
+    else:
+        variant_snps = Table(
+            "variant_snps",
+            metadata,
+
+            # Keep chromosome as a normal column always
+            Column("chromosome", Integer, nullable=False),
+
+            # SQLite: INTEGER PRIMARY KEY => autoincrement behavior
+            # Postgres: bigint identity handled by raw DDL; here we declare BigInteger and keep nullable=False.
+            Column(
+                "id",
+                Integer if is_sqlite else BigInteger,
+                primary_key=is_sqlite,      # SQLite: PK is only id
+                autoincrement=is_sqlite,    # SQLite: true autoincrement
+                nullable=False,
+            ),
+
+            Column("source_type", String(20), nullable=False),
+            Column("source_id", BigInteger, nullable=False),
+
+            Column("position_37", BigInteger, nullable=True),
+            Column("position_38", BigInteger, nullable=True),
+            Column("position_other", BigInteger, nullable=True),
+
+            Column("reference_allele", String(4), nullable=True),
+            Column("alternate_allele", String(16), nullable=True),
+
+            Column("data_source_id", Integer, ForeignKey("etl_data_sources.id", ondelete="CASCADE"), nullable=True),
+            Column("etl_package_id", Integer, ForeignKey("etl_packages.id", ondelete="CASCADE"), nullable=True),
+
+            # Postgres: declare composite PK in metadata (matches your partitioned parent DDL).
+            # SQLite: cannot have autoincrement on composite PK, so we omit this constraint there.
+            *((
+                PrimaryKeyConstraint("chromosome", "id", name="pk_variant_snps"),
+            ) if not is_sqlite else ()),
+
+            UniqueConstraint("chromosome", "source_type", "source_id", name="uq_variant_snps_chr_source"),
+        )
+
+    # 2) Map ORM class only on SQLite (so VariantSNP.__table__ exists there)
+    # On Postgres we avoid mapping this class because the table is partitioned via raw DDL
+    # and we use the Core Table for inserts.
+    if is_sqlite and not hasattr(model_cls, "__mapper__"):
+        mapper_registry.map_imperatively(
+            model_cls,
+            variant_snps,
+            properties={
+                "data_source": relationship("ETLDataSource", passive_deletes=True),
+                "etl_package": relationship("ETLPackage", passive_deletes=True),
+            },
+        )
+
+    return variant_snps
+
 
 class VariantSNPMerge(Base):
 

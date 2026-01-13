@@ -1,8 +1,8 @@
 import time
 from biofilter import Biofilter
 
-# db_uri = "sqlite:///dev_biofilter.db"
-db_uri = "postgresql+psycopg2://bioadmin:bioadmin@localhost/biofilter"
+db_uri = "sqlite:///dev_biofilter_2.db"
+# db_uri = "postgresql+psycopg2://bioadmin:bioadmin@localhost/biofilter"
 
 # Configure below
 data_sources_to_process = [
@@ -10,7 +10,7 @@ data_sources_to_process = [
     # -----
     # "hgnc",
     # "gene_ncbi",
-    "ensembl",
+    # "ensembl",
     #
     # Proteins
     # --------
@@ -28,7 +28,7 @@ data_sources_to_process = [
     #
     # Variants
     # --------
-    # "dbsnp_sample",
+    "dbsnp_sample",
     # "dbsnp_chr1",
     # "dbsnp_chr2",
     # "dbsnp_chr3",
@@ -75,8 +75,8 @@ data_sources_to_process = [
 ]
 
 run_steps = [
-    # "extract",
-    # "transform",
+    "extract",
+    "transform",
     "load",
     # "all"
 ]  # noqa E501

@@ -4,7 +4,9 @@ from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 from biofilter.db.base import Base
 from importlib import import_module
-from biofilter.utils.db_loader import load_all_models  # ✅ novo import
+# from biofilter.utils.db_loader import load_all_models  # ✅ novo import
+from biofilter.utils.db_loader import bootstrap_models
+
 from datetime import datetime
 
 
@@ -20,7 +22,9 @@ class CreateDBMixin:
         self.connect(check_exists=False)
 
         self.logger.log("Loading models...", "INFO")
-        load_all_models()
+
+        # Ensure all models + imperative mappings are registered
+        bootstrap_models(self.engine)
 
         self.logger.log("Creating tables...", "INFO")
         self._create_tables()
@@ -32,8 +36,9 @@ class CreateDBMixin:
         return True
 
     def _create_tables(self):
-        load_all_models()
-        # Base.metadata.create_all(self.engine)
+
+        # Ensure all models + imperative mappings are registered
+        bootstrap_models(self.engine)
 
         if self.engine.dialect.name == "postgresql":
             # 1) create partitioned parent FIRST (DDL)
@@ -50,6 +55,7 @@ class CreateDBMixin:
             Base.metadata.create_all(self.engine, tables=other_tables)
 
         else:
+            # SQLite path: variant_snps is registered + mapped
             Base.metadata.create_all(self.engine)
 
     def _create_variant_snps_partitioned_parent(self):

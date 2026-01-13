@@ -25,7 +25,7 @@ from biofilter.query import Query, SchemaExplorer
 
 class Biofilter:
     def __init__(self, db_uri: str = None, debug_mode: bool = False):
-        self.version = "3.2.0"
+        self.version = "3.2.1"
         
         if debug_mode:
             self.logger = Logger(log_level="DEBUG")
@@ -62,9 +62,17 @@ class Biofilter:
         # 1. Value from constructor
         # 2. Value from .biofilter.toml
         # 3. Fallback local
-        self.db_uri = db_uri or self.config.db_uri or "sqlite:///biofilter.db"
-        if self.db_uri:
+        # self.db_uri = db_uri or self.config.db_uri or "sqlite:///biofilter.db"
+        # self.db_uri = db_uri or self.config.db_uri
+        # if self.db_uri:
+        #     self.connect_db()
+        config_db_uri = getattr(self.config, "db_uri", None)
+        self.db_uri = db_uri or config_db_uri or "sqlite:///./biofilter.db"
+
+        # só conecta se o usuário explicitamente forneceu db_uri ou existe config
+        if db_uri or config_db_uri:
             self.connect_db()
+
 
     def _log_boot_banner(self, config_path: str | None):
         self.logger.log("════════════════════════════════════", "INFO")
