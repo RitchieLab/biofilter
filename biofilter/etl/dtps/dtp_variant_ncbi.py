@@ -10,6 +10,7 @@ import pandas as pd
 from pathlib import Path
 from typing import Dict, List, Any
 
+from sqlalchemy.engine import Connection
 from sqlalchemy import insert as generic_insert
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
@@ -18,7 +19,6 @@ from biofilter.etl.mixins.base_dtp import DTPBase
 from biofilter.etl.conflict_manager import ConflictManager
 from biofilter.etl.mixins.entity_query_mixin import EntityQueryMixin
 from biofilter.db.models import (
-    VariantSNP,
     VariantSNPMerge,
 )
 
@@ -77,6 +77,7 @@ class DTP(DTPBase, EntityQueryMixin):
         datasource=None,
         package=None,
         session=None,
+        db=None,
         use_conflict_csv=False,
     ):  # noqa: E501
         self.logger = logger
@@ -84,6 +85,7 @@ class DTP(DTPBase, EntityQueryMixin):
         self.data_source = datasource
         self.package = package
         self.session = session
+        self.db = db
         self.use_conflict_csv = use_conflict_csv
         self.conflict_mgr = ConflictManager(session, logger)
 
@@ -453,132 +455,79 @@ class DTP(DTPBase, EntityQueryMixin):
         # ===== PROCESS PER FILE =====
         # ============================
         for data_file in files_list:
+            self.logger.log(f"📂 Processing {data_file}", "INFO")
 
             try:
-                self.logger.log(f"📂 Processing {data_file}", "INFO")
                 df_data = pd.read_parquet(data_file, engine="pyarrow")
 
-                # SNP UPSERT
-                self._upsert_snps_from_df(
-                    df=df_data,
-                )
+                if df_data.empty:
+                    self.logger.log(f"⚠️ Empty file (skipped): {data_file}", "WARNING")
+                    continue
 
-                # SNPMerge UPSERT/INSERT
-                self._upsert_snpmerge_from_df(
-                    df=df_data,
-                )
+                # ✅ Transaction per file (commit/rollback automático)
+                with self.db.engine.begin() as conn:
+                    # SNP UPSERT
+                    self._upsert_snps_from_df(df=df_data, conn=conn)
 
-                self.session.commit()
-                self.logger.log(
-                    f"Processed {data_file}",
-                    "INFO",
-                )
+                    # SNPMerge UPSERT/INSERT
+                    self._upsert_snpmerge_from_df(df=df_data, conn=conn)
+
+                self.logger.log(f"✅ Processed {data_file}", "INFO")
 
             except Exception as e:
-                self.session.rollback()
-                self.logger.log(f"❌ SNP load failed: {e}", "ERROR")
+                total_warnings += 1
+                self.logger.log(f"❌ SNP load failed for {data_file}: {e}", "ERROR")
                 raise
 
         # Set DB to Read Mode and Create Index
         try:
             # self.create_indexes(self.get_snp_index_specs)
             # self.db_read_mode()
-            print("--> Indixe desativados")
+            self.logger.log("ℹ️ Index creation currently disabled.", "INFO")
         except Exception as e:
             total_warnings += 1
-            msg = f"Failed to switch DB to write mode or drop indexes: {e}"
+            msg = f"Failed to finalize DB (create indexes / read mode): {e}"
             self.logger.log(msg, "WARNING")
 
         if self.debug_mode:
-            msg = f"Load process ran in {time.time() - start_total}"
+            msg = f"Load process ran in {time.time() - start_total:.2f}s"
             self.logger.log(msg, "DEBUG")
 
         if total_warnings == 0:
-            msg = f"✅ Loaded {total_variants} variants from {len(files_list)} file(s)."  # noqa E501
+            msg = f"✅ Loaded {total_variants} variants from {len(files_list)} file(s)."
             self.logger.log(msg, "SUCCESS")
             return True, msg
-        else:
-            msg = f"Loaded {total_variants} variants with {total_warnings} warning(s). Check logs."  # noqa E501
-            self.logger.log(msg, "WARNING")
-            return True, msg
 
-    #  Support functions to TRANSFORM FASE  #
-    # --------------------------------------#
+        msg = f"⚠️ Loaded {total_variants} variants with {total_warnings} warning(s). Check logs."
+        self.logger.log(msg, "WARNING")
+        return True, msg
 
-    def _parse_merge_log(self, raw: Any) -> List[int]:
-        """
-        Parse merge_log column to a list of numeric rsIDs (integers).
+    # -------------------------------------------------------------------------
+    # Get Dialect Cnnector
+    # -------------------------------------------------------------------------
 
-        Accepted forms:
-        - "['59291991', '67359146']"
-        - []
-        - None
-        """
-        if raw is None:
-            return []
-
-        if isinstance(raw, list):
-            return [int(x) for x in raw]
-
-        s = str(raw).strip()
-        if not s or s == "[]":
-            return []
-
-        try:
-            parsed = ast.literal_eval(s)
-            if isinstance(parsed, (list, tuple)):
-                out = []
-                for x in parsed:
-                    if x is None:
-                        continue
-                    xs = str(x).strip()
-                    # Remove prefix "rs"
-                    if xs.startswith("rs"):
-                        xs = xs[2:]
-                    try:
-                        out.append(int(xs))
-                    except ValueError:
-                        continue
-                return out
-        except Exception:
-            return []
-        return []
-
-    # Add 3.2.1
-    # def _get_insert_for_dialect(self, model_cls, dialect_name):
-    #     if dialect_name == "sqlite":
-    #         return sqlite_insert(model_cls)
-    #     elif dialect_name == "postgresql":
-    #         return pg_insert(model_cls)
-    #     else:
-    #         return generic_insert(model_cls)
-    def _get_insert_for_dialect(self, table_or_model, dialect_name):
-        # Always target a Table for dialect inserts
-        table = getattr(table_or_model, "__table__", table_or_model)
-
+    def _get_insert_for_dialect(self, table, dialect_name: str):
         if dialect_name == "sqlite":
             return sqlite_insert(table)
-        elif dialect_name == "postgresql":
+        if dialect_name == "postgresql":
             return pg_insert(table)
-        else:
-            return generic_insert(table)
+        return generic_insert(table)
 
-    def _upsert_snps_from_df(self, df: pd.DataFrame):
+    # -------------------------------------------------------------------------
+    # INSERT Variants
+    # -------------------------------------------------------------------------
+
+    def _upsert_snps_from_df(self, df: pd.DataFrame, conn: Connection) -> int:
         if df.empty:
-            return
+            return 0
 
-        dialect_name = self.session.get_bind().dialect.name
+        v = self.db.table("variant_snps")
+        dialect_name = conn.dialect.name
 
-        # Security for SQLite: keep well below the parameter limit.
-        # 8 columns * 100 rows = 800 parameters << 999
-        if dialect_name == "sqlite":
-            chunk_size = 80
-        else:
-            # For Postgres, you can upload more records without problems.
-            chunk_size = 1000
+        # SQLite param-limit safety
+        chunk_size = 80 if dialect_name == "sqlite" else 2000
 
-        records: list[dict] = []
-        # for _, row in df.iterrows():
+        records: List[Dict[str, Any]] = []
         for row in df.itertuples(index=False):
             try:
                 rs_num = int(row.rs_id)
@@ -602,26 +551,18 @@ class DTP(DTPBase, EntityQueryMixin):
             )
 
         if not records:
-            return
+            return 0
 
-        # ADD 3.2.1: after we change de model
-        # insert_cls = self._get_insert_for_dialect(VariantSNP, dialect_name)
-        # insert_cls = self._get_insert_for_dialect(VariantSNP.__table__, dialect_name)
-        from biofilter.db.base import Base
-        variant_snps_table = Base.metadata.tables["variant_snps"]
-        insert_cls = self._get_insert_for_dialect(variant_snps_table, dialect_name)
+        insert_cls = self._get_insert_for_dialect(v, dialect_name)
 
         for start in range(0, len(records), chunk_size):
-            chunk = records[start: start + chunk_size]
-
+            chunk = records[start : start + chunk_size]
             stmt = insert_cls.values(chunk)
 
             if dialect_name in ("sqlite", "postgresql"):
                 stmt = stmt.on_conflict_do_update(
-                    # index_elements=["rs_id"],
                     index_elements=["chromosome", "source_type", "source_id"],
                     set_={
-                        "chromosome": stmt.excluded.chromosome,
                         "position_37": stmt.excluded.position_37,
                         "position_38": stmt.excluded.position_38,
                         "position_other": stmt.excluded.position_other,
@@ -632,61 +573,51 @@ class DTP(DTPBase, EntityQueryMixin):
                     },
                 )
 
-            self.session.execute(stmt)
+            conn.execute(stmt)
 
-        self.session.flush()
+        return len(records)
 
-    def _get_snpmerge_insert_for_dialect(self):
-        dialect_name = self.session.get_bind().dialect.name
-        if dialect_name == "sqlite":
-            return sqlite_insert(VariantSNPMerge)
-        elif dialect_name == "postgresql":
-            return pg_insert(VariantSNPMerge)
-        else:
-            return generic_insert(VariantSNPMerge)
+    # -------------------------------------------------------------------------
+    # INSERT Variants Merged
+    # -------------------------------------------------------------------------
 
-    def _upsert_snpmerge_from_df(self, df: pd.DataFrame) -> None:
-        """
-        Bulk UPSERT/INSERT for SNPMerge based on 'merge_log' + 'rs_id'.
-
-        For each row in df:
-            - 'rs_id' = canonical rsID (int)
-            - 'merge_log' = list of obsolete rsIDs (strings or ints)
-        We create one SNPMerge row per (obsolete, canonical) pair.
-
-        The operation is chunked to respect SQLite parameter limits and
-        still work efficiently on PostgreSQL.
-        """
+    def _upsert_snpmerge_from_df(self, df: pd.DataFrame, conn: Connection) -> None:
         if df.empty:
             return
 
-        dialect_name = self.session.get_bind().dialect.name
+        m = self.db.table("variant_snp_merges")  # ajuste para o nome real da tabela
+        dialect_name = conn.dialect.name
 
-        # Safe chunk sizes: keep SQLite below ~999 parameters
-        # Each row has 4 columns → 4 * 100 = 400 params, well below the limit.
-        if dialect_name == "sqlite":
-            chunk_size = 100
-        else:
-            # For PostgreSQL we can use a larger chunk size
-            chunk_size = 1000
+        chunk_size = 100 if dialect_name == "sqlite" else 5000
 
-        insert_cls = self._get_snpmerge_insert_for_dialect()
+        insert_cls = self._get_insert_for_dialect(m, dialect_name)
 
         records: List[Dict[str, Any]] = []
 
-        for _, row in df.iterrows():
+        # se merge_log no parquet já vem como list, perfeito
+        for row in df.itertuples(index=False):
             try:
-                canonical = int(row["rs_id"])
+                canonical = int(getattr(row, "rs_id"))
             except Exception:
                 continue
 
-            merge_list = row.get("merge_log")
-            # merge_list = self._parse_merge_log(row.get("merge_log"))
+            merge_list = getattr(row, "merge_log", None)
 
+            if merge_list is None:
+                continue
+
+            if len(merge_list) == 0:
+                continue
+    
             for obsolete in merge_list:
+                try:
+                    obsolete_int = int(obsolete)
+                except Exception:
+                    continue
+
                 records.append(
                     {
-                        "rs_obsolete_id": int(obsolete),
+                        "rs_obsolete_id": obsolete_int,
                         "rs_canonical_id": canonical,
                         "data_source_id": self.data_source.id,
                         "etl_package_id": self.package.id,
@@ -696,46 +627,13 @@ class DTP(DTPBase, EntityQueryMixin):
         if not records:
             return
 
-        # Process in chunks to avoid "too many SQL variables" on SQLite
         for start in range(0, len(records), chunk_size):
-            chunk = records[start: start + chunk_size]
-            if not chunk:
-                continue
-
+            chunk = records[start : start + chunk_size]
             stmt = insert_cls.values(chunk)
 
             if dialect_name in ("postgresql", "sqlite"):
-                # ON CONFLICT (rs_obsolete_id, rs_canonical_id) DO NOTHING
                 stmt = stmt.on_conflict_do_nothing(
                     index_elements=["rs_obsolete_id", "rs_canonical_id"]
                 )
 
-            self.session.execute(stmt)
-
-        # Single flush at the end
-        self.session.flush()
-
-
-# # Como fica dentro do DTP
-
-# # Você mantém o bloco atual, mas vira algo bem menor:
-# ok, msg = self.etl_manager.rebuild_indexes(
-#     index_spec_fns=[self.get_gene_index_specs, self.get_entity_index_specs],
-#     drop_first=False,          # aqui seria só recriar no final
-#     set_write_mode=False,      # no final geralmente não precisa
-#     set_read_mode=True,
-#     label="Genes+Entity",
-# )
-# if not ok:
-#     total_warnings += 1
-
-# # E para o “pré-load drop”:
-# ok, msg = self.etl_manager.rebuild_indexes(
-#     index_spec_fns=[self.get_gene_index_specs, self.get_entity_index_specs],
-#     drop_first=True,
-#     set_write_mode=True,
-#     set_read_mode=False,   # vai continuar em write mode durante load
-#     label="Pre-load drop",
-# )
-# if not ok:
-#     return False, msg
+            conn.execute(stmt)

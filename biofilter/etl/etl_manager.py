@@ -10,7 +10,8 @@ from datetime import datetime
 
 # from collections.abc import Iterable
 from sqlalchemy import MetaData, func, select  # inspect
-from sqlalchemy.orm import Session
+# from sqlalchemy.orm import Session
+from biofilter.db.database import Database
 from sqlalchemy.exc import SQLAlchemyError
 from biofilter.utils.logger import Logger
 from biofilter.db.models import (
@@ -39,9 +40,11 @@ def _is_etl_table(table_name: str) -> bool:
 
 
 class ETLManager:
-    def __init__(self, debug_mode: bool, session: Session):
+    # def __init__(self, debug_mode: bool, session: Session):
+    def __init__(self, debug_mode: bool, db: Database):
         self.debug_mode = debug_mode
-        self.session = session
+        self.session = db.get_session()
+        self.db = db
         self.logger = Logger()
 
     # ----------------------------------
@@ -812,6 +815,7 @@ class ETLManager:
                         datasource=ds,
                         package=extract_pkg,
                         session=self.session,
+                        db=self.db,
                         use_conflict_csv=use_conflict_csv,
                     )
 
@@ -948,6 +952,7 @@ class ETLManager:
                             datasource=ds,
                             package=transform_pkg,
                             session=self.session,
+                            db=self.db,
                             use_conflict_csv=use_conflict_csv,
                         )
 
@@ -1054,6 +1059,7 @@ class ETLManager:
                             datasource=ds,
                             package=load_pkg,
                             session=self.session,
+                            db=self.db,
                             use_conflict_csv=use_conflict_csv,
                         )
 

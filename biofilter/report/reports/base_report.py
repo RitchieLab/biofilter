@@ -1,22 +1,29 @@
 from __future__ import annotations
 
-from sqlalchemy.orm import Session
-from sqlalchemy import func
-from pathlib import Path
 import os
 import re
 import ast
+from pathlib import Path
 from typing import Any, Optional
+
+from sqlalchemy import func
 
 
 class ReportBase:
     name: str = "unnamed_report"
     description: str = "No description provided"
 
-    def __init__(self, session: Session | None = None, logger=None, **kwargs):
+    def __init__(self, session=None, db=None, logger=None, **kwargs):
         self.session = session
+        self.db = db
         self.logger = logger or self.default_logger()
         self.params = kwargs
+
+        if not self.db:
+            raise ValueError("Report requires a Database instance (db=...).")
+
+    # def table(self, name: str):
+    #     return self.db.table(name)
 
     def default_logger(self):
         from biofilter.utils.logger import Logger

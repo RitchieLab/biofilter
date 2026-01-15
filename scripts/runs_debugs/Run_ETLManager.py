@@ -1,8 +1,8 @@
 import time
 from biofilter import Biofilter
 
-db_uri = "sqlite:///dev_biofilter_2.db"
-# db_uri = "postgresql+psycopg2://bioadmin:bioadmin@localhost/biofilter"
+# db_uri = "sqlite:///dev_biofilter_2.db"
+db_uri = "postgresql+psycopg2://bioadmin:bioadmin@localhost/biofilter_dev"
 
 # Configure below
 data_sources_to_process = [

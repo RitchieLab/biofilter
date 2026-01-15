@@ -11,27 +11,11 @@ from sqlalchemy import (
     PrimaryKeyConstraint,
     MetaData,
 )
-from sqlalchemy.orm import registry, relationship
+from sqlalchemy.orm import relationship
+from sqlalchemy import Identity
+
 from biofilter.db.base import Base
 from biofilter.db.types import PKBigIntOrInt
-
-"""
-Biofilter3R v3.2.0 Note:
-
-Starting in version 3.2.0, variants are no longer modeled as Entities.
-Instead, the system adopts a lightweight SNP schema optimized for large
-variant datasets. The `VariantSNP` table stores one row per rsID (as the
-primary key), containing chromosome, positions, alleles, and provenance
-metadata. Merged rsIDs are tracked separately in `VariantSNPMerge`.
-
-This simplified design improves ingestion speed, reduces storage overhead,
-and makes the database more suitable for dbSNP- and GWAS-scale variant
-workflows. Gene - Variant relationships are now resolved through genomic
-locations (`EntityLocation`) rather than Entity-level relationships.
-
-Future releases may reintroduce richer variant Entity modeling when VEP
-annotation layers are fully established.
-"""
 
 # # This model has rsID as PK because the group asked to keep only dbSNP as Source
 # # and now they need more sources
@@ -120,88 +104,131 @@ annotation layers are fully established.
 
 #     # IMPORT: This model is create table by DB management because partitions
 
-mapper_registry = registry()
 
 
-class VariantSNP:
-    """
-    ORM-mapped class for the 'variant_snps' table.
+# def map_variant_snp(engine, metadata: MetaData):
+#     """
+#     Ensure Table('variant_snps') exists in the provided metadata for ALL dialects.
 
-    - SQLite: PK is (id) with autoincrement (INTEGER PRIMARY KEY).
-    - PostgreSQL: PK is (chromosome, id) to satisfy partitioning constraints.
-    NOTE: On PostgreSQL the table is created via raw DDL (partitioned),
-    and we generally use SQLAlchemy Core (Table) to write to it.
-    """
-    pass
+#     This table is accessed via SQLAlchemy Core in both SQLite and PostgreSQL.
+#     Safe to call multiple times.
+#     """
+#     dialect = engine.dialect.name
+#     is_sqlite = dialect == "sqlite"
 
+#     id_col = (
+#         Column(
+#             "id",
+#             Integer,
+#             primary_key=True,
+#             autoincrement=True,
+#             nullable=False,
+#         )
+#         if is_sqlite
+#         else Column(
+#             "id",
+#             BigInteger,
+#             nullable=False,
+#             server_default=Identity(always=False),
+#             # No autoincrement Here
+#         )
+#     )
 
-def map_variant_snp(engine, metadata: MetaData, model_cls=VariantSNP):
-    """
-    Ensure Table('variant_snps') exists in the provided metadata for ALL dialects.
-    Additionally, map the ORM class ONLY on SQLite.
+#     # 1) Ensure Table is registered in metadata (for both SQLite and Postgres)
+#     if "variant_snps" in metadata.tables:
+#         variant_snps = metadata.tables["variant_snps"]
+#     else:
+#         variant_snps = Table(
+#             "variant_snps",
+#             metadata,
 
-    Safe to call multiple times.
-    """
+#             # Keep chromosome as a normal column always
+#             Column("chromosome", Integer, nullable=False),
+
+#             # SQLite: INTEGER PRIMARY KEY => autoincrement behavior
+#             # Postgres: bigint identity handled by raw DDL; here we declare BigInteger and keep nullable=False.
+#             # Column(
+#             #     "id",
+#             #     Integer if is_sqlite else BigInteger,
+#             #     primary_key=is_sqlite,      # SQLite: PK is only id
+#             #     autoincrement=is_sqlite,    # SQLite: true autoincrement
+#             #     nullable=False,
+#             # ),
+#             id_col,
+
+#             Column("source_type", String(20), nullable=False),
+#             Column("source_id", BigInteger, nullable=False),
+
+#             Column("position_37", BigInteger, nullable=True),
+#             Column("position_38", BigInteger, nullable=True),
+#             Column("position_other", BigInteger, nullable=True),
+
+#             Column("reference_allele", String(4), nullable=True),
+#             Column("alternate_allele", String(16), nullable=True),
+
+#             Column("data_source_id", Integer, ForeignKey("etl_data_sources.id", ondelete="CASCADE"), nullable=True),
+#             Column("etl_package_id", Integer, ForeignKey("etl_packages.id", ondelete="CASCADE"), nullable=True),
+
+#             # Postgres: declare composite PK in metadata (matches your partitioned parent DDL).
+#             # SQLite: cannot have autoincrement on composite PK, so we omit this constraint there.
+#             *((
+#                 PrimaryKeyConstraint("chromosome", "id", name="pk_variant_snps"),
+#             ) if not is_sqlite else ()),
+
+#             UniqueConstraint("chromosome", "source_type", "source_id", name="uq_variant_snps_chr_source"),
+#         )
+
+#     return variant_snps
+
+def map_variant_snp(engine, metadata: MetaData):
     dialect = engine.dialect.name
     is_sqlite = dialect == "sqlite"
 
-    # 1) Ensure Table is registered in metadata (for both SQLite and Postgres)
     if "variant_snps" in metadata.tables:
-        variant_snps = metadata.tables["variant_snps"]
-    else:
+        return metadata.tables["variant_snps"]
+
+    if is_sqlite:
+        # SQLite: SINGLE PK autoincrement
         variant_snps = Table(
             "variant_snps",
             metadata,
-
-            # Keep chromosome as a normal column always
             Column("chromosome", Integer, nullable=False),
-
-            # SQLite: INTEGER PRIMARY KEY => autoincrement behavior
-            # Postgres: bigint identity handled by raw DDL; here we declare BigInteger and keep nullable=False.
-            Column(
-                "id",
-                Integer if is_sqlite else BigInteger,
-                primary_key=is_sqlite,      # SQLite: PK is only id
-                autoincrement=is_sqlite,    # SQLite: true autoincrement
-                nullable=False,
-            ),
-
+            Column("id", Integer, primary_key=True, autoincrement=True),  # ✅ must be INTEGER
             Column("source_type", String(20), nullable=False),
             Column("source_id", BigInteger, nullable=False),
-
             Column("position_37", BigInteger, nullable=True),
             Column("position_38", BigInteger, nullable=True),
             Column("position_other", BigInteger, nullable=True),
-
             Column("reference_allele", String(4), nullable=True),
             Column("alternate_allele", String(16), nullable=True),
-
-            Column("data_source_id", Integer, ForeignKey("etl_data_sources.id", ondelete="CASCADE"), nullable=True),
-            Column("etl_package_id", Integer, ForeignKey("etl_packages.id", ondelete="CASCADE"), nullable=True),
-
-            # Postgres: declare composite PK in metadata (matches your partitioned parent DDL).
-            # SQLite: cannot have autoincrement on composite PK, so we omit this constraint there.
-            *((
-                PrimaryKeyConstraint("chromosome", "id", name="pk_variant_snps"),
-            ) if not is_sqlite else ()),
-
+            Column("data_source_id", Integer, nullable=True),
+            Column("etl_package_id", Integer, nullable=True),
+            # Column("data_source_id", Integer, ForeignKey("etl_data_sources.id", ondelete="CASCADE"), nullable=True),
+            # Column("etl_package_id", Integer, ForeignKey("etl_packages.id", ondelete="CASCADE"), nullable=True),
+            UniqueConstraint("chromosome", "source_type", "source_id", name="uq_variant_snps_chr_source"),
+        )
+    else:
+        # Postgres: COMPOSITE PK for partitioned parent (matches DDL)
+        variant_snps = Table(
+            "variant_snps",
+            metadata,
+            Column("chromosome", Integer, nullable=False),
+            Column("id", BigInteger, nullable=False, server_default=Identity(always=False)),  # identity comes from raw DDL
+            Column("source_type", String(20), nullable=False),
+            Column("source_id", BigInteger, nullable=False),
+            Column("position_37", BigInteger, nullable=True),
+            Column("position_38", BigInteger, nullable=True),
+            Column("position_other", BigInteger, nullable=True),
+            Column("reference_allele", String(4), nullable=True),
+            Column("alternate_allele", String(16), nullable=True),
+            Column("data_source_id", Integer, nullable=True),
+            Column("etl_package_id", Integer, nullable=True),
+            PrimaryKeyConstraint("chromosome", "id", name="pk_variant_snps"),
             UniqueConstraint("chromosome", "source_type", "source_id", name="uq_variant_snps_chr_source"),
         )
 
-    # 2) Map ORM class only on SQLite (so VariantSNP.__table__ exists there)
-    # On Postgres we avoid mapping this class because the table is partitioned via raw DDL
-    # and we use the Core Table for inserts.
-    if is_sqlite and not hasattr(model_cls, "__mapper__"):
-        mapper_registry.map_imperatively(
-            model_cls,
-            variant_snps,
-            properties={
-                "data_source": relationship("ETLDataSource", passive_deletes=True),
-                "etl_package": relationship("ETLPackage", passive_deletes=True),
-            },
-        )
-
     return variant_snps
+
 
 
 class VariantSNPMerge(Base):

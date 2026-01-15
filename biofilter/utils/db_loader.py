@@ -3,6 +3,10 @@
 from importlib import import_module
 
 
+# -------------------------------------------------------------------------
+# ORM Models Register
+# -------------------------------------------------------------------------
+
 def load_all_models():
     """
     Import all models modules to ensure SQLAlchemy registers all tables.
@@ -22,27 +26,38 @@ def load_all_models():
     # NOTE: Will be removed in the future
     # import_module("biofilter.db.models.loki_models")
 
+# -------------------------------------------------------------------------
+# Core Tables Register
+# -------------------------------------------------------------------------
 
 def register_imperative_tables(engine):
     """
     Register dialect-specific tables/mappings into the same metadata
     used by the declarative Base.
 
-    We always register the Table object for 'variant_snps' so SQLAlchemy Core
+    We always register the Table object like 'variant_snps' so SQLAlchemy Core
     inserts/updates can target it in any dialect.
 
-    We only map the ORM class on SQLite (where we want VariantSNP.__table__ and
-    ORM usage), because on PostgreSQL the table is created as a partitioned
-    parent via raw DDL in CreateDBMixin.
+    PostgreSQL the Particional table is created as a partitioned parent via raw
+    DDL in CreateDBMixin.
     """
     from biofilter.db.base import Base
-    from biofilter.db.models.model_variants import VariantSNP, map_variant_snp
 
-#     if engine.dialect.name != "sqlite":
-#         return
+    from biofilter.db.models.model_variants import map_variant_snp
 
-    map_variant_snp(engine, Base.metadata, model_cls=VariantSNP)
+    # if "variant_snps" in Base.metadata.tables:
+    #     Base.metadata.remove(Base.metadata.tables["variant_snps"])
+    tbl = Base.metadata.tables.get("variant_snps")
+    if tbl is not None:
+        Base.metadata.remove(tbl)
 
+    map_variant_snp(engine, Base.metadata)
+
+    # TODO: Extend to other Model like EntityRelationship
+
+# -------------------------------------------------------------------------
+# Start ORM and Tables im the Metadata
+# -------------------------------------------------------------------------
 
 def bootstrap_models(engine):
     """

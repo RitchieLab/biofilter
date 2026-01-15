@@ -8,6 +8,7 @@ from typing import Dict, List, Optional, Type, Any
 
 from sqlalchemy.orm import Session
 
+from biofilter.db.database import Database
 import biofilter.report.reports as reports_pkg
 from biofilter.report.reports.base_report import ReportBase
 from biofilter.utils.logger import Logger
@@ -28,8 +29,9 @@ class ReportManager:
     with `report_`. Each module must expose exactly one subclass of ReportBase.
     """
 
-    def __init__(self, session: Session, logger: Logger):
+    def __init__(self, session: Session, db: Database, logger: Logger):
         self.session = session
+        self.db = db
         self.logger = logger
         self._class_cache: Dict[str, Type[ReportBase]] = {}
         self._index_cache: Optional[List[ReportInfo]] = None
@@ -180,7 +182,15 @@ class ReportManager:
         Instantiate and return a report object.
         """
         cls = self.get_report_class(identifier)
-        return cls(session=self.session, logger=self.logger, **kwargs)
+        # return cls(session=self.session, logger=self.logger, **kwargs)
+        try:
+            return cls(session=self.session, db=self.db, logger=self.logger, **kwargs)
+        except TypeError:
+            self.logger.log(
+                f"Report '{cls.__name__}' does not accept db=... yet. Falling back to session-only.",
+                "WARNING",
+            )
+            return cls(session=self.session, logger=self.logger, **kwargs)
 
     def run(self, identifier: str, **kwargs):
         """
@@ -189,10 +199,6 @@ class ReportManager:
         try:
             report = self.get_report(identifier, **kwargs)
             return report.run()
-        # except Exception as e:
-        #     self.logger.log(f"Report '{identifier}' failed: {e}", "ERROR")
-        #     raise
-        # 3.2.0: Avoit idle in transation in Postgres
         except Exception as e:
             self.logger.log(f"Report '{identifier}' failed: {e}", "ERROR")
             # Ensure we don't keep an aborted transaction open

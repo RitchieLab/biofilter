@@ -1,160 +1,111 @@
+from __future__ import annotations
+
 import os
+import time
 from pathlib import Path
-from sqlalchemy import create_engine, text
-from sqlalchemy.orm import sessionmaker
+from typing import Dict, Optional
+
+from sqlalchemy import Table, create_engine, text
+from sqlalchemy.engine import Engine
 from sqlalchemy.engine.url import make_url
-from biofilter.utils.logger import Logger
+from sqlalchemy.orm import sessionmaker
+
+from biofilter.db.base import Base
 from biofilter.db.create_db_mixin import CreateDBMixin
 from biofilter.utils.db_loader import bootstrap_models
-import time
-
-# class Database(CreateDBMixin):
-#     def __init__(self, db_uri=None):
-#         self.logger = Logger(log_level="DEBUG")
-#         self.db_uri = db_uri
-#         self.engine = None
-#         self.session = None
-#         self.connected = False
-#         # TODO: Extend to other db parameters (e.g. user, password, etc.)
-
-#         if self.db_uri:
-#             self.connect()
-
-#     def _normalize_uri(self, uri: str) -> str:
-#         if "://" in uri:
-#             return uri
-#         return f"sqlite:///{os.path.abspath(uri)}"
-
-#     def connect(self, new_uri: str = None, check_exists=True):
-#         """
-#         Connect to the specified database.
-
-#         Args:
-#             new_uri (str): Optionally provide a new database URI.
-#             check_exists (bool): If True, raises error if database does not
-#             exist. Set to False during DB creation.
-#         """
-#         """
-#         Connect to the specified database.
-#         Can receive SQLite paths as files (e.g. 'biofilter.sqlite')
-#         or full URIs e.g. 'sqlite:///biofilter.sqlite', 'postgresql://...'
-#         """
-#         if new_uri:
-#             self.db_uri = new_uri
-
-#         self.db_uri = self._normalize_uri(self.db_uri)
-
-#         if check_exists and not self.exists_db():
-#             msn = f"❌ Database not found at {self.db_uri}"
-#             self.logger.log(msn, "ERROR")
-#             raise ValueError(msn)
-
-#         start = time.perf_counter()
-
-#         self.engine = create_engine(self.db_uri, future=True)
-
-#         bootstrap_models(self.engine)
-
-#         self.session = sessionmaker(bind=self.engine, future=True)
-
-#         elapsed_ms = (time.perf_counter() - start) * 1000
-
-#         # Safe URI information (no username/password)
-#         try:
-#             url = make_url(self.db_uri)
-
-#             if url.drivername.startswith("sqlite"):
-#                 engine_name = url.drivername
-#                 host = "local file"
-#                 db_name = url.database
-#             else:
-#                 engine_name = url.drivername
-#                 host = url.host or "<unknown>"
-#                 db_name = url.database
-#         except Exception:
-#             engine_name = "<unknown>"
-#             host = "<unknown>"
-#             db_name = "<unknown>"
-
-#         self.logger.log("🔌 Database connection established", "INFO")
-#         self.logger.log(f"   • Engine: {engine_name}", "INFO")
-#         self.logger.log(f"   • Host:   {host}", "INFO")
-#         self.logger.log(f"   • DB:     {db_name}", "INFO")
-#         self.logger.log(f"   • Time:   {elapsed_ms:.1f} ms", "INFO")
-#         self.logger.log("════════════════════════════════════", "INFO")
-
-#         self.connected = True
-
-#     def exists_db(self):
-#         if not self.db_uri:
-#             msn = "Database URI must be set before connecting."
-#             self.logger.log(msn, "ERROR")
-#             return False
-
-#         if self.db_uri.startswith("sqlite:///"):
-#             path = self.db_uri.replace("sqlite:///", "")
-#             return Path(path).exists()
-
-#         if self.db_uri.startswith("postgresql"):
-#             try:
-#                 engine = create_engine(self.db_uri)
-#                 with engine.connect() as conn:
-#                     conn.execute(text("SELECT 1"))
-#                 return True
-#             except Exception as e:
-#                 self.logger.log(f"Could not connect to database: {e}", "ERROR")
-#                 return False
-
-#         self.logger.log("Unsupported database type for exists_db check.", "WARNING")
-#         return False
-
-#     def get_session(self):
-#         if not self.session:
-#             msn = "⚠️ Database not connected. Call connect() first."
-#             self.logger.log(msn, "WARNING")
-#             return None
-#         return self.session()
+from biofilter.utils.logger import Logger
 
 
 class Database(CreateDBMixin):
-    def __init__(self, db_uri=None):
-        self.logger = Logger(log_level="DEBUG")
-        self.db_uri = db_uri
-        self.engine = None
-        self.SessionLocal = None   # <- clearer than "session"
-        self.connected = False
+    """
+    Central DB access layer for Biofilter3R.
+
+    Responsibilities:
+    - Normalize & validate DB URI
+    - Create SQLAlchemy Engine + Session factory
+    - Bootstrap models (declarative + imperative Core tables) into Base.metadata
+    - Provide a unified Table resolver (Core) via db.table("name")
+    """
+
+    def __init__(self, db_uri: Optional[str] = None, log_level: str = "DEBUG"):
+        self.logger = Logger(log_level=log_level)
+        self.db_uri: Optional[str] = db_uri
+
+        self.engine: Optional[Engine] = None
+        self.SessionLocal = None
+        self.connected: bool = False
+
+        # Cache of resolved SQLAlchemy Core Table objects
+        self._tables: Dict[str, Table] = {}
 
         if self.db_uri:
             self.connect()
 
+    # -------------------------------------------------------------------------
+    # URI / Connection
+    # -------------------------------------------------------------------------
     def _normalize_uri(self, uri: str) -> str:
+        """
+        If user passes a filesystem path (no scheme), treat it as sqlite:///path.
+        """
         if "://" in uri:
             return uri
         return f"sqlite:///{os.path.abspath(uri)}"
 
-    def connect(self, new_uri: str = None, check_exists=True):
+    def connect(self, new_uri: Optional[str] = None, check_exists: bool = True) -> None:
+        """
+        Connect to database, bootstrap all models for this dialect, and prepare
+        a session factory.
+
+        - check_exists=True will attempt a lightweight connectivity check before
+          finalizing the connection.
+        """
         if new_uri:
             self.db_uri = new_uri
 
+        if not self.db_uri:
+            raise ValueError("db_uri must be provided to connect().")
+
+        # Close previous engine (if any)
+        if self.engine is not None:
+            try:
+                self.engine.dispose()
+            except Exception:
+                pass
+
+        # Reset caches
+        self._tables.clear()
+
+        # Normalize uri
         self.db_uri = self._normalize_uri(self.db_uri)
 
+        # Optional connectivity check BEFORE bootstrapping
         if check_exists and not self.exists_db():
-            msn = f"❌ Database not found at {self.db_uri}"
-            self.logger.log(msn, "ERROR")
-            raise ValueError(msn)
+            msg = f"❌ Database not found at {self.db_uri}"
+            self.logger.log(msg, "ERROR")
+            raise ValueError(msg)
 
         start = time.perf_counter()
 
+        # Create engine
         self.engine = create_engine(self.db_uri, future=True)
 
-        # ✅ Make models ready for this dialect (imports + sqlite imperative mappings)
+        # CRITICAL: clear metadata AFTER we know we're switching engines
+        # Base.metadata.clear()
+
+        # Re-register everything for this engine/dialect
         bootstrap_models(self.engine)
 
-        self.SessionLocal = sessionmaker(bind=self.engine, future=True)
+        self.SessionLocal = sessionmaker(
+            bind=self.engine,
+            future=True,
+            expire_on_commit=False,
+        )
 
         elapsed_ms = (time.perf_counter() - start) * 1000
 
-        # Safe URI info
+        # Safe URI info logging
+        engine_name = host = db_name = "<unknown>"
         try:
             url = make_url(self.db_uri)
             engine_name = url.drivername
@@ -163,9 +114,9 @@ class Database(CreateDBMixin):
                 db_name = url.database
             else:
                 host = url.host or "<unknown>"
-                db_name = url.database
+                db_name = url.database or "<unknown>"
         except Exception:
-            engine_name = host = db_name = "<unknown>"
+            pass
 
         self.logger.log("🔌 Database connection established", "INFO")
         self.logger.log(f"   • Engine: {engine_name}", "INFO")
@@ -176,10 +127,14 @@ class Database(CreateDBMixin):
 
         self.connected = True
 
-    def exists_db(self):
+    def exists_db(self, new_db=False) -> bool:
+        """
+        Lightweight check:
+        - SQLite: file exists
+        - Postgres: SELECT 1 using a temporary engine if needed
+        """
         if not self.db_uri:
-            msn = "Database URI must be set before connecting."
-            self.logger.log(msn, "ERROR")
+            self.logger.log("Database URI must be set before connecting.", "ERROR")
             return False
 
         try:
@@ -188,66 +143,63 @@ class Database(CreateDBMixin):
             self.logger.log("Invalid database URI.", "ERROR")
             return False
 
+        # SQLite path existence check
         if url.drivername.startswith("sqlite"):
             path = url.database
             return bool(path) and Path(path).exists()
 
+        # PostgreSQL connectivity check
         if url.drivername.startswith("postgresql"):
+            temp_engine = None
             try:
-                engine = self.engine or create_engine(str(url))
+                if self.engine is not None:
+                    engine = self.engine
+                else:
+                    temp_engine = create_engine(url, future=True)
+                    engine = temp_engine
+
                 with engine.connect() as conn:
                     conn.execute(text("SELECT 1"))
+
                 return True
             except Exception as e:
-                self.logger.log(f"Could not connect to database: {e}", "ERROR")
+                if not new_db:
+                    self.logger.log(f"Could not connect to database: {e}", "ERROR")
                 return False
+            finally:
+                if temp_engine is not None:
+                    temp_engine.dispose()
 
         self.logger.log("Unsupported database type for exists_db check.", "WARNING")
         return False
 
+    # -------------------------------------------------------------------------
+    # Sessions / Tables
+    # -------------------------------------------------------------------------
     def get_session(self):
         if not self.SessionLocal:
-            msn = "⚠️ Database not connected. Call connect() first."
-            self.logger.log(msn, "WARNING")
+            self.logger.log("⚠️ Database not connected. Call connect() first.", "WARNING")
             return None
         return self.SessionLocal()
 
-"""
-===============================================================================
-Developer Note - Database Class
-================================================================================
+    def table(self, name: str) -> Table:
+        """
+        Return a SQLAlchemy Core Table by name, using Base.metadata as the
+        source of truth (populated by bootstrap_models).
 
-IMPORT: NEED TO BE UPDATE!!
+        Falls back to reflection if the table isn't registered.
+        """
+        if not self.engine:
+            raise RuntimeError("Database not connected. Call connect() first.")
 
-This class manages the core database connection logic and session management
-for the Biofilter system. It supports both SQLite and other
-SQLAlchemy-compatible backends.
+        if name in self._tables:
+            return self._tables[name]
 
-Key Responsibilities:
-- Normalize and store the database URI
-- Create SQLAlchemy Engine and Session factory
-- Check if the database exists (only implemented for SQLite for now)
-- Provide sessions via `get_session()`
-- Integrate with CreateDBMixin to support schema creation and seeding
+        if name in Base.metadata.tables:
+            t = Base.metadata.tables[name]
+        else:
+            # fallback: reflect from DB into Base.metadata
+            t = Table(name, Base.metadata, autoload_with=self.engine)
 
-Usage:
->>> db = Database("sqlite:///biofilter.sqlite")
->>> with db.get_session() as session:
-...     session.query(...)
-
-types:
-uri to SQLlite: "sqlite:///biofilter.sqlite"
-uri to Postgres: "postgresql://user:pass@localhost/dbname""
-
-Notes:
-- Ensure all models are loaded before `create_all()`
-- When adding support for Postgres or others, update `exists_db()`
-- `connect(check_exists=True)` raises if the DB does not exist
-
-See also: biofilter.db.create_db_mixin.CreateDBMixin
-
-================================================================================
-    Author: Andre Garon - Biofilter 3R
-    Date: 2025-04
-================================================================================
-"""
+        self._tables[name] = t
+        return t

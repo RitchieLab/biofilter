@@ -36,7 +36,7 @@ from biofilter.db.models import (
     GeneLocusType,
     GeneGroupMembership,
     # Variant Models
-    VariantSNP,
+    # VariantSNP,
     VariantSNPMerge,
     VariantGWAS,
     VariantGWASSNP,
@@ -108,7 +108,7 @@ class Query:
             "GeneLocusType": GeneLocusType,
             "GeneGroupMembership": GeneGroupMembership,
             # Variant
-            "VariantSNP": VariantSNP,
+            # "VariantSNP": VariantSNP,
             "VariantSNPMerge": VariantSNPMerge,
             "VariantGWAS": VariantGWAS,
             "VariantGWASSNP": VariantGWASSNP,

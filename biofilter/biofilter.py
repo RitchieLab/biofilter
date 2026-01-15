@@ -230,7 +230,8 @@ class Biofilter:
 
         self.logger.log("🚀 Starting ETL update process...", "INFO")
 
-        manager = ETLManager(self.debug_mode, self.db.get_session())
+        # manager = ETLManager(self.debug_mode, self.db.get_session())
+        manager = ETLManager(self.debug_mode, self.db)
 
         manager.start_process(
             source_system=source_system,
@@ -376,8 +377,11 @@ class Biofilter:
         if self._report is None:
             if not self.db:
                 raise RuntimeError("You must connect to a database first.")
+
             self._report = ReportManager(
                 session=self.db.get_session(),
+                db=self.db,
                 logger=self.logger,
             )
+
         return self._report

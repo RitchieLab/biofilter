@@ -12,10 +12,10 @@ from biofilter.db.models import (
     EntityAlias,
     EntityGroup,
     EntityLocation,
+    VariantSNP,
     ETLDataSource,
     ETLSourceSystem,
 )
-# from biofilter.db.models.model_variants import map_variant_snp
 
 
 class GeneToSNPReport(ReportBase):
@@ -276,11 +276,9 @@ Usage:
         # QUERY 3: Fetch SNPs using chosen strategy
         # -----------------------------
         if chosen == "per_gene":
-            # snp_df = self._fetch_snps_per_gene(loc_df, bind)
-            snp_df = self._fetch_snps_per_gene(loc_df)
+            snp_df = self._fetch_snps_per_gene(loc_df, bind)
         else:
-            # snp_df = self._fetch_snps_per_chr(loc_df, bind)
-            snp_df = self._fetch_snps_per_chr(loc_df)
+            snp_df = self._fetch_snps_per_chr(loc_df, bind)
 
         # Add provenance for returned SNPs (optional, but in your columns contract)
         if not snp_df.empty:
@@ -332,138 +330,123 @@ Usage:
     # -----------------------------
     # SNP fetch strategies
     # -----------------------------
-    def _fetch_snps_per_gene(self, loc_df: pd.DataFrame) -> pd.DataFrame:
+    def _fetch_snps_per_gene(self, loc_df: pd.DataFrame, bind) -> pd.DataFrame:
+        """
+        One indexed query per gene range.
+        Best for small number of genes.
+        """
         rows = []
-        v = self.db.table("variant_snps")
-
-        with self.db.engine.connect() as conn:
+        with bind.connect() as conn:
+            # iterate deterministically
             for r in loc_df[["gene_entity_id", "gene_chr", "w_start", "w_end"]].itertuples(index=False):
-                try:
-                    gene_entity_id = int(r.gene_entity_id)
-                    chr_ = int(r.gene_chr)
-                    w_start = int(r.w_start)
-                    w_end = int(r.w_end)
-                except (TypeError, ValueError):
-                    continue
-
-                if w_start > w_end:
-                    continue
+                gene_entity_id = int(r.gene_entity_id)
+                chr_ = int(r.gene_chr)
+                w_start = int(r.w_start)
+                w_end = int(r.w_end)
 
                 stmt = (
                     select(
-                        v.c.chromosome.label("snp_chr"),
-                        v.c.source_type.label("source_type"),
-                        v.c.source_id.label("source_id"),
-                        v.c.position_38.label("snp_pos_38"),
-                        v.c.position_37.label("snp_pos_37"),
-                        v.c.reference_allele.label("ref"),
-                        v.c.alternate_allele.label("alt"),
+                        VariantSNP.chromosome.label("snp_chr"),
+                        VariantSNP.source_type.label("source_type"),
+                        VariantSNP.source_id.label("source_id"),
+                        VariantSNP.position_38.label("snp_pos_38"),
+                        VariantSNP.position_37.label("snp_pos_37"),
+                        VariantSNP.reference_allele.label("ref"),
+                        VariantSNP.alternate_allele.label("alt"),
                         ETLDataSource.name.label("data_source"),
                         ETLSourceSystem.name.label("source_system"),
                     )
-                    .select_from(v)
-                    .outerjoin(ETLDataSource, ETLDataSource.id == v.c.data_source_id)
+                    .select_from(VariantSNP)
+                    .outerjoin(ETLDataSource, ETLDataSource.id == VariantSNP.data_source_id)
                     .outerjoin(ETLSourceSystem, ETLSourceSystem.id == ETLDataSource.source_system_id)
                     .where(
-                        v.c.chromosome == chr_,
-                        v.c.position_38.isnot(None),
-                        v.c.position_38.between(w_start, w_end),
+                        VariantSNP.chromosome == chr_,
+                        VariantSNP.position_38.isnot(None),
+                        VariantSNP.position_38 >= w_start,
+                        VariantSNP.position_38 <= w_end,
                     )
                 )
-
                 df_one = pd.read_sql(stmt, conn)
                 if not df_one.empty:
                     df_one["gene_entity_id"] = gene_entity_id
                     rows.append(df_one)
 
-        return pd.concat(rows, ignore_index=True) if rows else pd.DataFrame()
+        if not rows:
+            return pd.DataFrame()
 
-    def _fetch_snps_per_chr(self, loc_df: pd.DataFrame) -> pd.DataFrame:
+        return pd.concat(rows, ignore_index=True)
+
+    def _fetch_snps_per_chr(self, loc_df: pd.DataFrame, bind) -> pd.DataFrame:
         """
         One query per chromosome partition:
-        - fetch all SNPs in [min(w_start), max(w_end)]
-        - match to genes in pandas
+          - fetch all SNPs in [min(w_start), max(w_end)]
+          - match to genes in pandas
         Best for larger inputs.
         """
         out_parts = []
-        v = self.db.table("variant_snps")
 
-        # Pre-sanitize numeric columns once (avoid repeated conversions)
-        loc = loc_df.copy()
-        loc["gene_chr"] = pd.to_numeric(loc["gene_chr"], errors="coerce")
-        loc["w_start"] = pd.to_numeric(loc["w_start"], errors="coerce")
-        loc["w_end"] = pd.to_numeric(loc["w_end"], errors="coerce")
-        loc["gene_entity_id"] = pd.to_numeric(loc["gene_entity_id"], errors="coerce")
+        # group ranges by chromosome
+        for chr_, g in loc_df.groupby("gene_chr", sort=True):
+            try:
+                chr_int = int(chr_)
+            except Exception:
+                continue
 
-        # Drop rows that can't be used
-        loc = loc.dropna(subset=["gene_chr", "w_start", "w_end", "gene_entity_id"])
-        if loc.empty:
+            w_min = int(pd.to_numeric(g["w_start"], errors="coerce").min())
+            w_max = int(pd.to_numeric(g["w_end"], errors="coerce").max())
+            if w_min > w_max:
+                continue
+
+            stmt = (
+                select(
+                    VariantSNP.chromosome.label("snp_chr"),
+                    VariantSNP.source_type.label("source_type"),
+                    VariantSNP.source_id.label("source_id"),
+                    VariantSNP.position_38.label("snp_pos_38"),
+                    VariantSNP.position_37.label("snp_pos_37"),
+                    VariantSNP.reference_allele.label("ref"),
+                    VariantSNP.alternate_allele.label("alt"),
+                    ETLDataSource.name.label("data_source"),
+                    ETLSourceSystem.name.label("source_system"),
+                )
+                .select_from(VariantSNP)
+                .outerjoin(ETLDataSource, ETLDataSource.id == VariantSNP.data_source_id)
+                .outerjoin(ETLSourceSystem, ETLSourceSystem.id == ETLDataSource.source_system_id)
+                .where(
+                    VariantSNP.chromosome == chr_int,
+                    VariantSNP.position_38.isnot(None),
+                    VariantSNP.position_38 >= w_min,
+                    VariantSNP.position_38 <= w_max,
+                )
+            )
+
+            with bind.connect() as conn:
+                snps_chr = pd.read_sql(stmt, conn)
+
+            if snps_chr.empty:
+                continue
+
+            # match snps to each gene in this chromosome group
+            snps_chr["snp_pos_38"] = pd.to_numeric(snps_chr["snp_pos_38"], errors="coerce")
+
+            matches = []
+            for rr in g[["gene_entity_id", "w_start", "w_end"]].itertuples(index=False):
+                gene_entity_id = int(rr.gene_entity_id)
+                w_start = int(rr.w_start)
+                w_end = int(rr.w_end)
+                m = snps_chr[(snps_chr["snp_pos_38"] >= w_start) & (snps_chr["snp_pos_38"] <= w_end)]
+                if not m.empty:
+                    mm = m.copy()
+                    mm["gene_entity_id"] = gene_entity_id
+                    matches.append(mm)
+
+            if matches:
+                out_parts.append(pd.concat(matches, ignore_index=True))
+
+        if not out_parts:
             return pd.DataFrame()
 
-        # Ensure integer-ish
-        loc["gene_chr"] = loc["gene_chr"].astype(int)
-        loc["gene_entity_id"] = loc["gene_entity_id"].astype(int)
-
-        with self.db.engine.connect() as conn:
-            # group ranges by chromosome
-            for chr_int, g in loc.groupby("gene_chr", sort=True):
-                w_min = int(g["w_start"].min())
-                w_max = int(g["w_end"].max())
-                if w_min > w_max:
-                    continue
-
-                stmt = (
-                    select(
-                        v.c.chromosome.label("snp_chr"),
-                        v.c.source_type.label("source_type"),
-                        v.c.source_id.label("source_id"),
-                        v.c.position_38.label("snp_pos_38"),
-                        v.c.position_37.label("snp_pos_37"),
-                        v.c.reference_allele.label("ref"),
-                        v.c.alternate_allele.label("alt"),
-                        ETLDataSource.name.label("data_source"),
-                        ETLSourceSystem.name.label("source_system"),
-                    )
-                    .select_from(v)
-                    .outerjoin(ETLDataSource, ETLDataSource.id == v.c.data_source_id)
-                    .outerjoin(ETLSourceSystem, ETLSourceSystem.id == ETLDataSource.source_system_id)
-                    .where(
-                        v.c.chromosome == chr_int,
-                        v.c.position_38.isnot(None),
-                        v.c.position_38.between(w_min, w_max),
-                    )
-                )
-
-                snps_chr = pd.read_sql(stmt, conn)
-                if snps_chr.empty:
-                    continue
-
-                # normalize positions once
-                snps_chr["snp_pos_38"] = pd.to_numeric(snps_chr["snp_pos_38"], errors="coerce")
-                snps_chr = snps_chr.dropna(subset=["snp_pos_38"])
-                if snps_chr.empty:
-                    continue
-
-                # Match SNPs to each gene window on this chromosome
-                matches = []
-                for rr in g[["gene_entity_id", "w_start", "w_end"]].itertuples(index=False):
-                    gene_entity_id = int(rr.gene_entity_id)
-                    w_start = int(rr.w_start)
-                    w_end = int(rr.w_end)
-                    if w_start > w_end:
-                        continue
-
-                    m = snps_chr[(snps_chr["snp_pos_38"] >= w_start) & (snps_chr["snp_pos_38"] <= w_end)]
-                    if not m.empty:
-                        mm = m.copy()
-                        mm["gene_entity_id"] = gene_entity_id
-                        matches.append(mm)
-
-                if matches:
-                    out_parts.append(pd.concat(matches, ignore_index=True))
-
-        return pd.concat(out_parts, ignore_index=True) if out_parts else pd.DataFrame()
-
+        return pd.concat(out_parts, ignore_index=True)
 
     # -----------------------------
     # Output formatting

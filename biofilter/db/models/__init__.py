@@ -29,7 +29,6 @@ from .model_curation import (
 from .model_variants import (
     # VariantMaster,
     # VariantLocus,
-    VariantSNP,
     VariantSNPMerge,
     VariantGWAS,
     VariantGWASSNP,
