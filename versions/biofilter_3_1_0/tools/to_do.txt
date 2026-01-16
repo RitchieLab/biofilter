@@ -1,1 +1,0 @@
-The Ideia here will create fucntions to export and import data to table direct
