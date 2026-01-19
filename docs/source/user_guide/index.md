@@ -33,3 +33,6 @@ sections in order.
 6_etl
 7_configuration_logs
 8_data_sources
+9_function_map
+10_cli_map
+11_transfer

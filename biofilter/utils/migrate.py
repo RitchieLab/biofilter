@@ -3,7 +3,7 @@ from pathlib import Path
 from alembic import command
 from alembic.config import Config
 from packaging.version import parse as parse_version
-from biofilter.db.models import BiofilterMetadata
+from biofilter.modules.db.models import BiofilterMetadata
 from biofilter.utils.version import __version__ as current_version
 
 

@@ -8,8 +8,7 @@ homepage = "https://ritchielab.org"
 readme = "README.md"
 
 [tool.poetry.scripts]
-biofilter = "biofilter.cli.main:main"
-biofilter-parquet = "biofilter.tools.parquet_exporter:cli"
+biofilter = "biofilter.api.cli.main:main"
 
 [tool.poetry.dependencies]
 python = "^3.10"

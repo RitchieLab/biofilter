@@ -142,6 +142,7 @@ dmypy.json
 *.sqlite3
 *.db
 *.sql
+*.dump
 
 # Arquivos grandes em geral
 *.zip

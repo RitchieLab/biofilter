@@ -8,7 +8,7 @@ db_uri = "postgresql+psycopg2://bioadmin:bioadmin@localhost/biofilter_dev"
 data_sources_to_process = [
     # Genes
     # -----
-    # "hgnc",
+    "hgnc",
     # "gene_ncbi",
     # "ensembl",
     #
@@ -28,7 +28,7 @@ data_sources_to_process = [
     #
     # Variants
     # --------
-    "dbsnp_sample",
+    # "dbsnp_sample",
     # "dbsnp_chr1",
     # "dbsnp_chr2",
     # "dbsnp_chr3",
@@ -97,7 +97,7 @@ if __name__ == "__main__":
             if step != "all":
                 try:
                     print(f"▶ Running ETL - Source: {source} | Step: {step}")
-                    bf.update(
+                    bf.etl.update(
                         data_sources=[source],
                         run_steps=[step],
                         # force_steps=[step],
@@ -107,7 +107,7 @@ if __name__ == "__main__":
             elif step == "all":
                 try:
                     print(f"▶ Running ETL - Source: {source} | Step: {step}")
-                    bf.update(
+                    bf.etl.update(
                         data_sources=[source],
                         # run_steps=[step],
                         # force_steps=[step],

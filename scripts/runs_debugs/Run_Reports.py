@@ -53,6 +53,6 @@ bf = Biofilter(db_uri)
 # ------------------------------
 
 # Run Report
-result = bf.report.run_example("gene_to_snp")
+result = bf.reports.run_example("gene_to_snp")
 
 print(result)
