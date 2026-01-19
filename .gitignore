@@ -148,3 +148,7 @@ dmypy.json
 *.zip
 *.tar.gz
 *.parquet
+
+
+.vscode/settings.local.json
+.vscode/launch.local.json

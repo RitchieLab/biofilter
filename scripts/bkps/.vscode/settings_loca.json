@@ -8,7 +8,6 @@
     "python.envFile": "${workspaceFolder}/.env",
     "python.testing.autoTestDiscoverOnSaveEnabled": true,
     "python.analysis.extraPaths": [
-        "./biofilter",
-    ],
-    "editor.formatOnSave": true
+        "./biofilter"
+    ]
 }
