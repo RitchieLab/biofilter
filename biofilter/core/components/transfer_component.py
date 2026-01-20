@@ -120,10 +120,10 @@ class TransferComponent(BaseComponent):
         self.core.logger.log(f"📥 Importing full clone bundle ← {inp} (fmt={fmt})", "WARNING")
 
         import_full_clone(
-            db.engine,
-            inp,
+            db=db,
+            in_dir=inp,
             fmt=fmt,
-            reset_postgres_sequences=reset_postgres_sequences,
+            reset_sequences=reset_postgres_sequences,
         )
 
         self.core.logger.log("✅ Bundle import completed.", "INFO")

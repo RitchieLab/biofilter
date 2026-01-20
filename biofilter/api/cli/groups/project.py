@@ -21,7 +21,7 @@ def create(db_uri: str, overwrite: bool, debug: bool):
     """
     Create a new Biofilter project database.
     """
-    bf = Biofilter(db_uri=db_uri, debug_mode=debug)
+    bf = Biofilter(debug_mode=debug)
 
     # In the new architecture, creation is explicit and lives in DBComponent
     bf.db.create(db_uri=db_uri, overwrite=overwrite)

@@ -13,6 +13,7 @@ def report():
     pass
 
 
+# TESTADO
 @report.command("list")
 @local_db_uri_option
 @click.option("--verbose", is_flag=True, help="Show descriptions and module names.")
@@ -22,9 +23,8 @@ def list_(ctx, db_uri, verbose, debug):
     db_uri = require_db_uri(ctx, local_db_uri=db_uri)
 
     bf = Biofilter(db_uri=db_uri, debug_mode=debug)
-    bf.db.connect()
 
-    rows = bf.reports.list(verbose=False)  # returns list[dict]
+    rows = bf.report.list(verbose=False)  # returns list[dict]
     if not rows:
         click.echo("No reports found.")
         return
@@ -44,48 +44,48 @@ def list_(ctx, db_uri, verbose, debug):
         click.echo("")
 
 
+# TESTADO
 @report.command("explain")
 @local_db_uri_option
-@click.option("--name", "identifier", required=True, help="Report identifier (module/friendly/class name).")
+@click.option("--report-name", "identifier", required=True, help="Report identifier (module/friendly/class name).")
 @click.option("--debug", is_flag=True, help="Enable debug logging.")
 @click.pass_context
 def explain(ctx, db_uri, identifier, debug):
     db_uri = require_db_uri(ctx, local_db_uri=db_uri)
 
     bf = Biofilter(db_uri=db_uri, debug_mode=debug)
-    bf.db.connect()
 
-    text = bf.reports.explain(identifier, print_output=False)
+    text = bf.report.explain(identifier)
     click.echo(text)
 
 
+# TESTADO
 @report.command("example-input")
 @local_db_uri_option
-@click.option("--name", "identifier", required=True, help="Report identifier (module/friendly/class name).")
+@click.option("--report-name", "identifier", required=True, help="Report identifier (module/friendly/class name).")
 @click.option("--debug", is_flag=True, help="Enable debug logging.")
 @click.pass_context
 def example_input(ctx, db_uri, identifier, debug):
     db_uri = require_db_uri(ctx, local_db_uri=db_uri)
 
     bf = Biofilter(db_uri=db_uri, debug_mode=debug)
-    bf.db.connect()
 
-    text = bf.reports.example_input(identifier, print_output=False)
+    text = bf.report.example_input(identifier, print_output=False)
     click.echo(text)
 
 
+# TESTADO
 @report.command("available-columns")
 @local_db_uri_option
-@click.option("--name", "identifier", required=True, help="Report identifier (module/friendly/class name).")
+@click.option("--report-name", "identifier", required=True, help="Report identifier (module/friendly/class name).")
 @click.option("--debug", is_flag=True, help="Enable debug logging.")
 @click.pass_context
 def available_columns(ctx, db_uri, identifier, debug):
     db_uri = require_db_uri(ctx, local_db_uri=db_uri)
 
     bf = Biofilter(db_uri=db_uri, debug_mode=debug)
-    bf.db.connect()
 
-    text = bf.reports.available_columns(identifier, print_output=False)
+    text = bf.report.available_columns(identifier, print_output=False)
     click.echo(text)
 
 
@@ -100,10 +100,9 @@ def run(ctx, db_uri, identifier, as_csv, output, debug):
     db_uri = require_db_uri(ctx, local_db_uri=db_uri)
 
     bf = Biofilter(db_uri=db_uri, debug_mode=debug)
-    bf.db.connect()
 
     # NOTE: report-specific parameters can be added later (e.g., --input-json, --param KEY=VALUE, etc.)
-    df = bf.reports.run(identifier)
+    df = bf.report.run(identifier)
 
     if as_csv:
         if not output:

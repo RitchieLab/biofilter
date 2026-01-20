@@ -65,7 +65,7 @@ class Database(CreateDBMixin):
 
         if not self.db_uri:
             raise ValueError("db_uri must be provided to connect().")
-
+        
         # Close previous engine (if any)
         if self.engine is not None:
             try:

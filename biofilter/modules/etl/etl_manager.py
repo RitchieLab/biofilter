@@ -126,7 +126,8 @@ class ETLManager:
                 self.logger.log("🧹 Dropping indexes...", "INFO")
                 for group_name, spec_fn in selected.items():
                     try:
-                        specs = spec_fn()  # ✅ call it
+                        specs = spec_fn
+                        # specs = spec_fn()  # ✅ call it
                         if specs:
                             tuning.drop_indexes(specs)
                     except Exception as e:
@@ -144,7 +145,8 @@ class ETLManager:
             self.logger.log("🏗️ Creating indexes...", "INFO")
             for group_name, spec_fn in selected.items():
                 try:
-                    specs = spec_fn()  # ✅ call it
+                    specs = spec_fn
+                    # specs = spec_fn()  # ✅ call it
                     if not specs:
                         continue
                     self.logger.log(f"🏗️ Creating indexes for {group_name}...", "INFO")
@@ -162,7 +164,8 @@ class ETLManager:
 
     def _select_index_groups(self, index_group, catalog, aliases):
         if not index_group:
-            return catalog
+            # return catalog
+            return dict(catalog)  # make a shallow copy for safety
 
         selected = {}
         invalid = []

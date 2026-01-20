@@ -8,5 +8,5 @@ bf = Biofilter()
 # bf.create_new_project("postgresql+psycopg2://bioadmin:bioadmin@localhost/biofilter_dev")
 # bf.create_new_project("sqlite:///dev_biofilter_2.db", overwrite=True)
 
-bf.db.create("sqlite:///dev_biofilter_2.db", overwrite=True)
-
+# bf.db.create("sqlite:///dev_biofilter_2.db", overwrite=True)
+bf.db.create("postgresql+psycopg2://bioadmin:bioadmin@localhost/biofilter_teste", overwrite=True)

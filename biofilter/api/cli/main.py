@@ -81,3 +81,7 @@ main.add_command(conflicts)
 main.add_command(report)
 main.add_command(config)
 main.add_command(db)
+
+
+if __name__ == "__main__":
+    main()

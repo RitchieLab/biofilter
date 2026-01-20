@@ -59,9 +59,8 @@ class BiofilterCore:
         self.conflicts = None
         self.query_component = None
         self.schema_component = None
-        self.reports = None
+        self.report = None
         self.transfer = None
-
 
         # Boot banner
         self.logger.log("════════════════════════════════════", "INFO")
@@ -91,8 +90,8 @@ class Biofilter:
         bf = Biofilter("sqlite:///./biofilter.db")
         bf.db.connect()
         bf.etl.update(...)
-        bf.reports.list()
-        bf.reports.run("gene_to_snp", {...})
+        bf.report.list()
+        bf.report.run("gene_to_snp", {...})
     """
 
     def __init__(self, db_uri: str | None = None, debug_mode: bool = False):
@@ -119,7 +118,7 @@ class Biofilter:
         self.query = QueryComponent(self.core)
         self.schema = SchemaComponent(self.core, self.query)
 
-        self.reports = ReportComponent(self.core)
+        self.report = ReportComponent(self.core)
 
         self.transfer = TransferComponent(self.core)
 
@@ -130,7 +129,7 @@ class Biofilter:
         self.core.conflicts = self.conflicts
         self.core.query_component = self.query
         self.core.schema_component = self.schema
-        self.core.reports = self.reports
+        self.core.report = self.report
         self.core.transfer = self.transfer
 
     def __repr__(self) -> str:

@@ -30,26 +30,28 @@ class ReportComponent(BaseComponent):
         return self._manager
 
     # --- Public API (thin wrappers) ---
+
+    def explain(self, identifier: str):
+        return self._get_manager().explain(identifier)
+
+    def list(self, verbose: bool = True):
+        return self._get_manager().list_reports()
+
     def refresh(self) -> None:
         self._get_manager().refresh()
 
-    def list(self, verbose: bool = True):
-        return self._get_manager().list(verbose=verbose)
+    def example_input(self, identifier: str):
+        return self._get_manager().example_input(identifier)
 
+    def available_columns(self, identifier: str, print_output: bool = True):
+        return self._get_manager().available_columns(identifier)
+
+    # NO TESTS YET
     def run(self, identifier: str, **kwargs):
         return self._get_manager().run(identifier, **kwargs)
 
     def run_example(self, identifier: str, **kwargs):
         return self._get_manager().run_example(identifier, **kwargs)
-
-    def explain(self, identifier: str, print_output: bool = True):
-        return self._get_manager().explain(identifier, print_output=print_output)
-
-    def example_input(self, identifier: str, print_output: bool = True):
-        return self._get_manager().example_input(identifier, print_output=print_output)
-
-    def available_columns(self, identifier: str, print_output: bool = True):
-        return self._get_manager().available_columns(identifier, print_output=print_output)
 
     def get_report_class(self, identifier: str):
         return self._get_manager().get_report_class(identifier)
