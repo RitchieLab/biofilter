@@ -2,6 +2,7 @@ from __future__ import annotations
 from biofilter.core.components.base_component import BaseComponent
 from biofilter.modules.report.report_manager import ReportManager
 
+
 class ReportComponent(BaseComponent):
     """
     Facade over ReportManager.

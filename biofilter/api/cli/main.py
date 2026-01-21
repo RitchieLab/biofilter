@@ -7,7 +7,6 @@ from biofilter.utils.version import __version__ as current_version
 from biofilter.api.cli.common import try_resolve_db_uri
 
 # Groups
-from biofilter.api.cli.groups.project import project
 from biofilter.api.cli.groups.etl import etl
 from biofilter.api.cli.groups.index import index
 from biofilter.api.cli.groups.conflicts import conflicts
@@ -74,7 +73,6 @@ def main(ctx, db_uri, debug):
 
 
 # Register groups
-main.add_command(project)
 main.add_command(etl)
 main.add_command(index)
 main.add_command(conflicts)

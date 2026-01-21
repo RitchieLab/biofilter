@@ -17,7 +17,7 @@ class ETLComponent(BaseComponent):
         manager = ETLManager(
             debug_mode=self.core.debug_mode,
             db=self.core.require_db(),
-            logger=self.core.logger, 
+            logger=self.core.logger,
         )
         return manager
 

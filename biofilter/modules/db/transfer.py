@@ -16,6 +16,7 @@ from sqlalchemy import MetaData, Table, inspect, text
 from sqlalchemy.engine import Engine
 from sqlalchemy.dialects.postgresql import JSON, JSONB
 from sqlalchemy.sql.sqltypes import NullType
+from sqlalchemy.engine.url import make_url
 
 from biofilter.modules.db.database import Database
 
@@ -74,6 +75,41 @@ def sqlite_db_path_from_engine(engine: Engine) -> Path:
 # Product A: Physical snapshot backup/restore
 # =============================================================================
 
+def _ensure_backup_file_path(output_path: Path, *, suffix: str) -> Path:
+    """
+    If output_path is a directory, create a timestamped file inside it.
+    If it's a file path, ensure parent exists.
+    """
+    p = Path(output_path).expanduser().resolve()
+
+    if p.exists() and p.is_dir():
+        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+        return (p / f"biofilter_backup_{ts}{suffix}").resolve()
+
+    # If it ends with "/" but doesn't exist yet, treat as dir.
+    if str(output_path).endswith(os.sep):
+        p.mkdir(parents=True, exist_ok=True)
+        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+        return (p / f"biofilter_backup_{ts}{suffix}").resolve()
+
+    p.parent.mkdir(parents=True, exist_ok=True)
+    return p
+
+
+def _to_libpq_dsn(engine: Engine) -> str:
+    url = engine.url  # URL object (tem password real, se você criou engine com ela)
+    drivername = url.drivername
+    if drivername.startswith("postgresql+"):
+        drivername = "postgresql"
+    elif drivername == "postgres":
+        drivername = "postgresql"
+
+    url2 = url.set(drivername=drivername)
+
+    # IMPORTANTE: isso precisa ser a senha real; se aqui sair "***", a origem já está mascarada
+    return url2.render_as_string(hide_password=False)
+
+
 def backup_db(
     engine: Engine,
     output_path: str | Path,
@@ -92,7 +128,11 @@ def backup_db(
         Path to created backup file.
     """
     out = Path(output_path).expanduser().resolve()
-    out.parent.mkdir(parents=True, exist_ok=True)
+    # out.parent.mkdir(parents=True, exist_ok=True)
+    if out.exists() and out.is_dir():
+        out.mkdir(parents=True, exist_ok=True)
+    else:
+        out.parent.mkdir(parents=True, exist_ok=True)
 
     dialect = detect_engine_name(engine)
     if dialect == "sqlite":
@@ -190,27 +230,20 @@ def backup_postgres(
     pg_dump: str = "pg_dump",
     format_custom: bool = True,
 ) -> Path:
-    """
-    Postgres snapshot backup using pg_dump.
+    dsn = _to_libpq_dsn(engine)
 
-    Uses the engine.url as a connection string. If you need masking or advanced
-    options, wrap/override this function.
+    # Choose extension + final file path
+    suffix = ".dump" if format_custom else ".sql"
+    out_file = _ensure_backup_file_path(Path(output_path), suffix=suffix)
 
-    output:
-      - custom format: .dump (recommended)
-      - plain SQL:     .sql
-    """
-    url = str(engine.url)
-    cmd = [pg_dump, url]
-
+    cmd = [pg_dump, dsn]
     if format_custom:
-        cmd += ["-Fc", "-f", str(output_path)]
+        cmd += ["-Fc", "-f", str(out_file)]
     else:
-        # plain text SQL
-        cmd += ["-f", str(output_path)]
+        cmd += ["-f", str(out_file)]
 
     _run_subprocess(cmd, "pg_dump failed")
-    return output_path
+    return out_file
 
 
 def restore_postgres(
@@ -239,10 +272,16 @@ def restore_postgres(
 
 def _run_subprocess(cmd: list[str], err_msg: str) -> None:
     try:
-        subprocess.run(cmd, check=True)
+        subprocess.run(cmd, check=True, capture_output=True, text=True)
     except subprocess.CalledProcessError as e:
-        raise RuntimeError(f"{err_msg}. Command={cmd}. ExitCode={e.returncode}") from e
-
+        stderr = (e.stderr or "").strip()
+        stdout = (e.stdout or "").strip()
+        extra = ""
+        if stderr:
+            extra += f"\n[stderr]\n{stderr}"
+        if stdout:
+            extra += f"\n[stdout]\n{stdout}"
+        raise RuntimeError(f"{err_msg}. Command={cmd}. ExitCode={e.returncode}{extra}") from e
 
 # =============================================================================
 # Product B: Full Clone Bundle export/import (logical snapshot)

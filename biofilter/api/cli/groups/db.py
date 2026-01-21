@@ -16,6 +16,44 @@ def db():
 
 
 # -----------------------------------------------------------------------------
+# Create New DataBase
+# -----------------------------------------------------------------------------
+
+# NOTE: Tested
+@db.command("create-db")
+@click.option("--db-uri", required=True, help="Database URI")
+@click.option("--overwrite", is_flag=True, help="Overwrite if exists")
+@click.option("--debug", is_flag=True, help="Enable debug logging.")
+def create(db_uri: str, overwrite: bool, debug: bool):
+    """
+    Create a new Biofilter db database.
+    """
+    bf = Biofilter(debug_mode=debug)
+
+    # In the new architecture, creation is explicit and lives in DBComponent
+    bf.db.create_db(db_uri=db_uri, overwrite=overwrite)
+
+    # click.echo(f"🏗️ Biofilter project created at: {db_uri}")
+
+
+# NOTE: Need fix and apply Alembic
+@db.command("migrate")
+@click.option("--debug", is_flag=True, help="Enable debug logging.")
+@click.pass_context
+def migrate(ctx, debug: bool):
+    """
+    Run database migrations.
+    """
+    db_uri = require_db_uri(ctx)
+
+    bf = Biofilter(db_uri=db_uri, debug_mode=debug)
+    bf.db.connect()
+    bf.db.migrate()
+
+    click.echo("✅ Database migration completed.")
+
+
+# -----------------------------------------------------------------------------
 # Physical snapshot: backup / restore
 # -----------------------------------------------------------------------------
 
@@ -34,7 +72,7 @@ def backup_cmd(ctx, db_uri, out_path: Path):
     bf = Biofilter(db_uri=db_uri, debug_mode=False)
     bf.db.connect()
 
-    created = bf.transfer.backup(out_path)
+    created = bf.db.backup(out_path)
     click.echo(f"✅ Backup created: {created}")
 
 

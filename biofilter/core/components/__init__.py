@@ -5,7 +5,7 @@ from biofilter.core.components.conflicts_component import ConflictsComponent
 from biofilter.core.components.query_component import QueryComponent
 from biofilter.core.components.schema_component import SchemaComponent
 from biofilter.core.components.report_component import ReportComponent
-from biofilter.core.components.transfer_component import TransferComponent
+# from biofilter.core.components.transfer_component import TransferComponent
 
 
 __all__ = [
@@ -16,5 +16,5 @@ __all__ = [
     "QueryComponent",
     "SchemaComponent",
     "ReportComponent",
-    "TransferComponent",
+    # "TransferComponent",
 ]
