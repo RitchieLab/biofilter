@@ -91,7 +91,7 @@ def restore_cmd(ctx, db_uri, in_path: Path):
     bf = Biofilter(db_uri=db_uri, debug_mode=False)
     bf.db.connect()
 
-    bf.transfer.restore(in_path)
+    bf.db.restore(in_path)
     click.echo("✅ Restore completed.")
 
 
@@ -135,7 +135,7 @@ def export_cmd(ctx, db_uri, out_dir: Path, fmt: str, schema_version: str, chunks
     bf = Biofilter(db_uri=db_uri, debug_mode=False)
     bf.db.connect()
 
-    bundle = bf.transfer.export(
+    bundle = bf.db.export(
         out_dir=out_dir,
         fmt=fmt.lower(),
         schema_version=schema_version,
@@ -177,7 +177,7 @@ def import_cmd(ctx, db_uri, in_dir: Path, fmt: str, no_rebuild_indexes: bool, no
     bf = Biofilter(db_uri=db_uri, debug_mode=False)
     bf.db.connect()
 
-    bf.transfer.import_(
+    bf.db.import_(
         in_dir=in_dir,
         fmt=fmt.lower(),
         rebuild_indexes=not no_rebuild_indexes,

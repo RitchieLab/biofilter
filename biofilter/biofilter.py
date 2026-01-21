@@ -11,11 +11,9 @@ from biofilter.core.components import (
     DBComponent,
     SettingsComponent,
     ETLComponent,
-    ConflictsComponent,
     QueryComponent,
     SchemaComponent,
     ReportComponent,
-    # TransferComponent,
 )
 
 
@@ -56,11 +54,9 @@ class BiofilterCore:
         self.db_component = None
         self.settings = None
         self.etl = None
-        self.conflicts = None
         self.query_component = None
         self.schema_component = None
         self.report = None
-        # self.transfer = None
 
         # Boot banner
         self.logger.log("════════════════════════════════════", "INFO")
@@ -113,24 +109,19 @@ class Biofilter:
 
         self.settings = SettingsComponent(self.core)
         self.etl = ETLComponent(self.core)
-        self.conflicts = ConflictsComponent(self.core)
 
         self.query = QueryComponent(self.core)
         self.schema = SchemaComponent(self.core, self.query)
 
         self.report = ReportComponent(self.core)
 
-        # self.transfer = TransferComponent(self.core)
-
         # Optional: expose components on core for internal cross-calls
         self.core.db_component = self.db
         self.core.settings = self.settings
         self.core.etl = self.etl
-        self.core.conflicts = self.conflicts
         self.core.query_component = self.query
         self.core.schema_component = self.schema
         self.core.report = self.report
-        # self.core.transfer = self.transfer
 
     def __repr__(self) -> str:
         return f"<Biofilter(db_uri={self.core.db_uri})>"

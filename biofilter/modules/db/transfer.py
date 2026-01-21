@@ -260,7 +260,8 @@ def restore_postgres(
 
     - clean=True uses --clean --if-exists to drop objects before recreating.
     """
-    url = str(engine.url)
+    # url = str(engine.url)
+    url = _to_libpq_dsn(engine)
 
     cmd = [pg_restore, "-d", url]
     if clean:
@@ -473,6 +474,7 @@ def _insert_df(engine: Engine, table: Table, df: pd.DataFrame, chunksize: int = 
     if df is None or df.empty:
         return
 
+    # BUG: When SQLite get error from data time.
     with engine.begin() as conn:
         n = len(df)
         for i in range(0, n, chunksize):

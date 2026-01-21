@@ -1,0 +1,1 @@
+The scripts in the folders will be the start to create the integrated tests

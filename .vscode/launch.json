@@ -192,67 +192,104 @@
             "justMyCode": true
         },
         {
-            "name": "CLI (dev) - project create",
+            "name": "Script - DB Restore in PS",
             "type": "debugpy",
             "request": "launch",
-            "module": "biofilter.api.cli.main",
-            "args": [
-                "project",
-                "create",
-                "--db-uri",
-                "postgresql+psycopg2://bioadmin:bioadmin@127.0.0.1:5432/biofilter_test_cli"
-            ],
+            "program": "${workspaceFolder}/scripts/runs_tests/db/restore_ps.py",
             "console": "integratedTerminal",
             "cwd": "${workspaceFolder}",
             "envFile": "${workspaceFolder}/.env",
-            "env": {
-                "PYTHONPATH": "${workspaceFolder}"
-            },
-            "justMyCode": false
+            "justMyCode": true
         },
         {
-            "name": "CLI (dev) - db export (parquet) - biofilter_prod",
+            "name": "Script - DB Restore in SQLite",
             "type": "debugpy",
             "request": "launch",
-            "module": "biofilter.api.cli.main",
-            "args": [
-                "--db-uri",
-                "postgresql+psycopg2://bioadmin:bioadmin@localhost/biofilter_prod",
-                "db",
-                "export",
-                "--out",
-                "./biofilter_bundle",
-                "--format",
-                "parquet"
-            ],
+            "program": "${workspaceFolder}/scripts/runs_tests/db/restore_sqlite.py",
             "console": "integratedTerminal",
             "cwd": "${workspaceFolder}",
             "envFile": "${workspaceFolder}/.env",
-            "env": {
-                "PYTHONPATH": "${workspaceFolder}"
-            },
-            "justMyCode": false
+            "justMyCode": true
         },
         {
-            "name": "CLI (dev) - db import - biofilter_test",
+            "name": "Script - DB Export in PS",
             "type": "debugpy",
             "request": "launch",
-            "module": "biofilter.api.cli.main",
-            "args": [
-                "--db-uri",
-                "postgresql+psycopg2://bioadmin:bioadmin@localhost/biofilter_test",
-                "db",
-                "import",
-                "--in",
-                "./biofilter_bundle"
-            ],
+            "program": "${workspaceFolder}/scripts/runs_tests/db/export_ps.py",
             "console": "integratedTerminal",
             "cwd": "${workspaceFolder}",
             "envFile": "${workspaceFolder}/.env",
-            "env": {
-                "PYTHONPATH": "${workspaceFolder}"
-            },
-            "justMyCode": false
+            "justMyCode": true
+        },
+        {
+            "name": "Script - DB Export in SQLite",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/scripts/runs_tests/db/export_sqlite.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "envFile": "${workspaceFolder}/.env",
+            "justMyCode": true
+        },
+        {
+            "name": "Script - DB Import in PS",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/scripts/runs_tests/db/import_ps.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "envFile": "${workspaceFolder}/.env",
+            "justMyCode": true
+        },
+        {
+            "name": "Script - DB Import in SQLite",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/scripts/runs_tests/db/import_sqlite.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "envFile": "${workspaceFolder}/.env",
+            "justMyCode": true
+        },
+        {
+            "name": "Script - ETL Update in PS",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/scripts/runs_tests/etl/update_ps.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "envFile": "${workspaceFolder}/.env",
+            "justMyCode": true
+        },
+        {
+            "name": "Script - ETL Update in SQLite",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/scripts/runs_tests/etl/update_sqlite.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "envFile": "${workspaceFolder}/.env",
+            "justMyCode": true
+        },
+        {
+            "name": "Script - ETL Index in PS",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/scripts/runs_tests/etl/index_ps.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "envFile": "${workspaceFolder}/.env",
+            "justMyCode": true
+        },
+        {
+            "name": "Script - ETL Index in SQLite",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/scripts/runs_tests/etl/index_sqlite.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "envFile": "${workspaceFolder}/.env",
+            "justMyCode": true
         },
         {
             "name": "CLI - Reports Explain",
@@ -401,6 +438,270 @@
                 "/opt/biofilter/dev/biofilter/tests/outputs/blp_from_cli.dump",
                 "--db-uri",
                 "postgresql+psycopg2://bioadmin:bioadmin@localhost/biofilter_dev_cli"
+            ],
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "envFile": "${workspaceFolder}/.env",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            },
+            "justMyCode": false
+        },
+        {
+            "name": "CLI - DB Backup in SQLite",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "biofilter.api.cli.main",
+            "args": [
+                "db",
+                "backup",
+                "--out",
+                "/opt/biofilter/dev/biofilter/tests/outputs/backup_sqlite_cli.sql",
+                "--db-uri",
+                "sqlite:///biofilter_dev_cli.db"
+            ],
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "envFile": "${workspaceFolder}/.env",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            },
+            "justMyCode": false
+        },
+        {
+            "name": "CLI - DB Retore in PS",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "biofilter.api.cli.main",
+            "args": [
+                "db",
+                "restore",
+                "--in",
+                "/opt/biofilter/dev/biofilter/tests/outputs/blp_from_cli.dump",
+                "--db-uri",
+                "postgresql+psycopg2://bioadmin:bioadmin@localhost/biofilter_dev_cli"
+            ],
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "envFile": "${workspaceFolder}/.env",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            },
+            "justMyCode": false
+        },
+        {
+            "name": "CLI - DB Restore in SQLite",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "biofilter.api.cli.main",
+            "args": [
+                "db",
+                "restore",
+                "--in",
+                "/opt/biofilter/dev/biofilter/tests/outputs/restore_sqlite_cli.sql",
+                "--db-uri",
+                "sqlite:///biofilter_dev_cli.db"
+            ],
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "envFile": "${workspaceFolder}/.env",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            },
+            "justMyCode": false
+        },
+        {
+            "name": "CLI - DB Export in PS",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "biofilter.api.cli.main",
+            "args": [
+                "db",
+                "export",
+                "--out",
+                "/opt/biofilter/dev/biofilter/tests/outputs/export_ps/cli/",
+                "--db-uri",
+                "postgresql+psycopg2://bioadmin:bioadmin@localhost/biofilter_dev_cli"
+            ],
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "envFile": "${workspaceFolder}/.env",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            },
+            "justMyCode": false
+        },
+        {
+            "name": "CLI - DB Export in SQLite",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "biofilter.api.cli.main",
+            "args": [
+                "db",
+                "export",
+                "--out",
+                "/opt/biofilter/dev/biofilter/tests/outputs/export_sqlite/cli/",
+                "--db-uri",
+                "sqlite:///biofilter_dev_cli.db"
+            ],
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "envFile": "${workspaceFolder}/.env",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            },
+            "justMyCode": false
+        },
+        {
+            "name": "CLI - DB Import in PS",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "biofilter.api.cli.main",
+            "args": [
+                "db",
+                "import",
+                "--in",
+                "/opt/biofilter/dev/biofilter/tests/outputs/export_ps/cli/",
+                "--db-uri",
+                "postgresql+psycopg2://bioadmin:bioadmin@localhost/biofilter_dev_cli"
+            ],
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "envFile": "${workspaceFolder}/.env",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            },
+            "justMyCode": false
+        },
+        {
+            "name": "CLI - ETL Updade in PS",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "biofilter.api.cli.main",
+            "args": [
+                "etl",
+                "update",
+                "--data-source",
+                "dbsnp_sample",
+                "--db-uri",
+                "postgresql+psycopg2://bioadmin:bioadmin@localhost/biofilter_dev_cli"
+            ],
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "envFile": "${workspaceFolder}/.env",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            },
+            "justMyCode": false
+        },
+        {
+            "name": "CLI - ETL Updade in SQLite",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "biofilter.api.cli.main",
+            "args": [
+                "etl",
+                "update",
+                "--data-source",
+                "dbsnp_sample",
+                "--db-uri",
+                "sqlite:///biofilter_dev_cli.db"
+            ],
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "envFile": "${workspaceFolder}/.env",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            },
+            "justMyCode": false
+        },
+        {
+            "name": "CLI - ETL Index in PS",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "biofilter.api.cli.main",
+            "args": [
+                "etl",
+                "index",
+                "--group",
+                "variant",
+                "--group",
+                "genes",
+                "--db-uri",
+                "postgresql+psycopg2://bioadmin:bioadmin@localhost/biofilter_dev_cli"
+            ],
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "envFile": "${workspaceFolder}/.env",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            },
+            "justMyCode": false
+        },
+        {
+            "name": "CLI - CONFIG Init",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "biofilter.api.cli.main",
+            "args": [
+                "config",
+                "init",
+                "--path",
+                "/opt/biofilter/dev/biofilter/tests/outputs/config/cli/"
+            ],
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "envFile": "${workspaceFolder}/.env",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            },
+            "justMyCode": false
+        },
+        {
+            "name": "CLI - CONFIG Show",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "biofilter.api.cli.main",
+            "args": [
+                "config",
+                "show"
+            ],
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "envFile": "${workspaceFolder}/.env",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            },
+            "justMyCode": false
+        },
+        {
+            "name": "CLI - CONFIG Get",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "biofilter.api.cli.main",
+            "args": [
+                "config",
+                "get",
+                "database.db_uri"
+            ],
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "envFile": "${workspaceFolder}/.env",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            },
+            "justMyCode": false
+        },
+        {
+            "name": "CLI - CONFIG Set",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "biofilter.api.cli.main",
+            "args": [
+                "config",
+                "set",
+                "database.db_uri",
+                "postgresql+psycopg2://bioadmin:bioadmin@localhost/biofilter_dev"
             ],
             "console": "integratedTerminal",
             "cwd": "${workspaceFolder}",

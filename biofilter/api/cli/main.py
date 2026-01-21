@@ -8,8 +8,6 @@ from biofilter.api.cli.common import try_resolve_db_uri
 
 # Groups
 from biofilter.api.cli.groups.etl import etl
-from biofilter.api.cli.groups.index import index
-from biofilter.api.cli.groups.conflicts import conflicts
 from biofilter.api.cli.groups.report import report
 from biofilter.api.cli.groups.config import config
 from biofilter.api.cli.groups.db import db
@@ -74,12 +72,9 @@ def main(ctx, db_uri, debug):
 
 # Register groups
 main.add_command(etl)
-main.add_command(index)
-main.add_command(conflicts)
 main.add_command(report)
 main.add_command(config)
 main.add_command(db)
-
 
 if __name__ == "__main__":
     main()
