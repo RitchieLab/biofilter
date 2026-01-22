@@ -26,8 +26,8 @@ if config.config_file_name is not None:
 # from myapp import mymodel
 # target_metadata = mymodel.Base.metadata
 # target_metadata = None # Default
-from biofilter.db import Base  # noqa E402
-from biofilter.db import models  # Import all models. # noqa
+from biofilter.modules.db import Base  # noqa E402
+from biofilter.modules.db import models  # Import all models. # noqa
 
 target_metadata = Base.metadata
 

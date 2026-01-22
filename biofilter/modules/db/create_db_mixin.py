@@ -11,6 +11,7 @@ from sqlalchemy.engine.url import make_url
 
 from biofilter.modules.db.base import Base
 from biofilter.utils.db_loader import bootstrap_models
+from biofilter.utils.migrate import get_script_location, get_repo_heads
 
 
 class CreateDBMixin:
@@ -253,6 +254,14 @@ class CreateDBMixin:
             records = data.get(key, data) if key else data
 
             for item in records:
+
+                if model_name == "BiofilterMetadata":
+                    # Get last Alembic version to BiofilterMetadata
+                    script_location = get_script_location()
+                    schema_revision = ",".join(get_repo_heads(script_location))
+                    # item.setdefault("schema_revision", schema_revision)
+                    item["schema_revision"] = schema_revision
+
                 # Converter campos datetime (se existirem e forem string)
                 for key, value in item.items():
                     if key.endswith("_start") or key.endswith("_end"):

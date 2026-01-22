@@ -2,6 +2,7 @@ import os
 from pathlib import Path
 from alembic import command
 from alembic.config import Config
+from alembic.script import ScriptDirectory
 from packaging.version import parse as parse_version
 from biofilter.modules.db.models import BiofilterMetadata
 from biofilter.utils.version import __version__ as current_version
@@ -52,3 +53,17 @@ def run_migration(session_factory, db_uri: str):
     except Exception as e:
         print(f"❌ Migration failed: {str(e)}")
         session.rollback()
+
+
+def get_script_location() -> str:
+    # repo_root/biofilter/utils/alembic_utils.py -> repo_root/biofilter
+    pkg_root = Path(__file__).resolve().parents[1]
+    alembic_dir = pkg_root / "alembic"
+    return str(alembic_dir)
+
+
+def get_repo_heads(script_location: str) -> list[str]:
+    cfg = Config()
+    cfg.set_main_option("script_location", script_location)
+    script = ScriptDirectory.from_config(cfg)
+    return script.get_heads()

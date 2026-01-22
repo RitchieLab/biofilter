@@ -416,7 +416,8 @@
                 "db",
                 "create-db",
                 "--db-uri",
-                "sqlite:///biofilter_dev_cli.db"
+                "sqlite:///biofilter_dev_cli.db",
+                "--overwrite"
             ],
             "console": "integratedTerminal",
             "cwd": "${workspaceFolder}",
