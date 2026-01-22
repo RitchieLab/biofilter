@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Optional, Literal
 from biofilter.core.components.base_component import BaseComponent
-from biofilter.utils.migrate import run_migration
+from biofilter.modules.db.migrate import run_migration
 from biofilter.modules.db.database import Database
 
 from biofilter.modules.db.transfer import (
@@ -58,16 +58,36 @@ class DBComponent(BaseComponent):
         self.core.logger.log(f"🏗️ Database created at: {self.core.db_uri}", "INFO")
         return True
 
-    def migrate(self) -> bool:
-        """
-        Run migrations (Alembic or custom).
-        """
+    # def migrate(self) -> bool:
+    #     db = self.require_db()
+    #     # run_migration(db.session_factory, db.db_uri)  # ou db.SessionLocal
+    #     run_migration(db.SessionLocal, db.engine, db.db_uri)
+    #     self.core.logger.log("✅ Migration completed.", "INFO")
+    #     return True
+    def migrate(
+        self,
+        *,
+        action: str = "upgrade",   # "upgrade" | "status" | "stamp-head" | "dry-run"
+        target: str = "head",
+        force: bool = False,
+    ) -> bool:
         db = self.require_db()
-        # You had: run_migration(self.db.session, self.db.db_uri)
-        # We'll keep the same, but ensure we use the active shared db.
-        run_migration(db.session, db.db_uri)
-        self.core.logger.log("✅ Migration completed.", "INFO")
-        return True
+        if not db.engine:
+            raise RuntimeError("Database engine not initialized. Call connect() first.")
+
+        ok = run_migration(
+            session_factory=db.SessionLocal,
+            engine=db.engine,
+            db_uri=db.db_uri,
+            action=action,
+            target=target,
+            force=force,
+        )
+
+        # log only if we actually ran something (opcional)
+        if ok:
+            self.core.logger.log("✅ Migration completed.", "INFO")
+        return ok
 
     def get_session(self):
         """

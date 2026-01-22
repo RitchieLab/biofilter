@@ -11,7 +11,7 @@ from sqlalchemy.engine.url import make_url
 
 from biofilter.modules.db.base import Base
 from biofilter.utils.db_loader import bootstrap_models
-from biofilter.utils.migrate import get_script_location, get_repo_heads
+from biofilter.modules.db.migrate import get_script_location, get_repo_heads
 
 
 class CreateDBMixin:

@@ -37,20 +37,59 @@ def create(db_uri: str, overwrite: bool, debug: bool):
 
 
 # NOTE: Need fix and apply Alembic
+# @db.command("migrate")
+# @local_db_uri_option
+# @click.option("--debug", is_flag=True, help="Enable debug logging.")
+# @click.pass_context
+# def migrate(ctx, db_uri, debug: bool):
+#     """
+#     Run database migrations.
+#     """
+#     # db_uri = require_db_uri(ctx)
+#     db_uri = require_db_uri(ctx, local_db_uri=db_uri)
+
+#     bf = Biofilter(db_uri=db_uri, debug_mode=debug)
+#     # bf.db.connect()
+#     bf.db.migrate()
+
+#     click.echo("✅ Database migration completed.")
 @db.command("migrate")
+@local_db_uri_option
 @click.option("--debug", is_flag=True, help="Enable debug logging.")
+@click.option("--status", is_flag=True, help="Show current DB revision and repo head.")
+@click.option("--stamp-head", is_flag=True, help="Stamp DB to Alembic head without running DDL.")
+@click.option("--dry-run", is_flag=True, help="Print SQL that would run for upgrade (no execution).")
+@click.option("--force", is_flag=True, help="Force dangerous actions (e.g., stamp over existing version).")
+@click.option("--target", default="head", show_default=True, help="Target revision (default: head).")
 @click.pass_context
-def migrate(ctx, debug: bool):
+def migrate(ctx, db_uri, debug: bool, status: bool, stamp_head: bool, dry_run: bool, force: bool, target: str):
     """
     Run database migrations.
     """
-    db_uri = require_db_uri(ctx)
+    db_uri = require_db_uri(ctx, local_db_uri=db_uri)
 
     bf = Biofilter(db_uri=db_uri, debug_mode=debug)
-    bf.db.connect()
-    bf.db.migrate()
 
-    click.echo("✅ Database migration completed.")
+    # resolve action
+    action = "upgrade"
+    if status:
+        action = "status"
+    elif stamp_head:
+        action = "stamp-head"
+    elif dry_run:
+        action = "dry-run"
+
+    bf.db.migrate(action=action, target=target, force=force)
+
+    # Messages
+    if action == "status":
+        click.echo("✅ Status displayed.")
+    elif action == "stamp-head":
+        click.echo("✅ Database stamped to head.")
+    elif action == "dry-run":
+        click.echo("✅ Dry-run completed (SQL printed).")
+    else:
+        click.echo("✅ Database migration completed.")
 
 
 # -----------------------------------------------------------------------------
@@ -70,7 +109,7 @@ def migrate(ctx, debug: bool):
 def backup_cmd(ctx, db_uri, out_path: Path):
     db_uri = require_db_uri(ctx, local_db_uri=db_uri)
     bf = Biofilter(db_uri=db_uri, debug_mode=False)
-    bf.db.connect()
+    # bf.db.connect()
 
     created = bf.db.backup(out_path)
     click.echo(f"✅ Backup created: {created}")
@@ -89,7 +128,7 @@ def backup_cmd(ctx, db_uri, out_path: Path):
 def restore_cmd(ctx, db_uri, in_path: Path):
     db_uri = require_db_uri(ctx, local_db_uri=db_uri)
     bf = Biofilter(db_uri=db_uri, debug_mode=False)
-    bf.db.connect()
+    # bf.db.connect()
 
     bf.db.restore(in_path)
     click.echo("✅ Restore completed.")
@@ -133,7 +172,7 @@ def restore_cmd(ctx, db_uri, in_path: Path):
 def export_cmd(ctx, db_uri, out_dir: Path, fmt: str, schema_version: str, chunksize: int):
     db_uri = require_db_uri(ctx, local_db_uri=db_uri)
     bf = Biofilter(db_uri=db_uri, debug_mode=False)
-    bf.db.connect()
+    # bf.db.connect()
 
     bundle = bf.db.export(
         out_dir=out_dir,
@@ -175,7 +214,7 @@ def export_cmd(ctx, db_uri, out_dir: Path, fmt: str, schema_version: str, chunks
 def import_cmd(ctx, db_uri, in_dir: Path, fmt: str, no_rebuild_indexes: bool, no_reset_sequences: bool):
     db_uri = require_db_uri(ctx, local_db_uri=db_uri)
     bf = Biofilter(db_uri=db_uri, debug_mode=False)
-    bf.db.connect()
+    # bf.db.connect()
 
     bf.db.import_(
         in_dir=in_dir,
