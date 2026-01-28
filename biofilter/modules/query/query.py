@@ -237,11 +237,25 @@ class Query:
             self.logger.log(str(e), "ERROR")
             return pd.DataFrame()
 
-    def run_sql(self, sql: str) -> pd.DataFrame:
+    # def run_sql(self, sql: str) -> pd.DataFrame:
+    #     """
+    #     Execute raw SQL and return a pandas DataFrame.
+
+    #     Intended for advanced/debug usage. Prefer SQLAlchemy statements whenever possible.
+    #     """
+    #     try:
+    #         result = self.session.execute(text(sql)).all()
+    #         data = [self._to_dict(r) for r in result]
+    #         return pd.DataFrame(data)
+    #     except SQLAlchemyError as e:
+    #         self.session.rollback()
+    #         self.logger.log(str(e), "ERROR")
+    #         return pd.DataFrame()
+
+    def run_sql(self, sql: str, *, raise_on_error: bool = False) -> pd.DataFrame:
         """
         Execute raw SQL and return a pandas DataFrame.
-
-        Intended for advanced/debug usage. Prefer SQLAlchemy statements whenever possible.
+        Intended for advanced/debug usage. Prefer SQLAlchemy whenever possible.
         """
         try:
             result = self.session.execute(text(sql)).all()
@@ -250,6 +264,6 @@ class Query:
         except SQLAlchemyError as e:
             self.session.rollback()
             self.logger.log(str(e), "ERROR")
+            if raise_on_error:
+                raise
             return pd.DataFrame()
-
-

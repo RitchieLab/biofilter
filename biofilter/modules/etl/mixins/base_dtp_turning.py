@@ -172,6 +172,7 @@ class DBTuningMixin:
             ("entity_aliases", ["alias_norm"]),
             ("entity_aliases", ["data_source_id"]),
             ("entity_aliases", ["entity_id", "is_primary"]),
+            ("entity_aliases", ["group_id", "alias_norm"]),
             ("entity_aliases", ["xref_source", "alias_value"]),
             ("entity_aliases", ["data_source_id", "alias_value"]),
             # EntityRelationship
