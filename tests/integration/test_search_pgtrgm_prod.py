@@ -33,7 +33,8 @@ def test_pgtrgm_perfect_match_resolves_best(resolver: TermResolver):
     and the best candidate should come from pg_trgm (method preserved).
     """
     res = resolver.resolve_best(
-        "((R)-3-Hydroxybutanoyl)(n-2)",
+        # "((R)-3-Hydroxybutanoyl)(n-2)",
+        "Phenazopyridine",
         entity_type_hints=["Chemicals"],
     )
 

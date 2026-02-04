@@ -4,19 +4,19 @@ from biofilter import Biofilter
 db_uri = "postgresql+psycopg2://bioadmin:bioadmin@localhost/biofilter_prod"
 bf = Biofilter(db_uri)
 
-df = bf.report.run(
-    "entity_neighborhood_summary",
-    items=["gene:BRCA1", "APOE"],
-    resolver_mode="exact",
-)
+# df = bf.report.run(
+#     "entity_neighborhood_summary",
+#     items=["gene:BRCA1", "APOE"],
+#     resolver_mode="exact",
+# )
 
-df = bf.report.run(
-    "entity_neighborhood_summary",
-    items=["chemical:((R)-3-Hydroxybutanoyl)(n-2)"],
-    resolver_mode="search",
-    include_candidates=True,
-    candidates_top_n=10,
-)
+# df = bf.report.run(
+#     "entity_neighborhood_summary",
+#     items=["chemical:((R)-3-Hydroxybutanoyl)(n-2)"],
+#     resolver_mode="search",
+#     include_candidates=True,
+#     candidates_top_n=10,
+# )
 
 df = bf.report.run(
     "entity_neighborhood_summary",
@@ -24,5 +24,12 @@ df = bf.report.run(
     resolver_mode="hybrid",
     include_candidates=True,
 )
+
+# df = bf.report.run(
+#     "position_to_gene",
+#     items=["pos:38:1:4000"],
+#     range_up=1000,
+#     range_down=1000,
+# )
 
 print(df)
