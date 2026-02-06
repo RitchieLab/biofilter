@@ -11,6 +11,7 @@ from biofilter.api.cli.groups.etl import etl
 from biofilter.api.cli.groups.report import report
 from biofilter.api.cli.groups.config import config
 from biofilter.api.cli.groups.db import db
+from biofilter.api.cli.groups.kdc import kdc
 
 
 def _version_callback(ctx, param, value):
@@ -75,6 +76,7 @@ main.add_command(etl)
 main.add_command(report)
 main.add_command(config)
 main.add_command(db)
+main.add_command(kdc)
 
 if __name__ == "__main__":
     main()

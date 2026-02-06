@@ -92,7 +92,7 @@ class DTP(DTPBase, EntityQueryMixin):
         # DTP versioning
         self.dtp_name = "dtp_variant_ncbi"
         self.dtp_version = "1.2.0"
-        self.compatible_schema_min = "3.2.0"
+        self.compatible_schema_min = "0.0.0"
         self.compatible_schema_max = "3.2.0"
 
     # ⬇️  --------------------------  ⬇️

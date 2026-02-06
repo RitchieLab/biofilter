@@ -4,6 +4,7 @@ from biofilter.core.components.etl_component import ETLComponent
 from biofilter.core.components.query_component import QueryComponent
 from biofilter.core.components.schema_component import SchemaComponent
 from biofilter.core.components.report_component import ReportComponent
+from biofilter.core.components.kdc_component import KDCComponent
 
 
 __all__ = [
@@ -13,4 +14,5 @@ __all__ = [
     "QueryComponent",
     "SchemaComponent",
     "ReportComponent",
+    "KDCComponent",
 ]

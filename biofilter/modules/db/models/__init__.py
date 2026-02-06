@@ -11,6 +11,15 @@ from .model_genes import (
 )
 from .model_etl import ETLDataSource, ETLSourceSystem, ETLPackage
 
+from .model_kdc import (
+    KDCAsset,
+    KDCAssetVersion,
+    KDCSchema,
+    KDCSchemaField,
+    KDCLineage,
+    KDCScanRun
+)
+
 from .model_entities import (
     EntityGroup,
     Entity,
@@ -66,6 +75,13 @@ __all__ = [
     "ETLDataSource",
     "ETLSourceSystem",
     "ETLPackage",
+    # KDC Models
+    "KDCAsset",
+    "KDCAssetVersion",
+    "KDCSchema",
+    "KDCSchemaField",
+    "KDCLineage",
+    "KDCScanRun",
     # # ENTITY MODELS
     "EntityGroup",
     "Entity",

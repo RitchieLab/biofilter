@@ -13,6 +13,7 @@ def load_all_models():
     """
     import_module("biofilter.modules.db.models.model_config")
     import_module("biofilter.modules.db.models.model_etl")
+    import_module("biofilter.modules.db.models.model_kdc")
     import_module("biofilter.modules.db.models.model_entities")
     import_module("biofilter.modules.db.models.model_genes")
     import_module("biofilter.modules.db.models.model_curation")
