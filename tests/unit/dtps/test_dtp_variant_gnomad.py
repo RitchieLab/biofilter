@@ -1,0 +1,297 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+
+import pyarrow.parquet as pq
+import pytest
+
+import biofilter.modules.etl.dtps.dtp_variant_gnomad as mod  # noqa: F401
+
+
+# -----------------------------
+# Test helpers (fakes/mocks)
+# -----------------------------
+
+
+class DummyLogger:
+    def __init__(self):
+        self.messages = []
+
+    def log(self, msg: str, level: str = "INFO"):
+        self.messages.append((level, msg))
+
+
+@dataclass
+class FakeSourceSystem:
+    name: str
+
+
+@dataclass
+class FakeDataSource:
+    name: str
+    source_system: FakeSourceSystem
+    source_url: str = "http://example.com/file.vcf.bgz"
+    release_tag: str = "test"
+    grch_version: str = "GRCh38"
+    id: int = 1
+
+
+class FakeVariant:
+    """
+    Minimal cyvcf2 Variant stub with the attributes used by the DTP:
+      - CHROM, POS, REF, ALT, ID, INFO.get()
+    """
+
+    def __init__(
+        self,
+        chrom: str,
+        pos: int,
+        ref: str,
+        alt: Optional[str],
+        rsid: Optional[str],
+        info: Dict[str, Any],
+    ):
+        self.CHROM = chrom
+        self.POS = pos
+        self.REF = ref
+        self.ALT = [alt] if alt is not None else []
+        self.ID = rsid if rsid is not None else "."
+        self.INFO = info
+
+
+class FakeVCF:
+    """
+    Minimal cyvcf2.VCF stub:
+      - raw_header
+      - iterable over variants
+    """
+
+    def __init__(
+        self, path: str, raw_header: str, variants: List[FakeVariant]
+    ):  # noqa E501
+        self.path = path
+        self.raw_header = raw_header
+        self._variants = variants
+
+    def __iter__(self):
+        yield from self._variants
+
+
+# -----------------------------
+# Unit tests for helper funcs
+# -----------------------------
+
+
+def test_parse_info_header_types():
+    raw = "\n".join(
+        [
+            "##fileformat=VCFv4.2",
+            '##INFO=<ID=AC,Number=A,Type=Integer,Description="Allele count">',
+            '##INFO=<ID=AF,Number=A,Type=Float,Description="Allele frequency">',  # noqa E501
+            '##INFO=<ID=FLAGX,Number=0,Type=Flag,Description="A flag">',
+            "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO",
+        ]
+    )
+    info_types = mod._parse_info_header_types(raw)
+    assert info_types["AC"] == "Integer"
+    assert info_types["AF"] == "Float"
+    assert info_types["FLAGX"] == "Flag"
+
+
+@pytest.mark.parametrize(
+    "val, vtype, expected",
+    [
+        (10, "Integer", 10),
+        ("10", "Integer", 10),
+        ("0.1", "Float", 0.1),
+        (0.2, "Float", 0.2),
+        (True, "Flag", True),
+        ("abc", "String", "abc"),
+        ([1, 2], "Integer", [1, 2]),
+        ((1, 2), "Integer", [1, 2]),
+        (None, "Integer", None),
+    ],
+)
+def test_cast_info_value(val, vtype, expected):
+    out = mod._cast_info_value(val, vtype)
+    assert out == expected
+
+
+def test_parse_vep_header_format():
+    raw = "\n".join(
+        [
+            "##fileformat=VCFv4.2",
+            '##INFO=<ID=vep,Number=.,Type=String,Description="VEP. Format: Allele|Consequence|IMPACT|SYMBOL|Gene|Feature_type|Feature">',  # noqa E501
+            "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO",
+        ]
+    )
+    vcf = FakeVCF("x", raw_header=raw, variants=[])
+    fields = mod._parse_vep_header_format(vcf, "vep")
+    assert fields[:4] == ["Allele", "Consequence", "IMPACT", "SYMBOL"]
+    assert "Feature" in fields
+
+
+def test_variant_key():
+    k = mod._variant_key("1", 123, "A", "G")
+    assert k == "1:123:A:G"
+
+
+# -----------------------------
+# Unit test for transform() using fakes
+# -----------------------------
+
+
+def test_transform_writes_parts_and_manifests(monkeypatch, tmp_path):
+    """
+    Unit-level transform test:
+    - No real cyvcf2 parsing
+    - No real VCF IO
+    - Uses FakeVCF + FakeVariant
+    - Verifies:
+        - outputs dirs
+        - parquet parts are created with dynamic numbering
+        - KDSManifestWriter.write called twice
+        - consequences written under consequences/ (not variants/)
+    """
+
+    # 1) Create a fake raw_dir structure with a dummy file that matches glob
+    raw_dir = tmp_path / "raw"
+    processed_dir = tmp_path / "processed"
+
+    ss = FakeSourceSystem(name="gnomad")
+    ds = FakeDataSource(name="gnomad_chr22", source_system=ss)
+
+    raw_base = raw_dir / ss.name / ds.name
+    raw_base.mkdir(parents=True, exist_ok=True)
+    dummy_vcf = raw_base / "gnomad_chr22_tiny.vcf"
+    dummy_vcf.write_text(
+        "##dummy\n#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\n"
+    )  # noqa E501
+
+    # 2) Fake header with INFO + VEP schema
+    raw_header = "\n".join(
+        [
+            "##fileformat=VCFv4.2",
+            '##INFO=<ID=AC,Number=A,Type=Integer,Description="Allele count">',
+            '##INFO=<ID=AF,Number=A,Type=Float,Description="Allele frequency">',  # noqa E501
+            '##INFO=<ID=vep,Number=.,Type=String,Description="VEP. Format: Allele|Consequence|IMPACT|SYMBOL|Gene|Feature_type|Feature">',  # noqa E501
+            "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO",
+        ]
+    )
+
+    # 3) Make a few fake variants (3 variants; chunk_size=2 => 2 parts: 0000 and 0001)  # noqa E501
+    v1 = FakeVariant(
+        chrom="22",
+        pos=100,
+        ref="A",
+        alt="G",
+        rsid="rs1",
+        info={
+            "AC": 1,
+            "AF": 0.1,
+            "vep": "G|missense_variant|MODERATE|GENE1|ENSG1|Transcript|ENST1",
+        },  # noqa E501
+    )
+    v2 = FakeVariant(
+        chrom="22",
+        pos=200,
+        ref="C",
+        alt="T",
+        rsid="rs2",
+        info={
+            "AC": 2,
+            "AF": 0.2,
+            "vep": "T|synonymous_variant|LOW|GENE2|ENSG2|Transcript|ENST2",
+        },  # noqa E501
+    )
+    v3 = FakeVariant(
+        chrom="22",
+        pos=300,
+        ref="G",
+        alt="A",
+        rsid="rs3",
+        info={
+            "AC": 3,
+            "AF": 0.3,
+            "vep": "A|stop_gained|HIGH|GENE3|ENSG3|Transcript|ENST3",
+        },  # noqa E501
+    )
+    fake_vcf_obj = FakeVCF(
+        str(dummy_vcf), raw_header=raw_header, variants=[v1, v2, v3]
+    )  # noqa E501
+
+    # 4) Monkeypatch VCF(...) to return our fake object
+    monkeypatch.setattr(mod, "VCF", lambda path: fake_vcf_obj)
+
+    # 5) Capture KDSManifestWriter.write calls
+    calls = []
+
+    def fake_manifest_write(**kwargs):
+        calls.append(kwargs)
+
+    monkeypatch.setattr(
+        mod.KDSManifestWriter, "write", staticmethod(fake_manifest_write)
+    )  # noqa E501
+
+    # 6) Run transform with small chunk_size for deterministic parts
+    logger = DummyLogger()
+    cfg = mod.GnomadCyvcf2Config(
+        chunk_size=2,
+        vep_info_key="vep",
+        extract_all_info=False,
+        info_allowlist=["AC", "AF"],
+        parquet_compression="snappy",
+    )
+    dtp = mod.DTP(logger=logger, datasource=ds, config=cfg)
+
+    monkeypatch.setattr(mod.DTP, "check_compatibility", lambda self: None)
+    ok, msg = dtp.transform(str(raw_dir), str(processed_dir))
+    assert ok is True, msg
+
+    out_base = Path(processed_dir) / ss.name / ds.name
+    variants_dir = out_base / "variants"
+    cons_dir = out_base / "consequences"
+
+    assert variants_dir.exists()
+    assert cons_dir.exists()
+
+    # 7) Validate parquet parts
+    variant_files = sorted(variants_dir.glob("variants_part_*.parquet"))
+    cons_files = sorted(cons_dir.glob("consequences_part_*.parquet"))
+
+    assert len(variant_files) == 1  # parts: 0000 (2 rows) + 0001 (1 row)
+    assert len(cons_files) == 1
+
+    assert variant_files[0].name == "variants_part_0000.parquet"
+    # assert variant_files[1].name == "variants_part_0001.parquet"
+    assert cons_files[0].name == "consequences_part_0000.parquet"
+    # assert cons_files[1].name == "consequences_part_0001.parquet"
+
+    # 8) Validate content quickly
+    vtab0 = pq.read_table(variant_files[0])
+    assert vtab0.num_rows == 2
+    assert "variant_key" in vtab0.column_names
+    assert "AC" in vtab0.column_names
+    assert "AF" in vtab0.column_names
+
+    ctab0 = pq.read_table(cons_files[0])
+    assert ctab0.num_rows == 2
+    assert "consequence" in ctab0.column_names
+    assert "gene_symbol" in ctab0.column_names
+
+    # 9) Validate manifests were requested (2 calls)
+    assert len(calls) == 2
+    assets = sorted([c["asset"] for c in calls])
+    assert assets == ["consequences", "variants"]
+
+    # Ensure consequences manifest carries csq schema fields from header
+    cons_call = next(c for c in calls if c["asset"] == "consequences")
+    assert "parameters" in cons_call
+    assert "csq_schema_fields" in cons_call["parameters"]
+    assert cons_call["parameters"]["csq_schema_fields"][:3] == [
+        "Allele",
+        "Consequence",
+        "IMPACT",
+    ]  # noqa E501

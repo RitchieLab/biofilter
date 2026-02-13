@@ -93,6 +93,44 @@ def migrate(ctx, db_uri, debug: bool, status: bool, stamp_head: bool, dry_run: b
 
 
 # -----------------------------------------------------------------------------
+# Upgrade (schema + seeds)
+# -----------------------------------------------------------------------------
+
+@db.command("upgrade")
+@local_db_uri_option
+@click.option(
+    "--seed-dir",
+    default="seed",
+    show_default=True,
+    help="Seed directory used to apply master data updates.",
+)
+@click.option("--debug", is_flag=True, help="Enable debug logging.")
+@click.option("--force", is_flag=True, help="Force dangerous actions (reserved for future use).")
+@click.pass_context
+def upgrade(ctx, db_uri, seed_dir: str, debug: bool, force: bool):
+    """
+    Upgrade database to latest schema and apply master seeds (idempotent).
+    Equivalent to:
+      - db migrate --target head
+      - apply seed upserts
+    """
+    db_uri = require_db_uri(ctx, local_db_uri=db_uri)
+
+    bf = Biofilter(db_uri=db_uri, debug_mode=debug)
+
+    # Ensure DB engine/session exist
+    bf.db.connect()
+
+    # 1) Schema upgrade
+    bf.db.migrate(action="upgrade", target="head", force=force)
+
+    # 2) Master seeds upsert
+    bf.db.upgrade(seed_dir=seed_dir)
+
+    click.echo("✅ Database upgraded (schema + seeds).")
+
+
+# -----------------------------------------------------------------------------
 # Physical snapshot: backup / restore
 # -----------------------------------------------------------------------------
 

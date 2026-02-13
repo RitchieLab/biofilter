@@ -19,4 +19,3 @@ texto curto com 2–3 entidades conhecidas
 
 texto com repetições (“A1BG … A1BG …”) → retorna 2 spans diferentes ou dedupa (dependendo do seu postprocess_mentions)
 """
-

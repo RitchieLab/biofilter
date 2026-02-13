@@ -6,7 +6,10 @@ import pytest
 
 from biofilter import Biofilter
 from biofilter.modules.search.resolver import TermResolver, ResolverConfig
-from biofilter.modules.search.db_retriever import make_entity_alias_retriever, DBRetrieverConfig
+from biofilter.modules.search.db_retriever import (
+    make_entity_alias_retriever,
+    DBRetrieverConfig,
+)
 
 pytestmark = pytest.mark.integration
 
@@ -20,9 +23,13 @@ def _require_env(name: str) -> str:
         )
     return val
 
+
 def _get_db_uri() -> str:
     # Prefer env var, fallback to local dev if not set
-    return os.getenv("BIOFILTER_DB_URI") or "postgresql+psycopg2://bioadmin:bioadmin@localhost/biofilter_prod"
+    return (
+        os.getenv("BIOFILTER_DB_URI")
+        or "postgresql+psycopg2://bioadmin:bioadmin@localhost/biofilter_prod"
+    )
 
 
 @pytest.fixture(scope="session")

@@ -60,16 +60,22 @@
             "homepage": "https://www.clinicalgenome.org/",
             "active": true
         },
-            {
+        {
             "name": "OMIM",
             "description": "Online Mendelian Inheritance in Man (OMIM) is a comprehensive, curated catalog of human genes and genetic phenotypes.",
             "homepage": "https://omim.org/",
             "active": true
         },
-            {
+        {
             "name": "BioGRID",
             "description": "A curated repository of genetic and protein interaction data from multiple organisms, focusing on experimentally validated molecular interactions.",
             "homepage": "https://thebiogrid.org/",
+            "active": true
+        },
+        {
+            "name": "gnomAD",
+            "description": "Genome Aggregation Database.",
+            "homepage": "https://gnomad.broadinstitute.org/",
             "active": true
         }
     ]

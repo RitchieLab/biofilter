@@ -667,6 +667,24 @@ files = [
 ]
 
 [[package]]
+name = "coloredlogs"
+version = "15.0.1"
+description = "Colored terminal output for Python's logging module"
+optional = false
+python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*"
+groups = ["main"]
+files = [
+    {file = "coloredlogs-15.0.1-py2.py3-none-any.whl", hash = "sha256:612ee75c546f53e92e70049c9dbfcc18c935a2b9a53b66085ce9ef6a6e5c0934"},
+    {file = "coloredlogs-15.0.1.tar.gz", hash = "sha256:7c991aa71a4577af2f82600d8f8f3a89f936baeaf9b50a9c197da014e5bf16b0"},
+]
+
+[package.dependencies]
+humanfriendly = ">=9.1"
+
+[package.extras]
+cron = ["capturer (>=2.4)"]
+
+[[package]]
 name = "comm"
 version = "0.2.3"
 description = "Jupyter Python Comm implementation, for usage in ipykernel, xeus-python etc."
@@ -772,6 +790,64 @@ files = [
     {file = "css-html-js-minify-2.5.5.zip", hash = "sha256:4a9f11f7e0496f5284d12111f3ba4ff5ff2023d12f15d195c9c48bd97013746c"},
     {file = "css_html_js_minify-2.5.5-py2.py3-none-any.whl", hash = "sha256:3da9d35ac0db8ca648c1b543e0e801d7ca0bab9e6bfd8418fee59d5ae001727a"},
 ]
+
+[[package]]
+name = "cyvcf2"
+version = "0.31.4"
+description = "fast vcf parsing with cython + htslib"
+optional = false
+python-versions = ">=3.7"
+groups = ["main"]
+files = [
+    {file = "cyvcf2-0.31.4-cp310-cp310-macosx_10_9_x86_64.whl", hash = "sha256:ca8ef53d7b58556f5c5d12b1e2717fd057246571cd966e8d92fc761819731e1d"},
+    {file = "cyvcf2-0.31.4-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:364402abcf16ac9cb7045a971b0040d62e4f94eaf0bb68e5f48b321cd86adf7e"},
+    {file = "cyvcf2-0.31.4-cp310-cp310-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:c722f5e6357da2c2896429badd84a7013ca518d7538c40d93dc8d7c08cd7b9fe"},
+    {file = "cyvcf2-0.31.4-cp310-cp310-manylinux_2_27_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:fb0674bef30fa816342fa994dc4bd650e8888cd2964ac5c568501005f705d1e4"},
+    {file = "cyvcf2-0.31.4-cp310-cp310-musllinux_1_2_x86_64.whl", hash = "sha256:b0c7a02e4994db39f5ebfd504592406e705c476ce08ac495c540a8dde1a210d1"},
+    {file = "cyvcf2-0.31.4-cp311-cp311-macosx_10_9_x86_64.whl", hash = "sha256:e870209c30ee7e103fba0c1541e626a239aae0c9160ea4aa40dffee3490ccc85"},
+    {file = "cyvcf2-0.31.4-cp311-cp311-macosx_11_0_arm64.whl", hash = "sha256:0b22f64ba487f96044783e73a05f6aecfd31a9cc8ca67ecd4e75f72d0b10cdd2"},
+    {file = "cyvcf2-0.31.4-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:0620f45a7cfb5d2dabc9c928156249473c87f03f94c80e07550a94293c441379"},
+    {file = "cyvcf2-0.31.4-cp311-cp311-manylinux_2_27_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:7525b450f81f3256f94a8b57d5708fdf010941ff739caf4cc5ddb9410eabf131"},
+    {file = "cyvcf2-0.31.4-cp311-cp311-musllinux_1_2_aarch64.whl", hash = "sha256:a2a0cc42115e0c592ca66f87a0195ed4043776343b9131b24591298340d928dc"},
+    {file = "cyvcf2-0.31.4-cp311-cp311-musllinux_1_2_x86_64.whl", hash = "sha256:406cf01e19e1aa93028330e3c635e8130c2925f99dd94fe6a1a7fccc2e3aa3cc"},
+    {file = "cyvcf2-0.31.4-cp312-cp312-macosx_10_13_x86_64.whl", hash = "sha256:fe67f02f1c2890dd793c901d984bc5e1887f5509fccdaf6e7676dde02e476449"},
+    {file = "cyvcf2-0.31.4-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:f704db67aaa951185d5dfe7723ef93af1164802d42936e0d8dd687aacc6018ef"},
+    {file = "cyvcf2-0.31.4-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:fab3fdf48eadadd88411e10d6427b2a71b5090cfad1ebb149556673cbb8ec99a"},
+    {file = "cyvcf2-0.31.4-cp312-cp312-manylinux_2_27_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:f6c890d2aabc85f25eb90cebc6337cd0e9b457dc16a724eb9522799707f5cae3"},
+    {file = "cyvcf2-0.31.4-cp312-cp312-musllinux_1_2_aarch64.whl", hash = "sha256:62a6ba6e96e2717c00b2691c69883fd557afa950a6849998c442e427ad9c5edd"},
+    {file = "cyvcf2-0.31.4-cp312-cp312-musllinux_1_2_x86_64.whl", hash = "sha256:99ffb8b505c98f15a98bce978270a4efff6e147154c6dc5c5c023081b09aeb6c"},
+    {file = "cyvcf2-0.31.4-cp313-cp313-macosx_10_13_x86_64.whl", hash = "sha256:46c8c310216e3b2ee1758c93c7d2a9657ece832afd319e21580c0a6846d6ff8b"},
+    {file = "cyvcf2-0.31.4-cp313-cp313-macosx_11_0_arm64.whl", hash = "sha256:38b7be922756b5e78a1972477e5f865d15b1abef774224c4d6421bab29e2b757"},
+    {file = "cyvcf2-0.31.4-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:4d885c2789fa8b41b9292f880a189fce7917aeeecfd4ea9cd0a9678946385a9c"},
+    {file = "cyvcf2-0.31.4-cp313-cp313-manylinux_2_27_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:bb4621b3be737230f52bb63fe03e94a578928c6488b8ab070cb1b516193b659b"},
+    {file = "cyvcf2-0.31.4-cp313-cp313-musllinux_1_2_aarch64.whl", hash = "sha256:8ad1f0216572e3be343a0d4af01ad415bce6412e0a9f62359967c450bf261307"},
+    {file = "cyvcf2-0.31.4-cp313-cp313-musllinux_1_2_x86_64.whl", hash = "sha256:af462b25bf73b98f9d9419d6e42bf0676cada1967eaa32865e1044557512abd1"},
+    {file = "cyvcf2-0.31.4-cp314-cp314-macosx_10_13_x86_64.whl", hash = "sha256:c707344ecb1c802fe1872162409224065886d5999db7cda67e42dd9b1e9caca8"},
+    {file = "cyvcf2-0.31.4-cp314-cp314-macosx_11_0_arm64.whl", hash = "sha256:c968bd546d0ada1c9c35c1b7e2a4ff8e846fa657660d921064f7fde7ccc0045e"},
+    {file = "cyvcf2-0.31.4-cp314-cp314-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:666244dd5849753cb0d6b53ac9fc2b070263fc0bbcf44e4cfc51f4232022a316"},
+    {file = "cyvcf2-0.31.4-cp314-cp314-manylinux_2_27_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:a97da556f5d383b6984d70069f960cdc4855ddcbfc1ace48892d67aee7608d29"},
+    {file = "cyvcf2-0.31.4-cp314-cp314-musllinux_1_2_aarch64.whl", hash = "sha256:37488f5d2e15c02618f0d133da4f4e4e19412ed9160f925166fc50735cc82b35"},
+    {file = "cyvcf2-0.31.4-cp314-cp314-musllinux_1_2_x86_64.whl", hash = "sha256:a6d3db9e7d8598b91be8be27e11ce87af0ece0e5a9890c8470483e67bd2ba6d1"},
+    {file = "cyvcf2-0.31.4-cp38-cp38-macosx_10_9_x86_64.whl", hash = "sha256:67b532021ff83c145e90ff46cf6901d916ff1f59016185af41b9054f93df64d9"},
+    {file = "cyvcf2-0.31.4-cp38-cp38-macosx_11_0_arm64.whl", hash = "sha256:729f8aa06885e54106e4d510d0736a7d3496d580cc3151a141ff2fd4149423d6"},
+    {file = "cyvcf2-0.31.4-cp38-cp38-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:66564f4ea4f1a7f6727766cc43e8a8525697bf8001ae1aaf557807f94f03daa2"},
+    {file = "cyvcf2-0.31.4-cp38-cp38-manylinux_2_27_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:f55ed16f55d5afbd08ee694a99adc0039548486d4916907239f4d827ef04d089"},
+    {file = "cyvcf2-0.31.4-cp39-cp39-macosx_10_9_x86_64.whl", hash = "sha256:a844b6ec1427d36df6c661387292d1a04a81f8c9056b649b47a55c3f4b76f89a"},
+    {file = "cyvcf2-0.31.4-cp39-cp39-macosx_11_0_arm64.whl", hash = "sha256:262493a8080627a1f94150682e226a7250f620ff9a810485469c1b604670224e"},
+    {file = "cyvcf2-0.31.4-cp39-cp39-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:dcbd0a729551b16ddc761c3b58f2fc7e74da062b5d2d673a224bb1f5b1b5973a"},
+    {file = "cyvcf2-0.31.4-cp39-cp39-manylinux_2_27_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:55ab60ea042b03f128b48f54d521e0cffb3894f2447afa6655317a520a483463"},
+    {file = "cyvcf2-0.31.4-cp39-cp39-musllinux_1_2_x86_64.whl", hash = "sha256:cefab7daa8d6205e26cd83f3ac5fe17b037616fe93301537b28d7e2eee939ef9"},
+    {file = "cyvcf2-0.31.4-pp310-pypy310_pp73-macosx_10_15_x86_64.whl", hash = "sha256:a29bc1bc06338bbd9e0210dc986fa785caafb878e24289e1bab58d875cc9e729"},
+    {file = "cyvcf2-0.31.4-pp310-pypy310_pp73-macosx_11_0_arm64.whl", hash = "sha256:a6388e048500f0355e1d404ccfb86331dda08d4506f8a1764d81fb92559aa0f6"},
+    {file = "cyvcf2-0.31.4-pp310-pypy310_pp73-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:3c3294000440c86d031019e50255981be1b133d175a00ded078a7b91c44bf727"},
+    {file = "cyvcf2-0.31.4-pp310-pypy310_pp73-manylinux_2_27_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:608f4ca072ffca07ef5f02d760fb802b3c7759a99ee960b2f8a9fc322919f202"},
+    {file = "cyvcf2-0.31.4.tar.gz", hash = "sha256:42f0c296b1f9a995c0240a1e33033d67ae728d6753ac129fdf90bddd5befaf57"},
+]
+
+[package.dependencies]
+click = "*"
+coloredlogs = "*"
+numpy = ">=1.16.0"
 
 [[package]]
 name = "debugpy"
@@ -1139,6 +1215,21 @@ cli = ["click (==8.*)", "pygments (==2.*)", "rich (>=10,<14)"]
 http2 = ["h2 (>=3,<5)"]
 socks = ["socksio (==1.*)"]
 zstd = ["zstandard (>=0.18.0)"]
+
+[[package]]
+name = "humanfriendly"
+version = "10.0"
+description = "Human friendly output for text interfaces using Python"
+optional = false
+python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*"
+groups = ["main"]
+files = [
+    {file = "humanfriendly-10.0-py2.py3-none-any.whl", hash = "sha256:1697e1a8a8f550fd43c2865cd84542fc175a61dcb779b6fee18cf6b6ccba1477"},
+    {file = "humanfriendly-10.0.tar.gz", hash = "sha256:6b0b831ce8f15f7300721aa49829fc4e83921a9a301cc7f606be6686a2288ddc"},
+]
+
+[package.dependencies]
+pyreadline3 = {version = "*", markers = "sys_platform == \"win32\" and python_version >= \"3.8\""}
 
 [[package]]
 name = "idna"
@@ -2745,6 +2836,69 @@ docs = ["furo (>=2024.8.6)", "sphinx-autodoc-typehints (>=2.4.1)"]
 testing = ["covdefaults (>=2.3)", "pytest (>=8.3.3)", "pytest-cov (>=5)", "pytest-mock (>=3.14)", "setuptools (>=75.1)"]
 
 [[package]]
+name = "pyreadline3"
+version = "3.5.4"
+description = "A python implementation of GNU readline."
+optional = false
+python-versions = ">=3.8"
+groups = ["main"]
+markers = "sys_platform == \"win32\""
+files = [
+    {file = "pyreadline3-3.5.4-py3-none-any.whl", hash = "sha256:eaf8e6cc3c49bcccf145fc6067ba8643d1df34d604a1ec0eccbf7a18e6d3fae6"},
+    {file = "pyreadline3-3.5.4.tar.gz", hash = "sha256:8d57d53039a1c75adba8e50dd3d992b28143480816187ea5efbd5c78e6c885b7"},
+]
+
+[package.extras]
+dev = ["build", "flake8", "mypy", "pytest", "twine"]
+
+[[package]]
+name = "pysam"
+version = "0.23.3"
+description = "Package for reading, manipulating, and writing genomic data"
+optional = false
+python-versions = ">=3.8"
+groups = ["main"]
+files = [
+    {file = "pysam-0.23.3-cp310-cp310-macosx_10_9_x86_64.whl", hash = "sha256:a0b99d875f293fad0bd9c9c923e8910c03af62d291ebb7d20e69ceaf39e383d4"},
+    {file = "pysam-0.23.3-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:725a32970cf4ce322f4ab2a52b755163297027a0349f0d151537fe16bdf525e5"},
+    {file = "pysam-0.23.3-cp310-cp310-manylinux_2_28_aarch64.whl", hash = "sha256:5fd54146c0a5a41e37b67212e3b9b0c123b73d1dd2ba58082d21dc2236c1b290"},
+    {file = "pysam-0.23.3-cp310-cp310-manylinux_2_28_x86_64.whl", hash = "sha256:a7d6b3dcbf4756bd178e217fa391187edc5793f8f50c3034e585d1e4d282d29b"},
+    {file = "pysam-0.23.3-cp310-cp310-musllinux_1_2_aarch64.whl", hash = "sha256:bc391a099ca74a1134a1cf71812c8ddf9934ab9d6675f3a97fe299466f227a1f"},
+    {file = "pysam-0.23.3-cp310-cp310-musllinux_1_2_x86_64.whl", hash = "sha256:d98ce73c07926d400c684773ce2521f03f78247a3dd6968c8206ba31b077b503"},
+    {file = "pysam-0.23.3-cp311-cp311-macosx_10_9_x86_64.whl", hash = "sha256:cb4c9c4eb245d643b60c7ec750d5554ebf17c6c9646f4f54439f94a3b3de15de"},
+    {file = "pysam-0.23.3-cp311-cp311-macosx_11_0_arm64.whl", hash = "sha256:3449070e0bbe716f9eccd3911d2482476478fbad63f739378d0203f470a446d6"},
+    {file = "pysam-0.23.3-cp311-cp311-manylinux_2_28_aarch64.whl", hash = "sha256:c6cb7069dcecca3d40bbe4a6d5adea5cafe483c11854892dbabd6e10e5776049"},
+    {file = "pysam-0.23.3-cp311-cp311-manylinux_2_28_x86_64.whl", hash = "sha256:a7e9c835126f94ff57199e2f58e61436e12e84d47077e70aac8aa03531c4cc71"},
+    {file = "pysam-0.23.3-cp311-cp311-musllinux_1_2_aarch64.whl", hash = "sha256:9b249367a4ad100e61afac9156bde6183c6119f2612bbd5d97ebe3153c643aed"},
+    {file = "pysam-0.23.3-cp311-cp311-musllinux_1_2_x86_64.whl", hash = "sha256:a720cc0818aa84aca5ee4ef884fda82367598e77ec0c95d2050f670fb1fd0db5"},
+    {file = "pysam-0.23.3-cp312-cp312-macosx_10_13_x86_64.whl", hash = "sha256:69f90c0867fe43f04004bcea963f6b2e68b39180afab54bf551f61f43856638b"},
+    {file = "pysam-0.23.3-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:2310d72bfae7a0980d414156267e25b57aa221a768c11c087f3f7d00ceb9fed4"},
+    {file = "pysam-0.23.3-cp312-cp312-manylinux_2_28_aarch64.whl", hash = "sha256:b2e45983efea190d374fcda0b6e0c835d6e9e474e02694729f3b3a14d680fa62"},
+    {file = "pysam-0.23.3-cp312-cp312-manylinux_2_28_x86_64.whl", hash = "sha256:4099393fc5097b5081c7efaf46b0109e4f0a8ed18f86d497219a8bf739c73992"},
+    {file = "pysam-0.23.3-cp312-cp312-musllinux_1_2_aarch64.whl", hash = "sha256:4f04b9aa9b23d767fe36652eacb8370791e3b56816a7e50553d52c65ccdce77f"},
+    {file = "pysam-0.23.3-cp312-cp312-musllinux_1_2_x86_64.whl", hash = "sha256:701843e5dc67c8eb217c3265039c699a5f83cce64fbc4225268141796e972353"},
+    {file = "pysam-0.23.3-cp313-cp313-macosx_10_13_x86_64.whl", hash = "sha256:2d3177c5b3e102bde297f86e079d23fa385ac88f16c4252502079ef368056d55"},
+    {file = "pysam-0.23.3-cp313-cp313-macosx_11_0_arm64.whl", hash = "sha256:2b6f6891684213e89ee679c5ac786b4e845e7d39d24f6ea0e4d8ed8be9c34f48"},
+    {file = "pysam-0.23.3-cp313-cp313-manylinux_2_28_aarch64.whl", hash = "sha256:735b938b809f0dc19a389cf3cee04fe7a451e21e2b20d3e45fa6bc23016ae21d"},
+    {file = "pysam-0.23.3-cp313-cp313-manylinux_2_28_x86_64.whl", hash = "sha256:b721ae4c9118e0c27e1500be278c3b62022c886eeb913ecabc0463fdf98da38f"},
+    {file = "pysam-0.23.3-cp313-cp313-musllinux_1_2_aarch64.whl", hash = "sha256:915bd2883eed08b16a41964a33923818e67166ca69a51086598d27287df6bb4f"},
+    {file = "pysam-0.23.3-cp313-cp313-musllinux_1_2_x86_64.whl", hash = "sha256:b80f1092ba290b738d6ed230cc58cc75ca815fda441afe76cb4c25639aec7ee7"},
+    {file = "pysam-0.23.3-cp38-cp38-macosx_10_9_x86_64.whl", hash = "sha256:9bf6281fc4709125f5089b5c8f83ffcb1b911c4aa9c601a0a4f62beb1de82413"},
+    {file = "pysam-0.23.3-cp38-cp38-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:456fb5f1a22001cb237fcc5b2ec03960979e5e18a3171c8e0a0116e02d86f31a"},
+    {file = "pysam-0.23.3-cp38-cp38-manylinux_2_28_aarch64.whl", hash = "sha256:7565c85fc636d75029ef4e133461c513a848c2d0ecd0489571f4fde1efa22d3b"},
+    {file = "pysam-0.23.3-cp38-cp38-manylinux_2_28_x86_64.whl", hash = "sha256:ad3cf30c6a48f3e2751a0b78d36c47cd4b272249cb6428be655b46473676d8f9"},
+    {file = "pysam-0.23.3-cp38-cp38-musllinux_1_2_aarch64.whl", hash = "sha256:15945db1483fef9760f32cfa112af3c3b7d50d586edfaf245edce52b99bb5c25"},
+    {file = "pysam-0.23.3-cp38-cp38-musllinux_1_2_x86_64.whl", hash = "sha256:013738cca990e235c56a7200ccfa9f105d7144ef34c2683c1ae8086ee030238b"},
+    {file = "pysam-0.23.3-cp39-cp39-macosx_10_9_x86_64.whl", hash = "sha256:83f6f22995fa9b89b619f0d932a6714108d0dd1536fff684d3e02257c3f59b3a"},
+    {file = "pysam-0.23.3-cp39-cp39-macosx_11_0_arm64.whl", hash = "sha256:ecf7cbc3d15c84cbc14a6c00af0f866b8f5e6b8ea3d2a496f18ad87adf55bcc5"},
+    {file = "pysam-0.23.3-cp39-cp39-manylinux_2_28_aarch64.whl", hash = "sha256:be2283f2ff15346d6ac10ba3b4370359ac3c1afc34b99bb0f2f39e715749cb8b"},
+    {file = "pysam-0.23.3-cp39-cp39-manylinux_2_28_x86_64.whl", hash = "sha256:513fa67af426e9e01f82653654e384d7774d81876d7dc3020ad7f72aa1d9c309"},
+    {file = "pysam-0.23.3-cp39-cp39-musllinux_1_2_aarch64.whl", hash = "sha256:fd35287d2f8d243d6e54746e8cd5df3eb6239b016e51e20bbca1a2b6ef5899df"},
+    {file = "pysam-0.23.3-cp39-cp39-musllinux_1_2_x86_64.whl", hash = "sha256:7ddbf573f0d3c650a03f2dcb4cdce50d536d380dbbc692f434b1cfa0cd7da4d2"},
+    {file = "pysam-0.23.3.tar.gz", hash = "sha256:9ebcb1f004b296fd139b103ec6fd7e415e80f89f194eb7d0d972ac6d11bbaf24"},
+]
+
+[[package]]
 name = "pytest"
 version = "8.3.5"
 description = "pytest: simple powerful testing with Python"
@@ -4197,4 +4351,4 @@ files = [
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.10"
-content-hash = "6c4f3b5304a4fde6485c285469b3d863f2f214ca069ed6541f84cca87f269a10"
+content-hash = "3e47c716c4db6e82b2c9a767ef7293a6e2dade2b395140bec2abea6ab4105fe8"

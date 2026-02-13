@@ -58,6 +58,42 @@ class DBComponent(BaseComponent):
         self.core.logger.log(f"🏗️ Database created at: {self.core.db_uri}", "INFO")
         return True
 
+    def upgrade(self, *, seed_dir: str = "seed") -> bool:
+        """
+        Upgrade an existing database:
+        - Connect (if needed)
+        - Run Alembic upgrade head
+        - Apply seeds idempotently (master data updates)
+
+        This is the canonical entry point used by CLI: `biofilter db upgrade`.
+        """
+        db = self.require_db()
+
+        # Ensure engine/session are initialized (connect if component was not connected yet)
+        if not getattr(db, "engine", None):
+            self.connect()
+
+        # 1) Migrate schema to head
+        ok = self.migrate(action="upgrade", target="head", force=False)
+        if ok:
+            self.core.logger.log("✅ Schema upgraded to head.", "INFO")
+
+        # 2) Apply seeds (idempotent upsert)
+        # This must be safe to run multiple times.
+        if not hasattr(db, "upgrade_db"):
+            raise RuntimeError(
+                "Database.upgrade_db() not found. "
+                "Implement it in CreateDBMixin/Database before using DBComponent.upgrade()."
+            )
+
+        db.upgrade_db(seed_dir=seed_dir)
+
+        self.core.logger.log("✅ Seeds applied successfully.", "INFO")
+        return True
+
+
+
+
     # def migrate(self) -> bool:
     #     db = self.require_db()
     #     # run_migration(db.session_factory, db.db_uri)  # ou db.SessionLocal

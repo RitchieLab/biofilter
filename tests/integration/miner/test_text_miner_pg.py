@@ -136,7 +136,9 @@ def test_text_miner_pg_empty(pg_miner: PgTrgmTextMiner):
     assert res.mentions == []
 
 
-def test_text_miner_pg_finds_gene_symbol_exact(pg_miner: PgTrgmTextMiner, prod_session: Session):
+def test_text_miner_pg_finds_gene_symbol_exact(
+    pg_miner: PgTrgmTextMiner, prod_session: Session
+):
     # Genes group_id appears to be 2 in your environment; keep this consistent with your EntityGroup table.
     # If this changes, either update the test or resolve it dynamically (optional enhancement).
     gene_alias = _pick_alias(prod_session, group_id=2, alias_type="symbol")
@@ -177,9 +179,13 @@ def test_text_miner_pg_finds_gene_symbol_exact(pg_miner: PgTrgmTextMiner, prod_s
     assert m.best.meta.get("alias_norm") == gene_alias.alias_norm
 
 
-def test_text_miner_pg_finds_chemical_label_exact(pg_miner: PgTrgmTextMiner, prod_session: Session):
+def test_text_miner_pg_finds_chemical_label_exact(
+    pg_miner: PgTrgmTextMiner, prod_session: Session
+):
     # Chemicals group_id appears to be 10 in your environment (CheBI labels).
-    chem_alias = _pick_alias(prod_session, group_id=10, alias_type="label", xref_source="CheBI")
+    chem_alias = _pick_alias(
+        prod_session, group_id=10, alias_type="label", xref_source="CheBI"
+    )
 
     raw = chem_alias.alias_value
     assert raw is not None and raw.strip()
@@ -190,7 +196,7 @@ def test_text_miner_pg_finds_chemical_label_exact(pg_miner: PgTrgmTextMiner, pro
         config=TextMinerConfig(
             entity_type_hints=["10"],  # restrict to Chemicals by group id
             top_k=5,
-            min_score=85.0,            # chemicals can be noisier; keep slightly lower
+            min_score=85.0,  # chemicals can be noisier; keep slightly lower
             keep_ambiguous=True,
             longest_span_wins=True,
             dedup_by_entity_id=False,
@@ -201,7 +207,9 @@ def test_text_miner_pg_finds_chemical_label_exact(pg_miner: PgTrgmTextMiner, pro
     assert len(res.mentions) >= 1
 
     m = _find_best_by_alias_id(res.mentions, int(chem_alias.id))
-    assert m is not None, "Expected to recover the inserted chemical alias as a mention."
+    assert (
+        m is not None
+    ), "Expected to recover the inserted chemical alias as a mention."
 
     assert raw.lower() in m.span.text.lower()
 
@@ -213,7 +221,9 @@ def test_text_miner_pg_finds_chemical_label_exact(pg_miner: PgTrgmTextMiner, pro
     assert m.best.meta.get("xref_source") == "CheBI"
 
 
-def test_text_miner_pg_dedup_by_entity_id(pg_miner: PgTrgmTextMiner, prod_session: Session):
+def test_text_miner_pg_dedup_by_entity_id(
+    pg_miner: PgTrgmTextMiner, prod_session: Session
+):
     gene_alias = _pick_alias(prod_session, group_id=2, alias_type="symbol")
     raw = gene_alias.alias_value
     assert raw is not None and raw.strip()

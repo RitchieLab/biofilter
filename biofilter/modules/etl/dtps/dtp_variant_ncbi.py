@@ -18,6 +18,7 @@ from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from biofilter.modules.etl.mixins.base_dtp import DTPBase
 from biofilter.modules.etl.conflict_manager import ConflictManager
 from biofilter.modules.etl.mixins.entity_query_mixin import EntityQueryMixin
+
 # from biofilter.modules.db.models import (
 #     VariantSNPMerge,
 # )
@@ -193,7 +194,8 @@ class DTP(DTPBase, EntityQueryMixin):
                             )  # noqa E501
                         else:
                             self.logger.log(
-                                f"⏭️  Skipping existing part {batch_id}", "DEBUG"  # noqa E501
+                                f"⏭️  Skipping existing part {batch_id}",
+                                "DEBUG",  # noqa E501
                             )  # noqa E501
                         batch_id += 1
                         batch = []
@@ -540,8 +542,12 @@ class DTP(DTPBase, EntityQueryMixin):
                     "source_id": rs_num,
                     "source_type": "rs",
                     "chromosome": chrom,
-                    "position_37": int(row.position_37) if pd.notna(row.position_37) else None,
-                    "position_38": int(row.position_38) if pd.notna(row.position_38) else None,
+                    "position_37": (
+                        int(row.position_37) if pd.notna(row.position_37) else None
+                    ),
+                    "position_38": (
+                        int(row.position_38) if pd.notna(row.position_38) else None
+                    ),
                     "position_other": None,
                     "reference_allele": row.reference_allele,
                     "alternate_allele": row.alternate_allele,
@@ -608,7 +614,7 @@ class DTP(DTPBase, EntityQueryMixin):
 
             if len(merge_list) == 0:
                 continue
-    
+
             for obsolete in merge_list:
                 try:
                     obsolete_int = int(obsolete)

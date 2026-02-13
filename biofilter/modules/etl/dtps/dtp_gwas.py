@@ -19,6 +19,7 @@ from biofilter.modules.db.models import VariantGWAS, VariantGWASSNP  # noqa E501
 # 1.2.0: Replace file to new ZIP format in dez/2025
 """
 
+
 class DTP(DTPBase, EntityQueryMixin):
     def __init__(
         self,
@@ -431,7 +432,7 @@ class DTP(DTPBase, EntityQueryMixin):
             msg = f"⚠️ Failed to read processed data: {e}"
             self.logger.log(msg, "ERROR")
             return False, msg
-        
+
         # SET DB AND DROP INDEXES
         try:
             self.db_write_mode()
@@ -571,12 +572,12 @@ class DTP(DTPBase, EntityQueryMixin):
 
             dialect = self.session.get_bind().dialect.name
             if dialect == "postgresql":
-                self.session.execute(text(
-                    "TRUNCATE variant_gwas_snp RESTART IDENTITY CASCADE"
-                ))
-                self.session.execute(text(
-                    "TRUNCATE variant_gwas RESTART IDENTITY CASCADE"
-                ))
+                self.session.execute(
+                    text("TRUNCATE variant_gwas_snp RESTART IDENTITY CASCADE")
+                )
+                self.session.execute(
+                    text("TRUNCATE variant_gwas RESTART IDENTITY CASCADE")
+                )
 
             else:  # SQLite (or others)
                 self.session.execute(text("DELETE FROM variant_gwas_snp"))
@@ -594,7 +595,6 @@ class DTP(DTPBase, EntityQueryMixin):
 
             self.session.execute(VariantGWAS.__table__.insert(), records)
             self.session.commit()
-
 
             """
             Rebuilds the VariantGWASSNP helper table from VariantGWAS.snp_id

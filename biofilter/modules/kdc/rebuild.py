@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Optional
 
+from sqlalchemy import text as sql_text
 from sqlalchemy.orm import Session
 
 from biofilter.modules.kdc.scanner import ScannedAsset, scan_manifests, scan_asset_from_manifest
@@ -132,6 +133,41 @@ def _rebuild_fields_from_schema(session: Session, av: KDCAssetVersion, schema: K
         )
 
 
+def _reset_kdc_tables(session: Session, *, keep_scan_runs: bool = True) -> None:
+    """
+    Reset KDC catalog tables.
+
+    - Postgres: TRUNCATE ... CASCADE is fast and resets identities.
+    - Others: fallback to DELETE in FK-safe order.
+    """
+    dialect = session.get_bind().dialect.name
+
+    if dialect == "postgresql":
+        tables = [
+            "kdc_schema_fields",
+            "kdc_lineages",
+            "kdc_schemas",
+            "kdc_asset_versions",
+            "kdc_assets",
+        ]
+        if not keep_scan_runs:
+            tables.append("kdc_scan_runs")
+
+        # TRUNCATE is fastest; RESTART IDENTITY keeps ids clean
+        sql = "TRUNCATE " + ", ".join(tables) + " RESTART IDENTITY CASCADE;"
+        session.execute(sql_text(sql))
+        return
+
+    # Fallback: DELETE in safe order (works on sqlite/mysql)
+    session.query(KDCSchemaField).delete()
+    session.query(KDCLineage).delete()
+    session.query(KDCSchema).delete()
+    session.query(KDCAssetVersion).delete()
+    session.query(KDCAsset).delete()
+    if not keep_scan_runs:
+        session.query(KDCScanRun).delete()
+
+
 def _upsert_lineage(session: Session, av: KDCAssetVersion, s: ScannedAsset) -> KDCLineage:
     lineage = session.query(KDCLineage).filter(KDCLineage.asset_version_id == av.id).one_or_none()
     if lineage is None:
@@ -160,6 +196,8 @@ def rebuild_kdc(
     *,
     dry_run: bool = False,
     strict: bool = False,
+    reset: bool = False,
+    keep_scan_runs: bool = True,
 ) -> RebuildResult:
     """
     Rebuild KDC tables by scanning KDS manifests and Parquet schemas.
@@ -169,6 +207,13 @@ def rebuild_kdc(
     """
     root = Path(kds_root).expanduser().resolve()
     warnings: list[str] = []
+
+    if reset:
+        if dry_run:
+            warnings.append("[KDC] reset=True ignored because dry_run=True.")
+        else:
+            _reset_kdc_tables(session, keep_scan_runs=keep_scan_runs)
+
 
     scan_run = KDCScanRun(kds_root=str(root), status="SUCCESS", summary_json=None)
     if not dry_run:

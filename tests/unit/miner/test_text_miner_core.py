@@ -139,8 +139,8 @@ def test_dedup_mentions_by_entity_id_skips_mentions_without_best(make_mention):
 # -----------------------------------------------------------------------------
 def test_postprocess_drops_too_short_spans(make_mention):
     cfg = TextMinerConfig(min_span_chars=3, longest_span_wins=False)
-    m_ok = make_mention(start=0, end=3, entity_id=1)      # len=3 ok
-    m_bad = make_mention(start=5, end=7, entity_id=2)     # len=2 drop
+    m_ok = make_mention(start=0, end=3, entity_id=1)  # len=3 ok
+    m_bad = make_mention(start=5, end=7, entity_id=2)  # len=2 drop
 
     out = postprocess_mentions([m_bad, m_ok], config=cfg)
     assert len(out) == 1

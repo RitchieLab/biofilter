@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import json
 from datetime import datetime
+from typing import Any, Dict, List, Optional, Tuple
 from importlib import import_module
 
 from sqlalchemy import text, inspect, create_engine
@@ -12,6 +13,29 @@ from sqlalchemy.engine.url import make_url
 from biofilter.modules.db.base import Base
 from biofilter.utils.db_loader import bootstrap_models
 from biofilter.modules.db.migrate import get_script_location, get_repo_heads
+# from biofilter.modules.db.migrate import alembic_upgrade_head
+
+
+# ---------------------------------------------------------------------
+# Seed unique keys (must match unique constraints / natural keys)
+# ---------------------------------------------------------------------
+SEED_UNIQUE_KEYS: Dict[str, List[str]] = {
+    # --- config ---
+    "SystemConfig": ["key"],
+    "BiofilterMetadata": ["schema_version"],
+
+    # --- ETL ---
+    "ETLSourceSystem": ["name"],
+    "ETLDataSource": ["name"],
+
+    # --- entities / curation ---
+    "EntityGroup": ["name"],
+    "EntityRelationshipType": ["id"],
+    "OmicStatus": ["name"],
+
+    # --- genome ---
+    "GenomeAssembly": ["accession"],
+}
 
 
 class CreateDBMixin:
@@ -102,6 +126,50 @@ class CreateDBMixin:
             self.logger.log(f"❌ Failed to create database: {e}", "ERROR")
             raise
 
+    # -----------------------------------------------------------------
+    # Public entry point: DB upgrade
+    # -----------------------------------------------------------------
+    # def upgrade_db(self, seed_dir: str = "seed") -> None:
+    #     """
+    #     Upgrade an existing DB:
+    #     1) connect
+    #     2) bootstrap/register models
+    #     3) run Alembic migrations to head
+    #     4) apply seeds idempotently (upsert)
+    #     """
+    #     self.connect(check_exists=True)
+
+    #     self.logger.log("📦 Bootstrapping models...", "INFO")
+    #     bootstrap_models(self.engine)
+
+    #     self.logger.log("⬆️  Running Alembic migrations (upgrade head)...", "INFO")
+    #     self.migrate_head()
+
+    #     self.logger.log("🌱 Applying seeds (idempotent upsert)...", "INFO")
+    #     self._seed_all(seed_dir)
+
+    #     self.logger.log("✅ DB upgrade completed.", "SUCCESS")
+
+    # def migrate_head(self) -> None:
+    #     """
+    #     Programmatically run 'alembic upgrade head' using the project's Alembic config.
+    #     """
+    #     script_location = get_script_location()
+    #     alembic_upgrade_head(
+    #         db_uri=self.db_uri,
+    #         script_location=script_location,
+    #         logger=self.logger,
+    #     )
+    def upgrade_db(self, seed_dir: str = "seed") -> None:
+        """
+        Apply/refresh master data seeds idempotently.
+        Assumes schema is already upgraded.
+        """
+        # ensure connected, bootstrap models if needed, then seed
+        self.connect(check_exists=True)
+        bootstrap_models(self.engine)
+        self._seed_all(seed_dir)
+
     # ---------------------------------------------------------------------
     # TABLE CREATION
     # ---------------------------------------------------------------------
@@ -187,11 +255,9 @@ class CreateDBMixin:
 
         self.logger.log(f"✅ Ensured Postgres partitions for chromosomes {chrom_min}..{chrom_max}", "INFO")
 
-
     # -------------------------------------------------------------------------
     # Load Seeds to new DB
     # -------------------------------------------------------------------------
-
     def _seed_all(self, seed_dir):
         self._seed_from_json(
             f"{seed_dir}/initial_config.json", "model_config", "SystemConfig"
@@ -239,7 +305,102 @@ class CreateDBMixin:
             key="genome_assemblies",
         )
 
-    def _seed_from_json(self, file, module_name, model_name, key=None):
+    # def _seed_from_json(self, file, module_name, model_name, key=None):
+    #     model_module = import_module(f"biofilter.modules.db.models.{module_name}")
+    #     model_class = getattr(model_module, model_name)
+
+    #     json_path = os.path.join(os.path.dirname(__file__), file)
+    #     if not os.path.exists(json_path):
+    #         self.logger.log(f"JSON not found: {json_path}", "WARNING")
+    #         return
+
+    #     with self.get_session() as session:
+    #         with open(json_path, "r") as f:
+    #             data = json.load(f)
+    #         records = data.get(key, data) if key else data
+
+    #         for item in records:
+
+    #             if model_name == "BiofilterMetadata":
+    #                 # Get last Alembic version to BiofilterMetadata
+    #                 script_location = get_script_location()
+    #                 schema_revision = ",".join(get_repo_heads(script_location))
+    #                 # item.setdefault("schema_revision", schema_revision)
+    #                 item["schema_revision"] = schema_revision
+
+    #             # Converter campos datetime (se existirem e forem string)
+    #             for key, value in item.items():
+    #                 if key.endswith("_start") or key.endswith("_end"):
+    #                     if isinstance(value, str):
+    #                         try:
+    #                             item[key] = datetime.fromisoformat(value)
+    #                         except ValueError:
+    #                             self.logger.log(
+    #                                 f"Invalid datetime format in key {key}: {value}",  # noqa E501
+    #                                 "WARNING",
+    #                             )  # noqa: E501
+
+    #             # Search FK ID from Names
+    #             if "source_system" in item:
+    #                 fk_name = item.pop("source_system")
+    #                 fk_qry = (
+    #                     session.query(
+    #                         import_module(
+    #                             "biofilter.modules.db.models.model_etl"
+    #                         ).ETLSourceSystem  # noqa E501
+    #                     )
+    #                     .filter_by(name=fk_name)
+    #                     .first()
+    #                 )
+
+    #                 if not fk_qry:
+    #                     self.logger.log(
+    #                         f"Source System not found for name: {fk_name}",
+    #                         "WARNING",  # noqa E501
+    #                     )
+    #                     continue
+    #                 item["source_system_id"] = fk_qry.id
+
+    #             if "data_source" in item:
+    #                 fk_name = item.pop("data_source")
+    #                 fk_qry = (
+    #                     session.query(
+    #                         import_module(
+    #                             "biofilter.modules.db.models.model_etl"
+    #                         ).ETLDataSource  # noqa E501
+    #                     )
+    #                     .filter_by(name=fk_name)
+    #                     .first()
+    #                 )
+
+    #                 if not fk_qry:
+    #                     self.logger.log(
+    #                         f"Data Source not found for name: {fk_name}",
+    #                         "WARNING",  # noqa E501
+    #                     )
+    #                     continue
+    #                 item["data_source_id"] = fk_qry.id
+
+    #             try:
+    #                 session.add(model_class(**item))
+    #             except Exception as e:
+    #                 self.logger.log(f"Failed to add {item}: {e}", "ERROR")
+    #         try:
+    #             session.commit()
+    #             self.logger.log(f"Seeded: {model_name}", "INFO")
+    #         except IntegrityError:
+    #             session.rollback()
+    #             msn = f"{model_name} data already exists. Skipping."
+    #             self.logger.log(msn, "WARNING")
+
+    def _seed_from_json(self, file: str, module_name: str, model_name: str, key: Optional[str] = None) -> None:
+        """
+        Seed data using an idempotent UPSERT strategy:
+        - If the record exists (by natural key), update fields (non-null only).
+        - Else, create it.
+
+        This makes `biofilter db upgrade` safe to run repeatedly.
+        """
         model_module = import_module(f"biofilter.modules.db.models.{module_name}")
         model_class = getattr(model_module, model_name)
 
@@ -248,81 +409,75 @@ class CreateDBMixin:
             self.logger.log(f"JSON not found: {json_path}", "WARNING")
             return
 
+        unique_keys = SEED_UNIQUE_KEYS.get(model_name)
+        if not unique_keys:
+            raise RuntimeError(f"Missing unique key config for seed model: {model_name}")
+
         with self.get_session() as session:
             with open(json_path, "r") as f:
                 data = json.load(f)
             records = data.get(key, data) if key else data
 
-            for item in records:
+            applied = created = updated = skipped = 0
 
+            for item in records:
+                applied += 1
+
+                # --- Special: BiofilterMetadata schema_revision comes from Alembic heads ---
                 if model_name == "BiofilterMetadata":
-                    # Get last Alembic version to BiofilterMetadata
                     script_location = get_script_location()
                     schema_revision = ",".join(get_repo_heads(script_location))
-                    # item.setdefault("schema_revision", schema_revision)
                     item["schema_revision"] = schema_revision
 
-                # Converter campos datetime (se existirem e forem string)
-                for key, value in item.items():
-                    if key.endswith("_start") or key.endswith("_end"):
-                        if isinstance(value, str):
-                            try:
-                                item[key] = datetime.fromisoformat(value)
-                            except ValueError:
-                                self.logger.log(
-                                    f"Invalid datetime format in key {key}: {value}",  # noqa E501
-                                    "WARNING",
-                                )  # noqa: E501
+                # --- Parse datetime-like fields (if your seeds contain them) ---
+                for k, v in list(item.items()):
+                    if (k.endswith("_start") or k.endswith("_end")) and isinstance(v, str):
+                        try:
+                            item[k] = datetime.fromisoformat(v)
+                        except ValueError:
+                            self.logger.log(f"Invalid datetime format in key {k}: {v}", "WARNING")
 
-                # Search FK ID from Names
+                # --- Resolve FK by name (your existing behavior) ---
                 if "source_system" in item:
                     fk_name = item.pop("source_system")
-                    fk_qry = (
-                        session.query(
-                            import_module(
-                                "biofilter.modules.db.models.model_etl"
-                            ).ETLSourceSystem  # noqa E501
-                        )
-                        .filter_by(name=fk_name)
-                        .first()
-                    )
-
-                    if not fk_qry:
-                        self.logger.log(
-                            f"Source System not found for name: {fk_name}",
-                            "WARNING",  # noqa E501
-                        )
+                    ETLSourceSystem = import_module("biofilter.modules.db.models.model_etl").ETLSourceSystem
+                    fk_obj = session.query(ETLSourceSystem).filter_by(name=fk_name).first()
+                    if not fk_obj:
+                        self.logger.log(f"Source System not found for name: {fk_name}", "WARNING")
+                        skipped += 1
                         continue
-                    item["source_system_id"] = fk_qry.id
+                    item["source_system_id"] = fk_obj.id
 
                 if "data_source" in item:
                     fk_name = item.pop("data_source")
-                    fk_qry = (
-                        session.query(
-                            import_module(
-                                "biofilter.modules.db.models.model_etl"
-                            ).ETLDataSource  # noqa E501
-                        )
-                        .filter_by(name=fk_name)
-                        .first()
-                    )
-
-                    if not fk_qry:
-                        self.logger.log(
-                            f"Data Source not found for name: {fk_name}",
-                            "WARNING",  # noqa E501
-                        )
+                    ETLDataSource = import_module("biofilter.modules.db.models.model_etl").ETLDataSource
+                    fk_obj = session.query(ETLDataSource).filter_by(name=fk_name).first()
+                    if not fk_obj:
+                        self.logger.log(f"Data Source not found for name: {fk_name}", "WARNING")
+                        skipped += 1
                         continue
-                    item["data_source_id"] = fk_qry.id
+                    item["data_source_id"] = fk_obj.id
 
-                try:
+                # --- Build lookup from natural key(s) ---
+                lookup = {k: item.get(k) for k in unique_keys}
+                if any(v is None for v in lookup.values()):
+                    self.logger.log(f"Seed item missing unique keys {unique_keys}: {item}", "WARNING")
+                    skipped += 1
+                    continue
+
+                existing = session.query(model_class).filter_by(**lookup).one_or_none()
+                if existing is None:
                     session.add(model_class(**item))
-                except Exception as e:
-                    self.logger.log(f"Failed to add {item}: {e}", "ERROR")
-            try:
-                session.commit()
-                self.logger.log(f"Seeded: {model_name}", "INFO")
-            except IntegrityError:
-                session.rollback()
-                msn = f"{model_name} data already exists. Skipping."
-                self.logger.log(msn, "WARNING")
+                    created += 1
+                else:
+                    # Update only provided fields (non-null), preventing accidental wipes
+                    for k, v in item.items():
+                        if v is not None:
+                            setattr(existing, k, v)
+                    updated += 1
+
+            session.commit()
+            self.logger.log(
+                f"Seeded: {model_name} | applied={applied} created={created} updated={updated} skipped={skipped}",
+                "INFO",
+            )

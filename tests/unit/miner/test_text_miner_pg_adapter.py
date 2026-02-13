@@ -42,6 +42,7 @@ pytestmark = pytest.mark.unit
 
 class _FakeSession:
     """No-op placeholder. We patch miner._pg_trgm_query so it won't use DB."""
+
     pass
 
 
@@ -78,10 +79,10 @@ def test_pg_text_miner_happy_path_builds_mentions(monkeypatch):
     pg_cfg = PgTextMinerConfig(
         similarity_threshold=0.30,
         per_query_limit=50,
-        max_windows_per_chunk=1,     # keep deterministic
+        max_windows_per_chunk=1,  # keep deterministic
         min_window_tokens=3,
         max_window_tokens=3,
-        include_chunk_query=True,    # will use nq.strict as single query
+        include_chunk_query=True,  # will use nq.strict as single query
         use_alias_value_similarity=False,
     )
     miner = PgTrgmTextMiner(_FakeSession(), cfg=pg_cfg)
@@ -119,7 +120,7 @@ def test_pg_text_miner_happy_path_builds_mentions(monkeypatch):
 
     # 5) Execute
     cfg = TextMinerConfig(
-        entity_type_hints=["Chemicals"],   # not used here (we patched query), but ok
+        entity_type_hints=["Chemicals"],  # not used here (we patched query), but ok
         top_k=5,
         min_score=90.0,
         keep_ambiguous=True,
@@ -160,7 +161,10 @@ def test_pg_text_miner_fallback_span_is_chunk_when_no_substring(monkeypatch):
 
     monkeypatch.setattr(mod, "_is_postgres", lambda session: True)
 
-    miner = PgTrgmTextMiner(_FakeSession(), cfg=PgTextMinerConfig(max_windows_per_chunk=1, include_chunk_query=True))
+    miner = PgTrgmTextMiner(
+        _FakeSession(),
+        cfg=PgTextMinerConfig(max_windows_per_chunk=1, include_chunk_query=True),
+    )
 
     raw_text = "No alias appears here."
 

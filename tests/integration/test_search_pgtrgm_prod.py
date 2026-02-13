@@ -60,4 +60,6 @@ def test_pgtrgm_partial_query_still_returns_candidates(resolver: TermResolver):
     )
 
     assert results, "Expected candidates for partial query"
-    assert any(c.method == "pg_trgm" for c in results), "Expected at least one pg_trgm candidate"
+    assert any(
+        c.method == "pg_trgm" for c in results
+    ), "Expected at least one pg_trgm candidate"

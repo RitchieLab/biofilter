@@ -16,6 +16,37 @@ def kdc():
     pass
 
 
+# @kdc.command("rebuild")
+# @local_db_uri_option
+# @click.option(
+#     "--kds-root",
+#     default="biofilter_data/processed",
+#     show_default=True,
+#     help="KDS root folder (currently implemented as processed/).",
+# )
+# @click.option("--dry-run", is_flag=True, help="Scan only; do not write to DB.")
+# @click.option("--strict", is_flag=True, help="Fail fast on any error.")
+# @click.option("--debug", is_flag=True, help="Enable debug logging.")
+
+# @click.pass_context
+# def rebuild(ctx, db_uri: str | None, kds_root: str, dry_run: bool, strict: bool, debug: bool):
+#     """
+#     Rebuild the KDC tables by scanning manifests and Parquet schemas under the KDS root.
+#     """
+#     db_uri = require_db_uri(ctx, local_db_uri=db_uri)
+#     bf = Biofilter(db_uri=db_uri, debug_mode=debug)
+#     bf.db.connect()
+
+#     result = bf.kdc.rebuild(kds_root=kds_root, dry_run=dry_run, strict=strict)
+
+#     # Nice compact output
+#     click.echo("✅ KDC rebuild completed.")
+#     click.echo(f"   • assets_scanned: {result.assets_scanned}")
+#     click.echo(f"   • versions_upserted: {result.versions_upserted}")
+#     if result.warnings:
+#         click.echo(f"   • warnings: {len(result.warnings)}")
+#         for w in result.warnings[:20]:
+#             click.echo(f"     - {w}")
 @kdc.command("rebuild")
 @local_db_uri_option
 @click.option(
@@ -26,26 +57,73 @@ def kdc():
 )
 @click.option("--dry-run", is_flag=True, help="Scan only; do not write to DB.")
 @click.option("--strict", is_flag=True, help="Fail fast on any error.")
+@click.option(
+    "--reset",
+    is_flag=True,
+    help="Truncate KDC catalog tables before rebuilding (clean slate).",
+)
+@click.option(
+    "--drop-scan-history",
+    is_flag=True,
+    help="When used with --reset, also remove KDC scan run history.",
+)
+@click.option("--yes", is_flag=True, help="Skip confirmation prompt (for automation).")
 @click.option("--debug", is_flag=True, help="Enable debug logging.")
 @click.pass_context
-def rebuild(ctx, db_uri: str | None, kds_root: str, dry_run: bool, strict: bool, debug: bool):
+def rebuild(
+    ctx,
+    db_uri: str | None,
+    kds_root: str,
+    dry_run: bool,
+    strict: bool,
+    reset: bool,
+    drop_scan_history: bool,
+    yes: bool,
+    debug: bool,
+):
     """
     Rebuild the KDC tables by scanning manifests and Parquet schemas under the KDS root.
     """
+
     db_uri = require_db_uri(ctx, local_db_uri=db_uri)
     bf = Biofilter(db_uri=db_uri, debug_mode=debug)
     bf.db.connect()
 
-    result = bf.kdc.rebuild(kds_root=kds_root, dry_run=dry_run, strict=strict)
+    if reset and not dry_run:
+        if not yes:
+            click.confirm(
+                "⚠️  This will RESET the KDC catalog tables. Continue?",
+                abort=True,
+            )
 
-    # Nice compact output
+        click.echo("🧹 Resetting KDC catalog before rebuild...")
+
+    result = bf.kdc.rebuild(
+        kds_root=kds_root,
+        dry_run=dry_run,
+        strict=strict,
+        reset=reset,
+        keep_scan_runs=not drop_scan_history,
+    )
+
+    click.echo("════════════════════════════════════")
     click.echo("✅ KDC rebuild completed.")
+    click.echo(f"   • kds_root: {kds_root}")
     click.echo(f"   • assets_scanned: {result.assets_scanned}")
     click.echo(f"   • versions_upserted: {result.versions_upserted}")
+
+    if dry_run:
+        click.echo("   • mode: DRY-RUN (no DB writes)")
+
+    if reset:
+        click.echo("   • reset_mode: TRUE")
+
     if result.warnings:
         click.echo(f"   • warnings: {len(result.warnings)}")
         for w in result.warnings[:20]:
             click.echo(f"     - {w}")
+
+    click.echo("════════════════════════════════════")
 
 
 @kdc.command("list")

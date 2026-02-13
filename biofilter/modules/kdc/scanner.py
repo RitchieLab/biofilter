@@ -42,6 +42,27 @@ class ScannedAsset:
     parameters_hash: Optional[str]
     inputs_json: Optional[list[dict[str, Any]]]
 
+def _resolve_parquet_files(base_path: Path, pattern: str) -> list[Path]:
+    """
+    Resolve parquet files for an asset, using the manifest path_pattern.
+
+    - Supports simple patterns like "vep_part_*.parquet"
+    - Supports recursive patterns like "**/*.parquet"
+    """
+    base_path = base_path.resolve()
+
+    if "**" in pattern:
+        files = sorted(base_path.glob(pattern))
+    else:
+        # Try direct glob first (same folder)
+        files = sorted(base_path.glob(pattern))
+        # Fallback: in case user gave "*.parquet" but files are nested
+        if not files and "/" not in pattern:
+            files = sorted(base_path.rglob(pattern))
+
+    # Keep only real parquet files
+    files = [p for p in files if p.is_file() and p.suffix == ".parquet"]
+    return files
 
 def _read_parquet_schema(base_path: Path, pattern: str) -> tuple[dict[str, Any], str]:
     """
@@ -50,44 +71,86 @@ def _read_parquet_schema(base_path: Path, pattern: str) -> tuple[dict[str, Any],
       schema_json: {"fields":[{"name":..., "type":..., "nullable":...}, ...]}
       schema_hash: sha256 of schema_json
     """
+    # if ds is None:
+    #     raise RuntimeError("pyarrow is required for KDC schema scanning (pip install pyarrow).")
+
+    # # Create dataset; allow partitioning inference
+    # dataset = ds.dataset(str(base_path), format="parquet")
+    # schema = dataset.schema
+
+    # fields = []
+    # for f in schema:
+    #     fields.append(
+    #         {
+    #             "name": f.name,
+    #             "type": str(f.type),
+    #             "nullable": bool(f.nullable),
+    #         }
+    #     )
+
+    # schema_json = {"fields": fields}
+    # return schema_json, sha256_json(schema_json)
     if ds is None:
         raise RuntimeError("pyarrow is required for KDC schema scanning (pip install pyarrow).")
 
-    # Create dataset; allow partitioning inference
-    dataset = ds.dataset(str(base_path), format="parquet")
+    files = _resolve_parquet_files(base_path, pattern)
+    if not files:
+        # empty asset (or mismatch pattern) — keep it explicit
+        schema_json = {"fields": []}
+        return schema_json, sha256_json(schema_json)
+
+    dataset = ds.dataset([str(p) for p in files], format="parquet")
     schema = dataset.schema
 
-    fields = []
-    for f in schema:
-        fields.append(
-            {
-                "name": f.name,
-                "type": str(f.type),
-                "nullable": bool(f.nullable),
-            }
-        )
-
+    fields = [{"name": f.name, "type": str(f.type), "nullable": bool(f.nullable)} for f in schema]
     schema_json = {"fields": fields}
     return schema_json, sha256_json(schema_json)
 
+# def _estimate_counts(base_path: Path) -> tuple[Optional[int], Optional[int]]:
+    # """
+    # Best-effort count:
+    # - file_count: count parquet files (can be expensive for huge trees; still ok for MVP)
+    # - row_count: uses dataset fragments metadata (fast-ish, but may vary)
+    # """
+    # if ds is None:
+    #     return None, None
 
-def _estimate_counts(base_path: Path) -> tuple[Optional[int], Optional[int]]:
-    """
-    Best-effort count:
-    - file_count: count parquet files (can be expensive for huge trees; still ok for MVP)
-    - row_count: uses dataset fragments metadata (fast-ish, but may vary)
-    """
+    # dataset = ds.dataset(str(base_path), format="parquet")
+    # fragments = list(dataset.get_fragments())
+    # file_count = len(fragments)
+
+    # # Row count from metadata if available
+    # total_rows = 0
+    # have_rows = True
+    # for frag in fragments[:2000]:  # safety cap for very large datasets
+    #     try:
+    #         md = frag.metadata
+    #         if md is None:
+    #             have_rows = False
+    #             break
+    #         total_rows += md.num_rows
+    #     except Exception:
+    #         have_rows = False
+    #         break
+
+    # return (total_rows if have_rows else None), file_count
+
+
+def _estimate_counts(base_path: Path, pattern: str) -> tuple[Optional[int], Optional[int]]:  
     if ds is None:
         return None, None
 
-    dataset = ds.dataset(str(base_path), format="parquet")
+    files = _resolve_parquet_files(base_path, pattern)
+    if not files:
+        return None, 0
+
+    dataset = ds.dataset([str(p) for p in files], format="parquet")
     fragments = list(dataset.get_fragments())
     file_count = len(fragments)
 
-    # Row count from metadata if available
     total_rows = 0
     have_rows = True
-    for frag in fragments[:2000]:  # safety cap for very large datasets
+    for frag in fragments[:2000]:
         try:
             md = frag.metadata
             if md is None:
@@ -133,8 +196,10 @@ def scan_asset_from_manifest(manifest_path: Path) -> ScannedAsset:
     path_pattern = manifest.path_pattern or "**/*.parquet"
     partitioning = manifest.partitioning or []
 
+    # schema_json, schema_hash = _read_parquet_schema(base_path, path_pattern)
+    # row_count, file_count = _estimate_counts(base_path)
     schema_json, schema_hash = _read_parquet_schema(base_path, path_pattern)
-    row_count, file_count = _estimate_counts(base_path)
+    row_count, file_count = _estimate_counts(base_path, path_pattern)
 
     parameters_hash = sha256_json(manifest.parameters) if manifest.parameters else None
 

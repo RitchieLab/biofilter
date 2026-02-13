@@ -52,9 +52,13 @@ data_sources_to_process = [
     # "dbsnp_chr21",
     # "dbsnp_chr22",
     # "dbsnp_chrx",
-    "dbsnp_chry",
+    # "dbsnp_chry",
     # "dbsnp_chrmt",
     # "gwas",
+
+    # gnomAD
+    "gnomad_chry",
+
     #
     # RelationShips
     # -------------
@@ -75,7 +79,7 @@ data_sources_to_process = [
 ]
 
 run_steps = [
-    "extract",
+    # "extract",
     "transform",
     # "load",
     # "all"

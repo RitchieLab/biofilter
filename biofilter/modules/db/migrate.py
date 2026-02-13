@@ -228,6 +228,25 @@ biofilter db migrate (default = upgrade)
 """
 
 
+# def alembic_upgrade_head(db_uri: str, script_location: str, logger=None) -> None:
+#     """
+#     Run 'alembic upgrade head' programmatically.
+
+#     Notes:
+#     - We set sqlalchemy.url to the runtime db_uri.
+#     - script_location must point to your Alembic env (alembic.ini or equivalent).
+#     """
+#     cfg = Config()
+#     cfg.set_main_option("script_location", script_location)
+#     cfg.set_main_option("sqlalchemy.url", db_uri)
+
+#     if logger:
+#         logger.log("Running Alembic command: upgrade head", "INFO")
+
+#     command.upgrade(cfg, "head")
+
+
+
 
 
 # import os
