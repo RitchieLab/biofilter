@@ -29,18 +29,19 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    JSON,
 )
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
 from biofilter.modules.db.base import Base
 
-# JSON type: JSONB on Postgres, JSON elsewhere
-try:
-    from sqlalchemy.dialects.postgresql import JSONB as _JSON
-except Exception:  # pragma: no cover
-    from sqlalchemy import JSON as _JSON  # type: ignore
-
+# # JSON type: JSONB on Postgres, JSON elsewhere
+# try:
+#     from sqlalchemy.dialects.postgresql import JSONB as _JSON
+# except Exception:  # pragma: no cover
+#     from sqlalchemy import JSON as _JSON  # type: ignore
+from sqlalchemy.dialects.postgresql import JSONB
 
 # ---------------------------------------------------------------------
 # Enums (string-enforced)
@@ -102,7 +103,9 @@ class KDCAsset(Base):
     asset = Column(String(150), nullable=False)
 
     description = Column(Text, nullable=True)
-    tags = Column(_JSON, nullable=True)  # optional: {"domain":"variants","tier":"core"}
+    # tags = Column(_JSON, nullable=True)  # optional: {"domain":"variants","tier":"core"}
+    # tags = Column(JSON, nullable=True)
+    tags = Column(JSON().with_variant(JSONB, "postgresql"), nullable=True)
 
     created_at = Column(DateTime, server_default=func.now(), nullable=False)
     updated_at = Column(
@@ -161,7 +164,8 @@ class KDCAssetVersion(Base):
     # Location/layout (KDS)
     base_path = Column(Text, nullable=False)
     path_pattern = Column(Text, nullable=True)  # e.g., "chromosome=*/part-*.parquet"
-    partitioning = Column(_JSON, nullable=True)  # e.g., ["chromosome","bucket"]
+    # partitioning = Column(_JSON, nullable=True)  # e.g., ["chromosome","bucket"]
+    partitioning = Column(JSON().with_variant(JSONB, "postgresql"), nullable=True)
 
     # Metrics (optional; scanner can populate)
     row_count = Column(BigInteger, nullable=True)
@@ -236,11 +240,17 @@ class KDCSchema(Base):
         unique=True,
     )
 
-    schema_json = Column(_JSON, nullable=False)
-    schema_hash = Column(String(64), nullable=False)
+    # schema_json = Column(_JSON, nullable=False)
+    # schema_hash = Column(String(64), nullable=False)
 
-    primary_key = Column(_JSON, nullable=True)  # e.g. ["assembly","chromosome","pos","ref","alt"]
-    link_keys = Column(_JSON, nullable=True)  # e.g. ["hgnc_id","entity_id"]
+    # primary_key = Column(_JSON, nullable=True)  # e.g. ["assembly","chromosome","pos","ref","alt"]
+    # link_keys = Column(_JSON, nullable=True)  # e.g. ["hgnc_id","entity_id"]
+
+    schema_json = Column(JSON().with_variant(JSONB, "postgresql"), nullable=True)
+    schema_hash = Column(JSON().with_variant(JSONB, "postgresql"), nullable=True)
+    primary_key = Column(JSON().with_variant(JSONB, "postgresql"), nullable=True)
+    link_keys = Column(JSON().with_variant(JSONB, "postgresql"), nullable=True)
+
 
     created_at = Column(DateTime, server_default=func.now(), nullable=False)
 
@@ -284,7 +294,8 @@ class KDCSchemaField(Base):
     source_field = Column(String(200), nullable=True)
     semantics = Column(String(200), nullable=True)  # e.g., "variant.position"
     units = Column(String(80), nullable=True)
-    enum_values = Column(_JSON, nullable=True)
+    # enum_values = Column(_JSON, nullable=True)
+    enum_values = Column(JSON().with_variant(JSONB, "postgresql"), nullable=True)
 
     # Contract flags
     is_primary_key = Column(Boolean, nullable=False, default=False)
@@ -344,10 +355,12 @@ class KDCLineage(Base):
     dtp_name = Column(String(200), nullable=True)
     dtp_version = Column(String(60), nullable=True)
 
-    parameters_json = Column(_JSON, nullable=True)
+    # parameters_json = Column(_JSON, nullable=True)
+    parameters_json = Column(JSON().with_variant(JSONB, "postgresql"), nullable=True)
     parameters_hash = Column(String(64), nullable=True)
 
-    inputs_json = Column(_JSON, nullable=True)
+    # inputs_json = Column(_JSON, nullable=True)
+    inputs_json = Column(JSON().with_variant(JSONB, "postgresql"), nullable=True)
     # Example: [{"name":"dbsnp.json.bz2","checksum_md5":"...","uri":"..."}]
 
     created_at = Column(DateTime, server_default=func.now(), nullable=False)
@@ -385,7 +398,9 @@ class KDCScanRun(Base):
         default="SUCCESS",
     )
 
-    summary_json = Column(_JSON, nullable=True)
+    # summary_json = Column(_JSON, nullable=True)
+    summary_json = Column(JSON().with_variant(JSONB, "postgresql"), nullable=True)
+
     # Example:
     # {"assets": 12, "versions": 25, "warnings": ["missing manifest: ..."]}
 

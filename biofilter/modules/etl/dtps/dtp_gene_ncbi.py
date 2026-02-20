@@ -46,7 +46,7 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
         # DTP versioning
         self.dtp_name = "dtp_gene_ncbi"
         self.dtp_version = "1.1.0"
-        self.compatible_schema_min = "3.1.0"
+        self.compatible_schema_min = "0.0.0"
         self.compatible_schema_max = "4.0.0"
 
     # ⬇️  --------------------------  ⬇️
