@@ -1,13 +1,13 @@
 CHANGELOG
 
 Biofilter3R Juyter VPS
+4.0.0 (Biofilter3R Juyter VPS)
+- Biofilter 4.0.0 establishes current production baseline
+- Variant model is rsID-centric / aggregated ALT alleles
+- Next release (4.1.0) introduces allele-level backbone and requires a new DB rebuild
 
-3.2.1: CLI
-
-3.0.1 (2025-DEV)
- - In development
-
-3.0.0 (Transition)
+3.0.0 (2025-DEV)
+ - Add news features
 
 2.4.4 (2025-01-08)
 - Reorganized code into functional packages
