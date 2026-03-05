@@ -44,16 +44,18 @@ def register_imperative_tables(engine):
     """
     from biofilter.modules.db.base import Base
 
-    from biofilter.modules.db.models.model_variants import map_variant_snp
+    # from biofilter.modules.db.models.model_variants import map_variant_snp
+    from biofilter.modules.db.models.model_variants import map_variant_master
 
     # if "variant_snps" in Base.metadata.tables:
     #     Base.metadata.remove(Base.metadata.tables["variant_snps"])
-    tbl = Base.metadata.tables.get("variant_snps")
+    # tbl = Base.metadata.tables.get("variant_snps")
+    tbl = Base.metadata.tables.get("variant_masters")
     if tbl is not None:
         Base.metadata.remove(tbl)
 
-    map_variant_snp(engine, Base.metadata)
-
+    # map_variant_snp(engine, Base.metadata)
+    map_variant_master(engine, Base.metadata)
     # TODO: Extend to other Model like EntityRelationship
 
 # -------------------------------------------------------------------------
