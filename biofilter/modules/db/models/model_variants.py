@@ -4,13 +4,13 @@ from sqlalchemy import (
     Text,
     Table,
     Column,
+    Boolean,
     Integer,
     BigInteger,
     String,
     ForeignKey,
     UniqueConstraint,
     PrimaryKeyConstraint,
-    MetaData,
 )
 from sqlalchemy.orm import relationship
 from sqlalchemy import Identity
@@ -19,9 +19,9 @@ from biofilter.modules.db.base import Base
 from biofilter.modules.db.types import PKBigIntOrInt
 
 
-def map_variant_master(engine, metadata):
+def map_variant_masters(engine, metadata):
     """
-    VariantMaster (BF4 4.1.0):
+    VariantMasters (BF4 4.1.0):
     - One row per ALT allele (chr, start, end, ref, alt) in GRCh38
     - Partitioned by chromosome on Postgres
     - Logical identity: (chromosome, variant_id)
@@ -29,98 +29,357 @@ def map_variant_master(engine, metadata):
     dialect = engine.dialect.name
     is_sqlite = dialect == "sqlite"
 
-    if "variant_master" in metadata.tables:
-        return metadata.tables["variant_master"]
+    if "variant_masters" in metadata.tables:
+        return metadata.tables["variant_masters"]
+
+    common_cols = [
+        Column("chromosome", Integer, nullable=False),
+
+        Column("position_start", BigInteger, nullable=False),
+        Column("position_end", BigInteger, nullable=False),
+
+        Column("reference_allele", String(64), nullable=False),
+        Column("alternate_allele", String(256), nullable=False),
+
+        # External IDs (optional)
+        Column("rsid", String(32), nullable=True),  # e.g. "rs123"
+
+        # Variant classification
+        Column("variant_type", String(20), nullable=True),  # mixed/multi/etc/
+        Column("allele_type", String(20), nullable=True),   # optional: SNV/MNV/INS/DEL/etc.
+
+        # Frequency summaries (variant-level)
+        Column("ac", BigInteger, nullable=True),
+        Column("an", BigInteger, nullable=True),
+        Column("af", Float, nullable=True),
+        Column("grpmax", String(32), nullable=True),
+        Column("grpmax_af", Float, nullable=True),
+
+        # Predictors / scores (summary fields at variant-allele level)
+        Column("cadd_raw_score", Float, nullable=True),
+        Column("cadd_phred", Float, nullable=True),
+        Column("revel_max", Float, nullable=True),
+
+        Column("spliceai_ds_max", Float, nullable=True),
+        Column("pangolin_largest_ds", Float, nullable=True),
+
+        # SIFT/PolyPhen are transcript/protein level. Here is a Max Score
+        Column("sift_max", Float, nullable=True),
+        Column("polyphen_max", Float, nullable=True),
+
+        # Provenance (no FK)
+        Column("data_source_id", Integer, nullable=True),
+        Column("etl_package_id", Integer, nullable=True),
+    ]
 
     if is_sqlite:
-        # SQLite: keep it simple. Single integer PK for fast inserts.
         variant_masters = Table(
             "variant_masters",
             metadata,
-            Column("chromosome", Integer, nullable=False),
             Column("variant_id", Integer, primary_key=True, autoincrement=True),
-
-            Column("position_start", BigInteger, nullable=False),
-            Column("position_end", BigInteger, nullable=False),
-
-            Column("reference_allele", String(64), nullable=False),
-            Column("alternate_allele", String(256), nullable=False),
-
-            # Optional external id (rsID etc.)
-            Column("source_type", String(20), nullable=True),   # e.g. "rs"
-            Column("source_id", BigInteger, nullable=True),     # numeric part (e.g. 123 for rs123)
-
-            # Variant shape
-            Column("variant_type", String(20), nullable=True),  # SNP/INDEL/SV...
-
-            # Frequency summaries (optional)
-            Column("af_global", Float, nullable=True),
-            Column("grpmax_af", Float, nullable=True),
-
-            # TODO: Adicionar os demais campos!
-
-            # Provenance (no FK for now)
-            Column("data_source_id", Integer, nullable=True),
-            Column("etl_package_id", Integer, nullable=True),
-
+            *common_cols,
             UniqueConstraint(
                 "chromosome",
                 "position_start",
                 "position_end",
                 "reference_allele",
                 "alternate_allele",
-                name="uq_variant_master_natkey",
-            ),
-            UniqueConstraint(
-                "chromosome",
-                "source_type",
-                "source_id",
-                name="uq_variant_master_chr_source",
+                name="uq_variant_masters_natkey",
             ),
         )
     else:
-        # Postgres: composite PK (chromosome, variant_id) to match partitioned parent DDL
         variant_masters = Table(
             "variant_masters",
             metadata,
-            Column("chromosome", Integer, nullable=False),
             Column("variant_id", BigInteger, nullable=False, server_default=Identity(always=False)),
-
-            Column("position_start", BigInteger, nullable=False),
-            Column("position_end", BigInteger, nullable=False),
-
-            Column("reference_allele", String(64), nullable=False),
-            Column("alternate_allele", String(256), nullable=False),
-
-            Column("source_type", String(20), nullable=True),
-            Column("source_id", BigInteger, nullable=True),
-
-            Column("variant_type", String(20), nullable=True),
-
-            Column("af_global", Float, nullable=True),
-            Column("grpmax_af", Float, nullable=True),
-
-            Column("data_source_id", Integer, nullable=True),
-            Column("etl_package_id", Integer, nullable=True),
-
-            PrimaryKeyConstraint("chromosome", "variant_id", name="pk_variant_master"),
+            *common_cols,
+            PrimaryKeyConstraint("chromosome", "variant_id", name="pk_variant_masters"),
             UniqueConstraint(
                 "chromosome",
                 "position_start",
                 "position_end",
                 "reference_allele",
                 "alternate_allele",
-                name="uq_variant_master_natkey",
-            ),
-            UniqueConstraint(
-                "chromosome",
-                "source_type",
-                "source_id",
-                name="uq_variant_master_chr_source",
+                name="uq_variant_masters_natkey",
             ),
         )
 
     return variant_masters
+
+
+def map_variant_molecular_effects(engine, metadata):
+    """
+    VariantMolecularEffects (BF4 4.1.0):
+    - One row per (variant allele × transcript × consequence) in GRCh38
+    - Partitioned by chromosome on Postgres
+    - Logical join key with VariantMasters: (chromosome, variant_id)
+    - No physical FK constraints (ETL-enforced integrity)
+    """
+    dialect = engine.dialect.name
+    is_sqlite = dialect == "sqlite"
+
+    if "variant_molecular_effects" in metadata.tables:
+        return metadata.tables["variant_molecular_effects"]
+
+    # Common columns (match Postgres DDL)
+    common_cols = [
+        Column("chromosome", Integer, nullable=False),
+
+        # Context (strings for now; no Transcript/Gene domains yet)
+        Column("gene_id", String(32), nullable=True),
+        Column("transcript_id", String(32), nullable=False),
+
+        # Layer 1 — consequence
+        Column("consequence", String(64), nullable=False),
+        Column("impact", String(16), nullable=True),
+
+        # Useful VEP context (optional)
+        Column("biotype", String(32), nullable=True),
+        Column("variant_class", String(16), nullable=True),
+        Column("canonical", Boolean, nullable=True),
+        Column("mane_select", Boolean, nullable=True),
+        Column("mane_plus_clinical", Boolean, nullable=True),
+
+        # HGVS / protein context (optional)
+        Column("hgvsc", String(128), nullable=True),
+        Column("hgvsp", String(128), nullable=True),
+        Column("cdna_position", String(32), nullable=True),
+        Column("cds_position", String(32), nullable=True),
+        Column("protein_position", String(32), nullable=True),
+        Column("amino_acids", String(32), nullable=True),
+        Column("codons", String(64), nullable=True),
+        Column("ensp", String(32), nullable=True),
+
+        # Layer 2 — LoF / LOFTEE
+        Column("lof_flag", Boolean, nullable=True),
+        Column("lof_confidence", String(8), nullable=True),  # HC/LC/Filtered/NA
+        Column("lof_filter", String(128), nullable=True),
+        Column("lof_flags", String(256), nullable=True),
+        Column("lof_info", Text, nullable=True),
+
+        # Provenance
+        Column("data_source_id", Integer, nullable=True),
+        Column("etl_package_id", Integer, nullable=True),
+    ]
+
+    if is_sqlite:
+        # SQLite: keep it simple. Use integer IDs and a composite PK.
+        # Note: SQLite doesn't support partitioning, but the schema remains identical.
+        variant_molecular_effects = Table(
+            "variant_molecular_effects",
+            metadata,
+            Column("variant_id", Integer, nullable=False),
+            *common_cols,
+            PrimaryKeyConstraint(
+                "chromosome",
+                "variant_id",
+                "transcript_id",
+                "consequence",
+                name="pk_variant_molecular_effects",
+            ),
+        )
+    else:
+        # Postgres: variant_id is bigint; parent table is created via raw DDL
+        # (partitioned by chromosome). This table definition mirrors that schema.
+        variant_molecular_effects = Table(
+            "variant_molecular_effects",
+            metadata,
+            Column("variant_id", BigInteger, nullable=False),
+            *common_cols,
+            PrimaryKeyConstraint(
+                "chromosome",
+                "variant_id",
+                "transcript_id",
+                "consequence",
+                name="pk_variant_molecular_effects",
+            ),
+        )
+
+    return variant_molecular_effects
+
+
+def map_variant_effect_predictions(engine, metadata):
+    """
+    VariantEffectPredictions (BF4 4.1.0):
+    - One row per predictor per variant (optionally per transcript)
+    - Partitioned by chromosome on Postgres
+    - Join key with VariantMasters: (chromosome, variant_id)
+    - No physical FK constraints
+    """
+    dialect = engine.dialect.name
+    is_sqlite = dialect == "sqlite"
+
+    if "variant_effect_predictions" in metadata.tables:
+        return metadata.tables["variant_effect_predictions"]
+
+    common_cols = [
+        Column("chromosome", Integer, nullable=False),
+
+        Column("predictor_key", String(128), nullable=False),
+        Column("transcript_id", String(32), nullable=True),
+
+        Column("predictor_name", String(64), nullable=False),
+        Column("predictor_version", String(32), nullable=True),
+
+        Column("score", Float, nullable=True),
+        Column("classification", String(64), nullable=True),
+        Column("details", Text, nullable=True),
+
+        Column("data_source_id", Integer, nullable=True),
+        Column("etl_package_id", Integer, nullable=True),
+    ]
+
+    if is_sqlite:
+        variant_effect_predictions = Table(
+            "variant_effect_predictions",
+            metadata,
+            Column("variant_id", Integer, nullable=False),
+            *common_cols,
+            PrimaryKeyConstraint(
+                "chromosome",
+                "variant_id",
+                "predictor_key",
+                name="pk_variant_effect_predictions",
+            ),
+        )
+    else:
+        variant_effect_predictions = Table(
+            "variant_effect_predictions",
+            metadata,
+            Column("variant_id", BigInteger, nullable=False),
+            *common_cols,
+            PrimaryKeyConstraint(
+                "chromosome",
+                "variant_id",
+                "predictor_key",
+                name="pk_variant_effect_predictions",
+            ),
+        )
+
+    return variant_effect_predictions
+
+
+def map_variant_regulatory_elements(engine, metadata):
+    """
+    VariantRegulatoryElements (BF4 4.1.0):
+    - One row per (variant × regulatory element × bio_context)
+    - Partitioned by chromosome on Postgres
+    - Join key with VariantMasters: (chromosome, variant_id)
+    """
+    dialect = engine.dialect.name
+    is_sqlite = dialect == "sqlite"
+
+    if "variant_regulatory_elements" in metadata.tables:
+        return metadata.tables["variant_regulatory_elements"]
+
+    common_cols = [
+        Column("chromosome", Integer, nullable=False),
+
+        Column("reg_element_key", String(192), nullable=False),
+        Column("regulatory_element_id", String(64), nullable=False),
+        Column("element_type", String(32), nullable=True),
+        Column("bio_context", String(128), nullable=True),
+
+        Column("score", Float, nullable=True),
+        Column("details", Text, nullable=True),
+
+        Column("data_source_id", Integer, nullable=True),
+        Column("etl_package_id", Integer, nullable=True),
+    ]
+
+    if is_sqlite:
+        variant_regulatory_elements = Table(
+            "variant_regulatory_elements",
+            metadata,
+            Column("variant_id", Integer, nullable=False),
+            *common_cols,
+            PrimaryKeyConstraint(
+                "chromosome",
+                "variant_id",
+                "reg_element_key",
+                name="pk_variant_regulatory_elements",
+            ),
+        )
+    else:
+        variant_regulatory_elements = Table(
+            "variant_regulatory_elements",
+            metadata,
+            Column("variant_id", BigInteger, nullable=False),
+            *common_cols,
+            PrimaryKeyConstraint(
+                "chromosome",
+                "variant_id",
+                "reg_element_key",
+                name="pk_variant_regulatory_elements",
+            ),
+        )
+
+    return variant_regulatory_elements
+
+
+def map_variant_gene_regulatory_evidence(engine, metadata):
+    """
+    VariantGeneRegulatoryEvidence (BF4 4.1.0):
+    - One row per (variant × gene × qtl_type × bio_context)
+    - Partitioned by chromosome on Postgres
+    - Join key with VariantMasters: (chromosome, variant_id)
+    """
+    dialect = engine.dialect.name
+    is_sqlite = dialect == "sqlite"
+
+    if "variant_gene_regulatory_evidence" in metadata.tables:
+        return metadata.tables["variant_gene_regulatory_evidence"]
+
+    common_cols = [
+        Column("chromosome", Integer, nullable=False),
+
+        Column("evidence_key", String(256), nullable=False),
+
+        Column("gene_id", String(32), nullable=False),
+        Column("bio_context", String(128), nullable=True),
+        Column("qtl_type", String(16), nullable=False),
+
+        Column("beta", Float, nullable=True),
+        Column("se", Float, nullable=True),
+        Column("p_value", Float, nullable=True),
+        Column("n", Integer, nullable=True),
+
+        Column("effect_allele", String(64), nullable=True),
+
+        Column("details", Text, nullable=True),
+
+        Column("data_source_id", Integer, nullable=True),
+        Column("etl_package_id", Integer, nullable=True),
+    ]
+
+    if is_sqlite:
+        variant_gene_regulatory_evidence = Table(
+            "variant_gene_regulatory_evidence",
+            metadata,
+            Column("variant_id", Integer, nullable=False),
+            *common_cols,
+            PrimaryKeyConstraint(
+                "chromosome",
+                "variant_id",
+                "evidence_key",
+                name="pk_variant_gene_regulatory_evidence",
+            ),
+        )
+    else:
+        variant_gene_regulatory_evidence = Table(
+            "variant_gene_regulatory_evidence",
+            metadata,
+            Column("variant_id", BigInteger, nullable=False),
+            *common_cols,
+            PrimaryKeyConstraint(
+                "chromosome",
+                "variant_id",
+                "evidence_key",
+                name="pk_variant_gene_regulatory_evidence",
+            ),
+        )
+
+    return variant_gene_regulatory_evidence
 
 
 class VariantSNPMerge(Base):

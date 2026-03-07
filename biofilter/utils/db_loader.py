@@ -1,7 +1,7 @@
 # utils/db_loader.py
-
+from __future__ import annotations
 from importlib import import_module
-
+from typing import Callable, Iterable, Tuple
 
 # -------------------------------------------------------------------------
 # ORM Models Register
@@ -27,41 +27,56 @@ def load_all_models():
     # NOTE: Will be removed in the future
     # import_module("biofilter.modules.db.models.loki_models")
 
+
 # -------------------------------------------------------------------------
 # Core Tables Register
 # -------------------------------------------------------------------------
-
-def register_imperative_tables(engine):
+def register_imperative_tables(engine) -> None:
     """
-    Register dialect-specific tables/mappings into the same metadata
-    used by the declarative Base.
+    Register dialect-specific Core tables into Base.metadata.
 
-    We always register the Table object like 'variant_snps' so SQLAlchemy Core
-    inserts/updates can target it in any dialect.
-
-    PostgreSQL the Particional table is created as a partitioned parent via raw
-    DDL in CreateDBMixin.
+    Notes:
+    - Postgres partitioned parents are created via raw DDL in CreateDBMixin.
+    - We still register Table objects here for SQLAlchemy Core usage.
     """
     from biofilter.modules.db.base import Base
+    from biofilter.modules.db.models.model_variants import (
+        map_variant_masters,
+        map_variant_molecular_effects,
+        map_variant_effect_predictions,
+        map_variant_regulatory_elements,
+        map_variant_gene_regulatory_evidence,
+    )
 
-    # from biofilter.modules.db.models.model_variants import map_variant_snp
-    from biofilter.modules.db.models.model_variants import map_variant_master
+    registry: list[Tuple[str, Callable]] = [
+        ("variant_masters", map_variant_masters),
+        ("variant_molecular_effects", map_variant_molecular_effects),
+        ("variant_effect_predictions", map_variant_effect_predictions),
+        ("variant_regulatory_elements", map_variant_regulatory_elements),
+        ("variant_gene_regulatory_evidence", map_variant_gene_regulatory_evidence),
+    ]
 
-    # if "variant_snps" in Base.metadata.tables:
-    #     Base.metadata.remove(Base.metadata.tables["variant_snps"])
-    # tbl = Base.metadata.tables.get("variant_snps")
-    tbl = Base.metadata.tables.get("variant_masters")
-    if tbl is not None:
-        Base.metadata.remove(tbl)
+    # Remove stale definitions first (important if bootstrap_models is called multiple times)
+    for table_name, _ in registry:
+        existing = Base.metadata.tables.get(table_name)
+        if existing is not None:
+            Base.metadata.remove(existing)
 
-    # map_variant_snp(engine, Base.metadata)
-    map_variant_master(engine, Base.metadata)
-    # TODO: Extend to other Model like EntityRelationship
+    # Register
+    for table_name, map_fn in registry:
+        tbl = map_fn(engine, Base.metadata)
+
+        # Hard validation: mapper must return the expected table name
+        if tbl.name != table_name:
+            raise RuntimeError(
+                f"Imperative table mapper returned unexpected name: "
+                f"expected='{table_name}' got='{tbl.name}' from {map_fn.__name__}"
+            )
+
 
 # -------------------------------------------------------------------------
 # Start ORM and Tables im the Metadata
 # -------------------------------------------------------------------------
-
 def bootstrap_models(engine):
     """
     One call to prepare all models for the current engine:

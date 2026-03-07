@@ -20,7 +20,7 @@ data_sources_to_process = [
     # Pathways
     # --------
     # "reactome",
-    "kegg_pathways",
+    # "kegg_pathways",
     #
     # Gene Ontology
     # -------------
@@ -57,7 +57,7 @@ data_sources_to_process = [
     # "gwas",
 
     # gnomAD
-    # "gnomad_chry",
+    "gnomad_chry",
 
     #
     # RelationShips
@@ -79,7 +79,7 @@ data_sources_to_process = [
 ]
 
 run_steps = [
-    "extract",
+    # "extract",
     "transform",
     # "load",
     # "all"
@@ -104,7 +104,7 @@ if __name__ == "__main__":
                     bf.etl.update(
                         data_sources=[source],
                         run_steps=[step],
-                        # force_steps=[step],
+                        force_steps=[step],
                     )
                 except Exception as e:
                     print(f"❌ Error processing {source} [{step}]: {e}")
