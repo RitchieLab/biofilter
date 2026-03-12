@@ -203,6 +203,258 @@ def parse_vep_rows(
     return rows
 
 
+VEP_CONSEQUENCE_SEVERITY_ORDER: List[str] = [
+    "transcript_ablation",
+    "splice_acceptor_variant",
+    "splice_donor_variant",
+    "stop_gained",
+    "frameshift_variant",
+    "stop_lost",
+    "start_lost",
+    "transcript_amplification",
+    "feature_elongation",
+    "feature_truncation",
+    "inframe_insertion",
+    "inframe_deletion",
+    "missense_variant",
+    "protein_altering_variant",
+    "splice_donor_5th_base_variant",
+    "splice_region_variant",
+    "splice_donor_region_variant",
+    "splice_polypyrimidine_tract_variant",
+    "incomplete_terminal_codon_variant",
+    "start_retained_variant",
+    "stop_retained_variant",
+    "synonymous_variant",
+    "coding_sequence_variant",
+    "mature_miRNA_variant",
+    "5_prime_UTR_variant",
+    "3_prime_UTR_variant",
+    "non_coding_transcript_exon_variant",
+    "intron_variant",
+    "NMD_transcript_variant",
+    "non_coding_transcript_variant",
+    "coding_transcript_variant",
+    "upstream_gene_variant",
+    "downstream_gene_variant",
+    "TFBS_ablation",
+    "TFBS_amplification",
+    "TF_binding_site_variant",
+    "regulatory_region_ablation",
+    "regulatory_region_amplification",
+    "regulatory_region_variant",
+    "intergenic_variant",
+    "sequence_variant",
+]
+
+VEP_CONSEQUENCE_RANK: Dict[str, int] = {
+    term: idx + 1 for idx, term in enumerate(VEP_CONSEQUENCE_SEVERITY_ORDER)
+}
+
+IMPACT_RANK: Dict[str, int] = {
+    "HIGH": 1,
+    "MODERATE": 2,
+    "LOW": 3,
+    "MODIFIER": 4,
+}
+
+
+def _split_consequences(value: Optional[str]) -> List[str]:
+    if value is None:
+        return []
+    parts = [item.strip() for item in str(value).split("&") if item and item.strip()]
+    return parts
+
+
+def _consequence_rank(term: Optional[str]) -> Optional[int]:
+    if not term:
+        return None
+    return VEP_CONSEQUENCE_RANK.get(term)
+
+
+def _impact_rank(value: Optional[str]) -> Optional[int]:
+    if not value:
+        return None
+    return IMPACT_RANK.get(str(value).strip().upper())
+
+
+def _classify_consequence(term: Optional[str]) -> Tuple[Optional[str], Optional[str]]:
+    if not term:
+        return None, None
+
+    direct_group_map = {
+        "transcript_ablation": ("transcript_loss", "coding"),
+        "transcript_amplification": ("transcript_change", "coding"),
+        "feature_elongation": ("structural_other", "structural_other"),
+        "feature_truncation": ("structural_other", "structural_other"),
+        "splice_acceptor_variant": ("splice", "coding"),
+        "splice_donor_variant": ("splice", "coding"),
+        "splice_donor_5th_base_variant": ("splice", "coding"),
+        "splice_region_variant": ("splice", "coding"),
+        "splice_donor_region_variant": ("splice", "coding"),
+        "splice_polypyrimidine_tract_variant": ("splice", "coding"),
+        "stop_gained": ("stop", "coding"),
+        "stop_lost": ("stop", "coding"),
+        "start_lost": ("start_stop", "coding"),
+        "start_retained_variant": ("start_stop", "coding"),
+        "stop_retained_variant": ("synonymous", "coding"),
+        "frameshift_variant": ("frameshift", "coding"),
+        "inframe_insertion": ("inframe", "coding"),
+        "inframe_deletion": ("inframe", "coding"),
+        "missense_variant": ("missense", "coding"),
+        "protein_altering_variant": ("protein_altering", "coding"),
+        "synonymous_variant": ("synonymous", "coding"),
+        "coding_sequence_variant": ("coding_other", "coding"),
+        "incomplete_terminal_codon_variant": ("coding_other", "coding"),
+        "5_prime_UTR_variant": ("utr", "non_coding"),
+        "3_prime_UTR_variant": ("utr", "non_coding"),
+        "mature_miRNA_variant": ("non_coding", "non_coding"),
+        "non_coding_transcript_exon_variant": ("non_coding", "non_coding"),
+        "non_coding_transcript_variant": ("non_coding", "non_coding"),
+        "coding_transcript_variant": ("non_coding", "non_coding"),
+        "NMD_transcript_variant": ("non_coding", "non_coding"),
+        "intron_variant": ("intronic", "non_coding"),
+        "upstream_gene_variant": ("upstream_downstream", "regulatory"),
+        "downstream_gene_variant": ("upstream_downstream", "regulatory"),
+        "TFBS_ablation": ("regulatory", "regulatory"),
+        "TFBS_amplification": ("regulatory", "regulatory"),
+        "TF_binding_site_variant": ("regulatory", "regulatory"),
+        "regulatory_region_ablation": ("regulatory", "regulatory"),
+        "regulatory_region_amplification": ("regulatory", "regulatory"),
+        "regulatory_region_variant": ("regulatory", "regulatory"),
+        "intergenic_variant": ("intergenic", "intergenic"),
+        "sequence_variant": ("other", "structural_other"),
+    }
+
+    if term in direct_group_map:
+        return direct_group_map[term]
+
+    if "splice" in term:
+        return "splice", "coding"
+    if "missense" in term:
+        return "missense", "coding"
+    if "synonymous" in term:
+        return "synonymous", "coding"
+    if "intron" in term:
+        return "intronic", "non_coding"
+    if "utr" in term.lower():
+        return "utr", "non_coding"
+    if "regulatory" in term or "tf_binding" in term.lower():
+        return "regulatory", "regulatory"
+    if "intergenic" in term:
+        return "intergenic", "intergenic"
+    if "upstream" in term or "downstream" in term:
+        return "upstream_downstream", "regulatory"
+
+    return "other", "structural_other"
+
+
+def _build_atomic_consequence_rows(
+    *,
+    variant_key: str,
+    chrom: int,
+    pos: int,
+    ref: str,
+    alt: str,
+    vep_rows: List[Dict[str, str]],
+) -> List[Dict[str, Any]]:
+    atomic_rows: List[Dict[str, Any]] = []
+    per_annotation_min_rank: Dict[int, Optional[int]] = {}
+    per_annotation_min_term: Dict[int, Optional[str]] = {}
+    min_rank_for_variant: Optional[int] = None
+    min_term_for_variant: Optional[str] = None
+
+    for annotation_index, r in enumerate(vep_rows):
+        lof_conf = (r.get("LoF") or "").strip() or None
+        impact = r.get("IMPACT") or None
+        impact_rank = _impact_rank(impact)
+        consequence_raw = r.get("Consequence") or None
+        atomic_terms = _split_consequences(consequence_raw) or [None]
+
+        local_min_rank: Optional[int] = None
+        local_min_term: Optional[str] = None
+
+        for consequence in atomic_terms:
+            consequence_rank = _consequence_rank(consequence)
+            if consequence_rank is not None and (
+                local_min_rank is None or consequence_rank < local_min_rank
+            ):
+                local_min_rank = consequence_rank
+                local_min_term = consequence
+
+            group, category = _classify_consequence(consequence)
+
+            atomic_rows.append(
+                {
+                    "annotation_index": annotation_index,
+                    "variant_key": variant_key,
+                    "chrom": chrom,
+                    "pos": pos,
+                    "ref": ref,
+                    "alt": alt,
+                    "allele": r.get("Allele") or None,
+                    "feature_type": r.get("Feature_type") or None,
+                    "gene_id_raw": r.get("Gene") or None,
+                    "gene_symbol_raw": r.get("SYMBOL") or None,
+                    "transcript_id_raw": r.get("Feature") or None,
+                    "gene_id": r.get("Gene") or None,
+                    "transcript_id": r.get("Feature") or None,
+                    "consequence_raw": consequence_raw,
+                    "consequence": consequence,
+                    "impact": impact,
+                    "impact_rank": impact_rank,
+                    "biotype": r.get("BIOTYPE") or None,
+                    "variant_class": r.get("VARIANT_CLASS") or None,
+                    "consequence_group": group,
+                    "consequence_category": category,
+                    "consequence_rank": consequence_rank,
+                    "canonical": _truthy_vep_flag(r.get("CANONICAL")),
+                    "mane_select": _truthy_vep_flag(r.get("MANE_SELECT")),
+                    "mane_plus_clinical": _truthy_vep_flag(r.get("MANE_PLUS_CLINICAL")),
+                    "hgvsc": r.get("HGVSc") or None,
+                    "hgvsp": r.get("HGVSp") or None,
+                    "cdna_position": r.get("cDNA_position") or None,
+                    "cds_position": r.get("CDS_position") or None,
+                    "protein_position": r.get("Protein_position") or None,
+                    "amino_acids": r.get("Amino_acids") or None,
+                    "codons": r.get("Codons") or None,
+                    "ensp": r.get("ENSP") or None,
+                    "lof_flag": lof_conf in {"HC", "LC"},
+                    "lof_confidence": lof_conf,
+                    "lof_filter": r.get("LoF_filter") or None,
+                    "lof_flags": r.get("LoF_flags") or None,
+                    "lof_info": r.get("LoF_info") or None,
+                }
+            )
+
+        per_annotation_min_rank[annotation_index] = local_min_rank
+        per_annotation_min_term[annotation_index] = local_min_term
+
+        if local_min_rank is not None and (
+            min_rank_for_variant is None or local_min_rank < min_rank_for_variant
+        ):
+            min_rank_for_variant = local_min_rank
+            min_term_for_variant = local_min_term
+
+    for row in atomic_rows:
+        annotation_index = row["annotation_index"]
+        annotation_rank = per_annotation_min_rank.get(annotation_index)
+        row["most_severe_consequence_per_annotation"] = per_annotation_min_term.get(annotation_index)
+        row["most_severe_consequence_per_variant"] = min_term_for_variant
+        row["is_most_severe_for_annotation"] = (
+            row.get("consequence_rank") is not None
+            and annotation_rank is not None
+            and row["consequence_rank"] == annotation_rank
+        )
+        row["is_most_severe_for_variant"] = (
+            row.get("consequence_rank") is not None
+            and min_rank_for_variant is not None
+            and row["consequence_rank"] == min_rank_for_variant
+        )
+
+    return atomic_rows
+
+
 def _variant_key(chrom: str, pos: int, ref: str, alt: Optional[str]) -> str:
     a = alt if alt else "."
     return f"{chrom}:{pos}:{ref}:{a}"
