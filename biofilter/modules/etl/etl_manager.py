@@ -80,13 +80,14 @@ class ETLManager:
                 "entity_relationship": tuning.get_entity_relationship_index_specs,
                 "entity_location": tuning.get_entity_location_index_specs,
                 "gene": tuning.get_gene_index_specs,
-                "variant": tuning.get_snp_index_specs,
                 "protein": tuning.get_protein_index_specs,
                 "go": tuning.get_go_index_specs,
                 "pathway": tuning.get_pathway_index_specs,
                 "gwas": tuning.get_variant_gwas_index_specs,
                 "disease": tuning.get_disease_index_specs,
                 "chemical": tuning.get_chemical_index_specs,
+                "variant": tuning.get_variant_master_index_specs,
+                "snp": tuning.get_snp_index_specs,
             }
 
             aliases = {

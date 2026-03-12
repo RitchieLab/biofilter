@@ -1,6 +1,6 @@
 from biofilter import Biofilter
 
-bf = Biofilter("postgresql+psycopg2://bioadmin:bioadmin@localhost/biofilter_dev")
+bf = Biofilter("postgresql+psycopg2://bioadmin:bioadmin@localhost/biofilter_dev_2")
 bf.etl.index()  # all indexs
 
 # other templates

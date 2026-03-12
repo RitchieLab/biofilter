@@ -779,7 +779,7 @@
                 "migrate",
                 "--status",
                 "--db-uri",
-                "postgresql+psycopg2://bioadmin:bioadmin@localhost/biofilter_test"
+                "postgresql+psycopg2://bioadmin:bioadmin@localhost/biofilter_prod"
             ],
             "console": "integratedTerminal",
             "cwd": "${workspaceFolder}",

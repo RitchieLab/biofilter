@@ -1,5 +1,5 @@
 [database]
-db_uri = "postgresql+psycopg2://bioadmin:bioadmin@localhost/biofilter_dev"
+db_uri = "postgresql+psycopg2://bioadmin:bioadmin@localhost/biofilter_prod"
 echo_sql = false
 auto_create = false
 

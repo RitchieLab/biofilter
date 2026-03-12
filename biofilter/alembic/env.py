@@ -46,7 +46,14 @@ from biofilter.modules.db.base import Base  # noqa: E402
 from biofilter.utils.db_loader import bootstrap_models  # noqa: E402
 
 # Imperative table mapping (partitioned parent, etc.)
-from biofilter.modules.db.models.model_variants import map_variant_snp  # noqa: E402
+# from biofilter.modules.db.models.model_variants import map_variant_snp  # noqa E402
+from biofilter.modules.db.models.model_variants import (
+    map_variant_masters,
+    map_variant_molecular_effects,
+    map_variant_effect_predictions,
+    map_variant_regulatory_elements,
+    map_variant_gene_regulatory_evidence,
+)  # noqa: E402
 
 target_metadata = Base.metadata
 
@@ -67,7 +74,12 @@ def _ensure_metadata_loaded(connection) -> None:
 
     # 2) Register imperative tables into the same metadata
     #    (e.g., variant_snps parent table)
-    map_variant_snp(engine, Base.metadata)
+    # map_variant_snp(engine, Base.metadata)
+    map_variant_masters(engine, Base.metadata)
+    map_variant_molecular_effects(engine, Base.metadata)
+    map_variant_effect_predictions(engine, Base.metadata)
+    map_variant_regulatory_elements(engine, Base.metadata)
+    map_variant_gene_regulatory_evidence(engine, Base.metadata)
 
 
 def _include_object(

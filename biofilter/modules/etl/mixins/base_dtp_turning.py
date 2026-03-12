@@ -221,7 +221,7 @@ class DBTuningMixin:
             ("entity_locations", ["assembly_id"]),
             ("entity_locations", ["chromosome"]),
             ("entity_locations", ["build"]),
-            # Region-style queries: "give me everything in chr N for this assembly"
+            # Region-style queries: "give me everything in chr N for this assembly"  # noqa E501
             ("entity_locations", ["assembly_id", "chromosome"]),
             ("entity_locations", ["assembly_id", "chromosome", "start_pos"]),
             (
@@ -230,11 +230,11 @@ class DBTuningMixin:
             ),
             # Fast uniqueness / existence check (matches the UniqueConstraint)
             ("entity_locations", ["entity_id", "assembly_id"]),
-            ("entity_locations", ["build", "chromosome", "start_pos", "end_pos"]),
+            ("entity_locations", ["build", "chromosome", "start_pos", "end_pos"]),  # noqa E501
             # ETL housekeeping
             ("entity_locations", ["data_source_id"]),
             ("entity_locations", ["etl_package_id"]),
-            # Optional: if you foresee queries like "all genes in region '12p13.31'"
+            # Optional: if you foresee queries like "all genes in region '12p13.31'"  # noqa E501
             # ("entity_locations", ["region_label"]),
         ]
 
@@ -276,18 +276,18 @@ class DBTuningMixin:
             # here for explicitness and for helper symmetry.
             # ("variant_snps", ["rs_id"]),  # natural primary key
             # ("variant_snps", ["source_id"]),
-            ("variant_snps", ["source_type", "source_id"]),
+            # ("variant_snps", ["source_type", "source_id"]),
             # Common query patterns: by chromosome and position in each build
             # ("variant_snps", ["chromosome"]),
             # ("variant_snps", ["position_37"]),
             # ("variant_snps", ["position_38"]),
-            ("variant_snps", ["chromosome", "position_37"]),
-            ("variant_snps", ["chromosome", "position_38"]),
+            # ("variant_snps", ["chromosome", "position_37"]),
+            # ("variant_snps", ["chromosome", "position_38"]),
             # Provenance filters (ETL / source system scoping)
             # ("variant_snps", ["data_source_id"]),
             # ("variant_snps", ["etl_package_id"]),
-            ("variant_snps", ["data_source_id", "chromosome"]),
-            ("variant_snps", ["etl_package_id", "chromosome"]),
+            # ("variant_snps", ["data_source_id", "chromosome"]),
+            # ("variant_snps", ["etl_package_id", "chromosome"]),
             # --- SNP merge table ---
             # Composite primary key: (rs_obsolete_id, rs_canonical_id)
             # PK also creates an index, but we expose them individually as well
@@ -302,6 +302,66 @@ class DBTuningMixin:
         ]
 
     @property
+    def get_variant_master_index_specs(self):
+        """
+        Secondary indexes for BF4 variant tables.
+
+        Notes:
+        - Do not duplicate PK indexes.
+        - Do not duplicate the natural-key unique index already defined on
+          variant_masters (chromosome, position_start, position_end, ref, alt).
+        """
+        return [
+            # --------------------------------------------------
+            # variant_masters
+            # --------------------------------------------------
+            # Fast interval / region search
+            ("variant_masters", ["chromosome", "position_start"]),
+            # ("variant_masters", ["chromosome", "position_start", "position_end"]),  # noqa E501
+
+            # Helpful for rs lookups / reports
+            ("variant_masters", ["rsid"]),
+
+            # Provenance / ETL filtering
+            # ("variant_masters", ["data_source_id"]),
+            # ("variant_masters", ["etl_package_id"]),
+            # ("variant_masters", ["data_source_id", "chromosome"]),
+            # ("variant_masters", ["etl_package_id", "chromosome"]),
+
+            # Optional: useful if you often filter by consequence-like summary attributes  # noqa E501
+            # ("variant_masters", ["variant_type"]),
+            # ("variant_masters", ["allele_type"]),
+
+            # --------------------------------------------------
+            # variant_molecular_effects
+            # --------------------------------------------------
+            # Main logical join with variant_masters
+            ("variant_molecular_effects", ["chromosome", "variant_id"]),
+
+            # Common biological lookup patterns
+            # ("variant_molecular_effects", ["gene_id"]),
+            ("variant_molecular_effects", ["gene_symbol"]),
+            ("variant_molecular_effects", ["transcript_id"]),
+
+            # Dimension-based filtering
+            # ("variant_molecular_effects", ["consequence_id"]),
+            # ("variant_molecular_effects", ["impact_id"]),
+            # ("variant_molecular_effects", ["biotype_id"]),
+
+            # Useful combined filters
+            # ("variant_molecular_effects", ["gene_symbol", "consequence_id"]),
+            # ("variant_molecular_effects", ["transcript_id", "consequence_id"]),  # noqa E501
+            # ("variant_molecular_effects", ["chromosome", "consequence_id"]),
+            # ("variant_molecular_effects", ["chromosome", "impact_id"]),
+
+            # # Provenance / ETL filtering
+            # ("variant_molecular_effects", ["data_source_id"]),
+            # ("variant_molecular_effects", ["etl_package_id"]),
+            # ("variant_molecular_effects", ["data_source_id", "chromosome"]),
+            # ("variant_molecular_effects", ["etl_package_id", "chromosome"]),
+        ]
+
+    @property
     def get_variant_gwas_index_specs(self):
         return [
             # VariantGWAS
@@ -311,7 +371,7 @@ class DBTuningMixin:
             ("variant_gwas", ["chr_id", "chr_pos"]),
             # VariantGWASSNP
             ("variant_gwas_snp", ["snp_id"]),  # main lookup by SNP
-            ("variant_gwas_snp", ["variant_gwas_id"]),  # join back to GWAS table
+            ("variant_gwas_snp", ["variant_gwas_id"]),  # join back to GWAS table  # noqa E501
         ]
 
     @property

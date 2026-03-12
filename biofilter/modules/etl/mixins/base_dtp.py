@@ -2,7 +2,6 @@ import os
 import requests
 from packaging import version
 from pathlib import Path
-from typing import Optional
 from typing import Optional, Dict
 
 # from biofilter.utils.file_hash import compute_file_hash
@@ -39,7 +38,7 @@ class DTPBase(DBTuningMixin):
 
     # def _bump_trunc(self, field: str) -> None:
     #     self.trunc_metrics[field] = self.trunc_metrics.get(field, 0) + 1
-    # TODO: Pensar em como implementar o super().__init__(*args, **kwargs) para as classes princiapis
+    # TODO: Pensar em como implementar o super().__init__(*args, **kwargs) para as classes principais
     def _bump_trunc(self, field: str) -> None:
         if not hasattr(self, "trunc_metrics") or self.trunc_metrics is None:
             self.trunc_metrics = {}

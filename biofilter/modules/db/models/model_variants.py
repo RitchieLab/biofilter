@@ -19,13 +19,10 @@ from biofilter.modules.db.base import Base
 from biofilter.modules.db.types import PKBigIntOrInt
 
 
-# -------- tabelas de suport para o consequences --------
-
-
 class VariantConsequenceGroup(Base):
     __tablename__ = "variant_consequence_groups"
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)  # noqa E501
     name: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
 
     consequences: Mapped[list["VariantConsequence"]] = relationship(
@@ -37,7 +34,7 @@ class VariantConsequenceGroup(Base):
 class VariantConsequenceCategory(Base):
     __tablename__ = "variant_consequence_categories"
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)  # noqa E501
     name: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
 
     consequences: Mapped[list["VariantConsequence"]] = relationship(
@@ -49,7 +46,7 @@ class VariantConsequenceCategory(Base):
 class VariantConsequence(Base):
     __tablename__ = "variant_consequences"
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)  # noqa E501
     name: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
 
     severity_rank: Mapped[int] = mapped_column(Integer, nullable=False)
@@ -66,7 +63,7 @@ class VariantConsequence(Base):
     )
 
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
-    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)  # noqa E501
 
     group: Mapped["VariantConsequenceGroup | None"] = relationship(
         "VariantConsequenceGroup",
@@ -81,7 +78,7 @@ class VariantConsequence(Base):
 class VariantImpact(Base):
     __tablename__ = "variant_impacts"
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)  # noqa E501
     name: Mapped[str] = mapped_column(String(16), unique=True, nullable=False)
     severity_rank: Mapped[int] = mapped_column(Integer, nullable=False)
 
@@ -89,7 +86,7 @@ class VariantImpact(Base):
 class VariantBiotype(Base):
     __tablename__ = "variant_biotypes"
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)  # noqa E501
     name: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
 
@@ -144,7 +141,7 @@ def map_variant_masters(engine, metadata):
         variant_masters = Table(
             "variant_masters",
             metadata,
-            Column("variant_id", Integer, primary_key=True, autoincrement=True),
+            Column("variant_id", Integer, primary_key=True, autoincrement=True),  # noqa E501
             *common_cols,
             UniqueConstraint(
                 "chromosome",
@@ -166,7 +163,7 @@ def map_variant_masters(engine, metadata):
                 server_default=Identity(always=False),
             ),
             *common_cols,
-            PrimaryKeyConstraint("chromosome", "variant_id", name="pk_variant_masters"),
+            PrimaryKeyConstraint("chromosome", "variant_id", name="pk_variant_masters"),  # noqa E501
             UniqueConstraint(
                 "chromosome",
                 "position_start",
@@ -180,96 +177,6 @@ def map_variant_masters(engine, metadata):
     return variant_masters
 
 
-# def map_variant_molecular_effects(engine, metadata):
-#     """
-#     VariantMolecularEffects (BF4 4.1.0):
-#     - One row per (variant allele × transcript × consequence) in GRCh38
-#     - Partitioned by chromosome on Postgres
-#     - Logical join key with VariantMasters: (chromosome, variant_id)
-#     - No physical FK constraints (ETL-enforced integrity)
-#     """
-#     dialect = engine.dialect.name
-#     is_sqlite = dialect == "sqlite"
-
-#     if "variant_molecular_effects" in metadata.tables:
-#         return metadata.tables["variant_molecular_effects"]
-
-#     # Common columns (match Postgres DDL)
-#     common_cols = [
-#         Column("chromosome", Integer, nullable=False),
-
-#         # Context (strings for now; no Transcript/Gene domains yet)
-#         Column("gene_id", String(32), nullable=True),
-#         Column("transcript_id", String(32), nullable=False),
-
-#         # Layer 1 — consequence
-#         Column("consequence", String(64), nullable=False),
-#         Column("impact", String(16), nullable=True),
-
-#         # Useful VEP context (optional)
-#         Column("biotype", String(32), nullable=True),
-#         Column("variant_class", String(16), nullable=True),
-#         Column("canonical", Boolean, nullable=True),
-#         Column("mane_select", Boolean, nullable=True),
-#         Column("mane_plus_clinical", Boolean, nullable=True),
-
-#         # HGVS / protein context (optional)
-#         Column("hgvsc", String(128), nullable=True),
-#         Column("hgvsp", String(128), nullable=True),
-#         Column("cdna_position", String(32), nullable=True),
-#         Column("cds_position", String(32), nullable=True),
-#         Column("protein_position", String(32), nullable=True),
-#         Column("amino_acids", String(32), nullable=True),
-#         Column("codons", String(64), nullable=True),
-#         Column("ensp", String(32), nullable=True),
-
-#         # Layer 2 — LoF / LOFTEE
-#         Column("lof_flag", Boolean, nullable=True),
-#         Column("lof_confidence", String(8), nullable=True),  # HC/LC/Filtered/NA
-#         Column("lof_filter", String(128), nullable=True),
-#         Column("lof_flags", String(256), nullable=True),
-#         Column("lof_info", Text, nullable=True),
-
-#         # Provenance
-#         Column("data_source_id", Integer, nullable=True),
-#         Column("etl_package_id", Integer, nullable=True),
-#     ]
-
-#     if is_sqlite:
-#         # SQLite: keep it simple. Use integer IDs and a composite PK.
-#         # Note: SQLite doesn't support partitioning, but the schema remains identical.
-#         variant_molecular_effects = Table(
-#             "variant_molecular_effects",
-#             metadata,
-#             Column("variant_id", Integer, nullable=False),
-#             *common_cols,
-#             PrimaryKeyConstraint(
-#                 "chromosome",
-#                 "variant_id",
-#                 "transcript_id",
-#                 "consequence",
-#                 name="pk_variant_molecular_effects",
-#             ),
-#         )
-#     else:
-#         # Postgres: variant_id is bigint; parent table is created via raw DDL
-#         # (partitioned by chromosome). This table definition mirrors that schema.
-#         variant_molecular_effects = Table(
-#             "variant_molecular_effects",
-#             metadata,
-#             Column("variant_id", BigInteger, nullable=False),
-#             *common_cols,
-#             PrimaryKeyConstraint(
-#                 "chromosome",
-#                 "variant_id",
-#                 "transcript_id",
-#                 "consequence",
-#                 name="pk_variant_molecular_effects",
-#             ),
-#         )
-
-
-#     return variant_molecular_effects
 def map_variant_molecular_effects(engine, metadata):
     """
     VariantMolecularEffects:
@@ -302,8 +209,8 @@ def map_variant_molecular_effects(engine, metadata):
         # Derived severity / helper fields
         Column("consequence_rank", Integer, nullable=True),
         Column("impact_rank", Integer, nullable=True),
-        Column("most_severe_consequence_per_annotation_id", Integer, nullable=True),
-        Column("most_severe_consequence_per_variant_id", Integer, nullable=True),
+        Column("most_severe_consequence_per_annotation_id", Integer, nullable=True),  # noqa E501
+        Column("most_severe_consequence_per_variant_id", Integer, nullable=True),  # noqa E501
         Column("is_most_severe_for_annotation", Boolean, nullable=True),
         Column("is_most_severe_for_variant", Boolean, nullable=True),
         # Useful VEP context
@@ -322,7 +229,7 @@ def map_variant_molecular_effects(engine, metadata):
         Column("ensp", String(32), nullable=True),
         # Layer 2 — LoF / LOFTEE
         Column("lof_flag", Boolean, nullable=True),
-        Column("lof_confidence", String(8), nullable=True),  # HC/LC/Filtered/NA
+        Column("lof_confidence", String(8), nullable=True),  # HC/LC/Filtered/NA  # noqa E501
         Column("lof_filter", String(128), nullable=True),
         Column("lof_flags", String(256), nullable=True),
         Column("lof_info", Text, nullable=True),

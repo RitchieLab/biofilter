@@ -12,7 +12,7 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 from cyvcf2 import VCF
 
-from sqlalchemy import and_, or_, select
+from sqlalchemy import and_, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 
@@ -25,9 +25,9 @@ import pandas as pd
 from sqlalchemy import insert as generic_insert
 
 
-# -----------------------------
+# -----------------------------------------------------------------------------
 # Config
-# -----------------------------
+# -----------------------------------------------------------------------------
 @dataclass
 class GnomadCyvcf2Config:
     """
@@ -37,7 +37,7 @@ class GnomadCyvcf2Config:
     - consequences: many rows per variant (exploded VEP field)
     """
 
-    chunk_size: int = 10_000
+    chunk_size: int = 200_000
 
     # INFO key for VEP payload in gnomAD
     vep_info_key: str = "vep"
@@ -77,15 +77,13 @@ class GnomadCyvcf2Config:
     # Output file naming
     variants_prefix: str = "variants_part_"
     consequences_prefix: str = "consequences_part_"
-
     parquet_compression: str = "snappy"
-
     min_qual = 1
 
 
-# -----------------------------
+# -----------------------------------------------------------------------------
 # Helpers
-# -----------------------------
+# -----------------------------------------------------------------------------
 # # transform._build_atomic_consequence_rows
 def _truthy_vep_flag(v: Optional[str]) -> Optional[bool]:
     """
@@ -102,7 +100,7 @@ def _truthy_vep_flag(v: Optional[str]) -> Optional[bool]:
 
 
 # transform
-def resolve_file_chromosome(vcf_path: Path, datasource_name: str) -> Optional[int]:
+def resolve_file_chromosome(vcf_path: Path, datasource_name: str) -> Optional[int]:  # noqa E501
     """
     Resolve chromosome once per file from datasource name or file name.
     Expected patterns like:
@@ -118,7 +116,7 @@ def resolve_file_chromosome(vcf_path: Path, datasource_name: str) -> Optional[in
 
     for text in candidates:
         m = re.search(
-            r"(?:chr|chromosome[_-]?)(\d+|X|Y|M|MT)\b", text, flags=re.IGNORECASE
+            r"(?:chr|chromosome[_-]?)(\d+|X|Y|M|MT)\b", text, flags=re.IGNORECASE  # noqa E501
         )
         if not m:
             continue
@@ -290,7 +288,7 @@ IMPACT_RANK: Dict[str, int] = {
 def _split_consequences(value: Optional[str]) -> List[str]:
     if value is None:
         return []
-    parts = [item.strip() for item in str(value).split("&") if item and item.strip()]
+    parts = [item.strip() for item in str(value).split("&") if item and item.strip()]  # noqa E501
     return parts
 
 
@@ -309,7 +307,7 @@ def _impact_rank(value: Optional[str]) -> Optional[int]:
 
 
 # transform._build_atomic_consequence_rows
-def _classify_consequence(term: Optional[str]) -> Tuple[Optional[str], Optional[str]]:
+def _classify_consequence(term: Optional[str]) -> Tuple[Optional[str], Optional[str]]:  # noqa E501
     if not term:
         return None, None
 
@@ -442,7 +440,7 @@ def _build_atomic_consequence_rows(
                     "consequence_rank": consequence_rank,
                     "canonical": _truthy_vep_flag(r.get("CANONICAL")),
                     "mane_select": _truthy_vep_flag(r.get("MANE_SELECT")),
-                    "mane_plus_clinical": _truthy_vep_flag(r.get("MANE_PLUS_CLINICAL")),
+                    "mane_plus_clinical": _truthy_vep_flag(r.get("MANE_PLUS_CLINICAL")),  # noqa E501
                     "hgvsc": r.get("HGVSc") or None,
                     "hgvsp": r.get("HGVSp") or None,
                     "cdna_position": r.get("cDNA_position") or None,
@@ -463,7 +461,7 @@ def _build_atomic_consequence_rows(
         per_annotation_min_term[annotation_index] = local_min_term
 
         if local_min_rank is not None and (
-            min_rank_for_variant is None or local_min_rank < min_rank_for_variant
+            min_rank_for_variant is None or local_min_rank < min_rank_for_variant  # noqa E501
         ):
             min_rank_for_variant = local_min_rank
             min_term_for_variant = local_min_term
@@ -471,7 +469,7 @@ def _build_atomic_consequence_rows(
     for row in atomic_rows:
         annotation_index = row["annotation_index"]
         annotation_rank = per_annotation_min_rank.get(annotation_index)
-        row["most_severe_consequence_per_annotation"] = per_annotation_min_term.get(
+        row["most_severe_consequence_per_annotation"] = per_annotation_min_term.get(  # noqa E501
             annotation_index
         )
         row["most_severe_consequence_per_variant"] = min_term_for_variant
@@ -500,150 +498,9 @@ def _write_parquet_part(
     pq.write_table(table, out_path, compression=compression)
 
 
-# #  ----  LOAD ----
-# # load._normalize_variant_df
-# def _normalize_rsid(value):
-#     if value is None:
-#         return None
-#     value = str(value).strip()
-#     if not value:
-#         return None
-#     return value.split(";")[0]
-
-
-# # load
-# def _normalize_variant_df(df: pd.DataFrame) -> pd.DataFrame:
-#     """
-#     Accept both old transform schema and newer BF4-aligned schema.
-#     """
-#     rename_map = {
-#         "chrom": "chromosome",
-#         "pos": "position_start",
-#         "ref": "reference_allele",
-#         "alt": "alternate_allele",
-#     }
-#     df = df.rename(columns={k: v for k, v in rename_map.items() if k in df.columns}).copy()
-
-#     if "position_end" not in df.columns:
-#         df["position_end"] = df.apply(
-#             lambda r: int(r["position_start"]) + len(str(r["reference_allele"])) - 1,
-#             axis=1,
-#         )
-
-#     if "allele_type" not in df.columns:
-#         df["allele_type"] = df.get("variant_type")
-
-#     if "af" not in df.columns and "af_global" in df.columns:
-#         df["af"] = df["af_global"]
-
-#     df = df.where(pd.notnull(df), None)
-
-#     # Temporary DB safeguard: keep only alleles that fit current schema
-#     ref_max_len = 64
-#     alt_max_len = 64
-
-#     ref_len = df["reference_allele"].astype(str).str.len()
-#     alt_len = df["alternate_allele"].astype(str).str.len()
-
-#     df = df[(ref_len <= ref_max_len) & (alt_len <= alt_max_len)].copy()
-
-#     # # Get first rsID
-#     if "rsid" in df.columns:
-#         df["rsid"] = df["rsid"].apply(_normalize_rsid)
-
-#     return df
-
-
-# # load
-# def _normalize_consequence_df(df: pd.DataFrame) -> pd.DataFrame:
-#     """
-#     Accept both old transform consequence schema and newer BF4-aligned schema.
-#     """
-#     rename_map = {
-#         "chrom": "chromosome",
-#         "feature": "transcript_id",
-#     }
-#     df = df.rename(columns={k: v for k, v in rename_map.items() if k in df.columns}).copy()
-
-#     if "gene_id" not in df.columns and "gene_id_raw" in df.columns:
-#         df["gene_id"] = df["gene_id_raw"]
-#     if "gene_symbol" not in df.columns and "gene_symbol_raw" in df.columns:
-#         df["gene_symbol"] = df["gene_symbol_raw"]
-#     if "transcript_id" not in df.columns and "transcript_id_raw" in df.columns:
-#         df["transcript_id"] = df["transcript_id_raw"]
-
-#     optional_defaults = {
-#         "canonical": None,
-#         "mane_select": None,
-#         "mane_plus_clinical": None,
-#         "feature_type": None,
-#         "consequence_raw": None,
-#         "consequence_group": None,
-#         "consequence_category": None,
-#         "consequence_rank": None,
-#         "impact_rank": None,
-#         "most_severe_consequence_per_annotation": None,
-#         "most_severe_consequence_per_variant": None,
-#         "is_most_severe_for_annotation": None,
-#         "is_most_severe_for_variant": None,
-#     }
-#     for col, default in optional_defaults.items():
-#         if col not in df.columns:
-#             df[col] = default
-
-#     df = df.where(pd.notnull(df), None)
-
-#     limits = {
-#         "variant_key": 64,
-#         "gene_id": 32,
-#         "gene_symbol": 64,
-#         "transcript_id": 32,
-#         "feature_type": 32,
-#         "consequence_raw": 255,
-#         "consequence": 64,
-#         "impact": 16,
-#         "biotype": 64,
-#         "variant_class": 16,
-#         "consequence_group": 64,
-#         "consequence_category": 64,
-#         "hgvsc": 128,
-#         "hgvsp": 128,
-#         "cdna_position": 32,
-#         "cds_position": 32,
-#         "protein_position": 32,
-#         "amino_acids": 32,
-#         "codons": 64,
-#         "ensp": 32,
-#         "lof_confidence": 8,
-#         "lof_filter": 128,
-#         "lof_flags": 256,
-#     }
-
-#     mask = pd.Series(True, index=df.index)
-
-#     for col, max_len in limits.items():
-#         if col in df.columns:
-#             mask &= df[col].isna() | (df[col].astype(str).str.len() <= max_len)
-
-#     if "transcript_id" in df.columns:
-#         mask &= df["transcript_id"].notna()
-#     if "consequence" in df.columns:
-#         mask &= df["consequence"].notna()
-
-#     return df[mask].copy()
-
-# # load
-# def _get_insert_for_dialect(table, dialect_name: str):
-#     if dialect_name == "sqlite":
-#         return sqlite_insert(table)
-#     if dialect_name == "postgresql":
-#         return pg_insert(table)
-#     return generic_insert(table)
-
-
-# -----------------------------
+# -----------------------------------------------------------------------------
 # DTP
-# -----------------------------
+# -----------------------------------------------------------------------------
 class DTP(DTPBase):
     """
     gnomAD DTP using cyvcf2.
@@ -807,7 +664,7 @@ class DTP(DTPBase):
             # raise ValueError(
             #     f"Chromosome mismatch in file {vcf_path}"
             # )
-            self.logger.log(f"❌ Chromosome mismatch in file {vcf_path}", "ERROR")
+            self.logger.log(f"❌ Chromosome mismatch in file {vcf_path}", "ERROR")  # noqa E501
             return False, msg
 
         # Inside method to save chunks
@@ -873,7 +730,7 @@ class DTP(DTPBase):
             vep_fields = _parse_vep_header_format(vcf, cfg.vep_info_key)
             if not vep_fields:
                 raise ValueError(
-                    f" Could not find VEP schema in header for INFO/{cfg.vep_info_key}."
+                    f" Could not find VEP schema in header for INFO/{cfg.vep_info_key}."  # noqa E501
                 )
         except Exception as e:
             self.logger.log(f"❌ Error to read {vcf_path}: {e}", "ERROR")
@@ -895,17 +752,13 @@ class DTP(DTPBase):
                     n_skipped += 1
                     continue
 
-                # if cfg.min_qual is not None and var_qual is not None and var_qual < cfg.min_qual:
-                #     n_skipped += 1
-                #     continue
-
                 # Assumption: gnomAD file already represents one ALT per record
                 if not var.ALT:
                     n_skipped += 1
                     continue
                 if len(var.ALT) > 1:
                     raise ValueError(
-                        f"Unexpected multi-allelic record found in {vcf_path.name} at {var.CHROM}:{var.POS}. "
+                        f"Unexpected multi-allelic record found in {vcf_path.name} at {var.CHROM}:{var.POS}."  # noqa E501
                         "Current transform assumes one ALT per record."
                     )
                 alt = var.ALT[0]
@@ -1076,7 +929,7 @@ class DTP(DTPBase):
         missing_required = [c for c in required if c not in df.columns]
         if missing_required:
             raise ValueError(
-                f"Variant parquet is missing required columns: {missing_required}"
+                f"Variant parquet is missing required columns: {missing_required}"  # noqa E501
             )
 
         # position_end (vectorized)
@@ -1128,7 +981,7 @@ class DTP(DTPBase):
 
     def _normalize_consequence_df(self, df: pd.DataFrame) -> pd.DataFrame:
         """
-        Accept both old transform consequence schema and newer BF4-aligned schema.
+        Accept both old transform consequence schema and newer BF4-aligned schema.  # noqa E501
         Normalize columns and filter rows that exceed current DB-safe limits.
         """
         if df.empty:
@@ -1147,7 +1000,7 @@ class DTP(DTPBase):
             df["gene_id"] = df["gene_id_raw"]
         if "gene_symbol" not in df.columns and "gene_symbol_raw" in df.columns:
             df["gene_symbol"] = df["gene_symbol_raw"]
-        if "transcript_id" not in df.columns and "transcript_id_raw" in df.columns:
+        if "transcript_id" not in df.columns and "transcript_id_raw" in df.columns:  # noqa E501
             df["transcript_id"] = df["transcript_id_raw"]
 
         optional_defaults = {
@@ -1191,7 +1044,7 @@ class DTP(DTPBase):
             if col in df.columns:
                 df[col] = df[col].map(
                     lambda x: (
-                        str(x).strip() if x is not None and str(x).strip() else None
+                        str(x).strip() if x is not None and str(x).strip() else None  # noqa E501
                     )
                 )
 
@@ -1230,7 +1083,7 @@ class DTP(DTPBase):
 
         for col, max_len in limits.items():
             if col in df.columns:
-                mask &= df[col].isna() | (df[col].astype(str).str.len() <= max_len)
+                mask &= df[col].isna() | (df[col].astype(str).str.len() <= max_len)  # noqa E501
 
         if "variant_key" in df.columns:
             mask &= df["variant_key"].notna()
@@ -1278,7 +1131,7 @@ class DTP(DTPBase):
                     "cadd_phred": getattr(row, "cadd_phred", None),
                     "revel_max": getattr(row, "revel_max", None),
                     "spliceai_ds_max": getattr(row, "spliceai_ds_max", None),
-                    "pangolin_largest_ds": getattr(row, "pangolin_largest_ds", None),
+                    "pangolin_largest_ds": getattr(row, "pangolin_largest_ds", None),  # noqa E501
                     "sift_max": getattr(row, "sift_max", None),
                     "polyphen_max": getattr(row, "polyphen_max", None),
                     "data_source_id": self.data_source.id,
@@ -1288,7 +1141,7 @@ class DTP(DTPBase):
 
         processed = 0
         for start in range(0, len(records), chunk_size):
-            chunk = records[start : start + chunk_size]
+            chunk = records[start : start + chunk_size]  # noqa E501
             stmt = insert_cls.values(chunk)
 
             if dialect_name == "postgresql":
@@ -1315,7 +1168,7 @@ class DTP(DTPBase):
         conn,
     ) -> Dict[str, Tuple[int, int]]:
         """
-        Resolve variant_key -> (chromosome, variant_id) for the current batch only.
+        Resolve variant_key -> (chromosome, variant_id) for the current batch only.  # noqa E501
 
         Strategy:
         - group input rows by chromosome
@@ -1324,7 +1177,7 @@ class DTP(DTPBase):
         - resolve each input variant_key from that map
 
         Natural key:
-        (chromosome, position_start, position_end, reference_allele, alternate_allele)
+        (chromosome, position_start, position_end, reference_allele, alternate_allele)  # noqa E501
         """
         if df.empty:
             return {}
@@ -1385,11 +1238,11 @@ class DTP(DTPBase):
 
     def _init_dimension_caches(self, conn) -> Dict[str, Dict[str, int]]:
         return {
-            "group": self._load_dimension_cache(conn, "variant_consequence_groups"),
+            "group": self._load_dimension_cache(conn, "variant_consequence_groups"),  # noqa E501
             "category": self._load_dimension_cache(
                 conn, "variant_consequence_categories"
             ),
-            "consequence": self._load_dimension_cache(conn, "variant_consequences"),
+            "consequence": self._load_dimension_cache(conn, "variant_consequences"),  # noqa E501
             "impact": self._load_dimension_cache(conn, "variant_impacts"),
             "biotype": self._load_dimension_cache(conn, "variant_biotypes"),
         }
@@ -1401,7 +1254,7 @@ class DTP(DTPBase):
         key_column: str = "name",
     ) -> Dict[str, int]:
         table = self.db.table(table_name)
-        rows = conn.execute(select(table.c.id, getattr(table.c, key_column))).fetchall()
+        rows = conn.execute(select(table.c.id, getattr(table.c, key_column))).fetchall()  # noqa E501
 
         cache: Dict[str, int] = {}
         for row in rows:
@@ -1467,7 +1320,7 @@ class DTP(DTPBase):
         ).fetchone()
         if not row:
             raise RuntimeError(
-                f"Failed to resolve dimension value '{value}' for table '{table_name}'"
+                f"Failed to resolve dimension value '{value}' for table '{table_name}'"  # noqa E501
             )
 
         cache[value] = int(row.id)
@@ -1499,28 +1352,28 @@ class DTP(DTPBase):
         # Normalize values exactly as the caches expect
         if "consequence" in out.columns:
             out["_consequence_key"] = out["consequence"].map(
-                lambda x: str(x).strip() if x is not None and str(x).strip() else None
+                lambda x: str(x).strip() if x is not None and str(x).strip() else None  # noqa E501
             )
-            out["consequence_id"] = out["_consequence_key"].map(consequence_cache)
+            out["consequence_id"] = out["_consequence_key"].map(consequence_cache)  # noqa E501
 
         if "impact" in out.columns:
             out["_impact_key"] = out["impact"].map(
                 lambda x: (
-                    str(x).strip().upper() if x is not None and str(x).strip() else None
+                    str(x).strip().upper() if x is not None and str(x).strip() else None  # noqa E501
                 )
             )
             out["impact_id"] = out["_impact_key"].map(impact_cache)
 
         if "biotype" in out.columns:
             out["_biotype_key"] = out["biotype"].map(
-                lambda x: str(x).strip() if x is not None and str(x).strip() else None
+                lambda x: str(x).strip() if x is not None and str(x).strip() else None  # noqa E501
             )
             out["biotype_id"] = out["_biotype_key"].map(biotype_cache)
 
         if "consequence_group" in out.columns:
             out["_group_key"] = out["consequence_group"].map(
                 lambda x: (
-                    str(x).strip() if x is not None and str(x).strip() else "other"
+                    str(x).strip() if x is not None and str(x).strip() else "other"  # noqa E501
                 )
             )
             out["consequence_group_id"] = out["_group_key"].map(group_cache)
@@ -1533,7 +1386,7 @@ class DTP(DTPBase):
                     else "structural_other"
                 )
             )
-            out["consequence_category_id"] = out["_category_key"].map(category_cache)
+            out["consequence_category_id"] = out["_category_key"].map(category_cache)  # noqa E501
 
         return out
 
@@ -1557,7 +1410,7 @@ class DTP(DTPBase):
         cache: Dict[str, int],
         category_name: Optional[str],
     ) -> Optional[int]:
-        fallback = str(category_name).strip() if category_name else "structural_other"
+        fallback = str(category_name).strip() if category_name else "structural_other"  # noqa E501
         return self._get_or_create_dimension_value(
             conn,
             table_name="variant_consequence_categories",
@@ -1642,7 +1495,7 @@ class DTP(DTPBase):
             consequence_cache[consequence_name] = int(row.id)
             return int(row.id)
 
-        group_id = self._get_or_create_consequence_group(conn, group_cache, group_name)
+        group_id = self._get_or_create_consequence_group(conn, group_cache, group_name)  # noqa E501
         category_id = self._get_or_create_consequence_category(
             conn, category_cache, category_name
         )
@@ -1673,7 +1526,7 @@ class DTP(DTPBase):
         dim_caches: Dict[str, Dict[str, int]],
     ) -> None:
         """
-        Warm up caches using unique values from the current consequence dataframe.
+        Warm up caches using unique values from the current consequence dataframe.  # noqa E501
         Only missing values trigger inserts/selects.
         """
         if df.empty:
@@ -1697,7 +1550,7 @@ class DTP(DTPBase):
             )
             for group_name in group_values:
                 if group_name not in group_cache:
-                    self._get_or_create_consequence_group(conn, group_cache, group_name)
+                    self._get_or_create_consequence_group(conn, group_cache, group_name)  # noqa E501
 
         # 2) Categories
         if "consequence_category" in df.columns:
@@ -1726,7 +1579,7 @@ class DTP(DTPBase):
                 impact_df["impact"] = impact_df["impact"].map(
                     lambda x: str(x).strip().upper() if x is not None else None
                 )
-                impact_df = impact_df.dropna(subset=["impact"]).drop_duplicates()
+                impact_df = impact_df.dropna(subset=["impact"]).drop_duplicates()  # noqa E501
 
                 for row in impact_df.itertuples(index=False):
                     impact_name = row.impact
@@ -1751,20 +1604,20 @@ class DTP(DTPBase):
             )
             for biotype_name in biotype_values:
                 if biotype_name not in biotype_cache:
-                    self._get_or_create_biotype(conn, biotype_cache, biotype_name)
+                    self._get_or_create_biotype(conn, biotype_cache, biotype_name)  # noqa E501
 
         # 5) Consequences
-        required_cols = {
-            "consequence",
-            "consequence_group",
-            "consequence_category",
-            "consequence_rank",
-        }
-        available_cols = [c for c in required_cols if c in df.columns]
+        # required_cols = {
+        #     "consequence",
+        #     "consequence_group",
+        #     "consequence_category",
+        #     "consequence_rank",
+        # }
+        # available_cols = [c for c in required_cols if c in df.columns]
 
         if "consequence" in df.columns:
             cons_cols = ["consequence"]
-            for c in ["consequence_rank", "consequence_group", "consequence_category"]:
+            for c in ["consequence_rank", "consequence_group", "consequence_category"]:  # noqa E501
                 if c in df.columns:
                     cons_cols.append(c)
 
@@ -1774,9 +1627,9 @@ class DTP(DTPBase):
                     lambda x: str(x).strip() if x is not None else None
                 )
                 if "consequence_group" in cons_df.columns:
-                    cons_df["consequence_group"] = cons_df["consequence_group"].map(
+                    cons_df["consequence_group"] = cons_df["consequence_group"].map(  # noqa E501
                         lambda x: (
-                            str(x).strip() if x is not None and str(x).strip() else None
+                            str(x).strip() if x is not None and str(x).strip() else None  # noqa E501
                         )
                     )
                 if "consequence_category" in cons_df.columns:
@@ -1784,11 +1637,11 @@ class DTP(DTPBase):
                         "consequence_category"
                     ].map(
                         lambda x: (
-                            str(x).strip() if x is not None and str(x).strip() else None
+                            str(x).strip() if x is not None and str(x).strip() else None  # noqa E501
                         )
                     )
 
-                cons_df = cons_df.dropna(subset=["consequence"]).drop_duplicates()
+                cons_df = cons_df.dropna(subset=["consequence"]).drop_duplicates()  # noqa E501
 
                 for row in cons_df.itertuples(index=False):
                     consequence_name = row.consequence
@@ -1799,9 +1652,9 @@ class DTP(DTPBase):
                             group_cache,
                             category_cache,
                             consequence_name=consequence_name,
-                            severity_rank=getattr(row, "consequence_rank", None),
+                            severity_rank=getattr(row, "consequence_rank", None),  # noqa E501
                             group_name=getattr(row, "consequence_group", None),
-                            category_name=getattr(row, "consequence_category", None),
+                            category_name=getattr(row, "consequence_category", None),  # noqa E501
                         )
 
     def _none_if_nan(self, value):
@@ -1863,10 +1716,7 @@ class DTP(DTPBase):
             chromosome, variant_id = resolved_variant
 
             # Prefer vectorized IDs first
-            # consequence_id = getattr(row, "consequence_id", None)
-            # impact_id = getattr(row, "impact_id", None)
-            # biotype_id = getattr(row, "biotype_id", None)
-            consequence_id = self._none_if_nan(getattr(row, "consequence_id", None))
+            consequence_id = self._none_if_nan(getattr(row, "consequence_id", None))  # noqa E501
             impact_id = self._none_if_nan(getattr(row, "impact_id", None))
             biotype_id = self._none_if_nan(getattr(row, "biotype_id", None))
 
@@ -1923,7 +1773,7 @@ class DTP(DTPBase):
                 "etl_package_id": self.package.id,
             }
 
-            record = {k: self._none_if_nan(v) for k, v in record.items() if k in vme.c}
+            record = {k: self._none_if_nan(v) for k, v in record.items() if k in vme.c}  # noqa E501
             records.append(record)
 
             if len(records) >= chunk_size:
@@ -1967,6 +1817,8 @@ class DTP(DTPBase):
         return processed
 
     def load(self, processed_dir=None):
+
+        t0 = time.time()
         msg = f"📥 Loading {self.data_source.name} data into the database..."
         self.logger.log(msg, "INFO")
 
@@ -1994,7 +1846,7 @@ class DTP(DTPBase):
                 glob.glob(str(variants_dir / "variants_part_*.parquet"))
             )
             consequence_files = sorted(
-                glob.glob(str(consequences_dir / "consequences_part_*.parquet"))
+                glob.glob(str(consequences_dir / "consequences_part_*.parquet"))  # noqa E501
             )
 
             if not variant_files:
@@ -2007,7 +1859,7 @@ class DTP(DTPBase):
                 for f in consequence_files
             }
 
-            msg = f"📄 Found {len(variant_files)} paired variant part files to load"
+            msg = f"📄 Found {len(variant_files)} paired variant part files to load"  # noqa E501
             self.logger.log(msg, "INFO")
 
         except Exception as e:
@@ -2025,6 +1877,8 @@ class DTP(DTPBase):
 
         try:
             self.db_write_mode()
+            # TODO: seria possivel apagar so os indices dessa particao???
+            # self.drop_indexes(self.get_variant_master_index_specs)
         except Exception as e:
             total_warnings += 1
             msg = f"⚠️ Failed to switch DB to write mode: {e}"
@@ -2076,7 +1930,7 @@ class DTP(DTPBase):
                 df_variants = self._normalize_variant_df(df_variants)
                 if df_variants.empty:
                     self.logger.log(
-                        f"⚠️ Variant file produced no valid rows after normalization: {variant_name}",
+                        f"⚠️ Variant file produced no valid rows after normalization: {variant_name}",  # noqa E501
                         "WARNING",
                     )
                     continue
@@ -2120,16 +1974,16 @@ class DTP(DTPBase):
                             df_consequences = None
 
                 with self.db.engine.begin() as conn:
-                    processed_variant_rows = self._upsert_variant_masters_from_df(
+                    processed_variant_rows = self._upsert_variant_masters_from_df(  # noqa E501
                         df_variants,
                         conn,
                     )
 
-                    variant_id_map = self._resolve_variant_ids_for_df(df_variants, conn)
+                    variant_id_map = self._resolve_variant_ids_for_df(df_variants, conn)  # noqa E501
 
                     loaded_effects = 0
-                    if df_consequences is not None and not df_consequences.empty:
-                        loaded_effects = self._upsert_variant_molecular_effects_from_df(
+                    if df_consequences is not None and not df_consequences.empty:  # noqa E501
+                        loaded_effects = self._upsert_variant_molecular_effects_from_df(  # noqa E501
                             df_consequences,
                             variant_id_map,
                             conn,
@@ -2149,7 +2003,7 @@ class DTP(DTPBase):
 
             except Exception as e:
                 total_warnings += 1
-                self.logger.log(f"❌ Load failed for {variant_name}: {e}", "ERROR")
+                self.logger.log(f"❌ Load failed for {variant_name}: {e}", "ERROR")  # noqa E501
                 raise
 
         try:
@@ -2158,17 +2012,22 @@ class DTP(DTPBase):
             total_warnings += 1
             self.logger.log(f"⚠️ Failed to finalize DB: {e}", "WARNING")
 
+        # total load time
+        dt = time.time() - t0
+        msg = (f"elapsed={dt:.1f}s")
+        self.logger.log(msg, "INFO")
+
         if total_warnings == 0:
             msg = (
-                f"✅ Processed {total_variants} variant rows and {total_effects} "
-                f"molecular effect rows from {len(variant_files)} part file(s)."
+                f"✅ Processed {total_variants} variant rows and {total_effects} "  # noqa E501
+                f"molecular effect rows from {len(variant_files)} part file(s)."  # noqa E501
             )
             self.logger.log(msg, "SUCCESS")
             return True, msg
 
         msg = (
             f"⚠️ Processed {total_variants} variant rows and {total_effects} "
-            f"molecular effect rows with {total_warnings} warning(s). Check logs."
+            f"molecular effect rows with {total_warnings} warning(s). Check logs."  # noqa E501
         )
         self.logger.log(msg, "WARNING")
         return True, msg

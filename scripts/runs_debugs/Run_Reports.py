@@ -60,35 +60,35 @@ bf = Biofilter(db_uri)
 # ------------------------------------------------------------------
 # Report Variant Consequences
 # ------------------------------------------------------------------
-items = [
-    "chrY:2781644:2781644",
-    "chrY:3579294:3579294",
-    "chr1:55516888:55516888",
-    "chr7:55019017:55019017",
-]
+# items = [
+#     "chrY:2781644:2781644",
+#     "chrY:3579294:3579294",
+#     "chr1:55516888:55516888",
+#     "chr7:55019017:55019017",
+# ]
 
 # Optional: input file instead of inline items
-# input_path = "/absolute/path/to/regions.txt"
-df = bf.report.run(
-    "variant_consequences",
-    items=items,
-    range_up=1,
-    range_down=1,
-    emit_not_found_rows=True,
-    include_variant_only_rows=True,
-    limit_variants_per_input=1000,
-)
-
-# Alternative using input file:
-# df = bf.run_report(
+input_path = "/opt/biofilter/dev/biofilter/scripts/runs_debugs/regions.txt"
+# df = bf.report.run(
 #     "variant_consequences",
-#     input_path=input_path,
-#     range_up=1000,
-#     range_down=1000,
+#     items=items,
+#     range_up=1,
+#     range_down=1,
 #     emit_not_found_rows=True,
 #     include_variant_only_rows=True,
 #     limit_variants_per_input=1000,
 # )
+
+# Alternative using input file:
+df = bf.report.run(
+    "variant_consequences",
+    input_path=input_path,
+    range_up=1000,
+    range_down=1000,
+    emit_not_found_rows=True,
+    include_variant_only_rows=True,
+    limit_variants_per_input=1000,
+)
 
 
 print(df)

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from pathlib import Path
+# from pathlib import Path
 from typing import Any, Optional
 
 import pandas as pd
@@ -38,7 +38,7 @@ def _parse_chr_to_int(chr_value: Any) -> Optional[int]:
     if not s:
         return None
 
-    s = s.replace("chromosome", "").replace("chrom", "").replace("chr", "").strip()
+    s = s.replace("chromosome", "").replace("chrom", "").replace("chr", "").strip()  # noqa E501
 
     if s == "x":
         return 23
@@ -70,7 +70,8 @@ def _format_chr(chromosome: Optional[int]) -> Optional[str]:
 
 def _overlap_bp(a_start: int, a_end: int, b_start: int, b_end: int) -> int:
     """
-    Inclusive overlap in bp between intervals [a_start, a_end] and [b_start, b_end].
+    Inclusive overlap in bp between intervals
+    [a_start, a_end] and [b_start, b_end].
     """
     return max(0, min(a_end, b_end) - max(a_start, b_start) + 1)
 
@@ -105,14 +106,14 @@ class NormalizedRegionInput:
 class VariantConsequencesReport(ReportBase):
     """
     Given genomic regions (chr:start:end), return matching variants from
-    variant_masters and all molecular consequences from variant_molecular_effects,
+    variant_masters and all molecular consequences from variant_molecular_effects,  # noqa E501
     enriched with consequence / impact / biotype dimension labels.
     """
 
     name = "variant_consequences"
     description = (
-        "Given genomic regions, returns matching variants from variant_masters and "
-        "their molecular consequences from variant_molecular_effects, including "
+        "Given genomic regions, returns matching variants from variant_masters and "  # noqa E501
+        "their molecular consequences from variant_molecular_effects, including "  # noqa E501
         "resolved consequence, group, category, impact, and biotype labels."
     )
 
@@ -199,7 +200,7 @@ class VariantConsequencesReport(ReportBase):
 
 Purpose:
 - Given one or more genomic regions, return all overlapping variants from
-  variant_masters and their molecular consequences from variant_molecular_effects.
+  variant_masters and their molecular consequences from variant_molecular_effects.  # noqa E501
 
 Input:
 - items: list[str] or list[dict]
@@ -216,9 +217,9 @@ Input:
 Key params:
 - range_up (default 0): extend query interval upstream
 - range_down (default 0): extend query interval downstream
-- emit_not_found_rows (default True): keep one row per input even if no variants found
-- include_variant_only_rows (default True): keep variants even if they have no consequences
-- limit_variants_per_input (default 1000): safety bound applied in memory after overlap matching
+- emit_not_found_rows (default True): keep one row per input even if no variants found  # noqa E501
+- include_variant_only_rows (default True): keep variants even if they have no consequences  # noqa E501
+- limit_variants_per_input (default 1000): safety bound applied in memory after overlap matching  # noqa E501
 
 Behavior:
 - First queries variant_masters by chromosome and interval overlap
@@ -233,7 +234,7 @@ Behavior:
 Output:
 - One row per input × variant × consequence
 - If no variant is found, emits one row with Status=not_found (if enabled)
-- If a variant is found but has no consequences, emits one row with Status=variant_only
+- If a variant is found but has no consequences, emits one row with Status=variant_only  # noqa E501
   (if include_variant_only_rows=True)
 """
 
@@ -255,9 +256,9 @@ Output:
     def _get_tables(self) -> dict[str, Table]:
         return {
             "variant_masters": self._table("variant_masters"),
-            "variant_molecular_effects": self._table("variant_molecular_effects"),
+            "variant_molecular_effects": self._table("variant_molecular_effects"),  # noqa E501
             "variant_consequences": self._table("variant_consequences"),
-            "variant_consequence_groups": self._table("variant_consequence_groups"),
+            "variant_consequence_groups": self._table("variant_consequence_groups"),  # noqa E501
             "variant_consequence_categories": self._table(
                 "variant_consequence_categories"
             ),
@@ -337,12 +338,12 @@ Output:
             note=None,
         )
 
-    def _parse_region_dict(self, item: dict[str, Any]) -> NormalizedRegionInput:
+    def _parse_region_dict(self, item: dict[str, Any]) -> NormalizedRegionInput:  # noqa E501
         raw = str(item)
 
         chrom = item.get("chromosome") or item.get("chr") or item.get("chrom")
-        start = item.get("start") or item.get("pos_start") or item.get("position_start")
-        end = item.get("end") or item.get("pos_end") or item.get("position_end")
+        start = item.get("start") or item.get("pos_start") or item.get("position_start")  # noqa E501
+        end = item.get("end") or item.get("pos_end") or item.get("position_end")  # noqa E501
 
         chr_in = _parse_chr_to_int(chrom)
         start_i = _parse_int(start)
@@ -380,7 +381,7 @@ Output:
             note=None,
         )
 
-    def _normalize_inputs(self, items: list[Any]) -> list[NormalizedRegionInput]:
+    def _normalize_inputs(self, items: list[Any]) -> list[NormalizedRegionInput]:  # noqa E501
         norm: list[NormalizedRegionInput] = []
 
         for item in items:
@@ -518,7 +519,7 @@ Output:
             for row in rows:
                 biotype_map[int(row["id"])] = row.get("name")
 
-        return consequence_map, group_map, category_map, impact_map, biotype_map
+        return consequence_map, group_map, category_map, impact_map, biotype_map  # noqa E501
 
     # -------------------------------------------------------------------------
     # Output row builders
@@ -600,7 +601,7 @@ Output:
         }
 
     def _fill_variant_fields(
-        self, row: dict[str, Any], variant: dict[str, Any], overlap: int, distance: int
+        self, row: dict[str, Any], variant: dict[str, Any], overlap: int, distance: int  # noqa E501
     ) -> None:
         chromosome = variant.get("chromosome")
         row.update(
@@ -653,7 +654,7 @@ Output:
             else None
         )
 
-        group_id = consequence.get("consequence_group_id") if consequence else None
+        group_id = consequence.get("consequence_group_id") if consequence else None  # noqa E501
         category_id = (
             consequence.get("consequence_category_id") if consequence else None
         )
@@ -666,13 +667,13 @@ Output:
                 "Feature Type": effect.get("feature_type"),
                 "Consequence Raw": effect.get("consequence_raw"),
                 "Consequence ID": consequence_id,
-                "Consequence": consequence.get("name") if consequence else None,
+                "Consequence": consequence.get("name") if consequence else None,  # noqa E501
                 "Consequence Severity Rank": (
                     consequence.get("severity_rank") if consequence else None
                 ),
                 "Consequence Group ID": group_id,
                 "Consequence Group": (
-                    group_map.get(int(group_id)) if group_id is not None else None
+                    group_map.get(int(group_id)) if group_id is not None else None  # noqa E501
                 ),
                 "Consequence Category ID": category_id,
                 "Consequence Category": (
@@ -682,11 +683,11 @@ Output:
                 ),
                 "Impact ID": impact_id,
                 "Impact": (
-                    impact_map.get(int(impact_id)) if impact_id is not None else None
+                    impact_map.get(int(impact_id)) if impact_id is not None else None  # noqa E501
                 ),
                 "Biotype ID": biotype_id,
                 "Biotype": (
-                    biotype_map.get(int(biotype_id)) if biotype_id is not None else None
+                    biotype_map.get(int(biotype_id)) if biotype_id is not None else None  # noqa E501
                 ),
                 "Canonical": effect.get("canonical"),
                 "MANE Select": effect.get("mane_select"),
@@ -710,21 +711,21 @@ Output:
         input_path = self.param("input_path", None)
 
         if input_data is None and input_path is None:
-            raise ValueError("Provide either 'items'/'input_data' or 'input_path'.")
+            raise ValueError("Provide either 'items'/'input_data' or 'input_path'.")  # noqa E501
 
         if input_data is None and input_path is not None:
-            input_data = self.resolve_input_list(input_path, param_name="input_path")
+            input_data = self.resolve_input_list(input_path, param_name="input_path")  # noqa E501
 
         range_up = max(0, int(self.param("range_up", 0) or 0))
         range_down = max(0, int(self.param("range_down", 0) or 0))
         emit_not_found_rows = bool(self.param("emit_not_found_rows", True))
-        include_variant_only_rows = bool(self.param("include_variant_only_rows", True))
+        include_variant_only_rows = bool(self.param("include_variant_only_rows", True))  # noqa E501
         limit_variants_per_input = int(
             self.param("limit_variants_per_input", 1000) or 1000
         )
 
         if not isinstance(input_data, list):
-            raise ValueError("'items'/'input_data' must resolve to a list of entries.")
+            raise ValueError("'items'/'input_data' must resolve to a list of entries.")  # noqa E501
 
         tables = self._get_tables()
         vm = tables["variant_masters"]
@@ -849,7 +850,7 @@ Output:
         # ---------------------------------------------------------------------
         # Query molecular effects in bulk per chromosome
         # ---------------------------------------------------------------------
-        effects_by_chr_variant: dict[tuple[int, int], list[dict[str, Any]]] = {}
+        effects_by_chr_variant: dict[tuple[int, int], list[dict[str, Any]]] = {}  # noqa E501
 
         all_consequence_ids: set[int] = set()
         all_impact_ids: set[int] = set()
@@ -898,7 +899,7 @@ Output:
                 if emit_not_found_rows:
                     row = dict(base)
                     row["Status"] = "not_found"
-                    row["Note"] = "No variants found overlapping query interval."
+                    row["Note"] = "No variants found overlapping query interval."  # noqa E501
                     row["Variants Found"] = 0
                     row["Consequences Found"] = 0
                     rows_out.append(row)
@@ -915,7 +916,7 @@ Output:
                         row = dict(base)
                         row["Status"] = "variant_only"
                         row["Note"] = (
-                            "Variant found, but no molecular consequences found."
+                            "Variant found, but no molecular consequences found."  # noqa E501
                         )
                         row["Variants Found"] = len(matched_variants)
                         row["Consequences Found"] = 0
@@ -956,7 +957,7 @@ Output:
 
                     rows_out.append(row)
 
-            # Optional: if only variant_only rows were emitted, keep counts aligned
+            # Optional: if only variant_only rows were emitted, keep counts aligned  # noqa E501
             if total_consequences_this_input == 0:
                 pass
 
@@ -983,6 +984,6 @@ Output:
         ]
         sort_cols = [c for c in sort_cols if c in df.columns]
         if sort_cols:
-            df = df.sort_values(sort_cols, kind="stable").reset_index(drop=True)
+            df = df.sort_values(sort_cols, kind="stable").reset_index(drop=True)  # noqa E501
 
         return df
