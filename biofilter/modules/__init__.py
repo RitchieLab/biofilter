@@ -17,6 +17,7 @@ class BaseComponent:
     - Provide a stable public interface (bf.<component>.<method>)
     - Delegate heavy logic to domain managers (ETLManager, ReportManager, etc.)
     """
+
     core: "BiofilterCore"
 
     def require_db(self):

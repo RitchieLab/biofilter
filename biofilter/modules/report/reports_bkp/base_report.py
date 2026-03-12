@@ -90,7 +90,7 @@
 #         ])
 #         [('1', 1111), ('1', 2222), ('2', 3333), ('3', 4444), ('4', 5555), ('X', 999), ('5', 6666)]
 #         """
-        
+
 #         # Load entries
 #         if isinstance(input_data_raw, (str, Path)) and os.path.isfile(str(input_data_raw)):
 #             with open(str(input_data_raw), "r") as f:
@@ -130,7 +130,7 @@
 #                 self.logger.log(f"⚠️ Skipped malformed input: {item} ({e})", "WARNING")
 
 #         return positions
-    
+
 #     def resolve_assembly_map(self, assembly_input: str) -> dict:
 #         """
 #         Resolve an assembly input (e.g., '38', 'GRCh38') to a chromosome → assembly_id map.

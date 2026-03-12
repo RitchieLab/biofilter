@@ -19,6 +19,7 @@ def db():
 # Create New DataBase
 # -----------------------------------------------------------------------------
 
+
 # NOTE: Tested
 @db.command("create-db")
 @click.option("--db-uri", required=True, help="Database URI")
@@ -52,17 +53,42 @@ def create(db_uri: str, overwrite: bool, debug: bool):
 #     # bf.db.connect()
 #     bf.db.migrate()
 
+
 #     click.echo("✅ Database migration completed.")
 @db.command("migrate")
 @local_db_uri_option
 @click.option("--debug", is_flag=True, help="Enable debug logging.")
 @click.option("--status", is_flag=True, help="Show current DB revision and repo head.")
-@click.option("--stamp-head", is_flag=True, help="Stamp DB to Alembic head without running DDL.")
-@click.option("--dry-run", is_flag=True, help="Print SQL that would run for upgrade (no execution).")
-@click.option("--force", is_flag=True, help="Force dangerous actions (e.g., stamp over existing version).")
-@click.option("--target", default="head", show_default=True, help="Target revision (default: head).")
+@click.option(
+    "--stamp-head", is_flag=True, help="Stamp DB to Alembic head without running DDL."
+)
+@click.option(
+    "--dry-run",
+    is_flag=True,
+    help="Print SQL that would run for upgrade (no execution).",
+)
+@click.option(
+    "--force",
+    is_flag=True,
+    help="Force dangerous actions (e.g., stamp over existing version).",
+)
+@click.option(
+    "--target",
+    default="head",
+    show_default=True,
+    help="Target revision (default: head).",
+)
 @click.pass_context
-def migrate(ctx, db_uri, debug: bool, status: bool, stamp_head: bool, dry_run: bool, force: bool, target: str):
+def migrate(
+    ctx,
+    db_uri,
+    debug: bool,
+    status: bool,
+    stamp_head: bool,
+    dry_run: bool,
+    force: bool,
+    target: str,
+):
     """
     Run database migrations.
     """
@@ -96,6 +122,7 @@ def migrate(ctx, db_uri, debug: bool, status: bool, stamp_head: bool, dry_run: b
 # Upgrade (schema + seeds)
 # -----------------------------------------------------------------------------
 
+
 @db.command("upgrade")
 @local_db_uri_option
 @click.option(
@@ -105,7 +132,9 @@ def migrate(ctx, db_uri, debug: bool, status: bool, stamp_head: bool, dry_run: b
     help="Seed directory used to apply master data updates.",
 )
 @click.option("--debug", is_flag=True, help="Enable debug logging.")
-@click.option("--force", is_flag=True, help="Force dangerous actions (reserved for future use).")
+@click.option(
+    "--force", is_flag=True, help="Force dangerous actions (reserved for future use)."
+)
 @click.pass_context
 def upgrade(ctx, db_uri, seed_dir: str, debug: bool, force: bool):
     """
@@ -133,6 +162,7 @@ def upgrade(ctx, db_uri, seed_dir: str, debug: bool, force: bool):
 # -----------------------------------------------------------------------------
 # Physical snapshot: backup / restore
 # -----------------------------------------------------------------------------
+
 
 @db.command("backup")
 @local_db_uri_option
@@ -176,6 +206,7 @@ def restore_cmd(ctx, db_uri, in_path: Path):
 # Logical full clone bundle: export / import
 # -----------------------------------------------------------------------------
 
+
 @db.command("export")
 @local_db_uri_option
 @click.option(
@@ -207,7 +238,9 @@ def restore_cmd(ctx, db_uri, in_path: Path):
     help="Chunk size for streaming reads during export (CSV + parquet chunking helpers).",
 )
 @click.pass_context
-def export_cmd(ctx, db_uri, out_dir: Path, fmt: str, schema_version: str, chunksize: int):
+def export_cmd(
+    ctx, db_uri, out_dir: Path, fmt: str, schema_version: str, chunksize: int
+):
     db_uri = require_db_uri(ctx, local_db_uri=db_uri)
     bf = Biofilter(db_uri=db_uri, debug_mode=False)
     # bf.db.connect()
@@ -249,7 +282,14 @@ def export_cmd(ctx, db_uri, out_dir: Path, fmt: str, schema_version: str, chunks
     help="(Postgres) Do not reset sequences after import.",
 )
 @click.pass_context
-def import_cmd(ctx, db_uri, in_dir: Path, fmt: str, no_rebuild_indexes: bool, no_reset_sequences: bool):
+def import_cmd(
+    ctx,
+    db_uri,
+    in_dir: Path,
+    fmt: str,
+    no_rebuild_indexes: bool,
+    no_reset_sequences: bool,
+):
     db_uri = require_db_uri(ctx, local_db_uri=db_uri)
     bf = Biofilter(db_uri=db_uri, debug_mode=False)
     # bf.db.connect()

@@ -15,6 +15,7 @@ from biofilter.modules.db.models import (
     ETLDataSource,
     ETLSourceSystem,
 )
+
 # from biofilter.db.models.model_variants import map_variant_snp
 
 
@@ -129,7 +130,9 @@ Usage:
             if window_bp < 0:
                 raise ValueError()
         except Exception:
-            self.logger.log("window_bp must be an int >= 0. Using default=1000.", "WARNING")
+            self.logger.log(
+                "window_bp must be an int >= 0. Using default=1000.", "WARNING"
+            )
             window_bp = 1000
 
         # assembly output selection (OUTPUT-ONLY)
@@ -137,7 +140,9 @@ Usage:
         if assembly is not None:
             assembly = str(assembly).strip()
             if assembly not in ("37", "38"):
-                self.logger.log("assembly must be '37', '38', or None. Using None.", "WARNING")
+                self.logger.log(
+                    "assembly must be '37', '38', or None. Using None.", "WARNING"
+                )
                 assembly = None
 
         # output columns filter (DISPLAY NAMES)
@@ -145,7 +150,9 @@ Usage:
         if output_columns is not None:
             if isinstance(output_columns, str):
                 output_columns = [output_columns]
-            output_columns = [str(c).strip() for c in output_columns if c and str(c).strip()]
+            output_columns = [
+                str(c).strip() for c in output_columns if c and str(c).strip()
+            ]
             allowed = set(self.available_columns())
             unknown = [c for c in output_columns if c not in allowed]
             if unknown:
@@ -159,7 +166,10 @@ Usage:
         # perf params
         strategy = str(self.params.get("strategy", "auto")).strip().lower()
         if strategy not in ("auto", "per_gene", "per_chr"):
-            self.logger.log("strategy must be one of: auto, per_gene, per_chr. Using auto.", "WARNING")
+            self.logger.log(
+                "strategy must be one of: auto, per_gene, per_chr. Using auto.",
+                "WARNING",
+            )
             strategy = "auto"
 
         per_gene_threshold = self.params.get("per_gene_threshold", 50)
@@ -202,7 +212,12 @@ Usage:
             .join(Entity, Entity.id == EntityAlias.entity_id)
             .join(PrimaryAlias, PrimaryAlias.entity_id == Entity.id)
             .filter(Entity.group_id == gene_group_id)
-            .filter(or_(PrimaryAlias.is_primary.is_(True), PrimaryAlias.alias_type == "preferred"))
+            .filter(
+                or_(
+                    PrimaryAlias.is_primary.is_(True),
+                    PrimaryAlias.alias_type == "preferred",
+                )
+            )
             .filter(EntityAlias.alias_norm.in_(input_list))
         )
 
@@ -218,19 +233,21 @@ Usage:
         gene_df["input_rank"] = gene_df["entity_norm"].map(input_order)
 
         gene_df["priority_rank"] = (
-            gene_df["primary_is_primary"]
-            .fillna(False)
-            .map({True: 0, False: 1})
+            gene_df["primary_is_primary"].fillna(False).map({True: 0, False: 1})
         )
         gene_df = gene_df.sort_values(
             ["entity_id", "priority_rank", "input_rank"],
             ascending=[True, True, True],
         )
 
-        unique_genes_df = gene_df.drop_duplicates(subset=["entity_id"], keep="first").copy()
+        unique_genes_df = gene_df.drop_duplicates(
+            subset=["entity_id"], keep="first"
+        ).copy()
         duplicates_df = gene_df[~gene_df.index.isin(unique_genes_df.index)].copy()
         if not duplicates_df.empty:
-            duplicates_df["note"] = "Duplicate entity_id: mapped to same gene as another input"
+            duplicates_df["note"] = (
+                "Duplicate entity_id: mapped to same gene as another input"
+            )
 
         gene_entity_ids = unique_genes_df["entity_id"].unique().tolist()
 
@@ -259,11 +276,17 @@ Usage:
             self.logger.log("No gene locations found for build=38.", "WARNING")
             out = unique_genes_df.copy()
             out["note"] = out.get("note", pd.NA)
-            return self._finalize_output(out, assembly=assembly, output_columns=output_columns)
+            return self._finalize_output(
+                out, assembly=assembly, output_columns=output_columns
+            )
 
         # windowed ranges
-        loc_df["w_start"] = (pd.to_numeric(loc_df["gene_start_38"], errors="coerce") - window_bp).clip(lower=0)
-        loc_df["w_end"] = (pd.to_numeric(loc_df["gene_end_38"], errors="coerce") + window_bp)
+        loc_df["w_start"] = (
+            pd.to_numeric(loc_df["gene_start_38"], errors="coerce") - window_bp
+        ).clip(lower=0)
+        loc_df["w_end"] = (
+            pd.to_numeric(loc_df["gene_end_38"], errors="coerce") + window_bp
+        )
 
         # choose strategy
         n_genes = int(loc_df["gene_entity_id"].nunique())
@@ -318,16 +341,20 @@ Usage:
 
         # Notes
         out_df["note"] = out_df.get("note", pd.NA)
-        out_df.loc[out_df["source_id"].isna(), "note"] = out_df.loc[out_df["source_id"].isna(), "note"].fillna(
-            "No SNPs found overlapping the gene region"
-        )
+        out_df.loc[out_df["source_id"].isna(), "note"] = out_df.loc[
+            out_df["source_id"].isna(), "note"
+        ].fillna("No SNPs found overlapping the gene region")
 
         # Append duplicates (align to same internal schema first)
         if not duplicates_df.empty:
-            dup_aligned = duplicates_df.reindex(columns=out_df.columns, fill_value=pd.NA)
+            dup_aligned = duplicates_df.reindex(
+                columns=out_df.columns, fill_value=pd.NA
+            )
             out_df = pd.concat([out_df, dup_aligned], ignore_index=True)
 
-        return self._finalize_output(out_df, assembly=assembly, output_columns=output_columns)
+        return self._finalize_output(
+            out_df, assembly=assembly, output_columns=output_columns
+        )
 
     # -----------------------------
     # SNP fetch strategies
@@ -337,7 +364,9 @@ Usage:
         v = self.db.table("variant_snps")
 
         with self.db.engine.connect() as conn:
-            for r in loc_df[["gene_entity_id", "gene_chr", "w_start", "w_end"]].itertuples(index=False):
+            for r in loc_df[
+                ["gene_entity_id", "gene_chr", "w_start", "w_end"]
+            ].itertuples(index=False):
                 try:
                     gene_entity_id = int(r.gene_entity_id)
                     chr_ = int(r.gene_chr)
@@ -363,7 +392,10 @@ Usage:
                     )
                     .select_from(v)
                     .outerjoin(ETLDataSource, ETLDataSource.id == v.c.data_source_id)
-                    .outerjoin(ETLSourceSystem, ETLSourceSystem.id == ETLDataSource.source_system_id)
+                    .outerjoin(
+                        ETLSourceSystem,
+                        ETLSourceSystem.id == ETLDataSource.source_system_id,
+                    )
                     .where(
                         v.c.chromosome == chr_,
                         v.c.position_38.isnot(None),
@@ -426,7 +458,10 @@ Usage:
                     )
                     .select_from(v)
                     .outerjoin(ETLDataSource, ETLDataSource.id == v.c.data_source_id)
-                    .outerjoin(ETLSourceSystem, ETLSourceSystem.id == ETLDataSource.source_system_id)
+                    .outerjoin(
+                        ETLSourceSystem,
+                        ETLSourceSystem.id == ETLDataSource.source_system_id,
+                    )
                     .where(
                         v.c.chromosome == chr_int,
                         v.c.position_38.isnot(None),
@@ -439,21 +474,28 @@ Usage:
                     continue
 
                 # normalize positions once
-                snps_chr["snp_pos_38"] = pd.to_numeric(snps_chr["snp_pos_38"], errors="coerce")
+                snps_chr["snp_pos_38"] = pd.to_numeric(
+                    snps_chr["snp_pos_38"], errors="coerce"
+                )
                 snps_chr = snps_chr.dropna(subset=["snp_pos_38"])
                 if snps_chr.empty:
                     continue
 
                 # Match SNPs to each gene window on this chromosome
                 matches = []
-                for rr in g[["gene_entity_id", "w_start", "w_end"]].itertuples(index=False):
+                for rr in g[["gene_entity_id", "w_start", "w_end"]].itertuples(
+                    index=False
+                ):
                     gene_entity_id = int(rr.gene_entity_id)
                     w_start = int(rr.w_start)
                     w_end = int(rr.w_end)
                     if w_start > w_end:
                         continue
 
-                    m = snps_chr[(snps_chr["snp_pos_38"] >= w_start) & (snps_chr["snp_pos_38"] <= w_end)]
+                    m = snps_chr[
+                        (snps_chr["snp_pos_38"] >= w_start)
+                        & (snps_chr["snp_pos_38"] <= w_end)
+                    ]
                     if not m.empty:
                         mm = m.copy()
                         mm["gene_entity_id"] = gene_entity_id
@@ -463,7 +505,6 @@ Usage:
                     out_parts.append(pd.concat(matches, ignore_index=True))
 
         return pd.concat(out_parts, ignore_index=True) if out_parts else pd.DataFrame()
-
 
     # -----------------------------
     # Output formatting

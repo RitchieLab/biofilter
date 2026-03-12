@@ -91,9 +91,6 @@ class DBComponent(BaseComponent):
         self.core.logger.log("✅ Seeds applied successfully.", "INFO")
         return True
 
-
-
-
     # def migrate(self) -> bool:
     #     db = self.require_db()
     #     # run_migration(db.session_factory, db.db_uri)  # ou db.SessionLocal
@@ -103,7 +100,7 @@ class DBComponent(BaseComponent):
     def migrate(
         self,
         *,
-        action: str = "upgrade",   # "upgrade" | "status" | "stamp-head" | "dry-run"
+        action: str = "upgrade",  # "upgrade" | "status" | "stamp-head" | "dry-run"
         target: str = "head",
         force: bool = False,
     ) -> bool:
@@ -130,7 +127,6 @@ class DBComponent(BaseComponent):
         Convenience passthrough to the shared Database session context manager.
         """
         return self.require_db().get_session()
-
 
     # ---------------------------
     # Snapshot (physical)
@@ -167,7 +163,9 @@ class DBComponent(BaseComponent):
         # After restore, reconnect to ensure bootstrap_models is re-applied
         # and to avoid stale engine/session state.
         db.connect(check_exists=True)
-        self.core.logger.log("🔁 Reconnected after restore (bootstrapped models).", "INFO")
+        self.core.logger.log(
+            "🔁 Reconnected after restore (bootstrapped models).", "INFO"
+        )
 
     # ---------------------------
     # Full clone bundle (logical)
@@ -193,7 +191,9 @@ class DBComponent(BaseComponent):
 
         bf_ver = biofilter_version or getattr(self.core, "version", "unknown")
 
-        self.core.logger.log(f"📦 Exporting full clone bundle → {out} (fmt={fmt})", "INFO")
+        self.core.logger.log(
+            f"📦 Exporting full clone bundle → {out} (fmt={fmt})", "INFO"
+        )
 
         bundle_dir = export_full_clone(
             db.engine,
@@ -227,7 +227,9 @@ class DBComponent(BaseComponent):
             raise RuntimeError("Database engine not initialized. Connect first.")
 
         inp = Path(in_dir).expanduser().resolve()
-        self.core.logger.log(f"📥 Importing full clone bundle ← {inp} (fmt={fmt})", "WARNING")
+        self.core.logger.log(
+            f"📥 Importing full clone bundle ← {inp} (fmt={fmt})", "WARNING"
+        )
 
         import_full_clone(
             db=db,

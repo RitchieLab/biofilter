@@ -6,6 +6,7 @@ from biofilter.core.components.base_component import BaseComponent
 from biofilter.modules.etl.etl_manager import ETLManager
 from biofilter.modules.etl.conflict_manager import ConflictManager
 
+
 class ETLComponent(BaseComponent):
     """
     ETL component wrapping ETLManager.

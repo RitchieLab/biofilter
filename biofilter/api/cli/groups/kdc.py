@@ -39,6 +39,7 @@ def kdc():
 
 #     result = bf.kdc.rebuild(kds_root=kds_root, dry_run=dry_run, strict=strict)
 
+
 #     # Nice compact output
 #     click.echo("✅ KDC rebuild completed.")
 #     click.echo(f"   • assets_scanned: {result.assets_scanned}")
@@ -128,7 +129,9 @@ def rebuild(
 
 @kdc.command("list")
 @local_db_uri_option
-@click.option("--source-system", default=None, help="Filter by source system (e.g., HGNC).")
+@click.option(
+    "--source-system", default=None, help="Filter by source system (e.g., HGNC)."
+)
 @click.option("--data-source", default=None, help="Filter by data source (e.g., hgnc).")
 @click.option("--asset", default=None, help="Filter by asset name (e.g., masterdata).")
 @click.option(
@@ -203,8 +206,7 @@ def list_cmd(
     assets = bf.kdc.list_assets()
     if as_json:
         payload = [
-            {"source_system": a[0], "data_source": a[1], "asset": a[2]}
-            for a in assets
+            {"source_system": a[0], "data_source": a[1], "asset": a[2]} for a in assets
         ]
         click.echo(json.dumps(payload, indent=2))
         return

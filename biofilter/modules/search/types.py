@@ -16,6 +16,7 @@ ResolutionStatus = Literal["resolved", "ambiguous", "not_found"]
 @dataclass(frozen=True)
 class NormalizedQuery:
     """Represents multiple deterministic normalization variants of the same input."""
+
     raw: str
     basic: str
     strict: str
@@ -25,6 +26,7 @@ class NormalizedQuery:
 @dataclass
 class Candidate:
     """A ranked candidate Entity result."""
+
     entity_id: int
     entity_type: Optional[str] = None
 

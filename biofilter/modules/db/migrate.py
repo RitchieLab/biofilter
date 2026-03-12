@@ -16,6 +16,7 @@ from biofilter.modules.db.models import BiofilterMetadata
 # Paths / Alembic helpers
 # -----------------------------------------------------------------------------
 
+
 def get_script_location() -> str:
     # Works both in editable installs and wheels
     return str(files("biofilter") / "alembic")
@@ -83,6 +84,7 @@ def get_status(engine, db_uri: str) -> MigrationStatus:
 # Core migration runner
 # -----------------------------------------------------------------------------
 
+
 def _mirror_revision_to_metadata(session_factory, revision: str) -> None:
     """
     Optional: update BiofilterMetadata.schema_revision for quick visibility.
@@ -107,7 +109,7 @@ def run_migration(
     db_uri: str | None = None,
     *,
     dry_run: bool = False,
-    action: str = "upgrade",   # "upgrade" | "status" | "stamp-head" | "dry-run"
+    action: str = "upgrade",  # "upgrade" | "status" | "stamp-head" | "dry-run"
     target: str = "head",
     force: bool = False,
 ) -> bool:
@@ -217,6 +219,7 @@ def get_repo_heads(script_location: str) -> list[str]:
     script = ScriptDirectory.from_config(cfg)
     return script.get_heads()
 
+
 """
 biofilter db migrate --status
 
@@ -244,9 +247,6 @@ biofilter db migrate (default = upgrade)
 #         logger.log("Running Alembic command: upgrade head", "INFO")
 
 #     command.upgrade(cfg, "head")
-
-
-
 
 
 # import os

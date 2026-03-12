@@ -61,6 +61,7 @@ class FallbackTextMinerConfig:
     - use_resolver_search: if True, use resolver.search() for top_k candidates;
       else use resolve_best() and keep only best.
     """
+
     min_ngram: int = 2
     max_ngram: int = 8
     max_windows_per_chunk: int = 2500
@@ -76,8 +77,27 @@ class FallbackTextMinerConfig:
     # Simple stopwords (can be expanded later)
     stopwords: frozenset[str] = frozenset(
         {
-            "a", "an", "and", "or", "the", "of", "to", "in", "on", "for", "with",
-            "by", "from", "at", "as", "is", "are", "was", "were", "be", "been",
+            "a",
+            "an",
+            "and",
+            "or",
+            "the",
+            "of",
+            "to",
+            "in",
+            "on",
+            "for",
+            "with",
+            "by",
+            "from",
+            "at",
+            "as",
+            "is",
+            "are",
+            "was",
+            "were",
+            "be",
+            "been",
         }
     )
 
@@ -226,7 +246,9 @@ class NgramFallbackTextMiner(BaseTextMiner):
                 stats["tokens"] += len(toks)
 
                 # Convert chunk-local offsets to global offsets
-                toks_global = [(t, s + chunk_start, e + chunk_start) for (t, s, e) in toks]
+                toks_global = [
+                    (t, s + chunk_start, e + chunk_start) for (t, s, e) in toks
+                ]
 
                 for window_text, s, e in _iter_ngram_windows(
                     toks_global,
@@ -240,7 +262,9 @@ class NgramFallbackTextMiner(BaseTextMiner):
                         continue
 
                     # Resolve
-                    res = self._resolve_cached(window_text, tuple(cfg.entity_type_hints or ()))
+                    res = self._resolve_cached(
+                        window_text, tuple(cfg.entity_type_hints or ())
+                    )
                     stats["resolver_calls"] += 1
 
                     # Decide keep/drop
@@ -284,7 +308,9 @@ class NgramFallbackTextMiner(BaseTextMiner):
             )
 
     # ---------------------------------------------------------------------
-    def _iter_chunks(self, text: str, cfg: TextMinerConfig) -> Iterable[tuple[int, int, str]]:
+    def _iter_chunks(
+        self, text: str, cfg: TextMinerConfig
+    ) -> Iterable[tuple[int, int, str]]:
         n = len(text)
         if cfg.chunk_size <= 0 or n <= cfg.chunk_size:
             yield (0, n, text)
@@ -301,7 +327,9 @@ class NgramFallbackTextMiner(BaseTextMiner):
 
     # ---------------------------------------------------------------------
     @lru_cache(maxsize=100_000)
-    def _resolve_cached(self, window_text: str, entity_type_hints: tuple[str, ...]) -> dict:
+    def _resolve_cached(
+        self, window_text: str, entity_type_hints: tuple[str, ...]
+    ) -> dict:
         """
         Cache resolver calls by window string + type hints.
 
@@ -313,7 +341,9 @@ class NgramFallbackTextMiner(BaseTextMiner):
 
         if self.cfg.use_resolver_search:
             # Get top-k candidates and translate into MentionCandidate
-            results = self.resolver.search(window_text, entity_type_hints=hints, limit=5)
+            results = self.resolver.search(
+                window_text, entity_type_hints=hints, limit=5
+            )
             if not results:
                 return {"status": "not_found", "candidates": []}
 
@@ -322,11 +352,19 @@ class NgramFallbackTextMiner(BaseTextMiner):
                 cands.append(
                     MentionCandidate(
                         entity_id=int(c.entity_id),
-                        group_id=int(c.meta.get("group_id")) if c.meta.get("group_id") is not None else None,
+                        group_id=(
+                            int(c.meta.get("group_id"))
+                            if c.meta.get("group_id") is not None
+                            else None
+                        ),
                         entity_type=c.entity_type,
                         primary_name=c.primary_name,
                         matched_name=c.matched_name,
-                        matched_name_id=int(c.matched_name_id) if c.matched_name_id is not None else None,
+                        matched_name_id=(
+                            int(c.matched_name_id)
+                            if c.matched_name_id is not None
+                            else None
+                        ),
                         method=c.method or "ngram",
                         score=float(c.score),
                         data_source=c.data_source,
@@ -348,11 +386,19 @@ class NgramFallbackTextMiner(BaseTextMiner):
             cands.append(
                 MentionCandidate(
                     entity_id=int(b.entity_id),
-                    group_id=int(b.meta.get("group_id")) if b.meta.get("group_id") is not None else None,
+                    group_id=(
+                        int(b.meta.get("group_id"))
+                        if b.meta.get("group_id") is not None
+                        else None
+                    ),
                     entity_type=b.entity_type,
                     primary_name=b.primary_name,
                     matched_name=b.matched_name,
-                    matched_name_id=int(b.matched_name_id) if b.matched_name_id is not None else None,
+                    matched_name_id=(
+                        int(b.matched_name_id)
+                        if b.matched_name_id is not None
+                        else None
+                    ),
                     method=b.method or "ngram",
                     score=float(b.score),
                     data_source=b.data_source,

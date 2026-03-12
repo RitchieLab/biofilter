@@ -8,7 +8,10 @@ from sqlalchemy import BigInteger, Integer, String, and_, func, select
 from sqlalchemy.orm import Session
 
 from biofilter.modules.search.types import Candidate, NormalizedQuery
-from biofilter.modules.db.models.model_entities import Entity, EntityAlias  # adjust import path if needed
+from biofilter.modules.db.models.model_entities import (
+    Entity,
+    EntityAlias,
+)  # adjust import path if needed
 
 
 @dataclass(frozen=True)
@@ -45,7 +48,9 @@ def is_postgres(session: Session) -> bool:
     return bool(bind) and bind.dialect.name == "postgresql"
 
 
-def _coerce_group_ids(entity_type_hints: Sequence[str] | None, group_map: dict[str, int] | None) -> list[int]:
+def _coerce_group_ids(
+    entity_type_hints: Sequence[str] | None, group_map: dict[str, int] | None
+) -> list[int]:
     """
     Convert entity_type_hints (names like 'Chemicals', 'Genes') to group_ids when possible.
     If hints are already numeric strings, accept them as ids.
@@ -182,8 +187,11 @@ def fetch_pgtrgm_candidates(
                 matched_name=(r.alias_norm or r.alias_value),
                 matched_name_id=int(r.alias_id),
                 method="pg_trgm",
-                score=float(r.score) * 100.0,  # normalize to 0..100 scale to match your resolver
-                data_source=str(r.data_source_id) if r.data_source_id is not None else None,
+                score=float(r.score)
+                * 100.0,  # normalize to 0..100 scale to match your resolver
+                data_source=(
+                    str(r.data_source_id) if r.data_source_id is not None else None
+                ),
                 meta={
                     "group_id": int(r.group_id) if r.group_id is not None else None,
                     "alias_type": r.alias_type,
@@ -201,6 +209,6 @@ def fetch_pgtrgm_candidates(
         )
 
     top = candidates[0]
-    stop_early = (top.meta.get("pg_trgm_score", 0.0) >= float(cfg.stop_score))
+    stop_early = top.meta.get("pg_trgm_score", 0.0) >= float(cfg.stop_score)
 
     return (candidates, stop_early)

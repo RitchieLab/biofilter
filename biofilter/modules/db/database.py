@@ -65,7 +65,7 @@ class Database(CreateDBMixin):
 
         if not self.db_uri:
             raise ValueError("db_uri must be provided to connect().")
-        
+
         # Close previous engine (if any)
         if self.engine is not None:
             try:
@@ -178,7 +178,9 @@ class Database(CreateDBMixin):
     # -------------------------------------------------------------------------
     def get_session(self):
         if not self.SessionLocal:
-            self.logger.log("⚠️ Database not connected. Call connect() first.", "WARNING")
+            self.logger.log(
+                "⚠️ Database not connected. Call connect() first.", "WARNING"
+            )
             return None
         return self.SessionLocal()
 

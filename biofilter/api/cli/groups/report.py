@@ -47,7 +47,12 @@ def list_(ctx, db_uri, verbose, debug):
 # TESTADO
 @report.command("explain")
 @local_db_uri_option
-@click.option("--report-name", "identifier", required=True, help="Report identifier (module/friendly/class name).")
+@click.option(
+    "--report-name",
+    "identifier",
+    required=True,
+    help="Report identifier (module/friendly/class name).",
+)
 @click.option("--debug", is_flag=True, help="Enable debug logging.")
 @click.pass_context
 def explain(ctx, db_uri, identifier, debug):
@@ -62,7 +67,12 @@ def explain(ctx, db_uri, identifier, debug):
 # TESTADO
 @report.command("example-input")
 @local_db_uri_option
-@click.option("--report-name", "identifier", required=True, help="Report identifier (module/friendly/class name).")
+@click.option(
+    "--report-name",
+    "identifier",
+    required=True,
+    help="Report identifier (module/friendly/class name).",
+)
 @click.option("--debug", is_flag=True, help="Enable debug logging.")
 @click.pass_context
 def example_input(ctx, db_uri, identifier, debug):
@@ -77,7 +87,12 @@ def example_input(ctx, db_uri, identifier, debug):
 # TESTADO
 @report.command("available-columns")
 @local_db_uri_option
-@click.option("--report-name", "identifier", required=True, help="Report identifier (module/friendly/class name).")
+@click.option(
+    "--report-name",
+    "identifier",
+    required=True,
+    help="Report identifier (module/friendly/class name).",
+)
 @click.option("--debug", is_flag=True, help="Enable debug logging.")
 @click.pass_context
 def available_columns(ctx, db_uri, identifier, debug):
@@ -91,9 +106,18 @@ def available_columns(ctx, db_uri, identifier, debug):
 
 @report.command("run")
 @local_db_uri_option
-@click.option("--name", "identifier", required=True, help="Report identifier (module/friendly/class name).")
+@click.option(
+    "--name",
+    "identifier",
+    required=True,
+    help="Report identifier (module/friendly/class name).",
+)
 @click.option("--as-csv", is_flag=True, help="Export result to CSV")
-@click.option("--output", type=click.Path(dir_okay=False), help="Output file path (required with --as-csv)")
+@click.option(
+    "--output",
+    type=click.Path(dir_okay=False),
+    help="Output file path (required with --as-csv)",
+)
 @click.option("--debug", is_flag=True, help="Enable debug logging.")
 @click.pass_context
 def run(ctx, db_uri, identifier, as_csv, output, debug):

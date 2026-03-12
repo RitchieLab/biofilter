@@ -105,7 +105,6 @@
 # #     # IMPORT: This model is create table by DB management because partitions
 
 
-
 # # def map_variant_snp(engine, metadata: MetaData):
 # #     """
 # #     Ensure Table('variant_snps') exists in the provided metadata for ALL dialects.
@@ -229,7 +228,6 @@
 #         )
 
 #     return variant_snps
-
 
 
 # class VariantSNPMerge(Base):

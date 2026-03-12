@@ -8,7 +8,11 @@ from typing import Any, Optional
 from sqlalchemy import text as sql_text
 from sqlalchemy.orm import Session
 
-from biofilter.modules.kdc.scanner import ScannedAsset, scan_manifests, scan_asset_from_manifest
+from biofilter.modules.kdc.scanner import (
+    ScannedAsset,
+    scan_manifests,
+    scan_asset_from_manifest,
+)
 
 from biofilter.modules.db.models.model_kdc import (  # adjust import path to your project
     KDCAsset,
@@ -48,7 +52,9 @@ def _upsert_asset(session: Session, s: ScannedAsset) -> KDCAsset:
     return asset
 
 
-def _upsert_asset_version(session: Session, asset: KDCAsset, s: ScannedAsset) -> KDCAssetVersion:
+def _upsert_asset_version(
+    session: Session, asset: KDCAsset, s: ScannedAsset
+) -> KDCAssetVersion:
     # Uniqueness choice (current model): identity by manifest_hash
     av = (
         session.query(KDCAssetVersion)
@@ -91,7 +97,11 @@ def _upsert_asset_version(session: Session, asset: KDCAsset, s: ScannedAsset) ->
 
 
 def _upsert_schema(session: Session, av: KDCAssetVersion, s: ScannedAsset) -> KDCSchema:
-    schema = session.query(KDCSchema).filter(KDCSchema.asset_version_id == av.id).one_or_none()
+    schema = (
+        session.query(KDCSchema)
+        .filter(KDCSchema.asset_version_id == av.id)
+        .one_or_none()
+    )
     if schema is None:
         schema = KDCSchema(
             asset_version_id=av.id,
@@ -108,12 +118,16 @@ def _upsert_schema(session: Session, av: KDCAssetVersion, s: ScannedAsset) -> KD
     return schema
 
 
-def _rebuild_fields_from_schema(session: Session, av: KDCAssetVersion, schema: KDCSchema) -> None:
+def _rebuild_fields_from_schema(
+    session: Session, av: KDCAssetVersion, schema: KDCSchema
+) -> None:
     """
     Scanner-generated field rows (minimal) are derived from schema_json.
     We delete-and-recreate for idempotency (safe: metadata table).
     """
-    session.query(KDCSchemaField).filter(KDCSchemaField.asset_version_id == av.id).delete()
+    session.query(KDCSchemaField).filter(
+        KDCSchemaField.asset_version_id == av.id
+    ).delete()
 
     pk = set(schema.primary_key or [])
     lk = set(schema.link_keys or [])
@@ -168,8 +182,14 @@ def _reset_kdc_tables(session: Session, *, keep_scan_runs: bool = True) -> None:
         session.query(KDCScanRun).delete()
 
 
-def _upsert_lineage(session: Session, av: KDCAssetVersion, s: ScannedAsset) -> KDCLineage:
-    lineage = session.query(KDCLineage).filter(KDCLineage.asset_version_id == av.id).one_or_none()
+def _upsert_lineage(
+    session: Session, av: KDCAssetVersion, s: ScannedAsset
+) -> KDCLineage:
+    lineage = (
+        session.query(KDCLineage)
+        .filter(KDCLineage.asset_version_id == av.id)
+        .one_or_none()
+    )
     if lineage is None:
         lineage = KDCLineage(
             asset_version_id=av.id,
@@ -213,7 +233,6 @@ def rebuild_kdc(
             warnings.append("[KDC] reset=True ignored because dry_run=True.")
         else:
             _reset_kdc_tables(session, keep_scan_runs=keep_scan_runs)
-
 
     scan_run = KDCScanRun(kds_root=str(root), status="SUCCESS", summary_json=None)
     if not dry_run:

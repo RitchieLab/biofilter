@@ -9,8 +9,14 @@ from biofilter.modules.search.types import NormalizedQuery
 
 
 _GREEK_MAP = {
-    "α": "alpha", "β": "beta", "γ": "gamma", "δ": "delta",
-    "κ": "kappa", "λ": "lambda", "μ": "mu", "ω": "omega",
+    "α": "alpha",
+    "β": "beta",
+    "γ": "gamma",
+    "δ": "delta",
+    "κ": "kappa",
+    "λ": "lambda",
+    "μ": "mu",
+    "ω": "omega",
 }
 
 _PUNCT_RE = re.compile(r"[^\w\s]+", flags=re.UNICODE)
@@ -20,6 +26,7 @@ _WS_RE = re.compile(r"\s+")
 @dataclass(frozen=True)
 class NormalizerConfig:
     """Deterministic normalization rules."""
+
     ascii_fold: bool = True
     greek_letters: bool = True
     remove_punct: bool = True
@@ -61,7 +68,8 @@ class TextNormalizer:
         if self.config.ascii_fold:
             # Strip accents/diacritics
             t = "".join(
-                ch for ch in unicodedata.normalize("NFKD", t)
+                ch
+                for ch in unicodedata.normalize("NFKD", t)
                 if not unicodedata.combining(ch)
             )
 

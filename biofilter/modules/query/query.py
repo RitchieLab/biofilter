@@ -224,7 +224,7 @@ class Query:
         Intended for interactive exploration in notebooks: always returns a DataFrame
         and logs errors instead of raising, so exploration is resilient.
         """
-        if hasattr(stmt, "__table__"):   # user passed a model class
+        if hasattr(stmt, "__table__"):  # user passed a model class
             stmt = select(stmt)
             # ex: bf.query.model(bf.query.GeneMaster).head()
 

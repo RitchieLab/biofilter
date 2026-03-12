@@ -27,6 +27,7 @@ class ReportBase:
 
     def default_logger(self):
         from biofilter.utils.logger import Logger
+
         return Logger(name=self.name)
 
     @classmethod
@@ -98,15 +99,19 @@ class ReportBase:
         ])
         [('1', 1111), ('1', 2222), ('2', 3333), ('3', 4444), ('4', 5555), ('X', 999), ('5', 6666)]
         """
-        
+
         # Load entries
-        if isinstance(input_data_raw, (str, Path)) and os.path.isfile(str(input_data_raw)):
+        if isinstance(input_data_raw, (str, Path)) and os.path.isfile(
+            str(input_data_raw)
+        ):
             with open(str(input_data_raw), "r") as f:
                 entries = [line.strip() for line in f if line.strip()]
         elif isinstance(input_data_raw, list):
             entries = input_data_raw
         else:
-            self.logger.log("Invalid input_data format. Expected list or file path.", "ERROR")
+            self.logger.log(
+                "Invalid input_data format. Expected list or file path.", "ERROR"
+            )
             return []
 
         positions = []
@@ -138,7 +143,7 @@ class ReportBase:
                 self.logger.log(f"⚠️ Skipped malformed input: {item} ({e})", "WARNING")
 
         return positions
-    
+
     def resolve_assembly_map(self, assembly_input: str) -> dict:
         """
         Resolve an assembly input (e.g., '38', 'GRCh38') to a chromosome → assembly_id map.
@@ -147,11 +152,11 @@ class ReportBase:
 
         assembly_input = str(assembly_input or "").lower()
         if "38" in assembly_input:
-            label = "GRCh38.p14"   # TODO: move to config
+            label = "GRCh38.p14"  # TODO: move to config
         elif "37" in assembly_input:
-            label = "GRCh37.p13"   # TODO: move to config
+            label = "GRCh37.p13"  # TODO: move to config
         else:
-            label = "GRCh38.p14"   # default
+            label = "GRCh38.p14"  # default
 
         rows = (
             self.session.query(GenomeAssembly.chromosome, GenomeAssembly.id)
@@ -190,7 +195,7 @@ class ReportBase:
             return stmt
         values_norm = [v.strip().lower() for v in values_list]
         return stmt.where(func.lower(column).in_(values_norm))
-    
+
     def _filter_ci(self, query, column, values):
         if not values:
             return query

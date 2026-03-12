@@ -17,7 +17,7 @@ from .model_kdc import (
     KDCSchema,
     KDCSchemaField,
     KDCLineage,
-    KDCScanRun
+    KDCScanRun,
 )
 
 from .model_entities import (
@@ -43,6 +43,11 @@ from .model_variants import (
     VariantGWASSNP,
     # VariantLiftedPosition,
     # VariantMergeLog,
+    VariantConsequenceGroup,
+    VariantConsequenceCategory,
+    VariantConsequence,
+    VariantImpact,
+    VariantBiotype,
 )
 from .model_pathways import PathwayMaster
 
@@ -104,6 +109,11 @@ __all__ = [
     "VariantGWASSNP",
     # "VariantLiftedPosition",
     # "VariantMergeLog",
+    "VariantConsequenceGroup",
+    "VariantConsequenceCategory",
+    "VariantConsequence",
+    "VariantImpact",
+    "VariantBiotype",
     # PATHWAY MODELS
     "PathwayMaster",
     # PROTEIN MODELS

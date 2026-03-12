@@ -7,6 +7,7 @@ from typing import Callable, Iterable, Tuple
 # ORM Models Register
 # -------------------------------------------------------------------------
 
+
 def load_all_models():
     """
     Import all models modules to ensure SQLAlchemy registers all tables.

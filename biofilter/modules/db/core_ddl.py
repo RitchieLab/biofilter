@@ -1,5 +1,6 @@
 # biofilter/modules/db/core_ddl.py
 
+
 def ddl_list_partitions(
     parent_table: str,
     part_prefix: str,
@@ -70,28 +71,101 @@ def ddl_variant_masters() -> str:
     """.strip()
 
 
+# def ddl_variant_molecular_effect() -> str:
+#     return """
+#     CREATE TABLE IF NOT EXISTS variant_molecular_effects (
+#         chromosome integer NOT NULL,
+#         variant_id bigint NOT NULL,
+
+#         -- Context (strings for now; no Transcript/Gene domains yet)
+#         gene_id varchar(32) NULL,        -- e.g. ENSG...
+#         transcript_id varchar(32) NOT NULL,  -- e.g. ENST...
+
+#         -- Layer 1 — consequence
+#         consequence varchar(64) NOT NULL,  -- Sequence Ontology term(s)
+#         impact varchar(16) NULL,           -- HIGH/MODERATE/LOW/MODIFIER
+
+#         -- Useful VEP context (optional)
+#         biotype varchar(32) NULL,          -- protein_coding, snRNA, etc.
+#         variant_class varchar(16) NULL,    -- SNV, INDEL, etc.
+#         canonical boolean NULL,            -- CANONICAL=YES
+#         mane_select boolean NULL,          -- MANE_SELECT
+#         mane_plus_clinical boolean NULL,   -- MANE_PLUS_CLINICAL
+
+#         -- HGVS / protein context (optional but useful)
+#         hgvsc varchar(128) NULL,
+#         hgvsp varchar(128) NULL,
+#         cdna_position varchar(32) NULL,
+#         cds_position varchar(32) NULL,
+#         protein_position varchar(32) NULL,
+#         amino_acids varchar(32) NULL,
+#         codons varchar(64) NULL,
+#         ensp varchar(32) NULL,             -- ENSP...
+
+#         -- Layer 2 — LoF / LOFTEE (from VEP annotations)
+#         lof_flag boolean NULL,             -- derived: LoF in {HC, LC}
+#         lof_confidence varchar(8) NULL,    -- HC / LC / NULL / Filtered / NA (your BF4 label)
+#         lof_filter varchar(128) NULL,
+#         lof_flags varchar(256) NULL,
+#         lof_info text NULL,
+
+#         -- Provenance
+#         data_source_id integer NULL,
+#         etl_package_id integer NULL,
+
+#         CONSTRAINT pk_variant_molecular_effects PRIMARY KEY
+#             (chromosome, variant_id, transcript_id, consequence),
+
+#         -- Optional sanity checks (cheap)
+#         CONSTRAINT ck_vme_impact CHECK (
+#             impact IS NULL OR impact IN ('HIGH', 'MODERATE', 'LOW', 'MODIFIER')
+#         ),
+#         CONSTRAINT ck_vme_lof_conf CHECK (
+#             lof_confidence IS NULL OR lof_confidence IN ('HC', 'LC', 'Filtered', 'NA')
+#         )
+
+
+#     ) PARTITION BY LIST (chromosome);
+#     """.strip()
 def ddl_variant_molecular_effect() -> str:
     return """
     CREATE TABLE IF NOT EXISTS variant_molecular_effects (
         chromosome integer NOT NULL,
         variant_id bigint NOT NULL,
+        variant_key varchar(64) NOT NULL,
 
-        -- Context (strings for now; no Transcript/Gene domains yet)
-        gene_id varchar(32) NULL,        -- e.g. ENSG...
-        transcript_id varchar(32) NOT NULL,  -- e.g. ENST...
+        -- Raw VEP identity / context
+        gene_id varchar(32) NULL,             -- stable/raw gene id (e.g. ENSG...)
+        gene_symbol varchar(64) NULL,         -- raw symbol from VEP for now
+        transcript_id varchar(32) NOT NULL,   -- e.g. ENST...
+        feature_type varchar(32) NULL,        -- Transcript, RegulatoryFeature, MotifFeature, etc.
 
-        -- Layer 1 — consequence
-        consequence varchar(64) NOT NULL,  -- Sequence Ontology term(s)
-        impact varchar(16) NULL,           -- HIGH/MODERATE/LOW/MODIFIER
+        -- Raw consequence preserved
+        consequence_raw varchar(255) NULL,    -- e.g. intron_variant&non_coding_transcript_variant
 
-        -- Useful VEP context (optional)
-        biotype varchar(32) NULL,          -- protein_coding, snRNA, etc.
-        variant_class varchar(16) NULL,    -- SNV, INDEL, etc.
-        canonical boolean NULL,            -- CANONICAL=YES
-        mane_select boolean NULL,          -- MANE_SELECT
-        mane_plus_clinical boolean NULL,   -- MANE_PLUS_CLINICAL
+        -- Normalized consequence layers
+        consequence_id integer NOT NULL,
+        impact_id integer NULL,
+        biotype_id integer NULL,
+        consequence_group_id integer NULL,
+        consequence_category_id integer NULL,
 
-        -- HGVS / protein context (optional but useful)
+        -- Derived severity helpers
+        consequence_rank integer NULL,
+        impact_rank integer NULL,
+        is_most_severe_for_annotation boolean NULL,
+        is_most_severe_for_variant boolean NULL,
+
+        -- Optional denormalized helpers for easier reporting/debug
+        most_severe_consequence_per_annotation_id integer NULL,
+        most_severe_consequence_per_variant_id integer NULL,
+
+        -- Useful VEP context
+        canonical boolean NULL,
+        mane_select boolean NULL,
+        mane_plus_clinical boolean NULL,
+
+        -- HGVS / protein context
         hgvsc varchar(128) NULL,
         hgvsp varchar(128) NULL,
         cdna_position varchar(32) NULL,
@@ -99,11 +173,11 @@ def ddl_variant_molecular_effect() -> str:
         protein_position varchar(32) NULL,
         amino_acids varchar(32) NULL,
         codons varchar(64) NULL,
-        ensp varchar(32) NULL,             -- ENSP...
+        ensp varchar(32) NULL,
 
-        -- Layer 2 — LoF / LOFTEE (from VEP annotations)
-        lof_flag boolean NULL,             -- derived: LoF in {HC, LC}
-        lof_confidence varchar(8) NULL,    -- HC / LC / NULL / Filtered / NA (your BF4 label)
+        -- LoF / LOFTEE
+        lof_flag boolean NULL,
+        lof_confidence varchar(8) NULL,
         lof_filter varchar(128) NULL,
         lof_flags varchar(256) NULL,
         lof_info text NULL,
@@ -113,16 +187,11 @@ def ddl_variant_molecular_effect() -> str:
         etl_package_id integer NULL,
 
         CONSTRAINT pk_variant_molecular_effects PRIMARY KEY
-            (chromosome, variant_id, transcript_id, consequence),
+            (chromosome, variant_id, transcript_id, consequence_id),
 
-        -- Optional sanity checks (cheap)
-        CONSTRAINT ck_vme_impact CHECK (
-            impact IS NULL OR impact IN ('HIGH', 'MODERATE', 'LOW', 'MODIFIER')
-        ),
         CONSTRAINT ck_vme_lof_conf CHECK (
             lof_confidence IS NULL OR lof_confidence IN ('HC', 'LC', 'Filtered', 'NA')
         )
-
     ) PARTITION BY LIST (chromosome);
     """.strip()
 

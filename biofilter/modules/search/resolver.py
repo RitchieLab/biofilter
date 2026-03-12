@@ -49,7 +49,9 @@ class TermResolver:
         self.retriever = retriever
         self.normalizer = normalizer or TextNormalizer()
         self.config = config or ResolverConfig()
-        scoring_cfg = ScoringConfig(min_score=self.config.min_score, min_delta=self.config.min_delta)
+        scoring_cfg = ScoringConfig(
+            min_score=self.config.min_score, min_delta=self.config.min_delta
+        )
         self.scorer = scorer or CandidateScorer(scoring_cfg)
 
     def search(
@@ -87,7 +89,9 @@ class TermResolver:
                 min_delta=self.config.min_delta,
             )
 
-        candidates = self._score_candidates(q, pool, entity_type_hints=entity_type_hints)
+        candidates = self._score_candidates(
+            q, pool, entity_type_hints=entity_type_hints
+        )
         candidates.sort(key=lambda c: c.score, reverse=True)
         candidates = candidates[: self.config.top_k]
 
@@ -153,7 +157,9 @@ class TermResolver:
                 if c in out:
                     continue
                 # Light fuzzy re-rank as tie-breaker (optional)
-                base = self.scorer.fuzzy_score(q, c.matched_name or c.primary_name or "")
+                base = self.scorer.fuzzy_score(
+                    q, c.matched_name or c.primary_name or ""
+                )
                 c.method = c.method or "db_pool"
                 c.score = self.scorer.apply_heuristics(base, c, entity_type_hint=hint)
                 out.append(c)
@@ -186,7 +192,6 @@ class TermResolver:
                 c.score = self.scorer.apply_heuristics(base, c, entity_type_hint=hint)
                 out.append(c)
             return out
-
 
         # Fallback disabled: return unscored
         return candidates

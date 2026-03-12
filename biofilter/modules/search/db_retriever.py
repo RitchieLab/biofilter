@@ -40,9 +40,11 @@ class DBRetrieverConfig:
 
     # New: pg_trgm layer (Postgres only)
     pgtrgm_enabled: bool = True
-    pgtrgm_min_score: float = 0.30     # 0..1 in Postgres, we convert to 0..100 in Candidate
-    pgtrgm_stop_score: float = 0.99    # stop early if top candidate >= this (0..1)
-    pgtrgm_limit: int = 500            # max rows from pg_trgm query
+    pgtrgm_min_score: float = (
+        0.30  # 0..1 in Postgres, we convert to 0..100 in Candidate
+    )
+    pgtrgm_stop_score: float = 0.99  # stop early if top candidate >= this (0..1)
+    pgtrgm_limit: int = 500  # max rows from pg_trgm query
 
 
 def build_group_name_to_id(session: Session) -> dict[str, int]:
@@ -113,7 +115,9 @@ def make_entity_alias_retriever(
             PrimaryAlias.alias_value.label("primary_name"),
         ]
 
-    def retriever(query: NormalizedQuery, pool_limit: int, entity_type_hints: Optional[list[str]]):
+    def retriever(
+        query: NormalizedQuery, pool_limit: int, entity_type_hints: Optional[list[str]]
+    ):
         """
         Retrieval strategy (in order):
 
@@ -175,7 +179,8 @@ def make_entity_alias_retriever(
             .join(Entity, Entity.id == EntityAlias.entity_id)
             .outerjoin(
                 PrimaryAlias,
-                (PrimaryAlias.entity_id == Entity.id) & (PrimaryAlias.is_primary.is_(True)),
+                (PrimaryAlias.entity_id == Entity.id)
+                & (PrimaryAlias.is_primary.is_(True)),
             )
             .where(*base_filters)
             .where(
@@ -219,7 +224,9 @@ def make_entity_alias_retriever(
                     matched_name_id=int(r.alias_id),
                     method=method,
                     score=0.0,
-                    data_source=str(r.data_source_id) if r.data_source_id is not None else None,
+                    data_source=(
+                        str(r.data_source_id) if r.data_source_id is not None else None
+                    ),
                     meta={
                         "group_id": int(r.group_id) if r.group_id is not None else None,
                         "alias_type": r.alias_type,
@@ -246,7 +253,9 @@ def make_entity_alias_retriever(
                 like_conds.append(EntityAlias.alias_norm.like(f"{tok}%"))
 
         if not like_conds and query.basic:
-            like_conds.append(func.lower(EntityAlias.alias_value).like(f"{query.basic[:3]}%"))
+            like_conds.append(
+                func.lower(EntityAlias.alias_value).like(f"{query.basic[:3]}%")
+            )
 
         if like_conds:
             pool_stmt = (
@@ -255,7 +264,8 @@ def make_entity_alias_retriever(
                 .join(Entity, Entity.id == EntityAlias.entity_id)
                 .outerjoin(
                     PrimaryAlias,
-                    (PrimaryAlias.entity_id == Entity.id) & (PrimaryAlias.is_primary.is_(True)),
+                    (PrimaryAlias.entity_id == Entity.id)
+                    & (PrimaryAlias.is_primary.is_(True)),
                 )
                 .where(*base_filters)
                 .where(or_(*like_conds))
@@ -267,7 +277,9 @@ def make_entity_alias_retriever(
                     EntityAlias.id.asc(),
                 )
 
-            pool_rows = session.execute(pool_stmt.limit(min(pool_limit, cfg.pool_limit))).all()
+            pool_rows = session.execute(
+                pool_stmt.limit(min(pool_limit, cfg.pool_limit))
+            ).all()
 
             for r in pool_rows:
                 key = (int(r.entity_id), int(r.alias_id))
@@ -286,9 +298,15 @@ def make_entity_alias_retriever(
                         matched_name_id=int(r.alias_id),
                         method="db_pool",
                         score=0.0,
-                        data_source=str(r.data_source_id) if r.data_source_id is not None else None,
+                        data_source=(
+                            str(r.data_source_id)
+                            if r.data_source_id is not None
+                            else None
+                        ),
                         meta={
-                            "group_id": int(r.group_id) if r.group_id is not None else None,
+                            "group_id": (
+                                int(r.group_id) if r.group_id is not None else None
+                            ),
                             "alias_type": r.alias_type,
                             "xref_source": r.xref_source,
                             "locale": r.locale,

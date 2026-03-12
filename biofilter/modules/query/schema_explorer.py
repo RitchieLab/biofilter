@@ -3,7 +3,7 @@ from __future__ import annotations
 import pandas as pd
 from typing import Optional, List, Dict, Any
 
-from biofilter.modules.query import Query  
+from biofilter.modules.query import Query
 
 
 class SchemaExplorer:
@@ -83,7 +83,8 @@ class SchemaExplorer:
         if keyword:
             kw = keyword.lower()
             names = [
-                name for name in names
+                name
+                for name in names
                 if kw in name.lower() or kw in self.groups.get(name, "").lower()
             ]
 
@@ -162,5 +163,5 @@ class SchemaExplorer:
         df["relationships"] = df["relationships"].apply(lambda xs: ", ".join(xs))
         df["primary_keys"] = df["primary_keys"].apply(lambda xs: ", ".join(xs))
         return df
-    
+
         # BUG: Quando filtra a palavra Gene tras outros modelos

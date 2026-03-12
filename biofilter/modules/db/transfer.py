@@ -37,6 +37,7 @@ class Manifest:
     - This is a logical snapshot: one file per table + manifest.json.
     - Includes PK values to preserve referential integrity on import.
     """
+
     biofilter_version: str
     schema_version: str
     engine: str
@@ -51,6 +52,7 @@ def utc_now_iso() -> str:
 # =============================================================================
 # Engine / Dialect helpers (single source of truth)
 # =============================================================================
+
 
 def detect_engine_name(engine: Engine) -> str:
     """
@@ -74,6 +76,7 @@ def sqlite_db_path_from_engine(engine: Engine) -> Path:
 # =============================================================================
 # Product A: Physical snapshot backup/restore
 # =============================================================================
+
 
 def _ensure_backup_file_path(output_path: Path, *, suffix: str) -> Path:
     """
@@ -138,7 +141,9 @@ def backup_db(
     if dialect == "sqlite":
         return backup_sqlite(engine, out, vacuum_into=sqlite_vacuum_into)
     if dialect in ("postgresql", "postgres"):
-        return backup_postgres(engine, out, pg_dump=postgres_pg_dump, format_custom=postgres_format_custom)
+        return backup_postgres(
+            engine, out, pg_dump=postgres_pg_dump, format_custom=postgres_format_custom
+        )
 
     raise NotImplementedError(f"backup_db not implemented for engine: {dialect}")
 
@@ -170,13 +175,17 @@ def restore_db(
         restore_sqlite(engine, inp)
         return
     if dialect in ("postgresql", "postgres"):
-        restore_postgres(engine, inp, pg_restore=postgres_pg_restore, clean=postgres_clean)
+        restore_postgres(
+            engine, inp, pg_restore=postgres_pg_restore, clean=postgres_clean
+        )
         return
 
     raise NotImplementedError(f"restore_db not implemented for engine: {dialect}")
 
 
-def backup_sqlite(engine: Engine, output_path: Path, *, vacuum_into: bool = True) -> Path:
+def backup_sqlite(
+    engine: Engine, output_path: Path, *, vacuum_into: bool = True
+) -> Path:
     """
     SQLite snapshot backup.
 
@@ -187,7 +196,9 @@ def backup_sqlite(engine: Engine, output_path: Path, *, vacuum_into: bool = True
 
     # Ensure output is not the same file
     if src == output_path:
-        raise ValueError("Output path must be different from the source SQLite DB path.")
+        raise ValueError(
+            "Output path must be different from the source SQLite DB path."
+        )
 
     if vacuum_into:
         # VACUUM INTO requires SQLite 3.27+ (most modern systems have it).
@@ -282,7 +293,10 @@ def _run_subprocess(cmd: list[str], err_msg: str) -> None:
             extra += f"\n[stderr]\n{stderr}"
         if stdout:
             extra += f"\n[stdout]\n{stdout}"
-        raise RuntimeError(f"{err_msg}. Command={cmd}. ExitCode={e.returncode}{extra}") from e
+        raise RuntimeError(
+            f"{err_msg}. Command={cmd}. ExitCode={e.returncode}{extra}"
+        ) from e
+
 
 # =============================================================================
 # Product B: Full Clone Bundle export/import (logical snapshot)
@@ -291,6 +305,7 @@ def _run_subprocess(cmd: list[str], err_msg: str) -> None:
 # -----------------------------------------------------------------------------
 # Type helpers
 # -----------------------------------------------------------------------------
+
 
 def _is_jsonish_col(coltype) -> bool:
     """
@@ -352,6 +367,7 @@ def _coerce_json_cell(v: Any) -> Any:
 
 #     # Final pass: convert any remaining NaT/NaN-like to None
 #     df = df.astype("object").where(pd.notna(df), None)
+
 
 #     return df
 def _df_nullify_specials(df: pd.DataFrame) -> pd.DataFrame:
@@ -463,7 +479,9 @@ def _df_to_db_records(df: pd.DataFrame, table: Table) -> list[dict]:
     return df2.to_dict(orient="records")
 
 
-def _insert_df(engine: Engine, table: Table, df: pd.DataFrame, chunksize: int = 50_000) -> None:
+def _insert_df(
+    engine: Engine, table: Table, df: pd.DataFrame, chunksize: int = 50_000
+) -> None:
     """
     Chunked SQLAlchemy Core insert that handles:
     - NaT/NaN -> NULL
@@ -487,6 +505,7 @@ def _insert_df(engine: Engine, table: Table, df: pd.DataFrame, chunksize: int = 
 # =============================================================================
 # Export / Import full clone
 # =============================================================================
+
 
 def export_full_clone(
     engine: Engine,
@@ -520,7 +539,9 @@ def export_full_clone(
             # row count (best-effort)
             try:
                 if detect_engine_name(engine) in ("postgresql", "postgres"):
-                    cnt = conn.execute(text(f'SELECT COUNT(*) FROM "{t}"')).scalar() or 0
+                    cnt = (
+                        conn.execute(text(f'SELECT COUNT(*) FROM "{t}"')).scalar() or 0
+                    )
                 else:
                     cnt = conn.execute(text(f"SELECT COUNT(*) FROM {t}")).scalar() or 0
             except Exception:
@@ -565,7 +586,9 @@ def import_full_clone(
     """
     engine = db.engine
     if engine is None:
-        raise RuntimeError("Database engine is not initialized (db.engine is None). Connect first.")
+        raise RuntimeError(
+            "Database engine is not initialized (db.engine is None). Connect first."
+        )
 
     base = Path(in_dir).expanduser().resolve()
     manifest_path = base / "manifest.json"
@@ -589,7 +612,9 @@ def import_full_clone(
         d = detect_engine_name(engine)
         if d in ("postgresql", "postgres"):
             for table in delete_order:
-                conn.execute(text(f'TRUNCATE TABLE "{table.name}" RESTART IDENTITY CASCADE'))
+                conn.execute(
+                    text(f'TRUNCATE TABLE "{table.name}" RESTART IDENTITY CASCADE')
+                )
         else:
             for table in delete_order:
                 conn.execute(text(f"DELETE FROM {table.name}"))
@@ -644,6 +669,7 @@ def import_full_clone(
 # Bundle helpers
 # =============================================================================
 
+
 def _select_all_sql(engine: Engine, table_name: str) -> str:
     d = detect_engine_name(engine)
     if d in ("postgresql", "postgres"):
@@ -651,7 +677,9 @@ def _select_all_sql(engine: Engine, table_name: str) -> str:
     return f"SELECT * FROM {table_name}"
 
 
-def _export_table_csv(conn, engine: Engine, table_name: str, out_path: Path, *, chunksize: int) -> None:
+def _export_table_csv(
+    conn, engine: Engine, table_name: str, out_path: Path, *, chunksize: int
+) -> None:
     header_written = False
     sql = _select_all_sql(engine, table_name)
     for chunk in pd.read_sql(text(sql), conn, chunksize=chunksize):
@@ -662,7 +690,9 @@ def _export_table_csv(conn, engine: Engine, table_name: str, out_path: Path, *, 
         pd.DataFrame().to_csv(out_path, index=False)
 
 
-def _export_table_parquet(conn, engine: Engine, table_name: str, out_path: Path, *, chunksize: int) -> None:
+def _export_table_parquet(
+    conn, engine: Engine, table_name: str, out_path: Path, *, chunksize: int
+) -> None:
     """
     Export parquet efficiently with chunking. For simplicity we join chunks at the end.
     If tables get huge, we can switch to dataset-style parquet (directory with row-groups).
@@ -732,9 +762,6 @@ def reset_postgres_sequences(engine: Engine) -> None:
                 ),
                 {"seq": seq},
             )
-
-
-
 
 
 # def _is_jsonish_col(coltype) -> bool:

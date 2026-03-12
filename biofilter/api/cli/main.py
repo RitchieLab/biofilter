@@ -20,7 +20,9 @@ def _version_callback(ctx, param, value):
 
     db_uri = try_resolve_db_uri(ctx.params.get("db_uri"))
     click.echo(f"biofilter {current_version}")
-    click.echo(f"DB: {db_uri}" if db_uri else "DB: <not set> (use --db-uri or .biofilter.toml)")
+    click.echo(
+        f"DB: {db_uri}" if db_uri else "DB: <not set> (use --db-uri or .biofilter.toml)"
+    )
     ctx.exit()
 
 

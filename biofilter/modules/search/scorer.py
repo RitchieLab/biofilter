@@ -16,6 +16,7 @@ class ScoringConfig:
     - `min_score`: minimum score to accept resolution
     - `min_delta`: required margin between top1 and top2 to auto-resolve
     """
+
     min_score: float = 90.0
     min_delta: float = 5.0
 
@@ -69,7 +70,11 @@ class CandidateScorer:
             s += self.config.primary_name_boost
 
         # Entity-type preference boost
-        if entity_type_hint and cand.entity_type and cand.entity_type == entity_type_hint:
+        if (
+            entity_type_hint
+            and cand.entity_type
+            and cand.entity_type == entity_type_hint
+        ):
             s += self.config.type_match_boost
 
         return min(100.0, s)

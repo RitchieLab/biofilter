@@ -26,6 +26,7 @@ class BiofilterCore:
     Keeps the single active Database instance (with bootstrapped metadata/mappings)
     so all components can reuse it reliably.
     """
+
     # db_uri: str
     db_uri: Optional[str]
     debug_mode: bool = False
@@ -41,7 +42,9 @@ class BiofilterCore:
         except FileNotFoundError:
             self.config = None
             self.config_path = None
-            self.logger.log("🔧 Configuration file not found. Using defaults.", "WARNING")
+            self.logger.log(
+                "🔧 Configuration file not found. Using defaults.", "WARNING"
+            )
 
         self.db: Optional[Database] = None
 
@@ -67,7 +70,11 @@ class BiofilterCore:
         self.logger.log(f"   • Version: {self.version}", "INFO")
         self.logger.log(f"   • Debug mode: {self.debug_mode}", "INFO")
         self.logger.log(
-            f"   • Config: {self.config_path}" if self.config_path else "   • Config: <none>",
+            (
+                f"   • Config: {self.config_path}"
+                if self.config_path
+                else "   • Config: <none>"
+            ),
             "INFO",
         )
         self.logger.log(f"   • DB URI: {self.db_uri}", "INFO")

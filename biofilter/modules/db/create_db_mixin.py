@@ -13,6 +13,7 @@ from sqlalchemy.engine.url import make_url
 from biofilter.modules.db.base import Base
 from biofilter.utils.db_loader import bootstrap_models
 from biofilter.modules.db.migrate import get_script_location, get_repo_heads
+
 # from biofilter.modules.db.migrate import alembic_upgrade_head
 from biofilter.modules.db.core_ddl import (
     ddl_variant_masters,
@@ -38,16 +39,13 @@ SEED_UNIQUE_KEYS: Dict[str, List[str]] = {
     # --- config ---
     "SystemConfig": ["key"],
     "BiofilterMetadata": ["schema_version"],
-
     # --- ETL ---
     "ETLSourceSystem": ["name"],
     "ETLDataSource": ["name"],
-
     # --- entities / curation ---
     "EntityGroup": ["name"],
     "EntityRelationshipType": ["id"],
     "OmicStatus": ["name"],
-
     # --- genome ---
     "GenomeAssembly": ["accession"],
 }
@@ -77,7 +75,9 @@ class CreateDBMixin:
         url = make_url(db_uri)
 
         if not url.database:
-            raise ValueError("db_uri must include a database name (e.g., .../biofilter_dev).")
+            raise ValueError(
+                "db_uri must include a database name (e.g., .../biofilter_dev)."
+            )
 
         target_db = url.database
         admin_url = url.set(database="postgres")
@@ -85,7 +85,9 @@ class CreateDBMixin:
         admin_engine = create_engine(admin_url, future=True)
 
         # AUTOCOMMIT is required for CREATE DATABASE
-        with admin_engine.connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
+        with admin_engine.connect().execution_options(
+            isolation_level="AUTOCOMMIT"
+        ) as conn:
             exists = conn.execute(
                 text("SELECT 1 FROM pg_database WHERE datname = :db"),
                 {"db": target_db},
@@ -102,7 +104,7 @@ class CreateDBMixin:
     # Postgres helpers
     # -----------------------------
     def create_db(self, overwrite: bool = False, seed_dir: str = "seed") -> bool:
-        
+
         # 1) Now we can connect safely
         # If overwrite=False and DB exists -> short-circuit
         if self.exists_db(new_db=True) and not overwrite:
@@ -117,9 +119,13 @@ class CreateDBMixin:
                 try:
                     created = self.ensure_postgres_database(self.db_uri)
                     if created:
-                        self.logger.log(f"🆕 Created PostgreSQL database '{url.database}'", "INFO")
+                        self.logger.log(
+                            f"🆕 Created PostgreSQL database '{url.database}'", "INFO"
+                        )
                 except Exception as e:
-                    self.logger.log(f"❌ Could not ensure PostgreSQL database exists: {e}", "ERROR")
+                    self.logger.log(
+                        f"❌ Could not ensure PostgreSQL database exists: {e}", "ERROR"
+                    )
                     raise
 
         self.connect(check_exists=False)
@@ -182,7 +188,9 @@ class CreateDBMixin:
             existing = set(insp.get_table_names())
             missing = core_partitioned - existing
             if missing:
-                raise RuntimeError(f"Core parent tables missing on PostgreSQL: {sorted(missing)}")
+                raise RuntimeError(
+                    f"Core parent tables missing on PostgreSQL: {sorted(missing)}"
+                )
 
             self.logger.log("✅ Tables created successfully (PostgreSQL).", "INFO")
             return
@@ -192,16 +200,22 @@ class CreateDBMixin:
 
         for tbl in core_partitioned:
             if tbl not in Base.metadata.tables:
-                raise RuntimeError(f"{tbl} was not registered in Base.metadata (SQLite path).")
+                raise RuntimeError(
+                    f"{tbl} was not registered in Base.metadata (SQLite path)."
+                )
 
         self.logger.log("✅ Tables created successfully (SQLite).", "INFO")
 
     def _create_partitioned_parent(self) -> None:
         with self.engine.begin() as conn:
             conn.execute(text(ddl_variant_masters()))
-            conn.execute(text(ddl_variant_molecular_effect()))  # renomeie para plural se quiser
+            conn.execute(
+                text(ddl_variant_molecular_effect())
+            )  # renomeie para plural se quiser
             conn.execute(text(ddl_variant_effect_predictions()))
-            conn.execute(text(ddl_variant_regulatory_elements()))  # corrigir typo no import/func
+            conn.execute(
+                text(ddl_variant_regulatory_elements())
+            )  # corrigir typo no import/func
             conn.execute(text(ddl_variant_gene_regulatory_evidence()))  # idem
 
     def _ensure_partitions_by_chromosome(self, core_partitioned) -> None:
@@ -268,7 +282,9 @@ class CreateDBMixin:
             key="genome_assemblies",
         )
 
-    def _seed_from_json(self, file: str, module_name: str, model_name: str, key: Optional[str] = None) -> None:
+    def _seed_from_json(
+        self, file: str, module_name: str, model_name: str, key: Optional[str] = None
+    ) -> None:
         """
         Seed data using an idempotent UPSERT strategy:
         - If the record exists (by natural key), update fields (non-null only).
@@ -286,7 +302,9 @@ class CreateDBMixin:
 
         unique_keys = SEED_UNIQUE_KEYS.get(model_name)
         if not unique_keys:
-            raise RuntimeError(f"Missing unique key config for seed model: {model_name}")
+            raise RuntimeError(
+                f"Missing unique key config for seed model: {model_name}"
+            )
 
         with self.get_session() as session:
             with open(json_path, "r") as f:
@@ -306,29 +324,45 @@ class CreateDBMixin:
 
                 # --- Parse datetime-like fields (if your seeds contain them) ---
                 for k, v in list(item.items()):
-                    if (k.endswith("_start") or k.endswith("_end")) and isinstance(v, str):
+                    if (k.endswith("_start") or k.endswith("_end")) and isinstance(
+                        v, str
+                    ):
                         try:
                             item[k] = datetime.fromisoformat(v)
                         except ValueError:
-                            self.logger.log(f"Invalid datetime format in key {k}: {v}", "WARNING")
+                            self.logger.log(
+                                f"Invalid datetime format in key {k}: {v}", "WARNING"
+                            )
 
                 # --- Resolve FK by name (your existing behavior) ---
                 if "source_system" in item:
                     fk_name = item.pop("source_system")
-                    ETLSourceSystem = import_module("biofilter.modules.db.models.model_etl").ETLSourceSystem
-                    fk_obj = session.query(ETLSourceSystem).filter_by(name=fk_name).first()
+                    ETLSourceSystem = import_module(
+                        "biofilter.modules.db.models.model_etl"
+                    ).ETLSourceSystem
+                    fk_obj = (
+                        session.query(ETLSourceSystem).filter_by(name=fk_name).first()
+                    )
                     if not fk_obj:
-                        self.logger.log(f"Source System not found for name: {fk_name}", "WARNING")
+                        self.logger.log(
+                            f"Source System not found for name: {fk_name}", "WARNING"
+                        )
                         skipped += 1
                         continue
                     item["source_system_id"] = fk_obj.id
 
                 if "data_source" in item:
                     fk_name = item.pop("data_source")
-                    ETLDataSource = import_module("biofilter.modules.db.models.model_etl").ETLDataSource
-                    fk_obj = session.query(ETLDataSource).filter_by(name=fk_name).first()
+                    ETLDataSource = import_module(
+                        "biofilter.modules.db.models.model_etl"
+                    ).ETLDataSource
+                    fk_obj = (
+                        session.query(ETLDataSource).filter_by(name=fk_name).first()
+                    )
                     if not fk_obj:
-                        self.logger.log(f"Data Source not found for name: {fk_name}", "WARNING")
+                        self.logger.log(
+                            f"Data Source not found for name: {fk_name}", "WARNING"
+                        )
                         skipped += 1
                         continue
                     item["data_source_id"] = fk_obj.id
@@ -336,7 +370,10 @@ class CreateDBMixin:
                 # --- Build lookup from natural key(s) ---
                 lookup = {k: item.get(k) for k in unique_keys}
                 if any(v is None for v in lookup.values()):
-                    self.logger.log(f"Seed item missing unique keys {unique_keys}: {item}", "WARNING")
+                    self.logger.log(
+                        f"Seed item missing unique keys {unique_keys}: {item}",
+                        "WARNING",
+                    )
                     skipped += 1
                     continue
 

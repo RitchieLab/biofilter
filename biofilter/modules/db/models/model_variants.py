@@ -12,11 +12,86 @@ from sqlalchemy import (
     UniqueConstraint,
     PrimaryKeyConstraint,
 )
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, mapped_column, Mapped
 from sqlalchemy import Identity
 
 from biofilter.modules.db.base import Base
 from biofilter.modules.db.types import PKBigIntOrInt
+
+
+# -------- tabelas de suport para o consequences --------
+
+
+class VariantConsequenceGroup(Base):
+    __tablename__ = "variant_consequence_groups"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
+
+    consequences: Mapped[list["VariantConsequence"]] = relationship(
+        "VariantConsequence",
+        back_populates="group",
+    )
+
+
+class VariantConsequenceCategory(Base):
+    __tablename__ = "variant_consequence_categories"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
+
+    consequences: Mapped[list["VariantConsequence"]] = relationship(
+        "VariantConsequence",
+        back_populates="category",
+    )
+
+
+class VariantConsequence(Base):
+    __tablename__ = "variant_consequences"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
+
+    severity_rank: Mapped[int] = mapped_column(Integer, nullable=False)
+
+    consequence_group_id: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey("variant_consequence_groups.id"),
+        nullable=True,
+    )
+    consequence_category_id: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey("variant_consequence_categories.id"),
+        nullable=True,
+    )
+
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+
+    group: Mapped["VariantConsequenceGroup | None"] = relationship(
+        "VariantConsequenceGroup",
+        back_populates="consequences",
+    )
+    category: Mapped["VariantConsequenceCategory | None"] = relationship(
+        "VariantConsequenceCategory",
+        back_populates="consequences",
+    )
+
+
+class VariantImpact(Base):
+    __tablename__ = "variant_impacts"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String(16), unique=True, nullable=False)
+    severity_rank: Mapped[int] = mapped_column(Integer, nullable=False)
+
+
+class VariantBiotype(Base):
+    __tablename__ = "variant_biotypes"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 
 def map_variant_masters(engine, metadata):
@@ -34,39 +109,32 @@ def map_variant_masters(engine, metadata):
 
     common_cols = [
         Column("chromosome", Integer, nullable=False),
-
         Column("position_start", BigInteger, nullable=False),
         Column("position_end", BigInteger, nullable=False),
-
         Column("reference_allele", String(64), nullable=False),
         Column("alternate_allele", String(256), nullable=False),
-
         # External IDs (optional)
         Column("rsid", String(32), nullable=True),  # e.g. "rs123"
-
         # Variant classification
         Column("variant_type", String(20), nullable=True),  # mixed/multi/etc/
-        Column("allele_type", String(20), nullable=True),   # optional: SNV/MNV/INS/DEL/etc.
-
+        Column(
+            "allele_type", String(20), nullable=True
+        ),  # optional: SNV/MNV/INS/DEL/etc.
         # Frequency summaries (variant-level)
         Column("ac", BigInteger, nullable=True),
         Column("an", BigInteger, nullable=True),
         Column("af", Float, nullable=True),
         Column("grpmax", String(32), nullable=True),
         Column("grpmax_af", Float, nullable=True),
-
         # Predictors / scores (summary fields at variant-allele level)
         Column("cadd_raw_score", Float, nullable=True),
         Column("cadd_phred", Float, nullable=True),
         Column("revel_max", Float, nullable=True),
-
         Column("spliceai_ds_max", Float, nullable=True),
         Column("pangolin_largest_ds", Float, nullable=True),
-
         # SIFT/PolyPhen are transcript/protein level. Here is a Max Score
         Column("sift_max", Float, nullable=True),
         Column("polyphen_max", Float, nullable=True),
-
         # Provenance (no FK)
         Column("data_source_id", Integer, nullable=True),
         Column("etl_package_id", Integer, nullable=True),
@@ -91,7 +159,12 @@ def map_variant_masters(engine, metadata):
         variant_masters = Table(
             "variant_masters",
             metadata,
-            Column("variant_id", BigInteger, nullable=False, server_default=Identity(always=False)),
+            Column(
+                "variant_id",
+                BigInteger,
+                nullable=False,
+                server_default=Identity(always=False),
+            ),
             *common_cols,
             PrimaryKeyConstraint("chromosome", "variant_id", name="pk_variant_masters"),
             UniqueConstraint(
@@ -107,10 +180,100 @@ def map_variant_masters(engine, metadata):
     return variant_masters
 
 
+# def map_variant_molecular_effects(engine, metadata):
+#     """
+#     VariantMolecularEffects (BF4 4.1.0):
+#     - One row per (variant allele × transcript × consequence) in GRCh38
+#     - Partitioned by chromosome on Postgres
+#     - Logical join key with VariantMasters: (chromosome, variant_id)
+#     - No physical FK constraints (ETL-enforced integrity)
+#     """
+#     dialect = engine.dialect.name
+#     is_sqlite = dialect == "sqlite"
+
+#     if "variant_molecular_effects" in metadata.tables:
+#         return metadata.tables["variant_molecular_effects"]
+
+#     # Common columns (match Postgres DDL)
+#     common_cols = [
+#         Column("chromosome", Integer, nullable=False),
+
+#         # Context (strings for now; no Transcript/Gene domains yet)
+#         Column("gene_id", String(32), nullable=True),
+#         Column("transcript_id", String(32), nullable=False),
+
+#         # Layer 1 — consequence
+#         Column("consequence", String(64), nullable=False),
+#         Column("impact", String(16), nullable=True),
+
+#         # Useful VEP context (optional)
+#         Column("biotype", String(32), nullable=True),
+#         Column("variant_class", String(16), nullable=True),
+#         Column("canonical", Boolean, nullable=True),
+#         Column("mane_select", Boolean, nullable=True),
+#         Column("mane_plus_clinical", Boolean, nullable=True),
+
+#         # HGVS / protein context (optional)
+#         Column("hgvsc", String(128), nullable=True),
+#         Column("hgvsp", String(128), nullable=True),
+#         Column("cdna_position", String(32), nullable=True),
+#         Column("cds_position", String(32), nullable=True),
+#         Column("protein_position", String(32), nullable=True),
+#         Column("amino_acids", String(32), nullable=True),
+#         Column("codons", String(64), nullable=True),
+#         Column("ensp", String(32), nullable=True),
+
+#         # Layer 2 — LoF / LOFTEE
+#         Column("lof_flag", Boolean, nullable=True),
+#         Column("lof_confidence", String(8), nullable=True),  # HC/LC/Filtered/NA
+#         Column("lof_filter", String(128), nullable=True),
+#         Column("lof_flags", String(256), nullable=True),
+#         Column("lof_info", Text, nullable=True),
+
+#         # Provenance
+#         Column("data_source_id", Integer, nullable=True),
+#         Column("etl_package_id", Integer, nullable=True),
+#     ]
+
+#     if is_sqlite:
+#         # SQLite: keep it simple. Use integer IDs and a composite PK.
+#         # Note: SQLite doesn't support partitioning, but the schema remains identical.
+#         variant_molecular_effects = Table(
+#             "variant_molecular_effects",
+#             metadata,
+#             Column("variant_id", Integer, nullable=False),
+#             *common_cols,
+#             PrimaryKeyConstraint(
+#                 "chromosome",
+#                 "variant_id",
+#                 "transcript_id",
+#                 "consequence",
+#                 name="pk_variant_molecular_effects",
+#             ),
+#         )
+#     else:
+#         # Postgres: variant_id is bigint; parent table is created via raw DDL
+#         # (partitioned by chromosome). This table definition mirrors that schema.
+#         variant_molecular_effects = Table(
+#             "variant_molecular_effects",
+#             metadata,
+#             Column("variant_id", BigInteger, nullable=False),
+#             *common_cols,
+#             PrimaryKeyConstraint(
+#                 "chromosome",
+#                 "variant_id",
+#                 "transcript_id",
+#                 "consequence",
+#                 name="pk_variant_molecular_effects",
+#             ),
+#         )
+
+
+#     return variant_molecular_effects
 def map_variant_molecular_effects(engine, metadata):
     """
-    VariantMolecularEffects (BF4 4.1.0):
-    - One row per (variant allele × transcript × consequence) in GRCh38
+    VariantMolecularEffects:
+    - One row per (variant allele × transcript × atomic consequence) in GRCh38
     - Partitioned by chromosome on Postgres
     - Logical join key with VariantMasters: (chromosome, variant_id)
     - No physical FK constraints (ETL-enforced integrity)
@@ -121,26 +284,34 @@ def map_variant_molecular_effects(engine, metadata):
     if "variant_molecular_effects" in metadata.tables:
         return metadata.tables["variant_molecular_effects"]
 
-    # Common columns (match Postgres DDL)
     common_cols = [
         Column("chromosome", Integer, nullable=False),
-
-        # Context (strings for now; no Transcript/Gene domains yet)
+        # Useful operational key
+        Column("variant_key", String(64), nullable=False),
+        # Raw / stable identity
         Column("gene_id", String(32), nullable=True),
+        Column("gene_symbol", String(64), nullable=True),
         Column("transcript_id", String(32), nullable=False),
-
-        # Layer 1 — consequence
-        Column("consequence", String(64), nullable=False),
-        Column("impact", String(16), nullable=True),
-
-        # Useful VEP context (optional)
-        Column("biotype", String(32), nullable=True),
+        Column("feature_type", String(32), nullable=True),
+        # Raw VEP consequence preserved
+        Column("consequence_raw", String(255), nullable=True),
+        # Dimension-backed fields (no physical FK)
+        Column("consequence_id", Integer, nullable=False),
+        Column("impact_id", Integer, nullable=True),
+        Column("biotype_id", Integer, nullable=True),
+        # Derived severity / helper fields
+        Column("consequence_rank", Integer, nullable=True),
+        Column("impact_rank", Integer, nullable=True),
+        Column("most_severe_consequence_per_annotation_id", Integer, nullable=True),
+        Column("most_severe_consequence_per_variant_id", Integer, nullable=True),
+        Column("is_most_severe_for_annotation", Boolean, nullable=True),
+        Column("is_most_severe_for_variant", Boolean, nullable=True),
+        # Useful VEP context
         Column("variant_class", String(16), nullable=True),
         Column("canonical", Boolean, nullable=True),
         Column("mane_select", Boolean, nullable=True),
         Column("mane_plus_clinical", Boolean, nullable=True),
-
-        # HGVS / protein context (optional)
+        # HGVS / protein context
         Column("hgvsc", String(128), nullable=True),
         Column("hgvsp", String(128), nullable=True),
         Column("cdna_position", String(32), nullable=True),
@@ -149,22 +320,18 @@ def map_variant_molecular_effects(engine, metadata):
         Column("amino_acids", String(32), nullable=True),
         Column("codons", String(64), nullable=True),
         Column("ensp", String(32), nullable=True),
-
         # Layer 2 — LoF / LOFTEE
         Column("lof_flag", Boolean, nullable=True),
         Column("lof_confidence", String(8), nullable=True),  # HC/LC/Filtered/NA
         Column("lof_filter", String(128), nullable=True),
         Column("lof_flags", String(256), nullable=True),
         Column("lof_info", Text, nullable=True),
-
         # Provenance
         Column("data_source_id", Integer, nullable=True),
         Column("etl_package_id", Integer, nullable=True),
     ]
 
     if is_sqlite:
-        # SQLite: keep it simple. Use integer IDs and a composite PK.
-        # Note: SQLite doesn't support partitioning, but the schema remains identical.
         variant_molecular_effects = Table(
             "variant_molecular_effects",
             metadata,
@@ -174,13 +341,11 @@ def map_variant_molecular_effects(engine, metadata):
                 "chromosome",
                 "variant_id",
                 "transcript_id",
-                "consequence",
+                "consequence_id",
                 name="pk_variant_molecular_effects",
             ),
         )
     else:
-        # Postgres: variant_id is bigint; parent table is created via raw DDL
-        # (partitioned by chromosome). This table definition mirrors that schema.
         variant_molecular_effects = Table(
             "variant_molecular_effects",
             metadata,
@@ -190,7 +355,7 @@ def map_variant_molecular_effects(engine, metadata):
                 "chromosome",
                 "variant_id",
                 "transcript_id",
-                "consequence",
+                "consequence_id",
                 name="pk_variant_molecular_effects",
             ),
         )
@@ -214,17 +379,13 @@ def map_variant_effect_predictions(engine, metadata):
 
     common_cols = [
         Column("chromosome", Integer, nullable=False),
-
         Column("predictor_key", String(128), nullable=False),
         Column("transcript_id", String(32), nullable=True),
-
         Column("predictor_name", String(64), nullable=False),
         Column("predictor_version", String(32), nullable=True),
-
         Column("score", Float, nullable=True),
         Column("classification", String(64), nullable=True),
         Column("details", Text, nullable=True),
-
         Column("data_source_id", Integer, nullable=True),
         Column("etl_package_id", Integer, nullable=True),
     ]
@@ -274,15 +435,12 @@ def map_variant_regulatory_elements(engine, metadata):
 
     common_cols = [
         Column("chromosome", Integer, nullable=False),
-
         Column("reg_element_key", String(192), nullable=False),
         Column("regulatory_element_id", String(64), nullable=False),
         Column("element_type", String(32), nullable=True),
         Column("bio_context", String(128), nullable=True),
-
         Column("score", Float, nullable=True),
         Column("details", Text, nullable=True),
-
         Column("data_source_id", Integer, nullable=True),
         Column("etl_package_id", Integer, nullable=True),
     ]
@@ -332,22 +490,16 @@ def map_variant_gene_regulatory_evidence(engine, metadata):
 
     common_cols = [
         Column("chromosome", Integer, nullable=False),
-
         Column("evidence_key", String(256), nullable=False),
-
         Column("gene_id", String(32), nullable=False),
         Column("bio_context", String(128), nullable=True),
         Column("qtl_type", String(16), nullable=False),
-
         Column("beta", Float, nullable=True),
         Column("se", Float, nullable=True),
         Column("p_value", Float, nullable=True),
         Column("n", Integer, nullable=True),
-
         Column("effect_allele", String(64), nullable=True),
-
         Column("details", Text, nullable=True),
-
         Column("data_source_id", Integer, nullable=True),
         Column("etl_package_id", Integer, nullable=True),
     ]

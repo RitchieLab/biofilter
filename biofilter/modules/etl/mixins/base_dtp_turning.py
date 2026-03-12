@@ -310,9 +310,8 @@ class DBTuningMixin:
             ("variant_gwas", ["mapped_trait_id"]),
             ("variant_gwas", ["chr_id", "chr_pos"]),
             # VariantGWASSNP
-            ("variant_gwas_snp", ["snp_id"]),                    # main lookup by SNP
-            ("variant_gwas_snp", ["variant_gwas_id"]),           # join back to GWAS table
-
+            ("variant_gwas_snp", ["snp_id"]),  # main lookup by SNP
+            ("variant_gwas_snp", ["variant_gwas_id"]),  # join back to GWAS table
         ]
 
     @property

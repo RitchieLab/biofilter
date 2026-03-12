@@ -24,7 +24,10 @@ from biofilter.modules.db.models.model_entities import (
 
 # Search / Resolver
 from biofilter.modules.search.resolver import TermResolver, ResolverConfig
-from biofilter.modules.search.db_retriever import make_entity_alias_retriever, DBRetrieverConfig
+from biofilter.modules.search.db_retriever import (
+    make_entity_alias_retriever,
+    DBRetrieverConfig,
+)
 
 try:
     # This matches the NormalizedQuery object you showed in the resolver output
@@ -214,7 +217,11 @@ Key params:
 
         # no header case
         if df.shape[1] == 1:
-            return [InputItem(None, str(x).strip()) for x in df.iloc[:, 0].tolist() if str(x).strip()]
+            return [
+                InputItem(None, str(x).strip())
+                for x in df.iloc[:, 0].tolist()
+                if str(x).strip()
+            ]
 
         if df.shape[1] >= 2:
             out: list[InputItem] = []
@@ -241,7 +248,7 @@ Key params:
 
         for x in raw_items:
             if isinstance(x, (list, tuple)) and len(x) == 2:
-                th = (x[0] or None)
+                th = x[0] or None
                 wd = str(x[1]).strip()
                 if wd:
                     items.append(InputItem(th, wd))
@@ -399,7 +406,9 @@ Key params:
     def run(self) -> pd.DataFrame:
         resolver_mode = str(self.params.get("resolver_mode", "exact")).strip().lower()
         if resolver_mode not in ("exact", "search", "hybrid"):
-            self.logger.log("resolver_mode must be exact|search|hybrid. Using exact.", "WARNING")
+            self.logger.log(
+                "resolver_mode must be exact|search|hybrid. Using exact.", "WARNING"
+            )
             resolver_mode = "exact"
 
         limit_neighbors = int(self.params.get("limit_neighbors", 200))
@@ -421,7 +430,14 @@ Key params:
         bind = self.session.get_bind()
 
         # Initialize neighbor columns
-        neighbor_cols = ["Genes", "Proteins", "Pathways", "GO Terms", "Diseases", "Chemicals"]
+        neighbor_cols = [
+            "Genes",
+            "Proteins",
+            "Pathways",
+            "GO Terms",
+            "Diseases",
+            "Chemicals",
+        ]
 
         # -----------------------------------------------------------------
         # Step 1) Resolve entities
@@ -441,7 +457,9 @@ Key params:
                 buckets.setdefault(th, []).append(it)
 
             # Preload group ids by name for filtering
-            group_name_to_id = {g.name: g.id for g in self.session.query(EntityGroup).all()}
+            group_name_to_id = {
+                g.name: g.id for g in self.session.query(EntityGroup).all()
+            }
             # mapping type_hint -> EntityGroup.name
             hint_to_group_name = {
                 "gene": "Genes",
@@ -473,7 +491,8 @@ Key params:
                     .join(Entity, Entity.id == EntityAlias.entity_id)
                     .join(
                         PrimaryAlias,
-                        (PrimaryAlias.entity_id == Entity.id) & (PrimaryAlias.is_primary.is_(True)),
+                        (PrimaryAlias.entity_id == Entity.id)
+                        & (PrimaryAlias.is_primary.is_(True)),
                     )
                     .filter(EntityAlias.alias_norm.in_(norms))
                 )
@@ -490,13 +509,17 @@ Key params:
                 if df.empty:
                     if emit_not_found_rows:
                         for b in bucket:
-                            row = self._make_empty_row(resolver_mode, b.word, b.type_hint)
+                            row = self._make_empty_row(
+                                resolver_mode, b.word, b.type_hint
+                            )
                             row["Resolve Status"] = "not_found"
                             resolved_rows.append(row)
                     continue
 
                 for _, r in df.iterrows():
-                    input_word = norm_to_word.get(str(r["alias_norm"]), str(r["alias_norm"]))
+                    input_word = norm_to_word.get(
+                        str(r["alias_norm"]), str(r["alias_norm"])
+                    )
                     row = self._make_base_row(
                         resolver_mode=resolver_mode,
                         input_word=input_word,
@@ -537,9 +560,17 @@ Key params:
                     primary_alias=None,  # filled later from DB
                     resolve_status=getattr(res, "status", None),
                     resolve_method=getattr(best, "method", None),
-                    resolve_score=float(getattr(best, "score", 0.0)) if getattr(best, "score", None) is not None else None,
+                    resolve_score=(
+                        float(getattr(best, "score", 0.0))
+                        if getattr(best, "score", None) is not None
+                        else None
+                    ),
                     resolve_meta=json.dumps(meta) if meta else None,
-                    resolve_candidates=self._serialize_candidates(res, candidates_top_n) if include_candidates else None,
+                    resolve_candidates=(
+                        self._serialize_candidates(res, candidates_top_n)
+                        if include_candidates
+                        else None
+                    ),
                 )
 
                 resolved_rows.append(row)
@@ -559,7 +590,9 @@ Key params:
                 buckets.setdefault(type_hint_norm(it.type_hint), []).append(it)
 
             # group filter prep
-            group_name_to_id = {g.name: g.id for g in self.session.query(EntityGroup).all()}
+            group_name_to_id = {
+                g.name: g.id for g in self.session.query(EntityGroup).all()
+            }
             hint_to_group_name = {
                 "gene": "Genes",
                 "genes": "Genes",
@@ -577,7 +610,9 @@ Key params:
             }
 
             # Map key -> list of exact matches (entity_id, primary_alias)
-            exact_matches: dict[tuple[str | None, str], list[tuple[int, Optional[str]]]] = {}
+            exact_matches: dict[
+                tuple[str | None, str], list[tuple[int, Optional[str]]]
+            ] = {}
 
             PrimaryAlias = aliased(EntityAlias)
 
@@ -593,7 +628,8 @@ Key params:
                     .join(Entity, Entity.id == EntityAlias.entity_id)
                     .join(
                         PrimaryAlias,
-                        (PrimaryAlias.entity_id == Entity.id) & (PrimaryAlias.is_primary.is_(True)),
+                        (PrimaryAlias.entity_id == Entity.id)
+                        & (PrimaryAlias.is_primary.is_(True)),
                     )
                     .filter(EntityAlias.alias_norm.in_(norms))
                 )
@@ -614,7 +650,9 @@ Key params:
                     # We don't know which specific input word (if multiple share same norm),
                     # but hybrid resolution is applied per (th_norm, norm) anyway.
                     k = (th_norm, str(r["alias_norm"]))
-                    exact_matches.setdefault(k, []).append((int(r["entity_id"]), r.get("primary_alias")))
+                    exact_matches.setdefault(k, []).append(
+                        (int(r["entity_id"]), r.get("primary_alias"))
+                    )
 
             # Now decide per input: keep exact if exactly one match; else fallback to resolve_best
             for it in items:
@@ -661,9 +699,17 @@ Key params:
                     primary_alias=None,  # filled later
                     resolve_status=getattr(res, "status", None),
                     resolve_method=getattr(best, "method", None),
-                    resolve_score=float(getattr(best, "score", 0.0)) if getattr(best, "score", None) is not None else None,
+                    resolve_score=(
+                        float(getattr(best, "score", 0.0))
+                        if getattr(best, "score", None) is not None
+                        else None
+                    ),
                     resolve_meta=json.dumps(meta) if meta else None,
-                    resolve_candidates=self._serialize_candidates(res, candidates_top_n) if include_candidates else None,
+                    resolve_candidates=(
+                        self._serialize_candidates(res, candidates_top_n)
+                        if include_candidates
+                        else None
+                    ),
                 )
                 resolved_rows.append(row)
 
@@ -694,7 +740,8 @@ Key params:
             .join(EntityGroup, EntityGroup.id == Entity.group_id)
             .join(
                 PrimaryAlias,
-                (PrimaryAlias.entity_id == Entity.id) & (PrimaryAlias.is_primary.is_(True)),
+                (PrimaryAlias.entity_id == Entity.id)
+                & (PrimaryAlias.is_primary.is_(True)),
             )
             .where(Entity.id.in_(entity_ids))
         )
@@ -706,7 +753,11 @@ Key params:
         prim_map = meta_df.set_index("entity_id")["primary_alias"].to_dict()
 
         out_df["Entity Type"] = out_df["Entity ID"].apply(
-            lambda eid: self._groupname_to_entity_type(group_map.get(int(eid), "")) if pd.notna(eid) else None
+            lambda eid: (
+                self._groupname_to_entity_type(group_map.get(int(eid), ""))
+                if pd.notna(eid)
+                else None
+            )
         )
 
         # Fill primary alias if missing (common when resolved via search)
@@ -726,25 +777,26 @@ Key params:
         # -----------------------------------------------------------------
         # Step 3) Aliases (top N or all)
         # -----------------------------------------------------------------
-        stmt_aliases = (
-            select(
-                EntityAlias.entity_id.label("entity_id"),
-                EntityAlias.alias_value.label("alias_value"),
-                EntityAlias.is_primary.label("is_primary"),
-                EntityAlias.alias_type.label("alias_type"),
-            )
-            .where(EntityAlias.entity_id.in_(entity_ids))
-        )
+        stmt_aliases = select(
+            EntityAlias.entity_id.label("entity_id"),
+            EntityAlias.alias_value.label("alias_value"),
+            EntityAlias.is_primary.label("is_primary"),
+            EntityAlias.alias_type.label("alias_type"),
+        ).where(EntityAlias.entity_id.in_(entity_ids))
 
         with bind.connect() as conn:
             alias_df = pd.read_sql(stmt_aliases, conn)
 
         alias_count_map = alias_df.groupby("entity_id")["alias_value"].count().to_dict()
 
-        alias_df["primary_rank"] = alias_df["is_primary"].apply(lambda x: 0 if bool(x) else 1)
+        alias_df["primary_rank"] = alias_df["is_primary"].apply(
+            lambda x: 0 if bool(x) else 1
+        )
         alias_df["type_rank"] = alias_df["alias_type"].fillna("").astype(str)
         alias_df["val_rank"] = alias_df["alias_value"].fillna("").astype(str)
-        alias_df = alias_df.sort_values(["entity_id", "primary_rank", "type_rank", "val_rank"])
+        alias_df = alias_df.sort_values(
+            ["entity_id", "primary_rank", "type_rank", "val_rank"]
+        )
 
         aliases_map: dict[int, list[str]] = {}
         for eid, g in alias_df.groupby("entity_id"):
@@ -757,25 +809,26 @@ Key params:
             lambda eid: int(alias_count_map.get(int(eid), 0)) if pd.notna(eid) else 0
         )
         out_df["Aliases Top"] = out_df["Entity ID"].apply(
-            lambda eid: json.dumps(aliases_map.get(int(eid), [])) if pd.notna(eid) else json.dumps([])
+            lambda eid: (
+                json.dumps(aliases_map.get(int(eid), []))
+                if pd.notna(eid)
+                else json.dumps([])
+            )
         )
 
         # -----------------------------------------------------------------
         # Step 4) Neighborhood 1-hop (summarized) using EntityRelationship
         # -----------------------------------------------------------------
         ER = EntityRelationship
-        stmt_edges = (
-            select(
-                ER.entity_1_id.label("src_id"),
-                ER.entity_2_id.label("dst_id"),
-                ER.entity_1_group_id.label("src_group_id"),
-                ER.entity_2_group_id.label("dst_group_id"),
-            )
-            .where(
-                or_(
-                    ER.entity_1_id.in_(entity_ids),
-                    ER.entity_2_id.in_(entity_ids),
-                )
+        stmt_edges = select(
+            ER.entity_1_id.label("src_id"),
+            ER.entity_2_id.label("dst_id"),
+            ER.entity_1_group_id.label("src_group_id"),
+            ER.entity_2_group_id.label("dst_group_id"),
+        ).where(
+            or_(
+                ER.entity_1_id.in_(entity_ids),
+                ER.entity_2_id.in_(entity_ids),
             )
         )
 
@@ -823,7 +876,8 @@ Key params:
                     .join(EntityGroup, EntityGroup.id == Entity.group_id)
                     .join(
                         NeighborPrimary,
-                        (NeighborPrimary.entity_id == Entity.id) & (NeighborPrimary.is_primary.is_(True)),
+                        (NeighborPrimary.entity_id == Entity.id)
+                        & (NeighborPrimary.is_primary.is_(True)),
                     )
                     .where(Entity.id.in_(neighbor_ids))
                 )
@@ -831,10 +885,9 @@ Key params:
                 with bind.connect() as conn:
                     nmeta = pd.read_sql(stmt_nmeta, conn)
 
-                nmeta_map = (
-                    nmeta.set_index("neighbor_id")[["neighbor_group_name", "neighbor_primary_name"]]
-                    .to_dict(orient="index")
-                )
+                nmeta_map = nmeta.set_index("neighbor_id")[
+                    ["neighbor_group_name", "neighbor_primary_name"]
+                ].to_dict(orient="index")
 
                 nbr_df["neighbor_group_name"] = nbr_df["neighbor_id"].apply(
                     lambda nid: nmeta_map.get(int(nid), {}).get("neighbor_group_name")
@@ -853,15 +906,15 @@ Key params:
                     out_df["Degree By Type (1-hop)"] = json.dumps({})
                 else:
                     nbr_df["neighbor_name"] = nbr_df["neighbor_name"].astype(str)
-                    nbr_df = nbr_df.sort_values(["entity_id", "neighbor_col", "neighbor_name", "neighbor_id"])
-
-                    nbr_df = (
-                        nbr_df.groupby(["entity_id", "neighbor_col"], as_index=False)
-                        .head(limit_neighbors_per_type)
+                    nbr_df = nbr_df.sort_values(
+                        ["entity_id", "neighbor_col", "neighbor_name", "neighbor_id"]
                     )
-                    nbr_df = (
-                        nbr_df.groupby("entity_id", as_index=False)
-                        .head(limit_neighbors)
+
+                    nbr_df = nbr_df.groupby(
+                        ["entity_id", "neighbor_col"], as_index=False
+                    ).head(limit_neighbors_per_type)
+                    nbr_df = nbr_df.groupby("entity_id", as_index=False).head(
+                        limit_neighbors
                     )
 
                     agg = (
@@ -896,7 +949,9 @@ Key params:
 
                     # Merge degree_total
                     out_df = out_df.merge(
-                        deg_total.rename(columns={"degree_total": "Degree Total (1-hop)"}),
+                        deg_total.rename(
+                            columns={"degree_total": "Degree Total (1-hop)"}
+                        ),
                         how="left",
                         left_on="Entity ID",
                         right_on="entity_id",
@@ -920,10 +975,16 @@ Key params:
                         # If merge didn't add anything, ensure the column exists
                         if "Degree Total (1-hop)" not in out_df.columns:
                             out_df["Degree Total (1-hop)"] = 0
-                        out_df["Degree Total (1-hop)"] = out_df["Degree Total (1-hop)"].fillna(0).astype(int)
-       
+                        out_df["Degree Total (1-hop)"] = (
+                            out_df["Degree Total (1-hop)"].fillna(0).astype(int)
+                        )
+
                     out_df["Degree By Type (1-hop)"] = out_df["Entity ID"].apply(
-                        lambda eid: json.dumps(deg_dict.get(int(eid), {})) if pd.notna(eid) else json.dumps({})
+                        lambda eid: (
+                            json.dumps(deg_dict.get(int(eid), {}))
+                            if pd.notna(eid)
+                            else json.dumps({})
+                        )
                     )
 
         # -----------------------------------------------------------------
@@ -933,11 +994,16 @@ Key params:
         if output_columns is not None:
             if isinstance(output_columns, str):
                 output_columns = [output_columns]
-            output_columns = [str(c).strip() for c in output_columns if c and str(c).strip()]
+            output_columns = [
+                str(c).strip() for c in output_columns if c and str(c).strip()
+            ]
             allowed = set(self.available_columns())
             unknown = [c for c in output_columns if c not in allowed]
             if unknown:
-                self.logger.log(f"Unknown output_columns: {unknown}. Allowed: {sorted(allowed)}", "ERROR")
+                self.logger.log(
+                    f"Unknown output_columns: {unknown}. Allowed: {sorted(allowed)}",
+                    "ERROR",
+                )
                 return pd.DataFrame()
             out_df = out_df[output_columns]
 
@@ -985,7 +1051,9 @@ Key params:
         }
         return row
 
-    def _make_empty_row(self, resolver_mode: str, input_word: str, input_type_hint: str | None) -> dict[str, Any]:
+    def _make_empty_row(
+        self, resolver_mode: str, input_word: str, input_type_hint: str | None
+    ) -> dict[str, Any]:
         return self._make_base_row(
             resolver_mode=resolver_mode,
             input_word=input_word,

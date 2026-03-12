@@ -26,12 +26,12 @@ from typing import Iterable, Literal, Optional, Protocol, Sequence
 # -----------------------------------------------------------------------------
 MiningStatus = Literal["ok", "empty", "error"]
 MatchMethod = Literal[
-    "pg_trgm",          # candidate recalled by pg_trgm similarity
-    "exact_name",       # exact match against alias_value
-    "exact_normalized", # exact match against alias_norm
-    "db_pool",          # DB pool/prefix candidates (non-fuzzy)
-    "fuzzy_pool",       # fuzzy-scored candidate from pool
-    "ngram",            # candidate found via n-gram fallback
+    "pg_trgm",  # candidate recalled by pg_trgm similarity
+    "exact_name",  # exact match against alias_value
+    "exact_normalized",  # exact match against alias_norm
+    "db_pool",  # DB pool/prefix candidates (non-fuzzy)
+    "fuzzy_pool",  # fuzzy-scored candidate from pool
+    "ngram",  # candidate found via n-gram fallback
     "other",
 ]
 
@@ -45,6 +45,7 @@ class Span:
     A character span in the ORIGINAL (raw) text.
     Offsets are [start, end) as usual in Python slicing.
     """
+
     start: int
     end: int
     text: str
@@ -73,12 +74,15 @@ class MentionCandidate:
     - method + score
     - meta: must remain JSON-serializable
     """
+
     entity_id: int
     group_id: Optional[int] = None  # EntityGroup.id
     entity_type: Optional[str] = None  # optional string label, if available
 
     primary_name: Optional[str] = None  # primary display label/code if known
-    matched_name: Optional[str] = None  # what text we compared (alias_norm or alias_value)
+    matched_name: Optional[str] = (
+        None  # what text we compared (alias_norm or alias_value)
+    )
 
     matched_name_id: Optional[int] = None  # alias_id if available
     method: MatchMethod = "other"
@@ -98,6 +102,7 @@ class Mention:
     - best: convenience pointer (first candidate), if any
     - note: optional diagnostic string (why kept/dropped, etc.)
     """
+
     span: Span
     candidates: list[MentionCandidate] = field(default_factory=list)
     best: Optional[MentionCandidate] = None
@@ -126,20 +131,21 @@ class TextMinerConfig:
     - Keep defaults conservative; callers can override for specific workloads.
     - This config is backend-agnostic (no pg-specific knobs here).
     """
+
     # Chunking: large texts can be processed in chunks (sentences or windows).
     # Implementations decide how to chunk, but these parameters guide it.
-    chunk_size: int = 800          # target chars per chunk (for window chunkers)
-    chunk_overlap: int = 120       # overlap chars between windows to avoid boundary misses
+    chunk_size: int = 800  # target chars per chunk (for window chunkers)
+    chunk_overlap: int = 120  # overlap chars between windows to avoid boundary misses
     max_text_chars: Optional[int] = None  # optional hard cap for safety
 
     # Mention extraction
-    max_mentions: int = 5000       # safety cap
-    min_span_chars: int = 3        # ignore too-short spans
+    max_mentions: int = 5000  # safety cap
+    min_span_chars: int = 3  # ignore too-short spans
 
     # Candidate control
-    top_k: int = 5                 # candidates per mention
-    min_score: float = 90.0        # auto-keep threshold for "resolved-like" mentions
-    keep_ambiguous: bool = True    # keep mentions below min_score if candidates exist
+    top_k: int = 5  # candidates per mention
+    min_score: float = 90.0  # auto-keep threshold for "resolved-like" mentions
+    keep_ambiguous: bool = True  # keep mentions below min_score if candidates exist
 
     # Domain filters
     entity_type_hints: Optional[list[str]] = None  # e.g. ["Chemicals"], ["Genes"]
@@ -158,6 +164,7 @@ class MiningResult:
     """
     Result container for extract_mentions().
     """
+
     status: MiningStatus
     text_len: int
 

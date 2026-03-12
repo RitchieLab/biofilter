@@ -37,12 +37,11 @@ class ETLPackagesReport(ReportBase):
         return [
             # input / match
             "...",
-
             # provenance
             "data_source",
             "source_system",
         ]
-       
+
     @classmethod
     def explain(cls) -> str:
         return """\
@@ -75,39 +74,36 @@ Recommended usage:
 
     def run(self) -> pd.DataFrame:
         # Optional filters (strings or lists)
-        source_system = self.params.get("source_system")   # "NCBI" or ["NCBI","EBI"]
-        data_sources  = self.params.get("data_sources")    # "dbsnp_chr1" or ["hgnc","mondo"]
-        only_active   = self.params.get("only_active", True)
+        source_system = self.params.get("source_system")  # "NCBI" or ["NCBI","EBI"]
+        data_sources = self.params.get(
+            "data_sources"
+        )  # "dbsnp_chr1" or ["hgnc","mondo"]
+        only_active = self.params.get("only_active", True)
 
         try:
             stmt = (
                 select(
                     ETLPackage.id.label("package_id"),
                     ETLPackage.created_at,
-
                     ETLSourceSystem.name.label("source_system"),
                     ETLDataSource.name.label("data_source"),
-
                     ETLPackage.status,
                     ETLPackage.operation_type,
                     ETLPackage.version_tag,
                     ETLPackage.note,
                     ETLPackage.stats.label("log"),
-
                     # Extract
                     ETLPackage.extract_status,
                     ETLPackage.extract_start,
                     ETLPackage.extract_end,
                     ETLPackage.extract_rows,
                     ETLPackage.extract_hash,
-
                     # Transform
                     ETLPackage.transform_status,
                     ETLPackage.transform_start,
                     ETLPackage.transform_end,
                     ETLPackage.transform_rows,
                     ETLPackage.transform_hash,
-
                     # Load
                     ETLPackage.load_status,
                     ETLPackage.load_start,
@@ -117,7 +113,10 @@ Recommended usage:
                 )
                 .select_from(ETLPackage)
                 .join(ETLDataSource, ETLPackage.data_source_id == ETLDataSource.id)
-                .join(ETLSourceSystem, ETLDataSource.source_system_id == ETLSourceSystem.id)
+                .join(
+                    ETLSourceSystem,
+                    ETLDataSource.source_system_id == ETLSourceSystem.id,
+                )
             )
 
             # -------------------
@@ -165,15 +164,10 @@ Recommended usage:
                     df[end_col] = pd.to_datetime(df[end_col], errors="coerce")
 
                     # Use end if present, otherwise "now" ONLY if start exists
-                    effective_end = df[end_col].where(
-                        df[end_col].notna(),
-                        now
-                    )
+                    effective_end = df[end_col].where(df[end_col].notna(), now)
 
                     df[duration_col] = (
-                        (effective_end - df[start_col])
-                        .dt.total_seconds()
-                        .div(60)
+                        (effective_end - df[start_col]).dt.total_seconds().div(60)
                     )
 
                     # If start is NULL → duration must be NULL
@@ -182,5 +176,7 @@ Recommended usage:
             return df
 
         except Exception as e:
-            self.logger.log(f"Error generating ETL package details report: {e}", "ERROR")
+            self.logger.log(
+                f"Error generating ETL package details report: {e}", "ERROR"
+            )
             return pd.DataFrame()

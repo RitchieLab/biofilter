@@ -49,7 +49,9 @@ class SettingsManager:
         else:
             self._cache.pop(key, None)
 
-    def get(self, key: str, default: T | None = None, *, as_path: bool = False) -> T | Any | None:
+    def get(
+        self, key: str, default: T | None = None, *, as_path: bool = False
+    ) -> T | Any | None:
         """
         Get a config value parsed according to SystemConfig.type.
 

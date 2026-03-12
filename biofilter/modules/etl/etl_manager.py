@@ -132,7 +132,9 @@ class ETLManager:
                             tuning.drop_indexes(specs)
                     except Exception as e:
                         total_warnings += 1
-                        self.logger.log(f"⚠️ Failed to drop indexes for {group_name}: {e}", "WARNING")
+                        self.logger.log(
+                            f"⚠️ Failed to drop indexes for {group_name}: {e}", "WARNING"
+                        )
 
                 if drop_only:
                     if set_read_mode:
@@ -153,7 +155,9 @@ class ETLManager:
                     tuning.create_indexes(specs)
                 except Exception as e:
                     total_warnings += 1
-                    self.logger.log(f"⚠️ Failed to create indexes for {group_name}: {e}", "WARNING")
+                    self.logger.log(
+                        f"⚠️ Failed to create indexes for {group_name}: {e}", "WARNING"
+                    )
 
             if set_read_mode:
                 tuning.db_read_mode()
@@ -211,7 +215,9 @@ class ETLManager:
             data_sources = [data_sources]
 
         if not source_system and not data_sources:
-            self.logger.log("❌ No source_system or data_sources provided. Aborting.", "ERROR")
+            self.logger.log(
+                "❌ No source_system or data_sources provided. Aborting.", "ERROR"
+            )
             return
 
         # Query DataSources in a short-lived session
@@ -245,7 +251,9 @@ class ETLManager:
         q = session.query(ETLDataSource.id).filter(ETLDataSource.active.is_(True))
 
         if source_system:
-            q = q.join(ETLSourceSystem).filter(ETLSourceSystem.name.in_(list(source_system)))
+            q = q.join(ETLSourceSystem).filter(
+                ETLSourceSystem.name.in_(list(source_system))
+            )
 
         if data_sources:
             q = q.filter(ETLDataSource.name.in_(list(data_sources)))
@@ -341,7 +349,9 @@ class ETLManager:
     # ---------------------------------------------------------------------
     # PACKAGE HELPERS
     # ---------------------------------------------------------------------
-    def _create_package(self, session: Session, data_source: ETLDataSource) -> Optional[ETLPackage]:
+    def _create_package(
+        self, session: Session, data_source: ETLDataSource
+    ) -> Optional[ETLPackage]:
         try:
             pkg = ETLPackage(
                 data_source_id=data_source.id,
@@ -375,13 +385,10 @@ class ETLManager:
         order_field,
         extra_filters: Optional[list[Any]] = None,
     ) -> Optional[ETLPackage]:
-        q = (
-            session.query(ETLPackage)
-            .filter(
-                ETLPackage.data_source_id == ds_id,
-                ETLPackage.operation_type == operation_type,
-                ETLPackage.status.in_(list(ok_statuses)),
-            )
+        q = session.query(ETLPackage).filter(
+            ETLPackage.data_source_id == ds_id,
+            ETLPackage.operation_type == operation_type,
+            ETLPackage.status.in_(list(ok_statuses)),
         )
         if extra_filters:
             for f in extra_filters:
@@ -402,7 +409,9 @@ class ETLManager:
     ) -> None:
         pkg = self._create_package(session, ds)
         if not pkg:
-            self.logger.log(f"❌ Could not create extract package for '{ds.name}'.", "ERROR")
+            self.logger.log(
+                f"❌ Could not create extract package for '{ds.name}'.", "ERROR"
+            )
             return
 
         pkg.operation_type = "extract"
@@ -444,18 +453,25 @@ class ETLManager:
                     "previous_package_id": last_same_hash.id,
                     "hash": file_hash,
                 }
-                self.logger.log(f"✅ [Extract] Up-to-date for '{ds.name}' (hash={file_hash})", "INFO")
+                self.logger.log(
+                    f"✅ [Extract] Up-to-date for '{ds.name}' (hash={file_hash})",
+                    "INFO",
+                )
             else:
                 pkg.status = "completed"
                 pkg.extract_status = "completed"
                 pkg.stats = {"hash": file_hash}
-                self.logger.log(f"✅ [Extract] Completed for '{ds.name}' (hash={file_hash})", "INFO")
+                self.logger.log(
+                    f"✅ [Extract] Completed for '{ds.name}' (hash={file_hash})", "INFO"
+                )
         else:
             pkg.status = "failed"
             pkg.extract_status = "failed"
             pkg.stats = {"error": message, "step": "extract"}
             self.logger.log(message, "ERROR")
-            self.logger.log(f"⛔️ ETL halted for '{ds.name}' due to extract failure", "ERROR")
+            self.logger.log(
+                f"⛔️ ETL halted for '{ds.name}' due to extract failure", "ERROR"
+            )
 
         session.commit()
 
@@ -481,7 +497,9 @@ class ETLManager:
         )
 
         if not last_extract:
-            msg = f"⚠️ No successful extract found for '{ds.name}' — cannot run transform."
+            msg = (
+                f"⚠️ No successful extract found for '{ds.name}' — cannot run transform."
+            )
             self.logger.log(msg, "WARNING")
 
             pkg = self._create_package(session, ds)
@@ -526,7 +544,10 @@ class ETLManager:
                 "hash": last_extract.extract_hash,
             }
             session.commit()
-            self.logger.log(f"⚙️  [Transform] Up-to-date for '{ds.name}' (package_id={pkg.id})", "INFO")
+            self.logger.log(
+                f"⚙️  [Transform] Up-to-date for '{ds.name}' (package_id={pkg.id})",
+                "INFO",
+            )
             return
 
         pkg = self._create_package(session, ds)
@@ -541,7 +562,9 @@ class ETLManager:
         pkg.extract_status = "not-applicable"
         session.commit()
 
-        self.logger.log(f"⚙️ [Transform] Running for '{ds.name}' (package_id={pkg.id})", "INFO")
+        self.logger.log(
+            f"⚙️ [Transform] Running for '{ds.name}' (package_id={pkg.id})", "INFO"
+        )
 
         dtp = module.DTP(
             logger=self.logger,
@@ -636,7 +659,9 @@ class ETLManager:
                 "hash": last_transform_ok.transform_hash,
             }
             session.commit()
-            self.logger.log(f"🚚 [Load] Up-to-date for '{ds.name}' (package_id={pkg.id})", "INFO")
+            self.logger.log(
+                f"🚚 [Load] Up-to-date for '{ds.name}' (package_id={pkg.id})", "INFO"
+            )
             return
 
         pkg = self._create_package(session, ds)
@@ -652,7 +677,9 @@ class ETLManager:
         pkg.transform_status = "not-applicable"
         session.commit()
 
-        self.logger.log(f"🚚 [Load] Running for '{ds.name}' (package_id={pkg.id})", "INFO")
+        self.logger.log(
+            f"🚚 [Load] Running for '{ds.name}' (package_id={pkg.id})", "INFO"
+        )
 
         dtp = module.DTP(
             logger=self.logger,
@@ -728,7 +755,10 @@ class ETLManager:
                 )
                 if cnt == 0:
                     continue
-                self.logger.log(f"🗑️  Deleting {cnt} rows from {table.name} (data_source_id={ds_id})", "INFO")
+                self.logger.log(
+                    f"🗑️  Deleting {cnt} rows from {table.name} (data_source_id={ds_id})",
+                    "INFO",
+                )
 
             session.execute(table.delete().where(table.c.data_source_id == ds_id))
             # We can't easily know affected rowcount reliably across DBs; commit at end.
@@ -753,7 +783,9 @@ class ETLManager:
                         graph[parent].add(t.name)
 
             ordered_names = []
-            no_incoming = [n for n in graph if not any(n in cs for cs in graph.values())]
+            no_incoming = [
+                n for n in graph if not any(n in cs for cs in graph.values())
+            ]
 
             while no_incoming:
                 n = no_incoming.pop()
@@ -764,7 +796,9 @@ class ETLManager:
                         no_incoming.append(m)
 
             remaining = [n for n, cs in graph.items() if cs]
-            ordered_rest = [cand_by_name[n] for n in ordered_names] + [cand_by_name[n] for n in remaining]
+            ordered_rest = [cand_by_name[n] for n in ordered_names] + [
+                cand_by_name[n] for n in remaining
+            ]
         else:
             ordered_rest = []
 

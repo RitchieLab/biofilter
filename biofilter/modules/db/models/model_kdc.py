@@ -251,7 +251,6 @@ class KDCSchema(Base):
     primary_key = Column(JSON().with_variant(JSONB, "postgresql"), nullable=True)
     link_keys = Column(JSON().with_variant(JSONB, "postgresql"), nullable=True)
 
-
     created_at = Column(DateTime, server_default=func.now(), nullable=False)
 
     asset_version_ref = relationship("KDCAssetVersion", back_populates="schema")

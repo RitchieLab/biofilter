@@ -2,7 +2,7 @@ import time
 from biofilter import Biofilter
 
 # db_uri = "sqlite:///dev_biofilter_2.db"
-db_uri = "postgresql+psycopg2://bioadmin:bioadmin@localhost/biofilter_dev"
+db_uri = "postgresql+psycopg2://bioadmin:bioadmin@localhost/biofilter_dev_2"
 
 # Configure below
 data_sources_to_process = [
@@ -55,10 +55,8 @@ data_sources_to_process = [
     # "dbsnp_chry",
     # "dbsnp_chrmt",
     # "gwas",
-
     # gnomAD
     "gnomad_chry",
-
     #
     # RelationShips
     # -------------
@@ -80,7 +78,7 @@ data_sources_to_process = [
 
 run_steps = [
     # "extract",
-    # "transform",
+    "transform",
     "load",
     # "all"
 ]  # noqa E501

@@ -48,7 +48,9 @@ def _ensure_list_str(values: Optional[Iterable[str]]) -> list[str]:
     return out
 
 
-def _normalize_inputs(inputs: Optional[list[dict[str, Any]]]) -> Optional[list[dict[str, Any]]]:
+def _normalize_inputs(
+    inputs: Optional[list[dict[str, Any]]]
+) -> Optional[list[dict[str, Any]]]:
     if not inputs:
         return None
     cleaned: list[dict[str, Any]] = []
@@ -59,7 +61,9 @@ def _normalize_inputs(inputs: Optional[list[dict[str, Any]]]) -> Optional[list[d
     return cleaned
 
 
-def _normalize_parameters(parameters: Optional[dict[str, Any]]) -> Optional[dict[str, Any]]:
+def _normalize_parameters(
+    parameters: Optional[dict[str, Any]]
+) -> Optional[dict[str, Any]]:
     if not parameters:
         return None
     if not isinstance(parameters, dict):

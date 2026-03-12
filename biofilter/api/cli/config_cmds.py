@@ -65,7 +65,9 @@ def _infer_value(value: str):
     v = value.strip()
 
     # Unwrap simple quotes: "x" or 'x'
-    if (v.startswith('"') and v.endswith('"')) or (v.startswith("'") and v.endswith("'")):
+    if (v.startswith('"') and v.endswith('"')) or (
+        v.startswith("'") and v.endswith("'")
+    ):
         v = v[1:-1]
 
     vl = v.lower()
@@ -93,8 +95,12 @@ def config():
 
 
 @config.command("init")
-@click.option("--path", "dirpath", default=".", show_default=True, help="Target directory.")
-@click.option("--force", is_flag=True, help="Overwrite existing .biofilter.toml if it exists.")
+@click.option(
+    "--path", "dirpath", default=".", show_default=True, help="Target directory."
+)
+@click.option(
+    "--force", is_flag=True, help="Overwrite existing .biofilter.toml if it exists."
+)
 @click.option("--db-uri", default=None, help="Pre-fill database.db_uri.")
 @click.option("--data-root", default=None, help="Pre-fill etl.data_root.")
 def config_init(dirpath, force, db_uri, data_root):
@@ -110,7 +116,9 @@ def config_init(dirpath, force, db_uri, data_root):
     if db_uri is not None:
         content = content.replace('db_uri = ""', f'db_uri = "{db_uri}"', 1)
     if data_root is not None:
-        content = content.replace('data_root = "./biofilter_data"', f'data_root = "{data_root}"', 1)
+        content = content.replace(
+            'data_root = "./biofilter_data"', f'data_root = "{data_root}"', 1
+        )
 
     cfg_path.write_text(content, encoding="utf-8")
     click.echo(f"✅ Created: {cfg_path}")
@@ -118,7 +126,12 @@ def config_init(dirpath, force, db_uri, data_root):
 
 @config.command("get")
 @click.argument("key")
-@click.option("--path", "dirpath", default=None, help="Directory containing .biofilter.toml (default: current dir).")
+@click.option(
+    "--path",
+    "dirpath",
+    default=None,
+    help="Directory containing .biofilter.toml (default: current dir).",
+)
 def config_get(key, dirpath):
     """Get a configuration value (SECTION.KEY)."""
     cfg_path = _find_config_file(dirpath)
@@ -135,7 +148,12 @@ def config_get(key, dirpath):
 @config.command("set")
 @click.argument("key")
 @click.argument("value")
-@click.option("--path", "dirpath", default=None, help="Directory containing .biofilter.toml (default: current dir).")
+@click.option(
+    "--path",
+    "dirpath",
+    default=None,
+    help="Directory containing .biofilter.toml (default: current dir).",
+)
 def config_set(key, value, dirpath):
     """Set a configuration value (SECTION.KEY VALUE)."""
     cfg_path = _find_config_file(dirpath)

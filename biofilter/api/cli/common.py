@@ -43,8 +43,10 @@ def get_ctx_db_uri(ctx: click.Context) -> str | None:
     obj = ctx.obj or {}
     return _clean_db_uri(obj.get("db_uri"))
 
+
 def get_ctx_debug(ctx: click.Context) -> bool:
     return bool((ctx.obj or {}).get("debug"))
+
 
 def require_db_uri(ctx: click.Context, local_db_uri: str | None = None) -> str:
     """

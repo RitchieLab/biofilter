@@ -4,9 +4,7 @@ bf = Biofilter("postgresql+psycopg2://bioadmin:bioadmin@localhost/biofilter_dev"
 
 in_path = "/opt/biofilter/dev/biofilter/tests/outputs/export_ps/"
 
-bf.db.import_(
-    in_dir=in_path
-)
+bf.db.import_(in_dir=in_path)
 
 # bf.db.import_(
 #     in_dir="/data/exports/biofilter_4_0_0",
@@ -24,7 +22,6 @@ bf.db.import_(
 # )
 # # rebuild indexes em etapa separada
 # bf.rebuild_indexes()
-
 
 
 # # 1. create schema

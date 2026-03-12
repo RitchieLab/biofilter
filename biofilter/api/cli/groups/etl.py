@@ -85,6 +85,7 @@ def restart(ctx, db_uri, data_source, source_system, delete_files, debug):
 # Recreate DB Indexs
 # -----------------------------------------------------------------------------
 
+
 @etl.command("index")
 @local_db_uri_option
 @click.option(
@@ -95,11 +96,15 @@ def restart(ctx, db_uri, data_source, source_system, delete_files, debug):
 )
 @click.option("--drop-only", is_flag=True, help="Only drop indexes, do not create.")
 @click.option("--no-drop-first", is_flag=True, help="Do not drop before creating.")
-@click.option("--no-write-mode", is_flag=True, help="Disable DB write-mode tuning hooks.")
+@click.option(
+    "--no-write-mode", is_flag=True, help="Disable DB write-mode tuning hooks."
+)
 @click.option("--no-read-mode", is_flag=True, help="Disable DB read-mode tuning hooks.")
 @click.option("--debug", is_flag=True, help="Enable debug logging.")
 @click.pass_context
-def index(ctx, db_uri, groups, drop_only, no_drop_first, no_write_mode, no_read_mode, debug):
+def index(
+    ctx, db_uri, groups, drop_only, no_drop_first, no_write_mode, no_read_mode, debug
+):
     db_uri = require_db_uri(ctx, local_db_uri=db_uri)
 
     bf = Biofilter(db_uri=db_uri, debug_mode=debug)
@@ -122,6 +127,7 @@ def index(ctx, db_uri, groups, drop_only, no_drop_first, no_write_mode, no_read_
 # -----------------------------------------------------------------------------
 # Conflict Management
 # -----------------------------------------------------------------------------
+
 
 @etl.command("update-conflicts")
 @local_db_uri_option

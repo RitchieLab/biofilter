@@ -61,8 +61,10 @@ Notes:
 
     def run(self) -> pd.DataFrame:
         # Optional filters
-        schema = self.params.get("schema")  # str or list[str], e.g. "public" or ["public","biofilter"]
-        table = self.params.get("table")    # str or list[str], table name filter
+        schema = self.params.get(
+            "schema"
+        )  # str or list[str], e.g. "public" or ["public","biofilter"]
+        table = self.params.get("table")  # str or list[str], table name filter
 
         # Optional output column selection
         output_columns = self.params.get("output_columns")  # list[str] or None
@@ -252,7 +254,9 @@ Notes:
                 f"{self.name} is PostgreSQL-only. Current dialect={name!r}."
             )
 
-    def _filter_ci_df(self, df: pd.DataFrame, col: str, value: str | list[str]) -> pd.DataFrame:
+    def _filter_ci_df(
+        self, df: pd.DataFrame, col: str, value: str | list[str]
+    ) -> pd.DataFrame:
         """
         Case-insensitive filter for DataFrame columns (similar spirit to _filter_ci for SQLAlchemy).
         Accepts str or list[str]. Uses substring match by default.

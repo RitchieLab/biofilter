@@ -6,7 +6,7 @@
 # class BiofilterConfig:
 
 #     def __init__(self, filename=".biofilter.toml"):
-        
+
 #         project_root = Path(biofilter.__file__).resolve().parent.parent
 #         self.path = project_root / filename
 
@@ -36,7 +36,9 @@ from pathlib import Path
 import toml
 
 
-def find_config_file(filename: str = ".biofilter.toml", start_dir: Path | None = None) -> Path | None:
+def find_config_file(
+    filename: str = ".biofilter.toml", start_dir: Path | None = None
+) -> Path | None:
     """
     Find config file in the current working directory or any parent directory.
     """
@@ -57,13 +59,17 @@ class BiofilterConfig:
     2) ../<filename> (parents)
     """
 
-    def __init__(self, filename: str = ".biofilter.toml", path: str | Path | None = None):
+    def __init__(
+        self, filename: str = ".biofilter.toml", path: str | Path | None = None
+    ):
         if path is not None:
             self.path = Path(path).expanduser().resolve()
         else:
             found = find_config_file(filename=filename)
             if not found:
-                raise FileNotFoundError(f"Config file not found: {filename} (searched from {Path.cwd()})")
+                raise FileNotFoundError(
+                    f"Config file not found: {filename} (searched from {Path.cwd()})"
+                )
             self.path = found
 
         if not self.path.exists():

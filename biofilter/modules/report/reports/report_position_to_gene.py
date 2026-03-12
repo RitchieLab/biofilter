@@ -26,7 +26,9 @@ from biofilter.modules.db.models.model_config import GenomeAssembly
 # Adjust these imports if your paths differ.
 # -----------------------------------------------------------------------------
 try:
-    from biofilter.modules.db.base import Base  # Declarative Base (same metadata used by core tables)
+    from biofilter.modules.db.base import (
+        Base,
+    )  # Declarative Base (same metadata used by core tables)
 except Exception:  # pragma: no cover
     Base = None  # type: ignore
 
@@ -132,7 +134,9 @@ def _overlap_bp(a_start: int, a_end: int, b_start: int, b_end: int) -> int:
     return max(0, min(a_end, b_end) - max(a_start, b_start) + 1)
 
 
-def _distance_bp(window_start: int, window_end: int, gene_start: int, gene_end: int) -> int:
+def _distance_bp(
+    window_start: int, window_end: int, gene_start: int, gene_end: int
+) -> int:
     """
     Return distance in bp between [window_start, window_end] and [gene_start, gene_end].
     0 if overlapping.
@@ -416,10 +420,31 @@ for downstream ranking without hard-coded gene prioritization.
             rs_id = _parse_rs_id(r.get("variant_id"))
             raw = f"{input_type}|{build_in}|{chr_in}|{pos_in}|{rs_id}"
             if input_type in ("rs", "variant"):
-                return NormalizedInput(raw=raw, input_type="rs", build_in=None, chr_in=None, pos_in=None, rs_id=rs_id)
+                return NormalizedInput(
+                    raw=raw,
+                    input_type="rs",
+                    build_in=None,
+                    chr_in=None,
+                    pos_in=None,
+                    rs_id=rs_id,
+                )
             if input_type == "pos":
-                return NormalizedInput(raw=raw, input_type="pos", build_in=build_in, chr_in=chr_in, pos_in=pos_in, rs_id=None)
-            return NormalizedInput(raw=raw, input_type="unknown", build_in=build_in, chr_in=chr_in, pos_in=pos_in, rs_id=rs_id)
+                return NormalizedInput(
+                    raw=raw,
+                    input_type="pos",
+                    build_in=build_in,
+                    chr_in=chr_in,
+                    pos_in=pos_in,
+                    rs_id=None,
+                )
+            return NormalizedInput(
+                raw=raw,
+                input_type="unknown",
+                build_in=build_in,
+                chr_in=chr_in,
+                pos_in=pos_in,
+                rs_id=rs_id,
+            )
 
         return [_row_to_norm(r) for r in df.to_dict(orient="records")]
 
@@ -450,7 +475,9 @@ for downstream ranking without hard-coded gene prioritization.
         if output_columns is not None:
             if isinstance(output_columns, str):
                 output_columns = [output_columns]
-            output_columns = [str(c).strip() for c in output_columns if c and str(c).strip()]
+            output_columns = [
+                str(c).strip() for c in output_columns if c and str(c).strip()
+            ]
             allowed = set(self.available_columns())
             unknown = [c for c in output_columns if c not in allowed]
             if unknown:
@@ -471,7 +498,9 @@ for downstream ranking without hard-coded gene prioritization.
             norm_inputs.extend(self._normalize_items(items))
 
         if not norm_inputs:
-            self.logger.log("No inputs provided. Use items=... or input_path=...", "ERROR")
+            self.logger.log(
+                "No inputs provided. Use items=... or input_path=...", "ERROR"
+            )
             return pd.DataFrame()
 
         # Resolve Gene group id
@@ -499,7 +528,9 @@ for downstream ranking without hard-coded gene prioritization.
         # -----------------------------
         # Resolve rs -> position_38 (bulk) using SQLAlchemy Core table
         # -----------------------------
-        rs_inputs = [x for x in norm_inputs if x.input_type == "rs" and x.rs_id is not None]
+        rs_inputs = [
+            x for x in norm_inputs if x.input_type == "rs" and x.rs_id is not None
+        ]
         rs_map: dict[int, dict[str, Any]] = {}
 
         if rs_inputs:
@@ -528,18 +559,15 @@ for downstream ranking without hard-coded gene prioritization.
             variant_snps = map_variant_snp(engine, Base.metadata)
 
             # We store rs as (source_type='rs', source_id=<int>)
-            stmt = (
-                select(
-                    variant_snps.c.source_id.label("rs_id"),
-                    variant_snps.c.chromosome.label("chr"),
-                    variant_snps.c.position_38.label("pos38"),
-                    variant_snps.c.position_37.label("pos37"),
-                )
-                .where(
-                    and_(
-                        variant_snps.c.source_type == "rs",
-                        variant_snps.c.source_id.in_(rs_ids),
-                    )
+            stmt = select(
+                variant_snps.c.source_id.label("rs_id"),
+                variant_snps.c.chromosome.label("chr"),
+                variant_snps.c.position_38.label("pos38"),
+                variant_snps.c.position_37.label("pos37"),
+            ).where(
+                and_(
+                    variant_snps.c.source_type == "rs",
+                    variant_snps.c.source_id.in_(rs_ids),
                 )
             )
 
@@ -595,7 +623,9 @@ for downstream ranking without hard-coded gene prioritization.
                 if build_in != 38:
                     # v1: no liftover from 37 -> 38
                     base_row["Status"] = "unmapped_build"
-                    base_row["Note"] = "Build 37 position inputs require liftover (not supported in v1)."
+                    base_row["Note"] = (
+                        "Build 37 position inputs require liftover (not supported in v1)."
+                    )
                     prepared.append(base_row)
                     continue
 
@@ -730,7 +760,9 @@ for downstream ranking without hard-coded gene prioritization.
         # -----------------------------
         # Gene identifiers via EntityAlias (codes) + gene domain metadata (optional)
         # -----------------------------
-        all_gene_entity_ids = sorted({g["Gene Entity ID"] for genes in gene_hits.values() for g in genes})
+        all_gene_entity_ids = sorted(
+            {g["Gene Entity ID"] for genes in gene_hits.values() for g in genes}
+        )
 
         # Map entity_id -> codes dict
         code_map: dict[int, dict[str, Optional[str]]] = {}
@@ -760,21 +792,31 @@ for downstream ranking without hard-coded gene prioritization.
                 val = _norm_str(row.alias_value) or None
 
                 if eid not in code_map:
-                    code_map[eid] = {"Entrez ID": None, "Ensembl ID": None, "HGNC ID": None}
+                    code_map[eid] = {
+                        "Entrez ID": None,
+                        "Ensembl ID": None,
+                        "HGNC ID": None,
+                    }
 
                 if val is None:
                     continue
 
                 # HGNC ID often looks like "HGNC:11998"
-                if (src in hgnc_sources or val.upper().startswith("HGNC:")) and code_map[eid]["HGNC ID"] is None:
+                if (
+                    src in hgnc_sources or val.upper().startswith("HGNC:")
+                ) and code_map[eid]["HGNC ID"] is None:
                     code_map[eid]["HGNC ID"] = val
 
                 # Ensembl ID often starts with ENSG
-                if (src in ensembl_sources or val.upper().startswith("ENSG")) and code_map[eid]["Ensembl ID"] is None:
+                if (
+                    src in ensembl_sources or val.upper().startswith("ENSG")
+                ) and code_map[eid]["Ensembl ID"] is None:
                     code_map[eid]["Ensembl ID"] = val
 
                 # Entrez is usually digits
-                if (src in entrez_sources or val.isdigit()) and code_map[eid]["Entrez ID"] is None:
+                if (src in entrez_sources or val.isdigit()) and code_map[eid][
+                    "Entrez ID"
+                ] is None:
                     code_map[eid]["Entrez ID"] = val
 
         # Optional joins to GeneMaster / locus / groups
@@ -793,8 +835,12 @@ for downstream ranking without hard-coded gene prioritization.
             for gm in gm_rows:
                 eid = int(gm.entity_id)
                 locus_map.setdefault(eid, {})
-                locus_map[eid]["Gene Locus Group"] = getattr(getattr(gm, "gene_locus_group", None), "name", None)
-                locus_map[eid]["Gene Locus Type"] = getattr(getattr(gm, "gene_locus_type", None), "name", None)
+                locus_map[eid]["Gene Locus Group"] = getattr(
+                    getattr(gm, "gene_locus_group", None), "name", None
+                )
+                locus_map[eid]["Gene Locus Type"] = getattr(
+                    getattr(gm, "gene_locus_type", None), "name", None
+                )
 
             # Gene functional groups (many-to-many)
             if GeneGroupMembership is not None and GeneGroup is not None:
@@ -806,7 +852,11 @@ for downstream ranking without hard-coded gene prioritization.
                             GeneGroup.name.label("group_name"),
                         )
                         .join(GeneGroup, GeneGroup.id == GeneGroupMembership.group_id)
-                        .filter(GeneGroupMembership.gene_id.in_(list(gm_id_by_entity.values())))
+                        .filter(
+                            GeneGroupMembership.gene_id.in_(
+                                list(gm_id_by_entity.values())
+                            )
+                        )
                         .all()
                     )
 

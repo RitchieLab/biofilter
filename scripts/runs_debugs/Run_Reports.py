@@ -10,7 +10,7 @@ from biofilter import Biofilter
 
 
 # db_uri = "sqlite:///dev_biofilter.db"
-db_uri = "postgresql+psycopg2://bioadmin:bioadmin@localhost/biofilter_prod"
+db_uri = "postgresql+psycopg2://bioadmin:bioadmin@localhost/biofilter_dev_2"
 # db_uri = "postgresql+psycopg2://bioadmin:Penn%402025@109.199.114.191:5432/biofilter?sslmode=require"
 
 # db_uri = "postgresql+psycopg://bioadmin:bioadmin@109.199.114.191:5432/biofilter?sslmode=require"
@@ -53,7 +53,42 @@ bf = Biofilter(db_uri)
 # ------------------------------
 
 # Run Report
-result = bf.report.run("db_pg_index_stats")
+# result = bf.report.run("db_pg_index_stats")
 # result = bf.report.explain("db_pg_table_stats")
 
-print(result)
+
+# ------------------------------------------------------------------
+# Report Variant Consequences
+# ------------------------------------------------------------------
+items = [
+    "chrY:2781644:2781644",
+    "chrY:3579294:3579294",
+    "chr1:55516888:55516888",
+    "chr7:55019017:55019017",
+]
+
+# Optional: input file instead of inline items
+# input_path = "/absolute/path/to/regions.txt"
+df = bf.report.run(
+    "variant_consequences",
+    items=items,
+    range_up=1,
+    range_down=1,
+    emit_not_found_rows=True,
+    include_variant_only_rows=True,
+    limit_variants_per_input=1000,
+)
+
+# Alternative using input file:
+# df = bf.run_report(
+#     "variant_consequences",
+#     input_path=input_path,
+#     range_up=1000,
+#     range_down=1000,
+#     emit_not_found_rows=True,
+#     include_variant_only_rows=True,
+#     limit_variants_per_input=1000,
+# )
+
+
+print(df)

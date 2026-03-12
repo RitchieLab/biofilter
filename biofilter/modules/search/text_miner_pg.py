@@ -51,6 +51,7 @@ class PgTextMinerConfig:
     """
     pg_trgm backend tuning parameters.
     """
+
     similarity_threshold: float = 0.30
     per_query_limit: int = 200
     max_windows_per_chunk: int = 80
@@ -78,14 +79,39 @@ class PgTextMinerConfig:
 class SurfaceForm:
     text: str
     start: int  # absolute start in full raw text
-    end: int    # absolute end in full raw text
+    end: int  # absolute end in full raw text
 
 
 _STOPWORDS_GENERIC = {
-    "the", "and", "or", "of", "in", "on", "to", "for", "with", "by",
-    "this", "that", "these", "those", "paper", "study", "assay", "assays",
-    "gene", "genes", "protein", "proteins", "pathway", "pathways",
-    "multiple", "mutated", "factor", "group", "domain",
+    "the",
+    "and",
+    "or",
+    "of",
+    "in",
+    "on",
+    "to",
+    "for",
+    "with",
+    "by",
+    "this",
+    "that",
+    "these",
+    "those",
+    "paper",
+    "study",
+    "assay",
+    "assays",
+    "gene",
+    "genes",
+    "protein",
+    "proteins",
+    "pathway",
+    "pathways",
+    "multiple",
+    "mutated",
+    "factor",
+    "group",
+    "domain",
 }
 
 
@@ -175,8 +201,8 @@ def _extract_surface_forms(
         r"\bCHEBI:\d+\b",
         r"\bGO:\d+\b",
         r"\bREACTOME:\d+\b",
-        r"\bR-HSA-\d+\b",     # Reactome stable IDs (common)
-        r"\bP\d{5}\b",        # Uniprot-ish (very rough; keep conservative)
+        r"\bR-HSA-\d+\b",  # Reactome stable IDs (common)
+        r"\bP\d{5}\b",  # Uniprot-ish (very rough; keep conservative)
         r"\bQ\d{5}\b",
     ]
 
@@ -319,19 +345,19 @@ class PgTrgmTextMiner(BaseTextMiner):
                     # for sf_text, spans_for_text in by_text.items():
                     #     # Try exact first (very fast + best precision)
                     #     exact_rows = self._exact_query(sf_text, cfg=cfg)
-                        # stats["exact_queries"] += 1
-                        # stats["rows"] += len(exact_rows)
+                    # stats["exact_queries"] += 1
+                    # stats["rows"] += len(exact_rows)
 
-                        # rows_to_use = exact_rows
-                        # used_exact = len(exact_rows) > 0
+                    # rows_to_use = exact_rows
+                    # used_exact = len(exact_rows) > 0
 
-                        # # If no exact, fallback to pg_trgm for this token
-                        # if not used_exact or not self.cfg.short_circuit_on_exact:
-                        #     if not used_exact:
-                        #         trgm_rows = self._pg_trgm_query(sf_text, cfg=cfg)
-                        #         stats["pg_queries"] += 1
-                        #         stats["rows"] += len(trgm_rows)
-                        #         rows_to_use = trgm_rows
+                    # # If no exact, fallback to pg_trgm for this token
+                    # if not used_exact or not self.cfg.short_circuit_on_exact:
+                    #     if not used_exact:
+                    #         trgm_rows = self._pg_trgm_query(sf_text, cfg=cfg)
+                    #         stats["pg_queries"] += 1
+                    #         stats["rows"] += len(trgm_rows)
+                    #         rows_to_use = trgm_rows
 
                     # ---- NEW: exact recall for all unique surface forms in one query
                     surface_texts = list(by_text.keys())
@@ -347,9 +373,13 @@ class PgTrgmTextMiner(BaseTextMiner):
                         # Prefer alias_value exact (lower) if it equals the surface; else alias_norm exact.
                         # We'll just store under BOTH keys to simplify attaching.
                         if r.alias_value:
-                            rows_by_key.setdefault(str(r.alias_value).lower(), []).append(r)
+                            rows_by_key.setdefault(
+                                str(r.alias_value).lower(), []
+                            ).append(r)
                         if r.alias_norm:
-                            rows_by_key.setdefault(str(r.alias_norm).lower(), []).append(r)
+                            rows_by_key.setdefault(
+                                str(r.alias_norm).lower(), []
+                            ).append(r)
 
                     # For each surface form, decide rows_to_use:
                     for sf_text, spans_for_text in by_text.items():
@@ -369,17 +399,31 @@ class PgTrgmTextMiner(BaseTextMiner):
                         for r in rows_to_use:
                             cand = MentionCandidate(
                                 entity_id=int(r.entity_id),
-                                group_id=int(r.group_id) if r.group_id is not None else None,
-                                entity_type=str(r.group_id) if r.group_id is not None else None,
+                                group_id=(
+                                    int(r.group_id) if r.group_id is not None else None
+                                ),
+                                entity_type=(
+                                    str(r.group_id) if r.group_id is not None else None
+                                ),
                                 primary_name=r.primary_name,
                                 matched_name=r.alias_norm or r.alias_value,
-                                matched_name_id=int(r.alias_id) if r.alias_id is not None else None,
+                                matched_name_id=(
+                                    int(r.alias_id) if r.alias_id is not None else None
+                                ),
                                 method=str(getattr(r, "method", "pg_trgm")),
                                 # exact query might not have pg_trgm_score; guard it
                                 score=float(getattr(r, "pg_trgm_score", 1.0)) * 100.0,
-                                data_source=str(r.data_source_id) if r.data_source_id is not None else None,
+                                data_source=(
+                                    str(r.data_source_id)
+                                    if r.data_source_id is not None
+                                    else None
+                                ),
                                 meta={
-                                    "group_id": int(r.group_id) if r.group_id is not None else None,
+                                    "group_id": (
+                                        int(r.group_id)
+                                        if r.group_id is not None
+                                        else None
+                                    ),
                                     "alias_type": r.alias_type,
                                     "xref_source": r.xref_source,
                                     "locale": r.locale,
@@ -387,13 +431,19 @@ class PgTrgmTextMiner(BaseTextMiner):
                                     "etl_package_id": r.etl_package_id,
                                     "alias_value": r.alias_value,
                                     "alias_norm": r.alias_norm,
-                                    "pg_trgm_score": float(getattr(r, "pg_trgm_score", 1.0)),
+                                    "pg_trgm_score": float(
+                                        getattr(r, "pg_trgm_score", 1.0)
+                                    ),
                                 },
                             )
                             stats["candidates"] += 1
 
                             for f in spans_for_text:
-                                sp = Span(start=f.start, end=f.end, text=raw_text[f.start:f.end])
+                                sp = Span(
+                                    start=f.start,
+                                    end=f.end,
+                                    text=raw_text[f.start : f.end],
+                                )
                                 stats["spans"] += 1
                                 key2 = (sp.start, sp.end)
                                 m = mentions_map.get(key2)
@@ -406,7 +456,9 @@ class PgTrgmTextMiner(BaseTextMiner):
                 # Only use this if you explicitly enable include_chunk_query/min_window_tokens.
                 if self.cfg.include_chunk_query:
                     nq = self.normalizer.build(chunk_text)
-                    windows = list(_iter_chunk_windows(nq.strict or "", nq.tokens, cfg=self.cfg))
+                    windows = list(
+                        _iter_chunk_windows(nq.strict or "", nq.tokens, cfg=self.cfg)
+                    )
                     stats["fallback_windows"] += len(windows)
 
                     for qwin in windows:
@@ -422,29 +474,53 @@ class PgTrgmTextMiner(BaseTextMiner):
                             # Prefer alias_value match for actual highlights
                             spans = []
                             if alias_value:
-                                for s, e in _find_spans_case_insensitive(raw_text, alias_value):
-                                    spans.append(Span(start=s, end=e, text=raw_text[s:e]))
+                                for s, e in _find_spans_case_insensitive(
+                                    raw_text, alias_value
+                                ):
+                                    spans.append(
+                                        Span(start=s, end=e, text=raw_text[s:e])
+                                    )
                             if not spans and alias_norm:
-                                for s, e in _find_spans_case_insensitive(raw_text, alias_norm):
-                                    spans.append(Span(start=s, end=e, text=raw_text[s:e]))
+                                for s, e in _find_spans_case_insensitive(
+                                    raw_text, alias_norm
+                                ):
+                                    spans.append(
+                                        Span(start=s, end=e, text=raw_text[s:e])
+                                    )
                             if not spans:
                                 cs = max(0, chunk_start)
                                 ce = min(len(raw_text), chunk_end)
                                 if ce > cs:
-                                    spans.append(Span(start=cs, end=ce, text=raw_text[cs:ce]))
+                                    spans.append(
+                                        Span(start=cs, end=ce, text=raw_text[cs:ce])
+                                    )
 
                             cand = MentionCandidate(
                                 entity_id=int(r.entity_id),
-                                group_id=int(r.group_id) if r.group_id is not None else None,
-                                entity_type=str(r.group_id) if r.group_id is not None else None,
+                                group_id=(
+                                    int(r.group_id) if r.group_id is not None else None
+                                ),
+                                entity_type=(
+                                    str(r.group_id) if r.group_id is not None else None
+                                ),
                                 primary_name=r.primary_name,
                                 matched_name=r.alias_norm or r.alias_value,
-                                matched_name_id=int(r.alias_id) if r.alias_id is not None else None,
+                                matched_name_id=(
+                                    int(r.alias_id) if r.alias_id is not None else None
+                                ),
                                 method="pg_trgm",
                                 score=float(r.pg_trgm_score) * 100.0,
-                                data_source=str(r.data_source_id) if r.data_source_id is not None else None,
+                                data_source=(
+                                    str(r.data_source_id)
+                                    if r.data_source_id is not None
+                                    else None
+                                ),
                                 meta={
-                                    "group_id": int(r.group_id) if r.group_id is not None else None,
+                                    "group_id": (
+                                        int(r.group_id)
+                                        if r.group_id is not None
+                                        else None
+                                    ),
                                     "alias_type": r.alias_type,
                                     "xref_source": r.xref_source,
                                     "locale": r.locale,
@@ -496,7 +572,9 @@ class PgTrgmTextMiner(BaseTextMiner):
             )
 
     # ---------------------------------------------------------------------
-    def _iter_chunks(self, text: str, cfg: TextMinerConfig) -> Iterable[tuple[int, int, str]]:
+    def _iter_chunks(
+        self, text: str, cfg: TextMinerConfig
+    ) -> Iterable[tuple[int, int, str]]:
         n = len(text)
         if cfg.chunk_size <= 0 or n <= cfg.chunk_size:
             yield (0, n, text)
@@ -571,7 +649,8 @@ class PgTrgmTextMiner(BaseTextMiner):
             .join(Entity, Entity.id == EntityAlias.entity_id)
             .outerjoin(
                 PrimaryAlias,
-                (PrimaryAlias.entity_id == Entity.id) & (PrimaryAlias.is_primary.is_(True)),
+                (PrimaryAlias.entity_id == Entity.id)
+                & (PrimaryAlias.is_primary.is_(True)),
             )
             .where(*filters)
             .where(
@@ -674,7 +753,8 @@ class PgTrgmTextMiner(BaseTextMiner):
             .join(Entity, Entity.id == EntityAlias.entity_id)
             .outerjoin(
                 PrimaryAlias,
-                (PrimaryAlias.entity_id == Entity.id) & (PrimaryAlias.is_primary.is_(True)),
+                (PrimaryAlias.entity_id == Entity.id)
+                & (PrimaryAlias.is_primary.is_(True)),
             )
             .where(*filters)
             .where(where_clause)
@@ -756,7 +836,8 @@ class PgTrgmTextMiner(BaseTextMiner):
             .join(Entity, Entity.id == EntityAlias.entity_id)
             .outerjoin(
                 PrimaryAlias,
-                (PrimaryAlias.entity_id == Entity.id) & (PrimaryAlias.is_primary.is_(True)),
+                (PrimaryAlias.entity_id == Entity.id)
+                & (PrimaryAlias.is_primary.is_(True)),
             )
             .where(*filters)
             .where(or_(*exact_conds))

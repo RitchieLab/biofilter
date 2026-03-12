@@ -15,8 +15,8 @@ from biofilter.utils.logger import Logger
 
 @dataclass(frozen=True)
 class ReportInfo:
-    module: str          # e.g. "report_gene_to_snp"
-    name: str            # friendly (ReportBase.name)
+    module: str  # e.g. "report_gene_to_snp"
+    name: str  # friendly (ReportBase.name)
     description: str
 
 
@@ -29,7 +29,9 @@ class ReportManager:
     - Each module defines exactly one ReportBase subclass
     """
 
-    def __init__(self, session_factory: Callable[[], Any], db: Database, logger: Logger):
+    def __init__(
+        self, session_factory: Callable[[], Any], db: Database, logger: Logger
+    ):
         # session_factory should be db.get_session (contextmanager)
         self._session_factory = session_factory
         self.db = db
@@ -81,19 +83,29 @@ class ReportManager:
             return self._class_cache[module_name]
 
         try:
-            module = importlib.import_module(f"biofilter.modules.report.reports.{module_name}")
+            module = importlib.import_module(
+                f"biofilter.modules.report.reports.{module_name}"
+            )
         except Exception as e:
-            self.logger.log(f"Failed to import report module '{module_name}': {e}", "ERROR")
+            self.logger.log(
+                f"Failed to import report module '{module_name}': {e}", "ERROR"
+            )
             raise
 
         candidates: List[Type[ReportBase]] = []
         for attr in dir(module):
             obj = getattr(module, attr)
-            if isinstance(obj, type) and issubclass(obj, ReportBase) and obj is not ReportBase:
+            if (
+                isinstance(obj, type)
+                and issubclass(obj, ReportBase)
+                and obj is not ReportBase
+            ):
                 candidates.append(obj)
 
         if not candidates:
-            raise ImportError(f"No ReportBase subclass found in module '{module_name}'.")
+            raise ImportError(
+                f"No ReportBase subclass found in module '{module_name}'."
+            )
         if len(candidates) > 1:
             names = ", ".join([c.__name__ for c in candidates])
             raise ImportError(
@@ -135,7 +147,9 @@ class ReportManager:
                 return info.module
 
         available = [i.name for i in idx]
-        raise ValueError(f"Report not found: '{identifier}'. Available reports: {available}")
+        raise ValueError(
+            f"Report not found: '{identifier}'. Available reports: {available}"
+        )
 
     def get_class(self, identifier: str) -> Type[ReportBase]:
         return self._load_class(self.resolve(identifier))

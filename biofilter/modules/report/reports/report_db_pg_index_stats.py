@@ -55,9 +55,9 @@ Notes:
 
     def run(self) -> pd.DataFrame:
         # Optional filters
-        schema = self.params.get("schema")       # str or list[str]
-        table = self.params.get("table")         # str or list[str]
-        index = self.params.get("index")         # str or list[str]
+        schema = self.params.get("schema")  # str or list[str]
+        table = self.params.get("table")  # str or list[str]
+        index = self.params.get("index")  # str or list[str]
 
         # Options
         include_index_def = bool(self.params.get("include_index_def", True))
@@ -167,7 +167,9 @@ Notes:
                 f"{self.name} is PostgreSQL-only. Current dialect={name!r}."
             )
 
-    def _filter_ci_df(self, df: pd.DataFrame, col: str, value: str | list[str]) -> pd.DataFrame:
+    def _filter_ci_df(
+        self, df: pd.DataFrame, col: str, value: str | list[str]
+    ) -> pd.DataFrame:
         if value is None:
             return df
 
