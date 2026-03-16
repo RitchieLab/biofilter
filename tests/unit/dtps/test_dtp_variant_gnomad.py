@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+import pandas as pd
 import pyarrow.parquet as pq
 import pytest
 
@@ -59,6 +60,8 @@ class FakeVariant:
         self.ALT = [alt] if alt is not None else []
         self.ID = rsid if rsid is not None else "."
         self.INFO = info
+        self.FILTER = None
+        self.QUAL = None
 
 
 class FakeVCF:
@@ -77,6 +80,28 @@ class FakeVCF:
 
     def __iter__(self):
         yield from self._variants
+
+
+class FakeConn:
+    class _Dialect:
+        def __init__(self, name: str):
+            self.name = name
+
+    class _ScalarResult:
+        def __init__(self, value: int):
+            self._value = value
+
+        def scalar(self):
+            return self._value
+
+    def __init__(self, dialect_name: str = "postgresql", scalar_value: int = 0):
+        self.dialect = self._Dialect(dialect_name)
+        self.scalar_value = scalar_value
+        self.executed = []
+
+    def execute(self, stmt, params=None):
+        self.executed.append((stmt, params))
+        return self._ScalarResult(self.scalar_value)
 
 
 # -----------------------------
@@ -261,13 +286,13 @@ def test_transform_writes_parts_and_manifests(monkeypatch, tmp_path):
     variant_files = sorted(variants_dir.glob("variants_part_*.parquet"))
     cons_files = sorted(cons_dir.glob("consequences_part_*.parquet"))
 
-    assert len(variant_files) == 1  # parts: 0000 (2 rows) + 0001 (1 row)
-    assert len(cons_files) == 1
+    assert len(variant_files) == 2  # parts: 0000 (2 rows) + 0001 (1 row)
+    assert len(cons_files) == 2
 
     assert variant_files[0].name == "variants_part_0000.parquet"
-    # assert variant_files[1].name == "variants_part_0001.parquet"
+    assert variant_files[1].name == "variants_part_0001.parquet"
     assert cons_files[0].name == "consequences_part_0000.parquet"
-    # assert cons_files[1].name == "consequences_part_0001.parquet"
+    assert cons_files[1].name == "consequences_part_0001.parquet"
 
     # 8) Validate content quickly
     vtab0 = pq.read_table(variant_files[0])
@@ -279,7 +304,7 @@ def test_transform_writes_parts_and_manifests(monkeypatch, tmp_path):
     ctab0 = pq.read_table(cons_files[0])
     assert ctab0.num_rows == 2
     assert "consequence" in ctab0.column_names
-    assert "gene_symbol" in ctab0.column_names
+    assert "gene_symbol_raw" in ctab0.column_names
 
     # 9) Validate manifests were requested (2 calls)
     assert len(calls) == 2
@@ -295,3 +320,136 @@ def test_transform_writes_parts_and_manifests(monkeypatch, tmp_path):
         "Consequence",
         "IMPACT",
     ]  # noqa E501
+
+
+def test_read_parquet_available_columns_skips_missing(tmp_path):
+    df = pd.DataFrame({"chrom": [22], "variant_key": ["22:100:A:G"]})
+    parquet_path = tmp_path / "sample.parquet"
+    df.to_parquet(parquet_path, index=False)
+
+    dtp = mod.DTP(
+        logger=DummyLogger(),
+        datasource=FakeDataSource(
+            name="gnomad_chr22", source_system=FakeSourceSystem(name="gnomad")
+        ),
+    )
+
+    out = dtp._read_parquet_available_columns(
+        str(parquet_path), ["chrom", "missing_col", "variant_key"]
+    )
+    assert list(out.columns) == ["chrom", "variant_key"]
+    assert out.iloc[0]["variant_key"] == "22:100:A:G"
+
+
+def test_supports_postgres_fast_load_respects_config():
+    dtp = mod.DTP(
+        logger=DummyLogger(),
+        datasource=FakeDataSource(
+            name="gnomad_chr22", source_system=FakeSourceSystem(name="gnomad")
+        ),
+        config=mod.GnomadCyvcf2Config(postgres_fast_load=False),
+    )
+
+    assert dtp._supports_postgres_fast_load(FakeConn("postgresql")) is False
+    assert dtp._supports_postgres_fast_load(FakeConn("sqlite")) is False
+
+
+def test_load_postgres_part_file_fast_stages_and_bulk_loads(monkeypatch):
+    dtp = mod.DTP(
+        logger=DummyLogger(),
+        datasource=FakeDataSource(
+            name="gnomad_chr22", source_system=FakeSourceSystem(name="gnomad")
+        ),
+    )
+    dtp.package = type("Pkg", (), {"id": 99})()
+
+    calls = {
+        "truncated": 0,
+        "copied": [],
+        "primed": 0,
+    }
+
+    monkeypatch.setattr(
+        dtp,
+        "_truncate_postgres_stage_tables",
+        lambda conn: calls.__setitem__("truncated", calls["truncated"] + 1),
+    )
+
+    def fake_copy(conn, *, table_name, df, columns):
+        calls["copied"].append((table_name, list(columns), list(df.columns)))
+
+    monkeypatch.setattr(dtp, "_copy_dataframe_to_postgres_stage", fake_copy)
+    monkeypatch.setattr(
+        dtp, "_bulk_insert_variant_masters_from_stage", lambda conn: 2
+    )
+    monkeypatch.setattr(
+        dtp,
+        "_prime_dimension_caches_from_df",
+        lambda df, conn, dim_caches: calls.__setitem__(
+            "primed", calls["primed"] + 1
+        ),
+    )
+    monkeypatch.setattr(
+        dtp, "_bulk_insert_variant_molecular_effects_from_stage", lambda conn: 5
+    )
+
+    df_variants = pd.DataFrame(
+        [
+            {
+                "chromosome": 22,
+                "position_start": 100,
+                "position_end": 100,
+                "reference_allele": "A",
+                "alternate_allele": "G",
+                "variant_key": "22:100:A:G",
+                "AC": 1,
+                "AN": 10,
+                "AF": 0.1,
+            },
+            {
+                "chromosome": 22,
+                "position_start": 200,
+                "position_end": 200,
+                "reference_allele": "C",
+                "alternate_allele": "T",
+                "variant_key": "22:200:C:T",
+                "AC": 2,
+                "AN": 10,
+                "AF": 0.2,
+            },
+        ]
+    )
+    df_consequences = pd.DataFrame(
+        [
+            {
+                "chromosome": 22,
+                "variant_key": "22:100:A:G",
+                "gene_id_raw": "ENSG1",
+                "gene_symbol_raw": "GENE1",
+                "transcript_id_raw": "ENST1",
+                "consequence": "missense_variant",
+            }
+        ]
+    )
+
+    conn = FakeConn("postgresql", scalar_value=2)
+    out = dtp._load_postgres_part_file_fast(
+        conn,
+        df_variants,
+        df_consequences,
+        dim_caches={
+            "group": {},
+            "category": {},
+            "consequence": {},
+            "impact": {},
+            "biotype": {},
+        },
+    )
+
+    assert out == (2, 2, 5)
+    assert calls["truncated"] == 1
+    assert calls["primed"] == 1
+    assert [item[0] for item in calls["copied"]] == [
+        "tmp_gnomad_variant_stage",
+        "tmp_gnomad_consequence_stage",
+    ]

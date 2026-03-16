@@ -194,7 +194,7 @@ def map_variant_molecular_effects(engine, metadata):
     common_cols = [
         Column("chromosome", Integer, nullable=False),
         # Useful operational key
-        Column("variant_key", String(64), nullable=False),
+        Column("variant_key", String(256), nullable=False),
         # Raw / stable identity
         Column("gene_id", String(32), nullable=True),
         Column("gene_symbol", String(64), nullable=True),

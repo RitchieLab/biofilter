@@ -21,11 +21,11 @@ data_sources_to_process = [
     # --------
     # "reactome",
     # "kegg_pathways",
-    #
+
     # Gene Ontology
     # -------------
     # "gene_ontology",
-    #
+
     # Variants
     # --------
     # "dbsnp_sample",
@@ -55,9 +55,32 @@ data_sources_to_process = [
     # "dbsnp_chry",
     # "dbsnp_chrmt",
     # "gwas",
-    # gnomAD
+    # "gnomad_chr1",
+    # "gnomad_chr2",
+    # "gnomad_chr3",
+    # "gnomad_chr4",
+    # "gnomad_chr5",
+    # "gnomad_chr6",
+    # "gnomad_chr7",
+    # "gnomad_chr8",
+    # "gnomad_chr9",
+    # "gnomad_chr10",
+    # "gnomad_chr11",
+    # "gnomad_chr12",
+    # "gnomad_chr13",
+    # "gnomad_chr14",
+    # "gnomad_chr15",
+    # "gnomad_chr16",
+    # "gnomad_chr17",
+    # "gnomad_chr18",
+    # "gnomad_chr19",
+    # "gnomad_chr20",
+    # "gnomad_chr21",
+    # "gnomad_chr22",
+    # "gnomad_chrx",
     "gnomad_chry",
-    #
+    # "gnomad_chrmt",
+
     # RelationShips
     # -------------
     # "reactome_relationships",
@@ -77,8 +100,8 @@ data_sources_to_process = [
 ]
 
 run_steps = [
-    # "extract",
-    "transform",
+    # # "extract",
+    # "transform",
     "load",
     # "all"
 ]  # noqa E501

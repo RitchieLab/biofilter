@@ -183,3 +183,14 @@ Notes:
         for v in vals:
             mask = mask | s.str.contains(str(v), case=False, na=False)
         return df[mask].copy()
+
+
+"""
+biofilter report run pg_index_stats
+biofilter report run pg_index_stats --params '{"schema":"public"}'
+biofilter report run pg_index_stats --params '{"table":["variant","entity"]}'
+biofilter report run pg_index_stats --params '{"index":"trgm"}'
+biofilter report run pg_index_stats --params '{"include_usage":false}'
+biofilter report run pg_index_stats --params '{"output_columns":["schema_name","table_name","index_name","index_size","idx_scan"]}'
+
+"""

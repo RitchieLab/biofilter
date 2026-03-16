@@ -30,7 +30,7 @@ class BiofilterCore:
     # db_uri: str
     db_uri: Optional[str]
     debug_mode: bool = False
-    version: str = "4.0.0"
+    version: str = "4.1.0"
 
     def __post_init__(self):
         self.logger = Logger(log_level="DEBUG") if self.debug_mode else Logger()

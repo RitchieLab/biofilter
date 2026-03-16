@@ -275,3 +275,11 @@ Notes:
         for v in vals:
             mask = mask | s.str.contains(str(v), case=False, na=False)
         return df[mask].copy()
+
+
+"""
+biofilter report run pg_table_stats
+biofilter report run pg_table_stats --params '{"schema":"public"}'
+biofilter report run pg_table_stats --params '{"table":["variant","entity"]}'
+biofilter report run pg_table_stats --params '{"output_columns":["schema_name","table_name","total_bytes","n_indexes"]}'
+"""

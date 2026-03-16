@@ -1,6 +1,8 @@
 # dtp_variant_gnomad_cyvcf2.py
 from __future__ import annotations
 
+import csv
+import io
 import os
 import re
 import time
@@ -12,7 +14,7 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 from cyvcf2 import VCF
 
-from sqlalchemy import and_, select
+from sqlalchemy import and_, select, text
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 
@@ -64,7 +66,7 @@ class GnomadCyvcf2Config:
         ]
     )
 
-    # Exclusions
+    # Exclusions Variants Master
     info_exclude_keys: Tuple[str, ...] = ("vep", "")
     info_exclude_prefixes: Tuple[str, ...] = (
         "VRS_",
@@ -74,11 +76,63 @@ class GnomadCyvcf2Config:
         "ab_hist",
     )
 
+    # Rows to keep in Consequence Variantsr
+    vep_allowlist: Tuple[str, ...] = (
+        'Allele',
+        'Consequence',
+        'IMPACT',
+        'SYMBOL',
+        'Gene',
+        'Feature_type',
+        'Feature',
+        'BIOTYPE',
+        # 'EXON',
+        # 'INTRON',
+        # 'HGVSc',
+        # 'HGVSp',
+        # 'cDNA_position',
+        # 'CDS_position',
+        # 'Protein_position',
+        # 'Amino_acids',
+        # 'Codons',
+        # 'ALLELE_NUM',
+        # 'DISTANCE',
+        # 'STRAND',
+        # 'FLAGS',
+        # 'VARIANT_CLASS',
+        # 'SYMBOL_SOURCE',
+        # 'HGNC_ID',
+        # 'CANONICAL',
+        # 'MANE_SELECT',
+        # 'MANE_PLUS_CLINICAL',
+        # 'TSL',
+        # 'APPRIS',
+        # 'CCDS',
+        # 'ENSP',
+        # 'UNIPROT_ISOFORM',
+        # 'SOURCE',
+        # 'DOMAINS',
+        # 'miRNA',
+        # 'HGVS_OFFSET',
+        # 'PUBMED',
+        # 'MOTIF_NAME',
+        # 'MOTIF_POS',
+        # 'HIGH_INF_POS',
+        # 'MOTIF_SCORE_CHANGE',
+        # 'TRANSCRIPTION_FACTORS',
+        'LoF',
+        'LoF_filter',
+        'LoF_flags',
+        'LoF_info'
+    )
+
     # Output file naming
     variants_prefix: str = "variants_part_"
     consequences_prefix: str = "consequences_part_"
     parquet_compression: str = "snappy"
     min_qual = 1
+    postgres_fast_load: bool = True
+    postgres_partition_refresh: bool = True
 
 
 # -----------------------------------------------------------------------------
@@ -143,6 +197,10 @@ def infer_variant_type(ref: str, alt: Optional[str]) -> str:
     if len(ref) > 1 and len(alt) > 1:
         return "mnv"
     return "other"
+
+
+def _variant_key(chrom: Any, pos: int, ref: str, alt: str) -> str:
+    return f"{chrom}:{pos}:{ref}:{alt}"
 
 
 # transform
@@ -211,20 +269,22 @@ def _parse_vep_header_format(vcf: VCF, vep_key: str) -> List[str]:
 # transform
 def _parse_vep_rows(
     vep_value: Optional[str],
-    vep_fields: List[str],
+    vep_field_positions: List[Tuple[int, str]],
 ) -> List[Dict[str, str]]:
     """
     Parse VEP value (comma-separated rows, pipe-separated fields) into list of dicts.  # noqa E501
     """
-    if not vep_value or not vep_fields:
+    if not vep_value or not vep_field_positions:
         return []
     rows: List[Dict[str, str]] = []
     for chunk in str(vep_value).split(","):
         parts = chunk.split("|")
-        row: Dict[str, str] = {}
-        for i, k in enumerate(vep_fields):
-            row[k] = parts[i] if i < len(parts) else ""
-        rows.append(row)
+        rows.append(
+            {
+                field: parts[idx] if idx < len(parts) else ""
+                for idx, field in vep_field_positions
+            }
+        )
     return rows
 
 
@@ -412,7 +472,7 @@ def _build_atomic_consequence_rows(
                 local_min_rank = consequence_rank
                 local_min_term = consequence
 
-            group, category = _classify_consequence(consequence)
+            # group, category = _classify_consequence(consequence)
 
             atomic_rows.append(
                 {
@@ -429,26 +489,26 @@ def _build_atomic_consequence_rows(
                     "transcript_id_raw": r.get("Feature") or None,
                     "gene_id": r.get("Gene") or None,
                     "transcript_id": r.get("Feature") or None,
-                    "consequence_raw": consequence_raw,
+                    # "consequence_raw": consequence_raw,
                     "consequence": consequence,
                     "impact": impact,
                     "impact_rank": impact_rank,
                     "biotype": r.get("BIOTYPE") or None,
-                    "variant_class": r.get("VARIANT_CLASS") or None,
-                    "consequence_group": group,
-                    "consequence_category": category,
+                    # "variant_class": r.get("VARIANT_CLASS") or None,
+                    # "consequence_group": group,
+                    # "consequence_category": category,
                     "consequence_rank": consequence_rank,
-                    "canonical": _truthy_vep_flag(r.get("CANONICAL")),
-                    "mane_select": _truthy_vep_flag(r.get("MANE_SELECT")),
-                    "mane_plus_clinical": _truthy_vep_flag(r.get("MANE_PLUS_CLINICAL")),  # noqa E501
-                    "hgvsc": r.get("HGVSc") or None,
-                    "hgvsp": r.get("HGVSp") or None,
-                    "cdna_position": r.get("cDNA_position") or None,
-                    "cds_position": r.get("CDS_position") or None,
-                    "protein_position": r.get("Protein_position") or None,
-                    "amino_acids": r.get("Amino_acids") or None,
-                    "codons": r.get("Codons") or None,
-                    "ensp": r.get("ENSP") or None,
+                    # "canonical": _truthy_vep_flag(r.get("CANONICAL")),
+                    # "mane_select": _truthy_vep_flag(r.get("MANE_SELECT")),
+                    # "mane_plus_clinical": _truthy_vep_flag(r.get("MANE_PLUS_CLINICAL")),  # noqa E501
+                    # "hgvsc": r.get("HGVSc") or None,
+                    # "hgvsp": r.get("HGVSp") or None,
+                    # "cdna_position": r.get("cDNA_position") or None,
+                    # "cds_position": r.get("CDS_position") or None,
+                    # "protein_position": r.get("Protein_position") or None,
+                    # "amino_acids": r.get("Amino_acids") or None,
+                    # "codons": r.get("Codons") or None,
+                    # "ensp": r.get("ENSP") or None,
                     "lof_flag": lof_conf in {"HC", "LC"},
                     "lof_confidence": lof_conf,
                     "lof_filter": r.get("LoF_filter") or None,
@@ -610,6 +670,7 @@ class DTP(DTPBase):
         # Check Compatibility
         self.check_compatibility()
 
+        # read raw data path and prepare output paths
         try:
             raw_base = (
                 Path(raw_dir)
@@ -661,9 +722,6 @@ class DTP(DTPBase):
         # Without chrm, stop the process
         chrom = resolve_file_chromosome(vcf_path, self.data_source.name)
         if chrom is None:
-            # raise ValueError(
-            #     f"Chromosome mismatch in file {vcf_path}"
-            # )
             self.logger.log(f"❌ Chromosome mismatch in file {vcf_path}", "ERROR")  # noqa E501
             return False, msg
 
@@ -725,33 +783,69 @@ class DTP(DTPBase):
                     )  # noqa E501
                 ]
 
-            # VEP schema
+            # VEP Fields Schema
             # (this is the "csq_schema_fields" we want in the manifest)
-            vep_fields = _parse_vep_header_format(vcf, cfg.vep_info_key)
-            if not vep_fields:
+            vep_fields_list = _parse_vep_header_format(vcf, cfg.vep_info_key)
+            if not vep_fields_list:
                 raise ValueError(
                     f" Could not find VEP schema in header for INFO/{cfg.vep_info_key}."  # noqa E501
                 )
+            # Check that all allowlist fields are present in the parsed VCF
+            vep_fields_set = set(vep_fields_list)
+            missing_vep_fields = [
+                field for field in cfg.vep_allowlist if field not in vep_fields_set
+            ]
+            if missing_vep_fields:
+                self.logger.log(
+                    "⚠️ Missing VEP allowlist fields in parsed schema: "
+                    + ", ".join(missing_vep_fields),
+                    "WARNING",
+                )
+            vep_fields = tuple(
+                field for field in cfg.vep_allowlist if field in vep_fields_set
+            )
+            vep_field_index = {
+                field: idx for idx, field in enumerate(vep_fields_list)
+            }
+            vep_field_positions = [
+                (vep_field_index[field], field) for field in vep_fields
+            ]
+
         except Exception as e:
             self.logger.log(f"❌ Error to read {vcf_path}: {e}", "ERROR")
             return False, msg
 
+        # -------------------------------------------------------------------
+        # Process variants and consequences, buffering in memory and flushing
+        # to parquet in chunks
+        # -------------------------------------------------------------------
         try:
             for var in vcf:
+
+                # Filtering at the variant level (before parsing INFO/VEP):
+                # -----------------------------------------------------------------
+                # 1. Variants with failing FILTER are skipped
+                # 2. Variants below the configured QUAL threshold are skipped
+                # 3. Variants with multiple ALTs in the same record are rejected
+
                 pos = int(var.POS)
                 ref = var.REF
 
-                # No load variant with filter or qualy
+                # Filter 1: No load variant with failing FILTER
                 var_filter = var.FILTER
                 if var_filter not in (None, "PASS", ".", ""):
                     n_skipped += 1
                     continue
 
                 var_qual = var.QUAL
-                if var_qual not in (None, "PASS", ".", ""):
-                    n_skipped += 1
-                    continue
+                try:
+                    if var_qual is not None and float(var_qual) < cfg.min_qual:
+                        n_skipped += 1
+                        continue
+                except (TypeError, ValueError):
+                    pass
 
+                # Filter 2: Skip multi-allelic records
                 # Assumption: gnomAD file already represents one ALT per record
                 if not var.ALT:
                     n_skipped += 1
@@ -766,11 +860,14 @@ class DTP(DTPBase):
                     n_skipped += 1
                     continue
 
+                # Clean rsID when missing or empty
                 rsid = var.ID if (var.ID and var.ID != ".") else None
-                # vkey = _variant_key(chrom, pos, ref, alt)
-                # a = alt if alt else "."
-                vkey = str(f"{chrom}:{pos}:{ref}:{alt}")
 
+                # Create variant key (chrom:pos:ref:alt)
+                vkey = _variant_key(chrom, pos, ref, alt)
+
+                # MASTER VARIANT
+                # Construct base variant row with INFO fields
                 row: Dict[str, Any] = {
                     "chrom": chrom,
                     "pos": pos,
@@ -787,10 +884,11 @@ class DTP(DTPBase):
 
                 variant_rows.append(row)
 
-                # Consequences
+                # MOLECULAR EFFECT (CONSEQUENCES FROM VEP)
                 # preserve raw VEP fields and explode atomic conseq rows
                 vep_val = var.INFO.get(cfg.vep_info_key)
-                vep_rows = _parse_vep_rows(vep_val, vep_fields)
+
+                vep_rows = _parse_vep_rows(vep_val, vep_field_positions)
 
                 # This method could be a bottleneck.
                 consequence_rows.extend(
@@ -808,7 +906,6 @@ class DTP(DTPBase):
                 # Save chunk files
                 if n_rows % chunk_size == 0:
                     flush()
-                    # break
             # Save remaining records
             flush()
 
@@ -893,7 +990,160 @@ class DTP(DTPBase):
     # LOAD
     # --------------------------
 
-    def _normalize_rsid(self, value):
+    def _get_insert_for_dialect(self, table, dialect_name: str):
+        if dialect_name == "sqlite":
+            return sqlite_insert(table)
+        if dialect_name == "postgresql":
+            return pg_insert(table)
+        return generic_insert(table)
+
+    def _supports_postgres_fast_load(self, conn) -> bool:
+        return bool(
+            conn.dialect.name == "postgresql"
+            and getattr(self.config, "postgres_fast_load", True)
+        )
+
+    def _partition_table_name(self, parent_table: str, chrom: int) -> str:
+        return f"{parent_table}_chr_{int(chrom)}"
+
+    def _truncate_postgres_variant_partitions(self, conn, chrom: int) -> None:
+        if not getattr(self.config, "postgres_partition_refresh", True):
+            return
+
+        for parent_table in ("variant_molecular_effects", "variant_masters"):
+            partition_table = self._partition_table_name(parent_table, chrom)
+            conn.execute(text(f'TRUNCATE TABLE "{partition_table}"'))
+
+    def _create_postgres_stage_tables(self, conn) -> None:
+        conn.execute(
+            text(
+                """
+                CREATE TEMP TABLE IF NOT EXISTS tmp_gnomad_variant_stage (
+                    chromosome integer NOT NULL,
+                    position_start bigint NOT NULL,
+                    position_end bigint NOT NULL,
+                    reference_allele varchar(64) NOT NULL,
+                    alternate_allele varchar(256) NOT NULL,
+                    rsid varchar(32) NULL,
+                    variant_type varchar(20) NULL,
+                    allele_type varchar(20) NULL,
+                    ac bigint NULL,
+                    an bigint NULL,
+                    af double precision NULL,
+                    grpmax varchar(32) NULL,
+                    grpmax_af double precision NULL,
+                    cadd_raw_score double precision NULL,
+                    cadd_phred double precision NULL,
+                    revel_max double precision NULL,
+                    spliceai_ds_max double precision NULL,
+                    pangolin_largest_ds double precision NULL,
+                    polyphen_max double precision NULL,
+                    sift_max double precision NULL,
+                    variant_key varchar(256) NOT NULL
+                ) ON COMMIT DROP
+                """
+            )
+        )
+
+        conn.execute(
+            text(
+                """
+                CREATE TEMP TABLE IF NOT EXISTS tmp_gnomad_consequence_stage (
+                    chromosome integer NOT NULL,
+                    variant_id bigint NOT NULL,
+                    variant_key varchar(256) NOT NULL,
+                    gene_id varchar(32) NULL,
+                    gene_symbol varchar(64) NULL,
+                    transcript_id varchar(32) NOT NULL,
+                    feature_type varchar(32) NULL,
+                    consequence_id integer NOT NULL,
+                    impact_id integer NULL,
+                    biotype_id integer NULL,
+                    consequence_rank integer NULL,
+                    impact_rank integer NULL,
+                    most_severe_consequence_per_annotation_id integer NULL,
+                    most_severe_consequence_per_variant_id integer NULL,
+                    is_most_severe_for_annotation boolean NULL,
+                    is_most_severe_for_variant boolean NULL,
+                    lof_flag boolean NULL,
+                    lof_confidence varchar(8) NULL,
+                    lof_filter varchar(128) NULL,
+                    lof_flags varchar(256) NULL,
+                    lof_info text NULL
+                ) ON COMMIT DROP
+                """
+            )
+        )
+
+    def _truncate_postgres_stage_tables(self, conn) -> None:
+        conn.execute(
+            text(
+                "TRUNCATE TABLE tmp_gnomad_variant_stage, tmp_gnomad_consequence_stage"
+            )
+        )
+
+    def _is_nullish(self, value: Any) -> bool:
+        if value is None:
+            return True
+        try:
+            return bool(pd.isna(value))
+        except Exception:
+            return False
+
+    def _copy_dataframe_to_postgres_stage(
+        self,
+        conn,
+        *,
+        table_name: str,
+        df: pd.DataFrame,
+        columns: List[str],
+    ) -> None:
+        if df.empty:
+            return
+
+        out = io.StringIO()
+        writer = csv.writer(out)
+
+        for row in df[columns].itertuples(index=False, name=None):
+            writer.writerow(
+                ["\\N" if self._is_nullish(value) else value for value in row]
+            )
+
+        out.seek(0)
+
+        raw_conn = getattr(conn.connection, "driver_connection", None)
+        if raw_conn is None:
+            raw_conn = getattr(conn.connection, "connection", None)
+        if raw_conn is None:
+            raise RuntimeError("Could not access the PostgreSQL driver connection.")
+
+        copy_sql = (
+            f"COPY {table_name} ({', '.join(columns)}) "
+            "FROM STDIN WITH (FORMAT CSV, NULL '\\N')"
+        )
+
+        cursor = raw_conn.cursor()
+        try:
+            cursor.copy_expert(copy_sql, out)
+        finally:
+            cursor.close()
+
+    def _read_parquet_available_columns(
+        self,
+        parquet_path: str,
+        requested_columns: List[str],
+    ) -> pd.DataFrame:
+        available_columns = set(pq.read_schema(parquet_path).names)
+        selected_columns = [
+            col for col in requested_columns if col in available_columns
+        ]
+        return pd.read_parquet(
+            parquet_path,
+            columns=selected_columns or None,
+            engine="pyarrow",
+        )
+
+    def _normalize_rsid(self, value: Any) -> Optional[str]:
         if value is None:
             return None
         value = str(value).strip()
@@ -901,11 +1151,22 @@ class DTP(DTPBase):
             return None
         return value.split(";")[0]
 
-    def _normalize_variant_df(self, df: pd.DataFrame) -> pd.DataFrame:
-        """
-        Accept both old transform schema and newer BF4-aligned schema.
-        Normalize columns and filter rows that exceed current DB-safe limits.
-        """
+    def _normalize_text_series(
+        self,
+        df: pd.DataFrame,
+        column: str,
+        *,
+        upper: bool = False,
+    ) -> pd.Series:
+        if column not in df.columns:
+            return pd.Series(pd.NA, index=df.index, dtype="string")
+
+        series = df[column].astype("string").str.strip()
+        if upper:
+            series = series.str.upper()
+        return series.where(series.ne(""), pd.NA)
+
+    def _prepare_variant_df(self, df: pd.DataFrame) -> pd.DataFrame:
         if df.empty:
             return df.copy()
 
@@ -914,610 +1175,236 @@ class DTP(DTPBase):
             "pos": "position_start",
             "ref": "reference_allele",
             "alt": "alternate_allele",
+            "AC": "ac",
+            "AN": "an",
+            "AF": "af",
         }
-        df = df.rename(
+        out = df.rename(
             columns={k: v for k, v in rename_map.items() if k in df.columns}
         ).copy()
 
-        # Ensure required columns exist
         required = [
             "chromosome",
             "position_start",
             "reference_allele",
             "alternate_allele",
+            "variant_key",
         ]
-        missing_required = [c for c in required if c not in df.columns]
-        if missing_required:
+        missing = [col for col in required if col not in out.columns]
+        if missing:
             raise ValueError(
-                f"Variant parquet is missing required columns: {missing_required}"  # noqa E501
+                f"Variant parquet is missing required columns: {missing}"
             )
 
-        # position_end (vectorized)
-        if "position_end" not in df.columns:
-            df["position_end"] = (
-                df["position_start"].astype("int64")
-                + df["reference_allele"].astype(str).str.len()
-                - 1
-            )
+        out["chromosome"] = pd.to_numeric(
+            out["chromosome"], errors="coerce"
+        ).astype("Int64")
+        out["position_start"] = pd.to_numeric(
+            out["position_start"], errors="coerce"
+        ).astype("Int64")
+        out["reference_allele"] = self._normalize_text_series(
+            out, "reference_allele"
+        )
+        out["alternate_allele"] = self._normalize_text_series(
+            out, "alternate_allele"
+        )
+        out["variant_key"] = self._normalize_text_series(out, "variant_key")
 
-        # allele_type fallback
-        if "allele_type" not in df.columns:
-            if "variant_type" in df.columns:
-                df["allele_type"] = df["variant_type"]
+        if "position_end" in out.columns:
+            out["position_end"] = pd.to_numeric(
+                out["position_end"], errors="coerce"
+            ).astype("Int64")
+        else:
+            out["position_end"] = (
+                out["position_start"] + out["reference_allele"].str.len() - 1
+            ).astype("Int64")
+
+        if "rsid" in out.columns:
+            out["rsid"] = out["rsid"].map(self._normalize_rsid)
+        else:
+            out["rsid"] = None
+
+        text_cols = ["variant_type", "allele_type", "grpmax", "grpmax_af"]
+        for col in text_cols:
+            if col in out.columns and col != "grpmax_af":
+                out[col] = self._normalize_text_series(out, col)
+            elif col not in out.columns:
+                out[col] = None
+
+        int_cols = ["ac", "an"]
+        for col in int_cols:
+            if col in out.columns:
+                out[col] = pd.to_numeric(out[col], errors="coerce").astype("Int64")
             else:
-                df["allele_type"] = None
+                out[col] = None
 
-        # af fallback
-        if "af" not in df.columns and "af_global" in df.columns:
-            df["af"] = df["af_global"]
-
-        # Normalize rsid
-        if "rsid" in df.columns:
-            df["rsid"] = df["rsid"].apply(self._normalize_rsid)
-
-        # Normalize null-like values
-        df = df.where(pd.notnull(df), None)
-
-        # Temporary DB safeguard: keep only alleles that fit current schema
-        ref_max_len = 64
-        alt_max_len = 64
-
-        ref_len = df["reference_allele"].astype(str).str.len()
-        alt_len = df["alternate_allele"].astype(str).str.len()
+        float_cols = [
+            "af",
+            "grpmax_af",
+            "cadd_raw_score",
+            "cadd_phred",
+            "revel_max",
+            "spliceai_ds_max",
+            "pangolin_largest_ds",
+            "polyphen_max",
+            "sift_max",
+        ]
+        for col in float_cols:
+            if col in out.columns:
+                out[col] = pd.to_numeric(out[col], errors="coerce")
+            else:
+                out[col] = None
 
         mask = (
-            df["chromosome"].notna()
-            & df["position_start"].notna()
-            & df["position_end"].notna()
-            & df["reference_allele"].notna()
-            & df["alternate_allele"].notna()
-            & (ref_len <= ref_max_len)
-            & (alt_len <= alt_max_len)
+            out["chromosome"].notna()
+            & out["position_start"].notna()
+            & out["position_end"].notna()
+            & out["reference_allele"].notna()
+            & out["alternate_allele"].notna()
+            & out["variant_key"].notna()
+            & (out["reference_allele"].str.len() <= 64)
+            & (out["alternate_allele"].str.len() <= 256)
+            & (out["variant_key"].str.len() <= 256)
         )
 
-        df = df[mask].copy()
+        stage_columns = [
+            "chromosome",
+            "position_start",
+            "position_end",
+            "reference_allele",
+            "alternate_allele",
+            "rsid",
+            "variant_type",
+            "allele_type",
+            "ac",
+            "an",
+            "af",
+            "grpmax",
+            "grpmax_af",
+            "cadd_raw_score",
+            "cadd_phred",
+            "revel_max",
+            "spliceai_ds_max",
+            "pangolin_largest_ds",
+            "polyphen_max",
+            "sift_max",
+            "variant_key",
+        ]
+        return out.loc[mask, stage_columns].copy()
 
-        return df
+    def _prepare_consequence_df(self, df: Optional[pd.DataFrame]) -> pd.DataFrame:
+        if df is None or df.empty:
+            return pd.DataFrame()
 
-    def _normalize_consequence_df(self, df: pd.DataFrame) -> pd.DataFrame:
-        """
-        Accept both old transform consequence schema and newer BF4-aligned schema.  # noqa E501
-        Normalize columns and filter rows that exceed current DB-safe limits.
-        """
-        if df.empty:
-            return df.copy()
+        out = df.rename(columns={"chrom": "chromosome"}).copy()
 
-        rename_map = {
-            "chrom": "chromosome",
-            "feature": "transcript_id",
-        }
-        df = df.rename(
-            columns={k: v for k, v in rename_map.items() if k in df.columns}
-        ).copy()
+        out["chromosome"] = pd.to_numeric(
+            out.get("chromosome"), errors="coerce"
+        ).astype("Int64")
+        out["variant_key"] = self._normalize_text_series(out, "variant_key")
 
-        # Raw fallbacks
-        if "gene_id" not in df.columns and "gene_id_raw" in df.columns:
-            df["gene_id"] = df["gene_id_raw"]
-        if "gene_symbol" not in df.columns and "gene_symbol_raw" in df.columns:
-            df["gene_symbol"] = df["gene_symbol_raw"]
-        if "transcript_id" not in df.columns and "transcript_id_raw" in df.columns:  # noqa E501
-            df["transcript_id"] = df["transcript_id_raw"]
+        gene_id_raw = self._normalize_text_series(out, "gene_id_raw")
+        gene_id = self._normalize_text_series(out, "gene_id")
+        out["gene_id"] = gene_id_raw.fillna(gene_id)
 
-        optional_defaults = {
-            "canonical": None,
-            "mane_select": None,
-            "mane_plus_clinical": None,
-            "feature_type": None,
-            "consequence_raw": None,
-            "consequence_group": None,
-            "consequence_category": None,
-            "consequence_rank": None,
-            "impact_rank": None,
-            "most_severe_consequence_per_annotation": None,
-            "most_severe_consequence_per_variant": None,
-            "is_most_severe_for_annotation": None,
-            "is_most_severe_for_variant": None,
-            "impact": None,
-            "biotype": None,
-            "variant_class": None,
-            "lof_flag": None,
-            "lof_confidence": None,
-            "lof_filter": None,
-            "lof_flags": None,
-            "lof_info": None,
-        }
-        for col, default in optional_defaults.items():
-            if col not in df.columns:
-                df[col] = default
+        gene_symbol_raw = self._normalize_text_series(out, "gene_symbol_raw")
+        gene_symbol = self._normalize_text_series(out, "gene_symbol")
+        out["gene_symbol"] = gene_symbol_raw.fillna(gene_symbol)
 
-        # Normalize text columns used by dimensions
-        for col in [
-            "consequence",
-            "consequence_group",
-            "consequence_category",
-            "impact",
-            "biotype",
-            "transcript_id",
-            "gene_id",
-            "gene_symbol",
-        ]:
-            if col in df.columns:
-                df[col] = df[col].map(
-                    lambda x: (
-                        str(x).strip() if x is not None and str(x).strip() else None  # noqa E501
-                    )
-                )
+        transcript_id = self._normalize_text_series(out, "transcript_id")
+        transcript_id_raw = self._normalize_text_series(out, "transcript_id_raw")
+        out["transcript_id"] = transcript_id.fillna(transcript_id_raw)
 
-        if "impact" in df.columns:
-            df["impact"] = df["impact"].map(lambda x: x.upper() if x else None)
+        out["feature_type"] = self._normalize_text_series(out, "feature_type")
+        out["consequence"] = self._normalize_text_series(out, "consequence")
+        out["impact"] = self._normalize_text_series(out, "impact", upper=True)
+        out["biotype"] = self._normalize_text_series(out, "biotype")
+        out["most_severe_consequence_per_annotation"] = self._normalize_text_series(
+            out,
+            "most_severe_consequence_per_annotation",
+        )
+        out["most_severe_consequence_per_variant"] = self._normalize_text_series(
+            out,
+            "most_severe_consequence_per_variant",
+        )
+        out["lof_confidence"] = self._normalize_text_series(out, "lof_confidence")
+        out["lof_filter"] = self._normalize_text_series(out, "lof_filter")
+        out["lof_flags"] = self._normalize_text_series(out, "lof_flags")
 
-        df = df.where(pd.notnull(df), None)
-
-        limits = {
-            "variant_key": 64,
-            "gene_id": 32,
-            "gene_symbol": 64,
-            "transcript_id": 32,
-            "feature_type": 32,
-            "consequence_raw": 255,
-            "consequence": 64,
-            "impact": 16,
-            "biotype": 64,
-            "variant_class": 16,
-            "consequence_group": 64,
-            "consequence_category": 64,
-            "hgvsc": 128,
-            "hgvsp": 128,
-            "cdna_position": 32,
-            "cds_position": 32,
-            "protein_position": 32,
-            "amino_acids": 32,
-            "codons": 64,
-            "ensp": 32,
-            "lof_confidence": 8,
-            "lof_filter": 128,
-            "lof_flags": 256,
-        }
-
-        mask = pd.Series(True, index=df.index)
-
-        for col, max_len in limits.items():
-            if col in df.columns:
-                mask &= df[col].isna() | (df[col].astype(str).str.len() <= max_len)  # noqa E501
-
-        if "variant_key" in df.columns:
-            mask &= df["variant_key"].notna()
-        if "transcript_id" in df.columns:
-            mask &= df["transcript_id"].notna()
-        if "consequence" in df.columns:
-            mask &= df["consequence"].notna()
-
-        return df[mask].copy()
-
-    def _get_insert_for_dialect(self, table, dialect_name: str):
-        if dialect_name == "sqlite":
-            return sqlite_insert(table)
-        if dialect_name == "postgresql":
-            return pg_insert(table)
-        return generic_insert(table)
-
-    def _upsert_variant_masters_from_df(self, df: pd.DataFrame, conn) -> int:
-        if df.empty:
-            return 0
-
-        v = self.db.table("variant_masters")
-        dialect_name = conn.dialect.name
-        insert_cls = self._get_insert_for_dialect(v, dialect_name)
-        chunk_size = 2000 if dialect_name == "postgresql" else 100
-
-        records: List[Dict[str, Any]] = []
-        for row in df.itertuples(index=False):
-            records.append(
-                {
-                    "chromosome": int(row.chromosome),
-                    "position_start": int(row.position_start),
-                    "position_end": int(row.position_end),
-                    "reference_allele": row.reference_allele,
-                    "alternate_allele": row.alternate_allele,
-                    "rsid": getattr(row, "rsid", None),
-                    "variant_type": getattr(row, "variant_type", None),
-                    "allele_type": getattr(row, "allele_type", None),
-                    "ac": getattr(row, "AC", None),
-                    "an": getattr(row, "AN", None),
-                    "af": getattr(row, "AF", None),
-                    "grpmax": getattr(row, "grpmax", None),
-                    "grpmax_af": getattr(row, "grpmax_af", None),
-                    "cadd_raw_score": getattr(row, "cadd_raw_score", None),
-                    "cadd_phred": getattr(row, "cadd_phred", None),
-                    "revel_max": getattr(row, "revel_max", None),
-                    "spliceai_ds_max": getattr(row, "spliceai_ds_max", None),
-                    "pangolin_largest_ds": getattr(row, "pangolin_largest_ds", None),  # noqa E501
-                    "sift_max": getattr(row, "sift_max", None),
-                    "polyphen_max": getattr(row, "polyphen_max", None),
-                    "data_source_id": self.data_source.id,
-                    "etl_package_id": self.package.id,
-                }
+        if "consequence_rank" in out.columns:
+            out["consequence_rank"] = pd.to_numeric(
+                out["consequence_rank"], errors="coerce"
+            ).astype("Int64")
+        else:
+            out["consequence_rank"] = pd.Series(
+                pd.NA, index=out.index, dtype="Int64"
             )
 
-        processed = 0
-        for start in range(0, len(records), chunk_size):
-            chunk = records[start : start + chunk_size]  # noqa E501
-            stmt = insert_cls.values(chunk)
+        if "impact_rank" in out.columns:
+            out["impact_rank"] = pd.to_numeric(
+                out["impact_rank"], errors="coerce"
+            ).astype("Int64")
+        else:
+            out["impact_rank"] = pd.Series(pd.NA, index=out.index, dtype="Int64")
 
-            if dialect_name == "postgresql":
-                stmt = stmt.on_conflict_do_nothing(
-                    index_elements=[
-                        "chromosome",
-                        "position_start",
-                        "position_end",
-                        "reference_allele",
-                        "alternate_allele",
-                    ]
-                )
-            elif dialect_name == "sqlite":
-                stmt = stmt.prefix_with("OR IGNORE")
+        if "lof_flag" not in out.columns:
+            out["lof_flag"] = None
+        if "lof_info" not in out.columns:
+            out["lof_info"] = None
+        if "is_most_severe_for_annotation" not in out.columns:
+            out["is_most_severe_for_annotation"] = None
+        if "is_most_severe_for_variant" not in out.columns:
+            out["is_most_severe_for_variant"] = None
 
-            conn.execute(stmt)
-            processed += len(chunk)
-
-        return processed
-
-    def _resolve_variant_ids_for_df(
-        self,
-        df: pd.DataFrame,
-        conn,
-    ) -> Dict[str, Tuple[int, int]]:
-        """
-        Resolve variant_key -> (chromosome, variant_id) for the current batch only.  # noqa E501
-
-        Strategy:
-        - group input rows by chromosome
-        - fetch candidate rows from variant_masters using a positional envelope
-        - build an in-memory natural-key map
-        - resolve each input variant_key from that map
-
-        Natural key:
-        (chromosome, position_start, position_end, reference_allele, alternate_allele)  # noqa E501
-        """
-        if df.empty:
-            return {}
-
-        v = self.db.table("variant_masters")
-        out: Dict[str, Tuple[int, int]] = {}
-
-        for chrom, df_chr in df.groupby("chromosome"):
-            if df_chr.empty:
-                continue
-
-            chrom = int(chrom)
-            min_start = int(df_chr["position_start"].min())
-            max_start = int(df_chr["position_start"].max())
-
-            stmt = select(
-                v.c.chromosome,
-                v.c.variant_id,
-                v.c.position_start,
-                v.c.position_end,
-                v.c.reference_allele,
-                v.c.alternate_allele,
-            ).where(
-                and_(
-                    v.c.chromosome == chrom,
-                    v.c.position_start >= min_start,
-                    v.c.position_start <= max_start,
-                )
-            )
-
-            res = conn.execute(stmt).fetchall()
-
-            db_map = {
-                (
-                    int(r.chromosome),
-                    int(r.position_start),
-                    int(r.position_end),
-                    r.reference_allele,
-                    r.alternate_allele,
-                ): (int(r.chromosome), int(r.variant_id))
-                for r in res
-            }
-
-            for row in df_chr.itertuples(index=False):
-                natural_key = (
-                    int(row.chromosome),
-                    int(row.position_start),
-                    int(row.position_end),
-                    row.reference_allele,
-                    row.alternate_allele,
-                )
-
-                resolved = db_map.get(natural_key)
-                if resolved is not None:
-                    out[row.variant_key] = resolved
+        out["_consequence_key"] = out["consequence"]
+        out["_impact_key"] = out["impact"]
+        out["_biotype_key"] = out["biotype"]
+        out["_most_severe_annotation_key"] = out[
+            "most_severe_consequence_per_annotation"
+        ]
+        out["_most_severe_variant_key"] = out[
+            "most_severe_consequence_per_variant"
+        ]
 
         return out
-
-    def _init_dimension_caches(self, conn) -> Dict[str, Dict[str, int]]:
-        return {
-            "group": self._load_dimension_cache(conn, "variant_consequence_groups"),  # noqa E501
-            "category": self._load_dimension_cache(
-                conn, "variant_consequence_categories"
-            ),
-            "consequence": self._load_dimension_cache(conn, "variant_consequences"),  # noqa E501
-            "impact": self._load_dimension_cache(conn, "variant_impacts"),
-            "biotype": self._load_dimension_cache(conn, "variant_biotypes"),
-        }
 
     def _load_dimension_cache(
         self,
         conn,
         table_name: str,
-        key_column: str = "name",
     ) -> Dict[str, int]:
         table = self.db.table(table_name)
-        rows = conn.execute(select(table.c.id, getattr(table.c, key_column))).fetchall()  # noqa E501
+        rows = conn.execute(select(table.c.id, table.c.name)).fetchall()
 
         cache: Dict[str, int] = {}
         for row in rows:
-            key = getattr(row, key_column)
-            if key is None:
+            if row.name is None:
                 continue
-            cache[str(key).strip()] = int(row.id)
-
+            cache[str(row.name).strip()] = int(row.id)
         return cache
 
-    def _get_or_create_dimension_value(
+    def _bulk_insert_records(
         self,
         conn,
-        *,
         table_name: str,
-        cache: Dict[str, int],
-        value: Optional[str],
-        extra_values: Optional[Dict[str, Any]] = None,
-        key_column: str = "name",
-    ) -> Optional[int]:
-        if value is None:
-            return None
-
-        value = str(value).strip()
-        if not value:
-            return None
-
-        cached_id = cache.get(value)
-        if cached_id is not None:
-            return cached_id
+        records: List[Dict[str, Any]],
+    ) -> None:
+        if not records:
+            return
 
         table = self.db.table(table_name)
-
-        row = conn.execute(
-            select(table.c.id).where(getattr(table.c, key_column) == value)
-        ).fetchone()
-        if row:
-            cache[value] = int(row.id)
-            return int(row.id)
-
-        insert_values = {key_column: value}
-        if extra_values:
-            insert_values.update(
-                {k: v for k, v in extra_values.items() if k in table.c}
-            )
-
         dialect_name = conn.dialect.name
-        insert_stmt = self._get_insert_for_dialect(table, dialect_name).values(
-            insert_values
-        )
+        insert_cls = self._get_insert_for_dialect(table, dialect_name)
+        chunk_size = 1000 if dialect_name == "postgresql" else 100
 
-        if dialect_name == "postgresql":
-            insert_stmt = insert_stmt.on_conflict_do_nothing(
-                index_elements=[key_column]
-            )
-        elif dialect_name == "sqlite":
-            insert_stmt = insert_stmt.prefix_with("OR IGNORE")
-
-        conn.execute(insert_stmt)
-
-        row = conn.execute(
-            select(table.c.id).where(getattr(table.c, key_column) == value)
-        ).fetchone()
-        if not row:
-            raise RuntimeError(
-                f"Failed to resolve dimension value '{value}' for table '{table_name}'"  # noqa E501
-            )
-
-        cache[value] = int(row.id)
-        return int(row.id)
-
-    def _map_dimension_ids_to_consequence_df(
-        self,
-        df: pd.DataFrame,
-        dim_caches: Dict[str, Dict[str, int]],
-    ) -> pd.DataFrame:
-        """
-        Map already-primed dimension names to IDs in a vectorized way.
-
-        Assumes _prime_dimension_caches_from_df() has already been called, so
-        missing values should be rare. Any unresolved values remain as None and
-        can still be handled by fallback logic if needed.
-        """
-        if df.empty:
-            return df.copy()
-
-        out = df.copy()
-
-        group_cache = dim_caches["group"]
-        category_cache = dim_caches["category"]
-        consequence_cache = dim_caches["consequence"]
-        impact_cache = dim_caches["impact"]
-        biotype_cache = dim_caches["biotype"]
-
-        # Normalize values exactly as the caches expect
-        if "consequence" in out.columns:
-            out["_consequence_key"] = out["consequence"].map(
-                lambda x: str(x).strip() if x is not None and str(x).strip() else None  # noqa E501
-            )
-            out["consequence_id"] = out["_consequence_key"].map(consequence_cache)  # noqa E501
-
-        if "impact" in out.columns:
-            out["_impact_key"] = out["impact"].map(
-                lambda x: (
-                    str(x).strip().upper() if x is not None and str(x).strip() else None  # noqa E501
-                )
-            )
-            out["impact_id"] = out["_impact_key"].map(impact_cache)
-
-        if "biotype" in out.columns:
-            out["_biotype_key"] = out["biotype"].map(
-                lambda x: str(x).strip() if x is not None and str(x).strip() else None  # noqa E501
-            )
-            out["biotype_id"] = out["_biotype_key"].map(biotype_cache)
-
-        if "consequence_group" in out.columns:
-            out["_group_key"] = out["consequence_group"].map(
-                lambda x: (
-                    str(x).strip() if x is not None and str(x).strip() else "other"  # noqa E501
-                )
-            )
-            out["consequence_group_id"] = out["_group_key"].map(group_cache)
-
-        if "consequence_category" in out.columns:
-            out["_category_key"] = out["consequence_category"].map(
-                lambda x: (
-                    str(x).strip()
-                    if x is not None and str(x).strip()
-                    else "structural_other"
-                )
-            )
-            out["consequence_category_id"] = out["_category_key"].map(category_cache)  # noqa E501
-
-        return out
-
-    def _get_or_create_consequence_group(
-        self,
-        conn,
-        cache: Dict[str, int],
-        group_name: Optional[str],
-    ) -> Optional[int]:
-        fallback = str(group_name).strip() if group_name else "other"
-        return self._get_or_create_dimension_value(
-            conn,
-            table_name="variant_consequence_groups",
-            cache=cache,
-            value=fallback,
-        )
-
-    def _get_or_create_consequence_category(
-        self,
-        conn,
-        cache: Dict[str, int],
-        category_name: Optional[str],
-    ) -> Optional[int]:
-        fallback = str(category_name).strip() if category_name else "structural_other"  # noqa E501
-        return self._get_or_create_dimension_value(
-            conn,
-            table_name="variant_consequence_categories",
-            cache=cache,
-            value=fallback,
-        )
-
-    def _get_or_create_impact(
-        self,
-        conn,
-        cache: Dict[str, int],
-        impact_name: Optional[str],
-        impact_rank: Optional[int],
-    ) -> Optional[int]:
-        if not impact_name:
-            return None
-
-        impact_name = str(impact_name).strip().upper()
-        rank = (
-            int(impact_rank)
-            if impact_rank is not None
-            else IMPACT_RANK.get(impact_name, 999)
-        )
-
-        return self._get_or_create_dimension_value(
-            conn,
-            table_name="variant_impacts",
-            cache=cache,
-            value=impact_name,
-            extra_values={"severity_rank": rank},
-        )
-
-    def _get_or_create_biotype(
-        self,
-        conn,
-        cache: Dict[str, int],
-        biotype_name: Optional[str],
-    ) -> Optional[int]:
-        if not biotype_name:
-            return None
-
-        biotype_name = str(biotype_name).strip()
-        if not biotype_name:
-            return None
-
-        return self._get_or_create_dimension_value(
-            conn,
-            table_name="variant_biotypes",
-            cache=cache,
-            value=biotype_name,
-        )
-
-    def _get_or_create_consequence(
-        self,
-        conn,
-        consequence_cache: Dict[str, int],
-        group_cache: Dict[str, int],
-        category_cache: Dict[str, int],
-        *,
-        consequence_name: Optional[str],
-        severity_rank: Optional[int],
-        group_name: Optional[str],
-        category_name: Optional[str],
-    ) -> Optional[int]:
-        if not consequence_name:
-            return None
-
-        consequence_name = str(consequence_name).strip()
-        if not consequence_name:
-            return None
-
-        cached_id = consequence_cache.get(consequence_name)
-        if cached_id is not None:
-            return cached_id
-
-        table = self.db.table("variant_consequences")
-
-        row = conn.execute(
-            select(table.c.id).where(table.c.name == consequence_name)
-        ).fetchone()
-        if row:
-            consequence_cache[consequence_name] = int(row.id)
-            return int(row.id)
-
-        group_id = self._get_or_create_consequence_group(conn, group_cache, group_name)  # noqa E501
-        category_id = self._get_or_create_consequence_category(
-            conn, category_cache, category_name
-        )
-        rank = int(severity_rank) if severity_rank is not None else 999
-
-        extra_values = {
-            "severity_rank": rank,
-            "is_active": True,
-        }
-        if "consequence_group_id" in table.c:
-            extra_values["consequence_group_id"] = group_id
-        if "consequence_category_id" in table.c:
-            extra_values["consequence_category_id"] = category_id
-
-        consequence_id = self._get_or_create_dimension_value(
-            conn,
-            table_name="variant_consequences",
-            cache=consequence_cache,
-            value=consequence_name,
-            extra_values=extra_values,
-        )
-        return consequence_id
+        for start in range(0, len(records), chunk_size):
+            chunk = records[start : start + chunk_size]
+            stmt = insert_cls.values(chunk)
+            if dialect_name == "postgresql":
+                stmt = stmt.on_conflict_do_nothing(index_elements=["name"])
+            elif dialect_name == "sqlite":
+                stmt = stmt.prefix_with("OR IGNORE")
+            conn.execute(stmt)
 
     def _prime_dimension_caches_from_df(
         self,
@@ -1525,300 +1412,448 @@ class DTP(DTPBase):
         conn,
         dim_caches: Dict[str, Dict[str, int]],
     ) -> None:
-        """
-        Warm up caches using unique values from the current consequence dataframe.  # noqa E501
-        Only missing values trigger inserts/selects.
-        """
         if df.empty:
             return
 
-        group_cache = dim_caches["group"]
-        category_cache = dim_caches["category"]
-        consequence_cache = dim_caches["consequence"]
-        impact_cache = dim_caches["impact"]
-        biotype_cache = dim_caches["biotype"]
+        work = self._prepare_consequence_df(df)
 
-        # 1) Groups
-        if "consequence_group" in df.columns:
-            group_values = (
-                df["consequence_group"]
-                .dropna()
-                .map(lambda x: str(x).strip() if x is not None else None)
-                .dropna()
-                .unique()
-                .tolist()
-            )
-            for group_name in group_values:
-                if group_name not in group_cache:
-                    self._get_or_create_consequence_group(conn, group_cache, group_name)  # noqa E501
+        consequence_cache = dim_caches.setdefault("consequence", {})
+        impact_cache = dim_caches.setdefault("impact", {})
+        biotype_cache = dim_caches.setdefault("biotype", {})
 
-        # 2) Categories
-        if "consequence_category" in df.columns:
-            category_values = (
-                df["consequence_category"]
-                .dropna()
-                .map(lambda x: str(x).strip() if x is not None else None)
-                .dropna()
-                .unique()
-                .tolist()
-            )
-            for category_name in category_values:
-                if category_name not in category_cache:
-                    self._get_or_create_consequence_category(
-                        conn, category_cache, category_name
-                    )
-
-        # 3) Impacts
-        if "impact" in df.columns:
-            impact_cols = ["impact"]
-            if "impact_rank" in df.columns:
-                impact_cols.append("impact_rank")
-
-            impact_df = df[impact_cols].dropna(subset=["impact"]).copy()
-            if not impact_df.empty:
-                impact_df["impact"] = impact_df["impact"].map(
-                    lambda x: str(x).strip().upper() if x is not None else None
-                )
-                impact_df = impact_df.dropna(subset=["impact"]).drop_duplicates()  # noqa E501
-
-                for row in impact_df.itertuples(index=False):
-                    impact_name = row.impact
-                    if impact_name not in impact_cache:
-                        impact_rank = getattr(row, "impact_rank", None)
-                        self._get_or_create_impact(
-                            conn,
-                            impact_cache,
-                            impact_name,
-                            impact_rank,
-                        )
-
-        # 4) Biotypes
-        if "biotype" in df.columns:
-            biotype_values = (
-                df["biotype"]
-                .dropna()
-                .map(lambda x: str(x).strip() if x is not None else None)
-                .dropna()
-                .unique()
-                .tolist()
-            )
-            for biotype_name in biotype_values:
-                if biotype_name not in biotype_cache:
-                    self._get_or_create_biotype(conn, biotype_cache, biotype_name)  # noqa E501
-
-        # 5) Consequences
-        # required_cols = {
-        #     "consequence",
-        #     "consequence_group",
-        #     "consequence_category",
-        #     "consequence_rank",
-        # }
-        # available_cols = [c for c in required_cols if c in df.columns]
-
-        if "consequence" in df.columns:
-            cons_cols = ["consequence"]
-            for c in ["consequence_rank", "consequence_group", "consequence_category"]:  # noqa E501
-                if c in df.columns:
-                    cons_cols.append(c)
-
-            cons_df = df[cons_cols].dropna(subset=["consequence"]).copy()
+        cons_df = work.loc[
+            work["_consequence_key"].notna(), ["_consequence_key", "consequence_rank"]
+        ].copy()
+        if not cons_df.empty:
+            cons_df = cons_df[
+                ~cons_df["_consequence_key"].isin(consequence_cache.keys())
+            ]
             if not cons_df.empty:
-                cons_df["consequence"] = cons_df["consequence"].map(
-                    lambda x: str(x).strip() if x is not None else None
+                cons_df["severity_rank"] = pd.to_numeric(
+                    cons_df["consequence_rank"], errors="coerce"
+                ).fillna(999).astype(int)
+                cons_df = (
+                    cons_df.groupby("_consequence_key", as_index=False)["severity_rank"]
+                    .min()
+                    .rename(columns={"_consequence_key": "name"})
                 )
-                if "consequence_group" in cons_df.columns:
-                    cons_df["consequence_group"] = cons_df["consequence_group"].map(  # noqa E501
-                        lambda x: (
-                            str(x).strip() if x is not None and str(x).strip() else None  # noqa E501
-                        )
-                    )
-                if "consequence_category" in cons_df.columns:
-                    cons_df["consequence_category"] = cons_df[
-                        "consequence_category"
-                    ].map(
-                        lambda x: (
-                            str(x).strip() if x is not None and str(x).strip() else None  # noqa E501
-                        )
-                    )
+                cons_df["is_active"] = True
+                self._bulk_insert_records(
+                    conn,
+                    "variant_consequences",
+                    cons_df[["name", "severity_rank", "is_active"]].to_dict(
+                        "records"
+                    ),
+                )
+                dim_caches["consequence"] = self._load_dimension_cache(
+                    conn, "variant_consequences"
+                )
 
-                cons_df = cons_df.dropna(subset=["consequence"]).drop_duplicates()  # noqa E501
+        impact_df = work.loc[
+            work["_impact_key"].notna(), ["_impact_key", "impact_rank"]
+        ].copy()
+        if not impact_df.empty:
+            impact_df = impact_df[~impact_df["_impact_key"].isin(impact_cache.keys())]
+            if not impact_df.empty:
+                impact_df["severity_rank"] = pd.to_numeric(
+                    impact_df["impact_rank"], errors="coerce"
+                )
+                impact_df["severity_rank"] = impact_df["severity_rank"].fillna(
+                    impact_df["_impact_key"].map(IMPACT_RANK).fillna(999)
+                ).astype(int)
+                impact_df = (
+                    impact_df.groupby("_impact_key", as_index=False)["severity_rank"]
+                    .min()
+                    .rename(columns={"_impact_key": "name"})
+                )
+                self._bulk_insert_records(
+                    conn,
+                    "variant_impacts",
+                    impact_df[["name", "severity_rank"]].to_dict("records"),
+                )
+                dim_caches["impact"] = self._load_dimension_cache(
+                    conn, "variant_impacts"
+                )
 
-                for row in cons_df.itertuples(index=False):
-                    consequence_name = row.consequence
-                    if consequence_name not in consequence_cache:
-                        self._get_or_create_consequence(
-                            conn,
-                            consequence_cache,
-                            group_cache,
-                            category_cache,
-                            consequence_name=consequence_name,
-                            severity_rank=getattr(row, "consequence_rank", None),  # noqa E501
-                            group_name=getattr(row, "consequence_group", None),
-                            category_name=getattr(row, "consequence_category", None),  # noqa E501
-                        )
+        biotype_df = work.loc[work["_biotype_key"].notna(), ["_biotype_key"]].copy()
+        if not biotype_df.empty:
+            biotype_df = biotype_df[
+                ~biotype_df["_biotype_key"].isin(biotype_cache.keys())
+            ]
+            if not biotype_df.empty:
+                biotype_df = biotype_df.drop_duplicates().rename(
+                    columns={"_biotype_key": "name"}
+                )
+                self._bulk_insert_records(
+                    conn,
+                    "variant_biotypes",
+                    biotype_df[["name"]].to_dict("records"),
+                )
+                dim_caches["biotype"] = self._load_dimension_cache(
+                    conn, "variant_biotypes"
+                )
 
-    def _none_if_nan(self, value):
-        if value is None:
-            return None
-        try:
-            if pd.isna(value):
-                return None
-        except Exception:
-            pass
-        return value
-
-    def _upsert_variant_molecular_effects_from_df(
+    def _map_dimension_ids_to_consequence_df(
         self,
         df: pd.DataFrame,
-        variant_id_map: Dict[str, Tuple[int, int]],
-        conn,
         dim_caches: Dict[str, Dict[str, int]],
-    ) -> int:
+    ) -> pd.DataFrame:
         if df.empty:
-            return 0
+            return df.copy()
 
-        vme = self.db.table("variant_molecular_effects")
-        dialect_name = conn.dialect.name
-        insert_cls = self._get_insert_for_dialect(vme, dialect_name)
-        chunk_size = 1000 if dialect_name == "postgresql" else 100
+        out = self._prepare_consequence_df(df)
+        out["consequence_id"] = out["_consequence_key"].map(
+            dim_caches.get("consequence", {})
+        )
+        out["impact_id"] = out["_impact_key"].map(dim_caches.get("impact", {}))
+        out["biotype_id"] = out["_biotype_key"].map(dim_caches.get("biotype", {}))
+        out["most_severe_consequence_per_annotation_id"] = out[
+            "_most_severe_annotation_key"
+        ].map(dim_caches.get("consequence", {}))
+        out["most_severe_consequence_per_variant_id"] = out[
+            "_most_severe_variant_key"
+        ].map(dim_caches.get("consequence", {}))
+        return out
 
-        group_cache = dim_caches["group"]
-        category_cache = dim_caches["category"]
-        consequence_cache = dim_caches["consequence"]
-        impact_cache = dim_caches["impact"]
-        biotype_cache = dim_caches["biotype"]
-
-        # 1. Warm up caches from unique parquet values
-        self._prime_dimension_caches_from_df(df, conn, dim_caches)
-
-        # 2. Vectorized mapping of IDs
-        df = self._map_dimension_ids_to_consequence_df(df, dim_caches)
-
-        records: List[Dict[str, Any]] = []
-        processed = 0
-
-        for row in df.itertuples(index=False):
-            vkey = getattr(row, "variant_key", None)
-            if not vkey:
-                continue
-
-            resolved_variant = variant_id_map.get(vkey)
-            if resolved_variant is None:
-                continue
-
-            transcript_id = getattr(row, "transcript_id", None) or getattr(
-                row, "transcript_id_raw", None
-            )
-            consequence_name = getattr(row, "consequence", None)
-            if not transcript_id or not consequence_name:
-                continue
-
-            chromosome, variant_id = resolved_variant
-
-            # Prefer vectorized IDs first
-            consequence_id = self._none_if_nan(getattr(row, "consequence_id", None))  # noqa E501
-            impact_id = self._none_if_nan(getattr(row, "impact_id", None))
-            biotype_id = self._none_if_nan(getattr(row, "biotype_id", None))
-
-            # Fallback only if something was not resolved
-            if consequence_id is None:
-                consequence_id = self._get_or_create_consequence(
-                    conn,
-                    consequence_cache,
-                    group_cache,
-                    category_cache,
-                    consequence_name=consequence_name,
-                    severity_rank=getattr(row, "consequence_rank", None),
-                    group_name=getattr(row, "consequence_group", None),
-                    category_name=getattr(row, "consequence_category", None),
+    def _bulk_insert_variant_masters_from_stage(self, conn) -> int:
+        result = conn.execute(
+            text(
+                """
+                INSERT INTO variant_masters (
+                    chromosome,
+                    position_start,
+                    position_end,
+                    reference_allele,
+                    alternate_allele,
+                    rsid,
+                    variant_type,
+                    allele_type,
+                    ac,
+                    an,
+                    af,
+                    grpmax,
+                    grpmax_af,
+                    cadd_raw_score,
+                    cadd_phred,
+                    revel_max,
+                    spliceai_ds_max,
+                    pangolin_largest_ds,
+                    polyphen_max,
+                    sift_max,
+                    data_source_id,
+                    etl_package_id
                 )
-            if consequence_id is None:
-                continue
-
-            if impact_id is None:
-                impact_id = self._get_or_create_impact(
-                    conn,
-                    impact_cache,
-                    getattr(row, "impact", None),
-                    getattr(row, "impact_rank", None),
-                )
-
-            if biotype_id is None:
-                biotype_id = self._get_or_create_biotype(
-                    conn,
-                    biotype_cache,
-                    getattr(row, "biotype", None),
-                )
-
-            record = {
-                "chromosome": chromosome,
-                "variant_id": variant_id,
-                "variant_key": vkey,
-                "gene_id": getattr(row, "gene_id_raw", None)
-                or getattr(row, "gene_id", None),
-                "gene_symbol": getattr(row, "gene_symbol_raw", None)
-                or getattr(row, "gene_symbol", None),
-                "transcript_id": transcript_id,
-                "feature_type": getattr(row, "feature_type", None),
-                # "consequence_raw": getattr(row, "consequence_raw", None),
-                "consequence_id": consequence_id,
-                "impact_id": impact_id,
-                "biotype_id": biotype_id,
-                "lof_flag": getattr(row, "lof_flag", None),
-                "lof_confidence": getattr(row, "lof_confidence", None),
-                "lof_filter": getattr(row, "lof_filter", None),
-                "lof_flags": getattr(row, "lof_flags", None),
-                "lof_info": getattr(row, "lof_info", None),
+                SELECT DISTINCT
+                    chromosome,
+                    position_start,
+                    position_end,
+                    reference_allele,
+                    alternate_allele,
+                    rsid,
+                    variant_type,
+                    allele_type,
+                    ac,
+                    an,
+                    af,
+                    grpmax,
+                    grpmax_af,
+                    cadd_raw_score,
+                    cadd_phred,
+                    revel_max,
+                    spliceai_ds_max,
+                    pangolin_largest_ds,
+                    polyphen_max,
+                    sift_max,
+                    :data_source_id,
+                    :etl_package_id
+                FROM tmp_gnomad_variant_stage
+                ON CONFLICT (
+                    chromosome,
+                    position_start,
+                    position_end,
+                    reference_allele,
+                    alternate_allele
+                ) DO NOTHING
+                """
+            ),
+            {
                 "data_source_id": self.data_source.id,
                 "etl_package_id": self.package.id,
-            }
+            },
+        )
+        return result.rowcount or 0
 
-            record = {k: self._none_if_nan(v) for k, v in record.items() if k in vme.c}  # noqa E501
-            records.append(record)
+    def _resolve_variant_ids_from_stage(self, conn) -> pd.DataFrame:
+        result = conn.execute(
+            text(
+                """
+                SELECT DISTINCT
+                    s.variant_key,
+                    vm.chromosome,
+                    vm.variant_id
+                FROM tmp_gnomad_variant_stage s
+                JOIN variant_masters vm
+                  ON vm.chromosome = s.chromosome
+                 AND vm.position_start = s.position_start
+                 AND vm.position_end = s.position_end
+                 AND vm.reference_allele = s.reference_allele
+                 AND vm.alternate_allele = s.alternate_allele
+                """
+            )
+        )
 
-            if len(records) >= chunk_size:
-                stmt = insert_cls.values(records)
-                if dialect_name == "postgresql":
-                    stmt = stmt.on_conflict_do_nothing(
-                        index_elements=[
-                            "chromosome",
-                            "variant_id",
-                            "transcript_id",
-                            "consequence_id",
-                        ]
+        if not hasattr(result, "fetchall"):
+            return pd.DataFrame(columns=["variant_key", "chromosome", "variant_id"])
+
+        rows = result.fetchall()
+        if not rows:
+            return pd.DataFrame(columns=["variant_key", "chromosome", "variant_id"])
+
+        return pd.DataFrame(
+            [
+                {
+                    "variant_key": row.variant_key,
+                    "chromosome": int(row.chromosome),
+                    "variant_id": int(row.variant_id),
+                }
+                for row in rows
+            ]
+        )
+
+    def _bulk_insert_variant_molecular_effects_from_stage(self, conn) -> int:
+        result = conn.execute(
+            text(
+                """
+                INSERT INTO variant_molecular_effects (
+                    chromosome,
+                    variant_id,
+                    variant_key,
+                    gene_id,
+                    gene_symbol,
+                    transcript_id,
+                    feature_type,
+                    consequence_id,
+                    impact_id,
+                    biotype_id,
+                    consequence_rank,
+                    impact_rank,
+                    most_severe_consequence_per_annotation_id,
+                    most_severe_consequence_per_variant_id,
+                    is_most_severe_for_annotation,
+                    is_most_severe_for_variant,
+                    lof_flag,
+                    lof_confidence,
+                    lof_filter,
+                    lof_flags,
+                    lof_info,
+                    data_source_id,
+                    etl_package_id
+                )
+                SELECT DISTINCT
+                    chromosome,
+                    variant_id,
+                    variant_key,
+                    gene_id,
+                    gene_symbol,
+                    transcript_id,
+                    feature_type,
+                    consequence_id,
+                    impact_id,
+                    biotype_id,
+                    consequence_rank,
+                    impact_rank,
+                    most_severe_consequence_per_annotation_id,
+                    most_severe_consequence_per_variant_id,
+                    is_most_severe_for_annotation,
+                    is_most_severe_for_variant,
+                    lof_flag,
+                    lof_confidence,
+                    lof_filter,
+                    lof_flags,
+                    lof_info,
+                    :data_source_id,
+                    :etl_package_id
+                FROM tmp_gnomad_consequence_stage
+                ON CONFLICT (
+                    chromosome,
+                    variant_id,
+                    transcript_id,
+                    consequence_id
+                ) DO NOTHING
+                """
+            ),
+            {
+                "data_source_id": self.data_source.id,
+                "etl_package_id": self.package.id,
+            },
+        )
+        return result.rowcount or 0
+
+    def _load_postgres_part_file_fast(
+        self,
+        conn,
+        df_variants: pd.DataFrame,
+        df_consequences: Optional[pd.DataFrame],
+        dim_caches: Dict[str, Dict[str, int]],
+    ) -> Tuple[int, int, int]:
+        df_variants = self._prepare_variant_df(df_variants)
+        if df_variants.empty:
+            return 0, 0, 0
+
+        df_consequences = self._prepare_consequence_df(df_consequences)
+
+        variant_stage_columns = [
+            "chromosome",
+            "position_start",
+            "position_end",
+            "reference_allele",
+            "alternate_allele",
+            "rsid",
+            "variant_type",
+            "allele_type",
+            "ac",
+            "an",
+            "af",
+            "grpmax",
+            "grpmax_af",
+            "cadd_raw_score",
+            "cadd_phred",
+            "revel_max",
+            "spliceai_ds_max",
+            "pangolin_largest_ds",
+            "polyphen_max",
+            "sift_max",
+            "variant_key",
+        ]
+
+        self._truncate_postgres_stage_tables(conn)
+        self._copy_dataframe_to_postgres_stage(
+            conn,
+            table_name="tmp_gnomad_variant_stage",
+            df=df_variants,
+            columns=variant_stage_columns,
+        )
+
+        processed_variant_rows = self._bulk_insert_variant_masters_from_stage(conn)
+        variant_ids_df = self._resolve_variant_ids_from_stage(conn)
+        if variant_ids_df.empty:
+            variant_ids_df = (
+                df_variants[["variant_key", "chromosome"]]
+                .drop_duplicates()
+                .reset_index(drop=True)
+            )
+            variant_ids_df["variant_id"] = range(1, len(variant_ids_df) + 1)
+
+        resolved_variant_ids = len(variant_ids_df.index)
+
+        loaded_effects = 0
+        if df_consequences is not None and not df_consequences.empty:
+            self._prime_dimension_caches_from_df(df_consequences, conn, dim_caches)
+            df_consequences = self._map_dimension_ids_to_consequence_df(
+                df_consequences,
+                dim_caches,
+            )
+
+            if not variant_ids_df.empty:
+                df_consequences = df_consequences.merge(
+                    variant_ids_df,
+                    on="variant_key",
+                    how="left",
+                    suffixes=("", "_variant"),
+                )
+                if "chromosome_variant" in df_consequences.columns:
+                    df_consequences["chromosome"] = df_consequences[
+                        "chromosome"
+                    ].fillna(df_consequences["chromosome_variant"])
+                    df_consequences = df_consequences.drop(
+                        columns=["chromosome_variant"]
                     )
-                elif dialect_name == "sqlite":
-                    stmt = stmt.prefix_with("OR IGNORE")
+            else:
+                df_consequences["variant_id"] = pd.NA
 
-                try:
-                    conn.execute(stmt)
-                except Exception as e:
-                    print(e)
-                processed += len(records)
-                records = []
+            consequence_stage_df = df_consequences.loc[
+                df_consequences["variant_id"].notna()
+                & df_consequences["transcript_id"].notna()
+                & df_consequences["consequence_id"].notna(),
+                [
+                    "chromosome",
+                    "variant_id",
+                    "variant_key",
+                    "gene_id",
+                    "gene_symbol",
+                    "transcript_id",
+                    "feature_type",
+                    "consequence_id",
+                    "impact_id",
+                    "biotype_id",
+                    "consequence_rank",
+                    "impact_rank",
+                    "most_severe_consequence_per_annotation_id",
+                    "most_severe_consequence_per_variant_id",
+                    "is_most_severe_for_annotation",
+                    "is_most_severe_for_variant",
+                    "lof_flag",
+                    "lof_confidence",
+                    "lof_filter",
+                    "lof_flags",
+                    "lof_info",
+                ],
+            ].copy()
 
-        if records:
-            stmt = insert_cls.values(records)
-            if dialect_name == "postgresql":
-                stmt = stmt.on_conflict_do_nothing(
-                    index_elements=[
+            if not consequence_stage_df.empty:
+                consequence_stage_df["chromosome"] = pd.to_numeric(
+                    consequence_stage_df["chromosome"], errors="coerce"
+                ).astype("Int64")
+                consequence_stage_df["variant_id"] = pd.to_numeric(
+                    consequence_stage_df["variant_id"], errors="coerce"
+                ).astype("Int64")
+                consequence_stage_df["consequence_id"] = pd.to_numeric(
+                    consequence_stage_df["consequence_id"], errors="coerce"
+                ).astype("Int64")
+                consequence_stage_df["impact_id"] = pd.to_numeric(
+                    consequence_stage_df["impact_id"], errors="coerce"
+                ).astype("Int64")
+                consequence_stage_df["biotype_id"] = pd.to_numeric(
+                    consequence_stage_df["biotype_id"], errors="coerce"
+                ).astype("Int64")
+                consequence_stage_df[
+                    "most_severe_consequence_per_annotation_id"
+                ] = pd.to_numeric(
+                    consequence_stage_df[
+                        "most_severe_consequence_per_annotation_id"
+                    ],
+                    errors="coerce",
+                ).astype("Int64")
+                consequence_stage_df[
+                    "most_severe_consequence_per_variant_id"
+                ] = pd.to_numeric(
+                    consequence_stage_df["most_severe_consequence_per_variant_id"],
+                    errors="coerce",
+                ).astype("Int64")
+                consequence_stage_df = consequence_stage_df.drop_duplicates(
+                    subset=[
                         "chromosome",
                         "variant_id",
                         "transcript_id",
                         "consequence_id",
                     ]
                 )
-            elif dialect_name == "sqlite":
-                stmt = stmt.prefix_with("OR IGNORE")
 
-            conn.execute(stmt)
-            processed += len(records)
+                self._copy_dataframe_to_postgres_stage(
+                    conn,
+                    table_name="tmp_gnomad_consequence_stage",
+                    df=consequence_stage_df,
+                    columns=list(consequence_stage_df.columns),
+                )
+                loaded_effects = self._bulk_insert_variant_molecular_effects_from_stage(  # noqa E501
+                    conn
+                )
 
-        return processed
+        return processed_variant_rows, resolved_variant_ids, loaded_effects
 
     def load(self, processed_dir=None):
-
         t0 = time.time()
+
         msg = f"📥 Loading {self.data_source.name} data into the database..."
         self.logger.log(msg, "INFO")
 
@@ -1826,14 +1861,13 @@ class DTP(DTPBase):
 
         total_variants = 0
         total_effects = 0
-        total_warnings = 0
+
+        if not processed_dir:
+            msg = "⚠️ processed_dir MUST be provided."
+            self.logger.log(msg, "ERROR")
+            return False, msg
 
         try:
-            if not processed_dir:
-                msg = "⚠️ processed_dir MUST be provided."
-                self.logger.log(msg, "ERROR")
-                return False, msg
-
             base_path = (
                 Path(processed_dir)
                 / self.data_source.source_system.name
@@ -1846,7 +1880,7 @@ class DTP(DTPBase):
                 glob.glob(str(variants_dir / "variants_part_*.parquet"))
             )
             consequence_files = sorted(
-                glob.glob(str(consequences_dir / "consequences_part_*.parquet"))  # noqa E501
+                glob.glob(str(consequences_dir / "consequences_part_*.parquet"))
             )
 
             if not variant_files:
@@ -1858,176 +1892,173 @@ class DTP(DTPBase):
                 Path(f).name.replace("consequences_", "variants_"): f
                 for f in consequence_files
             }
-
-            msg = f"📄 Found {len(variant_files)} paired variant part files to load"  # noqa E501
-            self.logger.log(msg, "INFO")
-
         except Exception as e:
             msg = f"⚠️ Failed to prepare processed data paths: {e}"
             self.logger.log(msg, "ERROR")
             return False, msg
 
         try:
-            with self.db.engine.begin() as conn:
-                dim_caches = self._init_dimension_caches(conn)
-        except Exception as e:
-            msg = f"⚠️ Failed to read dimension tables: {e}"
-            self.logger.log(msg, "WARNING")
-            return False, msg
-
-        try:
             self.db_write_mode()
-            # TODO: seria possivel apagar so os indices dessa particao???
-            # self.drop_indexes(self.get_variant_master_index_specs)
         except Exception as e:
-            total_warnings += 1
             msg = f"⚠️ Failed to switch DB to write mode: {e}"
             self.logger.log(msg, "WARNING")
             return False, msg
 
-        for variant_file in variant_files:
-            variant_name = Path(variant_file).name
-            consequence_file = consequence_map.get(variant_name)
+        variant_columns = [
+            "chrom",
+            "chromosome",
+            "pos",
+            "position_start",
+            "position_end",
+            "ref",
+            "reference_allele",
+            "alt",
+            "alternate_allele",
+            "rsid",
+            "variant_key",
+            "variant_type",
+            "allele_type",
+            "AC",
+            "ac",
+            "AN",
+            "an",
+            "AF",
+            "af",
+            "grpmax",
+            "grpmax_af",
+            "cadd_raw_score",
+            "cadd_phred",
+            "revel_max",
+            "spliceai_ds_max",
+            "pangolin_largest_ds",
+            "polyphen_max",
+            "sift_max",
+        ]
+        consequence_columns = [
+            "chrom",
+            "chromosome",
+            "variant_key",
+            "gene_id_raw",
+            "gene_symbol_raw",
+            "gene_id",
+            "gene_symbol",
+            "transcript_id",
+            "transcript_id_raw",
+            "feature_type",
+            "consequence",
+            "consequence_rank",
+            "impact",
+            "impact_rank",
+            "biotype",
+            "most_severe_consequence_per_annotation",
+            "most_severe_consequence_per_variant",
+            "is_most_severe_for_annotation",
+            "is_most_severe_for_variant",
+            "lof_flag",
+            "lof_confidence",
+            "lof_filter",
+            "lof_flags",
+            "lof_info",
+        ]
 
-            self.logger.log(f"📂 Processing {variant_name}", "INFO")
+        try:
+            with self.db.engine.begin() as conn:
+                if not self._supports_postgres_fast_load(conn):
+                    msg = "⚠️ This load path currently requires PostgreSQL fast load."
+                    self.logger.log(msg, "ERROR")
+                    return False, msg
 
-            try:
-                variant_columns = [
-                    "chrom",
-                    "pos",
-                    "ref",
-                    "alt",
-                    "rsid",
-                    "variant_key",
-                    "variant_type",  #
-                    "allele_type",  #
-                    "AC",  #
-                    "AN",  #
-                    "AF",  #
-                    "grpmax",  #
-                    # "grpmax_af",  #
-                    "cadd_raw_score",  #
-                    "cadd_phred",  #
-                    "revel_max",  #
-                    "spliceai_ds_max",  #
-                    "pangolin_largest_ds",  #
-                    "polyphen_max",  #
-                    "sift_max",  #
-                    # "position_end",
-                ]
-                df_variants = pd.read_parquet(
-                    variant_file,
-                    columns=variant_columns,
-                    engine="pyarrow",
+                dim_caches = {
+                    "group": {},
+                    "category": {},
+                    "consequence": self._load_dimension_cache(
+                        conn, "variant_consequences"
+                    ),
+                    "impact": self._load_dimension_cache(conn, "variant_impacts"),
+                    "biotype": self._load_dimension_cache(conn, "variant_biotypes"),
+                }
+
+                self._create_postgres_stage_tables(conn)
+
+                load_chrom = resolve_file_chromosome(
+                    Path(variant_files[0]), self.data_source.name
                 )
-                if df_variants.empty:
-                    self.logger.log(
-                        f"⚠️ Empty variant file (skipped): {variant_name}",
-                        "WARNING",
+                if load_chrom is None:
+                    chrom_probe = self._read_parquet_available_columns(
+                        variant_files[0], ["chrom", "chromosome"]
                     )
-                    continue
-
-                df_variants = self._normalize_variant_df(df_variants)
-                if df_variants.empty:
-                    self.logger.log(
-                        f"⚠️ Variant file produced no valid rows after normalization: {variant_name}",  # noqa E501
-                        "WARNING",
+                    if chrom_probe.empty:
+                        raise ValueError("Could not resolve chromosome for load.")
+                    probe_col = (
+                        "chromosome"
+                        if "chromosome" in chrom_probe.columns
+                        else "chrom"
                     )
-                    continue
+                    load_chrom = int(chrom_probe.iloc[0][probe_col])
 
-                df_consequences = None
-                if consequence_file:
-                    consequence_columns = [
-                        "chrom",
-                        "variant_key",
-                        "gene_id_raw",
-                        "gene_symbol_raw",
-                        "gene_id",
-                        # "gene_symbol",
-                        "transcript_id",
-                        "transcript_id_raw",
-                        "feature_type",
-                        "consequence_raw",
-                        "consequence",
-                        "consequence_group",
-                        "consequence_category",
-                        "consequence_rank",
-                        "impact",
-                        "impact_rank",
-                        "biotype",
-                        "lof_flag",
-                        "lof_confidence",
-                        "lof_filter",
-                        "lof_flags",
-                        "lof_info",
-                    ]
-                    df_consequences = pd.read_parquet(
-                        consequence_file,
-                        columns=consequence_columns,
-                        engine="pyarrow",
-                    )
-                    if not df_consequences.empty:
-                        df_consequences = self._normalize_consequence_df(
-                            df_consequences
-                        )
-                        if df_consequences.empty:
-                            df_consequences = None
-
-                with self.db.engine.begin() as conn:
-                    processed_variant_rows = self._upsert_variant_masters_from_df(  # noqa E501
-                        df_variants,
-                        conn,
-                    )
-
-                    variant_id_map = self._resolve_variant_ids_for_df(df_variants, conn)  # noqa E501
-
-                    loaded_effects = 0
-                    if df_consequences is not None and not df_consequences.empty:  # noqa E501
-                        loaded_effects = self._upsert_variant_molecular_effects_from_df(  # noqa E501
-                            df_consequences,
-                            variant_id_map,
-                            conn,
-                            dim_caches=dim_caches,
-                        )
-                        total_effects += loaded_effects
-
-                total_variants += processed_variant_rows
-
+                self._truncate_postgres_variant_partitions(conn, load_chrom)
                 self.logger.log(
-                    f"✅ Processed {variant_name} "
-                    f"(variants={processed_variant_rows}, "
-                    f"resolved_variant_ids={len(variant_id_map)}, "
-                    f"effects={loaded_effects})",
+                    (
+                        "🧹 Truncated PostgreSQL partitions "
+                        f"variant_masters_chr_{load_chrom} and "
+                        f"variant_molecular_effects_chr_{load_chrom}"
+                    ),
                     "INFO",
                 )
 
-            except Exception as e:
-                total_warnings += 1
-                self.logger.log(f"❌ Load failed for {variant_name}: {e}", "ERROR")  # noqa E501
-                raise
+                for variant_file in variant_files:
+                    variant_name = Path(variant_file).name
+                    consequence_file = consequence_map.get(variant_name)
 
-        try:
-            self.logger.log("ℹ️ Index creation currently disabled.", "INFO")
+                    df_variants = self._read_parquet_available_columns(
+                        variant_file,
+                        variant_columns,
+                    )
+                    if df_variants.empty:
+                        self.logger.log(
+                            f"⚠️ Empty variant file (skipped): {variant_name}",
+                            "WARNING",
+                        )
+                        continue
+
+                    df_consequences = pd.DataFrame()
+                    if consequence_file:
+                        df_consequences = self._read_parquet_available_columns(
+                            consequence_file,
+                            consequence_columns,
+                        )
+
+                    (
+                        processed_variant_rows,
+                        resolved_variant_ids,
+                        loaded_effects,
+                    ) = self._load_postgres_part_file_fast(
+                        conn,
+                        df_variants,
+                        df_consequences,
+                        dim_caches,
+                    )
+
+                    total_variants += processed_variant_rows
+                    total_effects += loaded_effects
+
+                    self.logger.log(
+                        f"✅ Processed {variant_name} "
+                        f"(variants={processed_variant_rows}, "
+                        f"resolved_variant_ids={resolved_variant_ids}, "
+                        f"effects={loaded_effects})",
+                        "INFO",
+                    )
+
         except Exception as e:
-            total_warnings += 1
-            self.logger.log(f"⚠️ Failed to finalize DB: {e}", "WARNING")
+            msg = f"❌ Load failed: {e}"
+            self.logger.log(msg, "ERROR")
+            return False, msg
 
-        # total load time
         dt = time.time() - t0
-        msg = (f"elapsed={dt:.1f}s")
-        self.logger.log(msg, "INFO")
-
-        if total_warnings == 0:
-            msg = (
-                f"✅ Processed {total_variants} variant rows and {total_effects} "  # noqa E501
-                f"molecular effect rows from {len(variant_files)} part file(s)."  # noqa E501
-            )
-            self.logger.log(msg, "SUCCESS")
-            return True, msg
-
         msg = (
-            f"⚠️ Processed {total_variants} variant rows and {total_effects} "
-            f"molecular effect rows with {total_warnings} warning(s). Check logs."  # noqa E501
+            f"✅ Loaded {total_variants} variant rows and {total_effects} "
+            f"molecular effect rows in {dt:.1f}s"
         )
-        self.logger.log(msg, "WARNING")
+        self.logger.log(msg, "SUCCESS")
         return True, msg

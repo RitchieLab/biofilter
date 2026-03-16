@@ -132,7 +132,7 @@ def ddl_variant_molecular_effect() -> str:
     CREATE TABLE IF NOT EXISTS variant_molecular_effects (
         chromosome integer NOT NULL,
         variant_id bigint NOT NULL,
-        variant_key varchar(64) NOT NULL,
+        variant_key varchar(256) NOT NULL,
 
         -- Raw VEP identity / context
         gene_id varchar(32) NULL,             -- stable/raw gene id (e.g. ENSG...)

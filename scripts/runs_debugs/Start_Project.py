@@ -10,5 +10,5 @@ bf = Biofilter("postgresql+psycopg2://bioadmin:bioadmin@localhost/biofilter_dev"
 
 # bf.db.create("sqlite:///dev_biofilter_2.db", overwrite=True)
 bf.db.create_db(
-    "postgresql+psycopg2://bioadmin:bioadmin@localhost/biofilter_prod", overwrite=True
+    "postgresql+psycopg2://bioadmin:bioadmin@localhost/biofilter_teste", overwrite=True
 )
