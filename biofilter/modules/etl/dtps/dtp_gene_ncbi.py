@@ -1,20 +1,18 @@
-import os
 import gc
 import gzip
+import os
 import shutil
 import time  # DEBUG
-import requests
-import pandas as pd
 from pathlib import Path
 
-from biofilter.utils.file_hash import compute_file_hash
-from biofilter.modules.etl.mixins.entity_query_mixin import EntityQueryMixin
-from biofilter.modules.db.models import (
-    GeneGroup,
-    OmicStatus,
-)  # noqa E501
-from biofilter.modules.etl.mixins.gene_query_mixin import GeneQueryMixin
+import pandas as pd
+import requests
+
+from biofilter.modules.db.models import GeneGroup, OmicStatus  # noqa E501
 from biofilter.modules.etl.mixins.base_dtp import DTPBase
+from biofilter.modules.etl.mixins.entity_query_mixin import EntityQueryMixin
+from biofilter.modules.etl.mixins.gene_query_mixin import GeneQueryMixin
+from biofilter.utils.file_hash import compute_file_hash
 
 
 def extract_id(dbxrefs, prefix):
@@ -33,7 +31,6 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
         package=None,
         session=None,
         db=None,
-        use_conflict_csv=False,
     ):  # noqa: E501
         self.logger = logger
         self.debug_mode = debug_mode
@@ -41,7 +38,6 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
         self.package = package
         self.session = session
         self.db = db
-        self.use_conflict_csv = use_conflict_csv
 
         # DTP versioning
         self.dtp_name = "dtp_gene_ncbi"
@@ -49,9 +45,9 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
         self.compatible_schema_min = "0.0.0"
         self.compatible_schema_max = "4.0.0"
 
-    # ⬇️  --------------------------  ⬇️
-    # ⬇️  ------ EXTRACT FASE ------  ⬇️
-    # ⬇️  --------------------------  ⬇️
+    # -------------------------------------------------------------------------
+    #                            EXTRACT METHOD
+    # -------------------------------------------------------------------------
     def extract(self, raw_dir: str):
         """
         Downloads Genes data from NCBI. Uses the hash of 'genes_ncbi.txt' as
@@ -122,9 +118,9 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
             self.logger.log(msg, "ERROR")
             return False, msg, None
 
-    # ⚙️  ----------------------------  ⚙️
-    # ⚙️  ------ TRANSFORM FASE ------  ⚙️
-    # ⚙️  ----------------------------  ⚙️
+    # -------------------------------------------------------------------------
+    #                            TRANSFORM METHOD
+    # -------------------------------------------------------------------------
     def transform(self, raw_dir: str, processed_dir: str):
         """ """
 
@@ -269,9 +265,9 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
             self.logger.log(msg, "ERROR")
             return False, msg
 
-    # 📥  ------------------------ 📥
-    # 📥  ------ LOAD FASE ------  📥
-    # 📥  ------------------------ 📥
+    # -------------------------------------------------------------------------
+    #                            LOAD METHOD
+    # -------------------------------------------------------------------------
     def load(self, processed_dir=None):
         """
         Load NCBI genes that are not present in HGNC, supplementing the
@@ -535,7 +531,7 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
                 continue  # TODO: Add in ETLLOG Model
 
             # --> Genes
-            gene, conflict_flag, status = self.get_or_create_gene(
+            gene, _, status = self.get_or_create_gene(
                 status_id=gene_status_id,
                 symbol=gene_master,
                 hgnc_status="Gene from NCBI",
@@ -593,36 +589,6 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
             #         total_warnings += 1
 
         #  ---> PROCESSED ALL PROCESS DATA ROWS
-
-        # POST INGESTION TASK
-
-        # TODO: 🚧 Conflict was desable after schame changes in 3.0.1 🚧
-        # -- PROCESS THE PENDING CONFLICTS ---
-
-        # if genes_with_pending_conflict:
-        #     conflict_df = pd.DataFrame(genes_with_pending_conflict)
-
-        #     # Se o arquivo já existir, vamos sobrescrevê-lo
-        #     if os.path.exists(conflict_file_name):
-        #         msg = f"⚠️ Overwriting existing conflict file: {conflict_file_name}"  # noqa: E501
-        #         self.logger.log(msg, "WARNING")
-
-        #     conflict_df.to_csv(conflict_file_name, index=False)
-        #     msg = f"✅ Saved {len(conflict_df)} gene conflicts to {conflict_file_name}"  # noqa: E501
-        #     self.logger.log(msg, "INFO")
-
-        #     # TODO: 🧠 Additional suggestion (optional)
-        #     # Generalize this behavior into a helper like
-        #     # save_pending_conflicts(entity_type: str, rows: List[Dict], path: str)  # noqa: E501
-        #     # to make it reusable for SNPs, Proteins, etc.
-
-        # # post-processing the resolved conflicts
-        # for row in genes_with_solved_conflict:
-        #     msg = f"Check and apply conflict rules to  {row.get('hgnc_id')}"
-        #     self.logger.log(msg, "INFO")
-
-        #     # Apply conflict resolution
-        #     self.conflict_mgr.apply_resolution(row)
 
         # Set DB to Read Mode and Create Index
         try:

@@ -1,1 +1,0 @@
-API = interfaces externas (Web API/SDK/REST)

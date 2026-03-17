@@ -1,8 +1,9 @@
 import os
+from pathlib import Path
+from typing import Dict, Optional
+
 import requests
 from packaging import version
-from pathlib import Path
-from typing import Optional, Dict
 
 # from biofilter.utils.file_hash import compute_file_hash
 from biofilter.modules.db.models import BiofilterMetadata, EntityGroup
@@ -10,21 +11,12 @@ from biofilter.modules.etl.mixins.base_dtp_turning import DBTuningMixin
 
 
 class DTPBase(DBTuningMixin):
-
-    # ---FIX START
-
-    # --- Hotfix flags (v3.1.x) ----------------------------------------------
-    TRUNCATE_MODE_255: bool = True  # set False after 3.2.0 schema TEXT migration
-
-    # Central limits used only when TRUNCATE_MODE_255 == True
+    TRUNCATE_MODE_255: bool = True
     MAXLEN_ALIAS: int = 255  # alias_value / alias_norm / free-text aliases
     MAXLEN_DESCRIPTION: int = 255  # generic descriptions (Pfam, GO, UniProt, etc.)
 
     def __init__(self, *args, **kwargs):
-        # ...
         self.trunc_metrics: Dict[str, int] = {}  # field_name -> count
-
-    # ----------------------------- Text guards -------------------------------
 
     @staticmethod
     def _normalize_text(s: Optional[str]) -> Optional[str]:
@@ -36,9 +28,6 @@ class DTPBase(DBTuningMixin):
             return None
         return " ".join(str(s).lower().split())
 
-    # def _bump_trunc(self, field: str) -> None:
-    #     self.trunc_metrics[field] = self.trunc_metrics.get(field, 0) + 1
-    # TODO: Pensar em como implementar o super().__init__(*args, **kwargs) para as classes principais
     def _bump_trunc(self, field: str) -> None:
         if not hasattr(self, "trunc_metrics") or self.trunc_metrics is None:
             self.trunc_metrics = {}

@@ -1,22 +1,22 @@
 import os
 import time  # DEBUG MODE
-import requests
 import zipfile
+from itertools import product
+from pathlib import Path
 
 # import gzip
 # import io
 import pandas as pd
-from pathlib import Path
-from itertools import product
-from biofilter.utils.file_hash import compute_file_hash
-from biofilter.modules.etl.conflict_manager import ConflictManager
-from biofilter.modules.etl.mixins.base_dtp import DTPBase
-from biofilter.modules.db.models import (
-    EntityGroup,
+import requests
+
+from biofilter.modules.db.models import (  # noqa E501
     EntityAlias,
-    EntityRelationshipType,
+    EntityGroup,
     EntityRelationship,
-)  # noqa E501
+    EntityRelationshipType,
+)
+from biofilter.modules.etl.mixins.base_dtp import DTPBase
+from biofilter.utils.file_hash import compute_file_hash
 
 
 class DTP(DTPBase):
@@ -28,7 +28,6 @@ class DTP(DTPBase):
         package=None,
         session=None,
         db=None,
-        use_conflict_csv=False,
     ):  # noqa: E501
         self.logger = logger
         self.debug_mode = debug_mode
@@ -36,8 +35,6 @@ class DTP(DTPBase):
         self.package = package
         self.session = session
         self.db = db
-        self.use_conflict_csv = use_conflict_csv
-        self.conflict_mgr = ConflictManager(session, logger)
 
         # DTP versioning
         self.dtp_name = "dtp_biogrid"
@@ -45,9 +42,9 @@ class DTP(DTPBase):
         self.compatible_schema_min = "0.0.0"
         self.compatible_schema_max = "4.0.0"
 
-    # ⬇️  --------------------------  ⬇️
-    # ⬇️  ------ EXTRACT FASE ------  ⬇️
-    # ⬇️  --------------------------  ⬇️
+    # -------------------------------------------------------------------------
+    #                            EXTRACT METHOD
+    # -------------------------------------------------------------------------
     def extract(self, raw_dir: str):
         """
         Download data from the BioGRID and stores it locally.
@@ -107,9 +104,9 @@ class DTP(DTPBase):
             self.logger.log(msg, "ERROR")
             return False, msg, None
 
-    # ⚙️  ----------------------------  ⚙️
-    # ⚙️  ------ TRANSFORM FASE ------  ⚙️
-    # ⚙️  ----------------------------  ⚙️
+    # -------------------------------------------------------------------------
+    #                            TRANSFORM METHOD
+    # -------------------------------------------------------------------------
     def transform(self, raw_dir: str, processed_dir: str):
 
         msg = f"🔧 Transforming the {self.data_source.name} data ..."
@@ -401,9 +398,9 @@ class DTP(DTPBase):
             # self.logger.log(msg, "ERROR")
             return False, msg
 
-    # 📥  ------------------------ 📥
-    # 📥  ------ LOAD FASE ------  📥
-    # 📥  ------------------------ 📥
+    # -------------------------------------------------------------------------
+    #                            LOAD METHOD
+    # -------------------------------------------------------------------------
     def load(self, processed_dir=None):
         """
         Loads BioGRID relationships into the database.

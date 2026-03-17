@@ -1,19 +1,16 @@
-import os
 import json
+import os
 import time  # DEBUG MODE
-import requests
-import pandas as pd
 from pathlib import Path
-from biofilter.utils.file_hash import compute_file_hash
+
+import pandas as pd
+import requests
+
+from biofilter.modules.db.models import OmicStatus
+from biofilter.modules.etl.mixins.base_dtp import DTPBase
 from biofilter.modules.etl.mixins.entity_query_mixin import EntityQueryMixin
 from biofilter.modules.etl.mixins.gene_query_mixin import GeneQueryMixin
-from biofilter.modules.etl.conflict_manager import ConflictManager
-from biofilter.modules.etl.mixins.base_dtp import DTPBase
-from biofilter.modules.db.models import (
-    CurationConflict,
-    ConflictStatus,
-    OmicStatus,
-)  # noqa E501
+from biofilter.utils.file_hash import compute_file_hash
 
 
 class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
@@ -25,7 +22,6 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
         package=None,
         session=None,
         db=None,
-        use_conflict_csv=False,
     ):  # noqa: E501
         self.logger = logger
         self.debug_mode = debug_mode
@@ -33,8 +29,6 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
         self.package = package
         self.session = session
         self.db = db
-        self.use_conflict_csv = use_conflict_csv
-        self.conflict_mgr = ConflictManager(session, logger)
 
         # DTP versioning
         self.dtp_name = "dtp_gene_hgnc"
@@ -42,16 +36,16 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
         self.compatible_schema_min = "0.0.0"
         self.compatible_schema_max = "5.0.0"
 
-    # ⬇️  --------------------------  ⬇️
-    # ⬇️  ------ EXTRACT FASE ------  ⬇️
-    # ⬇️  --------------------------  ⬇️
+    # -------------------------------------------------------------------------
+    #                            EXTRACT METHOD
+    # -------------------------------------------------------------------------
     def extract(self, raw_dir: str):
         """
         Download data from the HGNC API and stores it locally.
         Also computes a file hash to track content versioning.
         """
 
-        msg = f"⬇️  Starting extraction of {self.data_source.name} data..."
+        msg = f"⬇️   Starting extraction of {self.data_source.name} data..."
         self.logger.log(
             msg,
             "INFO",  # noqa: E501
@@ -63,12 +57,6 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
             self.check_compatibility()
 
             source_url = self.data_source.source_url
-            # if force_steps:
-            #     last_hash = ""
-            #     msg = "Ignoring hash check, forcing download"
-            #     self.logger.log(msg, "WARNING")
-            # else:
-            #     last_hash = self.package.raw_data_hash
 
             # Landing directory
             landing_path = os.path.join(
@@ -96,10 +84,6 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
 
             # Compute hash and compare
             current_hash = compute_file_hash(file_path)
-            # if current_hash == last_hash:
-            #     msg = f"No change detected in {file_path}"
-            #     self.logger.log(msg, "INFO")
-            #     return False, msg, current_hash
 
             # Finish block
             msg = f"✅ HGNC file downloaded to {file_path}"
@@ -111,10 +95,9 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
             self.logger.log(msg, "ERROR")
             return False, msg, None
 
-    # ⚙️  ----------------------------  ⚙️
-    # ⚙️  ------ TRANSFORM FASE ------  ⚙️
-    # ⚙️  ----------------------------  ⚙️
-    # def transform(self, raw_path, processed_path):
+    # -------------------------------------------------------------------------
+    #                            TRANSFORM METHOD
+    # -------------------------------------------------------------------------
     def transform(self, raw_dir: str, processed_dir: str):
 
         msg = f"🔧 Transforming the {self.data_source.name} data ..."
@@ -190,9 +173,9 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
             msg = f"❌ Error during transformation: {e}"
             return False, msg
 
-    # 📥  ------------------------ 📥
-    # 📥  ------ LOAD FASE ------  📥
-    # 📥  ------------------------ 📥
+    # -------------------------------------------------------------------------
+    #                            LOAD METHOD
+    # -------------------------------------------------------------------------
     def load(self, processed_dir=None):
         """
         TODO: CREATE DOCSTRING
@@ -214,11 +197,6 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
 
         total_gene = 0  # not considered conflict genes
         total_warnings = 0
-        # Gene List with resolved conflicts to be processed later
-        genes_with_solved_conflict = []
-        # Gene List with pending conflicts (to be processed later)
-        genes_with_pending_conflict = []
-
         # ALIASES MAP FROM PROCESS DATA FIELDS
         self.alias_schema = {
             "symbol": ("symbol", "HGNC", True),
@@ -248,25 +226,14 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
             )
 
             # Setting files names
-            conflict_file_name = processed_path + "/master_data_conflict.csv"
             processed_file_name = processed_path + "/master_data.parquet"
 
-            # Process Pre Load Genes with Conflict?
-            if self.use_conflict_csv:
-                if not os.path.exists(conflict_file_name):
-                    msg = f"⚠️  File not found: {conflict_file_name}"
-                    self.logger.log(msg, "ERROR")
-                    return False, msg  # ⧮ Leaving with ERROR
-
-                df = pd.read_csv(processed_path, dtype=str)
-
             # Read Processed Gene Master Data
-            else:
-                if not os.path.exists(processed_file_name):
-                    msg = f"⚠️  File not found: {processed_file_name}"
-                    self.logger.log(msg, "ERROR")
-                    return False, msg  # ⧮ Leaving with ERROR
-                df = pd.read_parquet(processed_file_name, engine="pyarrow")
+            if not os.path.exists(processed_file_name):
+                msg = f"⚠️  File not found: {processed_file_name}"
+                self.logger.log(msg, "ERROR")
+                return False, msg  # ⧮ Leaving with ERROR
+            df = pd.read_parquet(processed_file_name, engine="pyarrow")
 
         except Exception as e:
             msg = f"⚠️  Failed to try read data: {e}"
@@ -292,15 +259,6 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
             msg = "⚠️  OmicStatus Active not found."
             self.logger.log(msg, "ERROR")
             return False, msg  # ⧮ Leaving with ERROR
-
-        # PRELOAD THE HGNC IDS WITH RESOLVED CONFLICTS
-        # TODO: 🚧 Conflict was desable after schame changes in 3.0.1 🚧
-        resolved_genes = {
-            c.identifier
-            for c in self.session.query(CurationConflict).filter_by(
-                entity_type="gene", status=ConflictStatus.resolved
-            )
-        }
 
         # SET DB AND DROP INDEXES
         try:
@@ -348,16 +306,6 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
                     f"{row.name} - {gene_master} | Total: {elapsed_total:.2f}s | Δ: {elapsed_since_last:.0f}ms"  # noqa E501
                 )  # noqa E501
                 self.logger.log(msg, "DEBUG")
-
-            # Skip genes with resolved conflicts in lote
-            # TODO: 🚧 Conflict was desable after schame changes in 3.0.1 🚧
-            if gene_master in resolved_genes:
-                self.logger.log(
-                    f"Gene '{gene_master}' skipped, conflict already resolved",
-                    "INFO",  # noqa E501
-                )
-                genes_with_solved_conflict.append(row)
-                continue
 
             # --- ALIASES STRUCTURE ---
 
@@ -432,24 +380,9 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
                 total_warnings += 1
                 continue  # TODO: Add in ETLLOG Model
 
-            # # --> Regions
-            # region_instance, status = self.get_or_create_genomic_region(
-            #     label=region_label,
-            #     chromosome=chromosome,
-            #     start=start,
-            #     end=end,
-            #     data_source_id=self.data_source.id,
-            #     package_id=self.package.id,
-            # )  # noqa: E501
-            # if not status:
-            #     msg = f"⚠️  Error on Region to: {gene_master}"
-            #     self.logger.log(msg, "WARNING")
-            #     total_warnings += 1
-            #     continue  # TODO: Add in ETLLOG Model
-
             group_names_list = self.parse_gene_groups(row.get("gene_group"))
 
-            gene, conflict_flag, status = self.get_or_create_gene(
+            gene, _, status = self.get_or_create_gene(
                 status_id=int(gene_status.id),
                 symbol=gene_master,
                 hgnc_status=row.get("status"),
@@ -461,71 +394,6 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
                 gene_group_names=group_names_list,
                 package_id=self.package.id,
             )
-
-            # TODO: 🚧 Conflict was desable after schame changes in 3.0.1 🚧
-            if conflict_flag:
-                msg = f"Gene '{gene_master}' has conflicts"
-                self.logger.log(msg, "WARNING")
-                # Add to the list of genes with resolved conflicts
-                genes_with_pending_conflict.append(row)
-
-            # if gene is not None:
-            #     total_gene += 1
-
-            #     location, status = self.get_or_create_gene_location(
-            #         gene=gene,
-            #         chromosome=chromosome,
-            #         start=row.get("start"),
-            #         end=row.get("end"),
-            #         strand=row.get("strand"),
-            #         region=region_instance,
-            #         data_source_id=self.data_source.id,
-            #         package_id=self.package.id,
-            #     )
-            #     if not status:
-            #         msg = f"⚠️  Error on Gene Location insert to: {gene_master}"  # noqa E501
-            #         self.logger.log(msg, "WARNING")
-            #         msg = f"⮐  Applied rollback to {gene_master} gene"
-            #         self.logger.log(msg, "WARNING")
-            #         total_warnings += 1
-            #         continue  # TODO: Add in ETLLOG Model
-
-            # # Check if location was created successfully
-            # if not location:
-            #     msg = f"⚠️  Failed to create Location for gene {gene_master}"
-            #     self.logger.log(msg, "WARNING")
-
-        #  ---> PROCESSED ALL PROCESS DATA ROWS
-
-        # POST INGESTION TASK
-
-        # TODO: 🚧 Conflict was desable after schame changes in 3.0.1 🚧
-        # -- PROCESS THE PENDING CONFLICTS ---
-
-        if genes_with_pending_conflict:
-            conflict_df = pd.DataFrame(genes_with_pending_conflict)
-
-            if os.path.exists(conflict_file_name):
-                msg = f"⚠️ Overwriting existing conflict file: {conflict_file_name}"  # noqa: E501
-                self.logger.log(msg, "WARNING")
-
-            conflict_df.to_csv(conflict_file_name, index=False)
-            msg = f"✅ Saved {len(conflict_df)} gene conflicts to {conflict_file_name}"  # noqa: E501
-            self.logger.log(msg, "INFO")
-
-            # TODO: 🧠 Additional suggestion (optional)
-            # Generalize this behavior into a helper like
-            # save_pending_conflicts(entity_type: str, rows: List[Dict], path: str)  # noqa: E501
-            # to make it reusable for SNPs, Proteins, etc.
-
-        # post-processing the resolved conflicts
-        for row in genes_with_solved_conflict:
-            msg = f"Check and apply conflict rules to  {row.get('hgnc_id')}"
-            self.logger.log(msg, "INFO")
-
-            # Apply conflict resolution
-            self.conflict_mgr.apply_resolution(row)
-
         # Set DB to Read Mode and Create Index
         try:
             self.create_indexes(self.get_gene_index_specs)

@@ -1,21 +1,22 @@
-import os
 import csv
 import json
+import os
 import time  # DEBUG MODE
-import requests
-import pandas as pd
-import numpy as np
 from pathlib import Path
-from biofilter.utils.file_hash import compute_file_hash
-from biofilter.modules.etl.mixins.entity_query_mixin import EntityQueryMixin
-from biofilter.modules.etl.conflict_manager import ConflictManager
-from biofilter.modules.etl.mixins.base_dtp import DTPBase
-from biofilter.modules.db.models import (
-    OmicStatus,
+
+import numpy as np
+import pandas as pd
+import requests
+
+from biofilter.modules.db.models import (  # noqa E501
     DiseaseGroup,
     DiseaseGroupMembership,
     DiseaseMaster,
-)  # noqa E501
+    OmicStatus,
+)
+from biofilter.modules.etl.mixins.base_dtp import DTPBase
+from biofilter.modules.etl.mixins.entity_query_mixin import EntityQueryMixin
+from biofilter.utils.file_hash import compute_file_hash
 
 
 class DTP(DTPBase, EntityQueryMixin):
@@ -27,7 +28,6 @@ class DTP(DTPBase, EntityQueryMixin):
         package=None,
         session=None,
         db=None,
-        use_conflict_csv=False,
     ):  # noqa: E501
         self.logger = logger
         self.debug_mode = debug_mode
@@ -35,8 +35,6 @@ class DTP(DTPBase, EntityQueryMixin):
         self.package = package
         self.session = session
         self.db = db
-        self.use_conflict_csv = use_conflict_csv
-        self.conflict_mgr = ConflictManager(session, logger)
 
         # DTP versioning
         self.dtp_name = "dtp_mondo"
@@ -44,9 +42,9 @@ class DTP(DTPBase, EntityQueryMixin):
         self.compatible_schema_min = "0.0.0"
         self.compatible_schema_max = "4.0.0"
 
-    # ⬇️  --------------------------  ⬇️
-    # ⬇️  ------ EXTRACT FASE ------  ⬇️
-    # ⬇️  --------------------------  ⬇️
+    # -------------------------------------------------------------------------
+    #                            EXTRACT METHOD
+    # -------------------------------------------------------------------------
     def extract(self, raw_dir: str):
         """
         Download mondo.json from MONDO PURL and store it locally.
@@ -107,32 +105,6 @@ class DTP(DTPBase, EntityQueryMixin):
             return node_id.replace("http://purl.obolibrary.org/obo/MONDO_", "MONDO:")
         return node_id  # keep as-is if already compact or different ontology
 
-    # def _normalize_id(self, uri: str):
-    #     """
-    #     Normalize an ontology URI into (prefix, code).
-    #     Examples:
-    #         http://purl.obolibrary.org/obo/MONDO_0009168 -> ("MONDO", "0009168")
-    #         http://identifiers.org/hgnc/20105 -> ("HGNC", "20105")
-    #         http://purl.obolibrary.org/obo/CHEBI_15705 -> ("CHEBI", "15705")
-    #     """
-    #     if not uri:
-    #         return None, None
-
-    #     # MONDO/CHEBI/etc. often use underscore separator
-    #     if "obo/" in uri:
-    #         token = uri.split("/")[-1]  # MONDO_0009168
-    #         if "_" in token:
-    #             prefix, code = token.split("_", 1)
-    #             return prefix, code
-
-    #     # identifiers.org URIs (e.g., hgnc/20105)
-    #     if "identifiers.org" in uri:
-    #         parts = uri.split("/")
-    #         prefix = parts[-2].upper()
-    #         code = parts[-1]
-    #         return prefix, code
-
-    #     return None, None
     def _normalize_id(self, raw_id: str):
         """
         Normalize MONDO relationship IDs into (prefix, code, alias_value).
@@ -258,9 +230,9 @@ class DTP(DTPBase, EntityQueryMixin):
                     ]
                 )
 
-    # ⚙️  ----------------------------  ⚙️
-    # ⚙️  ------ TRANSFORM FASE ------  ⚙️
-    # ⚙️  ----------------------------  ⚙️
+    # -------------------------------------------------------------------------
+    #                            TRANSFORM METHOD
+    # -------------------------------------------------------------------------
     def transform(self, raw_dir: str, processed_dir: str):
         """
         Transform MONDO JSON into master_data + relationships
@@ -401,9 +373,9 @@ class DTP(DTPBase, EntityQueryMixin):
             self.logger.log(msg, "ERROR")
             return False, msg
 
-    # 📥  ------------------------ 📥
-    # 📥  ------ LOAD FASE ------  📥
-    # 📥  ------------------------ 📥
+    # -------------------------------------------------------------------------
+    #                            LOAD METHOD
+    # -------------------------------------------------------------------------
     def load(self, processed_dir=None):
         """
         Load MONDO diseases into DiseaseMaster and related tables.

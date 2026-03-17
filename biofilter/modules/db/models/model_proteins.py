@@ -1,14 +1,15 @@
-from biofilter.modules.db.base import Base
-from sqlalchemy.orm import relationship
 from sqlalchemy import (
-    Column,
     BigInteger,
-    Integer,
-    String,
-    ForeignKey,
     Boolean,
+    Column,
+    ForeignKey,
+    Integer,
     PrimaryKeyConstraint,
+    String,
 )
+from sqlalchemy.orm import relationship
+
+from biofilter.modules.db.base import Base
 
 
 class ProteinPfam(Base):
@@ -128,11 +129,6 @@ class ProteinEntity(Base):
         nullable=True,
     )
     etl_package = relationship("ETLPackage", passive_deletes=True)
-
-    # __table_args__ = (
-    #     PrimaryKeyConstraint("protein_id", "pfam_pk_id"),
-    #     UniqueConstraint("entity_id", "protein_id"),  # em ProteinEntity
-    # )
 
 
 class ProteinPfamLink(Base):

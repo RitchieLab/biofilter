@@ -1,27 +1,20 @@
-# dtp_variant_ncbi_v2.py
+import bz2
+import glob
+import json
 import os
 import re
-import bz2
-import ast
-import glob
 import time
-import json
-import pandas as pd
 from pathlib import Path
-from typing import Dict, List, Any
+from typing import Any, Dict, List
 
-from sqlalchemy.engine import Connection
+import pandas as pd
 from sqlalchemy import insert as generic_insert
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
+from sqlalchemy.engine import Connection
 
 from biofilter.modules.etl.mixins.base_dtp import DTPBase
-from biofilter.modules.etl.conflict_manager import ConflictManager
 from biofilter.modules.etl.mixins.entity_query_mixin import EntityQueryMixin
-
-# from biofilter.modules.db.models import (
-#     VariantSNPMerge,
-# )
 
 
 def _map_seq_id_to_chrom(seq_id: str) -> int | None:
@@ -79,7 +72,6 @@ class DTP(DTPBase, EntityQueryMixin):
         package=None,
         session=None,
         db=None,
-        use_conflict_csv=False,
     ):  # noqa: E501
         self.logger = logger
         self.debug_mode = debug_mode
@@ -87,8 +79,6 @@ class DTP(DTPBase, EntityQueryMixin):
         self.package = package
         self.session = session
         self.db = db
-        self.use_conflict_csv = use_conflict_csv
-        self.conflict_mgr = ConflictManager(session, logger)
 
         # DTP versioning
         self.dtp_name = "dtp_variant_ncbi"
@@ -96,9 +86,9 @@ class DTP(DTPBase, EntityQueryMixin):
         self.compatible_schema_min = "0.0.0"
         self.compatible_schema_max = "3.2.0"
 
-    # ⬇️  --------------------------  ⬇️
-    # ⬇️  ------ EXTRACT FASE ------  ⬇️
-    # ⬇️  --------------------------  ⬇️
+    # -------------------------------------------------------------------------
+    #                            EXTRACT METHOD
+    # -------------------------------------------------------------------------
     def extract(self, raw_dir: str):
         """
         Downloads the file from the dbSNP JSON release and stores it locally
@@ -142,9 +132,9 @@ class DTP(DTPBase, EntityQueryMixin):
             self.logger.log(msg, "ERROR")
             return False, msg, None
 
-    # ⚙️  ----------------------------  ⚙️
-    # ⚙️  ------ TRANSFORM FASE ------  ⚙️
-    # ⚙️  ----------------------------  ⚙️
+    # -------------------------------------------------------------------------
+    #                            TRANSFORM METHOD
+    # -------------------------------------------------------------------------
     def transform(self, raw_dir: str, processed_dir: str):
 
         msg = f"🔧 Transforming the {self.data_source.name} data ..."
@@ -401,9 +391,9 @@ class DTP(DTPBase, EntityQueryMixin):
             "INFO",
         )
 
-    # 📥  ------------------------ 📥
-    # 📥  ------ LOAD FASE ------  📥
-    # 📥  ------------------------ 📥
+    # -------------------------------------------------------------------------
+    #                            LOAD METHOD
+    # -------------------------------------------------------------------------
     def load(self, processed_dir=None):
 
         msg = f"📥 Loading {self.data_source.name} data into the database..."

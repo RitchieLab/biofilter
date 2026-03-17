@@ -6,11 +6,10 @@ from typing import Optional
 
 from alembic import command
 from alembic.config import Config
-from alembic.script import ScriptDirectory
 from alembic.runtime.migration import MigrationContext
+from alembic.script import ScriptDirectory
 
 from biofilter.modules.db.models import BiofilterMetadata
-
 
 # -----------------------------------------------------------------------------
 # Paths / Alembic helpers
@@ -48,7 +47,7 @@ def get_db_revision(engine) -> Optional[str]:
 def is_db_versioned(engine) -> bool:
     # Detect if alembic_version table exists (Postgres: schema-aware)
     try:
-        has_tbl = engine.dialect.has_table(engine.connect(), "alembic_version")  # type: ignore
+        has_tbl = engine.dialect.has_table(engine.connect(), "alembic_version")  # noqa E501
         return bool(has_tbl)
     except Exception:
         # Fallback: if get_current_revision() works, it's versioned
@@ -121,7 +120,7 @@ def run_migration(
 
     New behavior:
       action="status"       -> prints status only
-      action="stamp-head"   -> stamps alembic head (baseline) without executing DDL
+      action="stamp-head"   -> stamps alembic head (baseline) without executing DDL  # noqa E501
       action="dry-run"      -> prints SQL for upgrade (no execution)
       action="upgrade"      -> upgrades to target (default head)
     """
@@ -150,13 +149,15 @@ def run_migration(
             print("⚠️  Pending migrations or unstamped DB.")
         return True
 
-    # If user requested stamp-head, they probably have an existing schema already.
+    # If user requested stamp-head, they probably have an existing
+    # schema already.
     if action == "stamp-head":
         if st.is_up_to_date:
             print(f"✅ Already at head (revision={st.current})")
             return True
 
-        # Safety: stamping overwrites "current revision" concept without applying DDL.
+        # Safety: stamping overwrites "current revision" concept without
+        # applying DDL.
         # Only allow if DB is unversioned OR force=True.
         if st.is_versioned and not force:
             raise RuntimeError(
@@ -194,7 +195,7 @@ def run_migration(
     if not st.is_versioned and st.current is None and not force:
         raise RuntimeError(
             "Database is not Alembic-versioned (no alembic_version row). "
-            "If this DB already has tables, run `biofilter db migrate --stamp-head` first. "
+            "If this DB already has tables, run `biofilter db migrate --stamp-head` first."   # noqa E501
             "If you really want to run upgrade anyway, use --force."
         )
 
@@ -229,111 +230,3 @@ biofilter db migrate --dry-run
 
 biofilter db migrate (default = upgrade)
 """
-
-
-# def alembic_upgrade_head(db_uri: str, script_location: str, logger=None) -> None:
-#     """
-#     Run 'alembic upgrade head' programmatically.
-
-#     Notes:
-#     - We set sqlalchemy.url to the runtime db_uri.
-#     - script_location must point to your Alembic env (alembic.ini or equivalent).
-#     """
-#     cfg = Config()
-#     cfg.set_main_option("script_location", script_location)
-#     cfg.set_main_option("sqlalchemy.url", db_uri)
-
-#     if logger:
-#         logger.log("Running Alembic command: upgrade head", "INFO")
-
-#     command.upgrade(cfg, "head")
-
-
-# import os
-# from pathlib import Path
-# from importlib.resources import files
-# from alembic import command
-# from alembic.config import Config
-# from alembic.script import ScriptDirectory
-# from alembic.runtime.migration import MigrationContext
-# from sqlalchemy import inspect
-
-# from packaging.version import parse as parse_version
-
-# from biofilter.modules.db.models import BiofilterMetadata
-# # from biofilter.utils.version import __version__ as current_version
-
-# from importlib.resources import files
-
-# def get_script_location() -> str:
-#     return str(files("biofilter") / "alembic")
-# # def get_script_location() -> str:
-# #     pkg_root = Path(__file__).resolve().parents[1]  # biofilter/
-# #     return str(pkg_root / "alembic")
-
-
-# def get_head_revision(script_location: str) -> str:
-#     cfg = Config()
-#     cfg.set_main_option("script_location", script_location)
-#     script = ScriptDirectory.from_config(cfg)
-#     heads = script.get_heads()
-#     if len(heads) != 1:
-#         raise RuntimeError(f"Expected single Alembic head, got: {heads}")
-#     return heads[0]
-
-
-# def get_db_revision(engine) -> str | None:
-#     with engine.connect() as conn:
-#         context = MigrationContext.configure(conn)
-#         return context.get_current_revision()  # None if never stamped
-
-
-# def run_migration(session_factory, engine, db_uri: str, *, dry_run: bool = False) -> bool:
-#     script_location = get_script_location()
-#     head = get_head_revision(script_location)
-#     current = get_db_revision(engine)
-
-#     # If DB has no alembic_version row yet, you can choose to "stamp" baseline.
-#     # But in your approach you already created a baseline revision; so "current" should exist.
-#     if current == head:
-#         print(f"✅ Schema up-to-date (revision={current})")
-#         return True
-
-#     print(f"📦 DB revision: {current} | Code head: {head}")
-#     if dry_run:
-#         print("🧪 Dry-run enabled: would run `alembic upgrade head`")
-#         return False
-
-#     cfg = Config()
-#     cfg.set_main_option("script_location", script_location)
-#     cfg.set_main_option("sqlalchemy.url", db_uri)
-
-#     print("🚀 Running Alembic migrations → head")
-#     command.upgrade(cfg, "head")
-
-#     # Optional: mirror the revision inside BiofilterMetadata (nice for UI/quick checks)
-#     session = session_factory()
-#     try:
-#         meta = session.query(BiofilterMetadata).first()
-#         if meta:
-#             meta.schema_revision = head
-#             session.commit()
-#     finally:
-#         session.close()
-
-#     print(f"✅ Migration completed: {current} → {head}")
-#     return True
-
-
-# # def get_script_location() -> str:
-# #     # repo_root/biofilter/utils/alembic_utils.py -> repo_root/biofilter
-# #     pkg_root = Path(__file__).resolve().parents[1]
-# #     alembic_dir = pkg_root / "alembic"
-# #     return str(alembic_dir)
-
-
-# def get_repo_heads(script_location: str) -> list[str]:
-#     cfg = Config()
-#     cfg.set_main_option("script_location", script_location)
-#     script = ScriptDirectory.from_config(cfg)
-#     return script.get_heads()

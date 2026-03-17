@@ -55,4 +55,4 @@ class ReportComponent(BaseComponent):
         return self._get_manager().run_example(identifier, **kwargs)
 
     def get_report_class(self, identifier: str):
-        return self._get_manager().get_report_class(identifier)
+        return self._get_manager().get_class(identifier)

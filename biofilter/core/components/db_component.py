@@ -1,16 +1,16 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Optional, Literal
-from biofilter.core.components.base_component import BaseComponent
-from biofilter.modules.db.migrate import run_migration
-from biofilter.modules.db.database import Database
+from typing import Literal, Optional
 
+from biofilter.core.components.base_component import BaseComponent
+from biofilter.modules.db.database import Database
+from biofilter.modules.db.migrate import run_migration
 from biofilter.modules.db.transfer import (
     backup_db,
-    restore_db,
     export_full_clone,
     import_full_clone,
+    restore_db,
 )
 
 ExportFormat = Literal["parquet", "csv"]
@@ -30,11 +30,6 @@ class DBComponent(BaseComponent):
 
         self.core.db = Database(self.core.db_uri)
 
-        # Optional: eager session test (helps catch bad URIs early)
-        # with self.core.db.get_session() as _:
-        #     pass
-
-        # self.core.logger.log(f"✅ Connected to DB: {self.core.db_uri}", "INFO")
         return self.core.db
 
     def create_db(self, db_uri: Optional[str] = None, overwrite: bool = False):
@@ -42,20 +37,20 @@ class DBComponent(BaseComponent):
         Create a new database file/schema and connect to it.
 
         Note:
-        - Uses Database().create_db(), which is expected to bootstrap core tables/mappings.
+        - Uses Database().create_db(), which is expected to bootstrap
+        core tables/mappings.
         """
         if db_uri:
             self.core.db_uri = db_uri
 
         # Create DB using your existing Database/CreateDBMixin logic.
-        db = Database()  # do not pass uri in ctor, following your current pattern
+        db = Database()  # do not pass uri in ctor
         db.db_uri = self.core.db_uri
         db.create_db(overwrite=overwrite)
 
-        # Ensure this becomes the active shared instance (core tables/mappings live here)
         self.core.db = db
 
-        self.core.logger.log(f"🏗️ Database created at: {self.core.db_uri}", "INFO")
+        self.core.logger.log(f"🏗️ Database created at: {self.core.db_uri}", "INFO")  # noqa E501
         return True
 
     def upgrade(self, *, seed_dir: str = "seed") -> bool:
@@ -69,7 +64,8 @@ class DBComponent(BaseComponent):
         """
         db = self.require_db()
 
-        # Ensure engine/session are initialized (connect if component was not connected yet)
+        # Ensure engine/session are initialized
+        # (connect if component was not connected yet)
         if not getattr(db, "engine", None):
             self.connect()
 
@@ -83,7 +79,7 @@ class DBComponent(BaseComponent):
         if not hasattr(db, "upgrade_db"):
             raise RuntimeError(
                 "Database.upgrade_db() not found. "
-                "Implement it in CreateDBMixin/Database before using DBComponent.upgrade()."
+                "Implement it in CreateDBMixin/Database before using DBComponent.upgrade()."   # noqa E501
             )
 
         db.upgrade_db(seed_dir=seed_dir)
@@ -91,22 +87,16 @@ class DBComponent(BaseComponent):
         self.core.logger.log("✅ Seeds applied successfully.", "INFO")
         return True
 
-    # def migrate(self) -> bool:
-    #     db = self.require_db()
-    #     # run_migration(db.session_factory, db.db_uri)  # ou db.SessionLocal
-    #     run_migration(db.SessionLocal, db.engine, db.db_uri)
-    #     self.core.logger.log("✅ Migration completed.", "INFO")
-    #     return True
     def migrate(
         self,
         *,
-        action: str = "upgrade",  # "upgrade" | "status" | "stamp-head" | "dry-run"
+        action: str = "upgrade",  # "upgrade" | "status" | "stamp-head" | "dry-run"  # noqa E501
         target: str = "head",
         force: bool = False,
     ) -> bool:
         db = self.require_db()
         if not db.engine:
-            raise RuntimeError("Database engine not initialized. Call connect() first.")
+            raise RuntimeError("Database engine not initialized. Call connect() first.")  # noqa E501
 
         ok = run_migration(
             session_factory=db.SessionLocal,
@@ -137,7 +127,7 @@ class DBComponent(BaseComponent):
         """
         db = self.core.require_db()
         if not db.engine:
-            raise RuntimeError("Database engine not initialized. Connect first.")
+            raise RuntimeError("Database engine not initialized. Connect first.")  # noqa E501
 
         out = Path(output_path).expanduser().resolve()
         self.core.logger.log(f"💾 Creating DB backup snapshot → {out}", "INFO")
@@ -152,10 +142,10 @@ class DBComponent(BaseComponent):
         """
         db = self.core.require_db()
         if not db.engine:
-            raise RuntimeError("Database engine not initialized. Connect first.")
+            raise RuntimeError("Database engine not initialized. Connect first.")  # noqa E501
 
         inp = Path(input_path).expanduser().resolve()
-        self.core.logger.log(f"♻️ Restoring DB snapshot from → {inp}", "WARNING")
+        self.core.logger.log(f"♻️ Restoring DB snapshot from → {inp}", "WARNING")  # noqa E501
 
         restore_db(db.engine, inp)
         self.core.logger.log("✅ Restore completed.", "INFO")
@@ -184,7 +174,7 @@ class DBComponent(BaseComponent):
         """
         db = self.core.require_db()
         if not db.engine:
-            raise RuntimeError("Database engine not initialized. Connect first.")
+            raise RuntimeError("Database engine not initialized. Connect first.")  # noqa E501
 
         out = Path(out_dir).expanduser().resolve()
         out.mkdir(parents=True, exist_ok=True)
@@ -219,12 +209,12 @@ class DBComponent(BaseComponent):
         Import a logical full-clone bundle into the current DB schema.
 
         Expectations:
-          - Schema already exists (project create / migrations done)
-          - This will truncate all tables and re-insert preserving PKs.
+        - Schema already exists (project create / migrations done)
+        - This will truncate all tables and re-insert preserving PKs.
         """
         db = self.core.require_db()
         if not db.engine:
-            raise RuntimeError("Database engine not initialized. Connect first.")
+            raise RuntimeError("Database engine not initialized. Connect first.")  # noqa E501
 
         inp = Path(in_dir).expanduser().resolve()
         self.core.logger.log(
@@ -240,14 +230,15 @@ class DBComponent(BaseComponent):
 
         self.core.logger.log("✅ Bundle import completed.", "INFO")
 
-        # Re-bootstrap models (safe) — especially useful if import touched metadata-heavy tables
+        # Re-bootstrap models (safe)
+        # especially useful if import touched metadata-heavy tables
         db.connect(check_exists=True)
 
         if rebuild_indexes:
             # Reuse your existing index rebuild flow if available
             try:
-                self.core.logger.log("🧱 Rebuilding indexes after import...", "INFO")
+                self.core.logger.log("🧱 Rebuilding indexes after import...", "INFO")  # noqa E501
                 self.core.etl.rebuild_indexes(groups=None, drop_first=True)
                 self.core.logger.log("✅ Index rebuild done.", "INFO")
             except Exception as e:
-                self.core.logger.log(f"⚠️ Index rebuild failed: {e}", "WARNING")
+                self.core.logger.log(f"⚠️ Index rebuild failed: {e}", "WARNING")  # noqa E501

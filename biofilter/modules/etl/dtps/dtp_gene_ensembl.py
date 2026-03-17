@@ -1,19 +1,20 @@
-import os
 import gzip
-import requests
-import pandas as pd
+import os
 from pathlib import Path
-from biofilter.utils.file_hash import compute_file_hash
+
+import pandas as pd
+import requests
+
+from biofilter.modules.db.models import (
+    EntityGroup,
+    EntityLocation,
+    GeneMaster,
+    GenomeAssembly,
+)
+from biofilter.modules.etl.mixins.base_dtp import DTPBase
 from biofilter.modules.etl.mixins.entity_query_mixin import EntityQueryMixin
 from biofilter.modules.etl.mixins.gene_query_mixin import GeneQueryMixin
-from biofilter.modules.etl.conflict_manager import ConflictManager
-from biofilter.modules.etl.mixins.base_dtp import DTPBase
-from biofilter.modules.db.models import (
-    GeneMaster,
-    EntityLocation,
-    GenomeAssembly,
-    EntityGroup,
-)
+from biofilter.utils.file_hash import compute_file_hash
 
 
 class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
@@ -25,7 +26,6 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
         package=None,
         session=None,
         db=None,
-        use_conflict_csv=False,
     ):  # noqa: E501
         self.logger = logger
         self.debug_mode = debug_mode
@@ -33,8 +33,6 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
         self.package = package
         self.session = session
         self.db = db
-        self.use_conflict_csv = use_conflict_csv
-        self.conflict_mgr = ConflictManager(session, logger)
 
         # DTP versioning
         self.dtp_name = "dtp_gene_hgnc"
@@ -70,9 +68,9 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
 
         return None
 
-    # ⬇️  --------------------------  ⬇️
-    # ⬇️  ------ EXTRACT FASE ------  ⬇️
-    # ⬇️  --------------------------  ⬇️
+    # -------------------------------------------------------------------------
+    #                            EXTRACT METHOD
+    # -------------------------------------------------------------------------
     def extract(self, raw_dir: str):
         """
         Download data from the HGNC API and stores it locally.
@@ -129,9 +127,9 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
             self.logger.log(msg, "ERROR")
             return False, msg, None
 
-    # ⚙️  ----------------------------  ⚙️
-    # ⚙️  ------ TRANSFORM FASE ------  ⚙️
-    # ⚙️  ----------------------------  ⚙️
+    # -------------------------------------------------------------------------
+    #                            TRANSFORM METHOD
+    # -------------------------------------------------------------------------
     def transform(self, raw_dir: str, processed_dir: str):
 
         msg = f"🔧 Transforming the {self.data_source.name} data ..."
@@ -346,9 +344,9 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
 
         # return created, updated
 
-    # 📥  ------------------------ 📥
-    # 📥  ------ LOAD FASE ------  📥
-    # 📥  ------------------------ 📥
+    # -------------------------------------------------------------------------
+    #                            LOAD METHOD
+    # -------------------------------------------------------------------------
     def load(self, processed_dir=None):
         """
         Load Ensembl gene coordinates into EntityLocation.

@@ -2,20 +2,18 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Optional
-
-from biofilter.modules.db.database import Database
-from biofilter.utils.logger import Logger
-from biofilter.utils.config import BiofilterConfig
+from urllib.parse import urlsplit, urlunsplit
 
 from biofilter.core.components import (
     DBComponent,
-    SettingsComponent,
     ETLComponent,
-    QueryComponent,
-    SchemaComponent,
     ReportComponent,
-    KDCComponent,
+    SettingsComponent,
 )
+from biofilter.modules.db.database import Database
+from biofilter.utils.config import BiofilterConfig
+from biofilter.utils.logger import Logger
+from biofilter.utils.version import __version__
 
 
 @dataclass
@@ -23,17 +21,43 @@ class BiofilterCore:
     """
     Shared state container.
 
-    Keeps the single active Database instance (with bootstrapped metadata/mappings)
+    Keeps the single active Database instance (with bootstrapped metadata/mappings)  # noqa E501
     so all components can reuse it reliably.
     """
 
     # db_uri: str
     db_uri: Optional[str]
     debug_mode: bool = False
-    version: str = "4.1.0"
+    version: str = __version__
+
+    @staticmethod
+    def _safe_db_uri(db_uri: Optional[str]) -> Optional[str]:
+        """
+        Redact password from URI before logging.
+        """
+        if not db_uri or "://" not in db_uri:
+            return db_uri
+
+        try:
+            parts = urlsplit(db_uri)
+            if parts.password is None:
+                return db_uri
+
+            host = parts.hostname or ""
+            if ":" in host:
+                host = f"[{host}]"
+
+            userinfo = f"{parts.username}:***@" if parts.username else ""
+            port = f":{parts.port}" if parts.port else ""
+            netloc = f"{userinfo}{host}{port}"
+            return urlunsplit(
+                (parts.scheme, netloc, parts.path, parts.query, parts.fragment)
+            )
+        except Exception:
+            return "<db_uri_redacted>"
 
     def __post_init__(self):
-        self.logger = Logger(log_level="DEBUG") if self.debug_mode else Logger()
+        self.logger = Logger(log_level="DEBUG") if self.debug_mode else Logger()  # noqa E501
 
         # Config (optional)
         try:
@@ -46,23 +70,21 @@ class BiofilterCore:
                 "🔧 Configuration file not found. Using defaults.", "WARNING"
             )
 
+        # db_uri priority: ctor > config > None
+        if not self.db_uri and self.config is not None:
+            self.db_uri = getattr(self.config, "db_uri", None)
+
         self.db: Optional[Database] = None
 
         # Lazy caches
         self._settings_manager = None
-        self._query = None
-        self._schema = None
         self._report_manager = None
-        self._kdc = None
 
         # Components will be attached by the facade (Biofilter)
         self.db_component = None
         self.settings = None
         self.etl = None
-        self.query_component = None
-        self.schema_component = None
         self.report = None
-        self.kdc = None
 
         # Boot banner
         self.logger.log("════════════════════════════════════", "INFO")
@@ -77,7 +99,7 @@ class BiofilterCore:
             ),
             "INFO",
         )
-        self.logger.log(f"   • DB URI: {self.db_uri}", "INFO")
+        self.logger.log(f"   • DB URI: {self._safe_db_uri(self.db_uri)}", "INFO")  # noqa E501
         self.logger.log("════════════════════════════════════", "INFO")
 
     def require_db(self) -> Database:
@@ -101,16 +123,7 @@ class Biofilter:
     """
 
     def __init__(self, db_uri: str | None = None, debug_mode: bool = False):
-        # DB URI priority: ctor > config > default
-        cfg_db_uri = None
-        try:
-            cfg = BiofilterConfig()
-            cfg_db_uri = getattr(cfg, "db_uri", None)
-        except FileNotFoundError:
-            pass
-
-        final_uri = db_uri or cfg_db_uri or None
-        self.core = BiofilterCore(db_uri=final_uri, debug_mode=debug_mode)
+        self.core = BiofilterCore(db_uri=db_uri, debug_mode=debug_mode)
 
         # Components
         self.db = DBComponent(self.core)
@@ -120,20 +133,12 @@ class Biofilter:
         self.settings = SettingsComponent(self.core)
         self.etl = ETLComponent(self.core)
 
-        self.query = QueryComponent(self.core)
-        self.schema = SchemaComponent(self.core, self.query)
-
         self.report = ReportComponent(self.core)
-        self.kdc = KDCComponent(self.core)
-
         # Optional: expose components on core for internal cross-calls
         self.core.db_component = self.db
         self.core.settings = self.settings
         self.core.etl = self.etl
-        self.core.query_component = self.query
-        self.core.schema_component = self.schema
         self.core.report = self.report
-        self.core.kdc = self.kdc
 
     def __repr__(self) -> str:
         return f"<Biofilter(db_uri={self.core.db_uri})>"

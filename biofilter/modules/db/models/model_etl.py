@@ -1,16 +1,17 @@
-from biofilter.modules.db.base import Base
-from sqlalchemy.orm import relationship
-from sqlalchemy.sql import func
 from sqlalchemy import (
+    JSON,
+    Boolean,
     Column,
+    DateTime,
+    Enum,
+    ForeignKey,
     Integer,
     String,
-    Boolean,
-    DateTime,
-    ForeignKey,
-    Enum,
-    JSON,
 )
+from sqlalchemy.orm import relationship
+from sqlalchemy.sql import func
+
+from biofilter.modules.db.base import Base
 
 
 def get_etl_status_enum(name: str):
@@ -39,12 +40,6 @@ class ETLSourceSystem(Base):
     active = Column(Boolean, default=True, nullable=False)
 
     created_at = Column(DateTime, server_default=func.now(), nullable=False)
-    # updated_at = Column(
-    #     DateTime,
-    #     server_default=func.now(),
-    #     onupdate=func.now(),
-    #     nullable=False,  # noqa E501
-    # )
 
     # Relationship
     data_sources = relationship(
@@ -98,12 +93,6 @@ class ETLDataSource(Base):
     created_at = Column(
         DateTime, server_default=func.now(), nullable=False
     )  # noqa E501
-    # updated_at = Column(
-    #     DateTime,
-    #     server_default=func.now(),
-    #     onupdate=func.now(),
-    #     nullable=False,  # noqa E501
-    # )
 
     # Relationships (Go Up)
     source_system = relationship(
@@ -175,73 +164,3 @@ class ETLPackage(Base):
     # ex: {"records_added": 1831, "warnings": 2}
 
     created_at = Column(DateTime, server_default=func.now(), nullable=False)
-
-
-# class ETLProcess(Base):
-#     """
-#     Tracks the ETL execution lifecycle for a given DataSource,
-#     including timestamps and status per ETL stage (Extract, Transform, Load).
-
-#     Supports status tracking via enums and optional content hashing for
-#     raw and processed data to ensure reproducibility and integrity.
-#     """
-
-#     __tablename__ = "etl_process"
-
-#     id = Column(Integer, primary_key=True, autoincrement=True)
-
-#     data_source_id = Column(
-#         Integer,
-#         ForeignKey("etl_data_sources.id", ondelete="CASCADE"),
-#         nullable=False,
-#     )
-
-#     global_status = Column(
-#         get_etl_status_enum("etl_extract_status_enum"),
-#         nullable=False,
-#         default="running",
-#     )
-
-#     extract_start = Column(DateTime, nullable=True)
-#     extract_end = Column(DateTime, nullable=True)
-#     extract_status = Column(
-#         get_etl_status_enum("extract_status_enum"),
-#         nullable=True,
-#         default="running",
-#     )
-
-#     transform_start = Column(DateTime, nullable=True)
-#     transform_end = Column(DateTime, nullable=True)
-#     transform_status = Column(
-#         get_etl_status_enum("transform_status_enum"),
-#         nullable=True,
-#         default="running",
-#     )
-
-#     load_start = Column(DateTime, nullable=True)
-#     load_end = Column(DateTime, nullable=True)
-#     load_status = Column(
-#         get_etl_status_enum("load_status_enum"),
-#         nullable=True,
-#         default="running",
-#     )
-
-#     raw_data_hash = Column(String(128), nullable=True)
-#     process_data_hash = Column(String(128), nullable=True)
-
-#     # Relationship to DataSource
-#     data_source = relationship("DataSource", back_populates="etl_processes")
-
-
-"""
-================================================================================
-Developer Note - ETL Core Models
-================================================================================
-
-...NEED UPDATE
-
-================================================================================
-    Author: Andre Garon - Biofilter 3R
-    Date: 2025-04
-================================================================================
-"""

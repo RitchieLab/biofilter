@@ -21,8 +21,6 @@ Biofilter (Facade)
 ├── SettingsComponent  → SettingsManager → SystemConfig
 ├── ETLComponent       → ETLManager → DTPs
 ├── ConflictsComponent → ConflictManager
-├── QueryComponent     → Query
-├── SchemaComponent    → SchemaExplorer
 └── ReportComponent    → ReportManager → ReportBase subclasses
 
 ````
@@ -123,38 +121,7 @@ bf.conflicts.process_resolved_conflicts()
 
 ---
 
-### 2.5 Query (`bf.query`)
-
-```python
-bf.query.<domain_specific_methods>
-```
-
-Examples (illustrative):
-
-```python
-bf.query.entity.find(...)
-bf.query.gene.by_symbol("BRCA1")
-bf.query.variant.by_position(...)
-```
-
----
-
-### 2.6 Schema Explorer (`bf.schema`)
-
-```python
-bf.schema.list_models()
-bf.schema.describe(model_name: str)
-bf.schema.relationships(model_name: str)
-```
-
-Purpose:
-
-* Introspection of SQLAlchemy models
-* Understanding relationships and schema layout
-
----
-
-### 2.7 Reports (`bf.reports`)
+### 2.5 Reports (`bf.reports`)
 
 ```python
 bf.reports.list(verbose: bool = True)

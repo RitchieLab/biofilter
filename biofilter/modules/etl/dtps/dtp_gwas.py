@@ -1,19 +1,20 @@
 import os
-import time  # DEBUG MODE
-import requests
-import zipfile
-import shutil
-import pandas as pd
-import numpy as np
 import re
-from sqlalchemy.orm import joinedload
+import shutil
+import time  # DEBUG MODE
+import zipfile
 from pathlib import Path
+
+import numpy as np
+import pandas as pd
+import requests
 from sqlalchemy import text
-from biofilter.utils.file_hash import compute_file_hash
-from biofilter.modules.etl.mixins.entity_query_mixin import EntityQueryMixin
-from biofilter.modules.etl.conflict_manager import ConflictManager
-from biofilter.modules.etl.mixins.base_dtp import DTPBase
+from sqlalchemy.orm import joinedload
+
 from biofilter.modules.db.models import VariantGWAS, VariantGWASSNP  # noqa E501
+from biofilter.modules.etl.mixins.base_dtp import DTPBase
+from biofilter.modules.etl.mixins.entity_query_mixin import EntityQueryMixin
+from biofilter.utils.file_hash import compute_file_hash
 
 """
 # 1.2.0: Replace file to new ZIP format in dez/2025
@@ -29,7 +30,6 @@ class DTP(DTPBase, EntityQueryMixin):
         package=None,
         session=None,
         db=None,
-        use_conflict_csv=False,
     ):  # noqa: E501
         self.logger = logger
         self.debug_mode = debug_mode
@@ -37,8 +37,6 @@ class DTP(DTPBase, EntityQueryMixin):
         self.package = package
         self.session = session
         self.db = db
-        self.use_conflict_csv = use_conflict_csv
-        self.conflict_mgr = ConflictManager(session, logger)
 
         # DTP versioning
         self.dtp_name = "dtp_gwas"
@@ -46,9 +44,9 @@ class DTP(DTPBase, EntityQueryMixin):
         self.compatible_schema_min = "0.0.0"
         self.compatible_schema_max = "4.0.0"
 
-    # ⬇️  --------------------------  ⬇️
-    # ⬇️  ------ EXTRACT FASE ------  ⬇️
-    # ⬇️  --------------------------  ⬇️
+    # -------------------------------------------------------------------------
+    #                            EXTRACT METHOD
+    # -------------------------------------------------------------------------
     def extract(self, raw_dir: str):
         """
         Download flat_files from EBI FTP.
@@ -157,9 +155,9 @@ class DTP(DTPBase, EntityQueryMixin):
             self.logger.log(msg, "ERROR")
             return False, msg, None
 
-    # ⚙️  ----------------------------  ⚙️
-    # ⚙️  ------ TRANSFORM FASE ------  ⚙️
-    # ⚙️  ----------------------------  ⚙️
+    # -------------------------------------------------------------------------
+    #                            TRANSFORM METHOD
+    # -------------------------------------------------------------------------
     def transform(self, raw_dir: str, processed_dir: str):
         """ """
 
@@ -379,9 +377,9 @@ class DTP(DTPBase, EntityQueryMixin):
             self.logger.log(msg, "ERROR")
             return False, msg
 
-    # 📥  ------------------------ 📥
-    # 📥  ------ LOAD FASE ------  📥
-    # 📥  ------------------------ 📥
+    # -------------------------------------------------------------------------
+    #                            LOAD METHOD
+    # -------------------------------------------------------------------------
     def load(self, processed_dir=None):
         """
         Load transformed GWAS Catalog into Biofilter3R schema.

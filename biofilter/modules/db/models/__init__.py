@@ -1,134 +1,100 @@
-from .model_config import SystemConfig, BiofilterMetadata, GenomeAssembly
-
+from .model_chemicals import ChemicalMaster
+from .model_config import BiofilterMetadata, GenomeAssembly, SystemConfig
+from .model_curation import OmicStatus
+from .model_diseases import DiseaseGroup, DiseaseGroupMembership, DiseaseMaster
+from .model_entities import (
+    Entity,
+    EntityAlias,
+    EntityGroup,
+    EntityLocation,
+    EntityRelationship,
+    EntityRelationshipType,
+)
+from .model_etl import ETLDataSource, ETLPackage, ETLSourceSystem
 from .model_genes import (
-    GeneMaster,
     GeneGroup,
+    GeneGroupMembership,
     GeneLocusGroup,
     GeneLocusType,
-    # GeneGenomicRegion,
-    GeneGroupMembership,
-    # GeneLocation,
-)
-from .model_etl import ETLDataSource, ETLSourceSystem, ETLPackage
-
-from .model_kdc import (
-    KDCAsset,
-    KDCAssetVersion,
-    KDCSchema,
-    KDCSchemaField,
-    KDCLineage,
-    KDCScanRun,
-)
-
-from .model_entities import (
-    EntityGroup,
-    Entity,
-    # EntityName,
-    EntityAlias,
-    EntityRelationshipType,
-    EntityRelationship,
-    EntityLocation,
-)
-from .model_curation import (
-    ConflictStatus,
-    ConflictResolution,
-    CurationConflict,
-    OmicStatus,
-)
-from .model_variants import (
-    # VariantMaster,
-    # VariantLocus,
-    VariantSNPMerge,
-    VariantGWAS,
-    VariantGWASSNP,
-    # VariantLiftedPosition,
-    # VariantMergeLog,
-    VariantConsequenceGroup,
-    VariantConsequenceCategory,
-    VariantConsequence,
-    VariantImpact,
-    VariantBiotype,
-)
-from .model_pathways import PathwayMaster
-
-from .model_proteins import (
-    ProteinPfam,
-    ProteinMaster,
-    ProteinEntity,
-    ProteinPfamLink,
+    GeneMaster,
 )
 from .model_go import GOMaster, GORelation
-
-from .model_diseases import DiseaseGroup, DiseaseGroupMembership, DiseaseMaster
-
-from .model_chemicals import ChemicalMaster
+from .model_pathways import PathwayMaster
+from .model_proteins import (  # noqa: E501
+    ProteinEntity,
+    ProteinMaster,
+    ProteinPfam,
+    ProteinPfamLink,
+)
+from .model_variants import (
+    VariantBiotype,
+    VariantConsequence,
+    VariantConsequenceCategory,
+    VariantConsequenceGroup,
+    VariantGWAS,
+    VariantGWASSNP,
+    VariantImpact,
+    VariantSNPMerge,
+)
 
 __all__ = [
     # # CONFIGURATION MODELS
     "SystemConfig",
     "BiofilterMetadata",
     "GenomeAssembly",
+
     # # GENE MODELS
     "GeneMaster",
     "GeneGroup",
     "GeneLocusGroup",
     "GeneLocusType",
-    # "GeneGenomicRegion",
     "GeneGroupMembership",
-    # "GeneLocation",
+
     # # ETL MODELS
     "ETLDataSource",
     "ETLSourceSystem",
     "ETLPackage",
-    # KDC Models
-    "KDCAsset",
-    "KDCAssetVersion",
-    "KDCSchema",
-    "KDCSchemaField",
-    "KDCLineage",
-    "KDCScanRun",
+
     # # ENTITY MODELS
     "EntityGroup",
     "Entity",
-    # "EntityName",
     "EntityAlias",
     "EntityRelationshipType",
     "EntityRelationship",
     "EntityLocation",
+
     # CURATION MODELS
-    "ConflictStatus",
-    "ConflictResolution",
-    "CurationConflict",
     "OmicStatus",
+
     # VARIANTS MODELS
-    # "VariantMaster",
-    # "VariantLocus",
     "VariantSNP",
     "VariantSNPMerge",
     "VariantGWAS",
     "VariantGWASSNP",
-    # "VariantLiftedPosition",
-    # "VariantMergeLog",
     "VariantConsequenceGroup",
     "VariantConsequenceCategory",
     "VariantConsequence",
     "VariantImpact",
     "VariantBiotype",
+
     # PATHWAY MODELS
     "PathwayMaster",
+
     # PROTEIN MODELS
     "ProteinPfam",
     "ProteinMaster",
     "ProteinEntity",
     "ProteinPfamLink",
+
     # GENE ONTOLOGY MODELS
     "GOMaster",
     "GORelation",
+
     # DISEASE MODELS
     "DiseaseGroup",
     "DiseaseGroupMembership",
     "DiseaseMaster",
+
     # CHEMICAL MODELS
     "ChemicalMaster",
-    # "ChemicalData",
 ]

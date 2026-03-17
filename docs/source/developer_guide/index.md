@@ -4,12 +4,12 @@ The Developer Guide is intended for contributors, maintainers, and advanced
 users who want to understand, extend, or operate Biofilter 4 at a deeper
 technical level.
 
-While the **User Guide** focuses on how to *use* Biofilter 4 (reports, queries,
+While the **User Guide** focuses on how to *use* Biofilter 4 (reports,
 configuration, and workflows), this guide explains **how Biofilter works
 internally** and how new components can be safely added or extended.
 
 This guide covers the internal architecture, database design, ETL framework,
-query layer internals, and development best practices that underpin Biofilter 4.
+and development best practices that underpin Biofilter 4.
 
 ---
 
@@ -22,7 +22,7 @@ This guide is intended for:
 - maintainers operating Biofilter in shared, HPC, or production environments,
 - advanced users who need to understand internal data modeling choices.
 
-If your goal is to *run reports, queries, or analyses*, start with the **User
+If your goal is to *run reports or analyses*, start with the **User
 Guide** instead.
 
 ---
@@ -35,7 +35,6 @@ The Developer Guide is organized around the core subsystems of Biofilter 4:
 - **Database schema and modeling strategy**
 - **ETL framework internals and DTP development**
 - **Report system internals and authoring**
-- **Query layer internals**
 - **Indexing and performance considerations**
 - **Schema evolution and migrations (Alembic)**
 
@@ -52,5 +51,4 @@ entity-centric biological knowledge platform.
 2_database_models/index
 3_etl_internals/index
 4_reports/index
-5_query_layer_internals
 6_project_structure

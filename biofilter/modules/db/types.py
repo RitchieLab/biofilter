@@ -1,5 +1,5 @@
 # biofilter/db/types.py
-from sqlalchemy.types import TypeDecorator, BigInteger, Integer
+from sqlalchemy.types import BigInteger, Integer, TypeDecorator
 
 
 class PKBigIntOrInt(TypeDecorator):

@@ -3,8 +3,8 @@ from __future__ import annotations
 
 import click
 
+from biofilter.api.cli.common import local_db_uri_option, require_db_uri
 from biofilter.biofilter import Biofilter
-from biofilter.api.cli.common import require_db_uri, local_db_uri_option
 
 
 @click.group()
@@ -16,7 +16,7 @@ def report():
 # TESTADO
 @report.command("list")
 @local_db_uri_option
-@click.option("--verbose", is_flag=True, help="Show descriptions and module names.")
+@click.option("--verbose", is_flag=True, help="Show descriptions and module names.")  # noqa E501
 @click.option("--debug", is_flag=True, help="Enable debug logging.")
 @click.pass_context
 def list_(ctx, db_uri, verbose, debug):
@@ -80,7 +80,7 @@ def example_input(ctx, db_uri, identifier, debug):
 
     bf = Biofilter(db_uri=db_uri, debug_mode=debug)
 
-    text = bf.report.example_input(identifier, print_output=False)
+    text = bf.report.example_input(identifier)
     click.echo(text)
 
 
@@ -104,6 +104,18 @@ def available_columns(ctx, db_uri, identifier, debug):
     click.echo(text)
 
 
+@report.command("refresh")
+@local_db_uri_option
+@click.option("--debug", is_flag=True, help="Enable debug logging.")
+@click.pass_context
+def refresh(ctx, db_uri, debug):
+    db_uri = require_db_uri(ctx, local_db_uri=db_uri)
+
+    bf = Biofilter(db_uri=db_uri, debug_mode=debug)
+    bf.report.refresh()
+    click.echo("✅ Report cache refreshed.")
+
+
 @report.command("run")
 @local_db_uri_option
 @click.option(
@@ -125,12 +137,14 @@ def run(ctx, db_uri, identifier, as_csv, output, debug):
 
     bf = Biofilter(db_uri=db_uri, debug_mode=debug)
 
-    # NOTE: report-specific parameters can be added later (e.g., --input-json, --param KEY=VALUE, etc.)
+    if as_csv and not output:
+        raise click.UsageError("Must provide --output with --as-csv")
+
+    # NOTE: report-specific parameters can be added later
+    # (e.g., --input-json, --param KEY=VALUE, etc.)
     df = bf.report.run(identifier)
 
     if as_csv:
-        if not output:
-            raise click.UsageError("Must provide --output with --as-csv")
         df.to_csv(output, index=False)
         click.echo(f"✅ Report exported to: {output}")
     else:

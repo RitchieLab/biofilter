@@ -3,15 +3,14 @@ from __future__ import annotations
 
 import click
 
-from biofilter.utils.version import __version__ as current_version
 from biofilter.api.cli.common import try_resolve_db_uri
+from biofilter.api.cli.groups.config import config
+from biofilter.api.cli.groups.db import db
 
 # Groups
 from biofilter.api.cli.groups.etl import etl
 from biofilter.api.cli.groups.report import report
-from biofilter.api.cli.groups.config import config
-from biofilter.api.cli.groups.db import db
-from biofilter.api.cli.groups.kdc import kdc
+from biofilter.utils.version import __version__ as current_version
 
 
 def _version_callback(ctx, param, value):
@@ -21,7 +20,7 @@ def _version_callback(ctx, param, value):
     db_uri = try_resolve_db_uri(ctx.params.get("db_uri"))
     click.echo(f"biofilter {current_version}")
     click.echo(
-        f"DB: {db_uri}" if db_uri else "DB: <not set> (use --db-uri or .biofilter.toml)"
+        f"DB: {db_uri}" if db_uri else "DB: <not set> (use --db-uri or .biofilter.toml)"  # noqa E501
     )
     ctx.exit()
 
@@ -70,7 +69,7 @@ def main(ctx, db_uri, debug):
         if resolved:
             click.echo(f"Active DB: {resolved}")
         else:
-            click.echo("Active DB: <not set> (use --db-uri or .biofilter.toml)")
+            click.echo("Active DB: <not set> (use --db-uri or .biofilter.toml)")  # noqa E501
 
 
 # Register groups
@@ -78,7 +77,6 @@ main.add_command(etl)
 main.add_command(report)
 main.add_command(config)
 main.add_command(db)
-main.add_command(kdc)
 
 if __name__ == "__main__":
     main()

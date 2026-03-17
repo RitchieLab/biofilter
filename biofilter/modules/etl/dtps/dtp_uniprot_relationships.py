@@ -1,15 +1,17 @@
 import os
 from pathlib import Path
+
 import pandas as pd
-from biofilter.modules.etl.mixins.base_dtp import DTPBase
-from biofilter.modules.etl.mixins.entity_query_mixin import EntityQueryMixin
-from biofilter.modules.db.models.model_entities import (
-    EntityGroup,
+
+from biofilter.modules.db.models.model_entities import (  # noqa E501
     Entity,
     EntityAlias,
+    EntityGroup,
     EntityRelationship,
     EntityRelationshipType,
-)  # noqa E501
+)
+from biofilter.modules.etl.mixins.base_dtp import DTPBase
+from biofilter.modules.etl.mixins.entity_query_mixin import EntityQueryMixin
 
 # TODO: GO esta vindo como listsa e preciso padronizar o processo,
 # adicionamnaod um novo conjunto de indice para apenas o EntityRelationship
@@ -24,7 +26,6 @@ class DTP(DTPBase, EntityQueryMixin):
         package=None,
         session=None,
         db=None,
-        use_conflict_csv=False,
     ):  # noqa: E501
         self.logger = logger
         self.debug_mode = debug_mode
@@ -32,7 +33,6 @@ class DTP(DTPBase, EntityQueryMixin):
         self.package = package
         self.session = session
         self.db = db
-        self.use_conflict_csv = use_conflict_csv
 
         # DTP versioning
         self.dtp_name = "dtp_uniprot_relationships"
@@ -40,9 +40,9 @@ class DTP(DTPBase, EntityQueryMixin):
         self.compatible_schema_min = "0.0.0"
         self.compatible_schema_max = "4.0.0"
 
-    # ⬇️  --------------------------  ⬇️
-    # ⬇️  ------ EXTRACT FASE ------  ⬇️
-    # ⬇️  --------------------------  ⬇️
+    # -------------------------------------------------------------------------
+    #                            EXTRACT METHOD
+    # -------------------------------------------------------------------------
     def extract(self, raw_dir: str):
         """
         This DTP is specifically for loading relationships from UniProt.
@@ -56,9 +56,9 @@ class DTP(DTPBase, EntityQueryMixin):
         self.logger.log(msg, "INFO")
         return True, msg, None
 
-    # ⚙️  ----------------------------  ⚙️
-    # ⚙️  ------ TRANSFORM FASE ------  ⚙️
-    # ⚙️  ----------------------------  ⚙️
+    # -------------------------------------------------------------------------
+    #                            TRANSFORM METHOD
+    # -------------------------------------------------------------------------
     def transform(self, raw_dir: str, processed_dir: str):
         """
         This DTP is specifically for loading relationships from UniProt.
@@ -72,9 +72,9 @@ class DTP(DTPBase, EntityQueryMixin):
         self.logger.log(msg, "INFO")
         return True, msg
 
-    # 📥  ------------------------ 📥
-    # 📥  ------ LOAD FASE ------  📥
-    # 📥  ------------------------ 📥
+    # -------------------------------------------------------------------------
+    #                            LOAD METHOD
+    # -------------------------------------------------------------------------
     def load(self, processed_dir=None):
         """
         Load relationships between proteins and other entities from processed file.  # noqa: E501

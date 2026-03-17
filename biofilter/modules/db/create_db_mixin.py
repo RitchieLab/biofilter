@@ -1,28 +1,27 @@
 from __future__ import annotations
 
-import os
 import json
+import os
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Tuple
 from importlib import import_module
+from typing import Dict, List, Optional
 
-from sqlalchemy import text, inspect, create_engine
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.engine.url import make_url
 
 from biofilter.modules.db.base import Base
-from biofilter.utils.db_loader import bootstrap_models
-from biofilter.modules.db.migrate import get_script_location, get_repo_heads
 
 # from biofilter.modules.db.migrate import alembic_upgrade_head
 from biofilter.modules.db.core_ddl import (
+    ddl_list_partitions,
+    ddl_variant_effect_predictions,
+    ddl_variant_gene_regulatory_evidence,
     ddl_variant_masters,
     ddl_variant_molecular_effect,
-    ddl_variant_effect_predictions,
-    ddl_list_partitions,
     ddl_variant_regulatory_elements,
-    ddl_variant_gene_regulatory_evidence,
 )
+from biofilter.modules.db.migrate import get_repo_heads, get_script_location
+from biofilter.utils.db_loader import bootstrap_models
 
 CORE_PARTITIONED = {
     "variant_masters",
@@ -57,7 +56,7 @@ class CreateDBMixin:
     - (Postgres) ensures database exists (CREATE DATABASE) using AUTOCOMMIT
     - connects (optionally even if DB doesn't exist yet)
     - registers models/tables into Base.metadata
-    - creates tables (with special handling for Postgres partitioned variant_snps)
+    - creates tables (with special handling for Postgres partitioned variant_snps)  # noqa E501
     - seeds initial data
     """
 
@@ -66,17 +65,18 @@ class CreateDBMixin:
     # -----------------------------
     def ensure_postgres_database(self, db_uri: str) -> bool:
         """
-        Ensure the target database exists. Returns True if created, False if already exists.
+        Ensure the target database exists. Returns True if created, False if
+        already exists.
 
         IMPORTANT:
-        - CREATE DATABASE cannot run inside a transaction, so we use AUTOCOMMIT.
+        - CREATE DATABASE cannot run inside a transaction, so we use AUTOCOMMIT.  # noqa E501
         - The user in db_uri must have CREATEDB privilege (or be superuser).
         """
         url = make_url(db_uri)
 
         if not url.database:
             raise ValueError(
-                "db_uri must include a database name (e.g., .../biofilter_dev)."
+                "db_uri must include a database name (e.g., .../biofilter_dev)."  # noqa E501
             )
 
         target_db = url.database
@@ -96,14 +96,13 @@ class CreateDBMixin:
             if exists:
                 return False
 
-            # NOTE: identifier quoting — target_db comes from your config, not user input
-            conn.execute(text(f'CREATE DATABASE "{target_db}" OWNER "{url.username}"'))
+            conn.execute(text(f'CREATE DATABASE "{target_db}" OWNER "{url.username}"'))  # noqa E501
             return True
 
     # -----------------------------
     # Postgres helpers
     # -----------------------------
-    def create_db(self, overwrite: bool = False, seed_dir: str = "seed") -> bool:
+    def create_db(self, overwrite: bool = False, seed_dir: str = "seed") -> bool:  # noqa E501
 
         # 1) Now we can connect safely
         # If overwrite=False and DB exists -> short-circuit
@@ -120,11 +119,11 @@ class CreateDBMixin:
                     created = self.ensure_postgres_database(self.db_uri)
                     if created:
                         self.logger.log(
-                            f"🆕 Created PostgreSQL database '{url.database}'", "INFO"
+                            f"🆕 Created PostgreSQL database '{url.database}'", "INFO"  # noqa E501
                         )
                 except Exception as e:
                     self.logger.log(
-                        f"❌ Could not ensure PostgreSQL database exists: {e}", "ERROR"
+                        f"❌ Could not ensure PostgreSQL database exists: {e}", "ERROR"  # noqa E501
                     )
                     raise
 
@@ -167,7 +166,7 @@ class CreateDBMixin:
         """
         Create tables for the connected engine.
         - Postgres: create all tables except variant_snps via metadata,
-                   then create partitioned variant_snps via DDL + partitions.
+        then create partitioned variant_snps via DDL + partitions.
         - SQLite: create everything via metadata (variant_snps is Core Table).
         """
         dialect = self.engine.dialect.name
@@ -176,7 +175,7 @@ class CreateDBMixin:
 
         if dialect == "postgresql":
             other_tables = [
-                t for t in Base.metadata.sorted_tables if t.name not in core_partitioned
+                t for t in Base.metadata.sorted_tables if t.name not in core_partitioned  # noqa E501
             ]
             Base.metadata.create_all(self.engine, tables=other_tables)
 
@@ -189,10 +188,10 @@ class CreateDBMixin:
             missing = core_partitioned - existing
             if missing:
                 raise RuntimeError(
-                    f"Core parent tables missing on PostgreSQL: {sorted(missing)}"
+                    f"Core parent tables missing on PostgreSQL: {sorted(missing)}"  # noqa E501
                 )
 
-            self.logger.log("✅ Tables created successfully (PostgreSQL).", "INFO")
+            self.logger.log("✅ Tables created successfully (PostgreSQL).", "INFO")  # noqa E501
             return
 
         # SQLite / others
@@ -283,7 +282,7 @@ class CreateDBMixin:
         )
 
     def _seed_from_json(
-        self, file: str, module_name: str, model_name: str, key: Optional[str] = None
+        self, file: str, module_name: str, model_name: str, key: Optional[str] = None  # noqa E501
     ) -> None:
         """
         Seed data using an idempotent UPSERT strategy:
@@ -292,7 +291,7 @@ class CreateDBMixin:
 
         This makes `biofilter db upgrade` safe to run repeatedly.
         """
-        model_module = import_module(f"biofilter.modules.db.models.{module_name}")
+        model_module = import_module(f"biofilter.modules.db.models.{module_name}")  # noqa E501
         model_class = getattr(model_module, model_name)
 
         json_path = os.path.join(os.path.dirname(__file__), file)
@@ -316,22 +315,22 @@ class CreateDBMixin:
             for item in records:
                 applied += 1
 
-                # --- Special: BiofilterMetadata schema_revision comes from Alembic heads ---
+                # --- Special: BiofilterMetadata schema_revision comes from Alembic heads ---  # noqa E501
                 if model_name == "BiofilterMetadata":
                     script_location = get_script_location()
                     schema_revision = ",".join(get_repo_heads(script_location))
                     item["schema_revision"] = schema_revision
 
-                # --- Parse datetime-like fields (if your seeds contain them) ---
+                # --- Parse datetime-like fields (if your seeds contain them) ---  # noqa E501
                 for k, v in list(item.items()):
-                    if (k.endswith("_start") or k.endswith("_end")) and isinstance(
+                    if (k.endswith("_start") or k.endswith("_end")) and isinstance(  # noqa E501
                         v, str
                     ):
                         try:
                             item[k] = datetime.fromisoformat(v)
                         except ValueError:
                             self.logger.log(
-                                f"Invalid datetime format in key {k}: {v}", "WARNING"
+                                f"Invalid datetime format in key {k}: {v}", "WARNING"  # noqa E501
                             )
 
                 # --- Resolve FK by name (your existing behavior) ---
@@ -341,11 +340,11 @@ class CreateDBMixin:
                         "biofilter.modules.db.models.model_etl"
                     ).ETLSourceSystem
                     fk_obj = (
-                        session.query(ETLSourceSystem).filter_by(name=fk_name).first()
+                        session.query(ETLSourceSystem).filter_by(name=fk_name).first()  # noqa E501
                     )
                     if not fk_obj:
                         self.logger.log(
-                            f"Source System not found for name: {fk_name}", "WARNING"
+                            f"Source System not found for name: {fk_name}", "WARNING"  # noqa E501
                         )
                         skipped += 1
                         continue
@@ -357,11 +356,11 @@ class CreateDBMixin:
                         "biofilter.modules.db.models.model_etl"
                     ).ETLDataSource
                     fk_obj = (
-                        session.query(ETLDataSource).filter_by(name=fk_name).first()
+                        session.query(ETLDataSource).filter_by(name=fk_name).first()  # noqa E501
                     )
                     if not fk_obj:
                         self.logger.log(
-                            f"Data Source not found for name: {fk_name}", "WARNING"
+                            f"Data Source not found for name: {fk_name}", "WARNING"  # noqa E501
                         )
                         skipped += 1
                         continue
@@ -377,12 +376,12 @@ class CreateDBMixin:
                     skipped += 1
                     continue
 
-                existing = session.query(model_class).filter_by(**lookup).one_or_none()
+                existing = session.query(model_class).filter_by(**lookup).one_or_none()  # noqa E501
                 if existing is None:
                     session.add(model_class(**item))
                     created += 1
                 else:
-                    # Update only provided fields (non-null), preventing accidental wipes
+                    # Update only provided fields (non-null), preventing accidental wipes  # noqa E501
                     for k, v in item.items():
                         if v is not None:
                             setattr(existing, k, v)
@@ -390,6 +389,6 @@ class CreateDBMixin:
 
             session.commit()
             self.logger.log(
-                f"Seeded: {model_name} | applied={applied} created={created} updated={updated} skipped={skipped}",
+                f"Seeded: {model_name} | applied={applied} created={created} updated={updated} skipped={skipped}",  # noqa E501
                 "INFO",
             )

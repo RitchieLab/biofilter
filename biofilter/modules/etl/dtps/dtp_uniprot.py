@@ -1,21 +1,21 @@
 import os
 import time  # DEBUG
-import requests
+import xml.etree.ElementTree as ET
 from pathlib import Path
-import pandas as pd
-import numpy as np
-from biofilter.utils.file_hash import compute_file_hash
-from biofilter.modules.etl.mixins.entity_query_mixin import EntityQueryMixin
-from biofilter.modules.etl.mixins.base_dtp import DTPBase
 
-from biofilter.modules.db.models import (
-    ProteinMaster,
+import numpy as np
+import pandas as pd
+import requests
+
+from biofilter.modules.db.models import (  # noqa E501
     ProteinEntity,
+    ProteinMaster,
     ProteinPfam,
     ProteinPfamLink,
-)  # noqa E501
-
-import xml.etree.ElementTree as ET
+)
+from biofilter.modules.etl.mixins.base_dtp import DTPBase
+from biofilter.modules.etl.mixins.entity_query_mixin import EntityQueryMixin
+from biofilter.utils.file_hash import compute_file_hash
 
 
 def get_text(element, path, ns, default=""):
@@ -32,7 +32,6 @@ class DTP(DTPBase, EntityQueryMixin):
         package=None,
         session=None,
         db=None,
-        use_conflict_csv=False,
     ):  # noqa: E501
         self.logger = logger
         self.debug_mode = debug_mode
@@ -40,7 +39,6 @@ class DTP(DTPBase, EntityQueryMixin):
         self.package = package
         self.session = session
         self.db = db
-        self.use_conflict_csv = use_conflict_csv
 
         # DTP versioning
         self.dtp_name = "dtp_uniprot"
@@ -48,9 +46,9 @@ class DTP(DTPBase, EntityQueryMixin):
         self.compatible_schema_min = "0.0.0"
         self.compatible_schema_max = "4.0.0"
 
-    # ⬇️  --------------------------  ⬇️
-    # ⬇️  ------ EXTRACT FASE ------  ⬇️
-    # ⬇️  --------------------------  ⬇️
+    # -------------------------------------------------------------------------
+    #                            EXTRACT METHOD
+    # -------------------------------------------------------------------------
     def extract(self, raw_dir: str):
         """
         Download UniProt data in XML format and store it locally.
@@ -106,9 +104,9 @@ class DTP(DTPBase, EntityQueryMixin):
             self.logger.log(msg, "ERROR")
             return False, msg, None
 
-    # ⚙️  ----------------------------  ⚙️
-    # ⚙️  ------ TRANSFORM FASE ------  ⚙️
-    # ⚙️  ----------------------------  ⚙️
+    # -------------------------------------------------------------------------
+    #                            TRANSFORM METHOD
+    # -------------------------------------------------------------------------
     def transform(self, raw_dir: str, processed_dir: str):
         """
         Transforms the xml data from Uniprot in two output files:
@@ -353,55 +351,6 @@ class DTP(DTPBase, EntityQueryMixin):
             self.logger.log(msg, "ERROR")
             return False, msg
 
-    # def _get_comment_text(self, entry, type_, ns):
-    #     comment = entry.find(f"up:comment[@type='{type_}']", ns)
-    #     if comment is not None:
-    #         text = comment.find("up:text", ns)
-    #         return text.text if text is not None else ""
-    #     return ""
-
-    # def _get_subcellular_locations(self, entry, ns):
-    #     locs = entry.findall(
-    #         "up:comment[@type='subcellular location']/up:subcellularLocation/up:location",  # noqa: E501
-    #         ns,
-    #     )
-    #     return "|".join([loc.text for loc in locs if loc is not None])
-
-    # def _get_db_ids(self, entry, db_type, ns):
-    #     return "|".join(
-    #         [
-    #             db.attrib["id"]
-    #             for db in entry.findall(
-    #                 f"up:dbReference[@type='{db_type}']", ns
-    #             )  # noqa: E501
-    #             if "id" in db.attrib
-    #         ]
-    #     )
-
-    # def _get_db_id(self, entry, db_type, ns):
-    #     db = entry.find(f"up:dbReference[@type='{db_type}']", ns)
-    #     return db.attrib["id"] if db is not None else ""
-
-    # def _get_isoform_ids(self, entry, ns):
-    #     isoform_ids = []
-    #     alt_products = entry.find(
-    #         "up:comment[@type='alternative products']", ns
-    #     )  # noqa: E501
-    #     if alt_products is not None:
-    #         for iso in alt_products.findall("up:isoform", ns):
-    #             iso_id = iso.find("up:id", ns)
-    #             if iso_id is not None:
-    #                 isoform_ids.append(iso_id.text)
-    #     return "|".join(isoform_ids)
-
-    # def _get_pfam_ids(self, entry, ns):
-    #     pfams = [
-    #         db.attrib["id"]
-    #         for db in entry.findall("up:dbReference[@type='Pfam']", ns)
-    #         if "id" in db.attrib
-    #     ]
-    #     return "|".join(pfams)
-
     def _get_comment_text(self, entry, type_, ns):
         comment = entry.find(f"up:comment[@type='{type_}']", ns)
         if comment is not None:
@@ -473,9 +422,9 @@ class DTP(DTPBase, EntityQueryMixin):
         # já é escalar → str
         return str(value).strip() or None
 
-    # 📥  ------------------------ 📥
-    # 📥  ------ LOAD FASE ------  📥
-    # 📥  ------------------------ 📥
+    # -------------------------------------------------------------------------
+    #                            LOAD METHOD
+    # -------------------------------------------------------------------------
     def load(self, processed_dir=None):
 
         msg = f"📥 Loading {self.data_source.name} data into the database..."

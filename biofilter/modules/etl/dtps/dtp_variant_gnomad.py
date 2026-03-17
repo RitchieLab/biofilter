@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import csv
+import glob
 import io
 import os
 import re
@@ -10,21 +11,17 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
+import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
 from cyvcf2 import VCF
-
-from sqlalchemy import and_, select, text
+from sqlalchemy import and_
+from sqlalchemy import insert as generic_insert
+from sqlalchemy import select, text
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 
 from biofilter.modules.etl.mixins.base_dtp import DTPBase
-from biofilter.modules.kdc.manifest_writer import KDSManifestWriter
-
-
-import glob
-import pandas as pd
-from sqlalchemy import insert as generic_insert
 
 
 # -----------------------------------------------------------------------------
@@ -586,7 +583,6 @@ class DTP(DTPBase):
         package=None,
         session=None,
         db=None,
-        use_conflict_csv: bool = False,
         config: Optional[GnomadCyvcf2Config] = None,
     ):
         self.logger = logger
@@ -595,7 +591,6 @@ class DTP(DTPBase):
         self.package = package
         self.session = session
         self.db = db
-        self.use_conflict_csv = use_conflict_csv
 
         # Exten
         self.config = config or GnomadCyvcf2Config()
@@ -605,9 +600,9 @@ class DTP(DTPBase):
         self.compatible_schema_min = "0.0.0"
         self.compatible_schema_max = "4.0.0"
 
-    # --------------------------
-    # EXTRACT
-    # --------------------------
+    # -------------------------------------------------------------------------
+    #                            EXTRACT METHOD
+    # -------------------------------------------------------------------------
 
     def extract(self, raw_dir: str):
         self.check_compatibility()
@@ -657,9 +652,9 @@ class DTP(DTPBase):
             self.logger.log(msg, "ERROR")
             return False, msg, None
 
-    # --------------------------
-    # TRANSFORM
-    # --------------------------
+    # -------------------------------------------------------------------------
+    #                            TRANSFORM METHOD
+    # -------------------------------------------------------------------------
 
     def transform(self, raw_dir: str, processed_dir: str):
 
@@ -914,68 +909,10 @@ class DTP(DTPBase):
             self.logger.log(msg, "ERROR")
             return False, msg
 
-        # ---------------------------------------------------------
-        # KDC: Write manifests (one asset per folder)
-        # ---------------------------------------------------------
-        try:
-            release_tag = (
-                getattr(self.data_source, "release_tag", None) or "manual"
-            )  # noqa E501
-            assembly = (
-                getattr(self.data_source, "grch_version", None) or "GRCh38"
-            )  # noqa E501
-
-            common_params = {
-                "chunk_size": cfg.chunk_size,
-                "parquet_compression": cfg.parquet_compression,
-                "vep_info_key": cfg.vep_info_key,
-                "vcf_filename": vcf_path.name,
-                "vcf_source_url": getattr(
-                    self.data_source, "source_url", None
-                ),  # noqa E501
-                "data_source_id": getattr(self.data_source, "id", None),  # noqa E501
-                "alt_policy": "first_alt_only",
-                "info_extract_all": cfg.extract_all_info,
-                "info_keys_count": len(info_keys),
-            }
-
-            KDSManifestWriter.write(
-                output_dir=variants_dir,
-                source_system=self.data_source.source_system.name,
-                data_source=self.data_source.name,
-                asset="variants",
-                release=release_tag,
-                assembly=assembly,
-                path_pattern=f"{cfg.variants_prefix}*.parquet",
-                partitioning=[],
-                dtp_name=self.dtp_name,
-                dtp_version=self.dtp_version,
-                parameters=common_params,
-                overwrite=True,
-            )
-
-            KDSManifestWriter.write(
-                output_dir=cons_dir,
-                source_system=self.data_source.source_system.name,
-                data_source=self.data_source.name,
-                asset="consequences",
-                release=release_tag,
-                assembly=assembly,
-                path_pattern=f"{cfg.consequences_prefix}*.parquet",
-                partitioning=[],
-                dtp_name=self.dtp_name,
-                dtp_version=self.dtp_version,
-                parameters={
-                    **common_params,
-                    "csq_schema_fields": list(vep_fields),
-                },
-                overwrite=True,
-            )
-
-        except Exception as e:
-            msg = f"⚠️ KDC failed: {str(e)}"
-            self.logger.log(msg, "WARNING")
-            # return False, msg
+        self.logger.log(
+            "ℹ️ KDS manifest generation disabled for BF4 light release.",
+            "INFO",
+        )
 
         dt = time.time() - t0
         msg = (
@@ -986,9 +923,9 @@ class DTP(DTPBase):
 
         return True, msg
 
-    # --------------------------
-    # LOAD
-    # --------------------------
+    # -------------------------------------------------------------------------
+    #                            LOAD METHOD
+    # -------------------------------------------------------------------------
 
     def _get_insert_for_dialect(self, table, dialect_name: str):
         if dialect_name == "sqlite":
@@ -1851,6 +1788,9 @@ class DTP(DTPBase):
 
         return processed_variant_rows, resolved_variant_ids, loaded_effects
 
+    # -------------------------------------------------------------------------
+    #                            LOAD METHOD
+    # -------------------------------------------------------------------------
     def load(self, processed_dir=None):
         t0 = time.time()
 

@@ -1,19 +1,19 @@
 import os
 import time  # DEBUG MODE
-import requests
-import pandas as pd
-import numpy as np
 from pathlib import Path
-from biofilter.utils.file_hash import compute_file_hash
+
+import numpy as np
+import pandas as pd
+import requests
+
+from biofilter.modules.db.models import (  # ChemicalData,; noqa E501
+    ChemicalMaster,
+    OmicStatus,
+)
+from biofilter.modules.etl.mixins.base_dtp import DTPBase
 from biofilter.modules.etl.mixins.entity_query_mixin import EntityQueryMixin
 from biofilter.modules.etl.mixins.gene_query_mixin import GeneQueryMixin
-from biofilter.modules.etl.conflict_manager import ConflictManager
-from biofilter.modules.etl.mixins.base_dtp import DTPBase
-from biofilter.modules.db.models import (
-    OmicStatus,
-    ChemicalMaster,
-    # ChemicalData,
-)  # noqa E501
+from biofilter.utils.file_hash import compute_file_hash
 
 
 class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
@@ -25,7 +25,6 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
         package=None,
         session=None,
         db=None,
-        use_conflict_csv=False,
     ):  # noqa: E501
         self.logger = logger
         self.debug_mode = debug_mode
@@ -33,8 +32,6 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
         self.package = package
         self.session = session
         self.db = db
-        self.use_conflict_csv = use_conflict_csv
-        self.conflict_mgr = ConflictManager(session, logger)
 
         # DTP versioning
         self.dtp_name = "dtp_chebi"
@@ -42,9 +39,9 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
         self.compatible_schema_min = "0.0.0"
         self.compatible_schema_max = "4.0.0"
 
-    # ⬇️  --------------------------  ⬇️
-    # ⬇️  ------ EXTRACT FASE ------  ⬇️
-    # ⬇️  --------------------------  ⬇️
+    # -------------------------------------------------------------------------
+    #                            EXTRACT METHOD
+    # -------------------------------------------------------------------------
     def extract(self, raw_dir: str):
         """
         Download flat_files from ChEBI FTP (compounds.tsv.gz, chemical_data.tsv.gz).
@@ -106,9 +103,9 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
             self.logger.log(msg, "ERROR")
             return False, msg, None
 
-    # ⚙️  ----------------------------  ⚙️
-    # ⚙️  ------ TRANSFORM FASE ------  ⚙️
-    # ⚙️  ----------------------------  ⚙️
+    # -------------------------------------------------------------------------
+    #                            TRANSFORM METHOD
+    # -------------------------------------------------------------------------
     def transform(self, raw_dir: str, processed_dir: str):
         """
         Parse compounds.tsv.gz + chemical_data.tsv.gz into master and data
@@ -312,9 +309,9 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
             self.logger.log(msg, "ERROR")
             return False, msg
 
-    # 📥  ------------------------ 📥
-    # 📥  ------ LOAD FASE ------  📥
-    # 📥  ------------------------ 📥
+    # -------------------------------------------------------------------------
+    #                            LOAD METHOD
+    # -------------------------------------------------------------------------
     def load(self, processed_dir=None):
         """
         Load transformed CheBI compounds into Biofilter3R schema.

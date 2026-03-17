@@ -1,22 +1,21 @@
 from __future__ import annotations
 
+import glob
 import importlib
 import os
-import glob
 import shutil
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Iterable, Optional, Sequence, Any
+from typing import Any, Iterable, Optional, Sequence
 
 from sqlalchemy import MetaData, func, select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session, selectinload
 
 from biofilter.modules.db.database import Database
-from biofilter.utils.logger import Logger
-from biofilter.modules.db.models import ETLPackage, ETLDataSource, ETLSourceSystem
+from biofilter.modules.db.models import ETLDataSource, ETLPackage, ETLSourceSystem
 from biofilter.modules.etl.mixins.base_dtp_turning import DBTuningMixin
-
+from biofilter.utils.logger import Logger
 
 ETL_TABLE_PREFIX = "etl_"
 PURGE_ORDER_OVERRIDE = [
@@ -199,7 +198,6 @@ class ETLManager:
         processed_path: Optional[str] = None,
         run_steps: Optional[Sequence[str]] = None,
         force_steps: Optional[Sequence[str]] = None,
-        use_conflict_csv: bool = False,
     ) -> None:
         if run_steps is None:
             run_steps = ["extract", "transform", "load"]
@@ -240,8 +238,71 @@ class ETLManager:
                     processed_path=processed_path,
                     run_steps=run_steps,
                     force_steps=force_steps,
-                    use_conflict_csv=use_conflict_csv,
                 )
+
+    def restart_etl_process(
+        self,
+        data_source: Optional[Sequence[str]] = None,
+        source_system: Optional[Sequence[str]] = None,
+        download_path: Optional[str] = None,
+        processed_path: Optional[str] = None,
+        delete_files: bool = False,
+    ) -> bool:
+        """
+        Restart ETL for selected data sources by:
+        1) purging non-ETL rows linked by data_source_id
+        2) optionally deleting raw/processed files
+        3) re-running extract/transform/load with forced steps
+        """
+        if isinstance(source_system, str):
+            source_system = [source_system]
+        if isinstance(data_source, str):
+            data_source = [data_source]
+
+        if not source_system and not data_source:
+            self.logger.log(
+                "❌ No source_system or data_source provided. Aborting restart.",
+                "ERROR",
+            )
+            return False
+
+        with self.db.get_session() as session:
+            ds_ids = self._resolve_datasource_ids(session, source_system, data_source)
+
+        if not ds_ids:
+            self.logger.log("⚠️ No matching active DataSources found.", "WARNING")
+            return False
+
+        for ds_id in ds_ids:
+            with self.db.get_session() as session:
+                ds = self._load_datasource(session, ds_id)
+                self.logger.log(f"♻️ Restarting ETL for '{ds.name}'", "INFO")
+
+                self._simple_purge_by_data_source(session, ds.id)
+
+                if delete_files:
+                    if download_path:
+                        raw_base = os.path.join(
+                            str(download_path), ds.source_system.name, ds.name
+                        )
+                        self._delete_matching_files(f"{raw_base}*")
+
+                    if processed_path:
+                        proc_base = os.path.join(
+                            str(processed_path), ds.source_system.name, ds.name
+                        )
+                        self._delete_matching_files(f"{proc_base}*")
+
+                self._run_one_datasource(
+                    session=session,
+                    ds=ds,
+                    download_path=download_path,
+                    processed_path=processed_path,
+                    run_steps=["extract", "transform", "load"],
+                    force_steps=["extract", "transform", "load"],
+                )
+
+        return True
 
     def _resolve_datasource_ids(
         self,
@@ -278,7 +339,6 @@ class ETLManager:
         processed_path: Optional[str],
         run_steps: Sequence[str],
         force_steps: Sequence[str],
-        use_conflict_csv: bool,
     ) -> None:
         self.logger.log(
             f"🔁 Starting ETL for '{ds.name}' (source_system_id={ds.source_system_id}, data_source_id={ds.id})",
@@ -296,7 +356,6 @@ class ETLManager:
                     ds=ds,
                     download_path=download_path,
                     force_steps=force_steps,
-                    use_conflict_csv=use_conflict_csv,
                 )
 
             # ---- Transform
@@ -308,7 +367,6 @@ class ETLManager:
                     download_path=download_path,
                     processed_path=processed_path,
                     force_steps=force_steps,
-                    use_conflict_csv=use_conflict_csv,
                 )
 
             # ---- Load
@@ -319,7 +377,6 @@ class ETLManager:
                     ds=ds,
                     processed_path=processed_path,
                     force_steps=force_steps,
-                    use_conflict_csv=use_conflict_csv,
                 )
 
             self.logger.log(f"🎉 ETL pipeline finished for '{ds.name}'", "INFO")
@@ -406,7 +463,6 @@ class ETLManager:
         ds: ETLDataSource,
         download_path: Optional[str],
         force_steps: Sequence[str],
-        use_conflict_csv: bool,
     ) -> None:
         pkg = self._create_package(session, ds)
         if not pkg:
@@ -428,7 +484,6 @@ class ETLManager:
             package=pkg,
             session=session,
             db=self.db,
-            use_conflict_csv=use_conflict_csv,
         )
 
         ok, message, file_hash = dtp.extract(raw_dir=download_path)
@@ -487,7 +542,6 @@ class ETLManager:
         download_path: Optional[str],
         processed_path: Optional[str],
         force_steps: Sequence[str],
-        use_conflict_csv: bool,
     ) -> None:
         last_extract = self._find_last_package(
             session=session,
@@ -564,7 +618,7 @@ class ETLManager:
         session.commit()
 
         self.logger.log(
-            f"⚙️ [Transform] Running for '{ds.name}' (package_id={pkg.id})", "INFO"
+            f"⚙️  [Transform] Running for '{ds.name}' (package_id={pkg.id})", "INFO"  # noqa E501
         )
 
         dtp = module.DTP(
@@ -574,7 +628,6 @@ class ETLManager:
             package=pkg,
             session=session,
             db=self.db,
-            use_conflict_csv=use_conflict_csv,
         )
 
         ok, message = dtp.transform(download_path, processed_path)
@@ -604,7 +657,6 @@ class ETLManager:
         ds: ETLDataSource,
         processed_path: Optional[str],
         force_steps: Sequence[str],
-        use_conflict_csv: bool,
     ) -> None:
         last_transform_ok = self._find_last_package(
             session=session,
@@ -689,7 +741,6 @@ class ETLManager:
             package=pkg,
             session=session,
             db=self.db,
-            use_conflict_csv=use_conflict_csv,
         )
 
         ok, message = dtp.load(processed_path)

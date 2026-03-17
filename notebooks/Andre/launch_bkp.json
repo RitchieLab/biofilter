@@ -1,0 +1,887 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Bio 3R - Start Project",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/scripts/runs_debugs/Start_Project.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "envFile": "${workspaceFolder}/.env",
+            "justMyCode": true
+        },
+        {
+            "name": "Bio 3R - Run ETLManager",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/scripts/runs_debugs/Run_ETLManager.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "envFile": "${workspaceFolder}/.env",
+            "justMyCode": true
+        },
+        {
+            "name": "Bio 3R - Run ETLManager (index)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/scripts/runs_debugs/Run_ETLManager_index.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "envFile": "${workspaceFolder}/.env",
+            "justMyCode": true
+        },
+        {
+            "name": "Bio 3R - Reset ETLManager",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/scripts/runs_debugs/Run_ETLManager_reset.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "envFile": "${workspaceFolder}/.env",
+            "justMyCode": true
+        },
+        {
+            "name": "Bio 3R - Run ConflictManager",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/scripts/runs_debugs/Run_ConflictManager.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "envFile": "${workspaceFolder}/.env",
+            "justMyCode": true
+        },
+        {
+            "name": "Bio 3R - Conflict ETL LOAD",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/scripts/runs_debugs/Run_ETLManager_conflict.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "envFile": "${workspaceFolder}/.env",
+            "justMyCode": true
+        },
+        {
+            "name": "Bio 3R - Model Explorer",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/scripts/runs_debugs/debug_runner.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "envFile": "${workspaceFolder}/.env",
+            "justMyCode": true
+        },
+        {
+            "name": "Bio 3R - Run Reports",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/scripts/runs_debugs/Run_Reports.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "envFile": "${workspaceFolder}/.env",
+            "justMyCode": true
+        },
+        {
+            "name": "Bio 3R - Query Test 01",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/scripts/runs_debugs/Query_test_01.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "envFile": "${workspaceFolder}/.env",
+            "justMyCode": true
+        },
+        {
+            "name": "Bio 3R - Run Any Script (pick)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/${input:scriptPath}",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "envFile": "${workspaceFolder}/.env",
+            "justMyCode": true
+        },
+        {
+            "name": "Script - Reports Run",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/scripts/runs_tests/reports/run.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "envFile": "${workspaceFolder}/.env",
+            "justMyCode": true
+        },
+        {
+            "name": "Script - Reports Explain",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/scripts/runs_tests/reports/explain.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "envFile": "${workspaceFolder}/.env",
+            "justMyCode": true
+        },
+        {
+            "name": "Script - Reports List",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/scripts/runs_tests/reports/list.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "envFile": "${workspaceFolder}/.env",
+            "justMyCode": true
+        },
+        {
+            "name": "Script - Reports Reflesh",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/scripts/runs_tests/reports/refresh.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "envFile": "${workspaceFolder}/.env",
+            "justMyCode": true
+        },
+        {
+            "name": "Script - Reports Example Inputs",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/scripts/runs_tests/reports/example_input.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "envFile": "${workspaceFolder}/.env",
+            "justMyCode": true
+        },
+        {
+            "name": "Script - Reports Available Columns",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/scripts/runs_tests/reports/availably_columns.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "envFile": "${workspaceFolder}/.env",
+            "justMyCode": true
+        },
+        {
+            "name": "Script - DB Create DB in PS",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/scripts/runs_tests/db/create_db_ps.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "envFile": "${workspaceFolder}/.env",
+            "justMyCode": true
+        },
+        {
+            "name": "Script - DB Create DB in SQLite",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/scripts/runs_tests/db/create_db_sqlite.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "envFile": "${workspaceFolder}/.env",
+            "justMyCode": true
+        },
+        {
+            "name": "Script - DB backup in PS",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/scripts/runs_tests/db/backup_ps.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "envFile": "${workspaceFolder}/.env",
+            "justMyCode": true
+        },
+        {
+            "name": "Script - DB backup in SQLite",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/scripts/runs_tests/db/backup_sqlite.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "envFile": "${workspaceFolder}/.env",
+            "justMyCode": true
+        },
+        {
+            "name": "Script - DB Restore in PS",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/scripts/runs_tests/db/restore_ps.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "envFile": "${workspaceFolder}/.env",
+            "justMyCode": true
+        },
+        {
+            "name": "Script - DB Restore in SQLite",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/scripts/runs_tests/db/restore_sqlite.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "envFile": "${workspaceFolder}/.env",
+            "justMyCode": true
+        },
+        {
+            "name": "Script - DB Export in PS",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/scripts/runs_tests/db/export_ps.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "envFile": "${workspaceFolder}/.env",
+            "justMyCode": true
+        },
+        {
+            "name": "Script - DB Export in SQLite",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/scripts/runs_tests/db/export_sqlite.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "envFile": "${workspaceFolder}/.env",
+            "justMyCode": true
+        },
+        {
+            "name": "Script - DB Import in PS",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/scripts/runs_tests/db/import_ps.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "envFile": "${workspaceFolder}/.env",
+            "justMyCode": true
+        },
+        {
+            "name": "Script - DB Import in SQLite",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/scripts/runs_tests/db/import_sqlite.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "envFile": "${workspaceFolder}/.env",
+            "justMyCode": true
+        },
+        {
+            "name": "Script - ETL Update in PS",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/scripts/runs_tests/etl/update_ps.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "envFile": "${workspaceFolder}/.env",
+            "justMyCode": true
+        },
+        {
+            "name": "Script - ETL Update in SQLite",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/scripts/runs_tests/etl/update_sqlite.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "envFile": "${workspaceFolder}/.env",
+            "justMyCode": true
+        },
+        {
+            "name": "Script - ETL Index in PS",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/scripts/runs_tests/etl/index_ps.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "envFile": "${workspaceFolder}/.env",
+            "justMyCode": true
+        },
+        {
+            "name": "Script - ETL Index in SQLite",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/scripts/runs_tests/etl/index_sqlite.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "envFile": "${workspaceFolder}/.env",
+            "justMyCode": true
+        },
+        {
+            "name": "Script - KDC Rebuild PS",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/scripts/runs_tests/kdc/rebuild.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "envFile": "${workspaceFolder}/.env",
+            "justMyCode": true
+        },
+        {
+            "name": "CLI - Reports Explain",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "biofilter.api.cli.main",
+            "args": [
+                "--db-uri",
+                "postgresql+psycopg2://biousers:biousers@localhost/biofilter_prod",
+                "report",
+                "explain",
+                "--report-name",
+                "etl_status"
+            ],
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "envFile": "${workspaceFolder}/.env",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            },
+            "justMyCode": false
+        },
+        {
+            "name": "CLI - Reports List",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "biofilter.api.cli.main",
+            "args": [
+                "--db-uri",
+                "postgresql+psycopg2://biousers:biousers@localhost/biofilter_prod",
+                "report",
+                "list"
+            ],
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "envFile": "${workspaceFolder}/.env",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            },
+            "justMyCode": false
+        },
+        {
+            "name": "CLI - Reports Reflesh",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "biofilter.api.cli.main",
+            "args": [
+                "--db-uri",
+                "postgresql+psycopg2://biousers:biousers@localhost/biofilter_prod",
+                "report",
+                "reflesh"
+            ],
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "envFile": "${workspaceFolder}/.env",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            },
+            "justMyCode": false
+        },
+        {
+            "name": "CLI - Reports Example Input",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "biofilter.api.cli.main",
+            "args": [
+                "report",
+                "example-input",
+                "--report-name",
+                "gene_to_snp"
+            ],
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "envFile": "${workspaceFolder}/.env",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            },
+            "justMyCode": false
+        },
+        {
+            "name": "CLI - Reports Available Columns",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "biofilter.api.cli.main",
+            "args": [
+                "report",
+                "available-columns",
+                "--report-name",
+                "gene_to_snp"
+            ],
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "envFile": "${workspaceFolder}/.env",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            },
+            "justMyCode": false
+        },
+        {
+            "name": "CLI - DB Create DB in PS",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "biofilter.api.cli.main",
+            "args": [
+                "db",
+                "create-db",
+                "--db-uri",
+                "postgresql+psycopg2://bioadmin:bioadmin@localhost/biofilter_dev_cli"
+            ],
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "envFile": "${workspaceFolder}/.env",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            },
+            "justMyCode": false
+        },
+        {
+            "name": "CLI - DB Create DB in SQLite",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "biofilter.api.cli.main",
+            "args": [
+                "db",
+                "create-db",
+                "--db-uri",
+                "sqlite:///biofilter_dev_cli.db",
+                "--overwrite"
+            ],
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "envFile": "${workspaceFolder}/.env",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            },
+            "justMyCode": false
+        },
+        {
+            "name": "CLI - DB migrate",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "biofilter.api.cli.main",
+            "args": [
+                "db",
+                "migrate",
+                "--stamp-head",
+            ],
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "envFile": "${workspaceFolder}/.env",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            },
+            "justMyCode": false
+        },
+        {
+            "name": "CLI - DB Backup in PS",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "biofilter.api.cli.main",
+            "args": [
+                "db",
+                "backup",
+                "--out",
+                "/opt/biofilter/dev/biofilter/tests/outputs/blp_from_cli.dump",
+                "--db-uri",
+                "postgresql+psycopg2://bioadmin:bioadmin@localhost/biofilter_dev_cli"
+            ],
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "envFile": "${workspaceFolder}/.env",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            },
+            "justMyCode": false
+        },
+        {
+            "name": "CLI - DB Backup in SQLite",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "biofilter.api.cli.main",
+            "args": [
+                "db",
+                "backup",
+                "--out",
+                "/opt/biofilter/dev/biofilter/tests/outputs/backup_sqlite_cli.sql",
+                "--db-uri",
+                "sqlite:///biofilter_dev_cli.db"
+            ],
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "envFile": "${workspaceFolder}/.env",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            },
+            "justMyCode": false
+        },
+        {
+            "name": "CLI - DB Retore in PS",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "biofilter.api.cli.main",
+            "args": [
+                "db",
+                "restore",
+                "--in",
+                "/opt/biofilter/dev/biofilter/tests/outputs/blp_from_cli.dump",
+                "--db-uri",
+                "postgresql+psycopg2://bioadmin:bioadmin@localhost/biofilter_dev_cli"
+            ],
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "envFile": "${workspaceFolder}/.env",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            },
+            "justMyCode": false
+        },
+        {
+            "name": "CLI - DB Restore in SQLite",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "biofilter.api.cli.main",
+            "args": [
+                "db",
+                "restore",
+                "--in",
+                "/opt/biofilter/dev/biofilter/tests/outputs/restore_sqlite_cli.sql",
+                "--db-uri",
+                "sqlite:///biofilter_dev_cli.db"
+            ],
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "envFile": "${workspaceFolder}/.env",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            },
+            "justMyCode": false
+        },
+        {
+            "name": "CLI - DB Export in PS",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "biofilter.api.cli.main",
+            "args": [
+                "db",
+                "export",
+                "--out",
+                "/opt/biofilter/dev/biofilter/tests/outputs/export_ps/cli/",
+                "--db-uri",
+                "postgresql+psycopg2://bioadmin:bioadmin@localhost/biofilter_dev_cli"
+            ],
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "envFile": "${workspaceFolder}/.env",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            },
+            "justMyCode": false
+        },
+        {
+            "name": "CLI - DB Export in SQLite",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "biofilter.api.cli.main",
+            "args": [
+                "db",
+                "export",
+                "--out",
+                "/opt/biofilter/dev/biofilter/tests/outputs/export_sqlite/cli/",
+                "--db-uri",
+                "sqlite:///biofilter_dev_cli.db"
+            ],
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "envFile": "${workspaceFolder}/.env",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            },
+            "justMyCode": false
+        },
+        {
+            "name": "CLI - DB Import in PS",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "biofilter.api.cli.main",
+            "args": [
+                "db",
+                "import",
+                "--in",
+                "/opt/biofilter/dev/biofilter/tests/outputs/export_ps/cli/",
+                "--db-uri",
+                "postgresql+psycopg2://bioadmin:bioadmin@localhost/biofilter_dev_cli"
+            ],
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "envFile": "${workspaceFolder}/.env",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            },
+            "justMyCode": false
+        },
+        {
+            "name": "CLI - ETL Updade in PS",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "biofilter.api.cli.main",
+            "args": [
+                "etl",
+                "update",
+                "--data-source",
+                "dbsnp_sample",
+                "--db-uri",
+                "postgresql+psycopg2://bioadmin:bioadmin@localhost/biofilter_dev_cli"
+            ],
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "envFile": "${workspaceFolder}/.env",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            },
+            "justMyCode": false
+        },
+        {
+            "name": "CLI - ETL Updade in SQLite",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "biofilter.api.cli.main",
+            "args": [
+                "etl",
+                "update",
+                "--data-source",
+                "dbsnp_sample",
+                "--db-uri",
+                "sqlite:///biofilter_dev_cli.db"
+            ],
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "envFile": "${workspaceFolder}/.env",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            },
+            "justMyCode": false
+        },
+        {
+            "name": "CLI - ETL Index in PS",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "biofilter.api.cli.main",
+            "args": [
+                "etl",
+                "index",
+                "--group",
+                "variant",
+                "--group",
+                "genes",
+                "--db-uri",
+                "postgresql+psycopg2://bioadmin:bioadmin@localhost/biofilter_dev_cli"
+            ],
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "envFile": "${workspaceFolder}/.env",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            },
+            "justMyCode": false
+        },
+        {
+            "name": "CLI - CONFIG Init",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "biofilter.api.cli.main",
+            "args": [
+                "config",
+                "init",
+                "--path",
+                "/opt/biofilter/dev/biofilter/tests/outputs/config/cli/"
+            ],
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "envFile": "${workspaceFolder}/.env",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            },
+            "justMyCode": false
+        },
+        {
+            "name": "CLI - CONFIG Show",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "biofilter.api.cli.main",
+            "args": [
+                "config",
+                "show"
+            ],
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "envFile": "${workspaceFolder}/.env",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            },
+            "justMyCode": false
+        },
+        {
+            "name": "CLI - CONFIG Get",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "biofilter.api.cli.main",
+            "args": [
+                "config",
+                "get",
+                "database.db_uri"
+            ],
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "envFile": "${workspaceFolder}/.env",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            },
+            "justMyCode": false
+        },
+        {
+            "name": "CLI - CONFIG Set",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "biofilter.api.cli.main",
+            "args": [
+                "config",
+                "set",
+                "database.db_uri",
+                "postgresql+psycopg2://bioadmin:bioadmin@localhost/biofilter_dev"
+            ],
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "envFile": "${workspaceFolder}/.env",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            },
+            "justMyCode": false
+        },
+        {
+            "name": "CLI - DB Migrate Set",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "biofilter.api.cli.main",
+            "args": [
+                "db",
+                "migrate",
+                "--db-uri",
+                "postgresql+psycopg2://bioadmin:bioadmin@localhost/biofilter_test"
+            ],
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "envFile": "${workspaceFolder}/.env",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            },
+            "justMyCode": false
+        },
+        {
+            "name": "CLI - DB Migrate Status",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "biofilter.api.cli.main",
+            "args": [
+                "db",
+                "migrate",
+                "--status",
+                "--db-uri",
+                "postgresql+psycopg2://bioadmin:bioadmin@localhost/biofilter_prod"
+            ],
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "envFile": "${workspaceFolder}/.env",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            },
+            "justMyCode": false
+        },
+        {
+            "name": "CLI - DB Upgrade",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "biofilter.api.cli.main",
+            "args": [
+                "db",
+                "upgrade",
+                "--db-uri",
+                "postgresql+psycopg2://bioadmin:bioadmin@localhost/biofilter_dev"
+            ],
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "envFile": "${workspaceFolder}/.env",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            },
+            "justMyCode": false
+        },
+        {
+            "name": "CLI - KDC Rebuild",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "biofilter.api.cli.main",
+            "args": [
+                "kdc",
+                "rebuild",
+                "--kds-root",
+                "biofilter_data/processed",
+            ],
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "envFile": "${workspaceFolder}/.env",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            },
+            "justMyCode": false
+        },
+        {
+            "name": "CLI - KDC List",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "biofilter.api.cli.main",
+            "args": [
+                "kdc",
+                "list",
+                "--source-system",
+                "HGNC",
+                "--asset",
+                "masterdata",
+            ],
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "envFile": "${workspaceFolder}/.env",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            },
+            "justMyCode": false
+        },
+        {
+            "name": "CLI - KDC Describe",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "biofilter.api.cli.main",
+            "args": [
+                "kdc",
+                "describe",
+                "--source-system",
+                "HGNC",
+                "--data-source",
+                "hgnc",
+                "--asset",
+                "masterdata",
+                "--release",
+                "manual",
+                "--assembly",
+                "NA",
+            ],
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "envFile": "${workspaceFolder}/.env",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            },
+            "justMyCode": false
+        },
+    ],
+    "inputs": [
+        {
+            "id": "scriptPath",
+            "type": "promptString",
+            "description": "Path (relative to workspace) of script to run",
+            "default": "scripts/runs_debugs/Run_Reports.py"
+        }
+    ]
+}

@@ -3,10 +3,18 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+import sys
+import types
 
 import pandas as pd
 import pyarrow.parquet as pq
 import pytest
+
+# Keep unit tests runnable even when cyvcf2 is not installed locally.
+if "cyvcf2" not in sys.modules:
+    cyvcf2_stub = types.ModuleType("cyvcf2")
+    cyvcf2_stub.VCF = object
+    sys.modules["cyvcf2"] = cyvcf2_stub
 
 import biofilter.modules.etl.dtps.dtp_variant_gnomad as mod  # noqa: F401
 
@@ -168,7 +176,7 @@ def test_variant_key():
 # -----------------------------
 
 
-def test_transform_writes_parts_and_manifests(monkeypatch, tmp_path):
+def test_transform_writes_parts(monkeypatch, tmp_path):
     """
     Unit-level transform test:
     - No real cyvcf2 parsing
@@ -177,7 +185,6 @@ def test_transform_writes_parts_and_manifests(monkeypatch, tmp_path):
     - Verifies:
         - outputs dirs
         - parquet parts are created with dynamic numbering
-        - KDSManifestWriter.write called twice
         - consequences written under consequences/ (not variants/)
     """
 
@@ -250,17 +257,7 @@ def test_transform_writes_parts_and_manifests(monkeypatch, tmp_path):
     # 4) Monkeypatch VCF(...) to return our fake object
     monkeypatch.setattr(mod, "VCF", lambda path: fake_vcf_obj)
 
-    # 5) Capture KDSManifestWriter.write calls
-    calls = []
-
-    def fake_manifest_write(**kwargs):
-        calls.append(kwargs)
-
-    monkeypatch.setattr(
-        mod.KDSManifestWriter, "write", staticmethod(fake_manifest_write)
-    )  # noqa E501
-
-    # 6) Run transform with small chunk_size for deterministic parts
+    # 5) Run transform with small chunk_size for deterministic parts
     logger = DummyLogger()
     cfg = mod.GnomadCyvcf2Config(
         chunk_size=2,
@@ -282,7 +279,7 @@ def test_transform_writes_parts_and_manifests(monkeypatch, tmp_path):
     assert variants_dir.exists()
     assert cons_dir.exists()
 
-    # 7) Validate parquet parts
+    # 6) Validate parquet parts
     variant_files = sorted(variants_dir.glob("variants_part_*.parquet"))
     cons_files = sorted(cons_dir.glob("consequences_part_*.parquet"))
 
@@ -294,7 +291,7 @@ def test_transform_writes_parts_and_manifests(monkeypatch, tmp_path):
     assert cons_files[0].name == "consequences_part_0000.parquet"
     assert cons_files[1].name == "consequences_part_0001.parquet"
 
-    # 8) Validate content quickly
+    # 7) Validate content quickly
     vtab0 = pq.read_table(variant_files[0])
     assert vtab0.num_rows == 2
     assert "variant_key" in vtab0.column_names
@@ -305,21 +302,6 @@ def test_transform_writes_parts_and_manifests(monkeypatch, tmp_path):
     assert ctab0.num_rows == 2
     assert "consequence" in ctab0.column_names
     assert "gene_symbol_raw" in ctab0.column_names
-
-    # 9) Validate manifests were requested (2 calls)
-    assert len(calls) == 2
-    assets = sorted([c["asset"] for c in calls])
-    assert assets == ["consequences", "variants"]
-
-    # Ensure consequences manifest carries csq schema fields from header
-    cons_call = next(c for c in calls if c["asset"] == "consequences")
-    assert "parameters" in cons_call
-    assert "csq_schema_fields" in cons_call["parameters"]
-    assert cons_call["parameters"]["csq_schema_fields"][:3] == [
-        "Allele",
-        "Consequence",
-        "IMPACT",
-    ]  # noqa E501
 
 
 def test_read_parquet_available_columns_skips_missing(tmp_path):
@@ -440,7 +422,7 @@ def test_load_postgres_part_file_fast_stages_and_bulk_loads(monkeypatch):
         dim_caches={
             "group": {},
             "category": {},
-            "consequence": {},
+            "consequence": {"missense_variant": 101},
             "impact": {},
             "biotype": {},
         },

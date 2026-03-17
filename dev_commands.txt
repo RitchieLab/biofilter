@@ -1,0 +1,13 @@
+
+Space Manager
+$ du -h --max-depth=1
+$ rm -r biofilter_bundle
+
+
+Run Coverage:
+$ coverage run --rcfile=.coveragerc-core -m pytest
+$ coverage report --rcfile=.coveragerc-core -m
+
+TMUX
+# tmux ls 
+$ 

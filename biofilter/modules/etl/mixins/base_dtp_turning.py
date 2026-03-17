@@ -41,10 +41,6 @@ class DBTuningMixin:
         )  # Temporarily disable FK checks  # noqa E501
         self.session.commit()
 
-        # DEBUG MODE
-        # mode = self.session.execute(text("PRAGMA journal_mode")).scalar()
-        # self.logger.log(f"🧾 Current journal_mode: {mode}", "DEBUG")
-
     def db_read_mode(self):
         """
         Reset SQLite PRAGMAs to default values after bulk insert.

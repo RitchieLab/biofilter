@@ -1,20 +1,19 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Optional, TypeVar, Union, overload
+from typing import Any, Optional, TypeVar
 
 from sqlalchemy.orm import Session
 
 from biofilter.modules.db.models import SystemConfig
-
 
 T = TypeVar("T")
 
 
 class SettingsManager:
     """
-    Read/write access to SystemConfig with lightweight caching and typed parsing.
+    Read/write access to SystemConfig with lightweight caching and
+    typed parsing.
 
     Notes
     -----
@@ -92,7 +91,7 @@ class SettingsManager:
                 return float(raw)  # type: ignore[return-value]
 
             if ctype == "path":
-                return Path(str(raw)) if as_path else str(raw)  # type: ignore[return-value]
+                return Path(str(raw)) if as_path else str(raw)
 
             # Default: string (or whatever was stored)
             return raw  # type: ignore[return-value]
@@ -132,7 +131,7 @@ class SettingsManager:
         # Update cache
         self._cache[key] = config
 
-    def set_typed(self, key: str, value: Any, ctype: str, commit: bool = True) -> None:
+    def set_typed(self, key: str, value: Any, ctype: str, commit: bool = True) -> None:  # noqa E501
         """
         Set value and explicit type (bool/int/float/path/str).
         """

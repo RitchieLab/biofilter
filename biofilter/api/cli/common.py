@@ -75,5 +75,5 @@ def global_db_uri_option(fn):
         "--db-uri",
         required=False,
         type=click.STRING,
-        help="Database URI used by all commands (can be overridden per-command).",
+        help="Database URI used by all commands (can be overridden per-command).",  # noqa E501
     )(fn)

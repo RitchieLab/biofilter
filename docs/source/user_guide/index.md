@@ -10,7 +10,6 @@ internal architecture. It covers common user workflows such as:
 - Connecting to a knowledge base
 - Creating and managing local databases
 - Running built-in reports
-- Exploring data through the query interface
 - Executing ETL pipelines as a user
 - Inspecting configuration and logs
 
@@ -29,7 +28,6 @@ sections in order.
 2_connecting_to_kb
 3_creating_local_db
 4_reports
-5_queries
 6_etl
 7_configuration_logs
 8_data_sources

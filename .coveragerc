@@ -6,7 +6,7 @@ source = biofilter
 
 [report]
 exclude_lines =
-    # Adicione outras regras para excluir linhas, se necessário
+    # Add more exclusion rules here if needed
     if __name__ == "__main__"
 show_missing = True
 skip_covered = True

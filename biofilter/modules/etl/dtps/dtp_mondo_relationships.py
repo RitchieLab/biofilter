@@ -1,15 +1,17 @@
 import os
 from pathlib import Path
+
 import pandas as pd
-from biofilter.modules.etl.mixins.base_dtp import DTPBase
-from biofilter.modules.etl.mixins.entity_query_mixin import EntityQueryMixin
-from biofilter.modules.db.models.model_entities import (
-    EntityGroup,
+
+from biofilter.modules.db.models.model_entities import (  # noqa E501
     Entity,
     EntityAlias,
+    EntityGroup,
     EntityRelationship,
     EntityRelationshipType,
-)  # noqa E501
+)
+from biofilter.modules.etl.mixins.base_dtp import DTPBase
+from biofilter.modules.etl.mixins.entity_query_mixin import EntityQueryMixin
 
 
 class DTP(DTPBase, EntityQueryMixin):
@@ -21,7 +23,6 @@ class DTP(DTPBase, EntityQueryMixin):
         package=None,
         session=None,
         db=None,
-        use_conflict_csv=False,
     ):  # noqa: E501
         self.logger = logger
         self.debug_mode = debug_mode
@@ -29,7 +30,6 @@ class DTP(DTPBase, EntityQueryMixin):
         self.package = package
         self.session = session
         self.db = db
-        self.use_conflict_csv = use_conflict_csv
 
         # DTP versioning
         self.dtp_name = "dtp_mondo_relationships"
@@ -37,25 +37,25 @@ class DTP(DTPBase, EntityQueryMixin):
         self.compatible_schema_min = "0.0.0"
         self.compatible_schema_max = "4.0.0"
 
-    # ⬇️  --------------------------  ⬇️
-    # ⬇️  ------ EXTRACT FASE ------  ⬇️
-    # ⬇️  --------------------------  ⬇️
+    # -------------------------------------------------------------------------
+    #                            EXTRACT METHOD
+    # -------------------------------------------------------------------------
     def extract(self, raw_dir: str):
         msg = f"🔄 The data source '{self.data_source.name}' is for MONDO relationships only."
         self.logger.log(msg, "INFO")
         return True, msg, None
 
-    # ⚙️  ----------------------------  ⚙️
-    # ⚙️  ------ TRANSFORM FASE ------  ⚙️
-    # ⚙️  ----------------------------  ⚙️
+    # -------------------------------------------------------------------------
+    #                            TRANSFORM METHOD
+    # -------------------------------------------------------------------------
     def transform(self, raw_dir: str, processed_dir: str):
         msg = f"⚠️ The data source '{self.data_source.name}' is for relationships only. Transform is handled in 'mondo'."
         self.logger.log(msg, "INFO")
         return True, msg
 
-    # 📥  ------------------------ 📥
-    # 📥  ------ LOAD FASE ------  📥
-    # 📥  ------------------------ 📥
+    # -------------------------------------------------------------------------
+    #                            LOAD METHOD
+    # -------------------------------------------------------------------------
     def load(self, processed_dir=None):
         msg = f"🔄 Loading MONDO relationships..."
         self.logger.log(msg, "INFO")

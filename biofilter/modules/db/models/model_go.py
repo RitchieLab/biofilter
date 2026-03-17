@@ -1,13 +1,7 @@
-from biofilter.modules.db.base import Base
+from sqlalchemy import BigInteger, Column, ForeignKey, Integer, String  # noqa E501
 from sqlalchemy.orm import relationship
-from sqlalchemy import (
-    Column,
-    String,
-    BigInteger,
-    Integer,
-    ForeignKey,
-    DateTime,
-)  # noqa E501
+
+from biofilter.modules.db.base import Base
 
 
 class GOMaster(Base):
@@ -35,7 +29,7 @@ class GOMaster(Base):
     namespace = Column(String(50), nullable=False)  # MF, BP, CC
 
     entity_id = Column(
-        BigInteger, ForeignKey("entities.id", ondelete="CASCADE"), nullable=False
+        BigInteger, ForeignKey("entities.id", ondelete="CASCADE"), nullable=False  # noqa E501
     )  # noqa E501
     entity = relationship("Entity", passive_deletes=True)
 

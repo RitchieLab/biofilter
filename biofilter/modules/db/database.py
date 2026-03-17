@@ -23,7 +23,8 @@ class Database(CreateDBMixin):
     Responsibilities:
     - Normalize & validate DB URI
     - Create SQLAlchemy Engine + Session factory
-    - Bootstrap models (declarative + imperative Core tables) into Base.metadata
+    - Bootstrap models (declarative + imperative Core tables) into
+    Base.metadata
     - Provide a unified Table resolver (Core) via db.table("name")
     """
 
@@ -46,19 +47,19 @@ class Database(CreateDBMixin):
     # -------------------------------------------------------------------------
     def _normalize_uri(self, uri: str) -> str:
         """
-        If user passes a filesystem path (no scheme), treat it as sqlite:///path.
+        If user passes a filesystem path (no scheme), treat it as sqlite:///path.  # noqa E501
         """
         if "://" in uri:
             return uri
         return f"sqlite:///{os.path.abspath(uri)}"
 
-    def connect(self, new_uri: Optional[str] = None, check_exists: bool = True) -> None:
+    def connect(self, new_uri: Optional[str] = None, check_exists: bool = True) -> None:  # noqa E501
         """
         Connect to database, bootstrap all models for this dialect, and prepare
         a session factory.
 
-        - check_exists=True will attempt a lightweight connectivity check before
-          finalizing the connection.
+        - check_exists=True will attempt a lightweight connectivity check
+        before finalizing the connection.
         """
         if new_uri:
             self.db_uri = new_uri
@@ -134,7 +135,7 @@ class Database(CreateDBMixin):
         - Postgres: SELECT 1 using a temporary engine if needed
         """
         if not self.db_uri:
-            self.logger.log("Database URI must be set before connecting.", "ERROR")
+            self.logger.log("Database URI must be set before connecting.", "ERROR")  # noqa E501
             return False
 
         try:
@@ -164,13 +165,13 @@ class Database(CreateDBMixin):
                 return True
             except Exception as e:
                 if not new_db:
-                    self.logger.log(f"Could not connect to database: {e}", "ERROR")
+                    self.logger.log(f"Could not connect to database: {e}", "ERROR")  # noqa E501
                 return False
             finally:
                 if temp_engine is not None:
                     temp_engine.dispose()
 
-        self.logger.log("Unsupported database type for exists_db check.", "WARNING")
+        self.logger.log("Unsupported database type for exists_db check.", "WARNING")  # noqa E501
         return False
 
     # -------------------------------------------------------------------------

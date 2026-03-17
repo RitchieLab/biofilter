@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 from pathlib import Path
+
 import click
 import toml  # third-party (read + write)
 
 TEMPLATE = """\
 [database]
-db_uri = ""              # e.g. "sqlite:///biofilter.db" or "postgresql+psycopg2://..."
+db_uri = ""              # e.g. "sqlite:///biofilter.db" or "postgresql+psycopg2://..."  # noqa E501
 echo_sql = false         # SQLAlchemy echo (debug)
 auto_create = false      # Create DB if it doesn't exist yet
 
@@ -43,7 +44,7 @@ def _find_config_file(dirpath: str | None = None) -> Path:
     if not cfg_path.exists():
         hint = f" (looked in {cfg_path.parent})" if dirpath else ""
         raise click.UsageError(
-            f".biofilter.toml not found{hint}. Run `biofilter config init` first."
+            f".biofilter.toml not found{hint}. Run `biofilter config init` first."  # noqa E501
         )
     return cfg_path
 
@@ -96,10 +97,10 @@ def config():
 
 @config.command("init")
 @click.option(
-    "--path", "dirpath", default=".", show_default=True, help="Target directory."
+    "--path", "dirpath", default=".", show_default=True, help="Target directory."  # noqa E501
 )
 @click.option(
-    "--force", is_flag=True, help="Overwrite existing .biofilter.toml if it exists."
+    "--force", is_flag=True, help="Overwrite existing .biofilter.toml if it exists."  # noqa E501
 )
 @click.option("--db-uri", default=None, help="Pre-fill database.db_uri.")
 @click.option("--data-root", default=None, help="Pre-fill etl.data_root.")
@@ -110,7 +111,7 @@ def config_init(dirpath, force, db_uri, data_root):
     cfg_path = target_dir / ".biofilter.toml"
 
     if cfg_path.exists() and not force:
-        raise click.UsageError(f"{cfg_path} already exists. Use --force to overwrite.")
+        raise click.UsageError(f"{cfg_path} already exists. Use --force to overwrite.")  # noqa E501
 
     content = TEMPLATE
     if db_uri is not None:

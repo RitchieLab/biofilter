@@ -3,12 +3,12 @@ from __future__ import annotations
 import importlib
 import pkgutil
 from dataclasses import dataclass
-from typing import Callable, Dict, List, Optional, Type, Any, Iterable
+from typing import Any, Callable, Dict, Iterable, List, Optional, Type
 
-from sqlalchemy.orm import Session, selectinload
+from sqlalchemy.orm import Session
 
-from biofilter.modules.db.database import Database
 import biofilter.modules.report.reports as reports_pkg
+from biofilter.modules.db.database import Database
 from biofilter.modules.report.reports.base_report import ReportBase
 from biofilter.utils.logger import Logger
 
@@ -129,11 +129,18 @@ class ReportManager:
         if not ident:
             raise ValueError("Report identifier cannot be empty.")
 
-        if ident.startswith("report_"):
-            return ident
-
         # Ensure index built
         idx = self.index()
+        modules = {info.module for info in idx}
+
+        # Explicit module name path (report_xxx)
+        if ident.startswith("report_"):
+            if ident in modules:
+                return ident
+            available = [i.name for i in idx]
+            raise ValueError(
+                f"Report not found: '{identifier}'. Available reports: {available}"
+            )
 
         # friendly name match
         for info in idx:

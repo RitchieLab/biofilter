@@ -1,6 +1,7 @@
-from biofilter.modules.db.base import Base
+from sqlalchemy import BigInteger, Column, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import relationship
-from sqlalchemy import Column, Integer, BigInteger, String, ForeignKey, Text
+
+from biofilter.modules.db.base import Base
 
 
 class DiseaseGroup(Base):
@@ -31,24 +32,25 @@ class DiseaseGroup(Base):
 
     # Relationships
     memberships = relationship(
-        "DiseaseGroupMembership", back_populates="group", cascade="all, delete-orphan"
+        "DiseaseGroupMembership", back_populates="group", cascade="all, delete-orphan"  # noqa E501
     )
 
 
 class DiseaseGroupMembership(Base):
     """
     Linking table between DiseaseMaster and DiseaseGroup.
-    One disease can have multiple groups, and each group can apply to many diseases.
+    One disease can have multiple groups, and each group can apply to many
+    diseases.
     """
 
     __tablename__ = "disease_group_memberships"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
 
-    disease_id = Column(Integer, ForeignKey("disease_masters.id", ondelete="CASCADE"))
+    disease_id = Column(Integer, ForeignKey("disease_masters.id", ondelete="CASCADE"))  # noqa E501
     disease = relationship("DiseaseMaster", back_populates="group_memberships")
 
-    group_id = Column(Integer, ForeignKey("disease_groups.id", ondelete="CASCADE"))
+    group_id = Column(Integer, ForeignKey("disease_groups.id", ondelete="CASCADE"))  # noqa E501
     group = relationship("DiseaseGroup", back_populates="memberships")
 
     data_source_id = Column(
@@ -77,7 +79,8 @@ class DiseaseMaster(Base):
 
     Relationships:
         - entity: Unique entity representation for the disease
-        - group_memberships: Links to DiseaseGroup through DiseaseGroupMembership
+        - group_memberships: Links to DiseaseGroup through
+        DiseaseGroupMembership
     """
 
     __tablename__ = "disease_masters"
@@ -98,7 +101,7 @@ class DiseaseMaster(Base):
 
     # Links to the central Entity table
     entity_id = Column(
-        BigInteger, ForeignKey("entities.id", ondelete="CASCADE"), nullable=False
+        BigInteger, ForeignKey("entities.id", ondelete="CASCADE"), nullable=False  # noqa E501
     )
     entity = relationship("Entity", passive_deletes=True)
 
@@ -119,5 +122,5 @@ class DiseaseMaster(Base):
 
     # Relationships
     group_memberships = relationship(
-        "DiseaseGroupMembership", back_populates="disease", cascade="all, delete-orphan"
+        "DiseaseGroupMembership", back_populates="disease", cascade="all, delete-orphan"  # noqa E501
     )
