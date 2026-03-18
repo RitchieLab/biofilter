@@ -738,7 +738,7 @@ Output:
                 "Canonical": effect.get("canonical"),
                 "MANE Select": effect.get("mane_select"),
                 "MANE Plus Clinical": effect.get("mane_plus_clinical"),
-                "LoF": effect.get("lof"),
+                "LoF": effect.get("lof_flag"),
                 "LoF Flags": effect.get("lof_flags"),
                 "LoF Filter": effect.get("lof_filter"),
                 "LoF Confidence": effect.get("lof_confidence"),
