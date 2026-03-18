@@ -92,7 +92,7 @@ def test_get_returns_default_when_missing(monkeypatch):
 
 @pytest.mark.parametrize(
     "raw, expected",
-    [("true", True), ("1", True), ("yes", True), ("on", True)],
+    [("true", True), ("1", True), ("yes", True), ("y", True), ("on", True)],
 )
 def test_get_bool_truthy(monkeypatch, raw, expected):
     manager, _ = _mk_mgr(
@@ -104,7 +104,7 @@ def test_get_bool_truthy(monkeypatch, raw, expected):
 
 @pytest.mark.parametrize(
     "raw, expected",
-    [("false", False), ("0", False), ("no", False), ("off", False)],
+    [("false", False), ("0", False), ("no", False), ("n", False), ("off", False)],
 )
 def test_get_bool_falsey(monkeypatch, raw, expected):
     manager, _ = _mk_mgr(

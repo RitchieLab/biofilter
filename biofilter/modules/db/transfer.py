@@ -8,10 +8,12 @@ import subprocess
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Iterable, Literal
 
 import numpy as np
 import pandas as pd
+import pyarrow as pa
+import pyarrow.parquet as pq
 from sqlalchemy import MetaData, Table, inspect, text
 from sqlalchemy.dialects.postgresql import JSON, JSONB
 from sqlalchemy.engine import Engine
@@ -326,6 +328,14 @@ def _is_date_col(coltype) -> bool:
     return coltype.__class__.__name__.lower() == "date"
 
 
+def _is_stringish_col(coltype) -> bool:
+    """
+    True for SQL string/text-like columns.
+    """
+    name = coltype.__class__.__name__.lower()
+    return name in {"string", "varchar", "text", "char", "unicode", "unicodetext"}
+
+
 def _coerce_json_cell(v: Any) -> Any:
     """
     Normalize a value for JSON/JSONB binding.
@@ -396,6 +406,11 @@ def _coerce_df_for_insert(df: pd.DataFrame, table: Table) -> pd.DataFrame:
         sa_col = col_by_name.get(col)
         if sa_col is None:
             continue
+
+        # CSV imports can decode empty-string as NaN -> None.
+        # For NOT NULL string columns, preserve empty string instead of NULL.
+        if not sa_col.nullable and _is_stringish_col(sa_col.type):
+            df[col] = df[col].apply(lambda v: "" if v is None else v)
 
         if _is_date_col(sa_col.type):
             parsed = pd.to_datetime(df[col], errors="coerce", utc=True)
@@ -503,6 +518,8 @@ def export_full_clone(
     schema_version: str,
     fmt: str = "parquet",
     chunksize: int = 250_000,
+    include_tables: Iterable[str] | None = None,
+    exclude_tables: Iterable[str] | None = None,
 ) -> Path:
     """
     Export a full-clone bundle:
@@ -518,12 +535,43 @@ def export_full_clone(
     tables_dir.mkdir(parents=True, exist_ok=True)
 
     insp = inspect(engine)
-    table_names = [t for t in insp.get_table_names() if t != "alembic_version"]
+    all_table_names = [t for t in insp.get_table_names() if t != "alembic_version"]
+    available = set(all_table_names)
+
+    selected = set(
+        t.strip() for t in (include_tables or []) if isinstance(t, str) and t.strip()
+    )
+    excluded = set(
+        t.strip() for t in (exclude_tables or []) if isinstance(t, str) and t.strip()
+    )
+
+    if selected:
+        unknown_selected = sorted(selected - available)
+        if unknown_selected:
+            raise RuntimeError(
+                "Requested export table(s) not found in DB: "
+                + ", ".join(unknown_selected)
+            )
+        table_names = sorted(selected)
+    else:
+        table_names = sorted(all_table_names)
+
+    if excluded:
+        unknown_excluded = sorted(excluded - available)
+        if unknown_excluded:
+            raise RuntimeError(
+                "Requested excluded table(s) not found in DB: "
+                + ", ".join(unknown_excluded)
+            )
+        table_names = [t for t in table_names if t not in excluded]
+
+    if not table_names:
+        raise RuntimeError("No tables selected for export.")
 
     rows_meta: list[dict] = []
 
     with engine.connect() as conn:
-        for t in sorted(table_names):
+        for t in table_names:
             # row count (best-effort)
             try:
                 if detect_engine_name(engine) in ("postgresql", "postgres"):
@@ -562,6 +610,7 @@ def import_full_clone(
     fmt: str = "parquet",
     reset_sequences: bool = True,
     chunksize: int = 50_000,
+    allow_missing_tables: bool = False,
 ) -> None:
     """
     Import a full-clone bundle into an existing schema.
@@ -595,19 +644,6 @@ def import_full_clone(
     insert_order = [t for t in meta.sorted_tables if t.name != "alembic_version"]  # noqa E501
     delete_order = list(reversed(insert_order))
 
-    # 1) Truncate all tables
-    with engine.begin() as conn:
-        d = detect_engine_name(engine)
-        if d in ("postgresql", "postgres"):
-            for table in delete_order:
-                conn.execute(
-                    text(f'TRUNCATE TABLE "{table.name}" RESTART IDENTITY CASCADE')  # noqa E501
-                )
-        else:
-            for table in delete_order:
-                conn.execute(text(f"DELETE FROM {table.name}"))
-
-    # 2) Import in dependency order
     name_to_file = {e["name"]: e["file"] for e in entries}
 
     bundle_tables = set(name_to_file.keys())
@@ -616,23 +652,46 @@ def import_full_clone(
     missing_in_bundle = sorted(schema_tables - bundle_tables)
     extra_in_bundle = sorted(bundle_tables - schema_tables)
 
-    if missing_in_bundle:
+    if missing_in_bundle and not allow_missing_tables:
         raise RuntimeError(
             "Full clone bundle is missing tables required by current schema: "
             + ", ".join(missing_in_bundle)
             + ".\nThis would break foreign keys. Re-export the bundle from a matching schema."  # noqa E501
         )
 
+    if allow_missing_tables:
+        tables_to_import = [t for t in insert_order if t.name in bundle_tables]
+        tables_to_truncate = list(reversed(tables_to_import))
+    else:
+        tables_to_import = insert_order
+        tables_to_truncate = delete_order
+
+    if not tables_to_import:
+        raise RuntimeError("No common tables between bundle and current schema.")
+
+    # 1) Truncate relevant tables
+    with engine.begin() as conn:
+        d = detect_engine_name(engine)
+        if d in ("postgresql", "postgres"):
+            for table in tables_to_truncate:
+                conn.execute(
+                    text(f'TRUNCATE TABLE "{table.name}" RESTART IDENTITY CASCADE')  # noqa E501
+                )
+        else:
+            for table in tables_to_truncate:
+                conn.execute(text(f"DELETE FROM {table.name}"))
+
     if extra_in_bundle:
-        # não é fatal, mas bom logar
+        # Extra tables in bundle are ignored (useful across schema versions).
         pass
 
-    for reflected_table in insert_order:
+    # 2) Import in dependency order
+    for reflected_table in tables_to_import:
         rel_file = name_to_file.get(reflected_table.name)
         if not rel_file:
-            # Strict full clone could raise here, but keeping current behavior.
-            # continue
-            raise RuntimeError(f"Bundle manifest missing table entry for: {table.name}")  # noqa E501
+            raise RuntimeError(
+                f"Bundle manifest missing table entry for: {reflected_table.name}"
+            )
 
         file_path = base / rel_file
         if not file_path.exists():
@@ -645,7 +704,6 @@ def import_full_clone(
                 _insert_df(engine, target_table, chunk, chunksize=chunksize)
         else:
             df = pd.read_parquet(file_path)
-            print(f"[IMPORT] {table.name}: {len(df)} rows from {file_path}")
             _insert_df(engine, target_table, df, chunksize=chunksize)
 
     # 3) Postgres sequences
@@ -682,37 +740,33 @@ def _export_table_parquet(
     conn, engine: Engine, table_name: str, out_path: Path, *, chunksize: int
 ) -> None:
     """
-    Export parquet efficiently with chunking. For simplicity we join chunks at
-    the end. If tables get huge, we can switch to dataset-style parquet
-    (directory with row-groups).
+    Export parquet in streaming mode.
+
+    This keeps memory usage stable by writing each chunk directly to the
+    destination parquet file (single file output).
     """
-    parts_dir = out_path.parent / f".{table_name}_parts"
-    if parts_dir.exists():
-        shutil.rmtree(parts_dir)
-    parts_dir.mkdir(parents=True, exist_ok=True)
-
     sql = _select_all_sql(engine, table_name)
-    part_files: list[Path] = []
-    i = 0
-    for chunk in pd.read_sql(text(sql), conn, chunksize=chunksize):
-        part = parts_dir / f"part_{i}.parquet"
-        chunk.to_parquet(part, index=False)
-        part_files.append(part)
-        i += 1
+    writer: pq.ParquetWriter | None = None
+    schema: pa.Schema | None = None
 
-    if not part_files:
+    try:
+        for chunk in pd.read_sql(text(sql), conn, chunksize=chunksize):
+            table = pa.Table.from_pandas(chunk, preserve_index=False)
+
+            if writer is None:
+                schema = table.schema
+                writer = pq.ParquetWriter(str(out_path), schema=schema)
+            elif table.schema != schema:
+                table = table.cast(schema, safe=False)
+
+            writer.write_table(table)
+    finally:
+        if writer is not None:
+            writer.close()
+
+    if writer is None:
+        # Empty table
         pd.DataFrame().to_parquet(out_path, index=False)
-        shutil.rmtree(parts_dir, ignore_errors=True)
-        return
-
-    if len(part_files) == 1:
-        shutil.move(str(part_files[0]), str(out_path))
-        shutil.rmtree(parts_dir, ignore_errors=True)
-        return
-
-    dfs = [pd.read_parquet(p) for p in part_files]
-    pd.concat(dfs, ignore_index=True).to_parquet(out_path, index=False)
-    shutil.rmtree(parts_dir, ignore_errors=True)
 
 
 def reset_postgres_sequences(engine: Engine) -> None:

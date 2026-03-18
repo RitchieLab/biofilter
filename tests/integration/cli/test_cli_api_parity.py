@@ -211,5 +211,93 @@ def test_api_export_cli_import_parity_csv(
             "--no-rebuild-indexes",
         ],
     )
-    # assert imported.exit_code == 0, imported.output
+    assert imported.exit_code == 0, imported.output
+    assert _has_config_key(target_db_uri, marker_key)
+
+
+@pytest.mark.integration
+def test_api_export_filtered_cli_import_allow_missing_parity_csv(
+    sqlite_seeded_db_uri, cli_runner, tmp_path
+):
+    marker_key = "api_cli_filtered_export_marker"
+    bundle_dir = Path(tmp_path) / "bundle_filtered_api_csv"
+    target_db_path = Path(tmp_path) / "target_filtered_cli_import.db"
+    target_db_uri = f"sqlite:///{target_db_path}"
+
+    _set_config_key(sqlite_seeded_db_uri, marker_key, "filtered_from_api_export")
+    assert _has_config_key(sqlite_seeded_db_uri, marker_key)
+
+    bf = Biofilter(db_uri=sqlite_seeded_db_uri, debug_mode=False)
+    bf.db.export(out_dir=bundle_dir, fmt="csv", tables=["system_config"])
+    assert (bundle_dir / "manifest.json").exists()
+
+    create_target = cli_runner.invoke(
+        main,
+        ["db", "create-db", "--db-uri", target_db_uri, "--overwrite"],
+    )
+    assert create_target.exit_code == 0, create_target.output
+
+    imported = cli_runner.invoke(
+        main,
+        [
+            "--db-uri",
+            target_db_uri,
+            "db",
+            "import",
+            "--in",
+            str(bundle_dir),
+            "--format",
+            "csv",
+            "--allow-missing-tables",
+            "--no-rebuild-indexes",
+        ],
+    )
+    assert imported.exit_code == 0, imported.output
+    assert _has_config_key(target_db_uri, marker_key)
+
+
+@pytest.mark.integration
+def test_cli_export_filtered_api_import_allow_missing_parity_csv(
+    sqlite_seeded_db_uri, cli_runner, tmp_path
+):
+    marker_key = "cli_api_filtered_import_marker"
+    bundle_dir = Path(tmp_path) / "bundle_filtered_cli_csv"
+    target_db_path = Path(tmp_path) / "target_filtered_api_import.db"
+    target_db_uri = f"sqlite:///{target_db_path}"
+
+    _set_config_key(sqlite_seeded_db_uri, marker_key, "filtered_from_cli_export")
+    assert _has_config_key(sqlite_seeded_db_uri, marker_key)
+
+    exported = cli_runner.invoke(
+        main,
+        [
+            "--db-uri",
+            sqlite_seeded_db_uri,
+            "db",
+            "export",
+            "--out",
+            str(bundle_dir),
+            "--format",
+            "csv",
+            "--table",
+            "system_config",
+        ],
+    )
+    assert exported.exit_code == 0, exported.output
+    assert (bundle_dir / "manifest.json").exists()
+
+    create_target = cli_runner.invoke(
+        main,
+        ["db", "create-db", "--db-uri", target_db_uri, "--overwrite"],
+    )
+    assert create_target.exit_code == 0, create_target.output
+
+    bf_target = Biofilter(db_uri=target_db_uri, debug_mode=False)
+    bf_target.db.import_(
+        in_dir=bundle_dir,
+        fmt="csv",
+        rebuild_indexes=False,
+        allow_missing_tables=True,
+    )
+
     assert _has_config_key(target_db_uri, marker_key)

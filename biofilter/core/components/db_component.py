@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Literal, Optional
+from typing import Iterable, Literal, Optional
 
 from biofilter.core.components.base_component import BaseComponent
 from biofilter.modules.db.database import Database
@@ -168,6 +168,8 @@ class DBComponent(BaseComponent):
         biofilter_version: Optional[str] = None,
         schema_version: str = "unknown",
         chunksize: int = 250_000,
+        tables: Iterable[str] | None = None,
+        exclude_tables: Iterable[str] | None = None,
     ) -> Path:
         """
         Export a logical full-clone bundle (manifest + one file per table).
@@ -192,6 +194,8 @@ class DBComponent(BaseComponent):
             schema_version=schema_version,
             fmt=fmt,
             chunksize=chunksize,
+            include_tables=tables,
+            exclude_tables=exclude_tables,
         )
 
         self.core.logger.log(f"✅ Bundle exported: {bundle_dir}", "INFO")
@@ -204,6 +208,7 @@ class DBComponent(BaseComponent):
         fmt: ExportFormat = "parquet",
         rebuild_indexes: bool = True,
         reset_postgres_sequences: bool = True,
+        allow_missing_tables: bool = False,
     ) -> None:
         """
         Import a logical full-clone bundle into the current DB schema.
@@ -226,6 +231,7 @@ class DBComponent(BaseComponent):
             in_dir=inp,
             fmt=fmt,
             reset_sequences=reset_postgres_sequences,
+            allow_missing_tables=allow_missing_tables,
         )
 
         self.core.logger.log("✅ Bundle import completed.", "INFO")

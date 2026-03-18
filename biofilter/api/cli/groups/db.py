@@ -15,6 +15,16 @@ def db():
     pass
 
 
+def _to_list_or_none(values):
+    items: list[str] = []
+    for value in values or ():
+        for part in str(value).split(","):
+            part = part.strip()
+            if part:
+                items.append(part)
+    return items or None
+
+
 # -----------------------------------------------------------------------------
 # Create New DataBase
 # -----------------------------------------------------------------------------
@@ -237,9 +247,28 @@ def restore_cmd(ctx, db_uri, in_path: Path):
     type=int,
     help="Chunk size for streaming reads during export (CSV + parquet chunking helpers).",
 )
+@click.option(
+    "--table",
+    "tables",
+    multiple=True,
+    help="Table name to include (repeatable or comma-separated).",
+)
+@click.option(
+    "--exclude-table",
+    "exclude_tables",
+    multiple=True,
+    help="Table name to exclude (repeatable or comma-separated).",
+)
 @click.pass_context
 def export_cmd(
-    ctx, db_uri, out_dir: Path, fmt: str, schema_version: str, chunksize: int
+    ctx,
+    db_uri,
+    out_dir: Path,
+    fmt: str,
+    schema_version: str,
+    chunksize: int,
+    tables,
+    exclude_tables,
 ):
     db_uri = require_db_uri(ctx, local_db_uri=db_uri)
     bf = Biofilter(db_uri=db_uri, debug_mode=False)
@@ -250,6 +279,8 @@ def export_cmd(
         fmt=fmt.lower(),
         schema_version=schema_version,
         chunksize=chunksize,
+        tables=_to_list_or_none(tables),
+        exclude_tables=_to_list_or_none(exclude_tables),
     )
     click.echo(f"✅ Bundle exported: {bundle}")
 
@@ -281,6 +312,11 @@ def export_cmd(
     is_flag=True,
     help="(Postgres) Do not reset sequences after import.",
 )
+@click.option(
+    "--allow-missing-tables",
+    is_flag=True,
+    help="Allow bundle missing schema tables and import only shared tables.",
+)
 @click.pass_context
 def import_cmd(
     ctx,
@@ -289,6 +325,7 @@ def import_cmd(
     fmt: str,
     no_rebuild_indexes: bool,
     no_reset_sequences: bool,
+    allow_missing_tables: bool,
 ):
     db_uri = require_db_uri(ctx, local_db_uri=db_uri)
     bf = Biofilter(db_uri=db_uri, debug_mode=False)
@@ -299,5 +336,6 @@ def import_cmd(
         fmt=fmt.lower(),
         rebuild_indexes=not no_rebuild_indexes,
         reset_postgres_sequences=not no_reset_sequences,
+        allow_missing_tables=allow_missing_tables,
     )
     click.echo("✅ Bundle import completed.")

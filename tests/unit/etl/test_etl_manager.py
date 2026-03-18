@@ -2,6 +2,9 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
+from sqlalchemy import Column, Integer, MetaData, String, Table, create_engine, select
+from sqlalchemy.orm import sessionmaker
+
 import biofilter.modules.etl.etl_manager as etl_mgr_mod
 
 
@@ -235,3 +238,69 @@ def test_restart_etl_process_purges_optionally_deletes_and_reruns(monkeypatch):
     assert run["ds"] is ds
     assert run["run_steps"] == ["extract", "transform", "load"]
     assert run["force_steps"] == ["extract", "transform", "load"]
+
+
+def test_simple_purge_by_data_source_deletes_only_non_etl_rows_with_datasource_id():
+    logger = DummyLogger()
+    manager = etl_mgr_mod.ETLManager(debug_mode=False, db=DummyDB(), logger=logger)
+
+    engine = create_engine("sqlite:///:memory:", future=True)
+    metadata = MetaData()
+    table_entity = Table(
+        "Entity",
+        metadata,
+        Column("id", Integer, primary_key=True),
+        Column("data_source_id", Integer),
+        Column("name", String(50)),
+    )
+    table_etl = Table(
+        "etl_status",
+        metadata,
+        Column("id", Integer, primary_key=True),
+        Column("data_source_id", Integer),
+        Column("status", String(20)),
+    )
+    table_other = Table(
+        "OtherTable",
+        metadata,
+        Column("id", Integer, primary_key=True),
+        Column("name", String(50)),
+    )
+    metadata.create_all(engine)
+
+    Session = sessionmaker(bind=engine, future=True)
+    with Session() as session:
+        session.execute(
+            table_entity.insert(),
+            [
+                {"id": 1, "data_source_id": 7, "name": "to_delete"},
+                {"id": 2, "data_source_id": 8, "name": "to_keep"},
+            ],
+        )
+        session.execute(
+            table_etl.insert(),
+            [{"id": 1, "data_source_id": 7, "status": "running"}],
+        )
+        session.execute(
+            table_other.insert(),
+            [{"id": 1, "name": "no_data_source_id_column"}],
+        )
+        session.commit()
+
+        manager._simple_purge_by_data_source(session, 7)
+
+        remaining_entity = session.execute(
+            select(table_entity.c.data_source_id, table_entity.c.name)
+        ).all()
+        remaining_etl = session.execute(
+            select(table_etl.c.data_source_id, table_etl.c.status)
+        ).all()
+        remaining_other = session.execute(select(table_other.c.name)).all()
+
+    assert remaining_entity == [(8, "to_keep")]
+    assert remaining_etl == [(7, "running")]
+    assert remaining_other == [("no_data_source_id_column",)]
+    assert any(
+        level == "INFO" and "Simple purge complete" in message
+        for level, message in logger.messages
+    )

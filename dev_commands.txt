@@ -9,5 +9,67 @@ $ coverage run --rcfile=.coveragerc-core -m pytest
 $ coverage report --rcfile=.coveragerc-core -m
 
 TMUX
-# tmux ls 
-$ 
+$ tmux ls 
+$ tmux new -s name
+$ tmux attach -t name
+$ tmux kill-session -t name
+
+
+
+
+==================================================
+TEST QUALITY BY LAYERS - CHECKLIST
+==================================================
+
+Status legend
+- [done]
+- [in-progress]
+- [todo]
+
+1) Unit layer
+- [done] db.transfer: export/import edge cases (include/exclude, allow-missing, empty string in NOT NULL string)
+- [done] db.migrate: status, stamp-head, dry-run, upgrade + safety branches
+- [done] etl_manager: purge behavior with real in-memory DB tables
+- [done] settings_manager: bool parsing (including y/n) and typed get/set paths
+- [todo] add negative tests for migrate repo heads/branching with multi-head fixtures from alembic test assets
+
+Run commands:
+$ poetry run python -m pytest -q tests/unit/db/test_db_transfer.py tests/unit/db/test_db_transfer_clone.py
+$ poetry run python -m pytest -q tests/unit/db/test_db_migrate.py
+$ poetry run python -m pytest -q tests/unit/etl/test_etl_manager.py tests/unit/core/test_settings_manager.py
+
+2) Integration layer
+- [done] SQLite lifecycle (create, migrate, report, export/import flows)
+- [done] Postgres lifecycle via testcontainers (export/import filtered + allow-missing)
+- [done] Postgres backup/restore integration test with environment-aware skip on pg client/server mismatch
+- [todo] run parquet lifecycle roundtrip in Postgres integration
+- [todo] add invariant checks after import (row counts / required keys / skipped tables summary)
+
+Run commands:
+$ poetry run python -m pytest -q tests/integration/cli/test_cli_db_lifecycle.py
+$ poetry run python -m pytest -q tests/integration/cli/test_cli_db_postgres_lifecycle.py -m postgres
+$ poetry run python -m pytest -q tests/integration/api/test_api_report.py -m postgres
+
+3) Contract layer (CLI x API parity)
+- [done] report parity: list/explain/available-columns
+- [done] db parity: backup/restore and export/import
+- [done] parity for new flags: --table / --allow-missing-tables (both directions: API->CLI and CLI->API)
+- [todo] enforce parity for error messages and exit codes in critical failure scenarios
+
+Run commands:
+$ poetry run python -m pytest -q tests/integration/cli/test_cli_api_parity.py
+
+4) CI and release safety
+- [todo] add CI gates: ruff + pytest + coverage threshold
+- [todo] split CI jobs:
+  - fast: unit + lightweight integration (sqlite)
+  - slow: postgres integration (testcontainers)
+- [todo] publish coverage by package (db.transfer, db.migrate, etl_manager, settings_manager)
+
+5) Operational quality
+- [todo] improve export/import progress logs (table, rows/sec, elapsed, size)
+- [todo] normalize failure messages with context (table/chunk/command suggestion)
+
+6) Docs and runbooks
+- [todo] production runbook: export/import, rollback, post-import validation
+- [todo] schema upgrade checklist per version (including removed modules/tables)

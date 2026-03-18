@@ -1,10 +1,9 @@
-from biofilter.modules.report.reports.base_report import ReportBase
-from biofilter.modules.db.models import Entity, EntityAlias, EntityGroup  # DataSource
-from sqlalchemy.orm import aliased
-from sqlalchemy import func
 import pandas as pd
+from sqlalchemy import and_, func
+from sqlalchemy.orm import aliased
 
-" TODO: Add data-source as FK in Entity to relation run"
+from biofilter.modules.db.models import Entity, EntityAlias, EntityGroup
+from biofilter.modules.report.reports.base_report import ReportBase
 
 
 class EntityFilterReport(ReportBase):
@@ -12,101 +11,115 @@ class EntityFilterReport(ReportBase):
     description = "Validates input list of entity names and returns all matching entities, including conflict and status flags."  # noqa E501
 
     def run(self):
-        input_data = self.params.get("input_data", [])
-        if not input_data:
-            raise ValueError("Missing required parameter: input_data")
+        input_data_raw = self.param("input_data", required=True)
+        input_data = self.resolve_input_list(input_data_raw, param_name="input_data")
 
-        # Mapeia input lowercase para o valor original
-        input_map = {x.lower(): x for x in input_data}
-        input_lc = list(input_map.keys())
+        # Normalize + preserve first original form
+        normalized_to_original: dict[str, str] = {}
+        for item in input_data:
+            value = str(item).strip()
+            if not value:
+                continue
+            key = value.lower()
+            normalized_to_original.setdefault(key, value)
 
-        # Aliases for primary name lookup
-        PrimaryName = aliased(EntityAlias)
+        if not normalized_to_original:
+            raise ValueError("input_data must contain at least one non-empty value.")
 
-        # Query
+        input_keys = list(normalized_to_original.keys())
+        primary_alias = aliased(EntityAlias)
+
+        input_key_expr = func.lower(
+            func.coalesce(EntityAlias.alias_norm, EntityAlias.alias_value)
+        )
 
         matches = (
             self.session.query(
-                EntityAlias.name.label("input_original"),
-                EntityAlias.name.label("input"),
+                input_key_expr.label("input_key"),
+                EntityAlias.alias_value.label("input"),
                 EntityAlias.is_primary.label("is_primary"),
                 Entity.id.label("entity_id"),
-                PrimaryName.name.label("primary_name"),
+                primary_alias.alias_value.label("primary_name"),
                 Entity.group_id.label("group_id"),
                 EntityGroup.name.label("group_name"),
-                Entity.has_conflict,
-                Entity.is_deactive,
-                EntityAlias.data_source_id,
-                # DataSource.name.label("data_source_name"),
+                Entity.has_conflict.label("has_conflict"),
+                Entity.is_active.label("is_active"),
+                EntityAlias.data_source_id.label("data_source_id"),
             )
             .join(Entity, Entity.id == EntityAlias.entity_id)
-            .join(PrimaryName, PrimaryName.entity_id == Entity.id)
+            .join(
+                primary_alias,
+                and_(
+                    primary_alias.entity_id == Entity.id,
+                    primary_alias.is_primary.is_(True),
+                ),
+            )
             .join(EntityGroup, Entity.group_id == EntityGroup.id, isouter=True)
-            .filter(PrimaryName.is_primary.is_(True))
-            .filter(func.lower(EntityAlias.name).in_(input_lc))
+            .filter(input_key_expr.in_(input_keys))
             .all()
         )
 
-        df = pd.DataFrame(matches)
+        columns = [
+            "input_original",
+            "input",
+            "is_primary",
+            "entity_id",
+            "primary_name",
+            "group_id",
+            "group_name",
+            "has_conflict",
+            "is_active",
+            "is_deactive",
+            "data_source_id",
+            "observation",
+        ]
 
-        df["input_original"] = df["input"].str.lower().map(input_map)
-
-        if not df.empty:
-            # Adds notes for duplicate entries
+        if matches:
+            df = pd.DataFrame(matches)
+            df["input_original"] = df["input_key"].map(normalized_to_original)
             df["observation"] = ""
-            dupes = df.duplicated(subset=["input"], keep=False)
-            df.loc[dupes, "observation"] = "multiple matches (conflict)"
-
-            # Order by Primary_name
-            df = df.sort_values(by=["primary_name", "input"]).reset_index(
-                drop=True
-            )  # noqa E501
-        else:
-            # Dataframe create with all outcome reusults
-            df = pd.DataFrame(
-                columns=[
-                    "input_original",
-                    "input",
-                    "is_primary",
-                    "entity_id",
-                    "primary_name",
-                    "group_id",
-                    "group_name",
-                    "has_conflict",
-                    "is_deactive",
-                    "data_source_id",
-                    # "data_source_name",
-                    "observation",
-                ]
+            dupes = df.duplicated(subset=["input_key"], keep=False)
+            df.loc[dupes, "observation"] = "multiple matches"
+            df["is_deactive"] = df["is_active"].apply(
+                lambda x: None if pd.isna(x) else (not bool(x))
             )
+            found_input_keys = set(df["input_key"].dropna().tolist())
+            df = df.drop(columns=["input_key"]).sort_values(
+                by=["primary_name", "input"]
+            )
+        else:
+            df = pd.DataFrame(columns=columns)
+            found_input_keys = set()
 
-        found_inputs_lc = set(df["input"].str.lower().unique())
         not_found = [
-            input_map[x] for x in input_map if x not in found_inputs_lc
-        ]  # noqa E501
+            normalized_to_original[k]
+            for k in normalized_to_original.keys()
+            if k not in found_input_keys
+        ]
 
         if not_found:
             missing = pd.DataFrame(
                 {
                     "input_original": not_found,
                     "input": not_found,
-                    "name": None,
                     "is_primary": None,
                     "entity_id": None,
                     "primary_name": None,
                     "group_id": None,
                     "group_name": None,
                     "has_conflict": None,
+                    "is_active": None,
                     "is_deactive": None,
                     "data_source_id": None,
-                    # "data_source_name": None,
                     "observation": "not found",
                 }
             )
             df = pd.concat([df, missing], ignore_index=True)
 
+        # Keep predictable output contract
+        df = df.reindex(columns=columns)
         self.results = df
-        return df
+        return df.reset_index(drop=True)
 
     def to_dataframe(self, data=None):
         return (

@@ -267,6 +267,49 @@ def test_export_calls_export_with_normalized_format(monkeypatch, tmp_path):
                 "fmt": "csv",
                 "schema_version": "4.2.0",
                 "chunksize": 123,
+                "tables": None,
+                "exclude_tables": None,
+            },
+        )
+    ]
+
+
+def test_export_accepts_table_filters(monkeypatch, tmp_path):
+    runner = CliRunner()
+    fake_db = FakeDBFacade()
+    capture = {}
+    _patch_biofilter(monkeypatch, fake_db, capture)
+    _patch_require_db_uri(monkeypatch, capture)
+
+    out_dir = tmp_path / "bundle"
+    result = runner.invoke(
+        db_cli_mod.db,
+        [
+            "export",
+            "--db-uri",
+            "sqlite:///x.db",
+            "--out",
+            str(out_dir),
+            "--table",
+            "variants,variant_consequences",
+            "--table",
+            "system_config",
+            "--exclude-table",
+            "etl_status",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert fake_db.calls == [
+        (
+            "export",
+            {
+                "out_dir": out_dir,
+                "fmt": "parquet",
+                "schema_version": "unknown",
+                "chunksize": 250000,
+                "tables": ["variants", "variant_consequences", "system_config"],
+                "exclude_tables": ["etl_status"],
             },
         )
     ]
@@ -307,6 +350,44 @@ def test_import_calls_import_with_flag_inversion(monkeypatch, tmp_path):
                 "fmt": "csv",
                 "rebuild_indexes": False,
                 "reset_postgres_sequences": False,
+                "allow_missing_tables": False,
+            },
+        )
+    ]
+
+
+def test_import_passes_allow_missing_tables(monkeypatch, tmp_path):
+    runner = CliRunner()
+    fake_db = FakeDBFacade()
+    capture = {}
+    _patch_biofilter(monkeypatch, fake_db, capture)
+    _patch_require_db_uri(monkeypatch, capture)
+
+    in_dir = tmp_path / "bundle"
+    in_dir.mkdir(parents=True, exist_ok=True)
+
+    result = runner.invoke(
+        db_cli_mod.db,
+        [
+            "import",
+            "--db-uri",
+            "sqlite:///x.db",
+            "--in",
+            str(in_dir),
+            "--allow-missing-tables",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert fake_db.calls == [
+        (
+            "import_",
+            {
+                "in_dir": in_dir,
+                "fmt": "parquet",
+                "rebuild_indexes": True,
+                "reset_postgres_sequences": True,
+                "allow_missing_tables": True,
             },
         )
     ]

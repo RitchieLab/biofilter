@@ -75,10 +75,17 @@ biofilter --db-uri sqlite:///biofilter_dev.db db restore --in ./tests/outputs/ba
 - `--format` (`parquet|csv`, default: `parquet`)
 - `--schema-version` (default: `unknown`)
 - `--chunksize` (default: `250000`)
+- `--table` (optional, repeatable or comma-separated)
+- `--exclude-table` (optional, repeatable or comma-separated)
 
 Example:
 ```bash
 biofilter --db-uri sqlite:///biofilter_dev.db db export --out ./tests/outputs/export_sqlite --format csv
+```
+
+Example with table filters:
+```bash
+biofilter --db-uri sqlite:///biofilter_dev.db db export --out ./tests/outputs/export_sqlite --format csv --table variants,variant_consequences --exclude-table etl_status
 ```
 
 ### `db import`
@@ -87,10 +94,16 @@ biofilter --db-uri sqlite:///biofilter_dev.db db export --out ./tests/outputs/ex
 - `--format` (`parquet|csv`, default: `parquet`)
 - `--no-rebuild-indexes` (flag)
 - `--no-reset-sequences` (flag)
+- `--allow-missing-tables` (flag)
 
 Example:
 ```bash
 biofilter --db-uri sqlite:///biofilter_target.db db import --in ./tests/outputs/export_sqlite --format csv --no-rebuild-indexes
+```
+
+Example for schema-drift import:
+```bash
+biofilter --db-uri sqlite:///biofilter_target.db db import --in ./tests/outputs/export_sqlite --format csv --allow-missing-tables
 ```
 
 ## Group `report`

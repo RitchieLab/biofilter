@@ -218,6 +218,37 @@ def test_export_calls_export_full_clone(monkeypatch, tmp_path):
     assert captured["kwargs"]["biofilter_version"] == core.version
     assert captured["kwargs"]["schema_version"] == "4.1.0"
     assert captured["kwargs"]["fmt"] == "csv"
+    assert captured["kwargs"]["include_tables"] is None
+    assert captured["kwargs"]["exclude_tables"] is None
+
+
+def test_export_passes_table_filters(monkeypatch, tmp_path):
+    core = DummyCore()
+    core.db = SimpleNamespace(engine=object())
+    component = dbcomp_mod.DBComponent(core)
+
+    captured = {}
+
+    def fake_export_full_clone(engine, out, **kwargs):
+        captured["engine"] = engine
+        captured["out"] = out
+        captured["kwargs"] = kwargs
+        return out
+
+    monkeypatch.setattr(dbcomp_mod, "export_full_clone", fake_export_full_clone)
+
+    component.export(
+        out_dir=tmp_path / "bundle",
+        fmt="parquet",
+        tables=["variants", "variant_consequences"],
+        exclude_tables=["etl_status"],
+    )
+
+    assert captured["kwargs"]["include_tables"] == [
+        "variants",
+        "variant_consequences",
+    ]
+    assert captured["kwargs"]["exclude_tables"] == ["etl_status"]
 
 
 def test_import_calls_import_full_clone_and_rebuild_indexes(monkeypatch, tmp_path):
@@ -259,5 +290,39 @@ def test_import_calls_import_full_clone_and_rebuild_indexes(monkeypatch, tmp_pat
     assert imported["in_dir"] == in_dir.resolve()
     assert imported["fmt"] == "csv"
     assert imported["reset_sequences"] is False
+    assert imported["allow_missing_tables"] is False
     assert connect_calls["check_exists"] is True
     assert rebuild_calls == {"groups": None, "drop_first": True}
+
+
+def test_import_passes_allow_missing_tables(monkeypatch, tmp_path):
+    connect_calls = {}
+
+    def fake_connect(check_exists=True):
+        connect_calls["check_exists"] = check_exists
+
+    db = SimpleNamespace(engine=object(), connect=fake_connect)
+    core = DummyCore()
+    core.etl = SimpleNamespace(rebuild_indexes=lambda **kwargs: (True, "ok"))
+    core.db = db
+    component = dbcomp_mod.DBComponent(core)
+
+    imported = {}
+
+    def fake_import_full_clone(**kwargs):
+        imported.update(kwargs)
+
+    monkeypatch.setattr(dbcomp_mod, "import_full_clone", fake_import_full_clone)
+
+    in_dir = tmp_path / "bundle"
+    in_dir.mkdir(parents=True, exist_ok=True)
+
+    component.import_(
+        in_dir=in_dir,
+        fmt="parquet",
+        rebuild_indexes=False,
+        allow_missing_tables=True,
+    )
+
+    assert imported["allow_missing_tables"] is True
+    assert connect_calls["check_exists"] is True

@@ -17,6 +17,13 @@ def _norm_str(x: Any) -> str:
     return str(x).strip() if x is not None else ""
 
 
+def _first_defined(d: dict[str, Any], keys: tuple[str, ...]) -> Any:
+    for key in keys:
+        if key in d and d[key] is not None:
+            return d[key]
+    return None
+
+
 def _parse_int(x: Any) -> Optional[int]:
     try:
         if x is None:
@@ -53,6 +60,22 @@ def _parse_chr_to_int(chr_value: Any) -> Optional[int]:
         return None
     except Exception:
         return None
+
+
+def _parse_bool(value: Any, default: bool) -> bool:
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return bool(value)
+
+    s = _norm_str(value).lower()
+    if s in {"true", "1", "yes", "y", "on"}:
+        return True
+    if s in {"false", "0", "no", "n", "off"}:
+        return False
+    return default
 
 
 def _format_chr(chromosome: Optional[int]) -> Optional[str]:
@@ -340,9 +363,9 @@ Output:
     def _parse_region_dict(self, item: dict[str, Any]) -> NormalizedRegionInput:  # noqa E501
         raw = str(item)
 
-        chrom = item.get("chromosome") or item.get("chr") or item.get("chrom")
-        start = item.get("start") or item.get("pos_start") or item.get("position_start")  # noqa E501
-        end = item.get("end") or item.get("pos_end") or item.get("position_end")  # noqa E501
+        chrom = _first_defined(item, ("chromosome", "chr", "chrom"))
+        start = _first_defined(item, ("start", "pos_start", "position_start"))
+        end = _first_defined(item, ("end", "pos_end", "position_end"))
 
         chr_in = _parse_chr_to_int(chrom)
         start_i = _parse_int(start)
@@ -366,6 +389,16 @@ Output:
                 end=None,
                 status="invalid_input",
                 note="Could not parse start/end from dict.",
+            )
+
+        if start_i <= 0 or end_i <= 0:
+            return NormalizedRegionInput(
+                raw=raw,
+                chromosome=chr_in,
+                start=start_i,
+                end=end_i,
+                status="invalid_input",
+                note="Positions must be positive integers.",
             )
 
         if end_i < start_i:
@@ -443,14 +476,28 @@ Output:
         if not variant_ids:
             return []
 
-        stmt = select(vme).where(
-            and_(
-                vme.c.chromosome == chromosome,
-                vme.c.variant_id.in_(variant_ids),
+        try:
+            chunk_size = int(self.param("effect_query_chunk_size", 2000) or 2000)
+        except Exception:
+            chunk_size = 2000
+        chunk_size = max(1, chunk_size)
+
+        clean_ids = sorted({int(v) for v in variant_ids if v is not None})
+        if not clean_ids:
+            return []
+
+        out_rows: list[dict[str, Any]] = []
+        for i in range(0, len(clean_ids), chunk_size):
+            chunk = clean_ids[i: i + chunk_size]
+            stmt = select(vme).where(
+                and_(
+                    vme.c.chromosome == chromosome,
+                    vme.c.variant_id.in_(chunk),
+                )
             )
-        )
-        rows = self.session.execute(stmt).mappings().all()
-        return [dict(r) for r in rows]
+            rows = self.session.execute(stmt).mappings().all()
+            out_rows.extend(dict(r) for r in rows)
+        return out_rows
 
     def _load_dimension_maps(
         self,
@@ -717,8 +764,12 @@ Output:
 
         range_up = max(0, int(self.param("range_up", 0) or 0))
         range_down = max(0, int(self.param("range_down", 0) or 0))
-        emit_not_found_rows = bool(self.param("emit_not_found_rows", True))
-        include_variant_only_rows = bool(self.param("include_variant_only_rows", True))  # noqa E501
+        emit_not_found_rows = _parse_bool(
+            self.param("emit_not_found_rows", True), default=True
+        )
+        include_variant_only_rows = _parse_bool(
+            self.param("include_variant_only_rows", True), default=True
+        )
         limit_variants_per_input = int(
             self.param("limit_variants_per_input", 1000) or 1000
         )

@@ -1,19 +1,19 @@
 # biofilter/modules/db/models/model_variants.py
 from sqlalchemy import (
-    Float,
-    Text,
-    Table,
-    Column,
-    Boolean,
-    Integer,
     BigInteger,
-    String,
+    Boolean,
+    Column,
+    Float,
     ForeignKey,
-    UniqueConstraint,
+    Identity,
+    Integer,
     PrimaryKeyConstraint,
+    String,
+    Table,
+    Text,
+    UniqueConstraint,
 )
-from sqlalchemy.orm import relationship, mapped_column, Mapped
-from sqlalchemy import Identity
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from biofilter.modules.db.base import Base
 from biofilter.modules.db.types import PKBigIntOrInt
@@ -79,7 +79,7 @@ class VariantImpact(Base):
     __tablename__ = "variant_impacts"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)  # noqa E501
-    name: Mapped[str] = mapped_column(String(16), unique=True, nullable=False)
+    name: Mapped[str] = mapped_column(String(128), unique=True, nullable=False)
     severity_rank: Mapped[int] = mapped_column(Integer, nullable=False)
 
 
