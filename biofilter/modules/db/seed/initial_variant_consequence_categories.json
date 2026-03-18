@@ -1,0 +1,9 @@
+{
+    "variant_consequence_categories": [
+        {"name": "coding"},
+        {"name": "structural_other"},
+        {"name": "non_coding"},
+        {"name": "regulatory"},
+        {"name": "intergenic"}
+    ]
+}

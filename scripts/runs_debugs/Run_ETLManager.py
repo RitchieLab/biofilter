@@ -3,7 +3,7 @@ import time
 from biofilter import Biofilter
 
 # db_uri = "sqlite:///dev_biofilter_2.db"
-db_uri = "postgresql+psycopg2://admin:admin@localhost/biofilter_dev"
+db_uri = "postgresql+psycopg2://admin:admin@localhost/biofilter_teste"
 
 # Configure below
 data_sources_to_process = [
@@ -101,7 +101,7 @@ data_sources_to_process = [
 ]
 
 run_steps = [
-    # # "extract",
+    "extract",
     "transform",
     "load",
     # "all"

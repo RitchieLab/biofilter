@@ -792,7 +792,7 @@ class DTP(DTPBase):
             # Check that all allowlist fields are present in the parsed VCF
             vep_fields_set = set(vep_fields_list)
             missing_vep_fields = [
-                field for field in cfg.vep_allowlist if field not in vep_fields_set
+                field for field in cfg.vep_allowlist if field not in vep_fields_set  # noqa E501
             ]
             if missing_vep_fields:
                 self.logger.log(
@@ -818,33 +818,48 @@ class DTP(DTPBase):
         # Process variants and consequences, buffering in memory and flushing
         # to parquet in chunks
         # -------------------------------------------------------------------
+        self.logger.log(
+            "🔬 Variant-level filters active: "
+            f"AC >= {cfg.min_ac}; FILTER in [PASS, ., empty]; "
+            f"QUAL >= {cfg.min_qual}; "
+            "reject multi-ALT records in same sample.",
+            "INFO",
+        )
+        skipped_by_ac = 0
+        skipped_by_filter = 0
+        skipped_by_qual = 0
+        skipped_by_alt_empty = 0
+
         try:
             for var in vcf:
 
                 # Filtering at the variant level (before parsing INFO/VEP):
                 # -----------------------------------------------------------------
-                # 0. Minimal AC filter: skip variants with AC=0 (not observed in gnomAD)
+                # 0. Minimal AC filter: skip variants with AC=0 (not observed in gnomAD)  # noqa E501
                 # 1. Variants with failing FILTER are skipped
                 # 2. Variants below the configured QUAL threshold are skipped
-                # 3. Variants with multiple ALTs in the same record are rejected
+                # 3. Variants with multiple ALTs in the same record are rejected  # noqa E501
 
                 pos = int(var.POS)
                 ref = var.REF
 
                 # Filter 0: Skip variants with AC=0
                 if var.INFO.get("AC") < cfg.min_ac:
+                    skipped_by_ac += 1
                     n_skipped += 1
                     continue
 
                 # Filter 1: No load variant with failing FILTER
                 var_filter = var.FILTER
                 if var_filter not in (None, "PASS", ".", ""):
+                    skipped_by_filter += 1
                     n_skipped += 1
                     continue
 
                 var_qual = var.QUAL
                 try:
                     if var_qual is not None and float(var_qual) < cfg.min_qual:
+                        skipped_by_qual += 1
                         n_skipped += 1
                         continue
                 except (TypeError, ValueError):
@@ -853,6 +868,7 @@ class DTP(DTPBase):
                 # Filter 2: Skip multi-allelic records
                 # Assumption: gnomAD file already represents one ALT per record
                 if not var.ALT:
+                    skipped_by_alt_empty += 1
                     n_skipped += 1
                     continue
                 if len(var.ALT) > 1:
@@ -919,12 +935,20 @@ class DTP(DTPBase):
             self.logger.log(msg, "ERROR")
             return False, msg
 
-        self.logger.log(
-            "ℹ️ KDS manifest generation disabled for BF4 light release.",
-            "INFO",
-        )
+        # self.logger.log(
+        #     "ℹ️ KDS manifest generation disabled for BF4 light release.",
+        #     "INFO",
+        # )
 
         dt = time.time() - t0
+        # self.logger.log(
+        #     "⚠️ Variant filter summary: "
+        #     f"AC<{cfg.min_ac}={skipped_by_ac}, "
+        #     f"FILTER_FAIL={skipped_by_filter}, "
+        #     f"QUAL<{cfg.min_qual}={skipped_by_qual}, "
+        #     f"ALT_EMPTY={skipped_by_alt_empty}.",
+        #     "WARNING",
+        # )
         msg = (
             f"✅ Transform done: {self.data_source.name} "
             f"elapsed={dt:.1f}s out={out_base} parts={part} rows={n_rows} skipped={n_skipped}"  # noqa E501
@@ -1025,7 +1049,7 @@ class DTP(DTPBase):
     def _truncate_postgres_stage_tables(self, conn) -> None:
         conn.execute(
             text(
-                "TRUNCATE TABLE tmp_gnomad_variant_stage, tmp_gnomad_consequence_stage"
+                "TRUNCATE TABLE tmp_gnomad_variant_stage, tmp_gnomad_consequence_stage"  # noqa E501
             )
         )
 
@@ -1062,7 +1086,7 @@ class DTP(DTPBase):
         if raw_conn is None:
             raw_conn = getattr(conn.connection, "connection", None)
         if raw_conn is None:
-            raise RuntimeError("Could not access the PostgreSQL driver connection.")
+            raise RuntimeError("Could not access the PostgreSQL driver connection.")  # noqa E501
 
         copy_sql = (
             f"COPY {table_name} ({', '.join(columns)}) "
@@ -1181,7 +1205,7 @@ class DTP(DTPBase):
         int_cols = ["ac", "an"]
         for col in int_cols:
             if col in out.columns:
-                out[col] = pd.to_numeric(out[col], errors="coerce").astype("Int64")
+                out[col] = pd.to_numeric(out[col], errors="coerce").astype("Int64")  # noqa E501
             else:
                 out[col] = None
 
@@ -1239,7 +1263,7 @@ class DTP(DTPBase):
         ]
         return out.loc[mask, stage_columns].copy()
 
-    def _prepare_consequence_df(self, df: Optional[pd.DataFrame]) -> pd.DataFrame:
+    def _prepare_consequence_df(self, df: Optional[pd.DataFrame]) -> pd.DataFrame:  # noqa E501
         if df is None or df.empty:
             return pd.DataFrame()
 
@@ -1259,22 +1283,22 @@ class DTP(DTPBase):
         out["gene_symbol"] = gene_symbol_raw.fillna(gene_symbol)
 
         transcript_id = self._normalize_text_series(out, "transcript_id")
-        transcript_id_raw = self._normalize_text_series(out, "transcript_id_raw")
+        transcript_id_raw = self._normalize_text_series(out, "transcript_id_raw")  # noqa E501
         out["transcript_id"] = transcript_id.fillna(transcript_id_raw)
 
         out["feature_type"] = self._normalize_text_series(out, "feature_type")
         out["consequence"] = self._normalize_text_series(out, "consequence")
         out["impact"] = self._normalize_text_series(out, "impact", upper=True)
         out["biotype"] = self._normalize_text_series(out, "biotype")
-        out["most_severe_consequence_per_annotation"] = self._normalize_text_series(
+        out["most_severe_consequence_per_annotation"] = self._normalize_text_series(  # noqa E501
             out,
             "most_severe_consequence_per_annotation",
         )
-        out["most_severe_consequence_per_variant"] = self._normalize_text_series(
+        out["most_severe_consequence_per_variant"] = self._normalize_text_series(  # noqa E501
             out,
             "most_severe_consequence_per_variant",
         )
-        out["lof_confidence"] = self._normalize_text_series(out, "lof_confidence")
+        out["lof_confidence"] = self._normalize_text_series(out, "lof_confidence")  # noqa E501
         out["lof_filter"] = self._normalize_text_series(out, "lof_filter")
         out["lof_flags"] = self._normalize_text_series(out, "lof_flags")
 
@@ -1292,7 +1316,7 @@ class DTP(DTPBase):
                 out["impact_rank"], errors="coerce"
             ).astype("Int64")
         else:
-            out["impact_rank"] = pd.Series(pd.NA, index=out.index, dtype="Int64")
+            out["impact_rank"] = pd.Series(pd.NA, index=out.index, dtype="Int64")  # noqa E501
 
         if "lof_flag" not in out.columns:
             out["lof_flag"] = None
@@ -1345,7 +1369,7 @@ class DTP(DTPBase):
         chunk_size = 1000 if dialect_name == "postgresql" else 100
 
         for start in range(0, len(records), chunk_size):
-            chunk = records[start : start + chunk_size]
+            chunk = records[start : start + chunk_size]  # noqa E501
             stmt = insert_cls.values(chunk)
             if dialect_name == "postgresql":
                 stmt = stmt.on_conflict_do_nothing(index_elements=["name"])
@@ -1369,38 +1393,29 @@ class DTP(DTPBase):
         biotype_cache = dim_caches.setdefault("biotype", {})
 
         cons_df = work.loc[
-            work["_consequence_key"].notna(), ["_consequence_key", "consequence_rank"]
+            work["_consequence_key"].notna(), ["_consequence_key", "consequence_rank"]  # noqa E501
         ].copy()
         if not cons_df.empty:
             cons_df = cons_df[
                 ~cons_df["_consequence_key"].isin(consequence_cache.keys())
             ]
             if not cons_df.empty:
-                cons_df["severity_rank"] = pd.to_numeric(
-                    cons_df["consequence_rank"], errors="coerce"
-                ).fillna(999).astype(int)
-                cons_df = (
-                    cons_df.groupby("_consequence_key", as_index=False)["severity_rank"]
-                    .min()
-                    .rename(columns={"_consequence_key": "name"})
+                unknown_terms = sorted(
+                    cons_df["_consequence_key"].dropna().astype(str).unique().tolist()
                 )
-                cons_df["is_active"] = True
-                self._bulk_insert_records(
-                    conn,
-                    "variant_consequences",
-                    cons_df[["name", "severity_rank", "is_active"]].to_dict(
-                        "records"
-                    ),
-                )
-                dim_caches["consequence"] = self._load_dimension_cache(
-                    conn, "variant_consequences"
+                sample = ", ".join(unknown_terms[:10])
+                more = " ..." if len(unknown_terms) > 10 else ""
+                self.logger.log(
+                    "⚠️ Unknown consequence terms found in VCF and ignored "
+                    f"(no dim upsert): {sample}{more}",
+                    "WARNING",
                 )
 
         impact_df = work.loc[
             work["_impact_key"].notna(), ["_impact_key", "impact_rank"]
         ].copy()
         if not impact_df.empty:
-            impact_df = impact_df[~impact_df["_impact_key"].isin(impact_cache.keys())]
+            impact_df = impact_df[~impact_df["_impact_key"].isin(impact_cache.keys())]  # noqa E501
             if not impact_df.empty:
                 impact_df["severity_rank"] = pd.to_numeric(
                     impact_df["impact_rank"], errors="coerce"
@@ -1409,7 +1424,7 @@ class DTP(DTPBase):
                     impact_df["_impact_key"].map(IMPACT_RANK).fillna(999)
                 ).astype(int)
                 impact_df = (
-                    impact_df.groupby("_impact_key", as_index=False)["severity_rank"]
+                    impact_df.groupby("_impact_key", as_index=False)["severity_rank"]  # noqa E501
                     .min()
                     .rename(columns={"_impact_key": "name"})
                 )
@@ -1422,7 +1437,7 @@ class DTP(DTPBase):
                     conn, "variant_impacts"
                 )
 
-        biotype_df = work.loc[work["_biotype_key"].notna(), ["_biotype_key"]].copy()
+        biotype_df = work.loc[work["_biotype_key"].notna(), ["_biotype_key"]].copy()  # noqa E501
         if not biotype_df.empty:
             biotype_df = biotype_df[
                 ~biotype_df["_biotype_key"].isin(biotype_cache.keys())
@@ -1453,13 +1468,22 @@ class DTP(DTPBase):
             dim_caches.get("consequence", {})
         )
         out["impact_id"] = out["_impact_key"].map(dim_caches.get("impact", {}))
-        out["biotype_id"] = out["_biotype_key"].map(dim_caches.get("biotype", {}))
+        out["biotype_id"] = out["_biotype_key"].map(dim_caches.get("biotype", {}))  # noqa E501
         out["most_severe_consequence_per_annotation_id"] = out[
             "_most_severe_annotation_key"
         ].map(dim_caches.get("consequence", {}))
         out["most_severe_consequence_per_variant_id"] = out[
             "_most_severe_variant_key"
         ].map(dim_caches.get("consequence", {}))
+
+        unknown_mask = out["_consequence_key"].notna() & out["consequence_id"].isna()
+        if unknown_mask.any():
+            unknown_rows = int(unknown_mask.sum())
+            self.logger.log(
+                "⚠️ Rows with unknown consequence mapped to NULL "
+                f"(consequence_id): {unknown_rows}.",
+                "WARNING",
+            )
         return out
 
     def _bulk_insert_variant_masters_from_stage(self, conn) -> int:
@@ -1550,11 +1574,11 @@ class DTP(DTPBase):
         )
 
         if not hasattr(result, "fetchall"):
-            return pd.DataFrame(columns=["variant_key", "chromosome", "variant_id"])
+            return pd.DataFrame(columns=["variant_key", "chromosome", "variant_id"])  # noqa E501
 
         rows = result.fetchall()
         if not rows:
-            return pd.DataFrame(columns=["variant_key", "chromosome", "variant_id"])
+            return pd.DataFrame(columns=["variant_key", "chromosome", "variant_id"])  # noqa E501
 
         return pd.DataFrame(
             [
@@ -1681,7 +1705,7 @@ class DTP(DTPBase):
             columns=variant_stage_columns,
         )
 
-        processed_variant_rows = self._bulk_insert_variant_masters_from_stage(conn)
+        processed_variant_rows = self._bulk_insert_variant_masters_from_stage(conn)  # noqa E501
         variant_ids_df = self._resolve_variant_ids_from_stage(conn)
         if variant_ids_df.empty:
             variant_ids_df = (
@@ -1695,7 +1719,7 @@ class DTP(DTPBase):
 
         loaded_effects = 0
         if df_consequences is not None and not df_consequences.empty:
-            self._prime_dimension_caches_from_df(df_consequences, conn, dim_caches)
+            self._prime_dimension_caches_from_df(df_consequences, conn, dim_caches)  # noqa E501
             df_consequences = self._map_dimension_ids_to_consequence_df(
                 df_consequences,
                 dim_caches,
@@ -1774,7 +1798,7 @@ class DTP(DTPBase):
                 consequence_stage_df[
                     "most_severe_consequence_per_variant_id"
                 ] = pd.to_numeric(
-                    consequence_stage_df["most_severe_consequence_per_variant_id"],
+                    consequence_stage_df["most_severe_consequence_per_variant_id"],  # noqa E501
                     errors="coerce",
                 ).astype("Int64")
                 consequence_stage_df = consequence_stage_df.drop_duplicates(

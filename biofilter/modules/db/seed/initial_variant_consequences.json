@@ -1,0 +1,276 @@
+{
+    "variant_consequences": [
+        {
+            "name": "3_prime_UTR_variant",
+            "severity_rank": 26,
+            "group": "utr",
+            "category": "non_coding",
+            "description": null,
+            "is_active": true
+        },
+        {
+            "name": "5_prime_UTR_variant",
+            "severity_rank": 25,
+            "group": "utr",
+            "category": "non_coding",
+            "description": null,
+            "is_active": true
+        },
+        {
+            "name": "TF_binding_site_variant",
+            "severity_rank": 36,
+            "group": "regulatory",
+            "category": "regulatory",
+            "description": null,
+            "is_active": true
+        },
+        {
+            "name": "coding_sequence_variant",
+            "severity_rank": 23,
+            "group": "coding_other",
+            "category": "coding",
+            "description": null,
+            "is_active": true
+        },
+        {
+            "name": "downstream_gene_variant",
+            "severity_rank": 33,
+            "group": "upstream_downstream",
+            "category": "regulatory",
+            "description": null,
+            "is_active": true
+        },
+        {
+            "name": "frameshift_variant",
+            "severity_rank": 5,
+            "group": "frameshift",
+            "category": "coding",
+            "description": null,
+            "is_active": true
+        },
+        {
+            "name": "inframe_deletion",
+            "severity_rank": 12,
+            "group": "inframe",
+            "category": "coding",
+            "description": null,
+            "is_active": true
+        },
+        {
+            "name": "inframe_insertion",
+            "severity_rank": 11,
+            "group": "inframe",
+            "category": "coding",
+            "description": null,
+            "is_active": true
+        },
+        {
+            "name": "intergenic_variant",
+            "severity_rank": 40,
+            "group": "intergenic",
+            "category": "intergenic",
+            "description": null,
+            "is_active": true
+        },
+        {
+            "name": "intron_variant",
+            "severity_rank": 28,
+            "group": "intronic",
+            "category": "non_coding",
+            "description": null,
+            "is_active": true
+        },
+        {
+            "name": "missense_variant",
+            "severity_rank": 13,
+            "group": "missense",
+            "category": "coding",
+            "description": null,
+            "is_active": true
+        },
+        {
+            "name": "non_coding_transcript_exon_variant",
+            "severity_rank": 27,
+            "group": "non_coding",
+            "category": "non_coding",
+            "description": null,
+            "is_active": true
+        },
+        {
+            "name": "non_coding_transcript_variant",
+            "severity_rank": 30,
+            "group": "non_coding",
+            "category": "non_coding",
+            "description": null,
+            "is_active": true
+        },
+        {
+            "name": "regulatory_region_variant",
+            "severity_rank": 39,
+            "group": "regulatory",
+            "category": "regulatory",
+            "description": null,
+            "is_active": true
+        },
+        {
+            "name": "splice_acceptor_variant",
+            "severity_rank": 2,
+            "group": "splice",
+            "category": "coding",
+            "description": null,
+            "is_active": true
+        },
+        {
+            "name": "splice_donor_5th_base_variant",
+            "severity_rank": 15,
+            "group": "splice",
+            "category": "coding",
+            "description": null,
+            "is_active": true
+        },
+        {
+            "name": "splice_donor_region_variant",
+            "severity_rank": 17,
+            "group": "splice",
+            "category": "coding",
+            "description": null,
+            "is_active": true
+        },
+        {
+            "name": "splice_donor_variant",
+            "severity_rank": 3,
+            "group": "splice",
+            "category": "coding",
+            "description": null,
+            "is_active": true
+        },
+        {
+            "name": "splice_polypyrimidine_tract_variant",
+            "severity_rank": 18,
+            "group": "splice",
+            "category": "coding",
+            "description": null,
+            "is_active": true
+        },
+        {
+            "name": "splice_region_variant",
+            "severity_rank": 16,
+            "group": "splice",
+            "category": "coding",
+            "description": null,
+            "is_active": true
+        },
+        {
+            "name": "stop_gained",
+            "severity_rank": 4,
+            "group": "stop",
+            "category": "coding",
+            "description": null,
+            "is_active": true
+        },
+        {
+            "name": "stop_lost",
+            "severity_rank": 6,
+            "group": "stop",
+            "category": "coding",
+            "description": null,
+            "is_active": true
+        },
+        {
+            "name": "stop_retained_variant",
+            "severity_rank": 21,
+            "group": "synonymous",
+            "category": "coding",
+            "description": null,
+            "is_active": true
+        },
+        {
+            "name": "synonymous_variant",
+            "severity_rank": 22,
+            "group": "synonymous",
+            "category": "coding",
+            "description": null,
+            "is_active": true
+        },
+        {
+            "name": "upstream_gene_variant",
+            "severity_rank": 32,
+            "group": "upstream_downstream",
+            "category": "regulatory",
+            "description": null,
+            "is_active": true
+        },
+        {
+            "name": "TFBS_ablation",
+            "severity_rank": 34,
+            "group": "regulatory",
+            "category": "regulatory",
+            "description": null,
+            "is_active": true
+        },
+        {
+            "name": "start_lost",
+            "severity_rank": 7,
+            "group": "start_stop",
+            "category": "coding",
+            "description": null,
+            "is_active": true
+        },
+        {
+            "name": "NMD_transcript_variant",
+            "severity_rank": 29,
+            "group": "non_coding",
+            "category": "non_coding",
+            "description": null,
+            "is_active": true
+        },
+        {
+            "name": "incomplete_terminal_codon_variant",
+            "severity_rank": 19,
+            "group": "coding_other",
+            "category": "coding",
+            "description": null,
+            "is_active": true
+        },
+        {
+            "name": "regulatory_region_ablation",
+            "severity_rank": 37,
+            "group": "regulatory",
+            "category": "regulatory",
+            "description": null,
+            "is_active": true
+        },
+        {
+            "name": "mature_miRNA_variant",
+            "severity_rank": 24,
+            "group": "non_coding",
+            "category": "non_coding",
+            "description": null,
+            "is_active": true
+        },
+        {
+            "name": "transcript_ablation",
+            "severity_rank": 1,
+            "group": "transcript_loss",
+            "category": "coding",
+            "description": null,
+            "is_active": true
+        },
+        {
+            "name": "protein_altering_variant",
+            "severity_rank": 14,
+            "group": "protein_altering",
+            "category": "coding",
+            "description": null,
+            "is_active": true
+        },
+        {
+            "name": "start_retained_variant",
+            "severity_rank": 20,
+            "group": "start_stop",
+            "category": "coding",
+            "description": null,
+            "is_active": true
+        }
+    ]
+}

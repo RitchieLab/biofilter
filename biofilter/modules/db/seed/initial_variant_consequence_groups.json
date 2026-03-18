@@ -1,0 +1,23 @@
+{
+    "variant_consequence_groups": [
+        {"name": "transcript_loss"},
+        {"name": "transcript_change"},
+        {"name": "structural_other"},
+        {"name": "splice"},
+        {"name": "stop"},
+        {"name": "start_stop"},
+        {"name": "synonymous"},
+        {"name": "frameshift"},
+        {"name": "inframe"},
+        {"name": "missense"},
+        {"name": "protein_altering"},
+        {"name": "coding_other"},
+        {"name": "utr"},
+        {"name": "non_coding"},
+        {"name": "intronic"},
+        {"name": "upstream_downstream"},
+        {"name": "regulatory"},
+        {"name": "intergenic"},
+        {"name": "other"}
+    ]
+}
