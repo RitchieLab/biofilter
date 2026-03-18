@@ -15,13 +15,16 @@ import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
 from cyvcf2 import VCF
-from sqlalchemy import and_
+
+# from sqlalchemy import and_
 from sqlalchemy import insert as generic_insert
 from sqlalchemy import select, text
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 
 from biofilter.modules.etl.mixins.base_dtp import DTPBase
+
+# from numpy.ma import var
 
 
 # -----------------------------------------------------------------------------
@@ -128,6 +131,7 @@ class GnomadCyvcf2Config:
     consequences_prefix: str = "consequences_part_"
     parquet_compression: str = "snappy"
     min_qual = 1
+    min_ac = 1
     postgres_fast_load: bool = True
     postgres_partition_refresh: bool = True
 
@@ -136,18 +140,18 @@ class GnomadCyvcf2Config:
 # Helpers
 # -----------------------------------------------------------------------------
 # # transform._build_atomic_consequence_rows
-def _truthy_vep_flag(v: Optional[str]) -> Optional[bool]:
-    """
-    Convert VEP-style YES/empty to boolean/None.
-    """
-    if v is None:
-        return None
-    s = str(v).strip().upper()
-    if s == "YES":
-        return True
-    if s == "":
-        return None
-    return None
+# def _truthy_vep_flag(v: Optional[str]) -> Optional[bool]:
+#     """
+#     Convert VEP-style YES/empty to boolean/None.
+#     """
+#     if v is None:
+#         return None
+#     s = str(v).strip().upper()
+#     if s == "YES":
+#         return True
+#     if s == "":
+#         return None
+#     return None
 
 
 # transform
@@ -165,15 +169,15 @@ def resolve_file_chromosome(vcf_path: Path, datasource_name: str) -> Optional[in
 
     candidates = [datasource_name or "", vcf_path.name]
 
-    for text in candidates:
+    for text_c in candidates:
         m = re.search(
-            r"(?:chr|chromosome[_-]?)(\d+|X|Y|M|MT)\b", text, flags=re.IGNORECASE  # noqa E501
+            r"(?:chr|chromosome[_-]?)(\d+|X|Y|M|MT)\b", text_c, flags=re.IGNORECASE  # noqa E501
         )
         if not m:
             continue
         c = m.group(1).upper()
         if c == "X":
-            return 23
+            return 23   
         if c == "Y":
             return 24
         if c in {"M", "MT"}:
@@ -363,76 +367,76 @@ def _impact_rank(value: Optional[str]) -> Optional[int]:
     return IMPACT_RANK.get(str(value).strip().upper())
 
 
-# transform._build_atomic_consequence_rows
-def _classify_consequence(term: Optional[str]) -> Tuple[Optional[str], Optional[str]]:  # noqa E501
-    if not term:
-        return None, None
+# # transform._build_atomic_consequence_rows
+# def _classify_consequence(term: Optional[str]) -> Tuple[Optional[str], Optional[str]]:  # noqa E501
+#     if not term:
+#         return None, None
 
-    direct_group_map = {
-        "transcript_ablation": ("transcript_loss", "coding"),
-        "transcript_amplification": ("transcript_change", "coding"),
-        "feature_elongation": ("structural_other", "structural_other"),
-        "feature_truncation": ("structural_other", "structural_other"),
-        "splice_acceptor_variant": ("splice", "coding"),
-        "splice_donor_variant": ("splice", "coding"),
-        "splice_donor_5th_base_variant": ("splice", "coding"),
-        "splice_region_variant": ("splice", "coding"),
-        "splice_donor_region_variant": ("splice", "coding"),
-        "splice_polypyrimidine_tract_variant": ("splice", "coding"),
-        "stop_gained": ("stop", "coding"),
-        "stop_lost": ("stop", "coding"),
-        "start_lost": ("start_stop", "coding"),
-        "start_retained_variant": ("start_stop", "coding"),
-        "stop_retained_variant": ("synonymous", "coding"),
-        "frameshift_variant": ("frameshift", "coding"),
-        "inframe_insertion": ("inframe", "coding"),
-        "inframe_deletion": ("inframe", "coding"),
-        "missense_variant": ("missense", "coding"),
-        "protein_altering_variant": ("protein_altering", "coding"),
-        "synonymous_variant": ("synonymous", "coding"),
-        "coding_sequence_variant": ("coding_other", "coding"),
-        "incomplete_terminal_codon_variant": ("coding_other", "coding"),
-        "5_prime_UTR_variant": ("utr", "non_coding"),
-        "3_prime_UTR_variant": ("utr", "non_coding"),
-        "mature_miRNA_variant": ("non_coding", "non_coding"),
-        "non_coding_transcript_exon_variant": ("non_coding", "non_coding"),
-        "non_coding_transcript_variant": ("non_coding", "non_coding"),
-        "coding_transcript_variant": ("non_coding", "non_coding"),
-        "NMD_transcript_variant": ("non_coding", "non_coding"),
-        "intron_variant": ("intronic", "non_coding"),
-        "upstream_gene_variant": ("upstream_downstream", "regulatory"),
-        "downstream_gene_variant": ("upstream_downstream", "regulatory"),
-        "TFBS_ablation": ("regulatory", "regulatory"),
-        "TFBS_amplification": ("regulatory", "regulatory"),
-        "TF_binding_site_variant": ("regulatory", "regulatory"),
-        "regulatory_region_ablation": ("regulatory", "regulatory"),
-        "regulatory_region_amplification": ("regulatory", "regulatory"),
-        "regulatory_region_variant": ("regulatory", "regulatory"),
-        "intergenic_variant": ("intergenic", "intergenic"),
-        "sequence_variant": ("other", "structural_other"),
-    }
+#     direct_group_map = {
+#         "transcript_ablation": ("transcript_loss", "coding"),
+#         "transcript_amplification": ("transcript_change", "coding"),
+#         "feature_elongation": ("structural_other", "structural_other"),
+#         "feature_truncation": ("structural_other", "structural_other"),
+#         "splice_acceptor_variant": ("splice", "coding"),
+#         "splice_donor_variant": ("splice", "coding"),
+#         "splice_donor_5th_base_variant": ("splice", "coding"),
+#         "splice_region_variant": ("splice", "coding"),
+#         "splice_donor_region_variant": ("splice", "coding"),
+#         "splice_polypyrimidine_tract_variant": ("splice", "coding"),
+#         "stop_gained": ("stop", "coding"),
+#         "stop_lost": ("stop", "coding"),
+#         "start_lost": ("start_stop", "coding"),
+#         "start_retained_variant": ("start_stop", "coding"),
+#         "stop_retained_variant": ("synonymous", "coding"),
+#         "frameshift_variant": ("frameshift", "coding"),
+#         "inframe_insertion": ("inframe", "coding"),
+#         "inframe_deletion": ("inframe", "coding"),
+#         "missense_variant": ("missense", "coding"),
+#         "protein_altering_variant": ("protein_altering", "coding"),
+#         "synonymous_variant": ("synonymous", "coding"),
+#         "coding_sequence_variant": ("coding_other", "coding"),
+#         "incomplete_terminal_codon_variant": ("coding_other", "coding"),
+#         "5_prime_UTR_variant": ("utr", "non_coding"),
+#         "3_prime_UTR_variant": ("utr", "non_coding"),
+#         "mature_miRNA_variant": ("non_coding", "non_coding"),
+#         "non_coding_transcript_exon_variant": ("non_coding", "non_coding"),
+#         "non_coding_transcript_variant": ("non_coding", "non_coding"),
+#         "coding_transcript_variant": ("non_coding", "non_coding"),
+#         "NMD_transcript_variant": ("non_coding", "non_coding"),
+#         "intron_variant": ("intronic", "non_coding"),
+#         "upstream_gene_variant": ("upstream_downstream", "regulatory"),
+#         "downstream_gene_variant": ("upstream_downstream", "regulatory"),
+#         "TFBS_ablation": ("regulatory", "regulatory"),
+#         "TFBS_amplification": ("regulatory", "regulatory"),
+#         "TF_binding_site_variant": ("regulatory", "regulatory"),
+#         "regulatory_region_ablation": ("regulatory", "regulatory"),
+#         "regulatory_region_amplification": ("regulatory", "regulatory"),
+#         "regulatory_region_variant": ("regulatory", "regulatory"),
+#         "intergenic_variant": ("intergenic", "intergenic"),
+#         "sequence_variant": ("other", "structural_other"),
+#     }
 
-    if term in direct_group_map:
-        return direct_group_map[term]
+#     if term in direct_group_map:
+#         return direct_group_map[term]
 
-    if "splice" in term:
-        return "splice", "coding"
-    if "missense" in term:
-        return "missense", "coding"
-    if "synonymous" in term:
-        return "synonymous", "coding"
-    if "intron" in term:
-        return "intronic", "non_coding"
-    if "utr" in term.lower():
-        return "utr", "non_coding"
-    if "regulatory" in term or "tf_binding" in term.lower():
-        return "regulatory", "regulatory"
-    if "intergenic" in term:
-        return "intergenic", "intergenic"
-    if "upstream" in term or "downstream" in term:
-        return "upstream_downstream", "regulatory"
+#     if "splice" in term:
+#         return "splice", "coding"
+#     if "missense" in term:
+#         return "missense", "coding"
+#     if "synonymous" in term:
+#         return "synonymous", "coding"
+#     if "intron" in term:
+#         return "intronic", "non_coding"
+#     if "utr" in term.lower():
+#         return "utr", "non_coding"
+#     if "regulatory" in term or "tf_binding" in term.lower():
+#         return "regulatory", "regulatory"
+#     if "intergenic" in term:
+#         return "intergenic", "intergenic"
+#     if "upstream" in term or "downstream" in term:
+#         return "upstream_downstream", "regulatory"
 
-    return "other", "structural_other"
+#     return "other", "structural_other"
 
 
 # transform
@@ -819,12 +823,18 @@ class DTP(DTPBase):
 
                 # Filtering at the variant level (before parsing INFO/VEP):
                 # -----------------------------------------------------------------
+                # 0. Minimal AC filter: skip variants with AC=0 (not observed in gnomAD)
                 # 1. Variants with failing FILTER are skipped
                 # 2. Variants below the configured QUAL threshold are skipped
                 # 3. Variants with multiple ALTs in the same record are rejected
 
                 pos = int(var.POS)
                 ref = var.REF
+
+                # Filter 0: Skip variants with AC=0
+                if var.INFO.get("AC") < cfg.min_ac:
+                    n_skipped += 1
+                    continue
 
                 # Filter 1: No load variant with failing FILTER
                 var_filter = var.FILTER
