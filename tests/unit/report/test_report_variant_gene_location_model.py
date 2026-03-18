@@ -239,3 +239,59 @@ def test_not_found_and_invalid_inputs_are_reported():
     observations = set(df["observation"].tolist())
     assert "not found" in observations
     assert "invalid_input" in observations
+
+
+def test_gene_input_reports_when_chromosome_has_no_variant_rows():
+    session, vm = _make_session()
+    with session:
+        _seed(session)
+        _seed_variants(session, vm)
+
+        gene_group = session.query(EntityGroup).filter_by(name="Gene").one()
+        session.add(
+            GenomeAssembly(
+                id=2,
+                accession="NC_000022.11",
+                assembly_name="GRCh38.p14",
+                chromosome="22",
+            )
+        )
+        session.flush()
+
+        gene_no_variants = Entity(group_id=gene_group.id, is_active=True)
+        session.add(gene_no_variants)
+        session.flush()
+        session.add(
+            EntityAlias(
+                entity_id=gene_no_variants.id,
+                group_id=gene_group.id,
+                alias_value="NO_VAR_GENE",
+                alias_norm="no_var_gene",
+                alias_type="preferred",
+                is_primary=True,
+            )
+        )
+        session.add(
+            EntityLocation(
+                entity_id=gene_no_variants.id,
+                entity_group_id=gene_group.id,
+                assembly_id=2,
+                build=38,
+                chromosome=22,
+                start_pos=100,
+                end_pos=200,
+            )
+        )
+        session.commit()
+
+        report = _report(
+            session,
+            input_mode="gene",
+            input_data=["NO_VAR_GENE"],
+        )
+        df = report.run()
+
+    row = df.iloc[0]
+    assert row["observation"] == "not found"
+    assert row["input_primary_name"] == "NO_VAR_GENE"
+    assert "variant_masters has no rows for chromosome chr22" in str(row["note"])

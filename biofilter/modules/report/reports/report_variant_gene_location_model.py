@@ -169,7 +169,7 @@ Main params:
 - input_mode (default auto): auto|gene|rsid|position|region
 - window_bp (default 0): symmetric expansion for overlap checks
 - build (default 38): entity_locations.build filter
-- gene_entity_groups (default ["Gene"]): group filter applied to genes
+- gene_entity_groups (default ["Gene", "Genes"]): group filter applied to genes
 - limit_variants_per_input (default 2000)
 - emit_not_found_rows (default True)
 """
@@ -489,6 +489,25 @@ Main params:
             bucket.append(dict(row))
         return out
 
+    def _chromosome_has_variants(
+        self,
+        vm: Table,
+        chrom: int,
+        cache: dict[int, bool],
+    ) -> bool:
+        chrom_i = int(chrom)
+        if chrom_i in cache:
+            return cache[chrom_i]
+
+        stmt = (
+            select(func.count())
+            .select_from(vm)
+            .where(vm.c.chromosome == chrom_i)
+        )
+        count_value = int(self.session.execute(stmt).scalar_one() or 0)
+        cache[chrom_i] = count_value > 0
+        return cache[chrom_i]
+
     def _query_genes_overlap(
         self,
         chrom: int,
@@ -633,7 +652,7 @@ Main params:
         )
         gene_group_filter = {
             str(x).strip().lower()
-            for x in (self.param("gene_entity_groups", ["Gene"]) or [])
+            for x in (self.param("gene_entity_groups", ["Gene", "Genes"]) or [])
             if str(x).strip()
         }
 
@@ -661,6 +680,8 @@ Main params:
             rsids_norm=rsid_keys,
             limit_per_rsid=limit_variants_per_input,
         )
+
+        chromosome_variant_cache: dict[int, bool] = {}
 
         # Cache gene-overlap lookups for variants/position/region workflows.
         gene_overlap_cache: dict[tuple[int, int, int], list[dict[str, Any]]] = {}
@@ -714,7 +735,17 @@ Main params:
                             miss["input_start"] = gene["start_pos"]
                             miss["input_end"] = gene["end_pos"]
                             miss["observation"] = "not found"
-                            miss["note"] = "No variants found for gene interval."
+                            if self._chromosome_has_variants(
+                                vm=vm,
+                                chrom=int(gene["chromosome"]),
+                                cache=chromosome_variant_cache,
+                            ):
+                                miss["note"] = "No variants found for gene interval."
+                            else:
+                                miss["note"] = (
+                                    "No variants found for gene interval. "
+                                    f"variant_masters has no rows for chromosome {_format_chr(int(gene['chromosome']))}."  # noqa: E501
+                                )
                             item_rows.append(miss)
                             continue
 
@@ -825,7 +856,17 @@ Main params:
                     if emit_not_found_rows:
                         miss = dict(base)
                         miss["observation"] = "not found"
-                        miss["note"] = "No variants found in region."
+                        if self._chromosome_has_variants(
+                            vm=vm,
+                            chrom=chrom,
+                            cache=chromosome_variant_cache,
+                        ):
+                            miss["note"] = "No variants found in region."
+                        else:
+                            miss["note"] = (
+                                "No variants found in region. "
+                                f"variant_masters has no rows for chromosome {_format_chr(chrom)}."  # noqa: E501
+                            )
                         item_rows.append(miss)
                 else:
                     for variant in variants:
