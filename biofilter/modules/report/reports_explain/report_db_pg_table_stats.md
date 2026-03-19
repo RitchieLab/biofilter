@@ -18,7 +18,8 @@ PostgreSQL-only report for table/storage observability:
 
 CLI:
 ```bash
-biofilter --db-uri postgresql+psycopg2://user:pass@localhost/biofilter_dev report run --name db_pg_table_stats
+biofilter --db-uri postgresql+psycopg2://user:pass@localhost/biofilter_dev report run --report-name db_pg_table_stats
+biofilter --db-uri postgresql+psycopg2://user:pass@localhost/biofilter_dev report run --report-name db_pg_table_stats --param schema=public --param 'table=["variant","entity"]'
 ```
 
 API:

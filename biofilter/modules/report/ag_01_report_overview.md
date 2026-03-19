@@ -39,9 +39,16 @@ print(bf.report.example_input("variant_molecular_effects"))
 
 CLI:
 ```bash
-biofilter --db-uri sqlite:///biofilter_dev.db report run --name etl_status
-biofilter --db-uri sqlite:///biofilter_dev.db report run --name etl_status --as-csv --output ./etl_status.csv
+biofilter --db-uri sqlite:///biofilter_dev.db report run --report-name etl_status
+biofilter --db-uri sqlite:///biofilter_dev.db report run --report-name etl_status --output ./etl_status.csv
+biofilter --db-uri sqlite:///biofilter_dev.db report run --report-name entity_relationship_model --params-template
+biofilter --db-uri sqlite:///biofilter_dev.db report run --report-name entity_relationship_model --input TP53 --input BRCA1 --param relationship_scope=input_to_any
+biofilter --db-uri sqlite:///biofilter_dev.db report run --report-name entity_relationship_model --input TP53 --param relationship_types=@./relationship_types.txt
+biofilter --db-uri sqlite:///biofilter_dev.db report run --report-name entity_relationship_model --input-file ./inputs.csv --input-column symbol --params-file ./params.yaml
 ```
+
+Tip:
+- Use `--input/--input-file` for inputs and keep `--param` for report options (scope, filters, toggles, etc.).
 
 API (supports report parameters):
 ```python
@@ -50,10 +57,10 @@ print(df.head())
 ```
 
 ## Active Report Tutorials
-- `ag_02_report_etl_status.md`
-- `ag_03_report_etl_packages.md`
-- `ag_04_report_entity_filter.md`
-- `ag_05_report_db_pg_table_stats.md`
-- `ag_06_report_db_pg_index_stats.md`
-- `ag_07_report_variant_molecular_effects.md`
-- `ag_08_report_qry_template.md`
+- `reports_explain/report_etl_status.md`
+- `reports_explain/report_etl_packages.md`
+- `reports_explain/report_entity_filter.md`
+- `reports_explain/report_db_pg_table_stats.md`
+- `reports_explain/report_db_pg_index_stats.md`
+- `reports_explain/report_variant_molecular_effects.md`
+- `reports_explain/report_template.md`

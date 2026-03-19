@@ -51,8 +51,14 @@ df = bf.report.run(
 ```
 
 CLI:
-- CLI `report run` currently does not expose report-specific parameter injection.
-- Use API for this report until CLI parameter pass-through is added.
+```bash
+biofilter --db-uri sqlite:///biofilter_dev.db report run --report-name variant_molecular_effects --input chr1:55516888:55516888 --param range_up=50 --param range_down=50
+```
+
+With input file:
+```bash
+biofilter --db-uri sqlite:///biofilter_dev.db report run --report-name variant_molecular_effects --input-file ./regions.txt --param limit_variants_per_input=500
+```
 
 ## Demo Tips
 - Use a short curated region list for interactive demos.

@@ -79,25 +79,26 @@ data_sources_to_process = [
     # "gnomad_chr21",
     # "gnomad_chr22",
     # "gnomad_chrx",
-    "gnomad_chry",
+    # "gnomad_chry",
     # "gnomad_chrmt",
+
+    #
+    # DISEASE
+    # -------
+    # "mondo",
+    # "clingen",
+    # "omim",
+
+    # CHEMICAL
+    # --------
+    "chebi",
 
     # RelationShips
     # -------------
     # "reactome_relationships",
     # "uniprot_relationships",
-    # "biogrid",
-    #
-    # DISEASE
-    # -------
-    # "mondo",
     # "mondo_relationships",
-    # "clingen",
-    # "omim",
-    #
-    # CHEMICAL
-    # --------
-    # "chebi",
+    # "biogrid",
 ]
 
 run_steps = [

@@ -210,3 +210,53 @@ def test_run_example_uses_default_input_data_and_preserves_explicit(monkeypatch)
 
     assert calls[0] == ("alpha", {"input_data": {"seed": "value"}})
     assert calls[1] == ("alpha", {"input_data": {"custom": 1}})
+
+
+def test_explain_prefers_markdown_guide_when_available(monkeypatch, tmp_path):
+    session = DummySession()
+    manager = _manager_with(session)
+    manager._guides_dir = tmp_path
+
+    guide = tmp_path / "report_alpha.md"
+    guide.write_text("# Alpha Guide\nFrom markdown\n", encoding="utf-8")
+
+    monkeypatch.setattr(
+        manager,
+        "index",
+        lambda: [rmod.ReportInfo(module="report_alpha", name="alpha", description="")],
+    )
+    monkeypatch.setattr(manager, "resolve", lambda identifier: "report_alpha")
+
+    class AlphaReport(ReportBase):
+        @classmethod
+        def explain(cls):
+            raise AssertionError("Class explain should not be called when guide exists")
+
+    monkeypatch.setattr(manager, "_load_class", lambda module_name: AlphaReport)
+
+    out = manager.explain("alpha")
+    assert "Alpha Guide" in out
+    assert "From markdown" in out
+
+
+def test_explain_falls_back_to_class_when_guide_missing(monkeypatch, tmp_path):
+    session = DummySession()
+    manager = _manager_with(session)
+    manager._guides_dir = tmp_path
+
+    monkeypatch.setattr(
+        manager,
+        "index",
+        lambda: [rmod.ReportInfo(module="report_alpha", name="alpha", description="")],
+    )
+    monkeypatch.setattr(manager, "resolve", lambda identifier: "report_alpha")
+
+    class AlphaReport(ReportBase):
+        @classmethod
+        def explain(cls):
+            return "Class explain fallback"
+
+    monkeypatch.setattr(manager, "_load_class", lambda module_name: AlphaReport)
+
+    out = manager.explain("alpha")
+    assert out == "Class explain fallback"

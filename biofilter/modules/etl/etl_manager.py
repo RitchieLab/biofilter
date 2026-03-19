@@ -8,22 +8,28 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Iterable, Optional, Sequence
 
-from sqlalchemy import MetaData, func, select
+from sqlalchemy import MetaData, func, or_, select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session, selectinload
 
 from biofilter.modules.db.database import Database
-from biofilter.modules.db.models import ETLDataSource, ETLPackage, ETLSourceSystem
+from biofilter.modules.db.models import (
+    ETLDataSource,
+    ETLPackage,
+    ETLSourceSystem,
+    Entity,
+    EntityRelationship,
+)
 from biofilter.modules.etl.mixins.base_dtp_turning import DBTuningMixin
 from biofilter.utils.logger import Logger
 
 ETL_TABLE_PREFIX = "etl_"
 PURGE_ORDER_OVERRIDE = [
-    "VariantLocus",
-    "VariantMaster",
-    "EntityRelationship",
-    "EntityAlias",
-    "Entity",
+    "variant_masters",
+    "variant_molecular_effects",
+    "entity_relationships",
+    "entity_aliases",
+    "entities",
 ]
 
 
@@ -240,6 +246,120 @@ class ETLManager:
                     force_steps=force_steps,
                 )
 
+    def start_process_all(
+        self,
+        source_system: Optional[Sequence[str]] = None,
+        data_sources: Optional[Sequence[str]] = None,
+        download_path: Optional[str] = None,
+        processed_path: Optional[str] = None,
+        drop_files_on_success: bool = False,
+        only_active: bool = True,
+        stop_on_error: bool = False,
+    ) -> dict[str, int]:
+        """
+        Resume-friendly ETL for many data sources:
+        - resolves targets in deterministic order (data_source_id asc)
+        - skips data sources whose latest LOAD is already successful
+        - runs extract/transform/load for pending ones
+        - optionally drops raw/processed files after successful load
+        """
+        if isinstance(source_system, str):
+            source_system = [source_system]
+        if isinstance(data_sources, str):
+            data_sources = [data_sources]
+
+        with self.db.get_session() as session:
+            ds_ids = self._resolve_datasource_ids(
+                session,
+                source_system,
+                data_sources,
+                only_active=only_active,
+            )
+
+        if not ds_ids:
+            self.logger.log("⚠️ No matching DataSources found for update-all.", "WARNING")
+            return {
+                "selected": 0,
+                "skipped": 0,
+                "processed": 0,
+                "succeeded": 0,
+                "failed": 0,
+            }
+
+        summary = {
+            "selected": len(ds_ids),
+            "skipped": 0,
+            "processed": 0,
+            "succeeded": 0,
+            "failed": 0,
+        }
+        success_statuses = {"completed", "up-to-date", "not-applicable"}
+
+        for ds_id in ds_ids:
+            with self.db.get_session() as session:
+                ds = self._load_datasource(session, ds_id)
+
+                latest_before = self._latest_load_status(session, ds.id)
+                if latest_before in success_statuses:
+                    summary["skipped"] += 1
+                    self.logger.log(
+                        f"⏭️ Skipping '{ds.name}' (latest load already {latest_before}).",
+                        "INFO",
+                    )
+                    continue
+
+                summary["processed"] += 1
+                self._run_one_datasource(
+                    session=session,
+                    ds=ds,
+                    download_path=download_path,
+                    processed_path=processed_path,
+                    run_steps=["extract", "transform", "load"],
+                    force_steps=[],
+                )
+
+                latest_after = self._latest_load_status(session, ds.id)
+                if latest_after in success_statuses:
+                    summary["succeeded"] += 1
+                    self.logger.log(
+                        f"✅ update-all succeeded for '{ds.name}' (load={latest_after}).",
+                        "INFO",
+                    )
+
+                    if drop_files_on_success:
+                        if download_path:
+                            raw_base = os.path.join(
+                                str(download_path), ds.source_system.name, ds.name
+                            )
+                            self._delete_matching_files(f"{raw_base}*")
+                        if processed_path:
+                            proc_base = os.path.join(
+                                str(processed_path), ds.source_system.name, ds.name
+                            )
+                            self._delete_matching_files(f"{proc_base}*")
+                else:
+                    summary["failed"] += 1
+                    self.logger.log(
+                        (
+                            f"❌ update-all failed for '{ds.name}' "
+                            f"(latest load={latest_after or 'none'})."
+                        ),
+                        "ERROR",
+                    )
+                    if stop_on_error:
+                        break
+
+        self.logger.log(
+            (
+                "📊 update-all summary "
+                f"(selected={summary['selected']}, skipped={summary['skipped']}, "
+                f"processed={summary['processed']}, succeeded={summary['succeeded']}, "
+                f"failed={summary['failed']})"
+            ),
+            "INFO",
+        )
+        return summary
+
     def restart_etl_process(
         self,
         data_source: Optional[Sequence[str]] = None,
@@ -250,7 +370,7 @@ class ETLManager:
     ) -> bool:
         """
         Restart ETL for selected data sources by:
-        1) purging non-ETL rows linked by data_source_id
+        1) rolling back non-ETL rows linked by data_source_id
         2) optionally deleting raw/processed files
         3) re-running extract/transform/load with forced steps
         """
@@ -273,12 +393,20 @@ class ETLManager:
             self.logger.log("⚠️ No matching active DataSources found.", "WARNING")
             return False
 
+        all_ok = True
         for ds_id in ds_ids:
             with self.db.get_session() as session:
                 ds = self._load_datasource(session, ds_id)
                 self.logger.log(f"♻️ Restarting ETL for '{ds.name}'", "INFO")
 
-                self._simple_purge_by_data_source(session, ds.id)
+                rollback_ok, _ = self._rollback_data_source(
+                    session=session,
+                    ds=ds,
+                    note="rollback before restart",
+                )
+                if not rollback_ok:
+                    all_ok = False
+                    continue
 
                 if delete_files:
                     if download_path:
@@ -302,25 +430,175 @@ class ETLManager:
                     force_steps=["extract", "transform", "load"],
                 )
 
-        return True
+        return all_ok
+
+    def rollback_etl_process(
+        self,
+        package_ids: Optional[Sequence[int]] = None,
+        data_source: Optional[Sequence[str]] = None,
+        source_system: Optional[Sequence[str]] = None,
+        delete_files: bool = False,
+        download_path: Optional[str] = None,
+        processed_path: Optional[str] = None,
+    ) -> bool:
+        """
+        Rollback ETL loads without rerunning ETL.
+
+        Supported modes:
+        - by package_ids (targeted rollback)
+        - by data_source/source_system filters (full data-source rollback)
+        """
+        normalized_pkg_ids = self._normalize_package_ids(package_ids)
+
+        if normalized_pkg_ids and (data_source or source_system):
+            self.logger.log(
+                "❌ Use either package_ids OR data_source/source_system filters, not both.",  # noqa E501
+                "ERROR",
+            )
+            return False
+
+        if not normalized_pkg_ids and not data_source and not source_system:
+            self.logger.log(
+                "❌ No rollback target provided. Use package_ids or data_source/source_system.",  # noqa E501
+                "ERROR",
+            )
+            return False
+
+        all_ok = True
+
+        if normalized_pkg_ids:
+            if delete_files:
+                self.logger.log(
+                    "⚠️ delete_files ignored for package rollback (ambiguous scope).",
+                    "WARNING",
+                )
+
+            for pkg_id in normalized_pkg_ids:
+                with self.db.get_session() as session:
+                    pkg = self._load_package(session, pkg_id)
+                    if not pkg:
+                        all_ok = False
+                        self.logger.log(
+                            f"❌ Package id={pkg_id} not found. Skipping.", "ERROR"
+                        )
+                        continue
+                    if str(pkg.operation_type or "").lower() == "rollback":
+                        all_ok = False
+                        self.logger.log(
+                            f"❌ Package id={pkg_id} is already a rollback package. Skipping.",  # noqa E501
+                            "ERROR",
+                        )
+                        continue
+
+                    ds = self._load_datasource(session, int(pkg.data_source_id))
+                    ok, _ = self._rollback_package(
+                        session=session,
+                        ds=ds,
+                        target_package=pkg,
+                        note="manual package rollback",
+                    )
+                    if not ok:
+                        all_ok = False
+
+            return all_ok
+
+        if isinstance(source_system, str):
+            source_system = [source_system]
+        if isinstance(data_source, str):
+            data_source = [data_source]
+
+        with self.db.get_session() as session:
+            ds_ids = self._resolve_datasource_ids(session, source_system, data_source)
+
+        if not ds_ids:
+            self.logger.log("⚠️ No matching active DataSources found.", "WARNING")
+            return False
+
+        for ds_id in ds_ids:
+            with self.db.get_session() as session:
+                ds = self._load_datasource(session, ds_id)
+                ok, _ = self._rollback_data_source(
+                    session=session,
+                    ds=ds,
+                    note="manual data-source rollback",
+                )
+                if not ok:
+                    all_ok = False
+                    continue
+
+                if delete_files:
+                    if download_path:
+                        raw_base = os.path.join(
+                            str(download_path), ds.source_system.name, ds.name
+                        )
+                        self._delete_matching_files(f"{raw_base}*")
+
+                    if processed_path:
+                        proc_base = os.path.join(
+                            str(processed_path), ds.source_system.name, ds.name
+                        )
+                        self._delete_matching_files(f"{proc_base}*")
+
+        return all_ok
 
     def _resolve_datasource_ids(
         self,
         session: Session,
         source_system: Optional[Sequence[str]],
         data_sources: Optional[Sequence[str]],
+        only_active: bool = True,
     ) -> list[int]:
-        q = session.query(ETLDataSource.id).filter(ETLDataSource.active.is_(True))
+        q = session.query(ETLDataSource.id)
+
+        if only_active:
+            q = q.filter(ETLDataSource.active.is_(True))
+
+        if source_system or only_active:
+            q = q.join(ETLSourceSystem)
+
+        if only_active:
+            q = q.filter(ETLSourceSystem.active.is_(True))
 
         if source_system:
-            q = q.join(ETLSourceSystem).filter(
-                ETLSourceSystem.name.in_(list(source_system))
-            )
+            q = q.filter(ETLSourceSystem.name.in_(list(source_system)))
 
         if data_sources:
             q = q.filter(ETLDataSource.name.in_(list(data_sources)))
 
-        return [row[0] for row in q.all()]
+        return [row[0] for row in q.order_by(ETLDataSource.id.asc()).all()]
+
+    def _latest_load_status(self, session: Session, ds_id: int) -> Optional[str]:
+        row = (
+            session.query(ETLPackage.load_status)
+            .filter(
+                ETLPackage.data_source_id == int(ds_id),
+                ETLPackage.operation_type == "load",
+            )
+            .order_by(ETLPackage.created_at.desc(), ETLPackage.id.desc())
+            .first()
+        )
+        if not row:
+            return None
+        status = row[0]
+        if status is None:
+            return None
+        return str(status).strip().lower()
+
+    @staticmethod
+    def _normalize_package_ids(
+        package_ids: Optional[Sequence[int]],
+    ) -> list[int]:
+        if package_ids is None:
+            return []
+        if isinstance(package_ids, int):
+            package_ids = [package_ids]
+        out = []
+        for value in package_ids:
+            try:
+                out.append(int(value))
+            except Exception:
+                continue
+        return sorted(set(out))
 
     def _load_datasource(self, session: Session, ds_id: int) -> ETLDataSource:
         ds = (
@@ -330,6 +608,334 @@ class ETLManager:
             .one()
         )
         return ds
+
+    def _load_package(self, session: Session, package_id: int) -> Optional[ETLPackage]:
+        return (
+            session.query(ETLPackage)
+            .filter(ETLPackage.id == int(package_id))
+            .one_or_none()
+        )
+
+    def _create_rollback_package(
+        self,
+        session: Session,
+        ds: ETLDataSource,
+        note: str,
+        target: dict[str, Any],
+    ) -> Optional[ETLPackage]:
+        try:
+            pkg = ETLPackage(
+                data_source_id=ds.id,
+                status="running",
+                operation_type="rollback",
+                note=note,
+                active=True,
+                extract_status="not-applicable",
+                transform_status="not-applicable",
+                load_status="running",
+                load_start=datetime.now(),
+                stats=target,
+            )
+            session.add(pkg)
+            session.commit()
+            self.logger.log(
+                (
+                    "📦 Created rollback ETLPackage "
+                    f"ID={pkg.id} for data source '{ds.name}'"
+                ),
+                "INFO",
+            )
+            return pkg
+        except Exception as e:
+            self.logger.log(f"❌ Error creating rollback ETLPackage: {e}", "ERROR")
+            try:
+                session.rollback()
+            except Exception:
+                pass
+            return None
+
+    def _mark_rollback_failed(
+        self,
+        session: Session,
+        rollback_pkg_id: int,
+        message: str,
+        extra_stats: Optional[dict[str, Any]] = None,
+    ) -> None:
+        try:
+            pkg = self._load_package(session, rollback_pkg_id)
+            if not pkg:
+                return
+            pkg.status = "failed"
+            pkg.load_status = "failed"
+            pkg.load_end = datetime.now()
+            stats = dict(pkg.stats or {})
+            stats.update({"error": message, "step": "rollback"})
+            if extra_stats:
+                stats.update(extra_stats)
+            pkg.stats = stats
+            session.commit()
+        except Exception:
+            try:
+                session.rollback()
+            except Exception:
+                pass
+
+    def _find_relationship_conflicts(
+        self,
+        session: Session,
+        *,
+        target_data_source_id: Optional[int] = None,
+        target_package_id: Optional[int] = None,
+        sample_limit: int = 20,
+    ) -> dict[str, Any]:
+        if target_data_source_id is None and target_package_id is None:
+            return {"entities_to_rollback": 0, "conflict_count": 0, "samples": []}
+
+        if target_package_id is not None:
+            entity_filter = Entity.etl_package_id == int(target_package_id)
+        else:
+            entity_filter = Entity.data_source_id == int(target_data_source_id)
+
+        entity_ids_subq = session.query(Entity.id).filter(entity_filter).subquery()
+        entity_count = int(
+            session.execute(select(func.count()).select_from(entity_ids_subq)).scalar()
+            or 0
+        )
+        if entity_count == 0:
+            return {"entities_to_rollback": 0, "conflict_count": 0, "samples": []}
+
+        relationship_uses_target_entities = or_(
+            EntityRelationship.entity_1_id.in_(select(entity_ids_subq.c.id)),
+            EntityRelationship.entity_2_id.in_(select(entity_ids_subq.c.id)),
+        )
+
+        if target_package_id is not None:
+            mismatch_filter = or_(
+                EntityRelationship.etl_package_id.is_(None),
+                EntityRelationship.etl_package_id != int(target_package_id),
+                EntityRelationship.data_source_id.is_(None),
+                EntityRelationship.data_source_id != int(target_data_source_id),
+            )
+        else:
+            mismatch_filter = or_(
+                EntityRelationship.data_source_id.is_(None),
+                EntityRelationship.data_source_id != int(target_data_source_id),
+            )
+
+        count_stmt = (
+            select(func.count(EntityRelationship.id))
+            .select_from(EntityRelationship)
+            .where(relationship_uses_target_entities)
+            .where(mismatch_filter)
+        )
+        conflict_count = int(session.execute(count_stmt).scalar() or 0)
+        if conflict_count == 0:
+            return {
+                "entities_to_rollback": entity_count,
+                "conflict_count": 0,
+                "samples": [],
+            }
+
+        sample_rows = (
+            session.query(
+                EntityRelationship.id.label("relationship_id"),
+                EntityRelationship.entity_1_id.label("entity_1_id"),
+                EntityRelationship.entity_2_id.label("entity_2_id"),
+                EntityRelationship.data_source_id.label("relationship_data_source_id"),
+                EntityRelationship.etl_package_id.label("relationship_package_id"),
+            )
+            .filter(relationship_uses_target_entities)
+            .filter(mismatch_filter)
+            .order_by(EntityRelationship.id.asc())
+            .limit(sample_limit)
+            .all()
+        )
+
+        samples = [
+            {
+                "relationship_id": int(r.relationship_id),
+                "entity_1_id": int(r.entity_1_id),
+                "entity_2_id": int(r.entity_2_id),
+                "relationship_data_source_id": r.relationship_data_source_id,
+                "relationship_package_id": r.relationship_package_id,
+            }
+            for r in sample_rows
+        ]
+        return {
+            "entities_to_rollback": entity_count,
+            "conflict_count": conflict_count,
+            "samples": samples,
+        }
+
+    def _rollback_data_source(
+        self,
+        session: Session,
+        ds: ETLDataSource,
+        note: str,
+    ) -> tuple[bool, str]:
+        rollback_pkg = self._create_rollback_package(
+            session=session,
+            ds=ds,
+            note=note,
+            target={"mode": "data_source", "target_data_source_id": ds.id},
+        )
+        if not rollback_pkg:
+            return False, "Could not create rollback package."
+
+        conflicts = self._find_relationship_conflicts(
+            session,
+            target_data_source_id=ds.id,
+        )
+        if conflicts["conflict_count"] > 0:
+            msg = (
+                "❌ Rollback blocked for data source "
+                f"'{ds.name}': found {conflicts['conflict_count']} "
+                "entity_relationship rows from different package/source that use "
+                "entities targeted for rollback. Rollback newer dependent loads first."  # noqa E501
+            )
+            self.logger.log(msg, "ERROR")
+            self._mark_rollback_failed(
+                session=session,
+                rollback_pkg_id=rollback_pkg.id,
+                message=msg,
+                extra_stats={
+                    "dependency_conflict": True,
+                    "entities_to_rollback": conflicts["entities_to_rollback"],
+                    "conflict_count": conflicts["conflict_count"],
+                    "conflict_samples": conflicts["samples"],
+                },
+            )
+            return False, msg
+
+        try:
+            deleted_rows_by_table = self._simple_purge_by_data_source(
+                session,
+                ds_id=ds.id,
+                commit=False,
+            )
+            deleted_total = int(sum(deleted_rows_by_table.values()))
+
+            rollback_pkg = self._load_package(session, rollback_pkg.id)
+            if rollback_pkg:
+                rollback_pkg.status = "completed"
+                rollback_pkg.load_status = "completed"
+                rollback_pkg.load_end = datetime.now()
+                rollback_pkg.stats = {
+                    "mode": "data_source",
+                    "target_data_source_id": ds.id,
+                    "deleted_rows_total": deleted_total,
+                    "deleted_rows_by_table": deleted_rows_by_table,
+                }
+            session.commit()
+            msg = (
+                f"✅ Rollback completed for data_source '{ds.name}' "
+                f"(deleted_rows={deleted_total}, rollback_package_id={rollback_pkg.id})"  # noqa E501
+            )
+            self.logger.log(msg, "INFO")
+            return True, msg
+        except Exception as e:
+            try:
+                session.rollback()
+            except Exception:
+                pass
+            msg = f"❌ Rollback failed for data_source '{ds.name}': {e}"
+            self.logger.log(msg, "ERROR")
+            self._mark_rollback_failed(
+                session=session,
+                rollback_pkg_id=rollback_pkg.id,
+                message=msg,
+            )
+            return False, msg
+
+    def _rollback_package(
+        self,
+        session: Session,
+        ds: ETLDataSource,
+        target_package: ETLPackage,
+        note: str,
+    ) -> tuple[bool, str]:
+        rollback_pkg = self._create_rollback_package(
+            session=session,
+            ds=ds,
+            note=note,
+            target={
+                "mode": "package",
+                "target_package_id": target_package.id,
+                "target_data_source_id": ds.id,
+            },
+        )
+        if not rollback_pkg:
+            return False, "Could not create rollback package."
+
+        conflicts = self._find_relationship_conflicts(
+            session,
+            target_data_source_id=ds.id,
+            target_package_id=target_package.id,
+        )
+        if conflicts["conflict_count"] > 0:
+            msg = (
+                "❌ Rollback blocked for package "
+                f"id={target_package.id} ({ds.name}): found {conflicts['conflict_count']} "  # noqa E501
+                "entity_relationship rows from different package/source that use "
+                "entities targeted for rollback. Rollback newer dependent loads first."  # noqa E501
+            )
+            self.logger.log(msg, "ERROR")
+            self._mark_rollback_failed(
+                session=session,
+                rollback_pkg_id=rollback_pkg.id,
+                message=msg,
+                extra_stats={
+                    "dependency_conflict": True,
+                    "entities_to_rollback": conflicts["entities_to_rollback"],
+                    "conflict_count": conflicts["conflict_count"],
+                    "conflict_samples": conflicts["samples"],
+                    "target_package_id": target_package.id,
+                },
+            )
+            return False, msg
+
+        try:
+            deleted_rows_by_table = self._simple_purge_by_package(
+                session=session,
+                package_id=target_package.id,
+                commit=False,
+            )
+            deleted_total = int(sum(deleted_rows_by_table.values()))
+
+            rollback_pkg = self._load_package(session, rollback_pkg.id)
+            if rollback_pkg:
+                rollback_pkg.status = "completed"
+                rollback_pkg.load_status = "completed"
+                rollback_pkg.load_end = datetime.now()
+                rollback_pkg.stats = {
+                    "mode": "package",
+                    "target_package_id": target_package.id,
+                    "target_data_source_id": ds.id,
+                    "deleted_rows_total": deleted_total,
+                    "deleted_rows_by_table": deleted_rows_by_table,
+                }
+            session.commit()
+            msg = (
+                f"✅ Rollback completed for package id={target_package.id} "
+                f"(data_source='{ds.name}', deleted_rows={deleted_total}, "
+                f"rollback_package_id={rollback_pkg.id})"
+            )
+            self.logger.log(msg, "INFO")
+            return True, msg
+        except Exception as e:
+            try:
+                session.rollback()
+            except Exception:
+                pass
+            msg = f"❌ Rollback failed for package id={target_package.id}: {e}"
+            self.logger.log(msg, "ERROR")
+            self._mark_rollback_failed(
+                session=session,
+                rollback_pkg_id=rollback_pkg.id,
+                message=msg,
+                extra_stats={"target_package_id": target_package.id},
+            )
+            return False, msg
 
     def _run_one_datasource(
         self,
@@ -775,25 +1381,35 @@ class ETLManager:
             except Exception as e:
                 self.logger.log(f"⚠️ Could not delete {file_path}: {e}", "WARNING")
 
-    def _simple_purge_by_data_source(self, session: Session, ds_id: int) -> None:
-        engine = session.get_bind()
-        metadata = MetaData()
-        metadata.reflect(bind=engine)
-
+    def _collect_purge_candidates(self, metadata: MetaData, key_name: str):
         candidates = []
         for tname, table in metadata.tables.items():
             if _is_etl_table(tname):
                 continue
-            if "data_source_id" in table.columns:
+            if key_name in table.columns:
                 candidates.append(table)
+        return candidates
+
+    def _simple_purge_by_data_source(
+        self,
+        session: Session,
+        ds_id: int,
+        *,
+        commit: bool = True,
+    ) -> dict[str, int]:
+        engine = session.get_bind()
+        metadata = MetaData()
+        metadata.reflect(bind=engine)
+
+        candidates = self._collect_purge_candidates(metadata, "data_source_id")
 
         if not candidates:
             self.logger.log("ℹ️ No non-ETL tables with `data_source_id` found.", "INFO")
-            return
+            return {}
 
         ordered = self._order_for_delete(candidates, metadata)
+        deleted_rows_by_table: dict[str, int] = {}
 
-        total = 0
         for table in ordered:
             # Optional: skip count unless debug
             if self.debug_mode:
@@ -812,51 +1428,85 @@ class ETLManager:
                     "INFO",
                 )
 
-            session.execute(table.delete().where(table.c.data_source_id == ds_id))
-            # We can't easily know affected rowcount reliably across DBs; commit at end.
+            result = session.execute(
+                table.delete().where(table.c.data_source_id == ds_id)
+            )
+            affected = int(result.rowcount or 0)
+            if affected > 0:
+                deleted_rows_by_table[table.name] = (
+                    deleted_rows_by_table.get(table.name, 0) + affected
+                )
 
-        session.commit()
+        if commit:
+            session.commit()
         self.logger.log(f"✅ Simple purge complete for data_source_id={ds_id}.", "INFO")
+        return deleted_rows_by_table
+
+    def _simple_purge_by_package(
+        self,
+        session: Session,
+        package_id: int,
+        *,
+        commit: bool = True,
+    ) -> dict[str, int]:
+        engine = session.get_bind()
+        metadata = MetaData()
+        metadata.reflect(bind=engine)
+
+        candidates = self._collect_purge_candidates(metadata, "etl_package_id")
+        if not candidates:
+            self.logger.log("ℹ️ No non-ETL tables with `etl_package_id` found.", "INFO")
+            return {}
+
+        ordered = self._order_for_delete(candidates, metadata)
+        deleted_rows_by_table: dict[str, int] = {}
+
+        for table in ordered:
+            if self.debug_mode:
+                cnt = (
+                    session.execute(
+                        select(func.count())
+                        .select_from(table)
+                        .where(table.c.etl_package_id == package_id)
+                    ).scalar()
+                    or 0
+                )
+                if cnt == 0:
+                    continue
+                self.logger.log(
+                    f"🗑️  Deleting {cnt} rows from {table.name} (etl_package_id={package_id})",  # noqa E501
+                    "INFO",
+                )
+
+            result = session.execute(
+                table.delete().where(table.c.etl_package_id == package_id)
+            )
+            affected = int(result.rowcount or 0)
+            if affected > 0:
+                deleted_rows_by_table[table.name] = (
+                    deleted_rows_by_table.get(table.name, 0) + affected
+                )
+
+        if commit:
+            session.commit()
+        self.logger.log(f"✅ Simple purge complete for etl_package_id={package_id}.", "INFO")  # noqa E501
+        return deleted_rows_by_table
 
     def _order_for_delete(self, candidates, metadata):
         cand_by_name = {t.name: t for t in candidates}
-
         override = [cand_by_name[n] for n in PURGE_ORDER_OVERRIDE if n in cand_by_name]
-        rest = [t for t in candidates if t.name not in PURGE_ORDER_OVERRIDE]
 
-        if rest:
-            graph = {t.name: set() for t in rest}
-            names = set(graph.keys())
+        sorted_all = list(metadata.sorted_tables)
+        sorted_candidates_child_first = [
+            t
+            for t in reversed(sorted_all)
+            if t.name in cand_by_name and t.name not in PURGE_ORDER_OVERRIDE
+        ]
+        # reflected tables not present in metadata.sorted_tables
+        missing = [
+            t
+            for t in candidates
+            if t.name not in {x.name for x in override + sorted_candidates_child_first}
+        ]
 
-            for t in rest:
-                for fk in t.foreign_keys:
-                    parent = fk.column.table.name
-                    if parent in names:
-                        graph[parent].add(t.name)
-
-            ordered_names = []
-            no_incoming = [
-                n for n in graph if not any(n in cs for cs in graph.values())
-            ]
-
-            while no_incoming:
-                n = no_incoming.pop()
-                ordered_names.append(n)
-                for m in list(graph[n]):
-                    graph[n].remove(m)
-                    if not any(m in cs for cs in graph.values()):
-                        no_incoming.append(m)
-
-            remaining = [n for n, cs in graph.items() if cs]
-            ordered_rest = [cand_by_name[n] for n in ordered_names] + [
-                cand_by_name[n] for n in remaining
-            ]
-        else:
-            ordered_rest = []
-
-        ordered = override + ordered_rest
-        if not ordered:
-            sorted_all = list(metadata.sorted_tables)
-            ordered = [t for t in reversed(sorted_all) if t in candidates]
-
-        return ordered
+        return override + sorted_candidates_child_first + missing

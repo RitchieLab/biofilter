@@ -21,7 +21,8 @@ PostgreSQL-only report with per-index details:
 
 CLI:
 ```bash
-biofilter --db-uri postgresql+psycopg2://user:pass@localhost/biofilter_dev report run --name db_pg_index_stats
+biofilter --db-uri postgresql+psycopg2://user:pass@localhost/biofilter_dev report run --report-name db_pg_index_stats
+biofilter --db-uri postgresql+psycopg2://user:pass@localhost/biofilter_dev report run --report-name db_pg_index_stats --param schema=public --param table=variant_masters --param include_usage=true
 ```
 
 API:

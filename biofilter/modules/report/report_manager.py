@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib
 import pkgutil
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Callable, Dict, Iterable, List, Optional, Type
 
 from sqlalchemy.orm import Session
@@ -39,6 +40,8 @@ class ReportManager:
 
         self._class_cache: Dict[str, Type[ReportBase]] = {}
         self._index_cache: Optional[List[ReportInfo]] = None
+        self._guides_dir = Path(__file__).resolve().parent / "reports_explain"
+        self._legacy_guides_dir = Path(__file__).resolve().parent
 
     # ----------------------------
     # Discovery
@@ -161,11 +164,66 @@ class ReportManager:
     def get_class(self, identifier: str) -> Type[ReportBase]:
         return self._load_class(self.resolve(identifier))
 
+    @staticmethod
+    def _normalize_report_slug(value: str) -> str:
+        slug = str(value or "").strip().lower()
+        slug = slug.replace("-", "_").replace(" ", "_")
+        while "__" in slug:
+            slug = slug.replace("__", "_")
+        if slug.startswith("report_"):
+            slug = slug[len("report_") :]
+        return slug.strip("_")
+
+    def _find_explain_guide(self, module_name: str) -> Optional[Path]:
+        direct_path = self._guides_dir / f"{module_name}.md"
+        if direct_path.exists():
+            return direct_path
+
+        info = next((i for i in self.index() if i.module == module_name), None)
+        candidate_values = [module_name]
+        if info is not None:
+            candidate_values.insert(0, info.name)
+
+        candidate_slugs = []
+        for value in candidate_values:
+            slug = self._normalize_report_slug(value)
+            if slug and slug not in candidate_slugs:
+                candidate_slugs.append(slug)
+
+        for slug in candidate_slugs:
+            modern_path = self._guides_dir / f"report_{slug}.md"
+            if modern_path.exists():
+                return modern_path
+
+            legacy_matches = sorted(
+                self._legacy_guides_dir.glob(f"ag_*_report_{slug}.md")
+            )
+            if legacy_matches:
+                return legacy_matches[0]
+        return None
+
+    def _load_explain_guide(self, module_name: str) -> Optional[str]:
+        path = self._find_explain_guide(module_name)
+        if path is None:
+            return None
+        try:
+            return path.read_text(encoding="utf-8")
+        except Exception as e:
+            self.logger.log(
+                f"Could not read report guide '{path.name}' for '{module_name}': {e}",
+                "WARNING",
+            )
+            return None
+
     # ----------------------------
     # Introspection helpers (no session needed)
     # ----------------------------
     def explain(self, identifier: str) -> str:
-        return self.get_class(identifier).explain()
+        module_name = self.resolve(identifier)
+        guide_text = self._load_explain_guide(module_name)
+        if guide_text:
+            return guide_text
+        return self._load_class(module_name).explain()
 
     def example_input(self, identifier: str):
         return self.get_class(identifier).example_input()

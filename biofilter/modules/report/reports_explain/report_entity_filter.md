@@ -20,8 +20,14 @@ df = bf.report.run(
 ```
 
 CLI:
-- CLI `report run` currently does not expose parameter injection for report-specific inputs.
-- Use API for this report until CLI params are extended.
+```bash
+biofilter --db-uri sqlite:///biofilter_dev.db report run --report-name entity_filter --input BRCA1 --input BRCA2 --input TP53 --input NOT_A_GENE
+```
+
+With input file:
+```bash
+biofilter --db-uri sqlite:///biofilter_dev.db report run --report-name entity_filter --input-file ./entities.txt
+```
 
 ## Recommended Demo Columns
 - `input_original`

@@ -159,14 +159,36 @@ biofilter --db-uri sqlite:///biofilter_dev.db report refresh
 
 ### `report run`
 - `--db-uri` (optional)
-- `--name` (required)
-- `--as-csv` (flag)
-- `--output` (required when `--as-csv`)
+- `--report-name` (required, alias: `--name`)
+- `--params-template` (flag, prints example_input as JSON and exits)
+- `--input` (multiple, direct values)
+- `--input-file` (optional, `.txt` or `.csv`)
+- `--input-column` (optional, CSV column name or index)
+- `--param` (multiple, `KEY=VALUE`)
+- `--params-json` (optional, JSON object string)
+- `--params-file` (optional, `.json|.yml|.yaml`)
+- `--output` (optional, export CSV when informed)
 - `--debug` (flag)
+
+Notes:
+- Use `--input/--input-file` for inputs and `--param` for report options.
+- Avoid passing `input_data`, `items`, or `input_path` through `--param` when using `--input/--input-file`.
 
 Example:
 ```bash
-biofilter --db-uri sqlite:///biofilter_dev.db report run --name etl_packages --as-csv --output ./tests/outputs/reports/etl_packages.csv
+biofilter --db-uri sqlite:///biofilter_dev.db report run --report-name etl_packages --output ./tests/outputs/reports/etl_packages.csv
+```
+
+```bash
+biofilter --db-uri sqlite:///biofilter_dev.db report run --report-name entity_relationship_model --input TP53 --input BRCA1 --param relationship_scope=input_to_any
+```
+
+```bash
+biofilter --db-uri sqlite:///biofilter_dev.db report run --report-name entity_relationship_model --params-template
+```
+
+```bash
+biofilter --db-uri sqlite:///biofilter_dev.db report run --report-name entity_relationship_model --input TP53 --param relationship_types=@./relationship_types.txt
 ```
 
 ## Group `etl`
@@ -184,6 +206,26 @@ Example:
 biofilter --db-uri sqlite:///biofilter_dev.db etl update --data-source dbsnp_sample --run-step extract --run-step transform
 ```
 
+### `etl update-all`
+- `--db-uri` (optional)
+- `--source-system` (multiple, optional filter)
+- `--data-source` (multiple, optional filter)
+- `--drop-files / --keep-files` (default: `--keep-files`)
+- `--only-active / --all` (default: `--only-active`)
+- `--stop-on-error` (flag)
+- `--debug` (flag)
+
+Examples:
+```bash
+# process all active data sources, resuming from where it stopped
+biofilter --db-uri sqlite:///biofilter_dev.db etl update-all
+```
+
+```bash
+# process only NCBI subset and delete raw/processed files after successful load
+biofilter --db-uri sqlite:///biofilter_dev.db etl update-all --source-system NCBI --drop-files
+```
+
 ### `etl restart`
 - `--db-uri` (optional)
 - `--data-source` (multiple)
@@ -194,6 +236,43 @@ biofilter --db-uri sqlite:///biofilter_dev.db etl update --data-source dbsnp_sam
 Example:
 ```bash
 biofilter --db-uri sqlite:///biofilter_dev.db etl restart --data-source dbsnp_sample --delete-files
+```
+
+### `etl rollback`
+- `--db-uri` (optional)
+- `--package-id` (multiple)
+- `--data-source` (multiple)
+- `--source-system` (multiple)
+- `--delete-files` (flag, only for rollback by data-source/source-system)
+- `--debug` (flag)
+
+Examples:
+```bash
+# rollback a specific ETL package
+biofilter --db-uri sqlite:///biofilter_dev.db etl rollback --package-id 123
+```
+
+```bash
+# rollback an entire data source
+biofilter --db-uri sqlite:///biofilter_dev.db etl rollback --data-source gnomad_chr22 --delete-files
+```
+
+### `etl status`
+- `--db-uri` (optional)
+- `--source-system` (multiple)
+- `--data-source` (multiple)
+- `--only-active / --all` (default: `--all`)
+- `--debug` (flag)
+
+Examples:
+```bash
+# all data sources with latest load result and last execution date
+biofilter --db-uri sqlite:///biofilter_dev.db etl status
+```
+
+```bash
+# filter by source system and active data sources only
+biofilter --db-uri sqlite:///biofilter_dev.db etl status --source-system NCBI --only-active
 ```
 
 ### `etl index`
@@ -252,3 +331,5 @@ biofilter config set database.db_uri sqlite:///biofilter_dev.db
 ## Notes
 - Commands with local `--db-uri` override global `--db-uri`.
 - DB URI resolution priority: local > global > `.biofilter.toml`.
+- `etl restart` performs rollback first, then reruns extract/transform/load.
+- Rollback and restart can be blocked if dependent rows exist in `entity_relationships` from newer/different loads; in this case rollback those dependent loads first.

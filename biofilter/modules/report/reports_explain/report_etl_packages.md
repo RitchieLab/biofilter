@@ -15,7 +15,7 @@ Detailed ETL audit report with package-level records and timing/hash fields for 
 
 CLI:
 ```bash
-biofilter --db-uri sqlite:///biofilter_dev.db report run --name etl_packages
+biofilter --db-uri sqlite:///biofilter_dev.db report run --report-name etl_packages
 ```
 
 API:

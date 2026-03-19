@@ -196,9 +196,8 @@
                 "${input:dbUri}",
                 "report",
                 "run",
-                "--name",
+                "--report-name",
                 "${input:reportName}",
-                "--as-csv",
                 "--output",
                 "${input:reportOutputCsv}"
             ],

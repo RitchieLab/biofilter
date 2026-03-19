@@ -29,6 +29,7 @@ class FakeReportFacade:
         self.example_input_result = "example"
         self.available_columns_result = ["col_a", "col_b"]
         self.run_result = FakeDataFrame()
+        self.run_error = None
 
     def list(self, verbose=False):
         self.calls.append(("list", {"verbose": verbose}))
@@ -54,8 +55,10 @@ class FakeReportFacade:
     def refresh(self):
         self.calls.append(("refresh", {}))
 
-    def run(self, identifier):
-        self.calls.append(("run", {"identifier": identifier}))
+    def run(self, identifier, **kwargs):
+        self.calls.append(("run", {"identifier": identifier, "kwargs": kwargs}))
+        if self.run_error is not None:
+            raise self.run_error
         return self.run_result
 
 
@@ -190,29 +193,7 @@ def test_report_refresh_calls_refresh_and_prints_confirmation(monkeypatch):
     assert ("refresh", {}) in facade.calls
 
 
-def test_report_run_requires_output_when_as_csv(monkeypatch):
-    runner = CliRunner()
-    facade = FakeReportFacade()
-    _patch_biofilter(monkeypatch, facade, {})
-
-    result = runner.invoke(
-        report_cli_mod.report,
-        [
-            "run",
-            "--db-uri",
-            "sqlite:///test.db",
-            "--name",
-            "etl_status",
-            "--as-csv",
-        ],
-    )
-
-    assert result.exit_code != 0
-    assert "Must provide --output with --as-csv" in result.output
-    assert not any(name == "run" for name, _ in facade.calls)
-
-
-def test_report_run_as_csv_writes_file(monkeypatch, tmp_path):
+def test_report_run_with_output_writes_csv_file(monkeypatch, tmp_path):
     runner = CliRunner()
     facade = FakeReportFacade()
     fake_df = FakeDataFrame()
@@ -228,7 +209,6 @@ def test_report_run_as_csv_writes_file(monkeypatch, tmp_path):
             "sqlite:///test.db",
             "--name",
             "etl_status",
-            "--as-csv",
             "--output",
             str(out_file),
         ],
@@ -238,6 +218,29 @@ def test_report_run_as_csv_writes_file(monkeypatch, tmp_path):
     assert out_file.exists()
     assert "Report exported to" in result.output
     assert fake_df.to_csv_calls == [(str(out_file), False)]
+    run_call = [payload for name, payload in facade.calls if name == "run"][-1]
+    assert run_call["kwargs"] == {}
+
+
+def test_report_run_accepts_report_name_option(monkeypatch):
+    runner = CliRunner()
+    facade = FakeReportFacade()
+    _patch_biofilter(monkeypatch, facade, {})
+
+    result = runner.invoke(
+        report_cli_mod.report,
+        [
+            "run",
+            "--db-uri",
+            "sqlite:///test.db",
+            "--report-name",
+            "etl_status",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    run_call = [payload for name, payload in facade.calls if name == "run"][-1]
+    assert run_call["identifier"] == "etl_status"
 
 
 def test_report_run_without_csv_prints_table(monkeypatch):
@@ -261,3 +264,298 @@ def test_report_run_without_csv_prints_table(monkeypatch):
     assert result.exit_code == 0, result.output
     assert "col_a" in result.output
     assert fake_df.to_string_calls == [False]
+    run_call = [payload for name, payload in facade.calls if name == "run"][-1]
+    assert run_call["kwargs"] == {}
+
+
+def test_report_run_params_template_prints_example_and_skips_run(monkeypatch):
+    runner = CliRunner()
+    facade = FakeReportFacade()
+    facade.example_input_result = {
+        "input_data": ["TP53", "BRCA1"],
+        "relationship_scope": "input_to_any",
+    }
+    _patch_biofilter(monkeypatch, facade, {})
+
+    result = runner.invoke(
+        report_cli_mod.report,
+        [
+            "run",
+            "--db-uri",
+            "sqlite:///test.db",
+            "--name",
+            "entity_relationship_model",
+            "--params-template",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert '"input_data": [' in result.output
+    assert '"relationship_scope": "input_to_any"' in result.output
+    assert not any(name == "run" for name, _ in facade.calls)
+
+
+def test_report_run_with_direct_inputs_and_params(monkeypatch):
+    runner = CliRunner()
+    facade = FakeReportFacade()
+    _patch_biofilter(monkeypatch, facade, {})
+
+    result = runner.invoke(
+        report_cli_mod.report,
+        [
+            "run",
+            "--db-uri",
+            "sqlite:///test.db",
+            "--name",
+            "entity_relationship_model",
+            "--input",
+            "TP53",
+            "--input",
+            "BRCA1",
+            "--param",
+            "relationship_scope=input_to_any",
+            "--param",
+            "deduplicate_pairs=true",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    run_call = [payload for name, payload in facade.calls if name == "run"][-1]
+    assert run_call["kwargs"] == {
+        "input_data": ["TP53", "BRCA1"],
+        "relationship_scope": "input_to_any",
+        "deduplicate_pairs": True,
+    }
+
+
+def test_report_run_param_value_from_file_reference(monkeypatch, tmp_path):
+    runner = CliRunner()
+    facade = FakeReportFacade()
+    _patch_biofilter(monkeypatch, facade, {})
+
+    values_file = tmp_path / "relationship_types.txt"
+    values_file.write_text("gene_to_pathway\ngene_to_protein\n", encoding="utf-8")
+
+    result = runner.invoke(
+        report_cli_mod.report,
+        [
+            "run",
+            "--db-uri",
+            "sqlite:///test.db",
+            "--name",
+            "entity_relationship_model",
+            "--param",
+            f"relationship_types=@{values_file}",
+            "--input",
+            "TP53",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    run_call = [payload for name, payload in facade.calls if name == "run"][-1]
+    assert run_call["kwargs"]["relationship_types"] == [
+        "gene_to_pathway",
+        "gene_to_protein",
+    ]
+
+
+def test_report_run_rejects_input_conflict_with_param_input_data(monkeypatch):
+    runner = CliRunner()
+    facade = FakeReportFacade()
+    _patch_biofilter(monkeypatch, facade, {})
+
+    result = runner.invoke(
+        report_cli_mod.report,
+        [
+            "run",
+            "--db-uri",
+            "sqlite:///test.db",
+            "--name",
+            "entity_relationship_model",
+            "--input",
+            "TP53",
+            "--param",
+            'input_data=["BRCA1"]',
+        ],
+    )
+
+    assert result.exit_code != 0
+    assert "Input conflict: use --input/--input-file for inputs" in result.output
+    assert "input_data" in result.output
+    assert not any(name == "run" for name, _ in facade.calls)
+
+
+def test_report_run_with_input_file_csv_and_column(monkeypatch, tmp_path):
+    runner = CliRunner()
+    facade = FakeReportFacade()
+    _patch_biofilter(monkeypatch, facade, {})
+
+    input_file = tmp_path / "genes.csv"
+    input_file.write_text("gene,other\nTP53,1\nBRCA1,2\n", encoding="utf-8")
+
+    result = runner.invoke(
+        report_cli_mod.report,
+        [
+            "run",
+            "--db-uri",
+            "sqlite:///test.db",
+            "--name",
+            "entity_filter",
+            "--input-file",
+            str(input_file),
+            "--input-column",
+            "gene",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    run_call = [payload for name, payload in facade.calls if name == "run"][-1]
+    assert run_call["kwargs"]["input_data"] == ["TP53", "BRCA1"]
+
+
+def test_report_run_with_input_file_csv_numeric_column_skips_header(monkeypatch, tmp_path):
+    runner = CliRunner()
+    facade = FakeReportFacade()
+    _patch_biofilter(monkeypatch, facade, {})
+
+    input_file = tmp_path / "genes.csv"
+    input_file.write_text("gene,other\nTP53,1\nBRCA1,2\n", encoding="utf-8")
+
+    result = runner.invoke(
+        report_cli_mod.report,
+        [
+            "run",
+            "--db-uri",
+            "sqlite:///test.db",
+            "--name",
+            "entity_filter",
+            "--input-file",
+            str(input_file),
+            "--input-column",
+            "0",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    run_call = [payload for name, payload in facade.calls if name == "run"][-1]
+    assert run_call["kwargs"]["input_data"] == ["TP53", "BRCA1"]
+
+
+def test_report_run_input_column_without_csv_file_errors(monkeypatch, tmp_path):
+    runner = CliRunner()
+    facade = FakeReportFacade()
+    _patch_biofilter(monkeypatch, facade, {})
+
+    input_file = tmp_path / "genes.txt"
+    input_file.write_text("TP53\nBRCA1\n", encoding="utf-8")
+
+    result = runner.invoke(
+        report_cli_mod.report,
+        [
+            "run",
+            "--db-uri",
+            "sqlite:///test.db",
+            "--name",
+            "entity_filter",
+            "--input-file",
+            str(input_file),
+            "--input-column",
+            "gene",
+        ],
+    )
+
+    assert result.exit_code != 0
+    assert "--input-column is only valid with CSV input files." in result.output
+
+
+def test_report_run_params_file_json_and_overrides(monkeypatch, tmp_path):
+    runner = CliRunner()
+    facade = FakeReportFacade()
+    _patch_biofilter(monkeypatch, facade, {})
+
+    params_file = tmp_path / "params.json"
+    params_file.write_text(
+        '{"relationship_scope": "between_inputs", "deduplicate_pairs": false}',
+        encoding="utf-8",
+    )
+
+    result = runner.invoke(
+        report_cli_mod.report,
+        [
+            "run",
+            "--db-uri",
+            "sqlite:///test.db",
+            "--name",
+            "entity_relationship_model",
+            "--params-file",
+            str(params_file),
+            "--params-json",
+            '{"relationship_scope":"input_to_any"}',
+            "--param",
+            "deduplicate_pairs=true",
+            "--input",
+            "TP53",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    run_call = [payload for name, payload in facade.calls if name == "run"][-1]
+    assert run_call["kwargs"] == {
+        "relationship_scope": "input_to_any",
+        "deduplicate_pairs": True,
+        "input_data": ["TP53"],
+    }
+
+
+def test_report_run_params_json_list_maps_to_input_data(monkeypatch):
+    runner = CliRunner()
+    facade = FakeReportFacade()
+    _patch_biofilter(monkeypatch, facade, {})
+
+    result = runner.invoke(
+        report_cli_mod.report,
+        [
+            "run",
+            "--db-uri",
+            "sqlite:///test.db",
+            "--name",
+            "entity_filter",
+            "--params-json",
+            '["TP53", "BRCA1"]',
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    run_call = [payload for name, payload in facade.calls if name == "run"][-1]
+    assert run_call["kwargs"]["input_data"] == ["TP53", "BRCA1"]
+
+
+def test_report_run_invalid_name_prints_friendly_error_without_traceback(monkeypatch):
+    runner = CliRunner()
+    facade = FakeReportFacade()
+    facade.list_result = [
+        {"name": "etl_status"},
+        {"name": "etl_packages"},
+    ]
+    facade.run_error = ValueError(
+        "Report not found: 'qry_etl_status'. Available reports: ['etl_packages', 'etl_status']"  # noqa E501
+    )
+    _patch_biofilter(monkeypatch, facade, {})
+
+    result = runner.invoke(
+        report_cli_mod.report,
+        [
+            "run",
+            "--db-uri",
+            "sqlite:///test.db",
+            "--name",
+            "qry_etl_status",
+        ],
+    )
+
+    assert result.exit_code != 0
+    assert "Report not found: 'qry_etl_status'." in result.output
+    assert "Did you mean:" in result.output
+    assert "etl_status" in result.output
+    assert "biofilter report list" in result.output
+    assert "Traceback" not in result.output

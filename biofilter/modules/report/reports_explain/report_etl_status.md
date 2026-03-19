@@ -15,7 +15,7 @@ Shows the latest good ETL status per data source (extract/transform/load) and al
 
 CLI:
 ```bash
-biofilter --db-uri sqlite:///biofilter_dev.db report run --name etl_status
+biofilter --db-uri sqlite:///biofilter_dev.db report run --report-name etl_status
 ```
 
 API:

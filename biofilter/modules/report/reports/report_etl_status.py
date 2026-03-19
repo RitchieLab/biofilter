@@ -1,7 +1,8 @@
 import pandas as pd
-from sqlalchemy import select, and_, func
+from sqlalchemy import and_, select
+
+from biofilter.modules.db.models import ETLDataSource, ETLPackage, ETLSourceSystem
 from biofilter.modules.report.reports.base_report import ReportBase
-from biofilter.modules.db.models import ETLPackage, ETLDataSource, ETLSourceSystem
 
 
 class ETLStatusReport(ReportBase):
@@ -31,18 +32,19 @@ class ETLStatusReport(ReportBase):
 
     @classmethod
     def explain(cls) -> str:
-        return """\
-📦 ETL Status (Latest Good)
+        return str("DOC IN MD FILE")
+#         return """\
+# 📦 ETL Status (Latest Good)
 
-This report summarizes ETL execution health per DataSource by selecting:
-- The most recent GOOD extract package (completed or up-to-date)
-- The most recent GOOD transform package
-- The most recent GOOD load package
+# This report summarizes ETL execution health per DataSource by selecting:
+# - The most recent GOOD extract package (completed or up-to-date)
+# - The most recent GOOD transform package
+# - The most recent GOOD load package
 
-If the latest extract is newer but transform/load are missing or not aligned
-(by hash), the report still shows the last good transform/load and flags them
-as stale (not aligned with latest extract).
-"""
+# If the latest extract is newer but transform/load are missing or not aligned
+# (by hash), the report still shows the last good transform/load and flags them
+# as stale (not aligned with latest extract).
+# """
 
     def run(self) -> pd.DataFrame:
         # Optional filters (strings or lists)
@@ -88,9 +90,9 @@ as stale (not aligned with latest extract).
                 ETLPackage.load_hash,
                 ETLPackage.stats,
             )
-            .select_from(ETLPackage)
-            .join(ETLDataSource, ETLDataSource.id == ETLPackage.data_source_id)
+            .select_from(ETLDataSource)
             .join(ETLSourceSystem, ETLSourceSystem.id == ETLDataSource.source_system_id)
+            .outerjoin(ETLPackage, ETLDataSource.id == ETLPackage.data_source_id)
         )
 
         if only_active:
@@ -272,8 +274,14 @@ as stale (not aligned with latest extract).
             "load_aligned_with_latest_transform",
             "latest_error",
         ]
+        if out.empty:
+            return pd.DataFrame(columns=cols)
+
         cols = [c for c in cols if c in out.columns]
-        return out[cols].sort_values(["source_system", "data_source"])
+        sort_cols = [c for c in ["source_system", "data_source"] if c in out.columns]
+        if sort_cols:
+            out = out.sort_values(sort_cols)
+        return out[cols]
 
     def _get_latest_error_message(self, g: pd.DataFrame) -> str | None:
         """

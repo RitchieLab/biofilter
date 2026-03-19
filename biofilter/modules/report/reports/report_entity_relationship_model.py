@@ -76,31 +76,32 @@ class EntityRelationshipModelReport(ReportBase):
 
     @classmethod
     def explain(cls) -> str:
-        return """\
-🔗 Entity Relationship Model
-============================
+        return str("DOC IN MD FILE")
+#         return """\
+# 🔗 Entity Relationship Model
+# ============================
 
-Purpose:
-- Resolve input terms through entity aliases and return relationship rows from
-  EntityRelationship where input entities participate on either side.
+# Purpose:
+# - Resolve input terms through entity aliases and return relationship rows from
+#   EntityRelationship where input entities participate on either side.
 
-Key parameters:
-- input_data (required): list[str] or file path with one alias per line
-- input_entity_groups (optional): restrict input resolution to these groups
-- output_entity_groups (optional): keep only related entities in these groups
-- relationship_types (optional): filter by relationship type code
-- relationship_scope:
-  - input_to_any (default): input entity related to any entity
-  - between_inputs: both sides must be in the input-resolved entity set
-- deduplicate_pairs (optional):
-  - defaults to True in between_inputs
-  - defaults to False in input_to_any
+# Key parameters:
+# - input_data (required): list[str] or file path with one alias per line
+# - input_entity_groups (optional): restrict input resolution to these groups
+# - output_entity_groups (optional): keep only related entities in these groups
+# - relationship_types (optional): filter by relationship type code
+# - relationship_scope:
+#   - input_to_any (default): input entity related to any entity
+#   - between_inputs: both sides must be in the input-resolved entity set
+# - deduplicate_pairs (optional):
+#   - defaults to True in between_inputs
+#   - defaults to False in input_to_any
 
-Notes:
-- Input matching is case-insensitive using alias_norm when present, else alias_value.
-- Input entities are matched against both entity_1 and entity_2.
-- Output includes primary aliases for input and related entities.
-"""
+# Notes:
+# - Input matching is case-insensitive using alias_norm when present, else alias_value.
+# - Input entities are matched against both entity_1 and entity_2.
+# - Output includes primary aliases for input and related entities.
+# """
 
     @staticmethod
     def _as_ci_set(value: Any) -> set[str]:

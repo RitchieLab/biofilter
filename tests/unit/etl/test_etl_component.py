@@ -110,6 +110,64 @@ def test_restart_passes_paths_and_returns_manager_value(monkeypatch):
     assert called["delete_files"] is True
 
 
+def test_update_all_passes_paths_and_returns_summary(monkeypatch):
+    called = {}
+
+    class FakeManager:
+        def start_process_all(self, **kwargs):
+            called.update(kwargs)
+            return {"selected": 2, "processed": 1}
+
+    core = DummyCore()
+    component = etl_comp_mod.ETLComponent(core)
+    monkeypatch.setattr(component, "_manager", lambda: FakeManager())
+
+    out = component.update_all(
+        source_system=["NCBI"],
+        data_sources=["hgnc"],
+        drop_files_on_success=True,
+        only_active=False,
+        stop_on_error=True,
+    )
+
+    assert out == {"selected": 2, "processed": 1}
+    assert called["source_system"] == ["NCBI"]
+    assert called["data_sources"] == ["hgnc"]
+    assert called["download_path"] == "/tmp/raw"
+    assert called["processed_path"] == "/tmp/processed"
+    assert called["drop_files_on_success"] is True
+    assert called["only_active"] is False
+    assert called["stop_on_error"] is True
+
+
+def test_rollback_passes_paths_and_returns_manager_value(monkeypatch):
+    called = {}
+
+    class FakeManager:
+        def rollback_etl_process(self, **kwargs):
+            called.update(kwargs)
+            return {"ok": True}
+
+    core = DummyCore()
+    component = etl_comp_mod.ETLComponent(core)
+    monkeypatch.setattr(component, "_manager", lambda: FakeManager())
+
+    out = component.rollback(
+        package_ids=[10, 11],
+        data_source=["dbsnp_chr22"],
+        source_system=["NCBI"],
+        delete_files=True,
+    )
+
+    assert out == {"ok": True}
+    assert called["package_ids"] == [10, 11]
+    assert called["data_source"] == ["dbsnp_chr22"]
+    assert called["source_system"] == ["NCBI"]
+    assert called["download_path"] == "/tmp/raw"
+    assert called["processed_path"] == "/tmp/processed"
+    assert called["delete_files"] is True
+
+
 def test_index_with_none_groups_calls_manager_with_none(monkeypatch):
     called = {}
 

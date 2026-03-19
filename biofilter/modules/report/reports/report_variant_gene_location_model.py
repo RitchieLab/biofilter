@@ -148,31 +148,32 @@ class VariantGeneLocationModelReport(ReportBase):
 
     @classmethod
     def explain(cls) -> str:
-        return """\
-🧬 Variant-Gene Location Model
-==============================
+        return str("DOC IN MD FILE")
+#         return """\
+# 🧬 Variant-Gene Location Model
+# ==============================
 
-Purpose:
-- Map variants and genes by interval overlap using:
-  - variant_masters (variant intervals)
-  - entity_locations (gene intervals)
+# Purpose:
+# - Map variants and genes by interval overlap using:
+#   - variant_masters (variant intervals)
+#   - entity_locations (gene intervals)
 
-Input modes:
-- auto (default): detect each item as gene, rsid, position, or region
-- gene: input terms resolved through EntityAlias
-- rsid: rs identifiers in variant_masters.rsid
-- position: chr + single position
-- region: chr + start/end interval
+# Input modes:
+# - auto (default): detect each item as gene, rsid, position, or region
+# - gene: input terms resolved through EntityAlias
+# - rsid: rs identifiers in variant_masters.rsid
+# - position: chr + single position
+# - region: chr + start/end interval
 
-Main params:
-- input_data (required): list[str|dict] or text-file path
-- input_mode (default auto): auto|gene|rsid|position|region
-- window_bp (default 0): symmetric expansion for overlap checks
-- build (default 38): entity_locations.build filter
-- gene_entity_groups (default ["Gene", "Genes"]): group filter applied to genes
-- limit_variants_per_input (default 2000)
-- emit_not_found_rows (default True)
-"""
+# Main params:
+# - input_data (required): list[str|dict] or text-file path
+# - input_mode (default auto): auto|gene|rsid|position|region
+# - window_bp (default 0): symmetric expansion for overlap checks
+# - build (default 38): entity_locations.build filter
+# - gene_entity_groups (default ["Gene", "Genes"]): group filter applied to genes
+# - limit_variants_per_input (default 2000)
+# - emit_not_found_rows (default True)
+# """
 
     # ------------------------------------------------------------------
     # Reflection

@@ -36,22 +36,23 @@ class DBPgIndexStatsReport(ReportBase):
 
     @classmethod
     def explain(cls) -> str:
-        return """\
-📚 PostgreSQL Index Stats
+        return str("DOC IN MD FILE")
+#         return """\
+# 📚 PostgreSQL Index Stats
 
-This report is PostgreSQL-only and returns one row per index, including:
-- index size (bytes + pretty)
-- access method (btree/gin/gist/brin/...)
-- properties: unique, primary, valid, ready
-- index definition (pg_get_indexdef)
+# This report is PostgreSQL-only and returns one row per index, including:
+# - index size (bytes + pretty)
+# - access method (btree/gin/gist/brin/...)
+# - properties: unique, primary, valid, ready
+# - index definition (pg_get_indexdef)
 
-Optional:
-- usage counters from pg_stat_all_indexes: idx_scan, idx_tup_read, idx_tup_fetch
+# Optional:
+# - usage counters from pg_stat_all_indexes: idx_scan, idx_tup_read, idx_tup_fetch
 
-Notes:
-- Usage stats reset when PostgreSQL restarts or when stats are reset.
-- Index size is from pg_relation_size(index_oid).
-"""
+# Notes:
+# - Usage stats reset when PostgreSQL restarts or when stats are reset.
+# - Index size is from pg_relation_size(index_oid).
+# """
 
     def run(self) -> pd.DataFrame:
         # Optional filters

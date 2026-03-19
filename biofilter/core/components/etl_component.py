@@ -44,6 +44,30 @@ class ETLComponent(BaseComponent):
         self.core.logger.log("✅ ETL update process finished.", "INFO")
         return True
 
+    def update_all(
+        self,
+        source_system: list[str] | None = None,
+        data_sources: list[str] | None = None,
+        drop_files_on_success: bool = False,
+        only_active: bool = True,
+        stop_on_error: bool = False,
+    ) -> dict:
+        self.core.logger.log("🚀 Starting ETL update-all process...", "INFO")
+        manager = self._manager()
+
+        out = manager.start_process_all(
+            source_system=source_system,
+            data_sources=data_sources,
+            download_path=self.core.settings.get("download_path", "./downloads"),  # noqa E501
+            processed_path=self.core.settings.get("processed_path", "./processed"),  # noqa E501
+            drop_files_on_success=drop_files_on_success,
+            only_active=only_active,
+            stop_on_error=stop_on_error,
+        )
+
+        self.core.logger.log("✅ ETL update-all process finished.", "INFO")
+        return out
+
     def restart(
         self,
         data_source: list[str] | None = None,
@@ -54,6 +78,25 @@ class ETLComponent(BaseComponent):
         manager = self._manager()
 
         return manager.restart_etl_process(
+            data_source=data_source,
+            source_system=source_system,
+            download_path=self.core.settings.get("download_path", "./downloads"),  # noqa E501
+            processed_path=self.core.settings.get("processed_path", "./processed"),  # noqa E501
+            delete_files=delete_files,
+        )
+
+    def rollback(
+        self,
+        package_ids: list[int] | None = None,
+        data_source: list[str] | None = None,
+        source_system: list[str] | None = None,
+        delete_files: bool = False,
+    ):
+        self.core.logger.log("↩️ Rolling back ETL data...", "INFO")
+        manager = self._manager()
+
+        return manager.rollback_etl_process(
+            package_ids=package_ids,
             data_source=data_source,
             source_system=source_system,
             download_path=self.core.settings.get("download_path", "./downloads"),  # noqa E501

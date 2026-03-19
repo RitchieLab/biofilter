@@ -1,23 +1,25 @@
-# Biofilter 4 Documentation
+# Biofilter Documentation
 
+Lightweight, user-focused documentation for running Biofilter today.
 
-Biofilter 4 is a **persistent, entity-centric knowledge base** designed for
-biological annotation, filtering, and modeling.
-
-It unifies curated biological knowledge, scalable ETL pipelines, and a
-query-first interaction model to support reproducible genomic analysis
-across genes, variants, pathways, proteins, and diseases.
-
-Biofilter 4 is designed to operate as a **long-lived knowledge layer**,
-separating data ingestion from analysis workflows and enabling both
-command-line and programmatic access.
+This documentation is intentionally practical:
+- install and configure quickly
+- bootstrap database and run ETL
+- run reports via CLI/API
+- troubleshoot common operational issues
 
 ```{toctree}
 :maxdepth: 2
-:caption: Getting Started
+:caption: Contents
 
-overview
-architecture
-concept
-user_guide/index
-developer_guide/index
+system_overview
+entity_and_omics
+developer_extensions
+getting_started
+configuration
+database
+etl
+reports
+cli_reference
+troubleshooting
+```

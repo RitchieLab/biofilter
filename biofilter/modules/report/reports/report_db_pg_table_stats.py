@@ -39,25 +39,26 @@ class DBPgTableStatsReport(ReportBase):
 
     @classmethod
     def explain(cls) -> str:
-        return """\
-📊 PostgreSQL Table Stats
+        return str("DOC IN MD FILE")
+#         return """\
+# 📊 PostgreSQL Table Stats
 
-This report is PostgreSQL-only and returns:
-- One row per physical table (including each partition)
-- One aggregated row per partitioned parent table (summing all partitions)
+# This report is PostgreSQL-only and returns:
+# - One row per physical table (including each partition)
+# - One aggregated row per partitioned parent table (summing all partitions)
 
-Metrics:
-- rows_est: estimated row count (fast, based on catalog statistics)
-- table_bytes: heap size
-- index_bytes: total size of all indexes on the table
-- toast_bytes: TOAST size (computed as total - heap - indexes)
-- total_bytes: total relation size (heap + indexes + toast)
-- n_indexes: number of indexes
+# Metrics:
+# - rows_est: estimated row count (fast, based on catalog statistics)
+# - table_bytes: heap size
+# - index_bytes: total size of all indexes on the table
+# - toast_bytes: TOAST size (computed as total - heap - indexes)
+# - total_bytes: total relation size (heap + indexes + toast)
+# - n_indexes: number of indexes
 
-Notes:
-- rows_est is an estimate and depends on ANALYZE/autovacuum.
-- This is designed for observability, not exact counting.
-"""
+# Notes:
+# - rows_est is an estimate and depends on ANALYZE/autovacuum.
+# - This is designed for observability, not exact counting.
+# """
 
     def run(self) -> pd.DataFrame:
         # Optional filters

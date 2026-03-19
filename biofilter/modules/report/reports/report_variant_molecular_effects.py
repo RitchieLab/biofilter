@@ -216,49 +216,50 @@ class VariantMolecularEffectsReport(ReportBase):
 
     @classmethod
     def explain(cls) -> str:
-        return """\
-🧬 VARIANT CONSEQUENCES Report (v1)
-==================================
+        return str("DOC IN MD FILE")
+#         return """\
+# 🧬 VARIANT CONSEQUENCES Report (v1)
+# ==================================
 
-Purpose:
-- Given one or more genomic regions, return all overlapping variants from
-  variant_masters and their molecular consequences from variant_molecular_effects.  # noqa E501
+# Purpose:
+# - Given one or more genomic regions, return all overlapping variants from
+#   variant_masters and their molecular consequences from variant_molecular_effects.  # noqa E501
 
-Input:
-- items: list[str] or list[dict]
-  Supported region format:
-    - "chr1:12345:12345"
-    - "1:12345:12400"
-    - "chrX:2781644:2781644"
-  Dict format:
-    - {"chromosome": "1", "start": 12345, "end": 12400}
-    - {"chr": "X", "pos_start": 2781644, "pos_end": 2781644}
+# Input:
+# - items: list[str] or list[dict]
+#   Supported region format:
+#     - "chr1:12345:12345"
+#     - "1:12345:12400"
+#     - "chrX:2781644:2781644"
+#   Dict format:
+#     - {"chromosome": "1", "start": 12345, "end": 12400}
+#     - {"chr": "X", "pos_start": 2781644, "pos_end": 2781644}
 
-- input_path: path to a text file with one region per line
+# - input_path: path to a text file with one region per line
 
-Key params:
-- range_up (default 0): extend query interval upstream
-- range_down (default 0): extend query interval downstream
-- emit_not_found_rows (default True): keep one row per input even if no variants found  # noqa E501
-- include_variant_only_rows (default True): keep variants even if they have no consequences  # noqa E501
-- limit_variants_per_input (default 1000): safety bound applied in memory after overlap matching  # noqa E501
+# Key params:
+# - range_up (default 0): extend query interval upstream
+# - range_down (default 0): extend query interval downstream
+# - emit_not_found_rows (default True): keep one row per input even if no variants found  # noqa E501
+# - include_variant_only_rows (default True): keep variants even if they have no consequences  # noqa E501
+# - limit_variants_per_input (default 1000): safety bound applied in memory after overlap matching  # noqa E501
 
-Behavior:
-- First queries variant_masters by chromosome and interval overlap
-- Then fetches variant_molecular_effects using (chromosome, variant_id)
-- Resolves labels from:
-    * variant_consequences
-    * variant_consequence_groups
-    * variant_consequence_categories
-    * variant_impacts
-    * variant_biotypes
+# Behavior:
+# - First queries variant_masters by chromosome and interval overlap
+# - Then fetches variant_molecular_effects using (chromosome, variant_id)
+# - Resolves labels from:
+#     * variant_consequences
+#     * variant_consequence_groups
+#     * variant_consequence_categories
+#     * variant_impacts
+#     * variant_biotypes
 
-Output:
-- One row per input × variant × consequence
-- If no variant is found, emits one row with Status=not_found (if enabled)
-- If a variant is found but has no consequences, emits one row with Status=variant_only  # noqa E501
-  (if include_variant_only_rows=True)
-"""
+# Output:
+# - One row per input × variant × consequence
+# - If no variant is found, emits one row with Status=not_found (if enabled)
+# - If a variant is found but has no consequences, emits one row with Status=variant_only  # noqa E501
+#   (if include_variant_only_rows=True)
+# """
 
     @classmethod
     def example_input(cls) -> list[str]:

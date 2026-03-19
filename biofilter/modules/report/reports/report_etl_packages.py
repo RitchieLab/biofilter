@@ -2,12 +2,9 @@
 
 import pandas as pd
 from sqlalchemy import select
+
+from biofilter.modules.db.models import ETLDataSource, ETLPackage, ETLSourceSystem
 from biofilter.modules.report.reports.base_report import ReportBase
-from biofilter.modules.db.models import (
-    ETLSourceSystem,
-    ETLDataSource,
-    ETLPackage,
-)
 
 
 class ETLPackagesReport(ReportBase):
@@ -44,33 +41,34 @@ class ETLPackagesReport(ReportBase):
 
     @classmethod
     def explain(cls) -> str:
-        return """\
-📦 ETL Packages – Detailed Audit Report
-======================================
+        return str("DOC IN MD FILE")
+#         return """\
+# 📦 ETL Packages – Detailed Audit Report
+# ======================================
 
-This report provides a **raw, non-aggregated** view of the ETL execution state.
+# This report provides a **raw, non-aggregated** view of the ETL execution state.
 
-Each row corresponds to **one ETLPackage record**, which may represent:
-- one ETL stage (extract / transform / load), or
-- one full execution attempt, depending on how the ETL was triggered.
+# Each row corresponds to **one ETLPackage record**, which may represent:
+# - one ETL stage (extract / transform / load), or
+# - one full execution attempt, depending on how the ETL was triggered.
 
-The report joins:
-- ETLSourceSystem (e.g. NCBI, Ensembl, UniProt)
-- ETLDataSource (e.g. dbSNP_chr1, ensembl, hgnc)
-- ETLPackage (execution metadata)
+# The report joins:
+# - ETLSourceSystem (e.g. NCBI, Ensembl, UniProt)
+# - ETLDataSource (e.g. dbSNP_chr1, ensembl, hgnc)
+# - ETLPackage (execution metadata)
 
-This report is intentionally *not consolidated*.
-It is designed for:
-- Debugging failed or stuck jobs
-- Auditing execution history
-- Understanding how many packages were created per data source
-- Verifying status transitions across ETL stages
+# This report is intentionally *not consolidated*.
+# It is designed for:
+# - Debugging failed or stuck jobs
+# - Auditing execution history
+# - Understanding how many packages were created per data source
+# - Verifying status transitions across ETL stages
 
-Recommended usage:
-- Use this report to identify inconsistencies
-- Fix ETL status logic
-- Only then create consolidated / dashboard-style reports
-"""
+# Recommended usage:
+# - Use this report to identify inconsistencies
+# - Fix ETL status logic
+# - Only then create consolidated / dashboard-style reports
+# """
 
     def run(self) -> pd.DataFrame:
         # Optional filters (strings or lists)
