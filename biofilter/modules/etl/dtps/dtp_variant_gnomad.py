@@ -131,7 +131,7 @@ class GnomadCyvcf2Config:
     consequences_prefix: str = "consequences_part_"
     parquet_compression: str = "snappy"
     min_qual = 1
-    min_ac = 1
+    min_ac = 5
     postgres_fast_load: bool = True
     postgres_partition_refresh: bool = True
 

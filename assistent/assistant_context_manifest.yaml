@@ -1,0 +1,88 @@
+assistant_name: "BF4 Assistant"
+assistant_version: "1.0.0"
+project_version_hint: "Biofilter 4.x"
+default_language: "en"
+fallback_language:
+  - "pt-BR"
+
+retrieval_policy:
+  strategy: "hierarchical_rag"
+  chunk_size: 1200
+  chunk_overlap: 120
+  top_k: 8
+  rerank: true
+
+source_priority:
+  - id: agents
+    path: "biofilter_agents"
+    role: "operational_guides"
+    weight: 1.0
+    include_globs:
+      - "**/*.md"
+    exclude_globs:
+      - "**/.DS_Store"
+
+  - id: docs
+    path: "docs/source"
+    role: "official_user_docs"
+    weight: 0.95
+    include_globs:
+      - "**/*.md"
+    exclude_globs:
+      - "**/_build/**"
+      - "**/.DS_Store"
+
+  - id: cli
+    path: "biofilter/api/cli"
+    role: "command_truth"
+    weight: 0.9
+    include_globs:
+      - "**/*.py"
+      - "**/*.md"
+
+  - id: etl
+    path: "biofilter/modules/etl"
+    role: "etl_behavior_truth"
+    weight: 0.85
+    include_globs:
+      - "**/*.py"
+      - "**/*.md"
+
+  - id: reports
+    path: "biofilter/modules/report"
+    role: "report_behavior_truth"
+    weight: 0.85
+    include_globs:
+      - "**/*.py"
+      - "**/*.md"
+
+  - id: notebooks
+    path: "notebooks/Templates"
+    role: "examples_only"
+    weight: 0.65
+    include_globs:
+      - "**/*.ipynb"
+      - "**/*.md"
+    note: "Prefer docs/agents over notebooks when conflicts exist."
+
+global_exclusions:
+  - "**/.git/**"
+  - "**/.venv/**"
+  - "**/__pycache__/**"
+  - "**/*.log"
+  - "**/docs/build/**"
+  - "**/.DS_Store"
+
+answering_rules:
+  - "Prefer high-priority sources on conflicts."
+  - "Mark assumptions explicitly."
+  - "When unsure, suggest a discovery/verification command."
+  - "Do not invent unavailable commands."
+
+maintenance:
+  refresh_triggers:
+    - "CLI options changed"
+    - "new report added"
+    - "new DTP/data source added"
+    - "docs/source updated"
+  minimum_refresh_cadence: "weekly"
