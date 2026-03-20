@@ -130,8 +130,8 @@ class GnomadCyvcf2Config:
     variants_prefix: str = "variants_part_"
     consequences_prefix: str = "consequences_part_"
     parquet_compression: str = "snappy"
-    min_qual = 1
-    min_ac = 5
+    min_qual: int = 1
+    min_ac: int = 5
     postgres_fast_load: bool = True
     postgres_partition_refresh: bool = True
 
@@ -177,7 +177,7 @@ def resolve_file_chromosome(vcf_path: Path, datasource_name: str) -> Optional[in
             continue
         c = m.group(1).upper()
         if c == "X":
-            return 23   
+            return 23
         if c == "Y":
             return 24
         if c in {"M", "MT"}:
@@ -1401,7 +1401,7 @@ class DTP(DTPBase):
             ]
             if not cons_df.empty:
                 unknown_terms = sorted(
-                    cons_df["_consequence_key"].dropna().astype(str).unique().tolist()
+                    cons_df["_consequence_key"].dropna().astype(str).unique().tolist()  # noqa E501
                 )
                 sample = ", ".join(unknown_terms[:10])
                 more = " ..." if len(unknown_terms) > 10 else ""
@@ -1476,7 +1476,7 @@ class DTP(DTPBase):
             "_most_severe_variant_key"
         ].map(dim_caches.get("consequence", {}))
 
-        unknown_mask = out["_consequence_key"].notna() & out["consequence_id"].isna()
+        unknown_mask = out["_consequence_key"].notna() & out["consequence_id"].isna()  # noqa E501
         if unknown_mask.any():
             unknown_rows = int(unknown_mask.sum())
             self.logger.log(
@@ -1854,7 +1854,7 @@ class DTP(DTPBase):
                 glob.glob(str(variants_dir / "variants_part_*.parquet"))
             )
             consequence_files = sorted(
-                glob.glob(str(consequences_dir / "consequences_part_*.parquet"))
+                glob.glob(str(consequences_dir / "consequences_part_*.parquet"))  # noqa E501
             )
 
             if not variant_files:
@@ -1938,7 +1938,7 @@ class DTP(DTPBase):
         try:
             with self.db.engine.begin() as conn:
                 if not self._supports_postgres_fast_load(conn):
-                    msg = "⚠️ This load path currently requires PostgreSQL fast load."
+                    msg = "⚠️ This load path currently requires PostgreSQL fast load."  # noqa E501
                     self.logger.log(msg, "ERROR")
                     return False, msg
 
@@ -1948,8 +1948,8 @@ class DTP(DTPBase):
                     "consequence": self._load_dimension_cache(
                         conn, "variant_consequences"
                     ),
-                    "impact": self._load_dimension_cache(conn, "variant_impacts"),
-                    "biotype": self._load_dimension_cache(conn, "variant_biotypes"),
+                    "impact": self._load_dimension_cache(conn, "variant_impacts"),  # noqa E501
+                    "biotype": self._load_dimension_cache(conn, "variant_biotypes"),  # noqa E501
                 }
 
                 self._create_postgres_stage_tables(conn)
@@ -1962,7 +1962,7 @@ class DTP(DTPBase):
                         variant_files[0], ["chrom", "chromosome"]
                     )
                     if chrom_probe.empty:
-                        raise ValueError("Could not resolve chromosome for load.")
+                        raise ValueError("Could not resolve chromosome for load.")  # noqa E501
                     probe_col = (
                         "chromosome"
                         if "chromosome" in chrom_probe.columns

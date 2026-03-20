@@ -463,6 +463,7 @@ class DTP(DTPBase, EntityQueryMixin):
                         pathway_id=pathway_master,
                         description=pathway_name,
                         data_source_id=self.data_source.id,
+                        etl_package_id=self.package.id,
                     )
 
                     self.session.add(pathway)

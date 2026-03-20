@@ -1,3 +1,12 @@
+"""
+Supplemental gene ingestion from NCBI.
+
+This DTP complements the HGNC baseline in the Genes pipeline:
+1) HGNC loads canonical genes.
+2) NCBI adds genes that are not curated by HGNC (with filters).
+3) Ensembl adds genomic coordinates for loaded genes.
+"""
+
 import gc
 import gzip
 import os
@@ -122,7 +131,15 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
     #                            TRANSFORM METHOD
     # -------------------------------------------------------------------------
     def transform(self, raw_dir: str, processed_dir: str):
-        """ """
+        """
+        Parse NCBI `gene_info.gz` and emit normalized `master_data`.
+
+        Transform behavior:
+        - reads only selected columns from `gene_info.gz`
+        - keeps only human genes (`#tax_id == 9606`)
+        - derives cross-refs (`hgnc_id`, `ensembl_id`) from `dbXrefs`
+        - writes `master_data.parquet` (and CSV for inspection)
+        """
 
         msg = f"🔧 Transforming the {self.data_source.name} data ..."
 
@@ -270,18 +287,27 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
     # -------------------------------------------------------------------------
     def load(self, processed_dir=None):
         """
-        Load NCBI genes that are not present in HGNC, supplementing the
-        Biofilter3R database.
+        Load NCBI genes as a complement to the HGNC baseline.
+
+        Pipeline role:
+        - This step should run after `dtp_gene_hgnc`.
+        - It is designed to add genes not present in HGNC.
+
+        Row-level filters applied before insert:
+        - keep only rows with `hgnc_id` missing (not curated by HGNC)
+        - drop invalid symbols (`-`, `unknown`, `n/a`)
+        - drop rows without region hint (`map_location == "-"`)
+
+        Loaded output:
+        - creates/updates Entities in group "Genes" using NCBI symbol
+        - stores aliases (symbols/synonyms/cross refs)
+        - creates GeneMaster rows with `hgnc_status = "Gene from NCBI"`
+        - uses fallback metadata: GeneGroup "NCBI Gene", LocusType "unknown"
 
         Notes:
-        - Each gene will generate an Entity using the NCBI symbol as the
-            primary name.
-        - Aliases are extracted from synonyms, Ensembl ID and description.
-        - Genes are linked to a placeholder GeneGroup ("NCBI Gene").
-        - Genomic regions are parsed from `map_location`.
-        - Only genes with missing HGNC ID are processed.
-
-        Import: Only Genes with map_location in the source will be load
+        - human-only filtering (`tax_id = 9606`) happens in `transform`.
+        - genomic start/end coordinates are not loaded here; Ensembl is the
+          source used to populate `EntityLocation`.
         """
 
         self.logger.log(
@@ -308,7 +334,6 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
             "entrez_id": ("code", "ENTREZ", None),
             "full_name": ("synonym", "NCBI", None),
             "synonyms": ("symbol", "NCBI", None),
-            # "other_designations": ("synonym", "NCBI", None), # TODO: To fix in 3.2.0
         }
 
         # READ PROCESSED DATA TO LOAD
@@ -423,10 +448,6 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
             if not status:
                 msg = "⚠️  Error on Locus Type 'unknown' "
                 self.logger.log(msg, "WARNING")
-
-            # Positions
-            start = None
-            end = None
 
         except Exception as e:
             self.session.rollback()
@@ -543,52 +564,6 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
                 gene_group_names=gene_group_id,
                 package_id=self.package.id,
             )
-
-            # --> Regions
-            # if gene is not None:
-            #     total_gene += 1
-
-            #     location_list = row.get("map_location", "")
-            #     if location_list:
-            #         location_list = location_list.split("|")
-            #     else:
-            #         location_list = []
-
-            # for region_label in location_list:
-            #     region_instance, status = self.get_or_create_genomic_region(  # noqa: E501
-            #         label=region_label,
-            #         chromosome=chromosome,
-            #         start=start,
-            #         end=end,
-            #         data_source_id=self.data_source.id,
-            #         package_id=self.package.id,
-            #     )  # noqa: E501
-            #     if not status:
-            #         msg = f"⚠️  Error on Region to: {gene_master}"
-            #         self.logger.log(msg, "WARNING")
-            #         total_warnings += 1
-            #         continue  # TODO: Add in ETLLOG Model
-
-            #     # Add GeneLocation
-            #     if region_instance:
-            #         location, status = self.get_or_create_gene_location(
-            #             gene=gene,
-            #             chromosome=chromosome,
-            #             start=start,
-            #             end=end,
-            #             strand=None,
-            #             region=region_instance,
-            #             data_source_id=self.data_source.id,
-            #             package_id=self.package.id,
-            #         )
-
-            #     # Check if location was created successfully
-            #     if not location:
-            #         msg = f"⚠️  Failed to create Location for gene {gene_master}"  # noqa E501
-            #         self.logger.log(msg, "WARNING")
-            #         total_warnings += 1
-
-        #  ---> PROCESSED ALL PROCESS DATA ROWS
 
         # Set DB to Read Mode and Create Index
         try:

@@ -275,6 +275,29 @@ biofilter --db-uri sqlite:///biofilter_dev.db etl status
 biofilter --db-uri sqlite:///biofilter_dev.db etl status --source-system NCBI --only-active
 ```
 
+### `etl explain`
+- `--db-uri` (optional when using `--dtp-script`; required for `--data-source`)
+- `--data-source` (multiple)
+- `--dtp-script` (multiple)
+- `--source-system` (multiple, optional filter for `--data-source`)
+- `--debug` (flag)
+
+Examples:
+```bash
+# explain by datasource name from ETL registry
+biofilter --db-uri sqlite:///biofilter_dev.db etl explain --data-source hgnc
+```
+
+```bash
+# explain directly by dtp script name (no DB lookup needed)
+biofilter etl explain --dtp-script dtp_gene_hgnc
+```
+
+```bash
+# list all available DTP explain documents
+biofilter etl explain
+```
+
 ### `etl index`
 - `--db-uri` (optional)
 - `--group` (multiple)

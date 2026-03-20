@@ -41,7 +41,7 @@ class DTP(DTPBase, EntityQueryMixin):
     #                            EXTRACT METHOD
     # -------------------------------------------------------------------------
     def extract(self, raw_dir: str):
-        msg = f"🔄 The data source '{self.data_source.name}' is for MONDO relationships only."
+        msg = f"🔄 The data source '{self.data_source.name}' is for MONDO relationships only."  # noqa E501
         self.logger.log(msg, "INFO")
         return True, msg, None
 
@@ -49,7 +49,7 @@ class DTP(DTPBase, EntityQueryMixin):
     #                            TRANSFORM METHOD
     # -------------------------------------------------------------------------
     def transform(self, raw_dir: str, processed_dir: str):
-        msg = f"⚠️ The data source '{self.data_source.name}' is for relationships only. Transform is handled in 'mondo'."
+        msg = f"⚠️ The data source '{self.data_source.name}' is for relationships only. Transform is handled in 'mondo'."  # noqa E501
         self.logger.log(msg, "INFO")
         return True, msg
 
@@ -57,18 +57,18 @@ class DTP(DTPBase, EntityQueryMixin):
     #                            LOAD METHOD
     # -------------------------------------------------------------------------
     def load(self, processed_dir=None):
-        msg = f"🔄 Loading MONDO relationships..."
+        msg = "🔄 Loading MONDO relationships..."
         self.logger.log(msg, "INFO")
 
         self.check_compatibility()
 
         total_relationships = 0
-        total_warnings = 0
+        # total_warnings = 0
         parent_source = "mondo"
 
         # --- Read processed file ---
         processed_path = (
-            Path(processed_dir) / self.data_source.source_system.name / parent_source
+            Path(processed_dir) / self.data_source.source_system.name / parent_source  # noqa E501
         )
         processed_file_name = str(processed_path / "relationship_data.parquet")
 
@@ -169,7 +169,7 @@ class DTP(DTPBase, EntityQueryMixin):
         # Commit batch
         try:
             self.session.commit()
-            msg = f"✅ {total_relationships} MONDO relationships loaded successfully"
+            msg = f"✅ {total_relationships} MONDO relationships loaded successfully"  # noqa E501
             self.logger.log(msg, "INFO")
         except Exception as e:
             self.session.rollback()
@@ -179,10 +179,10 @@ class DTP(DTPBase, EntityQueryMixin):
         # Save not loaded if exists
         if not_loaded:
             df_not_loaded = pd.DataFrame(not_loaded)
-            not_loaded_path = processed_path / "relationship_data_not_loaded.csv"
+            not_loaded_path = processed_path / "relationship_data_not_loaded.csv"  # noqa E501
             df_not_loaded.to_csv(not_loaded_path, index=False)
             self.logger.log(
-                f"⚠️ {len(df_not_loaded)} MONDO relationships skipped. See {not_loaded_path}",
+                f"⚠️ {len(df_not_loaded)} MONDO relationships skipped. See {not_loaded_path}",  # noqa E501
                 "WARNING",
             )
 

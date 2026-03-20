@@ -33,6 +33,7 @@ Groups:
 
 - `biofilter etl update`
 - `biofilter etl update-all`
+- `biofilter etl explain`
 - `biofilter etl status`
 - `biofilter etl restart`
 - `biofilter etl rollback`

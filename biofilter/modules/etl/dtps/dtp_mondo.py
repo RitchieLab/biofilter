@@ -102,13 +102,13 @@ class DTP(DTPBase, EntityQueryMixin):
         if not node_id:
             return None
         if node_id.startswith("http://purl.obolibrary.org/obo/MONDO_"):
-            return node_id.replace("http://purl.obolibrary.org/obo/MONDO_", "MONDO:")
+            return node_id.replace("http://purl.obolibrary.org/obo/MONDO_", "MONDO:")  # noqa E501
         return node_id  # keep as-is if already compact or different ontology
 
     def _normalize_id(self, raw_id: str):
         """
         Normalize MONDO relationship IDs into (prefix, code, alias_value).
-        Returns (prefix, code, alias_value) or (None, None, None) if not parsable.
+        Returns (prefix, code, alias_value) or (None, None, None) if not parsable.    # noqa E501
         """
 
         if not raw_id:
@@ -166,7 +166,7 @@ class DTP(DTPBase, EntityQueryMixin):
         """
         mapping = {
             "is_a": "is_a",
-            "http://purl.obolibrary.org/obo/RO_0004003": "Disease_has_disruption",
+            "http://purl.obolibrary.org/obo/RO_0004003": "Disease_has_disruption",  # noqa E501
             "http://purl.obolibrary.org/obo/RO_0004026": "located_in",
             "http://purl.obolibrary.org/obo/RO_0002162": "in_taxon",
             # Add more as needed
@@ -290,9 +290,9 @@ class DTP(DTPBase, EntityQueryMixin):
                         description = n["meta"]["definition"].get("val")
 
                     synonyms = [
-                        s.get("val") for s in n.get("meta", {}).get("synonyms", [])
+                        s.get("val") for s in n.get("meta", {}).get("synonyms", [])  # noqa E501
                     ]
-                    xrefs = [x.get("val") for x in n.get("meta", {}).get("xrefs", [])]
+                    xrefs = [x.get("val") for x in n.get("meta", {}).get("xrefs", [])]  # noqa E501
                     subsets = [
                         s.replace("http://purl.obolibrary.org/obo/mondo#", "")
                         for s in n.get("meta", {}).get("subsets", [])
@@ -304,7 +304,7 @@ class DTP(DTPBase, EntityQueryMixin):
                             "label": n.get("lbl"),
                             "description": description,
                             "iri": n.get("iri"),
-                            "is_obsolete": n.get("meta", {}).get("deprecated", False),
+                            "is_obsolete": n.get("meta", {}).get("deprecated", False),  # noqa E501
                             "synonyms": synonyms,
                             "xrefs": xrefs,
                             "subsets": subsets,
@@ -357,7 +357,7 @@ class DTP(DTPBase, EntityQueryMixin):
 
             if self.debug_mode:
                 df_master.to_csv(output_path / "master_data.csv", index=False)
-                df_rels.to_csv(output_path / "relationship_data.csv", index=False)
+                df_rels.to_csv(output_path / "relationship_data.csv", index=False)  # noqa E501
                 end_time = time.time() - start_total
                 msg = str(
                     f"processed {len(df_master)} records - and {len(df_rels)} relationships /  Time Total: {end_time:.2f}s |"  # noqa E501
@@ -395,8 +395,8 @@ class DTP(DTPBase, EntityQueryMixin):
         self.check_compatibility()
 
         # VARIABLES TO LOAD PROCESS
-        if self.debug_mode:
-            start_total = time.time()
+        # if self.debug_mode:
+        #     start_total = time.time()
 
         # Setting variables
         total_diseases = 0
@@ -520,8 +520,8 @@ class DTP(DTPBase, EntityQueryMixin):
             # Interaction to each Disease Entry
             for _, row in df.iterrows():
 
-                if self.debug_mode:
-                    row_time = time.time() - start_total
+                # if self.debug_mode:
+                #     row_time = time.time() - start_total
 
                 # CANONICAL PROTEIN
                 # Add or Get Entity for Canonical protein
@@ -570,9 +570,6 @@ class DTP(DTPBase, EntityQueryMixin):
                                 }
                             )
 
-                # Drop Alias Invalids
-                # not_primary_alias = [alias for alias in not_primary_alias if alias.get("xref_source") != "ICD9"]
-
                 # --- Determine OmicStatus ---
                 omic_status_id = (
                     status_map["deactive"].id
@@ -607,7 +604,7 @@ class DTP(DTPBase, EntityQueryMixin):
                 disease_master_obj = (
                     self.session.query(DiseaseMaster)
                     .filter_by(
-                        disease_id=disease_master, data_source_id=self.data_source.id
+                        disease_id=disease_master, data_source_id=self.data_source.id  # noqa E501
                     )
                     .first()
                 )
@@ -640,7 +637,7 @@ class DTP(DTPBase, EntityQueryMixin):
                         link = (
                             self.session.query(DiseaseGroupMembership)
                             .filter_by(
-                                disease_id=disease_master_obj.id, group_id=group_id
+                                disease_id=disease_master_obj.id, group_id=group_id  # noqa E501
                             )
                             .first()
                         )

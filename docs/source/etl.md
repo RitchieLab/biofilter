@@ -25,6 +25,13 @@ biofilter etl status
 biofilter etl status --source-system NCBI --only-active
 ```
 
+Explain a DTP process:
+
+```bash
+biofilter etl explain --data-source hgnc
+biofilter etl explain --dtp-script dtp_gene_hgnc
+```
+
 Restart with rollback + rerun:
 
 ```bash
@@ -46,10 +53,12 @@ biofilter etl rollback --data-source gnomad_chr22 --delete-files
 ## File Lifecycle (Raw and Processed)
 
 By default, BF4 uses:
+
 - download path: `./downloads`
 - processed path: `./processed`
 
 For each data source, ETL stages typically use:
+
 - raw files: `<download_path>/<source_system>/<data_source>/...`
 - processed outputs: `<processed_path>/<source_system>/<data_source>/...`
 
@@ -60,6 +69,7 @@ You will commonly see parquet files in the processed stage (e.g., `master_data.p
 ## ETL Package Tracking
 
 Each ETL run writes package metadata into the database, including:
+
 - operation type (`extract`, `transform`, `load`, `rollback`)
 - step status and timestamps
 - hash linkage to support skip/up-to-date behavior

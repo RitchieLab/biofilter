@@ -20,6 +20,7 @@ class EntityQueryMixin:
         alias_norm: str = None,
         is_active: bool = True,
         force_create: bool = False,
+        auto_commit: bool = True,
     ):
         """
         Returns the ID of an existing entity or creates a new one with its
@@ -36,6 +37,8 @@ class EntityQueryMixin:
             xref_source (str): Cross-reference source (ex: "dbSNP", "HGNC").
             alias_norm (str): Optional normalized version of the alias.
             is_active (bool): Whether this entity is active (for filters).
+            auto_commit (bool): When True commits the transaction inside the
+                helper; when False leaves commit control to the caller.
 
         Returns:
             Tuple[int, bool]: (entity_id, is_new)
@@ -87,7 +90,8 @@ class EntityQueryMixin:
             )
             self.session.add(primary_alias)
 
-            self.session.commit()
+            if auto_commit:
+                self.session.commit()
             msg = f"✅ Entity '{clean_name}' created with ID {new_entity.id}"
             # self.logger.log(msg, "DEBUG")
             return new_entity.id, True
@@ -107,7 +111,15 @@ class EntityQueryMixin:
         data_source_id: int = 0,
         package_id: int = None,
         force_create: bool = False,
+        auto_commit: bool = True,
     ) -> int:
+        """
+        Add aliases to an entity avoiding duplicates.
+
+        Args:
+            auto_commit (bool): When True commits inside helper; when False
+                caller is responsible for commit/rollback boundaries.
+        """
 
         existing_keys = {}
 
@@ -167,6 +179,9 @@ class EntityQueryMixin:
             )
             self.session.add(new_alias)
             count_added += 1
+
+        if not auto_commit:
+            return count_added
 
         try:
             self.session.commit()

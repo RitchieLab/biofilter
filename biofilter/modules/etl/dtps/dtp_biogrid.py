@@ -4,8 +4,6 @@ import zipfile
 from itertools import product
 from pathlib import Path
 
-# import gzip
-# import io
 import pandas as pd
 import requests
 
@@ -586,9 +584,6 @@ class DTP(DTPBase):
         # ----= CHECK PREVIOUS DATA IN DB =----
         # --------------------------------------
 
-        # BUG: para uso somente de debug, deixar apebas uma linha
-        # df_resolved = df_resolved.head(2)
-
         def normalize_pair(a, b):
             """Returns (min, max) tuple to make the relationship symmetric."""
             return (a, b) if a <= b else (b, a)
@@ -607,11 +602,6 @@ class DTP(DTPBase):
                 .filter(EntityRelationship.data_source_id == self.data_source.id)
                 .all()
             )
-            # existing_set = {
-            #     # (r.entity_1_id, r.entity_2_id, r.relationship_type_id)
-            #     (r.entity_1_id, r.entity_2_id)
-            #     for r in existing
-            # }
             existing_set = {
                 normalize_pair(r.entity_1_id, r.entity_2_id) for r in existing
             }
@@ -619,13 +609,6 @@ class DTP(DTPBase):
             self.logger.log(msg, "DEBUG")
 
             # Create key to match
-            # df_resolved["rel_key"] = list(
-            #     zip(
-            #         df_resolved["entity_1_id"],
-            #         df_resolved["entity_2_id"],
-            #         # df_resolved["relationship_type_id"]
-            #     )
-            # )
             df_resolved["rel_key"] = [
                 normalize_pair(a, b)
                 for a, b in zip(df_resolved["entity_1_id"], df_resolved["entity_2_id"])

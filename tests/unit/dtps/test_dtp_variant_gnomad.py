@@ -264,6 +264,7 @@ def test_transform_writes_parts(monkeypatch, tmp_path):
         vep_info_key="vep",
         extract_all_info=False,
         info_allowlist=["AC", "AF"],
+        min_ac=1,
         parquet_compression="snappy",
     )
     dtp = mod.DTP(logger=logger, datasource=ds, config=cfg)

@@ -1,3 +1,12 @@
+"""
+Gene baseline ingestion from HGNC.
+
+This DTP is intended to be the first step of the Genes pipeline:
+1) HGNC loads the canonical baseline of genes and aliases.
+2) NCBI complements only genes that are absent from HGNC.
+3) Ensembl enriches locations (start/end/strand) for loaded genes.
+"""
+
 import json
 import os
 import time  # DEBUG MODE
@@ -99,6 +108,14 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
     #                            TRANSFORM METHOD
     # -------------------------------------------------------------------------
     def transform(self, raw_dir: str, processed_dir: str):
+        """
+        Convert HGNC raw JSON into `master_data.parquet`/`master_data.csv`.
+
+        The transformed dataset keeps HGNC fields used by `load` to create:
+        - primary gene symbols/entities
+        - aliases/cross references (HGNC, Ensembl, Entrez, UCSC)
+        - HGNC status and locus metadata
+        """
 
         msg = f"🔧 Transforming the {self.data_source.name} data ..."
 
@@ -178,7 +195,22 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
     # -------------------------------------------------------------------------
     def load(self, processed_dir=None):
         """
-        TODO: CREATE DOCSTRING
+        Load HGNC as the canonical baseline for Gene entities.
+
+        Pipeline role:
+        - This step should run before `dtp_gene_ncbi` and `dtp_gene_ensembl`.
+        - It creates the first-pass gene universe in Biofilter.
+
+        What is loaded:
+        - EntityGroup "Genes" entities keyed by HGNC symbol (primary alias)
+        - aliases and cross references from HGNC payload
+        - GeneMaster records with HGNC status, chromosome and locus metadata
+        - GeneGroup memberships parsed from HGNC `gene_group`
+
+        Notes:
+        - `is_active` is inferred from HGNC status (`Approved` => active).
+        - HGNC source does not provide start/end coordinates here; those are
+          added later by Ensembl into `EntityLocation`.
         """
 
         msg = f"📥 Loading {self.data_source.name} data into the database..."

@@ -314,18 +314,6 @@ class DTP(DTPBase, EntityQueryMixin):
                             }
                         )
 
-                # if row.pfam_ids:
-                #     for pf in str(row.pfam_ids).split(";"):
-                #         link_rows.append(
-                #             {
-                #                 "source_id": source_id,
-                #                 "target_id": pf.strip(),
-                #                 "source_type": "Proteomics",
-                #                 "target_type": "pfam",
-                #                 "relation_type": "contains_domain",
-                #             }
-                #         )
-
             # Write links.csv
             links_df = pd.DataFrame(link_rows)
 
@@ -534,13 +522,6 @@ class DTP(DTPBase, EntityQueryMixin):
                     self.logger.log(msg, "WARNING")
                     continue
 
-                # # Add or Get ProteinMaster
-                # entity_id, _ = self.get_or_create_entity(
-                #     name=protein_master,
-                #     group_id=self.entity_group,
-                #     data_source_id=self.data_source.id,
-                # )
-
                 # --- ALIASES STRUCTURE ---
                 # Create a dict of Aliases
                 alias_dict = self.build_alias(row)
@@ -565,26 +546,6 @@ class DTP(DTPBase, EntityQueryMixin):
                     is_active=True,
                 )
 
-                # # Add all possible aliases for this protein
-                # possible_names = set()
-                # # Principal Name (Uniprot_name)
-                # if row.get("uniprot_name"):
-                #     possible_names.add(row["uniprot_name"].strip())
-                # # Full Name (full_name)
-                # if row.get("full_name"):
-                #     possible_names.add(row["full_name"].strip())
-                # # Secondary IDs (can be multiple, separated by "|")
-                # if row.get("secondary_ids"):
-                #     for sid in row["secondary_ids"].split("|"):
-                #         sid = sid.strip()
-                #         if sid:
-                #             possible_names.add(sid)
-                # # Record all found names
-                # for name in possible_names:
-                #     self.get_or_create_entity_name(
-                #         entity_id, name, data_source_id=self.data_source.id
-                #     )
-
                 # Add or Get EntityName
                 self.get_or_create_entity_name(
                     group_id=self.entity_group,
@@ -604,16 +565,14 @@ class DTP(DTPBase, EntityQueryMixin):
                     )  # noqa: E501
                     .first()
                 )
-                # TODO: Ajustar os campos para serem TEXT e avitar erros de array
-                location_txt = self._coerce_text(row.get("function"))
+                # TODO: Ajustar o Location para o field correto
+                location_txt = self._coerce_text(row.get("location"))
                 tissue_txt = self._coerce_text(row.get("tissue"))
 
                 if not protein_master_obj:
                     protein_master_obj = ProteinMaster(
                         protein_id=protein_master,
                         function=self.guard_description(row.get("function")),
-                        # location=row.get("location"),
-                        # tissue_expression=row.get("tissue"),
                         location=self.guard_description(location_txt),
                         tissue_expression=self.guard_description(tissue_txt),
                         pseudogene_note=self.guard_description(
@@ -692,11 +651,6 @@ class DTP(DTPBase, EntityQueryMixin):
                         if not isoform_acc:
                             continue
 
-                        # isoform_entity_id, _ = self.get_or_create_entity(
-                        #     name=isoform_acc,
-                        #     group_id=self.entity_group,
-                        #     data_source_id=self.data_source.id,
-                        # )
                         # Add or Get Entity
                         isoform_entity_id, _ = self.get_or_create_entity(
                             name=isoform_acc,

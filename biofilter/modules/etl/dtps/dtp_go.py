@@ -237,7 +237,7 @@ class DTP(DTPBase, EntityQueryMixin):
             for col in ["alt_ids", "consider", "synonyms", "xrefs"]:
                 df_terms[col] = df_terms[col].apply(
                     lambda x: (
-                        x if isinstance(x, list) else (None if pd.isna(x) else [x])
+                        x if isinstance(x, list) else (None if pd.isna(x) else [x])  # noqa E501
                     )  # noqa E501
                 )
 

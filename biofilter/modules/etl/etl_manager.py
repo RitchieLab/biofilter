@@ -14,11 +14,11 @@ from sqlalchemy.orm import Session, selectinload
 
 from biofilter.modules.db.database import Database
 from biofilter.modules.db.models import (
+    Entity,
+    EntityRelationship,
     ETLDataSource,
     ETLPackage,
     ETLSourceSystem,
-    Entity,
-    EntityRelationship,
 )
 from biofilter.modules.etl.mixins.base_dtp_turning import DBTuningMixin
 from biofilter.utils.logger import Logger
@@ -51,10 +51,11 @@ class ETLManager:
     Design:
     - One SQLAlchemy session per DataSource run (extract→transform→load).
     - ETLPackage is updated throughout the run using the same session.
-    - DTPs receive BOTH: `session` (for ORM) and `db` (for engine/dialect/mappings).
+    - DTPs receive BOTH: `session` (for ORM) and `db`
+        (for engine/dialect/mappings).
     """
 
-    def __init__(self, debug_mode: bool, db: Database, logger: Optional[Logger] = None):
+    def __init__(self, debug_mode: bool, db: Database, logger: Optional[Logger] = None):  # noqa E501
         self.debug_mode = debug_mode
         self.db = db
         self.logger = logger or Logger()
@@ -74,15 +75,15 @@ class ETLManager:
         set_read_mode: bool = True,
     ) -> tuple[bool, str]:
         """
-        Rebuild (drop/create) indexes for selected groups using DBTuningMixin specs.
-        Uses a short-lived session since this is admin-only.
+        Rebuild (drop/create) indexes for selected groups using DBTuningMixin
+        specs. Uses a short-lived session since this is admin-only.
         """
         with self.db.get_session() as session:
             tuning = DBTuningMixin()._bind_db_tuning(session, self.logger)
 
             index_catalog = {
                 "entity": tuning.get_entity_index_specs,
-                "entity_relationship": tuning.get_entity_relationship_index_specs,
+                "entity_relationship": tuning.get_entity_relationship_index_specs,  # noqa E501
                 "entity_location": tuning.get_entity_location_index_specs,
                 "gene": tuning.get_gene_index_specs,
                 "protein": tuning.get_protein_index_specs,
@@ -116,7 +117,7 @@ class ETLManager:
                 "proteins": "protein",
             }
 
-            selected = self._select_index_groups(index_group, index_catalog, aliases)
+            selected = self._select_index_groups(index_group, index_catalog, aliases)  # noqa E501
             if not selected:
                 msg = "❌ No valid index groups selected. Nothing to do."
                 self.logger.log(msg, "ERROR")
@@ -138,15 +139,14 @@ class ETLManager:
                             tuning.drop_indexes(specs)
                     except Exception as e:
                         total_warnings += 1
-                        self.logger.log(
-                            f"⚠️ Failed to drop indexes for {group_name}: {e}", "WARNING"
-                        )
+                        msg = f"⚠️ Failed to drop indexes in {group_name}: {e}"
+                        self.logger.log(msg, "WARNING")
 
                 if drop_only:
                     if set_read_mode:
                         tuning.db_read_mode()
-                    final = f"✅ Dropped indexes with {total_warnings} warning(s)."
-                    self.logger.log(final, "WARNING" if total_warnings else "INFO")
+                    final = f"✅ Dropped indexes with {total_warnings} warning(s)."  # noqa E501
+                    self.logger.log(final, "WARNING" if total_warnings else "INFO")  # noqa E501
                     return (total_warnings == 0), final
 
             # Create
@@ -157,18 +157,18 @@ class ETLManager:
                     # specs = spec_fn()  # ✅ call it
                     if not specs:
                         continue
-                    self.logger.log(f"🏗️ Creating indexes for {group_name}...", "INFO")
+                    msg = f"✅ Found {len(specs)} index specs for {group_name}."
+                    self.logger.log(msg, "INFO")
                     tuning.create_indexes(specs)
                 except Exception as e:
                     total_warnings += 1
-                    self.logger.log(
-                        f"⚠️ Failed to create indexes for {group_name}: {e}", "WARNING"
-                    )
+                    msg = f"⚠️ Failed to create indexes for {group_name}: {e}"
+                    self.logger.log(msg, "WARNING")
 
             if set_read_mode:
                 tuning.db_read_mode()
 
-            final = f"✅ Index rebuild finished with {total_warnings} warning(s)."
+            final = f"✅ Index rebuild finished with {total_warnings} warning(s)."  # noqa E501
             self.logger.log(final, "WARNING" if total_warnings else "INFO")
             return True, final
 
@@ -188,7 +188,7 @@ class ETLManager:
 
         if invalid:
             self.logger.log(
-                f"⚠️ Unknown index groups ignored: {invalid}. Valid groups: {sorted(catalog.keys())}",
+                f"⚠️ Unknown index groups ignored: {invalid}. Valid groups: {sorted(catalog.keys())}",  # noqa E501
                 "WARNING",
             )
         return selected
@@ -220,20 +220,21 @@ class ETLManager:
             data_sources = [data_sources]
 
         if not source_system and not data_sources:
-            self.logger.log(
-                "❌ No source_system or data_sources provided. Aborting.", "ERROR"
-            )
+            msg = "❌ No source_system or data_sources provided. Aborting."
+            self.logger.log(msg, "ERROR")
             return
 
         # Query DataSources in a short-lived session
         with self.db.get_session() as session:
-            ds_ids = self._resolve_datasource_ids(session, source_system, data_sources)
+            ds_ids = self._resolve_datasource_ids(session, source_system, data_sources)  # noqa E501
 
         if not ds_ids:
-            self.logger.log("⚠️ No matching active DataSources found.", "WARNING")
+            msg = "⚠️ No matching active DataSources found."
+            self.logger.log(msg, "WARNING")
             return
 
-        # Run each datasource with its OWN session (keeps package updates consistent per ds)
+        # Run each datasource with its OWN session
+        # (keeps package updates consistent per ds)
         for ds_id in ds_ids:
             with self.db.get_session() as session:
                 ds = self._load_datasource(session, ds_id)
@@ -277,7 +278,8 @@ class ETLManager:
             )
 
         if not ds_ids:
-            self.logger.log("⚠️ No matching DataSources found for update-all.", "WARNING")
+            msg = "⚠️ No matching DataSources found for update-all."
+            self.logger.log(msg, "WARNING")
             return {
                 "selected": 0,
                 "skipped": 0,
@@ -302,10 +304,8 @@ class ETLManager:
                 latest_before = self._latest_load_status(session, ds.id)
                 if latest_before in success_statuses:
                     summary["skipped"] += 1
-                    self.logger.log(
-                        f"⏭️ Skipping '{ds.name}' (latest load already {latest_before}).",
-                        "INFO",
-                    )
+                    msg = f"⏭️ Skipping '{ds.name}' (latest load already {latest_before})."  # noqa E501
+                    self.logger.log(msg, "INFO")
                     continue
 
                 summary["processed"] += 1
@@ -322,19 +322,19 @@ class ETLManager:
                 if latest_after in success_statuses:
                     summary["succeeded"] += 1
                     self.logger.log(
-                        f"✅ update-all succeeded for '{ds.name}' (load={latest_after}).",
+                        f"✅ update-all succeeded for '{ds.name}' (load={latest_after}).",  # noqa E501
                         "INFO",
                     )
 
                     if drop_files_on_success:
                         if download_path:
                             raw_base = os.path.join(
-                                str(download_path), ds.source_system.name, ds.name
+                                str(download_path), ds.source_system.name, ds.name  # noqa E501
                             )
                             self._delete_matching_files(f"{raw_base}*")
                         if processed_path:
                             proc_base = os.path.join(
-                                str(processed_path), ds.source_system.name, ds.name
+                                str(processed_path), ds.source_system.name, ds.name  # noqa E501
                             )
                             self._delete_matching_files(f"{proc_base}*")
                 else:
@@ -352,8 +352,8 @@ class ETLManager:
         self.logger.log(
             (
                 "📊 update-all summary "
-                f"(selected={summary['selected']}, skipped={summary['skipped']}, "
-                f"processed={summary['processed']}, succeeded={summary['succeeded']}, "
+                f"(selected={summary['selected']}, skipped={summary['skipped']}, "  # noqa E501
+                f"processed={summary['processed']}, succeeded={summary['succeeded']}, "  # noqa E501
                 f"failed={summary['failed']})"
             ),
             "INFO",
@@ -381,23 +381,23 @@ class ETLManager:
 
         if not source_system and not data_source:
             self.logger.log(
-                "❌ No source_system or data_source provided. Aborting restart.",
+                "❌ No source_system or data_source provided. Aborting restart.",  # noqa E501
                 "ERROR",
             )
             return False
 
         with self.db.get_session() as session:
-            ds_ids = self._resolve_datasource_ids(session, source_system, data_source)
+            ds_ids = self._resolve_datasource_ids(session, source_system, data_source)  # noqa E501
 
         if not ds_ids:
-            self.logger.log("⚠️ No matching active DataSources found.", "WARNING")
+            self.logger.log("⚠️ No matching active DataSources found.", "WARNING")  # noqa E501
             return False
 
         all_ok = True
         for ds_id in ds_ids:
             with self.db.get_session() as session:
                 ds = self._load_datasource(session, ds_id)
-                self.logger.log(f"♻️ Restarting ETL for '{ds.name}'", "INFO")
+                self.logger.log(f"♻️  Restarting ETL for '{ds.name}'", "INFO")
 
                 rollback_ok, _ = self._rollback_data_source(
                     session=session,
@@ -469,7 +469,7 @@ class ETLManager:
         if normalized_pkg_ids:
             if delete_files:
                 self.logger.log(
-                    "⚠️ delete_files ignored for package rollback (ambiguous scope).",
+                    "⚠️ delete_files ignored for package rollback (ambiguous scope).",  # noqa E501
                     "WARNING",
                 )
 
@@ -479,7 +479,7 @@ class ETLManager:
                     if not pkg:
                         all_ok = False
                         self.logger.log(
-                            f"❌ Package id={pkg_id} not found. Skipping.", "ERROR"
+                            f"❌ Package id={pkg_id} not found. Skipping.", "ERROR"  # noqa E501
                         )
                         continue
                     if str(pkg.operation_type or "").lower() == "rollback":
@@ -490,7 +490,7 @@ class ETLManager:
                         )
                         continue
 
-                    ds = self._load_datasource(session, int(pkg.data_source_id))
+                    ds = self._load_datasource(session, int(pkg.data_source_id))  # noqa E501
                     ok, _ = self._rollback_package(
                         session=session,
                         ds=ds,
@@ -508,10 +508,10 @@ class ETLManager:
             data_source = [data_source]
 
         with self.db.get_session() as session:
-            ds_ids = self._resolve_datasource_ids(session, source_system, data_source)
+            ds_ids = self._resolve_datasource_ids(session, source_system, data_source)  # noqa E501
 
         if not ds_ids:
-            self.logger.log("⚠️ No matching active DataSources found.", "WARNING")
+            self.logger.log("⚠️ No matching active DataSources found.", "WARNING")  # noqa E501
             return False
 
         for ds_id in ds_ids:
@@ -567,7 +567,7 @@ class ETLManager:
 
         return [row[0] for row in q.order_by(ETLDataSource.id.asc()).all()]
 
-    def _latest_load_status(self, session: Session, ds_id: int) -> Optional[str]:
+    def _latest_load_status(self, session: Session, ds_id: int) -> Optional[str]:  # noqa E501
         row = (
             session.query(ETLPackage.load_status)
             .filter(
@@ -609,7 +609,7 @@ class ETLManager:
         )
         return ds
 
-    def _load_package(self, session: Session, package_id: int) -> Optional[ETLPackage]:
+    def _load_package(self, session: Session, package_id: int) -> Optional[ETLPackage]:  # noqa E501
         return (
             session.query(ETLPackage)
             .filter(ETLPackage.id == int(package_id))
@@ -647,7 +647,7 @@ class ETLManager:
             )
             return pkg
         except Exception as e:
-            self.logger.log(f"❌ Error creating rollback ETLPackage: {e}", "ERROR")
+            self.logger.log(f"❌ Error creating rollback ETLPackage: {e}", "ERROR")  # noqa E501
             try:
                 session.rollback()
             except Exception:
@@ -689,20 +689,20 @@ class ETLManager:
         sample_limit: int = 20,
     ) -> dict[str, Any]:
         if target_data_source_id is None and target_package_id is None:
-            return {"entities_to_rollback": 0, "conflict_count": 0, "samples": []}
+            return {"entities_to_rollback": 0, "conflict_count": 0, "samples": []}  # noqa E501
 
         if target_package_id is not None:
             entity_filter = Entity.etl_package_id == int(target_package_id)
         else:
             entity_filter = Entity.data_source_id == int(target_data_source_id)
 
-        entity_ids_subq = session.query(Entity.id).filter(entity_filter).subquery()
+        entity_ids_subq = session.query(Entity.id).filter(entity_filter).subquery()  # noqa E501
         entity_count = int(
-            session.execute(select(func.count()).select_from(entity_ids_subq)).scalar()
+            session.execute(select(func.count()).select_from(entity_ids_subq)).scalar()  # noqa E501
             or 0
         )
         if entity_count == 0:
-            return {"entities_to_rollback": 0, "conflict_count": 0, "samples": []}
+            return {"entities_to_rollback": 0, "conflict_count": 0, "samples": []}  # noqa E501
 
         relationship_uses_target_entities = or_(
             EntityRelationship.entity_1_id.in_(select(entity_ids_subq.c.id)),
@@ -714,12 +714,12 @@ class ETLManager:
                 EntityRelationship.etl_package_id.is_(None),
                 EntityRelationship.etl_package_id != int(target_package_id),
                 EntityRelationship.data_source_id.is_(None),
-                EntityRelationship.data_source_id != int(target_data_source_id),
+                EntityRelationship.data_source_id != int(target_data_source_id),  # noqa E501
             )
         else:
             mismatch_filter = or_(
                 EntityRelationship.data_source_id.is_(None),
-                EntityRelationship.data_source_id != int(target_data_source_id),
+                EntityRelationship.data_source_id != int(target_data_source_id),  # noqa E501
             )
 
         count_stmt = (
@@ -741,8 +741,8 @@ class ETLManager:
                 EntityRelationship.id.label("relationship_id"),
                 EntityRelationship.entity_1_id.label("entity_1_id"),
                 EntityRelationship.entity_2_id.label("entity_2_id"),
-                EntityRelationship.data_source_id.label("relationship_data_source_id"),
-                EntityRelationship.etl_package_id.label("relationship_package_id"),
+                EntityRelationship.data_source_id.label("relationship_data_source_id"),  # noqa E501
+                EntityRelationship.etl_package_id.label("relationship_package_id"),  # noqa E501
             )
             .filter(relationship_uses_target_entities)
             .filter(mismatch_filter)
@@ -790,7 +790,7 @@ class ETLManager:
             msg = (
                 "❌ Rollback blocked for data source "
                 f"'{ds.name}': found {conflicts['conflict_count']} "
-                "entity_relationship rows from different package/source that use "
+                "entity_relationship rows from different package/source that use "  # noqa E501
                 "entities targeted for rollback. Rollback newer dependent loads first."  # noqa E501
             )
             self.logger.log(msg, "ERROR")
@@ -876,7 +876,7 @@ class ETLManager:
             msg = (
                 "❌ Rollback blocked for package "
                 f"id={target_package.id} ({ds.name}): found {conflicts['conflict_count']} "  # noqa E501
-                "entity_relationship rows from different package/source that use "
+                "entity_relationship rows from different package/source that use "  # noqa E501
                 "entities targeted for rollback. Rollback newer dependent loads first."  # noqa E501
             )
             self.logger.log(msg, "ERROR")
@@ -947,7 +947,7 @@ class ETLManager:
         force_steps: Sequence[str],
     ) -> None:
         self.logger.log(
-            f"🔁 Starting ETL for '{ds.name}' (source_system_id={ds.source_system_id}, data_source_id={ds.id})",
+            f"🔁 Starting ETL for '{ds.name}' (source_system_id={ds.source_system_id}, data_source_id={ds.id})",  # noqa E501
             "INFO",
         )
 
@@ -1028,7 +1028,7 @@ class ETLManager:
             session.add(pkg)
             session.commit()
             self.logger.log(
-                f"📦 Created ETLPackage ID={pkg.id} for data source '{data_source.name}'",
+                f"📦 Created ETLPackage ID={pkg.id} for data source '{data_source.name}'",  # noqa E501
                 "DEBUG",
             )
             return pkg
@@ -1116,7 +1116,7 @@ class ETLManager:
                     "hash": file_hash,
                 }
                 self.logger.log(
-                    f"✅ [Extract] Up-to-date for '{ds.name}' (hash={file_hash})",
+                    f"✅ [Extract] Up-to-date for '{ds.name}' (hash={file_hash})",  # noqa E501
                     "INFO",
                 )
             else:
@@ -1124,7 +1124,7 @@ class ETLManager:
                 pkg.extract_status = "completed"
                 pkg.stats = {"hash": file_hash}
                 self.logger.log(
-                    f"✅ [Extract] Completed for '{ds.name}' (hash={file_hash})", "INFO"
+                    f"✅ [Extract] Completed for '{ds.name}' (hash={file_hash})", "INFO"  # noqa E501
                 )
         else:
             pkg.status = "failed"
@@ -1132,7 +1132,7 @@ class ETLManager:
             pkg.stats = {"error": message, "step": "extract"}
             self.logger.log(message, "ERROR")
             self.logger.log(
-                f"⛔️ ETL halted for '{ds.name}' due to extract failure", "ERROR"
+                f"⛔️ ETL halted for '{ds.name}' due to extract failure", "ERROR"  # noqa E501
             )
 
         session.commit()
@@ -1159,7 +1159,7 @@ class ETLManager:
 
         if not last_extract:
             msg = (
-                f"⚠️ No successful extract found for '{ds.name}' — cannot run transform."
+                f"⚠️ No successful extract found for '{ds.name}' — cannot run transform."  # noqa E501
             )
             self.logger.log(msg, "WARNING")
 
@@ -1183,7 +1183,7 @@ class ETLManager:
             operation_type="transform",
             ok_statuses=["completed", "up-to-date"],
             order_field=ETLPackage.transform_end,
-            extra_filters=[ETLPackage.transform_hash == last_extract.extract_hash],
+            extra_filters=[ETLPackage.transform_hash == last_extract.extract_hash],  # noqa E501
         )
 
         if last_transform and "transform" not in force_steps:
@@ -1206,7 +1206,7 @@ class ETLManager:
             }
             session.commit()
             self.logger.log(
-                f"⚙️  [Transform] Up-to-date for '{ds.name}' (package_id={pkg.id})",
+                f"⚙️  [Transform] Up-to-date for '{ds.name}' (package_id={pkg.id})",  # noqa E501
                 "INFO",
             )
             return
@@ -1273,7 +1273,7 @@ class ETLManager:
         )
 
         if not last_transform_ok:
-            msg = f"⚠️ No successful transform found for '{ds.name}' — cannot run load."
+            msg = f"⚠️ No successful transform found for '{ds.name}' — cannot run load."  # noqa E501
             self.logger.log(msg, "WARNING")
 
             pkg = self._create_package(session, ds)
@@ -1296,7 +1296,7 @@ class ETLManager:
             operation_type="load",
             ok_statuses=["completed", "up-to-date"],
             order_field=ETLPackage.load_end,
-            extra_filters=[ETLPackage.load_hash == last_transform_ok.transform_hash],
+            extra_filters=[ETLPackage.load_hash == last_transform_ok.transform_hash],  # noqa E501
         )
 
         if last_load and "load" not in force_steps:
@@ -1319,7 +1319,7 @@ class ETLManager:
             }
             session.commit()
             self.logger.log(
-                f"🚚 [Load] Up-to-date for '{ds.name}' (package_id={pkg.id})", "INFO"
+                f"🚚 [Load] Up-to-date for '{ds.name}' (package_id={pkg.id})", "INFO"  # noqa E501
             )
             return
 
@@ -1374,12 +1374,12 @@ class ETLManager:
             try:
                 if os.path.isdir(file_path):
                     shutil.rmtree(file_path)
-                    self.logger.log(f"🧹 Deleted directory: {file_path}", "DEBUG")
+                    self.logger.log(f"🧹 Deleted directory: {file_path}", "DEBUG")  # noqa E501
                 else:
                     os.remove(file_path)
                     self.logger.log(f"🗑️ Deleted file: {file_path}", "DEBUG")
             except Exception as e:
-                self.logger.log(f"⚠️ Could not delete {file_path}: {e}", "WARNING")
+                self.logger.log(f"⚠️ Could not delete {file_path}: {e}", "WARNING")  # noqa E501
 
     def _collect_purge_candidates(self, metadata: MetaData, key_name: str):
         candidates = []
@@ -1404,7 +1404,7 @@ class ETLManager:
         candidates = self._collect_purge_candidates(metadata, "data_source_id")
 
         if not candidates:
-            self.logger.log("ℹ️ No non-ETL tables with `data_source_id` found.", "INFO")
+            self.logger.log("ℹ️ No non-ETL tables with `data_source_id` found.", "INFO")  # noqa E501
             return {}
 
         ordered = self._order_for_delete(candidates, metadata)
@@ -1424,7 +1424,7 @@ class ETLManager:
                 if cnt == 0:
                     continue
                 self.logger.log(
-                    f"🗑️  Deleting {cnt} rows from {table.name} (data_source_id={ds_id})",
+                    f"🗑️  Deleting {cnt} rows from {table.name} (data_source_id={ds_id})",  # noqa E501
                     "INFO",
                 )
 
@@ -1439,7 +1439,7 @@ class ETLManager:
 
         if commit:
             session.commit()
-        self.logger.log(f"✅ Simple purge complete for data_source_id={ds_id}.", "INFO")
+        self.logger.log(f"✅ Simple purge complete for data_source_id={ds_id}.", "INFO")  # noqa E501
         return deleted_rows_by_table
 
     def _simple_purge_by_package(
@@ -1455,7 +1455,7 @@ class ETLManager:
 
         candidates = self._collect_purge_candidates(metadata, "etl_package_id")
         if not candidates:
-            self.logger.log("ℹ️ No non-ETL tables with `etl_package_id` found.", "INFO")
+            self.logger.log("ℹ️ No non-ETL tables with `etl_package_id` found.", "INFO")  # noqa E501
             return {}
 
         ordered = self._order_for_delete(candidates, metadata)
@@ -1494,7 +1494,7 @@ class ETLManager:
 
     def _order_for_delete(self, candidates, metadata):
         cand_by_name = {t.name: t for t in candidates}
-        override = [cand_by_name[n] for n in PURGE_ORDER_OVERRIDE if n in cand_by_name]
+        override = [cand_by_name[n] for n in PURGE_ORDER_OVERRIDE if n in cand_by_name]  # noqa E501
 
         sorted_all = list(metadata.sorted_tables)
         sorted_candidates_child_first = [
@@ -1506,7 +1506,7 @@ class ETLManager:
         missing = [
             t
             for t in candidates
-            if t.name not in {x.name for x in override + sorted_candidates_child_first}
+            if t.name not in {x.name for x in override + sorted_candidates_child_first}  # noqa E501
         ]
 
         return override + sorted_candidates_child_first + missing

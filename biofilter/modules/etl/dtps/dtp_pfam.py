@@ -264,7 +264,7 @@ class DTP(DTPBase, EntityQueryMixin):
                             pfam_acc=row.pfam_acc,
                             pfam_id=row.pfam_id,
                             # description=row.description,
-                            description=self.guard_description(row.description),
+                            description=self.guard_description(row.description),  # noqa E501
                             clan_acc=row.clan_acc,
                             source_database=row.source_database,
                             type=row.type,

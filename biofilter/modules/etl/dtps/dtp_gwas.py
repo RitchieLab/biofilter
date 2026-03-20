@@ -9,12 +9,14 @@ import numpy as np
 import pandas as pd
 import requests
 from sqlalchemy import text
-from sqlalchemy.orm import joinedload
 
 from biofilter.modules.db.models import VariantGWAS, VariantGWASSNP  # noqa E501
 from biofilter.modules.etl.mixins.base_dtp import DTPBase
 from biofilter.modules.etl.mixins.entity_query_mixin import EntityQueryMixin
 from biofilter.utils.file_hash import compute_file_hash
+
+# from sqlalchemy.orm import joinedload
+
 
 """
 # 1.2.0: Replace file to new ZIP format in dez/2025
@@ -61,7 +63,7 @@ class DTP(DTPBase, EntityQueryMixin):
 
             # source_url = self.data_source.source_url
             # Donwload more files to extract data
-            base_url = "https://ftp.ebi.ac.uk/pub/databases/gwas/releases/latest/"
+            base_url = "https://ftp.ebi.ac.uk/pub/databases/gwas/releases/latest/"  # noqa E501
 
             associations_zip_name = "gwas-catalog-associations-full.zip"
             efo_tsv_name = "gwas-efo-trait-mappings.tsv"
@@ -114,7 +116,7 @@ class DTP(DTPBase, EntityQueryMixin):
             try:
                 with zipfile.ZipFile(zip_path, "r") as zf:
                     # Get first .tsv in the zip
-                    members = [m for m in zf.namelist() if m.lower().endswith(".tsv")]
+                    members = [m for m in zf.namelist() if m.lower().endswith(".tsv")]  # noqa E501
                     if not members:
                         raise RuntimeError(
                             f"No TSV file found inside {associations_zip_name}"
@@ -139,7 +141,7 @@ class DTP(DTPBase, EntityQueryMixin):
                     pass
 
             except Exception as e:
-                msg = f"❌ Failed to extract TSV from {associations_zip_name}: {e}"
+                msg = f"❌ Failed to extract TSV from {associations_zip_name}: {e}"  # noqa E501
                 self.logger.log(msg, "ERROR")
                 return False, msg, None
 
@@ -191,7 +193,7 @@ class DTP(DTPBase, EntityQueryMixin):
                 return False, msg
             dtype_map = {
                 "CHR_ID": str,
-                "CHR_POS": str,  # pode ser único valor ou lista separada por ";"
+                "CHR_POS": str,  # pode ser único valor ou lista sep por ";"
                 "SNPS": str,
                 "SNP_ID_CURRENT": str,  # idem, pode ter múltiplos
                 "RISK ALLELE FREQUENCY": str,  # pode ser número, range ou "NR"
@@ -222,7 +224,6 @@ class DTP(DTPBase, EntityQueryMixin):
             gwas_catalog["P-VALUE"] = pd.to_numeric(
                 gwas_catalog["P-VALUE"], errors="coerce"
             )
-            # gwas_catalog = gwas_catalog.rename(columns={"..": "..", "..": ".."})
 
             # --- Mapping Traits ---
             input_file = input_path / "gwas-efo-trait-mappings.tsv"
@@ -234,15 +235,6 @@ class DTP(DTPBase, EntityQueryMixin):
 
             # Padronizar URIs -> IDs curtos (EFO, MONDO, HP)
             def normalize_uri(uri: str) -> str:
-                # if pd.isna(uri):
-                #     return None
-                # if "EFO_" in uri:
-                #     return "EFO:" + uri.split("EFO_")[-1]
-                # if "MONDO_" in uri:
-                #     return "MONDO:" + uri.split("MONDO_")[-1]
-                # if "HP_" in uri:
-                #     return "HP:" + uri.split("HP_")[-1]
-                # return uri.split("/")[-1]  # fallback
                 if pd.isna(uri) or not isinstance(uri, str):
                     return ""
                 return uri.split("/")[-1].replace("_", ":").upper()
@@ -250,12 +242,12 @@ class DTP(DTPBase, EntityQueryMixin):
             gwas_trait_mapping["efo_id"] = gwas_trait_mapping["EFO URI"].map(
                 normalize_uri
             )
-            gwas_trait_mapping["parent_id"] = gwas_trait_mapping["Parent URI"].map(
+            gwas_trait_mapping["parent_id"] = gwas_trait_mapping["Parent URI"].map(  # noqa E501
                 normalize_uri
             )
 
             gwas_trait_mapping = gwas_trait_mapping[
-                ["Disease trait", "EFO term", "Parent term", "efo_id", "parent_id"]
+                ["Disease trait", "EFO term", "Parent term", "efo_id", "parent_id"]  # noqa E501
             ]
 
             # --- Aggregate mappings per Disease trait ---
@@ -409,7 +401,7 @@ class DTP(DTPBase, EntityQueryMixin):
                 self.data_source.source_system.name,
                 self.data_source.name,
             )
-            processed_file_name = os.path.join(processed_path, "master_data.parquet")
+            processed_file_name = os.path.join(processed_path, "master_data.parquet")  # noqa E501
 
             if not os.path.exists(processed_file_name):
                 msg = f"⚠️ File not found: {processed_file_name}"
@@ -441,46 +433,6 @@ class DTP(DTPBase, EntityQueryMixin):
             self.logger.log(msg, "WARNING")
             return False, msg  # ⧮ Leaving with ERROR
 
-        # def safe_float(val):
-        #     """
-        #     Convert value to float if possible, else None.
-        #     Handles NR, NA, empty strings, and invalid entries.
-        #     """
-        #     if pd.isna(val) or str(val).strip() in ["", "NR", "NA", "N/A", "nan"]:
-        #         return None
-        #     try:
-        #         return float(val)
-        #     except ValueError:
-        #         return None
-
-        # # Campos que devem virar float
-        # float_fields = ["risk_allele_frequency", "odds_ratio_beta",
-        #                 "p_value", "pvalue_mlog"]
-
-        # for field in float_fields:
-        #     if field in df.columns:
-        #         df[field] = df[field].apply(safe_float).astype("float64")
-
-        # # def flatten_list(val):
-        # #     if isinstance(val, list):
-        # #         return ";".join([str(v) for v in val if v])
-        # #     return str(val) if pd.notna(val) else None
-
-        # def flatten_list(val):
-        #     if isinstance(val, (list, np.ndarray)):
-        #         return ";".join([str(v) for v in val if v is not None and str(v) != ""])
-        #     return str(val) if pd.notna(val) and str(val) != "" else None
-
-        # # for col in ["mapped_trait", "mapped_trait_id", "parent_trait", "parent_trait_id"]:
-        # #     if col in df.columns:
-        # #         df[col] = df[col].apply(flatten_list)
-        # for col in ["mapped_trait", "mapped_trait_id", "parent_trait", "parent_trait_id"]:
-        #     if col in df.columns:
-        #         df[col] = df[col].apply(flatten_list)
-
-        # df["data_source_id"] = self.data_source.id
-        # df["etl_package_id"] = self.package.id
-
         # Helpers
         SENTINELS = {"", "NA", "N/A", "na", "null", "None", "Nan", "nan"}
 
@@ -511,27 +463,27 @@ class DTP(DTPBase, EntityQueryMixin):
             df["p_value"] = pd.to_numeric(df["p_value"], errors="coerce")
 
         if "pvalue_mlog" in df.columns:
-            df["pvalue_mlog"] = pd.to_numeric(df["pvalue_mlog"], errors="coerce")
+            df["pvalue_mlog"] = pd.to_numeric(df["pvalue_mlog"], errors="coerce")  # noqa E501
 
         # chr_pos é INTEGER no modelo
         if "chr_pos" in df.columns:
-            df["chr_pos"] = pd.to_numeric(df["chr_pos"], errors="coerce").astype(
+            df["chr_pos"] = pd.to_numeric(df["chr_pos"], errors="coerce").astype(  # noqa E501
                 "Int64"
             )  # pandas nullable int
 
         # chr_id é TEXT; normalize vazios para None
         if "chr_id" in df.columns:
             df["chr_id"] = df["chr_id"].astype(str)
-            df.loc[df["chr_id"].isin(SENTINELS) | df["chr_id"].isna(), "chr_id"] = None
+            df.loc[df["chr_id"].isin(SENTINELS) | df["chr_id"].isna(), "chr_id"] = None  # noqa E501
 
         # odds_ratio_beta é String(50) no modelo -> não converter para float
         # (se quiser, padronize para string curta)
         if "odds_ratio_beta" in df.columns:
             df["odds_ratio_beta"] = df["odds_ratio_beta"].astype(str)
-            df.loc[df["odds_ratio_beta"].isin(SENTINELS), "odds_ratio_beta"] = None
+            df.loc[df["odds_ratio_beta"].isin(SENTINELS), "odds_ratio_beta"] = None  # noqa E501
             df["odds_ratio_beta"] = df["odds_ratio_beta"].str.slice(0, 50)
 
-        # Campos textuais comuns: normalize vazios para None (sem quebrar numéricos)
+        # Campos textuais comuns: normalize vazios para None (sem quebrar numéricos)  # noqa E501
         text_cols = [
             "pubmed_id",
             "raw_trait",
@@ -585,7 +537,6 @@ class DTP(DTPBase, EntityQueryMixin):
             records = df.to_dict(orient="records")
 
             # NOTE: Keep only 255 per record (Rethink next versions)
-            # TODO: consider using explicit column lengths instead of blind 255 cut
             for r in records:
                 for k, v in r.items():
                     if isinstance(v, str) and len(v) > 255:
@@ -600,7 +551,7 @@ class DTP(DTPBase, EntityQueryMixin):
             """
 
             self.logger.log(
-                "🧹 Cleaning and rebuilding variant_gwas_snp helper table for this data source...",
+                "🧹 Cleaning and rebuilding variant_gwas_snp helper table for this data source...",  # noqa E501
                 "INFO",
             )
 
@@ -630,15 +581,13 @@ class DTP(DTPBase, EntityQueryMixin):
 
                     # Accept forms like "rs12345" (case-insensitive)
                     if not re.match(r"^[rR][sS]\d+$", token):
-                        # If needed, log in DEBUG only
-                        # self.logger.log(f"Skipping non-rs token '{token}' in snp_id='{vg.snp_id}'", "DEBUG")
                         continue
 
                     try:
                         numeric_id = int(token[2:])  # strip "rs"
                     except ValueError:
                         self.logger.log(
-                            f"⚠️ Failed to parse rs-number from '{token}' (snp_id='{vg.snp_id}')",
+                            f"⚠️ Failed to parse rs-number from '{token}' (snp_id='{vg.snp_id}')",  # noqa E501
                             "WARNING",
                         )
                         continue
@@ -669,7 +618,7 @@ class DTP(DTPBase, EntityQueryMixin):
             self.session.commit()
 
             self.logger.log(
-                f"✅ Rebuilt variant_gwas_snp: {total_snps} SNP links from {total_rows} GWAS rows "
+                f"✅ Rebuilt variant_gwas_snp: {total_snps} SNP links from {total_rows} GWAS rows "  # noqa E501
                 f"for data_source_id={self.data_source.id}",
                 "INFO",
             )

@@ -44,7 +44,8 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
     # -------------------------------------------------------------------------
     def extract(self, raw_dir: str):
         """
-        Download flat_files from ChEBI FTP (compounds.tsv.gz, chemical_data.tsv.gz).
+        Download flat_files from ChEBI FTP
+        (compounds.tsv.gz, chemical_data.tsv.gz).
         """
 
         msg = f"⬇️  Starting extraction of {self.data_source.name} data..."
@@ -116,7 +117,7 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
         # sao relacionamentos entre Chemicals e nao sera o nosso foco nesse
         # momento
 
-        msg = f"⚙️ Starting transform of {self.data_source.name}..."
+        msg = f"⚙️  Starting transform of {self.data_source.name}..."
         self.logger.log(msg, "INFO")
 
         # Check Compartibility
@@ -155,13 +156,13 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
                 msg = f"❌ Input file not found: {input_file}"
                 self.logger.log(msg, "ERROR")
                 return False, msg
-            chemical_data = pd.read_csv(input_file, sep="\t", compression="gzip")
+            chemical_data = pd.read_csv(input_file, sep="\t", compression="gzip")  # noqa E501
 
             # Join on compound_id vs CHEBI:XXX
             compounds["compound_id"] = (
                 compounds["chebi_id"].str.replace("CHEBI:", "").astype(int)
             )
-            merged = pd.merge(compounds, chemical_data, how="left", on="compound_id")
+            merged = pd.merge(compounds, chemical_data, how="left", on="compound_id")  # noqa E501
 
             status_map = {1: "active", 3: "active", 9: "active", 4: "deactive"}
 
@@ -170,16 +171,17 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
             )
 
             # --- Secondary IDs Data -
-            # NOTE: Temos o arquivo Names.tsv que podemos expandir para Alias se necessario.
+            # NOTE: Temos o arquivo Names.tsv que podemos expandir para
+            # Alias se necessario.
             input_file = input_path / "secondary_ids.tsv.gz"
             if not input_file.exists():
                 msg = f"❌ Input file not found: {input_file}"
                 self.logger.log(msg, "ERROR")
                 return False, msg
-            df_secondary = pd.read_csv(input_file, sep="\t", compression="gzip")
+            df_secondary = pd.read_csv(input_file, sep="\t", compression="gzip")  # noqa E501
             # Padronizar para CHEBI:xxxx
             df_secondary["secondary_id"] = (
-                df_secondary["secondary_id"].astype(str).apply(lambda x: f"CHEBI:{x}")
+                df_secondary["secondary_id"].astype(str).apply(lambda x: f"CHEBI:{x}")  # noqa E501
             )
             # Agrupar por compound_id
             df_secondary_grouped = (
@@ -188,10 +190,10 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
                 .reset_index()
             )
             # Merge com o merged principal
-            merged = merged.merge(df_secondary_grouped, how="left", on="compound_id")
+            merged = merged.merge(df_secondary_grouped, how="left", on="compound_id")  # noqa E501
 
             # Renomear coluna
-            merged.rename(columns={"secondary_id": "secondary_ids"}, inplace=True)
+            merged.rename(columns={"secondary_id": "secondary_ids"}, inplace=True)  # noqa E501
             merged.rename(columns={"status_id_x": "status_id"}, inplace=True)
 
             # --- Xrefs IDs Data -
@@ -204,13 +206,13 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
             df_xref = pd.read_csv(input_file, sep="\t", compression="gzip")
             # Padronizar para CHEBI:xxxx
             df_xref["chem_id"] = (
-                df_xref["compound_id"].astype(str).apply(lambda x: f"CHEBI:{x}")
+                df_xref["compound_id"].astype(str).apply(lambda x: f"CHEBI:{x}")  # noqa E501
             )
             """
-            id	    compound_id	    accession_number	type	        status_id	source_id
-            9	    3	            C06147	            MANUAL_X_REF	3	        45
-            97743	7	            663435	            REGISTRY_NUMBER	1	        33
-            97747	7	            4229885	            REGISTRY_NUMBER	1	        10
+            id	    compound_id	    accession_number	type	        status_id	source_id  # noqa E501
+            9	    3	            C06147	            MANUAL_X_REF	3	        45  # noqa E501
+            97743	7	            663435	            REGISTRY_NUMBER	1	        33  # noqa E501
+            97747	7	            4229885	            REGISTRY_NUMBER	1	        10  # noqa E501
             """
 
             # ler os Sources (no database_accession esta com o ID)
@@ -221,11 +223,11 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
                 return False, msg
             df_source = pd.read_csv(input_file, sep="\t", compression="gzip")
             """
-            id	name	                url	                                    prefix	description
-            1	Agricola	            https://europepmc.org/abstract/AGR/*	agr	
-            2	Alan Wood's Pesticides	https://bioregistry.io/pesticides:*	    pesticides	
+            id	name	                url	                                    prefix	description  # noqa E501
+            1	Agricola	            https://europepmc.org/abstract/AGR/*	agr	  # noqa E501
+            2	Alan Wood's Pesticides	https://bioregistry.io/pesticides:*	    pesticides	  # noqa E501
             """
-            # --- Merge df_xref com df_source para pegar os nomes dos bancos ---
+            # --- Merge df_xref com df_source para pegar os nomes dos bancos ---  # noqa E501
             df_xref = df_xref.merge(
                 df_source[["id", "name", "prefix"]],
                 left_on="source_id",
@@ -260,7 +262,7 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
 
             # Merge no df principal
             merged = merged.merge(
-                df_xref_grouped, how="left", left_on="chebi_id", right_on="chem_id"
+                df_xref_grouped, how="left", left_on="chebi_id", right_on="chem_id"  # noqa E501
             )
 
             # Se não houver aliases_extra, garantir lista vazia
@@ -327,8 +329,8 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
         self.check_compatibility()
 
         # VARIABLES TO LOAD PROCESS
-        if self.debug_mode:
-            start_total = time.time()
+        # if self.debug_mode:
+        #     start_total = time.time()
 
         # Setting variables
         total_chemicals = 0
@@ -369,7 +371,19 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
                 self.logger.log(msg, "ERROR")
                 return False, msg
 
-            df.fillna("", inplace=True)
+            # Avoid filling numeric columns with string values (""),
+            # which triggers pandas FutureWarning for incompatible dtypes.
+            text_cols = df.select_dtypes(include=["object", "string"]).columns
+            if len(text_cols) > 0:
+                df[text_cols] = df[text_cols].fillna("")
+            before_dedup = len(df)
+            df = df.drop_duplicates(subset=["chebi_id"], keep="first")
+            dropped = before_dedup - len(df)
+            if dropped > 0:
+                self.logger.log(
+                    f"ℹ️ Dropped {dropped} duplicate ChEBI rows before load.",
+                    "INFO",
+                )
 
         except Exception as e:
             msg = f"⚠️  Failed to try read data: {e}"
@@ -407,7 +421,7 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
 
         # Set DB and drop indexes
         try:
-            # self.db_write_mode()
+            self.db_write_mode()
             self.drop_indexes(self.get_chemical_index_specs)
             self.drop_indexes(self.get_entity_index_specs)
         except Exception as e:
@@ -422,11 +436,11 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
         # df["label"] = df["label"].fillna("")
 
         # Numeric normalization
-        numeric_fields = ["charge", "mass", "monoisotopic_mass", "structure_id"]
+        numeric_fields = ["charge", "mass", "monoisotopic_mass", "structure_id"]  # noqa E501
         # for col in numeric_fields:
         #     df[col] = pd.to_numeric(df[col], errors="coerce")
         for col in numeric_fields:
-            df[col] = pd.to_numeric(df[col], errors="coerce").replace({np.nan: None})
+            df[col] = pd.to_numeric(df[col], errors="coerce").replace({np.nan: None})  # noqa E501
 
         # Boolean normalization
         df["is_autogenerated"] = (
@@ -434,34 +448,45 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
             .astype(str)
             .str.upper()
             .replace(
-                {"TRUE": True, "FALSE": False, "NAN": None, "NONE": None, "": None}
+                {"TRUE": True, "FALSE": False, "NAN": None, "NONE": None, "": None}  # noqa E501
             )
         )
 
         try:
+            existing_chemical_ids = {
+                cid
+                for (cid,) in (
+                    self.session.query(ChemicalMaster.chemical_id)
+                    .filter(ChemicalMaster.data_source_id == self.data_source.id)  # noqa E501
+                    .all()
+                )
+            }
+
             failed_records = []
 
-            for _, row in df.iterrows():
+            for row in df.itertuples(index=False):
+                row_dict = {}
                 try:
-                    chebi_id = row["chebi_id"]
+                    row_dict = row._asdict()
+                    chebi_id = row_dict.get("chebi_id")
                     if not chebi_id:
                         continue
 
                     # --- Aliases ---
-                    alias_dict = self.build_alias(row)
+                    alias_dict = self.build_alias(row_dict)
                     is_primary_alias = next(
                         (a for a in alias_dict if a.get("is_primary")), None
                     )
-                    not_primary_alias = [a for a in alias_dict if a != is_primary_alias]
+                    not_primary_alias = [a for a in alias_dict if a != is_primary_alias]  # noqa E501
 
-                    aliases_extra = row.get("aliases_extra", [])
+                    aliases_extra = row_dict.get("aliases_extra", [])
                     if isinstance(aliases_extra, np.ndarray):
                         aliases_extra = aliases_extra.tolist()
                     if not isinstance(aliases_extra, list):
                         aliases_extra = []
 
                     for alias in aliases_extra:
-                        if alias.get("alias_value") and alias.get("xref_source"):
+                        if alias.get("alias_value") and alias.get("xref_source"):  # noqa E501
                             not_primary_alias.append(alias)
 
                     # Drop Alias Invalids
@@ -472,7 +497,7 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
                     ]
 
                     # --- Status ---
-                    status_id = row.get("status_id")
+                    status_id = row_dict.get("status_id")
                     if status_id == 4:
                         omic_status_id = status_map["deactive"].id
                         is_active_entity = False
@@ -490,6 +515,7 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
                         xref_source=is_primary_alias["xref_source"],
                         alias_norm=is_primary_alias["alias_norm"],
                         is_active=is_active_entity,
+                        auto_commit=False,
                     )
 
                     # if not _:
@@ -504,66 +530,47 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
                         is_active=is_active_entity,
                         data_source_id=self.data_source.id,
                         package_id=self.package.id,
+                        auto_commit=False,
                     )
 
                     # --- Chemical Master ---
-                    chem_master = (
-                        self.session.query(ChemicalMaster)
-                        .filter_by(
-                            chemical_id=chebi_id, data_source_id=self.data_source.id
-                        )
-                        .first()
-                    )
-                    if not chem_master:
+                    if chebi_id not in existing_chemical_ids:
                         chem_master = ChemicalMaster(
                             chemical_id=chebi_id,
                             # name=row.get("ascii_name"),
-                            name=self.guard_description(row.get("ascii_name")),
-                            definition=row.get("definition"),
+                            name=self.guard_description(
+                                row_dict.get("ascii_name")
+                            ),
+                            definition=row_dict.get("definition"),
                             # ascii_name=row.get("ascii_name"),
                             # ascii_name=None,
                             omic_status_id=omic_status_id,
-                            formula=row.get("formula"),
-                            charge=row.get("charge"),
-                            mass=row.get("mass"),
-                            monoisotopic_mass=row.get("monoisotopic_mass"),
-                            structure_id=row.get("structure_id"),
-                            is_autogenerated=row.get("is_autogenerated"),
+                            formula=row_dict.get("formula"),
+                            charge=row_dict.get("charge"),
+                            mass=row_dict.get("mass"),
+                            monoisotopic_mass=row_dict.get(
+                                "monoisotopic_mass"
+                            ),
+                            structure_id=row_dict.get("structure_id"),
+                            is_autogenerated=row_dict.get("is_autogenerated"),
                             entity_id=entity_id,
                             data_source_id=self.data_source.id,
                             etl_package_id=self.package.id,
                         )
                         self.session.add(chem_master)
-                        self.session.flush()
+                        existing_chemical_ids.add(chebi_id)
 
-                    # --- Chemical Data ---
-                    # chem_data = (
-                    #     self.session.query(ChemicalData)
-                    #     .filter_by(chemical_id=chem_master.id)
-                    #     .first()
-                    # )
-                    # if not chem_data:
-                    #     chem_data = ChemicalData(
-                    #         chemical_id=chem_master.id,
-                    #         formula=row.get("formula"),
-                    #         charge=row.get("charge"),
-                    #         mass=row.get("mass"),
-                    #         monoisotopic_mass=row.get("monoisotopic_mass"),
-                    #         structure_id=row.get("structure_id"),
-                    #         is_autogenerated=row.get("is_autogenerated"),
-                    #         data_source_id=self.data_source.id,
-                    #         etl_package_id=self.package.id,
-                    #     )
-                    #     self.session.add(chem_data)
-                    #     self.session.flush()
+                    # Single commit per row (instead of multiple commits inside
+                    # helper methods) to reduce transaction overhead.
+                    self.session.commit()
 
                     total_chemicals += 1
 
                 except Exception as inner_e:
                     self.session.rollback()
-                    failed_records.append((row.get("chebi_id"), str(inner_e)))
+                    failed_records.append((row_dict.get("chebi_id"), str(inner_e)))  # noqa E501
                     self.logger.log(
-                        f"⚠️ Skipped {row.get('chebi_id')} due to error: {inner_e}",
+                        f"⚠️ Skipped {row_dict.get('chebi_id')} due to error: {inner_e}",  # noqa E501
                         "WARNING",
                     )
 
@@ -587,7 +594,7 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
             msg = f"{total_warnings} warning to analysis in log file"
             self.logger.log(msg, "WARNING")
 
-        msg = f"📥 Total Pathways: {total_chemicals}"  # noqa E501  # noqa E501
+        msg = f"📥 Total Chemicals processed: {total_chemicals}"  # noqa E501
         self.logger.log(msg, "INFO")
 
         return True, msg

@@ -72,6 +72,24 @@ For resumable batch behavior:
 biofilter etl update-all --data-source <your_data_source>
 ```
 
+### 6. Add explain markdown for the DTP
+
+Create:
+
+- `biofilter/modules/etl/dtps_explain/dtp_<your_name>.md`
+
+You can then inspect it from CLI:
+
+```bash
+biofilter etl explain --dtp-script dtp_<your_name>
+```
+
+Or by registered data source name:
+
+```bash
+biofilter etl explain --data-source <your_data_source>
+```
+
 ## Add a New Report
 
 ### 1. Create the report module

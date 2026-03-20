@@ -1,11 +1,15 @@
 # biofilter/api/cli/groups/etl.py
 from __future__ import annotations
 
+import difflib
+from pathlib import Path
+
 import click
 import pandas as pd
 
 from biofilter.api.cli.common import local_db_uri_option, require_db_uri
 from biofilter.biofilter import Biofilter
+from biofilter.modules.db.models import ETLDataSource, ETLSourceSystem
 
 
 @click.group()
@@ -41,6 +45,68 @@ def _format_ts(value: object) -> str | None:
     if pd.isna(ts):
         return str(value)
     return ts.strftime("%Y-%m-%d %H:%M:%S")
+
+
+def _normalize_dtp_script(value: str) -> str:
+    v = str(value or "").strip().lower()
+    if v.endswith(".py"):
+        v = v[:-3]
+    return v
+
+
+def _dtp_explain_dir() -> Path:
+    return Path(__file__).resolve().parents[3] / "modules" / "etl" / "dtps_explain"
+
+
+def _available_dtp_explain_docs() -> dict[str, Path]:
+    explain_dir = _dtp_explain_dir()
+    docs: dict[str, Path] = {}
+    if not explain_dir.exists():
+        return docs
+
+    for md_path in sorted(explain_dir.glob("dtp_*.md")):
+        if md_path.is_file():
+            docs[_normalize_dtp_script(md_path.stem)] = md_path
+    return docs
+
+
+def _friendly_missing_data_source_message(
+    missing: list[str], available_data_sources: list[str]
+) -> str:
+    lines = [f"Data source not found: {', '.join(missing)}."]
+    if available_data_sources:
+        suggestions: list[str] = []
+        for item in missing:
+            matches = difflib.get_close_matches(
+                item.lower().strip(), available_data_sources, n=3, cutoff=0.45
+            )
+            suggestions.extend(matches)
+        if suggestions:
+            unique = sorted(set(suggestions))
+            lines.append(f"Did you mean: {', '.join(unique)}?")
+        lines.append(f"Available data sources: {', '.join(available_data_sources)}")
+    return "\n".join(lines)
+
+
+def _friendly_missing_dtp_doc_message(
+    missing_scripts: list[str], available_scripts: list[str], explain_dir: Path
+) -> str:
+    lines = [
+        f"DTP explain document not found for: {', '.join(missing_scripts)}.",
+        f"Expected files under: {explain_dir}",
+    ]
+    if available_scripts:
+        suggestions: list[str] = []
+        for script in missing_scripts:
+            matches = difflib.get_close_matches(
+                script, available_scripts, n=3, cutoff=0.45
+            )
+            suggestions.extend(matches)
+        if suggestions:
+            unique = sorted(set(suggestions))
+            lines.append(f"Did you mean: {', '.join(unique)}?")
+        lines.append(f"Available DTP docs: {', '.join(available_scripts)}")
+    return "\n".join(lines)
 
 
 @etl.command("update")
@@ -276,6 +342,115 @@ def status(ctx, db_uri, source_system, data_source, only_active, debug):
     out = out.sort_values(["source_system", "data_source"])
 
     click.echo(out.to_string(index=False))
+
+
+@etl.command("explain")
+@local_db_uri_option
+@click.option(
+    "--data-source",
+    "data_sources",
+    multiple=True,
+    help="Data source name from ETL registry (repeatable). Example: --data-source hgnc",
+)
+@click.option(
+    "--dtp-script",
+    "dtp_scripts",
+    multiple=True,
+    help="DTP script name (repeatable). Example: --dtp-script dtp_gene_hgnc",
+)
+@click.option(
+    "--source-system",
+    multiple=True,
+    help="Optional source-system filter when resolving --data-source.",
+)
+@click.option("--debug", is_flag=True, help="Enable debug logging.")
+@click.pass_context
+def explain(
+    ctx,
+    db_uri,
+    data_sources,
+    dtp_scripts,
+    source_system,
+    debug,
+):
+    explain_dir = _dtp_explain_dir()
+    docs_by_script = _available_dtp_explain_docs()
+
+    if source_system and not data_sources:
+        raise click.UsageError("--source-system requires --data-source.")
+
+    requested_scripts = {
+        _normalize_dtp_script(s) for s in dtp_scripts if str(s).strip()
+    }
+
+    if data_sources:
+        db_uri = require_db_uri(ctx, local_db_uri=db_uri)
+        bf = Biofilter(db_uri=db_uri, debug_mode=debug)
+        bf.db.connect()
+
+        with bf.core.require_db().get_session() as session:
+            q = session.query(ETLDataSource.name, ETLDataSource.dtp_script).join(
+                ETLSourceSystem,
+                ETLDataSource.source_system_id == ETLSourceSystem.id,
+            )
+            if source_system:
+                q = q.filter(ETLSourceSystem.name.in_(list(source_system)))
+
+            rows = q.all()
+
+        ds_to_script = {
+            str(name).strip().lower(): _normalize_dtp_script(script)
+            for name, script in rows
+            if str(name or "").strip()
+        }
+        available_data_sources = sorted(ds_to_script.keys())
+
+        missing_data_sources = []
+        for ds in data_sources:
+            key = str(ds).strip().lower()
+            script = ds_to_script.get(key)
+            if not script:
+                missing_data_sources.append(ds)
+                continue
+            requested_scripts.add(script)
+
+        if missing_data_sources:
+            raise click.ClickException(
+                _friendly_missing_data_source_message(
+                    missing=missing_data_sources,
+                    available_data_sources=available_data_sources,
+                )
+            )
+
+    if not requested_scripts:
+        if not docs_by_script:
+            raise click.ClickException(
+                f"No DTP explain documents found under: {explain_dir}"
+            )
+        click.echo("📘 Available DTP explain documents:\n")
+        for script_name, path in sorted(docs_by_script.items()):
+            click.echo(f"- {script_name} ({path.name})")
+        click.echo(
+            "\nUse `biofilter etl explain --data-source <name>` "
+            "or `--dtp-script <script>`."
+        )
+        return
+
+    missing_scripts = sorted(s for s in requested_scripts if s not in docs_by_script)
+    if missing_scripts:
+        raise click.ClickException(
+            _friendly_missing_dtp_doc_message(
+                missing_scripts=missing_scripts,
+                available_scripts=sorted(docs_by_script.keys()),
+                explain_dir=explain_dir,
+            )
+        )
+
+    for i, script_name in enumerate(sorted(requested_scripts)):
+        doc_text = docs_by_script[script_name].read_text(encoding="utf-8")
+        if i > 0:
+            click.echo("\n" + ("=" * 80) + "\n")
+        click.echo(doc_text)
 
 
 # -----------------------------------------------------------------------------

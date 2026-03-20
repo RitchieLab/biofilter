@@ -1,3 +1,12 @@
+"""
+Gene coordinate enrichment from Ensembl GFF3.
+
+This DTP is the coordinate step in the Genes pipeline:
+1) HGNC builds the core gene catalog.
+2) NCBI complements non-HGNC genes.
+3) Ensembl maps loaded genes to genomic coordinates (build 38).
+"""
+
 import gzip
 import os
 from pathlib import Path
@@ -73,8 +82,9 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
     # -------------------------------------------------------------------------
     def extract(self, raw_dir: str):
         """
-        Download data from the HGNC API and stores it locally.
-        Also computes a file hash to track content versioning.
+        Download the Ensembl human GFF3 file and store it in raw staging.
+
+        The downloaded file hash is returned for ETL package tracking.
         """
 
         msg = f"⬇️  Starting extraction of {self.data_source.name} data..."
@@ -131,6 +141,15 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
     #                            TRANSFORM METHOD
     # -------------------------------------------------------------------------
     def transform(self, raw_dir: str, processed_dir: str):
+        """
+        Parse Ensembl GFF3 and export gene-level rows to `master_data`.
+
+        Transform behavior:
+        - reads gzipped GFF3 rows
+        - keeps records whose attributes contain `ID=gene:...`
+        - extracts gene symbol, chromosome, start/end, strand and biotype
+        - writes `master_data.parquet` (CSV in debug mode)
+        """
 
         msg = f"🔧 Transforming the {self.data_source.name} data ..."
         self.logger.log(msg, "INFO")
@@ -305,7 +324,7 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
         insert_cls = self._get_entity_location_insert_for_dialect()
 
         for start in range(0, len(records), chunk_size):
-            chunk = records[start : start + chunk_size]
+            chunk = records[start : start + chunk_size]  # noqa E501
 
             stmt = insert_cls.values(chunk)
 
@@ -330,31 +349,27 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
 
         self.session.flush()
 
-        #     result = self.session.execute(stmt)
-        #     # Nem todo backend retorna rowcount separado por insert/update,
-        #     # então por simplicidade marcamos tudo como "created/updated"
-        #     # ou você pode apenas somar no created.
-        #     updated = result.rowcount or 0
-        # else:
-        #     # Sem suporte nativo a ON CONFLICT:
-        #     # fallback = tentar um MERGE manual em Python ou aceitar inserts simples.
-        #     # Aqui vamos só tentar inserts "cegos".
-        #     result = self.session.execute(stmt)
-        #     created = result.rowcount or 0
-
-        # return created, updated
-
     # -------------------------------------------------------------------------
     #                            LOAD METHOD
     # -------------------------------------------------------------------------
     def load(self, processed_dir=None):
         """
-        Load Ensembl gene coordinates into EntityLocation.
+        Load Ensembl coordinates into `EntityLocation` for gene entities.
 
-        For each Ensembl gene row:
-        - Resolve the corresponding GeneMaster by (symbol, chromosome)
-        - Use its entity_id to create/update an EntityLocation row
-        for GRCh38 (assembly-aware, generic for non-variant entities).
+        Pipeline role:
+        - This step should run after `dtp_gene_hgnc` and `dtp_gene_ncbi`,
+          because it depends on pre-existing `GeneMaster` rows.
+
+        Matching and load strategy:
+        - reads transformed Ensembl rows from `master_data.parquet`
+        - resolves genes by `(gene_symbol.upper(), chromosome)` against
+          existing `GeneMaster`
+        - maps chromosome labels (1..22, X, Y, MT) into internal integers
+        - upserts by `(entity_id, assembly_id)` into `EntityLocation`
+          for assembly `GRCh38.p14`
+
+        Rows that cannot be matched or mapped are skipped with warnings/debug
+        logs, preserving pipeline continuity.
         """
 
         msg = f"📥 Loading {self.data_source.name} data into the database..."
@@ -416,7 +431,7 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
                 self.data_source.source_system.name,
                 self.data_source.name,
             )
-            processed_file_name = os.path.join(processed_path, "master_data.parquet")
+            processed_file_name = os.path.join(processed_path, "master_data.parquet")  # noqa E501
 
             if not os.path.exists(processed_file_name):
                 msg = f"⚠️ File not found: {processed_file_name}"
@@ -445,12 +460,12 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
             removed = initial_rows - len(df)
             if removed > 0:
                 self.logger.log(
-                    f"ℹ️ Dropped {removed} rows with missing gene_symbol/chromosome",
+                    f"ℹ️ Dropped {removed} rows with missing gene_symbol/chromosome",  # noqa E501
                     "DEBUG",
                 )
 
             if df.empty:
-                msg = "⚠️ All rows were removed after dropping invalid gene_symbol/chromosome."
+                msg = "⚠️ All rows were removed after dropping invalid gene_symbol/chromosome."  # noqa E501
                 self.logger.log(msg, "WARNING")
                 return False, msg
 
@@ -471,12 +486,12 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
             return False, msg
 
         created = 0
-        updated = 0
+        # updated = 0
         skipped = 0
 
         try:
             # ------------------------------------------------------------------
-            # 1) Build in-memory index: (symbol_upper, chromosome_raw) -> GeneMaster
+            # 1) Build in-memory index: (symbol_upper, chromosome_raw) -> GeneMaster  # noqa E501
             # ------------------------------------------------------------------
             gene_index = {}
             for g in self.session.query(GeneMaster).all():
@@ -486,7 +501,7 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
 
             if not gene_index:
                 self.logger.log(
-                    "⚠️ GeneMaster index is empty. Did you load HGNC/NCBI before Ensembl?",
+                    "⚠️ GeneMaster index is empty. Did you load HGNC/NCBI before Ensembl?",  # noqa E501
                     "WARNING",
                 )
 
@@ -518,7 +533,7 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
             gene_entity_group_id = gene_group.id if gene_group else None
             if not gene_group:
                 self.logger.log(
-                    "⚠️ EntityGroup 'Genes' not found; entity_group_id will be NULL",
+                    "⚠️ EntityGroup 'Genes' not found; entity_group_id will be NULL",  # noqa E501
                     "WARNING",
                 )
 
@@ -544,18 +559,18 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
                     skipped += 1
                     # Optional: verbose only in debug mode
                     self.logger.log(
-                        f"🔎 Gene not found for Ensembl row: symbol={symbol}, chrom={chrom_raw}",
+                        f"🔎 Gene not found for Ensembl row: symbol={symbol}, chrom={chrom_raw}",  # noqa E501
                         "DEBUG",
                     )
                     continue
 
                 # Map chromosome string -> integer (1..25)
-                # Implement or reuse your helper (e.g. 'X'->23, 'Y'->24, 'MT'->25)
+                # Implement or reuse your helper (e.g. 'X'->23, 'Y'->24, 'MT'->25)  # noqa E501
                 chrom_int = self._map_chrom_to_int(chrom_raw)
                 if chrom_int is None:
                     skipped += 1
                     self.logger.log(
-                        f"⚠️ Could not map chromosome '{chrom_raw}' to integer for gene {symbol}",
+                        f"⚠️ Could not map chromosome '{chrom_raw}' to integer for gene {symbol}",  # noqa E501
                         "WARNING",
                     )
                     continue
@@ -564,7 +579,7 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
                 if not assembly:
                     skipped += 1
                     self.logger.log(
-                        f"⚠️ No GenomeAssembly found for GRCh38.p14, chrom={chrom_int}",
+                        f"⚠️ No GenomeAssembly found for GRCh38.p14, chrom={chrom_int}",  # noqa E501
                         "WARNING",
                     )
                     continue
@@ -575,7 +590,7 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
                     loc_key = (gene.entity_id, assembly.id)
                     if loc_key in seen_keys:
                         self.logger.log(
-                            f"⚠️ Duplicate location for gene {symbol}, chrom={chrom_raw}: "
+                            f"⚠️ Duplicate location for gene {symbol}, chrom={chrom_raw}: "  # noqa E501
                             f"start={row.get('start')}, end={row.get('end')}",
                             "WARNING",
                         )
@@ -586,7 +601,7 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
                 except Exception:
                     skipped += 1
                     self.logger.log(
-                        f"⚠️ Invalid start/end for gene {symbol}, chrom={chrom_raw}: "
+                        f"⚠️ Invalid start/end for gene {symbol}, chrom={chrom_raw}: "  # noqa E501
                         f"start={row.get('start')}, end={row.get('end')}",
                         "WARNING",
                     )
@@ -636,169 +651,3 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
         )
         self.logger.log(msg, "INFO")
         return True, msg
-
-        # def load(self, processed_dir=None):
-        #     """
-        #     TODO: CREATE DOCSTRING
-        #     """
-
-        #     msg = f"📥 Loading {self.data_source.name} data into the database..."
-
-        #     self.logger.log(
-        #         msg,
-        #         "INFO",
-        #     )
-
-        #     # CHECK COMPARTIBILITY
-        #     self.check_compatibility()
-
-        #     created = 0
-        #     updated = 0
-        #     skipped = 0
-
-        # # READ PROCESSED DATA TO LOAD
-        # try:
-        #     # Check if processed dir was set
-        #     if not processed_dir:
-        #         msg = "⚠️  processed_dir MUST be provided."
-        #         self.logger.log(msg, "ERROR")
-        #         return False, msg  # ⧮ Leaving with ERROR
-
-        #     processed_path = os.path.join(
-        #         processed_dir,
-        #         self.data_source.source_system.name,
-        #         self.data_source.name,
-        #     )
-
-        #     # Setting files names
-        #     processed_file_name = processed_path + "/master_data.parquet"
-
-        #     # Read Processed Gene Master Data
-        #     if not os.path.exists(processed_file_name):
-        #         msg = f"⚠️  File not found: {processed_file_name}"
-        #         self.logger.log(msg, "ERROR")
-        #         return False, msg  # ⧮ Leaving with ERROR
-        #     df = pd.read_parquet(processed_file_name, engine="pyarrow")
-
-        #     required_columns = {
-        #         "gene_symbol",
-        #         "chromosome",
-        #         "start",
-        #         "end",
-        #         "strand",
-        #     }  # noqa E501
-        #     missing = required_columns - set(df.columns)
-        #     if missing:
-        #         msg = f"❌ Missing columns in DataFrame: {missing}"
-        #         self.logger.log(msg, "ERROR")
-        #         return False, msg
-
-        #     # Drop rows without gene symbol (or empty strings)
-        #     initial_rows = len(df)
-        #     df = df.dropna(subset=["gene_symbol"])
-        #     df = df[df["gene_symbol"].str.strip() != ""]
-        #     removed = initial_rows - len(df)
-        #     if removed > 0:
-        #         self.logger.log(
-        #             f"ℹ️ Dropped {removed} rows with missing gene_symbol", "DEBUG"  # noqa E501
-        #         )  # noqa E501
-
-        #     if df.empty:
-        #         msg = "⚠️ All rows were removed after dropping missing gene_symbol."  # noqa E501
-        #         self.logger.log(msg, "WARNING")
-        #         return False, msg
-
-        # except Exception as e:
-        #     msg = f"⚠️  Failed to try read data: {e}"
-        #     self.logger.log(msg, "ERROR")
-        #     return False, msg  # ⧮ Leaving with ERROR
-
-        # # SET DB AND DROP INDEXES
-        # try:
-        #     self.db_write_mode()
-        #     # self.drop_indexes(self.get_gene_index_specs)
-        #     # self.drop_indexes(self.get_entity_index_specs)
-        # except Exception as e:
-        #     msg = f"⚠️  Failed to switch DB to write mode or drop indexes: {e}"
-        #     self.logger.log(msg, "WARNING")
-        #     return False, msg  # ⧮ Leaving with ERROR
-
-        # try:
-
-        #     # Load once the gene index to avoid repeated queries
-        #     # gene_index = {
-        #     #     (g.symbol, g.chromosome): g
-        #     #     for g in self.session.query(GeneMaster).all()
-        #     # }
-        #     gene_index = {
-        #         (g.symbol.upper(), g.chromosome): g
-        #         for g in self.session.query(GeneMaster).all()
-        #     }
-
-        #     # NTERACTION WITH EACH MASTER DATA ROW
-        #     # Row = Ensembl Gene (Process only Genes with Symbols)
-        #     for _, row in df.iterrows():
-
-        #         # key = (row["gene_symbol"], row["chromosome"])
-        #         key = (row["gene_symbol"].upper(), row["chromosome"])
-        #         gene = gene_index.get(key)
-
-        #         if not gene:
-        #             self.logger.log(f"⚠️ Gene not found: {key}", "WARNING")
-        #             skipped += 1
-        #             continue
-
-        #         # Check if location already exists
-        #         location = (
-        #             self.session.query(GeneLocation)
-        #             .filter_by(gene_id=gene.id, assembly="GRCh38")
-        #             .first()
-        #         )
-
-        #         if location:
-        #             # Update
-        #             location.start_pos = row["start"]
-        #             location.end_pos = row["end"]
-        #             location.strand = row["strand"]
-        #             location.chromosome = row["chromosome"]
-        #             # Keep first Data Source and Package for now
-        #             updated += 1
-        #         else:
-        #             # Create
-        #             location = GeneLocation(
-        #                 gene_id=gene.id,
-        #                 assembly="GRCh38",
-        #                 start_pos=row["start"],
-        #                 end_pos=row["end"],
-        #                 strand=row["strand"],
-        #                 chromosome=row["chromosome"],
-        #                 region_id=None,
-        #                 data_source_id=self.data_source.id,
-        #                 etl_package_id=self.package.id,
-        #             )
-        #             self.session.add(location)
-        #             created += 1
-
-        #     self.session.commit()
-
-        # except Exception as e:
-        #     self.session.rollback()
-        #     msg = f"❌ Error during loading GeneLocation: {e}"
-        #     self.logger.log(msg, "ERROR")
-        #     return False, msg
-
-        # # Set DB to Read Mode and Create Index
-        # try:
-        #     # self.create_indexes(self.get_gene_index_specs)
-        #     # self.create_indexes(self.get_entity_index_specs)
-        #     self.db_read_mode()
-        # except Exception as e:
-        #     msg = f"⚠️  Failed to switch DB to read mode or create indexes: {e}"  # noqa E501
-        #     self.logger.log(msg, "WARNING")
-        #     return False, msg  # ⧮ Leaving with ERROR
-
-        # #  ---> LOAD FINISHED WITH SUCCESS
-        # msg = f"✅ GeneLocation loaded: {created} created, {updated} updated, {skipped} skipped"  # noqa E501
-        # self.logger.log(msg, "INFO")
-
-        # return True, msg

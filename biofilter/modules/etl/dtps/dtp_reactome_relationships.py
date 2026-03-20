@@ -222,13 +222,6 @@ class DTP(DTPBase, EntityQueryMixin):
                 ]
             )
 
-            # USE THIS IF YOU WANT TO KEEP THE OLD RELATIONSHIP TYPE
-            # df["relationship_type_id"] = df["relation_type"].apply(
-            #     lambda x: relationship_type_map["part_of"]
-            #     if x == "pathway_parent"
-            #     else relationship_type_map["in_pathway"]
-            # )
-
             # Load only valid relationships and save invalid ones in file
             df_valid = df[
                 df["entity_1_id"].notnull() & df["entity_2_id"].notnull()
@@ -316,10 +309,6 @@ class DTP(DTPBase, EntityQueryMixin):
                     processed_path / "relationship_data_not_loaded.csv"
                 )  # noqa E501
                 df_not_loaded.to_csv(not_loaded_path, index=False)
-
-            # msg = f"✅ Relations loaded: {len(df_valid)} | Not found: {len(df_not_loaded)}"  # noqa: E501
-            # self.logger.log(msg, "INFO")
-            # return len(df_valid), True, msg
 
         except Exception as e:
             msg = f"❌ ETL load_relations failed: {str(e)}"
