@@ -50,7 +50,7 @@ class DTP(DTPBase, EntityQueryMixin):
         'uniprot' data source instead.
         """
         msg = (
-            f"🔄 The data source '{self.data_source.name}' is for relationships only. "  # noqa E501
+            f"⚠️  The data source '{self.data_source.name}' is for relationships only. "  # noqa E501
             "Use the 'uniprot' data source to extract raw data."
         )
         self.logger.log(msg, "INFO")
@@ -66,7 +66,7 @@ class DTP(DTPBase, EntityQueryMixin):
         use the 'uniprot' data source instead.
         """
         msg = (
-            f"⚠️ The data source '{self.data_source.name}' is for relationships only. "  # noqa E501
+            f"⚠️  The data source '{self.data_source.name}' is for relationships only. "  # noqa E501
             "Transformation should be done through the 'uniprot' data source."
         )
         self.logger.log(msg, "INFO")

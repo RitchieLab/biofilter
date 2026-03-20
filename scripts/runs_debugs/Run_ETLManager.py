@@ -86,12 +86,12 @@ data_sources_to_process = [
     # DISEASE
     # -------
     # "mondo",
-    # "clingen",
+    "clingen",
     # "omim",
 
     # CHEMICAL
     # --------
-    "chebi",
+    # "chebi",
 
     # RelationShips
     # -------------
@@ -102,9 +102,9 @@ data_sources_to_process = [
 ]
 
 run_steps = [
-    # "extract",
-    # "transform",
-    "load",
+    "extract",
+    "transform",
+    # "load",
     # "all"
 ]  # noqa E501
 

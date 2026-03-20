@@ -35,6 +35,7 @@ notebook = "^7.4.6"
 duckdb = "^1.4.0"
 rapidfuzz = "^3.14.3"
 cyvcf2 = "^0.31.4"
+matplotlib = "^3.10.8"
 
 [tool.poetry.group.dev.dependencies]
 black = "^24.10.0"

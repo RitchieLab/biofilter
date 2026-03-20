@@ -9,6 +9,7 @@ from .report_protein_master_annotation import ProteinMasterAnnotationReport
 from .report_disease_master_annotation import DiseaseMasterAnnotationReport
 from .report_go_master_annotation import GOMasterAnnotationReport
 from .report_chemical_master_annotation import ChemicalMasterAnnotationReport
+from .report_platform_data_statistics import PlatformDataStatisticsReport
 
 
 __all__ = [
@@ -24,4 +25,5 @@ __all__ = [
     "DiseaseMasterAnnotationReport",
     "GOMasterAnnotationReport",
     "ChemicalMasterAnnotationReport",
+    "PlatformDataStatisticsReport",
 ]
