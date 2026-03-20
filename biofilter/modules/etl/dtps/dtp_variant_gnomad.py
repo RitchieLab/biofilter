@@ -1970,10 +1970,13 @@ class DTP(DTPBase):
                     )
                     load_chrom = int(chrom_probe.iloc[0][probe_col])
 
-                self._truncate_postgres_variant_partitions(conn, load_chrom)
+                # NOTE: Disable to permit incremental loading of multiple
+                # chromosomes in the future
+                # self._truncate_postgres_variant_partitions(conn, load_chrom)
+
                 self.logger.log(
                     (
-                        "🧹 Truncated PostgreSQL partitions "
+                        "🧹 Truncated PostgreSQL partitions disabled"
                         f"variant_masters_chr_{load_chrom} and "
                         f"variant_molecular_effects_chr_{load_chrom}"
                     ),
