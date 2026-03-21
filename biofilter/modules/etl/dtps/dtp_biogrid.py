@@ -80,7 +80,7 @@ class DTP(DTPBase):
 
             response = requests.get(source_url, stream=True)
             if response.status_code != 200:
-                msg = f"❌ Failed to fetch data from Ensembl: {response.status_code}"  # noqa E501
+                msg = f"❌ Failed to fetch data from BioGRID: {response.status_code}"  # noqa E501
                 self.logger.log(msg, "ERROR")
                 return False, msg, None
 
@@ -164,28 +164,20 @@ class DTP(DTPBase):
             msg = "Reading BioGRID MITAB file..."
             self.logger.log(msg, "DEBUG")
 
-            # Open the ZIP and locate the MITAB file inside
-            with zipfile.ZipFile(input_file, "r") as z:
-                inner_files = [f for f in z.namelist() if f.endswith(".mitab.txt")]
-                if not inner_files:
-                    msg = "❌ No MITAB file found inside the ZIP archive."
-                    # self.logger.log(msg, "ERROR")
-                    return False, msg
-
-                mitab_name = inner_files[0]
-                with z.open(mitab_name) as f:
-                    df = pd.read_csv(f, sep="\t", low_memory=False)
-
-            msg = f"✅ Loaded MITAB file with {len(df)} rows"
-            self.logger.log(msg, "DEBUG")
-
-            # Keep only Homo sapiens
-            df = df[
-                (df["Taxid Interactor A"] == "taxid:9606")
-                & (df["Taxid Interactor B"] == "taxid:9606")
-            ].copy()
-            msg = f"🧬 Filtered for Homo sapiens (taxid:9606) → {len(df)} interactions"
-            self.logger.log(msg, "DEBUG")
+            required_columns = [
+                "Alt IDs Interactor A",
+                "Alt IDs Interactor B",
+                "Interaction Identifiers",
+                "Interaction Detection Method",
+                "Interaction Types",
+                "Taxid Interactor A",
+                "Taxid Interactor B",
+            ]
+            idx_alt_a = 0
+            idx_alt_b = 1
+            idx_interaction_id = 2
+            idx_interaction_method = 3
+            idx_interaction_type = 4
 
             # Internal Functions to transform row
             def _extract_ids(field, prefix):
@@ -202,32 +194,28 @@ class DTP(DTPBase):
                 relations = []
 
                 # Core identifiers
-                gene_a = _extract_ids(
-                    row["Alt IDs Interactor A"], "entrez gene/locuslink"
+                alt_ids_a = row[idx_alt_a]
+                alt_ids_b = row[idx_alt_b]
+                gene_a = _extract_ids(alt_ids_a, "entrez gene/locuslink")
+                gene_b = _extract_ids(alt_ids_b, "entrez gene/locuslink")
+                prot_a = _extract_ids(alt_ids_a, "uniprot")
+                prot_b = _extract_ids(alt_ids_b, "uniprot")
+                chem_a = _extract_ids(alt_ids_a, "chebi") + _extract_ids(
+                    alt_ids_a, "pubchem"
                 )
-                gene_b = _extract_ids(
-                    row["Alt IDs Interactor B"], "entrez gene/locuslink"
+                chem_b = _extract_ids(alt_ids_b, "chebi") + _extract_ids(
+                    alt_ids_b, "pubchem"
                 )
-                prot_a = _extract_ids(row["Alt IDs Interactor A"], "uniprot")
-                prot_b = _extract_ids(row["Alt IDs Interactor B"], "uniprot")
-                chem_a = _extract_ids(
-                    row["Alt IDs Interactor A"], "chebi"
-                ) + _extract_ids(row["Alt IDs Interactor A"], "pubchem")
-                chem_b = _extract_ids(
-                    row["Alt IDs Interactor B"], "chebi"
-                ) + _extract_ids(row["Alt IDs Interactor B"], "pubchem")
 
                 # Metadata
-                interaction_id = str(row.get("Interaction Identifiers", "")).split("|")[
-                    0
-                ]
+                interaction_id = str(row[idx_interaction_id]).split("|")[0]
                 interaction_method = (
-                    str(row.get("Interaction Detection Method", ""))
+                    str(row[idx_interaction_method])
                     .split("(")[-1]
                     .replace(")", "")
                 )
                 interaction_type = (
-                    str(row.get("Interaction Types", ""))
+                    str(row[idx_interaction_type])
                     .split("(")[-1]
                     .replace(")", "")
                 )
@@ -352,10 +340,45 @@ class DTP(DTPBase):
 
                 return relations
 
-            # Expand rows
+            # Open the ZIP and locate the MITAB file inside
+            total_rows = 0
+            total_human_interactions = 0
             expanded = []
-            for _, row in df.iterrows():
-                expanded.extend(_parse_biogrid_line(row))
+            with zipfile.ZipFile(input_file, "r") as z:
+                inner_files = [f for f in z.namelist() if f.endswith(".mitab.txt")]
+                if not inner_files:
+                    msg = "❌ No MITAB file found inside the ZIP archive."
+                    return False, msg
+
+                mitab_name = inner_files[0]
+                with z.open(mitab_name) as f:
+                    chunks = pd.read_csv(
+                        f,
+                        sep="\t",
+                        low_memory=False,
+                        usecols=required_columns,
+                        chunksize=100_000,
+                    )
+                    for chunk in chunks:
+                        total_rows += len(chunk)
+                        chunk = chunk[
+                            (chunk["Taxid Interactor A"] == "taxid:9606")
+                            & (chunk["Taxid Interactor B"] == "taxid:9606")
+                        ]
+                        total_human_interactions += len(chunk)
+                        # Keep tuple position aligned with required_columns order.
+                        for row in chunk[required_columns].itertuples(
+                            index=False, name=None
+                        ):
+                            expanded.extend(_parse_biogrid_line(row))
+
+            msg = f"✅ Loaded MITAB file with {total_rows} rows"
+            self.logger.log(msg, "DEBUG")
+            msg = (
+                "🧬 Filtered for Homo sapiens (taxid:9606) → "
+                f"{total_human_interactions} interactions"
+            )
+            self.logger.log(msg, "DEBUG")
 
             # Convert to DataFrame
             df_expanded = pd.DataFrame(
@@ -387,7 +410,10 @@ class DTP(DTPBase):
                 )  # noqa E501
                 self.logger.log(msg, "DEBUG")
 
-            msg = f"Transform completed successfully with {len(df)} interactions."
+            msg = (
+                "Transform completed successfully with "
+                f"{total_human_interactions} interactions."
+            )
             self.logger.log(msg, "INFO")
             return True, msg
 
@@ -496,6 +522,8 @@ class DTP(DTPBase):
             df_gene_map = pd.DataFrame(
                 gene_aliases, columns=["alias_value", "entity_id"]
             )
+            df_gene_map["group_name"] = "Genes"
+            df_gene_map["source_name"] = "ENTREZ"
         except Exception as e:
             msg = f"⚠️  Failed to map Genes Entity data: {e}"
             self.logger.log(msg, "DEBUG")
@@ -518,6 +546,8 @@ class DTP(DTPBase):
             df_protein_map = pd.DataFrame(
                 protein_aliases, columns=["alias_value", "entity_id"]
             )
+            df_protein_map["group_name"] = "Proteins"
+            df_protein_map["source_name"] = "UNIPROT"
         except Exception as e:
             msg = f"⚠️  Failed to map Proteins Entity data: {e}"
             self.logger.log(msg, "DEBUG")
@@ -527,7 +557,7 @@ class DTP(DTPBase):
         try:
             chems = (
                 df.loc[df["group_a"].eq("Chemicals"), "value_a"].unique().tolist()
-                + df.loc[df["group_b"].eq("Chemicas"), "value_b"].unique().tolist()
+                + df.loc[df["group_b"].eq("Chemicals"), "value_b"].unique().tolist()
             )
             chem_aliases = (
                 self.session.query(EntityAlias.alias_value, EntityAlias.entity_id)
@@ -539,6 +569,8 @@ class DTP(DTPBase):
             df_chem_map = pd.DataFrame(
                 chem_aliases, columns=["alias_value", "entity_id"]
             )
+            df_chem_map["group_name"] = "Chemicals"
+            df_chem_map["source_name"] = "CHEBI"
         except Exception as e:
             msg = f"⚠️  Failed to map Chemicals Entity data: {e}"
             self.logger.log(msg, "DEBUG")
@@ -547,10 +579,15 @@ class DTP(DTPBase):
         # 2.4 Merge all Entities IDs
         map_dict = {}
         for d in [df_gene_map, df_protein_map, df_chem_map]:
-            for _, row in d.iterrows():
-                map_dict[row.alias_value] = row.entity_id
-        df["entity_1_id"] = df["value_a"].map(map_dict)
-        df["entity_2_id"] = df["value_b"].map(map_dict)
+            for row in d.itertuples(index=False):
+                map_dict[(row.group_name, row.source_name, row.alias_value)] = (
+                    row.entity_id
+                )
+        df["key_a"] = list(zip(df["group_a"], df["source_a"], df["value_a"]))
+        df["key_b"] = list(zip(df["group_b"], df["source_b"], df["value_b"]))
+        df["entity_1_id"] = df["key_a"].map(map_dict)
+        df["entity_2_id"] = df["key_b"].map(map_dict)
+        df.drop(columns=["key_a", "key_b"], inplace=True)
 
         # 3. Map Relationship Type ID
         # TODO: Improve Relation types
@@ -559,6 +596,10 @@ class DTP(DTPBase):
             .filter_by(code="interacts_with")
             .first()
         )
+        if rel_type is None:
+            msg = "⚠️  Relationship type 'interacts_with' not found."
+            self.logger.log(msg, "ERROR")
+            return False, msg
 
         # ----= CLEAN DATA =----
         # Slitting in two dfs (to load and with missing ID to check)
@@ -569,8 +610,6 @@ class DTP(DTPBase):
             # Covert to INT after filter pd.NAN
             df_resolved["entity_1_id"] = df_resolved["entity_1_id"].astype(int)
             df_resolved["entity_2_id"] = df_resolved["entity_2_id"].astype(int)
-            df_missing["entity_1_id"] = df_resolved["entity_1_id"].astype(int)
-            df_missing["entity_2_id"] = df_resolved["entity_2_id"].astype(int)
 
             # Save records without Master Data / Entity
             missing_file = processed_path + "/biogrid_missing_aliases.csv"
@@ -639,6 +678,7 @@ class DTP(DTPBase):
         # Create Bulk
         chunk_size = 10_000  # 🔧 ajuste conforme o desempenho do servidor
         total = len(df_new)
+        insert_error = None
 
         # Build relationships in chunks
         rels = []
@@ -657,30 +697,38 @@ class DTP(DTPBase):
 
             # 🚀 Quando atingir o chunk_size ou o fim
             if i % chunk_size == 0 or i == total:
+                chunk_number = ((i - 1) // chunk_size) + 1
                 try:
                     self.session.bulk_save_objects(rels, return_defaults=False)
                     self.session.commit()
+                    total_relationships += len(rels)
                     self.logger.log(
-                        f"💾 Inserted chunk {i // chunk_size + 1} ({len(rels):,} records)",
+                        f"💾 Inserted chunk {chunk_number} ({len(rels):,} records)",
                         "DEBUG",
                     )
-                    rels.clear()  # libera memória
 
                 except Exception as e:
                     self.session.rollback()
-                    self.logger.log(
-                        f"⚠️ Error inserting chunk ending at record {i:,}: {str(e)}",
-                        "ERROR",
+                    insert_error = (
+                        "⚠️ Error inserting chunk "
+                        f"{chunk_number} ending at record {i:,}: {str(e)}"
                     )
+                    self.logger.log(insert_error, "ERROR")
                     rels.clear()
-                    # continua o loop — não interrompe o processo
-                    continue
+                    break
+                rels.clear()  # libera memória
 
         # Create Index
         try:
             self.create_indexes(self.get_entity_relationship_index_specs)
         except Exception as e:
-            self.logger.log(f"⚠️ Failed to restore DB indexes: {e}", "WARNING")
+            idx_msg = f"⚠️ Failed to restore DB indexes: {e}"
+            self.logger.log(idx_msg, "WARNING")
+            if not insert_error:
+                insert_error = idx_msg
+
+        if insert_error:
+            return False, insert_error
 
         msg = f"📥 Total BioGRID Relationships: {total_relationships}"
         return True, msg

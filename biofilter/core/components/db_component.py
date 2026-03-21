@@ -28,6 +28,18 @@ class DBComponent(BaseComponent):
         if new_uri:
             self.core.db_uri = new_uri
 
+        # Idempotent fast-path:
+        # many CLI commands instantiate Biofilter (which already connects in
+        # the facade constructor) and then call bf.db.connect() again.
+        # If we are already connected and URI is unchanged, just reuse it.
+        if (
+            new_uri is None
+            and self.core.db is not None
+            and getattr(self.core.db, "connected", False)
+            and getattr(self.core.db, "engine", None) is not None
+        ):
+            return self.core.db
+
         self.core.db = Database(self.core.db_uri)
 
         return self.core.db

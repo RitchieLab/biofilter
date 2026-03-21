@@ -81,7 +81,7 @@
         {
             "source_system": "GO",
             "name": "gene_ontology",
-            "data_type": "go",
+            "data_type": "GO",
             "source_url": "https://current.geneontology.org/ontology/go-basic.obo",
             "format": "OBO",
             "grch_version": "GRCh38",
@@ -94,7 +94,7 @@
         {
             "source_system": "KEGG",
             "name": "kegg_pathways",
-            "data_type": "pathway",
+            "data_type": "Pathway",
             "source_url": "https://rest.kegg.jp/list/pathway/hsa",
             "format": "TXT",
             "grch_version": "GRCh38",
@@ -107,7 +107,7 @@
         {
             "source_system": "MONDO",
             "name": "mondo",
-            "data_type": "disease",
+            "data_type": "Disease",
             "source_url": "https://purl.obolibrary.org/obo/mondo.json",
             "format": "JSON",
             "grch_version": "",
@@ -120,7 +120,7 @@
         {
             "source_system": "EBI",
             "name": "chebi",
-            "data_type": "chemical",
+            "data_type": "Chemical",
             "source_url": "https://ftp.ebi.ac.uk/pub/databases/chebi/flat_files/compounds.tsv.gz",
             "format": "tsv",
             "grch_version": "",
@@ -133,7 +133,7 @@
         {
             "source_system": "CLINGEN",
             "name": "clingen",
-            "data_type": "disease relationships",
+            "data_type": "Disease Relationships",
             "source_url": "https://search.clinicalgenome.org/kb/gene-validity/download",
             "format": "csv",
             "grch_version": "",
@@ -146,7 +146,7 @@
         {
             "source_system": "OMIM",
             "name": "omim",
-            "data_type": "disease relationships",
+            "data_type": "Disease Relationships",
             "source_url": "https://omim.org/static/omim/data/mim2gene.txt",
             "format": "txt",
             "grch_version": "",
@@ -159,7 +159,7 @@
         {
             "source_system": "BioGRID",
             "name": "biogrid",
-            "data_type": "relationships",
+            "data_type": "Relationships",
             "source_url": "https://downloads.thebiogrid.org/Download/BioGRID/Latest-Release/BIOGRID-ALL-LATEST.mitab.zip",
             "format": "mitab",
             "grch_version": "",
@@ -185,7 +185,7 @@
         {
             "source_system": "MONDO",
             "name": "mondo_relationships",
-            "data_type": "disease",
+            "data_type": "Disease",
             "source_url": "not_applicable",
             "format": "",
             "grch_version": "",
@@ -211,7 +211,7 @@
         {
             "source_system": "EBI",
             "name": "gwas",
-            "data_type": "variant",
+            "data_type": "Variant",
             "source_url": "https://ftp.ebi.ac.uk/pub/databases/gwas/releases/latest/gwas-catalog-associations.tsv",
             "format": "tsv",
             "grch_version": "",

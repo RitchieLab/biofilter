@@ -300,15 +300,37 @@ def test_status_prints_all_data_sources_with_load_result_and_last_execution(monk
 
     fake_report.responses["etl_status"] = pd.DataFrame(
         [
-            {"source_system": "NCBI", "data_source": "hgnc"},
-            {"source_system": "NCBI", "data_source": "mondo"},
-            {"source_system": "EBI", "data_source": "ensembl"},
+            {
+                "data_source_id": 1,
+                "data_type": "Gene",
+                "source_system": "NCBI",
+                "data_source": "hgnc",
+                "data_source_active": True,
+                "data_version": "2026.1",
+            },
+            {
+                "data_source_id": 2,
+                "data_type": "Disease",
+                "source_system": "NCBI",
+                "data_source": "mondo",
+                "data_source_active": True,
+                "data_version": "2026.2",
+            },
+            {
+                "data_source_id": 3,
+                "data_type": "Gene",
+                "source_system": "EBI",
+                "data_source": "ensembl",
+                "data_source_active": False,
+                "data_version": "2026.3",
+            },
         ]
     )
     fake_report.responses["etl_packages"] = pd.DataFrame(
         [
             {
                 "package_id": 10,
+                "data_source_id": 1,
                 "source_system": "NCBI",
                 "data_source": "hgnc",
                 "operation_type": "load",
@@ -318,6 +340,7 @@ def test_status_prints_all_data_sources_with_load_result_and_last_execution(monk
             },
             {
                 "package_id": 20,
+                "data_source_id": 3,
                 "source_system": "EBI",
                 "data_source": "ensembl",
                 "operation_type": "load",
@@ -327,6 +350,7 @@ def test_status_prints_all_data_sources_with_load_result_and_last_execution(monk
             },
             {
                 "package_id": 9,
+                "data_source_id": 1,
                 "source_system": "NCBI",
                 "data_source": "hgnc",
                 "operation_type": "extract",
@@ -357,13 +381,153 @@ def test_status_prints_all_data_sources_with_load_result_and_last_execution(monk
     assert ("run", "etl_status", {"source_system": ["NCBI"], "data_sources": ["hgnc"], "only_active": False}) in fake_report.calls  # noqa E501
     assert ("run", "etl_packages", {"source_system": ["NCBI"], "data_sources": ["hgnc"], "only_active": False}) in fake_report.calls  # noqa E501
     assert "hgnc" in result.output
-    assert "success" in result.output
+    assert "loaded" in result.output
     assert "ensembl" in result.output
-    assert "fail" in result.output
+    assert "failed" in result.output
     assert "mondo" in result.output
     assert "never" in result.output
     assert "2026-03-01 10:00:00" in result.output
     assert "2026-03-02 13:30:00" in result.output
+    assert "Domain" in result.output
+    assert "active" in result.output
+    assert "data_version" in result.output
+
+
+def test_status_uses_only_latest_load_per_data_source(monkeypatch):
+    runner = CliRunner()
+    fake_db = FakeDBFacade()
+    fake_etl = FakeETLFacade()
+    fake_report = FakeReportFacade()
+    capture = {}
+    _patch_biofilter(monkeypatch, fake_db, fake_etl, fake_report, capture)
+    _patch_require_db_uri(monkeypatch, capture)
+
+    fake_report.responses["etl_status"] = pd.DataFrame(
+        [
+            {
+                "data_source_id": 1,
+                "data_type": "Gene",
+                "source_system": "NCBI",
+                "data_source": "hgnc",
+                "data_source_active": True,
+                "data_version": "2026.1",
+            },
+            {
+                "data_source_id": 1,
+                "data_type": "Gene",
+                "source_system": "NCBI",
+                "data_source": "hgnc",
+                "data_source_active": True,
+                "data_version": "2026.1",
+            },
+        ]
+    )
+    fake_report.responses["etl_packages"] = pd.DataFrame(
+        [
+            {
+                "package_id": 100,
+                "data_source_id": 1,
+                "source_system": "NCBI",
+                "data_source": "hgnc",
+                "operation_type": "load",
+                "load_status": "completed",
+                "created_at": "2026-03-10 10:00:00",
+            },
+            {
+                "package_id": 101,
+                "data_source_id": 1,
+                "source_system": "NCBI",
+                "data_source": "hgnc",
+                "operation_type": "load",
+                "load_status": "running",
+                "created_at": "2026-03-10 10:05:00",
+            },
+            {
+                "package_id": 99,
+                "data_source_id": 1,
+                "source_system": "NCBI",
+                "data_source": "hgnc",
+                "operation_type": "load",
+                "load_status": "failed",
+                "created_at": "2026-03-10 09:59:00",
+            },
+        ]
+    )
+
+    result = runner.invoke(
+        etl_cli_mod.etl,
+        [
+            "status",
+            "--db-uri",
+            "sqlite:///etl.db",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert result.output.count("hgnc") == 1
+    assert "running" in result.output
+
+
+def test_status_ignores_not_applicable_load_attempts(monkeypatch):
+    runner = CliRunner()
+    fake_db = FakeDBFacade()
+    fake_etl = FakeETLFacade()
+    fake_report = FakeReportFacade()
+    capture = {}
+    _patch_biofilter(monkeypatch, fake_db, fake_etl, fake_report, capture)
+    _patch_require_db_uri(monkeypatch, capture)
+
+    fake_report.responses["etl_status"] = pd.DataFrame(
+        [
+            {
+                "data_source_id": 1,
+                "data_type": "Gene",
+                "source_system": "NCBI",
+                "data_source": "hgnc",
+                "data_source_active": True,
+                "data_version": "2026.1",
+            }
+        ]
+    )
+    fake_report.responses["etl_packages"] = pd.DataFrame(
+        [
+            {
+                "package_id": 11,
+                "data_source_id": 1,
+                "source_system": "NCBI",
+                "data_source": "hgnc",
+                "operation_type": "load",
+                "status": "not-applicable",
+                "load_status": "not-applicable",
+                "created_at": "2026-03-10 10:10:00",
+            },
+            {
+                "package_id": 10,
+                "data_source_id": 1,
+                "source_system": "NCBI",
+                "data_source": "hgnc",
+                "operation_type": "load",
+                "status": "completed",
+                "load_status": "completed",
+                "load_end": "2026-03-10 10:00:00",
+                "created_at": "2026-03-10 10:01:00",
+            },
+        ]
+    )
+
+    result = runner.invoke(
+        etl_cli_mod.etl,
+        [
+            "status",
+            "--db-uri",
+            "sqlite:///etl.db",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert "loaded" in result.output
+    assert "2026-03-10 10:00:00" in result.output
+    assert "2026-03-10 10:10:00" not in result.output
 
 
 def test_status_handles_empty_etl_status_report(monkeypatch):

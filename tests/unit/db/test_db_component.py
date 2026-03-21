@@ -47,6 +47,28 @@ def test_connect_updates_uri_and_instantiates_database(monkeypatch):
     assert core.db is db
 
 
+def test_connect_reuses_existing_connected_db_when_no_new_uri(monkeypatch):
+    core = DummyCore()
+    component = dbcomp_mod.DBComponent(core)
+
+    class FakeDatabase:
+        instances = 0
+
+        def __init__(self, db_uri=None):
+            FakeDatabase.instances += 1
+            self.db_uri = db_uri
+            self.connected = True
+            self.engine = object()
+
+    monkeypatch.setattr(dbcomp_mod, "Database", FakeDatabase)
+
+    first = component.connect()
+    second = component.connect()
+
+    assert first is second
+    assert FakeDatabase.instances == 1
+
+
 def test_create_db_calls_database_create_db(monkeypatch):
     core = DummyCore()
     component = dbcomp_mod.DBComponent(core)

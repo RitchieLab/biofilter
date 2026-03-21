@@ -84,6 +84,7 @@ class ETLPackagesReport(ReportBase):
                     ETLPackage.id.label("package_id"),
                     ETLPackage.created_at,
                     ETLSourceSystem.name.label("source_system"),
+                    ETLDataSource.id.label("data_source_id"),
                     ETLDataSource.name.label("data_source"),
                     ETLPackage.status,
                     ETLPackage.operation_type,

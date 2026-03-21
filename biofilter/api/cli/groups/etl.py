@@ -30,10 +30,10 @@ def _classify_load_result(status: object) -> str:
     if not value:
         return "never"
     if value in {"completed", "up-to-date"}:
-        return "success"
+        return "loaded"
     if value == "failed":
-        return "fail"
-    return value
+        return "failed"
+    return "running"
 
 
 def _format_ts(value: object) -> str | None:
@@ -301,11 +301,51 @@ def status(ctx, db_uri, source_system, data_source, only_active, debug):
         click.echo("No data sources found.")
         return
 
-    base_cols = [c for c in ["source_system", "data_source"] if c in df_status.columns]
-    base = df_status[base_cols].drop_duplicates().copy()
+    status_view = df_status.copy()
+
+    if "data_version" not in status_view.columns:
+        if "dtp_version" in status_view.columns:
+            status_view["data_version"] = status_view["dtp_version"]
+        elif "schema_version" in status_view.columns:
+            status_view["data_version"] = status_view["schema_version"]
+        else:
+            status_view["data_version"] = None
+
+    if "data_source_active" not in status_view.columns:
+        status_view["data_source_active"] = None
+
+    base_cols = [
+        c
+        for c in [
+            "data_source_id",
+            "data_type",
+            "source_system",
+            "data_source",
+            "data_source_active",
+            "data_version",
+        ]
+        if c in status_view.columns
+    ]
+    base = status_view[base_cols].copy()
+    if "data_source_id" in base.columns and base["data_source_id"].notna().any():
+        base["_ds_key"] = pd.to_numeric(base["data_source_id"], errors="coerce")
+    else:
+        base["_ds_key"] = (
+            base["data_source"].astype(str).str.strip().str.lower()
+            if "data_source" in base.columns
+            else None
+        )
+
+    sort_base_cols = [c for c in ["_ds_key", "source_system", "data_source"] if c in base.columns]  # noqa E501
+    if sort_base_cols:
+        base = base.sort_values(sort_base_cols, na_position="last")
+    if "_ds_key" in base.columns:
+        base = base.drop_duplicates(subset=["_ds_key"], keep="first")
+    else:
+        base = base.drop_duplicates()
 
     df_pkg = bf.report.run("etl_packages", **report_filters)
-    latest_load = pd.DataFrame(columns=["data_source", "load_status", "last_execution"])
+    latest_load = pd.DataFrame(columns=["_ds_key", "load_status", "last_execution"])
 
     if df_pkg is not None and not df_pkg.empty:
         loads = df_pkg.copy()
@@ -317,6 +357,27 @@ def status(ctx, db_uri, source_system, data_source, only_active, debug):
             loads = loads.iloc[0:0].copy()
 
         if not loads.empty:
+            # Ignore "not-applicable" load attempts (up-to-date/no-op runs)
+            # so they do not override true latest execution/status.
+            if "status" in loads.columns:
+                loads = loads[
+                    ~loads["status"].astype(str).str.lower().eq("not-applicable")
+                ].copy()
+            if "load_status" in loads.columns:
+                loads = loads[
+                    ~loads["load_status"].astype(str).str.lower().eq("not-applicable")
+                ].copy()
+
+        if not loads.empty:
+            if "data_source_id" in loads.columns and loads["data_source_id"].notna().any():
+                loads["_ds_key"] = pd.to_numeric(loads["data_source_id"], errors="coerce")
+            else:
+                loads["_ds_key"] = (
+                    loads["data_source"].astype(str).str.strip().str.lower()
+                    if "data_source" in loads.columns
+                    else None
+                )
+
             loads["_created_at_sort"] = pd.to_datetime(
                 loads.get("created_at"), errors="coerce"
             )
@@ -324,22 +385,59 @@ def status(ctx, db_uri, source_system, data_source, only_active, debug):
                 loads.get("package_id"), errors="coerce"
             )
             loads = loads.sort_values(
-                ["data_source", "_created_at_sort", "_package_id_sort"],
+                ["_ds_key", "_created_at_sort", "_package_id_sort"],
                 ascending=[True, False, False],
+                na_position="last",
             )
-            loads_latest = loads.drop_duplicates(subset=["data_source"], keep="first")
+            loads_latest = loads.drop_duplicates(subset=["_ds_key"], keep="first")
 
-            latest_load = loads_latest[["data_source", "load_status"]].copy()
-            latest_load["last_execution"] = loads_latest["load_end"].where(
-                loads_latest["load_end"].notna(),
-                loads_latest["created_at"],
+            latest_load = loads_latest[["_ds_key", "load_status"]].copy()
+            load_end = (
+                loads_latest["load_end"]
+                if "load_end" in loads_latest.columns
+                else pd.Series([None] * len(loads_latest), index=loads_latest.index)
             )
+            created_at = (
+                loads_latest["created_at"]
+                if "created_at" in loads_latest.columns
+                else pd.Series([None] * len(loads_latest), index=loads_latest.index)
+            )
+            latest_load["last_execution"] = load_end.where(load_end.notna(), created_at)
 
-    out = base.merge(latest_load, how="left", on="data_source")
-    out["load_result"] = out["load_status"].map(_classify_load_result)
+    out = base.merge(latest_load, how="left", on="_ds_key")
+    out["status"] = out["load_status"].map(_classify_load_result)
     out["last_execution"] = out["last_execution"].map(_format_ts)
-    out = out[["source_system", "data_source", "load_result", "last_execution"]]
-    out = out.sort_values(["source_system", "data_source"])
+    out = out.rename(columns={"data_source_active": "active", "data_type": "Domain"})
+    show_cols = [
+        c
+        for c in [
+            "Domain",
+            "active",
+            "source_system",
+            "data_source",
+            "data_version",
+            "status",
+            "last_execution",
+        ]
+        if c in out.columns
+    ]
+    out = out[show_cols]
+    # Case-insensitive ordering to keep domains grouped regardless of casing.
+    if "Domain" in out.columns:
+        out["_domain_sort"] = out["Domain"].astype(str).str.casefold()
+    if "source_system" in out.columns:
+        out["_source_system_sort"] = out["source_system"].astype(str).str.casefold()
+    if "data_source" in out.columns:
+        out["_data_source_sort"] = out["data_source"].astype(str).str.casefold()
+
+    sort_cols = [
+        c
+        for c in ["_domain_sort", "_source_system_sort", "_data_source_sort"]
+        if c in out.columns
+    ]
+    if sort_cols:
+        out = out.sort_values(sort_cols, na_position="last")
+        out = out.drop(columns=sort_cols)
 
     click.echo(out.to_string(index=False))
 

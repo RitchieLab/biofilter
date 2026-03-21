@@ -23,3 +23,20 @@ Recommended sections in each file:
 - transform (input/output and filters)
 - load (target models/tables, matching keys, filters, upsert rules)
 - practical notes and known caveats
+
+Available explain docs:
+- [`dtp_biogrid.md`](dtp_biogrid.md)
+- [`dtp_clingen.md`](dtp_clingen.md)
+- [`dtp_gene_ensembl.md`](dtp_gene_ensembl.md)
+- [`dtp_gene_hgnc.md`](dtp_gene_hgnc.md)
+- [`dtp_gene_ncbi.md`](dtp_gene_ncbi.md)
+- [`dtp_go.md`](dtp_go.md)
+- [`dtp_kegg.md`](dtp_kegg.md)
+- [`dtp_mondo.md`](dtp_mondo.md)
+- [`dtp_mondo_relationships.md`](dtp_mondo_relationships.md)
+- [`dtp_pfam.md`](dtp_pfam.md)
+- [`dtp_reactome.md`](dtp_reactome.md)
+- [`dtp_reactome_relationships.md`](dtp_reactome_relationships.md)
+- [`dtp_uniprot.md`](dtp_uniprot.md)
+- [`dtp_uniprot_relationships.md`](dtp_uniprot_relationships.md)
+- [`dtp_variant_gnomad.md`](dtp_variant_gnomad.md)

@@ -178,6 +178,8 @@ class ETLStatusReport(ReportBase):
                     "data_source_id": base["data_source_id"],
                     "data_source": base["data_source"],
                     "data_type": base["data_type"],
+                    "data_source_active": base.get("data_source_active"),
+                    "data_version": base.get("data_version", base.get("dtp_version")),
                     "format": base["format"],
                     "dtp_version": base["dtp_version"],
                     "schema_version": base["schema_version"],
@@ -257,9 +259,12 @@ class ETLStatusReport(ReportBase):
         # ]
         # Optional nice ordering
         cols = [
+            "data_source_id",
             "source_system",
             "data_source",
             "data_type",
+            "data_source_active",
+            "data_version",
             "pipeline_ok",
             "extract_package_id",
             "extract_status",
