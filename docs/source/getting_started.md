@@ -36,6 +36,12 @@ Set DB URI:
 biofilter config set database.db_uri "postgresql+psycopg2://bioadmin:change_me@localhost:5432/biofilter_dev"
 ```
 
+Optional (especially in containers/CI), use environment variable instead:
+
+```bash
+export DATABASE_URL="postgresql+psycopg2://bioadmin:change_me@localhost:5432/biofilter_dev"
+```
+
 Set ETL data root:
 
 ```bash

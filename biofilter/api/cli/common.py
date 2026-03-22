@@ -1,6 +1,8 @@
 # biofilter/api/cli/common.py
 from __future__ import annotations
 
+import os
+
 import click
 
 from biofilter.utils.config import BiofilterConfig
@@ -17,11 +19,18 @@ def try_resolve_db_uri(cli_db_uri: str | None) -> str | None:
     """
     Resolve DB URI with priority:
     1) CLI --db-uri
-    2) .biofilter.toml (BiofilterConfig)
+    2) ENV DATABASE_URL / BIOFILTER_DB_URI
+    3) .biofilter.toml (BiofilterConfig)
     """
     cli_db_uri = _clean_db_uri(cli_db_uri)
     if cli_db_uri:
         return cli_db_uri
+
+    env_db_uri = _clean_db_uri(
+        os.getenv("DATABASE_URL") or os.getenv("BIOFILTER_DB_URI")
+    )
+    if env_db_uri:
+        return env_db_uri
 
     try:
         cfg = BiofilterConfig()
@@ -35,7 +44,7 @@ def resolve_db_uri(cli_db_uri: str | None) -> str:
     if db_uri:
         return db_uri
     raise click.UsageError(
-        "DB not set. Use --db-uri or define db_uri in .biofilter.toml."
+        "DB not set. Use --db-uri, DATABASE_URL, or define db_uri in .biofilter.toml."
     )
 
 
@@ -53,7 +62,8 @@ def require_db_uri(ctx: click.Context, local_db_uri: str | None = None) -> str:
     Resolve DB URI with priority:
     1) command-local --db-uri
     2) global --db-uri (ctx.obj)
-    3) config file (.biofilter.toml)
+    3) env vars (DATABASE_URL / BIOFILTER_DB_URI)
+    4) config file (.biofilter.toml)
     """
     return resolve_db_uri(_clean_db_uri(local_db_uri) or get_ctx_db_uri(ctx))
 

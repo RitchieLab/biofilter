@@ -20,7 +20,9 @@ def _version_callback(ctx, param, value):
     db_uri = try_resolve_db_uri(ctx.params.get("db_uri"))
     click.echo(f"biofilter {current_version}")
     click.echo(
-        f"DB: {db_uri}" if db_uri else "DB: <not set> (use --db-uri or .biofilter.toml)"  # noqa E501
+        f"DB: {db_uri}"
+        if db_uri
+        else "DB: <not set> (use --db-uri, DATABASE_URL or .biofilter.toml)"
     )
     ctx.exit()
 
@@ -36,7 +38,7 @@ Biofilter 4 CLI - Omics Knowledge Platform
     "--db-uri",
     required=False,
     type=click.STRING,
-    help="Database URI (or set in .biofilter.toml).",
+    help="Database URI (or set DATABASE_URL / .biofilter.toml).",
 )
 @click.option(
     "--debug",
@@ -69,7 +71,9 @@ def main(ctx, db_uri, debug):
         if resolved:
             click.echo(f"Active DB: {resolved}")
         else:
-            click.echo("Active DB: <not set> (use --db-uri or .biofilter.toml)")  # noqa E501
+            click.echo(
+                "Active DB: <not set> (use --db-uri, DATABASE_URL or .biofilter.toml)"  # noqa E501
+            )
 
 
 # Register groups

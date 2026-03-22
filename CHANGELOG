@@ -1,15 +1,34 @@
 CHANGELOG
 
 Biofilter3R Juyter VPS
-4.0.0 (Biofilter3R Juyter VPS)
-- Biofilter 4.0.0 establishes current production baseline
-- Variant model is rsID-centric / aggregated ALT alleles
-- Next release (4.1.0) introduces allele-level backbone and requires a new DB rebuild
+4.1.0 (2026-03-21)
 
-3.0.0 (2025-DEV)
- - Add news features
+- Removed the server-first stack introduced in 4.0.0 to keep a lean core that runs without a dedicated server
+- Removed KaaS (Knowledge as a Service)
+- Removed KDS/KDC catalog services from runtime
+- Removed the noSQL + Parquet Data Lake extension layer and KDC coupling
+- Removed the Search/Data Mining translation layer for filter input handling
+- Updated multiple internal components and pipelines
+- Added DTP support with NCBI Variant data
+- Added gnomAD integration with a new partitioned table layout
+- Implemented two variant data models: variant_mastes and variant_molecular_effect
 
-2.4.4 (2025-01-08)
+  4.0.0 (Biofilter3R Project)
+
+- Full system redesign with a new server-oriented architecture
+- Consolidated all project capabilities into a unified platform service
+- Introduced KaaS (Knowledge as a Service)
+- Introduced KDS/KDC (Knowledge Data Catalog) services
+- Introduced a noSQL layer with knowledge extension in Parquet (Data Lake format), supported by KDC
+- Added Search and Data Mining layers to improve filter-input translation
+
+  3.0.0 (2025)
+
+- Full rebuild of Biofilter 2.4.4 for native Python 3
+- Reconstructed the entire codebase while preserving the user-facing schema and CLI contract
+
+  2.4.4 (2025-01-08)
+
 - Reorganized code into functional packages
 - Developed unit tests
 - Added tools to support the project, such as black, phinx, poetry, pytest, and tox
@@ -17,37 +36,43 @@ Biofilter3R Juyter VPS
 - Fixed inconsistencies to ensure compatibility with Python versions 3.10 to 3.12
 - Added technical documentation for the project
 
-2.4.3 (2023-09-15)
-- updated from Python2 to Python3 
+  2.4.3 (2023-09-15)
+
+- updated from Python2 to Python3
 - updated LOKI loaders
 
-2.4.2 (2019-03-15)
+  2.4.2 (2019-03-15)
+
 - fixed a bug in PARIS which may have inflated the reported permutation significance in some cases
 - modified PARIS output report formats to reduce redundancy and simplify batch processing
 - updated LOKI loaders for dbSNP, MINT and PharmGKB
 
-2.4.1 (2017-04-17)
+  2.4.1 (2017-04-17)
+
 - fixed a bug in PARIS which included non-gene regions
 - updated LOKI loaders for dbSNP, GO and PharmGKB
 
-2.4.0 (2016-05-09)
+  2.4.0 (2016-05-09)
+
 - implemented the PARIS algorithm with the corresponding --paris output option and other related configuration options
 - added limited support for user-defined knowledge (custom gene groups) in --filter and --paris modes
 - added --allow-ambiguous-snps option to accept input SNPs with multiple known positions
 - fixed a bug in --region-match-bases with a negative value so that it correctly functions like --region-position-margin except for region-region matching
 - updated LOKI loaders for gwas and dbsnp
 
-2.3.0 (2015-12-14)
+  2.3.0 (2015-12-14)
+
 - changed default --report-genome-build option to 'yes'
 - added --grch-build-version and --ucsc-build-version options to specify the
   reference gnome build of user input; if it does not match the build used
   in the provided LOKI database, liftOver will be automatically applied
 - added --coordinate-base and --regions-half-open options to specify the
   coordinate system conventions of user input and program output
-- changed the any-namespace special tag from empty '' to '*'
+- changed the any-namespace special tag from empty '' to '\*'
 - fixed a bug in installation on Windows platforms
 
-2.2.0 (2014-06-04)
+  2.2.0 (2014-06-04)
+
 - fixed a bug when matching gene regions to input regions of size 1
 - added support for "extra" input data to be stored with SNPs, positions,
   regions, genes and groups, and corresponding output columns snp_extra, etc.
@@ -57,24 +82,27 @@ Biofilter3R Juyter VPS
   mismatched data
 - (LOKI) added a tally of SNP role records with unrecognized Entrez GeneIDs
 
-2.1.2 (2014-03-31)
+  2.1.2 (2014-03-31)
+
 - fixed a bug in the 'biopolymer_chr' output column (which is part of
   the 'generegion' output shortcut) which caused a crash with certain
   combinations of input data and requested output
 - (LOKI) added support for HTTP (but not SOCKS) proxy servers for downloading
   source data via HTTP
 
-2.1.1 (2013-08-21)
+  2.1.1 (2013-08-21)
+
 - fixed a bug in model expansion that caused some models to be duplicated in
   reverse order, and some types to be paired with themselves as a model
 
-2.1.0 (2013-07-19)
+  2.1.0 (2013-07-19)
+
 - REGION_POSITION_MARGIN is now applied when matching positions to
   upstream/downstream gene annotations
 - added "gwas_rs" output option
 - updated dbsnp loader to handle incomplete SNP roles in dbSNP's data download
 - added support for "upstream" and "downstream" gene annotation; the shorthand
-  outputs provide the gene label and distance, but "_id", "_start" and "_stop"
+  outputs provide the gene label and distance, but "\_id", "\_start" and "\_stop"
   suffixes are also available (i.e. "upstream_start")
 - added support for "gwas" catalog ananotation by way of RS# or chr/position,
   with a corresponding LOKI source loader; the shorthand output provides the
@@ -84,5 +112,6 @@ Biofilter3R Juyter VPS
 - fixed a bug in the LOKI updater which would mask the original error if the
   error-handler itself caused an additional error
 
-2.0.0 (2013-02-14)
+  2.0.0 (2013-02-14)
+
 - first public release

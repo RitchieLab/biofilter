@@ -26,10 +26,12 @@ Recommended sections in each file:
 
 Available explain docs:
 - [`dtp_biogrid.md`](dtp_biogrid.md)
+- [`dtp_chebi.md`](dtp_chebi.md)
 - [`dtp_clingen.md`](dtp_clingen.md)
 - [`dtp_gene_ensembl.md`](dtp_gene_ensembl.md)
 - [`dtp_gene_hgnc.md`](dtp_gene_hgnc.md)
 - [`dtp_gene_ncbi.md`](dtp_gene_ncbi.md)
+- [`dtp_gwas.md`](dtp_gwas.md)
 - [`dtp_go.md`](dtp_go.md)
 - [`dtp_kegg.md`](dtp_kegg.md)
 - [`dtp_mondo.md`](dtp_mondo.md)

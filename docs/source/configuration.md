@@ -2,8 +2,9 @@
 
 Biofilter resolves settings from:
 1. command-line options (highest priority)
-2. `.biofilter.toml`
-3. internal defaults
+2. environment variables (`DATABASE_URL` or `BIOFILTER_DB_URI`)
+3. `.biofilter.toml`
+4. internal defaults
 
 ## Common Commands
 
@@ -39,4 +40,5 @@ biofilter config init --path .
 ## Tips
 
 - Prefer `--db-uri` in CI or one-off commands.
+- Prefer `DATABASE_URL` in containers and orchestrators.
 - Prefer `.biofilter.toml` for local development defaults.

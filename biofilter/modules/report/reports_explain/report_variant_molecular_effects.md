@@ -1,12 +1,15 @@
-# AG 07 - Report Tutorial: `variant_molecular_effects`
+# Report Tutorial: `variant_molecular_effects`
 
 ## Purpose
+
 Given genomic regions, returns overlapping variants from `variant_masters` and consequence annotations from `variant_molecular_effects` with resolved labels (consequence/group/category/impact/biotype).
 
 ## Report Name
+
 `variant_molecular_effects`
 
 ## Parameters (API)
+
 - Input:
   - `items`: `list[str] | list[dict]` (optional)
   - `input_data`: alias for `items` (optional)
@@ -20,6 +23,7 @@ Given genomic regions, returns overlapping variants from `variant_masters` and c
   - `effect_query_chunk_size`: `int` (default `2000`)
 
 ## Input Formats
+
 - String: `chr:start:end` (for example `chr1:55516888:55516888`)
 - Dict:
   - `{"chromosome": "1", "start": 123, "end": 456}`
@@ -28,6 +32,7 @@ Given genomic regions, returns overlapping variants from `variant_masters` and c
 ## Examples
 
 API:
+
 ```python
 df = bf.report.run(
     "variant_molecular_effects",
@@ -42,6 +47,7 @@ df = bf.report.run(
 ```
 
 From file:
+
 ```python
 df = bf.report.run(
     "variant_molecular_effects",
@@ -51,15 +57,18 @@ df = bf.report.run(
 ```
 
 CLI:
+
 ```bash
 biofilter --db-uri sqlite:///biofilter_dev.db report run --report-name variant_molecular_effects --input chr1:55516888:55516888 --param range_up=50 --param range_down=50
 ```
 
 With input file:
+
 ```bash
 biofilter --db-uri sqlite:///biofilter_dev.db report run --report-name variant_molecular_effects --input-file ./regions.txt --param limit_variants_per_input=500
 ```
 
 ## Demo Tips
+
 - Use a short curated region list for interactive demos.
 - Show `Status`, `Variant Key`, `Gene Symbol`, `Consequence`, `Impact`, `Biotype`.

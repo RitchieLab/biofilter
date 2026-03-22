@@ -1,4 +1,4 @@
-# AG 01 - Report Module Overview
+# Report Module Overview
 
 This guide explains how to discover and run reports in Biofilter.
 
@@ -57,10 +57,17 @@ print(df.head())
 ```
 
 ## Active Report Tutorials
-- `reports_explain/report_etl_status.md`
-- `reports_explain/report_etl_packages.md`
-- `reports_explain/report_entity_filter.md`
-- `reports_explain/report_db_pg_table_stats.md`
+- `reports_explain/report_annotation_master_chemical.md`
 - `reports_explain/report_db_pg_index_stats.md`
-- `reports_explain/report_variant_molecular_effects.md`
+- `reports_explain/report_db_pg_table_stats.md`
+- `reports_explain/report_annotation_master_disease.md`
+- `reports_explain/report_entity_filter.md`
+- `reports_explain/report_etl_packages.md`
+- `reports_explain/report_etl_status.md`
+- `reports_explain/report_annotation_master_gene.md`
+- `reports_explain/report_annotation_master_go.md`
+- `reports_explain/report_annotation_master_pathway.md`
+- `reports_explain/report_platform_data_statistics.md`
+- `reports_explain/report_annotation_master_protein.md`
 - `reports_explain/report_template.md`
+- `reports_explain/report_variant_molecular_effects.md`

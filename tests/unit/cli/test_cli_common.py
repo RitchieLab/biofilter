@@ -22,6 +22,9 @@ def test_try_resolve_db_uri_prefers_cli_value():
 
 
 def test_try_resolve_db_uri_from_config(monkeypatch):
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+    monkeypatch.delenv("BIOFILTER_DB_URI", raising=False)
+
     class FakeConfig:
         db_uri = "sqlite:///from_config.db"
 
@@ -31,6 +34,9 @@ def test_try_resolve_db_uri_from_config(monkeypatch):
 
 
 def test_try_resolve_db_uri_handles_missing_config(monkeypatch):
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+    monkeypatch.delenv("BIOFILTER_DB_URI", raising=False)
+
     class MissingConfig:
         def __init__(self):
             raise FileNotFoundError
@@ -38,6 +44,19 @@ def test_try_resolve_db_uri_handles_missing_config(monkeypatch):
     monkeypatch.setattr(cmod, "BiofilterConfig", MissingConfig)
 
     assert cmod.try_resolve_db_uri(None) is None
+
+
+def test_try_resolve_db_uri_from_env(monkeypatch):
+    monkeypatch.setenv("DATABASE_URL", "sqlite:///from_env.db")
+    monkeypatch.setenv("BIOFILTER_DB_URI", "sqlite:///from_legacy_env.db")
+
+    class MissingConfig:
+        def __init__(self):
+            raise FileNotFoundError
+
+    monkeypatch.setattr(cmod, "BiofilterConfig", MissingConfig)
+
+    assert cmod.try_resolve_db_uri(None) == "sqlite:///from_env.db"
 
 
 def test_resolve_db_uri_returns_value_or_raises(monkeypatch):
