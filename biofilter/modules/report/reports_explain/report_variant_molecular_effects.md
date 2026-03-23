@@ -1,5 +1,7 @@
 # Report Tutorial: `variant_molecular_effects`
 
+TODO: ADD output argument
+
 ## Purpose
 
 Given genomic regions, returns overlapping variants from `variant_masters` and consequence annotations from `variant_molecular_effects` with resolved labels (consequence/group/category/impact/biotype).

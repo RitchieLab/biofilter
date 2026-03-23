@@ -74,32 +74,46 @@ How to trigger:
 1. Push a git tag like `v4.1.1` (publishes `4.1.1` and `latest`)
 2. Or run manually via `Actions -> Publish Docker Image -> Run workflow`
 
-Exmples of Commands:
+## Quick Start Workflows
+
+Use this section for the fastest day-to-day flows.
+
+### 1) Build image from a specific Git ref
 
 ```bash
-docker build -t biofilter:bf4 -f docker/Dockerfile "https://github.com/RitchieLab/biofilter.git#biofilter3r"
+docker build -t biofilter:bf4 -f docker/Dockerfile \
+  "https://github.com/RitchieLab/biofilter.git#biofilter3r"
 ```
+
+### 2) Run a single command (non-interactive)
 
 ```bash
-docker run --rm -e DATABASE_URL="postgresql+psycopg2://bioadmin:bioadmin@109.199.114.191:5432/biofilter_prod" biofilter:bf4
+docker run --rm \
+  -e DATABASE_URL="postgresql+psycopg2://user:password@host:5432/biofilter" \
+  biofilter:bf4 report list
 ```
 
-Run in CLI:
+### 3) Run reports with local input/output files
+
+```bash
+docker run --rm \
+  -e DATABASE_URL="postgresql+psycopg2://user:password@host:5432/biofilter" \
+  -v "$(pwd):/workspace" \
+  biofilter:bf4 report run \
+    --report-name annotation_master_gene \
+    --input-file /workspace/gene.txt \
+    --param include_relationships=true \
+    --param include_variant_summary=true \
+    --param emit_not_found_rows=true \
+    --output /workspace/annotation_master_gene.csv
+```
+
+### 4) Open an interactive shell in the container
 
 ```bash
 docker run --rm -it \
- -e DATABASE_URL="postgresql+psycopg2://bioadmin:bioadmin@109.199.114.191:5432/biofilter_prod" \
- -v "$(pwd):/workspace" \
- --entrypoint /bin/bash \
- biofilter:bf4
-```
-
-```bash
-biofilter report run \
- --report-name annotation_master_gene \
- --input-file /workspace/gene.txt \
- --param include_relationships=true \
- --param include_variant_summary=true \
- --param emit_not_found_rows=true \
- --output /workspace/annotation_master_gene.csv
+  -e DATABASE_URL="postgresql+psycopg2://user:password@host:5432/biofilter" \
+  -v "$(pwd):/workspace" \
+  --entrypoint /bin/bash \
+  biofilter:bf4
 ```
