@@ -23,6 +23,27 @@ Biofilter 4 is designed to support both **exploratory research** and **productio
 
 ---
 
+## Core Concepts: Entities, Domains, and Relationships
+
+Biofilter organizes biological knowledge around three core concepts:
+
+- **Entities**
+  - Canonical biological objects (for example Gene, Variant, Disease, Protein, Pathway).
+
+- **Domains**
+  - Functional/omics contexts used to structure and interpret entities and their links.
+
+- **Entity Relationships**
+  - A relational layer that connects entities across domains and behaves like a graph traversal surface (including multi-hop relationship discovery) while staying in a SQL-native environment.
+
+This design lets users recover cross-omics relationships and reuse them directly in reports for:
+
+- annotation workflows,
+- filtering and prioritization workflows,
+- relationship-driven analyses that support downstream statistical modeling.
+
+---
+
 ## Key Features
 
 - **Entity-centric data model**
@@ -43,7 +64,7 @@ Biofilter 4 is designed to support both **exploratory research** and **productio
 
 - **Multiple interaction layers**
   - Python API
-  - ORM-based Query layer
+  - ORM-based data access
   - Reusable Reports
   - Command-line interface (CLI)
 
@@ -65,7 +86,7 @@ At a high level, Biofilter 4 consists of:
   - Entity, Alias, Relationship, and Domain Master tables
   - Designed for extensibility and long-term evolution
 
-- **Query Layer**
+- **Data Access Layer**
   - ORM-backed, Python-first access to the knowledge base
   - Foundation for reports and advanced analysis
 
@@ -84,7 +105,6 @@ biofilter/
 ├── core/             # Core orchestration logic
 ├── db/               # Database models and schema
 ├── etl/              # ETL framework and DTPs
-├── query/            # Query layer
 ├── report/           # Report framework
 ├── tools/            # Developer and admin utilities
 ├── utils/            # Shared helpers
@@ -111,9 +131,55 @@ The documentation covers:
 * Writing DTPs
 * Managed indexes
 * Entity and alias registration
-* Query layer internals
+* Data access and report internals
 * Writing and extending reports
 * Developer tooling and project structure
+
+---
+
+## Run with Docker (Container)
+
+Biofilter 4 can be executed as an application-only container, using an external database via `DATABASE_URL`.
+
+Build from this repository:
+
+```bash
+docker build -t biofilter:bf4 -f docker/Dockerfile .
+```
+
+Run CLI with external DB:
+
+```bash
+docker run --rm \
+  -e DATABASE_URL="postgresql+psycopg2://user:password@host:5432/biofilter_prod" \
+  biofilter:bf4
+```
+
+Run a report and save output to your local machine:
+
+```bash
+docker run --rm \
+  -e DATABASE_URL="postgresql+psycopg2://user:password@host:5432/biofilter_prod" \
+  -v "$(pwd)/outputs:/workspace/outputs" \
+  biofilter:bf4 \
+  biofilter report run \
+    --report-name etl_status \
+    --output /workspace/outputs/etl_status.csv
+```
+
+Open an interactive shell in the container:
+
+```bash
+docker run --rm -it \
+  -e DATABASE_URL="postgresql+psycopg2://user:password@host:5432/biofilter_prod" \
+  -v "$(pwd):/workspace" \
+  --entrypoint /bin/bash \
+  biofilter:bf4
+```
+
+For full container documentation (publishing, multi-arch, GitHub Actions), see:
+
+- [docker/README.md](docker/README.md)
 
 ---
 

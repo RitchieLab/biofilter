@@ -13,6 +13,25 @@ pip install biofilter
 biofilter --help
 ```
 
+Docker (application-only container):
+
+```bash
+docker build -t biofilter:bf4 -f docker/Dockerfile .
+docker run --rm \
+  -e DATABASE_URL="postgresql+psycopg2://bioadmin:change_me@host:5432/biofilter_dev" \
+  biofilter:bf4
+```
+
+Run a report and save output to host filesystem:
+
+```bash
+docker run --rm \
+  -e DATABASE_URL="postgresql+psycopg2://bioadmin:change_me@host:5432/biofilter_dev" \
+  -v "$(pwd)/outputs:/workspace/outputs" \
+  biofilter:bf4 \
+  biofilter report run --report-name etl_status --output /workspace/outputs/etl_status.csv
+```
+
 Source (contributors):
 
 ```bash

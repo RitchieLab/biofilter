@@ -3,7 +3,7 @@
 Lightweight, user-focused documentation for running Biofilter today.
 
 This documentation is intentionally practical:
-- install and configure quickly
+- install/configure quickly (PyPI, source, or Docker)
 - bootstrap database and run ETL
 - run reports via CLI/API
 - troubleshoot common operational issues

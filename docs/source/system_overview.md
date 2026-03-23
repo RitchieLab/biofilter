@@ -22,7 +22,7 @@ BF4 has four practical layers:
 - `extract -> transform -> load` pipelines per data source
 - package-level tracking and status history
 
-3. Query and Report Layer
+3. Data Access and Report Layer
 - generic report manager
 - dynamic report execution with shared CLI/API contracts
 
@@ -37,6 +37,7 @@ BF4 supports two common modes:
 
 - Local managed database (for development, isolated workflows)
 - Shared database (team/centralized operations)
+- Containerized app-only runtime with external database (portable execution)
 
 Both modes use the same CLI/API patterns.
 

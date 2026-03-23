@@ -73,3 +73,33 @@ How to trigger:
 
 1. Push a git tag like `v4.1.1` (publishes `4.1.1` and `latest`)
 2. Or run manually via `Actions -> Publish Docker Image -> Run workflow`
+
+Exmples of Commands:
+
+```bash
+docker build -t biofilter:bf4 -f docker/Dockerfile "https://github.com/RitchieLab/biofilter.git#biofilter3r"
+```
+
+```bash
+docker run --rm -e DATABASE_URL="postgresql+psycopg2://bioadmin:bioadmin@109.199.114.191:5432/biofilter_prod" biofilter:bf4
+```
+
+Run in CLI:
+
+```bash
+docker run --rm -it \
+ -e DATABASE_URL="postgresql+psycopg2://bioadmin:bioadmin@109.199.114.191:5432/biofilter_prod" \
+ -v "$(pwd):/workspace" \
+ --entrypoint /bin/bash \
+ biofilter:bf4
+```
+
+```bash
+biofilter report run \
+ --report-name annotation_master_gene \
+ --input-file /workspace/gene.txt \
+ --param include_relationships=true \
+ --param include_variant_summary=true \
+ --param emit_not_found_rows=true \
+ --output /workspace/annotation_master_gene.csv
+```
