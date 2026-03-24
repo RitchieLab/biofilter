@@ -148,6 +148,48 @@ def _scope_keep(scope: str, seed_count: int) -> bool:
     return False
 
 
+def _iter_group_gene_pairs(
+    members: set[int],
+    seed_gene_ids: set[int],
+    scope: str,
+):
+    """
+    Generate candidate gene pairs for one group, already pruned by scope.
+    """
+    seed_members = sorted(members & seed_gene_ids)
+    non_seed_members = sorted(members - seed_gene_ids)
+
+    if scope == "both_from_seed":
+        for gene_1_id, gene_2_id in combinations(seed_members, 2):
+            yield (gene_1_id, gene_2_id)
+        return
+
+    if scope == "one_from_seed":
+        for seed_gene_id in seed_members:
+            for non_seed_gene_id in non_seed_members:
+                yield (
+                    min(seed_gene_id, non_seed_gene_id),
+                    max(seed_gene_id, non_seed_gene_id),
+                )
+        return
+
+    if scope == "at_least_one_from_seed":
+        for gene_1_id, gene_2_id in combinations(seed_members, 2):
+            yield (gene_1_id, gene_2_id)
+        for seed_gene_id in seed_members:
+            for non_seed_gene_id in non_seed_members:
+                yield (
+                    min(seed_gene_id, non_seed_gene_id),
+                    max(seed_gene_id, non_seed_gene_id),
+                )
+        return
+
+    # any_expanded
+    members_sorted = sorted(members)
+    for gene_1_id, gene_2_id in combinations(members_sorted, 2):
+        yield (gene_1_id, gene_2_id)
+
+
 class SNPSNPModelReport(ReportBase):
     name = "snp_snp_model"
     description = (
@@ -760,6 +802,7 @@ class SNPSNPModelReport(ReportBase):
 
         rows_out: list[dict[str, Any]] = []
 
+        # If variant got any problem during parsing, emit a row for each invalid input and then stop.
         for item in normalized_inputs:
             if item["status"] == "ok":
                 continue
@@ -780,7 +823,7 @@ class SNPSNPModelReport(ReportBase):
             return df.reset_index(drop=True)
 
         # ------------------------------------------------------------------
-        # Step 1: seed variants from input chr:position
+        # Step 1: seed variants from input chr:position # TODO melhor query por bloco ou por variant?
         # ------------------------------------------------------------------
         seed_variants_by_id: dict[int, dict[str, Any]] = {}
         for item in valid_inputs:
@@ -817,7 +860,7 @@ class SNPSNPModelReport(ReportBase):
 
         for variant_id, variant in seed_variants_by_id.items():
             vstart = max(1, int(variant["position_start"]) - window_bp)
-            vend = int(variant["position_end"]) + window_bp
+            vend = int(variant["position_end"]) + window_bp  # TODO vez se colocamos o windows aqui ou na variant (eu ach melhor aqui)
             cache_key = (int(variant["chromosome"]), int(vstart), int(vend))
             genes = gene_overlap_cache.get(cache_key)
             if genes is None:
@@ -900,19 +943,16 @@ class SNPSNPModelReport(ReportBase):
         for members in group_to_gene_ids.values():
             expanded_gene_ids.update(members)
 
-        metadata_map = self._resolve_entity_metadata(expanded_gene_ids | selected_group_ids)
-
-        def _entity_name(entity_id: int) -> str:
-            meta = metadata_map.get(int(entity_id), {})
-            return _norm_str(meta.get("primary_name")) or str(entity_id)
-
         # ------------------------------------------------------------------
         # Step 5: gene-gene from co-membership in selected groups
         # ------------------------------------------------------------------
         pair_to_group_ids: dict[tuple[int, int], set[int]] = {}
         for group_id, members in group_to_gene_ids.items():
-            members_sorted = sorted(members)
-            for gene_1_id, gene_2_id in combinations(members_sorted, 2):
+            for gene_1_id, gene_2_id in _iter_group_gene_pairs(
+                members=members,
+                seed_gene_ids=seed_gene_ids,
+                scope=gene_pair_scope,
+            ):
                 pair_to_group_ids.setdefault((gene_1_id, gene_2_id), set()).add(int(group_id))
 
         relationship_types_used = (
@@ -931,6 +971,15 @@ class SNPSNPModelReport(ReportBase):
         }
 
         gene_pair_models: list[dict[str, Any]] = []
+        genes_in_pair_models: set[int] = set()
+
+        metadata_map = self._resolve_entity_metadata(
+            {gene_id for pair in pair_to_group_ids for gene_id in pair} | selected_group_ids
+        )
+
+        def _entity_name(entity_id: int) -> str:
+            meta = metadata_map.get(int(entity_id), {})
+            return _norm_str(meta.get("primary_name")) or str(entity_id)
 
         for (gene_1_id, gene_2_id), support_groups in sorted(pair_to_group_ids.items()):
             seed_count = int(gene_1_id in seed_gene_ids) + int(gene_2_id in seed_gene_ids)
@@ -953,6 +1002,8 @@ class SNPSNPModelReport(ReportBase):
                 "group_names": group_names,
             }
             gene_pair_models.append(model)
+            genes_in_pair_models.add(int(gene_1_id))
+            genes_in_pair_models.add(int(gene_2_id))
 
             if include_gene_pairs:
                 row = self._base_row()
@@ -975,9 +1026,10 @@ class SNPSNPModelReport(ReportBase):
         # ------------------------------------------------------------------
         snp_pairs_truncated = False
         if include_snp_pairs and gene_pair_models:
-            genes_for_variant_expansion = (
-                set(expanded_gene_ids) if expand_variants_from_expanded_genes else set(seed_gene_ids)
-            )
+            if expand_variants_from_expanded_genes:
+                genes_for_variant_expansion = set(genes_in_pair_models)
+            else:
+                genes_for_variant_expansion = set(genes_in_pair_models) & set(seed_gene_ids)
 
             gene_locations = self._query_gene_locations(
                 gene_ids=genes_for_variant_expansion,

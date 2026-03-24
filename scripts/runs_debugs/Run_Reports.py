@@ -101,5 +101,15 @@ df = bf.report.run(
     # snp_pair_scope='at_least_one_from_seed',
 )
 
+df = bf.report.run(
+    'snp_snp_model',
+    input_data=['chr19:44904604', 'chr1:13259', 'chr15:63279422'],
+    build=38,
+    window_bp=0,
+    group_entity_groups=['Pathways'],
+    gene_pair_scope='both_from_seed',
+)
+
+
 print('rows:', len(df))
 print(df)
