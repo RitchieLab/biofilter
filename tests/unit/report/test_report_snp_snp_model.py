@@ -51,6 +51,7 @@ def _create_variant_masters_table(engine):
         Column("position_end", BigInteger, nullable=False),
         Column("reference_allele", String(64), nullable=False),
         Column("alternate_allele", String(256), nullable=False),
+        Column("allele_type", String(20), nullable=True),
         Column("rsid", String(32), nullable=True),
     )
     metadata.create_all(engine)
@@ -199,6 +200,7 @@ def _seed_variants(session, vm):
                 "position_end": 150,
                 "reference_allele": "A",
                 "alternate_allele": "G",
+                "allele_type": "snv",
                 "rsid": "rs111",
             },
             {
@@ -208,6 +210,7 @@ def _seed_variants(session, vm):
                 "position_end": 280,
                 "reference_allele": "C",
                 "alternate_allele": "T",
+                "allele_type": "snv",
                 "rsid": "rs222",
             },
             {
@@ -217,7 +220,41 @@ def _seed_variants(session, vm):
                 "position_end": 380,
                 "reference_allele": "G",
                 "alternate_allele": "A",
+                "allele_type": "snv",
                 "rsid": "rs333",
+            },
+            # Same logical variant (same rsid) with another ALT allele.
+            # Report should keep only one row after variant dedupe.
+            {
+                "variant_id": 4,
+                "chromosome": 17,
+                "position_start": 280,
+                "position_end": 280,
+                "reference_allele": "C",
+                "alternate_allele": "G",
+                "allele_type": "snv",
+                "rsid": "rs222",
+            },
+            # Non-SNV rows must be ignored by the report.
+            {
+                "variant_id": 5,
+                "chromosome": 17,
+                "position_start": 150,
+                "position_end": 150,
+                "reference_allele": "A",
+                "alternate_allele": "AG",
+                "allele_type": "ins",
+                "rsid": "rsINS150",
+            },
+            {
+                "variant_id": 6,
+                "chromosome": 17,
+                "position_start": 155,
+                "position_end": 155,
+                "reference_allele": "A",
+                "alternate_allele": "AT",
+                "allele_type": "ins",
+                "rsid": "rsINS155",
             },
         ],
     )
@@ -252,6 +289,8 @@ def test_default_pipeline_builds_gene_and_snp_pairs():
         for _, row in snp_rows.iterrows()
     }
     assert rs_pairs == {("rs111", "rs222"), ("rs111", "rs333")}
+    assert 5 not in set(snp_rows["variant_1_id"].tolist())
+    assert 5 not in set(snp_rows["variant_2_id"].tolist())
 
 
 def test_scope_both_from_seed_keeps_only_seed_seed_pairs():
@@ -322,3 +361,20 @@ def test_invalid_and_not_found_inputs_are_reported():
     observations = set(input_rows["observation"].tolist())
     assert "invalid_input" in observations
     assert "not_found" in observations
+
+
+def test_non_snv_seed_position_is_reported_as_not_found():
+    session, vm = _make_session()
+    with session:
+        _seed(session)
+        _seed_variants(session, vm)
+
+        report = _report(
+            session,
+            input_data=["chr17:155"],
+        )
+        df = report.run()
+
+    input_rows = df[df["row_type"] == "input"]
+    assert len(input_rows) >= 1
+    assert "not_found" in set(input_rows["observation"].tolist())

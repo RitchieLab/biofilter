@@ -152,8 +152,9 @@ class SNPSNPModelReport(ReportBase):
     name = "snp_snp_model"
     description = (
         "Builds BF4 gene-gene and SNP-SNP candidate models from seed genomic positions "
-        "using variant_masters + entity_locations, then expands through biological "
-        "group relationships (for example pathways)."
+        "using SNV rows from variant_masters + entity_locations, collapsing "
+        "multi-allelic variant rows, then expands through biological group "
+        "relationships (for example pathways)."
     )
 
     columns = [
@@ -241,6 +242,37 @@ class SNPSNPModelReport(ReportBase):
         metadata = MetaData()
         return Table(table_name, metadata, autoload_with=self.db.engine)
 
+    @staticmethod
+    def _variant_dedupe_key(variant: dict[str, Any]) -> tuple[Any, ...]:
+        """
+        Collapse alternate-allele rows representing the same logical variant.
+
+        Priority for identity:
+        1) rsID (when available)
+        2) genomic locus + reference allele
+        """
+        rsid = _norm_str(variant.get("rsid")).lower()
+        if rsid:
+            return ("rsid", rsid)
+        return (
+            "locus",
+            int(variant.get("chromosome") or 0),
+            int(variant.get("position_start") or 0),
+            int(variant.get("position_end") or 0),
+            _norm_str(variant.get("reference_allele")).upper(),
+        )
+
+    def _dedupe_variants(self, variants: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        out: list[dict[str, Any]] = []
+        seen: set[tuple[Any, ...]] = set()
+        for variant in variants:
+            key = self._variant_dedupe_key(variant)
+            if key in seen:
+                continue
+            seen.add(key)
+            out.append(variant)
+        return out
+
     def _parse_position_input(self, item: Any) -> dict[str, Any]:
         out = {
             "raw": str(item),
@@ -314,8 +346,10 @@ class SNPSNPModelReport(ReportBase):
             )
             .order_by(vm.c.position_start.asc(), vm.c.variant_id.asc())
         )
+        if "allele_type" in vm.c:
+            stmt = stmt.where(func.lower(vm.c.allele_type) == "snv")
         rows = self.session.execute(stmt).mappings().all()
-        return [dict(row) for row in rows]
+        return self._dedupe_variants([dict(row) for row in rows])
 
     def _query_variants_overlap(
         self,
@@ -344,10 +378,16 @@ class SNPSNPModelReport(ReportBase):
             )
             .order_by(vm.c.position_start.asc(), vm.c.variant_id.asc())
         )
+        if "allele_type" in vm.c:
+            stmt = stmt.where(func.lower(vm.c.allele_type) == "snv")
         if limit > 0:
-            stmt = stmt.limit(limit)
+            # Overfetch to avoid underfilling after dedupe of alternate alleles.
+            stmt = stmt.limit(max(limit * 5, limit))
         rows = self.session.execute(stmt).mappings().all()
-        return [dict(row) for row in rows]
+        deduped = self._dedupe_variants([dict(row) for row in rows])
+        if limit > 0:
+            return deduped[:limit]
+        return deduped
 
     def _query_genes_overlap(
         self,

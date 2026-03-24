@@ -92,12 +92,12 @@ bf = Biofilter()
 
 df = bf.report.run(
     'snp_snp_model',
-    input_data=['chr19:44904604', 'chr1:13259'],
+    input_data=['chr19:44904604', 'chr1:13259', 'chr15:63279422'],
     build=38,
-    window_bp=100,
+    window_bp=0,
     group_entity_groups=['Pathways'],
     # relationship_types=['in_pathway'],
-    # gene_pair_scope='at_least_one_from_seed',
+    gene_pair_scope='both_from_seed',
     # snp_pair_scope='at_least_one_from_seed',
 )
 

@@ -1,0 +1,225 @@
+NG00022 
+ADC1 - Alzheimer's Disease Center Dataset 1
+02/07/2024
+NG00023 
+ADC2 - Alzheimer's Disease Center Dataset 2
+02/07/2024
+NG00024 
+ADC3 - Alzheimer's Disease Center Dataset 3
+02/07/2024
+NG00035 
+GWAS of CSF tau levels identifies risk variants for Alzheimer’s Disease
+02/20/2025
+NG00050 
+GWAS of CLU, A potential endophenotype for Alzheimer's disease
+02/20/2025
+NG00067 
+Alzheimer's Disease Sequencing Project Umbrella Study
+03/12/2026
+NG00068 
+ADC4 - Alzheimer's Disease Center Dataset 4
+02/07/2024
+NG00069 
+ADC5 - Alzheimer's Disease Center Dataset 5
+02/07/2024
+NG00070 
+ADC6 - Alzheimer's Disease Center Dataset 6
+02/07/2024
+NG00071 
+ADC7 - Alzheimer's Disease Center Dataset 7
+02/07/2024
+NG00075 
+IGAP Rare Variant Summary Statistics- Kunkle et al. (2019)
+06/03/2025
+NG00082 
+UAB/HudsonAlpha Families with Neurodegenerative Diseases
+03/31/2025
+NG00100 
+Novel Alzheimer Disease Risk Loci and Pathways in African American Individuals Using the African Genome Resources Panel: A Meta-analysis. Kunkle et al. (2021)
+01/21/2025
+NG00102 
+Genomic atlas of the proteome from brain, CSF and plasma prioritizes proteins implicated in neurological disorders
+11/07/2023
+NG00103 
+Association Between Common Variants in RBFOX1, an RNA-Binding Protein, and Brain Amyloidosis in Early and Preclinical Alzheimer Disease
+03/06/2024
+NG00104 
+Dataset from Clinical and Pathological Studies in the Oldest Old (90+ Study)
+02/02/2022
+NG00105 
+MiGA – Microglia Genomic Atlas
+05/29/2024
+NG00106 
+LASI-DAD Genotyping Chip Data (Illumina Infinium GSA-24 v2.0), Imputed Data (1000 Genomes Phase 3 v5 and TOPMed r2)
+09/16/2021
+NG00108 
+Profiling microglia expression profiles in AD using single-nuclei RNA-seq
+11/23/2021
+NG00113 
+Metabolomic and lipidomic signatures in Alzheimer disease brains
+02/02/2022
+NG00114 
+DNA Methylation in Alzheimer disease brains
+02/02/2022
+NG00116 
+Resolving mutations in challenging genomic regions to test association with disease phenotypes
+02/28/2024
+NG00117 
+NCRAD Families GWAS
+12/13/2022
+NG00118 
+AMP-AD SV WGS and SV-xQTL
+04/24/2023
+NG00119 
+Health and Retirement Study Genotype Data 2006-2012
+01/28/2022
+NG00121 
+Alzheimer’s disease single-neuron whole-genome sequencing - Miller 2022
+06/01/2022
+NG00126 
+A fast and robust strategy to remove variant level artifacts in Alzheimer’s Disease Sequencing Project data (Belloy et al. 2022)
+02/23/2023
+NG00127 
+A longitudinal study of Alzheimer's Disease and other dementing illnesses – KnightADRC GWAS
+05/16/2025
+NG00128 
+Proteomic profiling identified plasma biomarkers for SARS-CoV-2 infection and severity of COVID-19 patients
+01/18/2023
+NG00129 
+NCRAD Families Whole Exome Sequencing
+03/21/2023
+NG00130 
+Large scale CSF proteogenomic atlas
+04/28/2025
+NG00131 
+Large scale genetics study on CSF and brain metabolite levels
+04/16/2025
+NG00132 
+Health and Retirement Study (HRS) APOE and Serotonin Transporter Alleles
+04/10/2023
+NG00134 
+National Health and Aging Trends Study (NHATS) GWAS
+06/01/2023
+NG00135 
+UAB ADRC - University of Alabama at Birmingham Alzheimer’s Disease Research Center
+10/04/2023
+NG00136 
+ADC8 - Alzheimer's Disease Center Dataset 8
+02/07/2024
+NG00137 
+ADC9 - Alzheimer's Disease Center Dataset 9
+02/07/2024
+NG00138 
+ADC10 - Alzheimer's Disease Center Dataset 10
+02/07/2024
+NG00139 
+ADC11 - Alzheimer's Disease Center Dataset 11
+02/07/2024
+NG00140 
+ADC12 - Alzheimer's Disease Center Dataset 12
+02/07/2024
+NG00141 
+The Sacramento Area Latino Study on Aging
+10/22/2024
+NG00142 
+Plasma Cell-Free RNA Transcriptomics for AD and Related Dementias
+01/06/2025
+NG00144 
+The Prediction of Alzheimer’s Disease through Multi-Trait Genetic Modeling
+08/18/2023
+NG00145 
+Colorado Adoption/Twin Study of Lifespan behavioral development & cognitive aging (CATSLife) APOE
+03/01/2024
+NG00146 
+Singapore Longitudinal study of Vascular Cognitive Impairment and Dementia
+03/28/2024
+NG00147 
+Amyloid Neuroimaging and Genetics Initiative (ANGI) GWAS
+03/18/2024
+NG00149 
+ADC13 - Alzheimer's Disease Center Dataset 13
+02/07/2024
+NG00150 
+ADC14 - Alzheimer's Disease Center Dataset 14
+02/07/2024
+NG00151 
+ADC15 - Alzheimer's Disease Center Dataset 15
+02/07/2024
+NG00153 
+Health and Retirement Study (HRS) DNA Methylation
+12/15/2023
+NG00154 
+Dementia in Parkinson's Disease(PDD)
+12/08/2023
+NG00156 
+Genetic variants and functional pathways associated with resilience to Alzheimer's disease
+03/06/2024
+NG00157 
+Sex-specific genetic predictors of Alzheimer's disease biomarkers – Deming, et al. 2018
+03/07/2024
+NG00158 
+Sex differences in the genetic predictors of Alzheimer’s pathology – Dumitrescu, et al. 2019
+03/07/2024
+NG00159 
+Longitudinal Change in Memory Performance as a Strong Endophenotype for Alzheimer’s Disease – Archer, et al, 2023
+02/13/2024
+NG00160 
+Sex-specific genetic architecture of late-life memory performance
+12/22/2023
+NG00161 
+Sex differences in the genetic architecture of cognitive resilience to Alzheimer's disease – Eissman, et al. 2022
+03/07/2024
+NG00162 
+Oligodendrocytes single-cell whole genome and RNA sequencing
+05/15/2024
+NG00165 
+CHARGE Association results from the ADSP R1 WGS data set
+05/15/2024
+NG00166 
+Association results from the ADSP R3 17k WGS data set - Lee et al., 2023
+06/20/2024
+NG00167 
+Brain Small RNA Transcriptomics for AD and Related Dementias
+09/03/2025
+NG00168 
+Plasma Small RNA Transcriptomics for AD and Related Dementias
+09/03/2025
+NG00169 
+Progressive Supranuclear Palsy (PSP) Summary Statistics- Farrell et al., 2024
+07/17/2024
+NG00171 
+Population structure in LASI-DAD
+04/22/2025
+NG00172 
+GWAS Summary Statistics of SNVs/INDELs/SVs for Progressive Supranuclear Palsy (PSP) – Wang et al., 2024
+12/17/2024
+NG00174 
+Whole Genome Sequencing (WGS) and SNP Array data for the SEA-AD Consortium Cohort
+12/03/2024
+NG00175 
+Genome-wide association study of neuropathology endophenotypes
+08/06/2025
+NG00176 
+CNVs from ADSP WES data using CANOES software
+02/20/2026
+NG00177 
+ADGC Multi-Ancestry GWAS Meta-Analysis – Rajabli et al., 2025
+08/05/2025
+NG00178 
+Multi-brain region mRNA-seq of sporadic ALS patients with pTDP-43 pathological staging
+05/14/2025
+NG00179 
+AD GWAS in participants of African ancestry – Ray et al., 2024
+12/10/2025
+NG00183 
+Diverse somatic genomic alterations in single neurons in chronic traumatic encephalopathy
+10/27/2025
+NG00186 
+Genetic Component of the Mapping the Human Connectome During Typical Aging (HCP-A) & Vulnerability and Resiliency in the Aging Adult Brain Connectome (AABC)
+02/06/2026
+NG00187 
+Stability of general cognitive ability from infancy to adulthood: A combined twin and genomic investigation
+02/10/2026
+NG00189 
+GWAS summary statistics of neuropsychiatric symptoms in MCI and dementia – Vattathil et al., 2025
+01/07/2026

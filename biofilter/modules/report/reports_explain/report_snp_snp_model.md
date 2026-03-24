@@ -16,7 +16,8 @@ The report starts from user seed positions (`chr:position`) and maps to variants
 ## Core Pipeline
 
 1. Input seed positions (`chr:position`)
-2. Resolve seed variants in `variant_masters`
+2. Resolve seed variants in `variant_masters` using only `allele_type = SNV`
+   and collapse multi-allelic rows to one logical variant
 3. Map seed variants to seed genes by genomic overlap in `entity_locations`
 4. Expand seed genes to biological groups using `entity_relationships`
 5. Expand back from those groups to additional genes
@@ -60,3 +61,9 @@ df = bf.report.run(
 - `gene_pair`: gene-gene candidate models
 - `snp_pair`: SNP-SNP models expanded from gene pairs
 - `summary`: truncation/no-model messages when relevant
+
+## Variant Selection Rules
+
+- Uses only SNV rows when `variant_masters.allele_type` is available
+- Collapses alternate-allele duplicates and keeps one deterministic row per
+  logical variant (preferably by `rsid`, otherwise by locus/ref)
