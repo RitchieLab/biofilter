@@ -1,6 +1,5 @@
 from biofilter import Biofilter
 
-
 # from urllib.parse import quote_plus
 # user = "bioadmin"
 # pwd  = quote_plus("xxx@1111")  # -> 'xxx%401111'
@@ -10,12 +9,12 @@ from biofilter import Biofilter
 
 
 # db_uri = "sqlite:///dev_biofilter.db"
-db_uri = "postgresql+psycopg2://bioadmin:bioadmin@localhost/biofilter_dev_2"
+# db_uri = "postgresql+psycopg2://bioadmin:bioadmin@localhost/biofilter_dev_2"
 # db_uri = "postgresql+psycopg2://bioadmin:Penn%402025@109.199.114.191:5432/biofilter?sslmode=require"
 
 # db_uri = "postgresql+psycopg://bioadmin:bioadmin@109.199.114.191:5432/biofilter?sslmode=require"
 
-bf = Biofilter(db_uri)
+bf = Biofilter()
 
 # print(bf.metadata.schema_version)
 
@@ -67,28 +66,40 @@ bf = Biofilter(db_uri)
 #     "chr7:55019017:55019017",
 # ]
 
-# Optional: input file instead of inline items
-input_path = "/opt/biofilter/dev/biofilter/scripts/runs_debugs/regions.txt"
+# # Optional: input file instead of inline items
+# input_path = "/opt/biofilter/dev/biofilter/scripts/runs_debugs/regions.txt"
+# # df = bf.report.run(
+# #     "variant_consequences",
+# #     items=items,
+# #     range_up=1,
+# #     range_down=1,
+# #     emit_not_found_rows=True,
+# #     include_variant_only_rows=True,
+# #     limit_variants_per_input=1000,
+# # )
+
+# # Alternative using input file:
 # df = bf.report.run(
 #     "variant_consequences",
-#     items=items,
-#     range_up=1,
-#     range_down=1,
+#     input_path=input_path,
+#     range_up=1000,
+#     range_down=1000,
 #     emit_not_found_rows=True,
 #     include_variant_only_rows=True,
 #     limit_variants_per_input=1000,
 # )
 
-# Alternative using input file:
+
 df = bf.report.run(
-    "variant_consequences",
-    input_path=input_path,
-    range_up=1000,
-    range_down=1000,
-    emit_not_found_rows=True,
-    include_variant_only_rows=True,
-    limit_variants_per_input=1000,
+    'snp_snp_model',
+    input_data=['chr19:44904604', 'chr1:13259'],
+    build=38,
+    window_bp=100,
+    group_entity_groups=['Pathways'],
+    # relationship_types=['in_pathway'],
+    # gene_pair_scope='at_least_one_from_seed',
+    # snp_pair_scope='at_least_one_from_seed',
 )
 
-
+print('rows:', len(df))
 print(df)

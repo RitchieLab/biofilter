@@ -305,7 +305,7 @@ class DBTuningMixin:
         Notes:
         - Do not duplicate PK indexes.
         - Do not duplicate the natural-key unique index already defined on
-          variant_masters (chromosome, position_start, position_end, ref, alt).
+        variant_masters (chromosome, position_start, position_end, ref, alt).
         """
         return [
             # --------------------------------------------------
@@ -333,6 +333,7 @@ class DBTuningMixin:
             # --------------------------------------------------
             # Main logical join with variant_masters
             ("variant_molecular_effects", ["chromosome", "variant_id"]),
+            ("variant_molecular_effects", ["variant_key"]),
 
             # Common biological lookup patterns
             # ("variant_molecular_effects", ["gene_id"]),

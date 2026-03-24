@@ -3,6 +3,7 @@ from .report_template import TemplateReport
 from .report_entity_filter import EntityFilterReport
 from .report_entity_relationship_model import EntityRelationshipModelReport
 from .report_variant_gene_location_model import VariantGeneLocationModelReport
+from .report_snp_snp_model import SNPSNPModelReport
 from .report_annotation_master_gene import AnnotationMasterGeneReport
 from .report_annotation_master_pathway import AnnotationMasterPathwayReport
 from .report_annotation_master_protein import AnnotationMasterProteinReport
@@ -19,6 +20,7 @@ __all__ = [
     "EntityFilterReport",
     "EntityRelationshipModelReport",
     "VariantGeneLocationModelReport",
+    "SNPSNPModelReport",
     "AnnotationMasterGeneReport",
     "AnnotationMasterPathwayReport",
     "AnnotationMasterProteinReport",
