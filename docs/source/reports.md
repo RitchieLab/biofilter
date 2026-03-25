@@ -91,3 +91,9 @@ If a guide file is missing, Biofilter falls back to the report class `explain()`
 This model keeps report documentation maintainable:
 - update the report module when behavior changes
 - update the paired explain markdown for user-facing guidance
+
+## Practical Examples
+
+Repository-level example guides:
+
+- `docs/reports/snp_snp_model.md`

@@ -6,10 +6,11 @@ from itertools import combinations
 from typing import Any
 
 import pandas as pd
-from sqlalchemy import MetaData, Table, and_, func, select
+from sqlalchemy import MetaData, Table, and_, func, or_, select
 from sqlalchemy.orm import aliased
 
 from biofilter.modules.db.models import (
+    ETLDataSource,
     Entity,
     EntityAlias,
     EntityGroup,
@@ -190,13 +191,58 @@ def _iter_group_gene_pairs(
         yield (gene_1_id, gene_2_id)
 
 
+def _prune_group_to_gene_ids_for_scope(
+    group_to_gene_ids: dict[int, set[int]],
+    seed_gene_ids: set[int],
+    scope: str,
+) -> dict[int, set[int]]:
+    """
+    Drop groups that cannot produce pairs for the requested scope.
+    """
+    out: dict[int, set[int]] = {}
+    for group_id, members in group_to_gene_ids.items():
+        seed_members = members & seed_gene_ids
+        non_seed_members = members - seed_gene_ids
+
+        if scope == "both_from_seed":
+            if len(seed_members) < 2:
+                continue
+            out[group_id] = set(seed_members)
+            continue
+
+        if scope == "one_from_seed":
+            if not seed_members or not non_seed_members:
+                continue
+            out[group_id] = set(seed_members | non_seed_members)
+            continue
+
+        if scope == "at_least_one_from_seed":
+            if not seed_members:
+                continue
+            out[group_id] = set(members)
+            continue
+
+        out[group_id] = set(members)
+    return out
+
+
+_DIRECT_GENE_TOKENS = {
+    "direct gene",
+    "direct_gene",
+    "directgene",
+    "gene-gene",
+    "gene_gene",
+    "direct",
+}
+
+
 class SNPSNPModelReport(ReportBase):
     name = "snp_snp_model"
     description = (
         "Builds BF4 gene-gene and SNP-SNP candidate models from seed genomic positions "
         "using SNV rows from variant_masters + entity_locations, collapsing "
         "multi-allelic variant rows, then expands through biological group "
-        "relationships (for example pathways)."
+        "relationships (for example pathways) or direct gene-gene links."
     )
 
     columns = [
@@ -234,6 +280,9 @@ class SNPSNPModelReport(ReportBase):
         "group_support_count",
         "group_support_ids",
         "group_support_names",
+        "data_source_support_count",
+        "data_source_support_ids",
+        "data_source_support_names",
         "relationship_types_used",
         "build",
         "window_bp",
@@ -255,7 +304,7 @@ class SNPSNPModelReport(ReportBase):
             "build": 38,
             "window_bp": 0,
             "group_entity_groups": ["Pathway"],
-            "relationship_types": ["in_pathway"],
+            "group_data_sources": ["Reactome"],
             "gene_pair_scope": "at_least_one_from_seed",
             "snp_pair_scope": "at_least_one_from_seed",
         }
@@ -513,6 +562,107 @@ class SNPSNPModelReport(ReportBase):
             found.add(str(row.input_key))
         return ids, found
 
+    def _available_group_name_map(self) -> dict[str, str]:
+        rows = self.session.query(EntityGroup.name).all()
+        out: dict[str, str] = {}
+        for row in rows:
+            name = _norm_str(row[0])
+            if not name:
+                continue
+            key = name.lower()
+            if key not in out:
+                out[key] = name
+        return out
+
+    @staticmethod
+    def _resolve_group_tokens(
+        tokens: set[str],
+        available_map: dict[str, str],
+    ) -> tuple[set[str], list[str]]:
+        resolved: set[str] = set()
+        unresolved: list[str] = []
+        for token in tokens:
+            token_norm = token.strip().lower()
+            if not token_norm:
+                continue
+
+            candidates = [token_norm]
+            if token_norm.endswith("s") and len(token_norm) > 1:
+                candidates.append(token_norm[:-1])
+            else:
+                candidates.append(token_norm + "s")
+
+            matched = False
+            for candidate in candidates:
+                if candidate in available_map:
+                    resolved.add(candidate)
+                    matched = True
+                    break
+            if not matched:
+                unresolved.append(token_norm)
+        return resolved, unresolved
+
+    @staticmethod
+    def _group_help_message(available_map: dict[str, str]) -> str:
+        options = ["Direct Gene"] + sorted(
+            {name for name in available_map.values()},
+            key=lambda x: x.lower(),
+        )
+        return (
+            "You need to inform one or more group_entity_groups. "
+            "Available options include: " + ", ".join(options)
+        )
+
+    def _available_data_source_maps(self) -> tuple[dict[str, int], dict[int, str]]:
+        rows = self.session.query(ETLDataSource.id, ETLDataSource.name).all()
+        name_to_id: dict[str, int] = {}
+        id_to_name: dict[int, str] = {}
+        for row in rows:
+            ds_id = _parse_int(row.id)
+            ds_name = _norm_str(row.name)
+            if ds_id is None or not ds_name:
+                continue
+            id_to_name[int(ds_id)] = ds_name
+            key = ds_name.lower()
+            if key not in name_to_id:
+                name_to_id[key] = int(ds_id)
+        return name_to_id, id_to_name
+
+    @staticmethod
+    def _resolve_data_source_tokens(
+        tokens: set[str],
+        name_to_id: dict[str, int],
+        id_to_name: dict[int, str],
+    ) -> tuple[set[int], list[str]]:
+        resolved: set[int] = set()
+        unresolved: list[str] = []
+        for token in tokens:
+            token_norm = _norm_str(token).lower()
+            if not token_norm:
+                continue
+
+            token_id = _parse_int(token_norm)
+            if token_id is not None and int(token_id) in id_to_name:
+                resolved.add(int(token_id))
+                continue
+
+            if token_norm in name_to_id:
+                resolved.add(int(name_to_id[token_norm]))
+                continue
+
+            unresolved.append(token_norm)
+        return resolved, unresolved
+
+    @staticmethod
+    def _data_source_help_message(id_to_name: dict[int, str]) -> str:
+        options = sorted({name for name in id_to_name.values()}, key=lambda x: x.lower())
+        if not options:
+            return "No data sources are available in ETLDataSource."
+        return (
+            "Invalid group_data_sources. Available options include: "
+            + ", ".join(options)
+        )
+
     def _query_seed_gene_to_groups(
         self,
         seed_gene_ids: set[int],
@@ -520,6 +670,7 @@ class SNPSNPModelReport(ReportBase):
         gene_group_filter: set[str],
         group_group_filter: set[str],
         group_entity_ids_filter: set[int] | None,
+        group_data_source_ids_filter: set[int] | None,
     ) -> list[dict[str, Any]]:
         if not seed_gene_ids:
             return []
@@ -537,6 +688,7 @@ class SNPSNPModelReport(ReportBase):
                 rt.code.label("relationship_type"),
                 EntityRelationship.entity_1_id.label("gene_id"),
                 EntityRelationship.entity_2_id.label("group_id"),
+                EntityRelationship.data_source_id.label("data_source_id"),
             )
             .join(rt, rt.id == EntityRelationship.relationship_type_id)
             .join(e1, e1.id == EntityRelationship.entity_1_id)
@@ -554,6 +706,10 @@ class SNPSNPModelReport(ReportBase):
             q1 = q1.filter(func.lower(eg2.name).in_(list(group_group_filter)))
         if group_entity_ids_filter is not None:
             q1 = q1.filter(EntityRelationship.entity_2_id.in_(list(group_entity_ids_filter)))
+        if group_data_source_ids_filter is not None:
+            q1 = q1.filter(
+                EntityRelationship.data_source_id.in_(list(group_data_source_ids_filter))
+            )
 
         for row in q1.all():
             rows_out.append(
@@ -562,6 +718,7 @@ class SNPSNPModelReport(ReportBase):
                     "relationship_type": row.relationship_type,
                     "gene_id": int(row.gene_id),
                     "group_id": int(row.group_id),
+                    "data_source_id": _parse_int(row.data_source_id),
                 }
             )
 
@@ -571,6 +728,7 @@ class SNPSNPModelReport(ReportBase):
                 rt.code.label("relationship_type"),
                 EntityRelationship.entity_2_id.label("gene_id"),
                 EntityRelationship.entity_1_id.label("group_id"),
+                EntityRelationship.data_source_id.label("data_source_id"),
             )
             .join(rt, rt.id == EntityRelationship.relationship_type_id)
             .join(e1, e1.id == EntityRelationship.entity_2_id)
@@ -588,6 +746,10 @@ class SNPSNPModelReport(ReportBase):
             q2 = q2.filter(func.lower(eg2.name).in_(list(group_group_filter)))
         if group_entity_ids_filter is not None:
             q2 = q2.filter(EntityRelationship.entity_1_id.in_(list(group_entity_ids_filter)))
+        if group_data_source_ids_filter is not None:
+            q2 = q2.filter(
+                EntityRelationship.data_source_id.in_(list(group_data_source_ids_filter))
+            )
 
         for row in q2.all():
             rows_out.append(
@@ -596,10 +758,76 @@ class SNPSNPModelReport(ReportBase):
                     "relationship_type": row.relationship_type,
                     "gene_id": int(row.gene_id),
                     "group_id": int(row.group_id),
+                    "data_source_id": _parse_int(row.data_source_id),
                 }
             )
 
         return rows_out
+
+    def _query_direct_gene_links(
+        self,
+        seed_gene_ids: set[int],
+        relationship_type_filter: set[str],
+        gene_group_filter: set[str],
+        group_data_source_ids_filter: set[int] | None,
+    ) -> list[dict[str, Any]]:
+        if not seed_gene_ids:
+            return []
+
+        rt = aliased(EntityRelationshipType)
+        e1 = aliased(Entity)
+        e2 = aliased(Entity)
+        eg1 = aliased(EntityGroup)
+        eg2 = aliased(EntityGroup)
+
+        q = (
+            self.session.query(
+                EntityRelationship.id.label("relationship_id"),
+                rt.code.label("relationship_type"),
+                EntityRelationship.entity_1_id.label("gene_1_id"),
+                EntityRelationship.entity_2_id.label("gene_2_id"),
+                EntityRelationship.data_source_id.label("data_source_id"),
+            )
+            .join(rt, rt.id == EntityRelationship.relationship_type_id)
+            .join(e1, e1.id == EntityRelationship.entity_1_id)
+            .join(eg1, eg1.id == e1.group_id, isouter=True)
+            .join(e2, e2.id == EntityRelationship.entity_2_id)
+            .join(eg2, eg2.id == e2.group_id, isouter=True)
+            .filter(
+                or_(
+                    EntityRelationship.entity_1_id.in_(list(seed_gene_ids)),
+                    EntityRelationship.entity_2_id.in_(list(seed_gene_ids)),
+                )
+            )
+        )
+
+        if relationship_type_filter:
+            q = q.filter(func.lower(rt.code).in_(list(relationship_type_filter)))
+
+        if gene_group_filter:
+            q = q.filter(func.lower(eg1.name).in_(list(gene_group_filter)))
+            q = q.filter(func.lower(eg2.name).in_(list(gene_group_filter)))
+        if group_data_source_ids_filter is not None:
+            q = q.filter(
+                EntityRelationship.data_source_id.in_(list(group_data_source_ids_filter))
+            )
+
+        out: list[dict[str, Any]] = []
+        for row in q.all():
+            gene_1_id = int(row.gene_1_id)
+            gene_2_id = int(row.gene_2_id)
+            if gene_1_id == gene_2_id:
+                continue
+            out.append(
+                {
+                    "relationship_id": int(row.relationship_id),
+                    "relationship_type": row.relationship_type,
+                    "gene_1_id": min(gene_1_id, gene_2_id),
+                    "gene_2_id": max(gene_1_id, gene_2_id),
+                    "data_source_id": _parse_int(row.data_source_id),
+                }
+            )
+        return out
 
     def _query_groups_to_genes(
         self,
@@ -607,6 +835,7 @@ class SNPSNPModelReport(ReportBase):
         relationship_type_filter: set[str],
         gene_group_filter: set[str],
         group_group_filter: set[str],
+        group_data_source_ids_filter: set[int] | None,
     ) -> list[dict[str, Any]]:
         if not group_ids:
             return []
@@ -624,6 +853,7 @@ class SNPSNPModelReport(ReportBase):
                 rt.code.label("relationship_type"),
                 EntityRelationship.entity_1_id.label("group_id"),
                 EntityRelationship.entity_2_id.label("gene_id"),
+                EntityRelationship.data_source_id.label("data_source_id"),
             )
             .join(rt, rt.id == EntityRelationship.relationship_type_id)
             .join(e1, e1.id == EntityRelationship.entity_1_id)
@@ -639,6 +869,10 @@ class SNPSNPModelReport(ReportBase):
             q1 = q1.filter(func.lower(eg1.name).in_(list(group_group_filter)))
         if gene_group_filter:
             q1 = q1.filter(func.lower(eg2.name).in_(list(gene_group_filter)))
+        if group_data_source_ids_filter is not None:
+            q1 = q1.filter(
+                EntityRelationship.data_source_id.in_(list(group_data_source_ids_filter))
+            )
 
         for row in q1.all():
             rows_out.append(
@@ -647,6 +881,7 @@ class SNPSNPModelReport(ReportBase):
                     "relationship_type": row.relationship_type,
                     "group_id": int(row.group_id),
                     "gene_id": int(row.gene_id),
+                    "data_source_id": _parse_int(row.data_source_id),
                 }
             )
 
@@ -656,6 +891,7 @@ class SNPSNPModelReport(ReportBase):
                 rt.code.label("relationship_type"),
                 EntityRelationship.entity_2_id.label("group_id"),
                 EntityRelationship.entity_1_id.label("gene_id"),
+                EntityRelationship.data_source_id.label("data_source_id"),
             )
             .join(rt, rt.id == EntityRelationship.relationship_type_id)
             .join(e1, e1.id == EntityRelationship.entity_2_id)
@@ -671,6 +907,10 @@ class SNPSNPModelReport(ReportBase):
             q2 = q2.filter(func.lower(eg1.name).in_(list(group_group_filter)))
         if gene_group_filter:
             q2 = q2.filter(func.lower(eg2.name).in_(list(gene_group_filter)))
+        if group_data_source_ids_filter is not None:
+            q2 = q2.filter(
+                EntityRelationship.data_source_id.in_(list(group_data_source_ids_filter))
+            )
 
         for row in q2.all():
             rows_out.append(
@@ -679,6 +919,7 @@ class SNPSNPModelReport(ReportBase):
                     "relationship_type": row.relationship_type,
                     "group_id": int(row.group_id),
                     "gene_id": int(row.gene_id),
+                    "data_source_id": _parse_int(row.data_source_id),
                 }
             )
 
@@ -788,10 +1029,65 @@ class SNPSNPModelReport(ReportBase):
         )
 
         gene_group_filter = _as_ci_set(self.param("gene_entity_groups", ["Gene", "Genes"]))
-        group_group_filter = _as_ci_set(
-            self.param("group_entity_groups", ["Pathway", "Pathways"])
+        group_filter_input = self.param("group_entity_groups", None)
+        if group_filter_input is None:
+            group_filter_input = self.param("group_group_filter", None)
+
+        if group_filter_input is None:
+            group_group_filter_raw = {"pathway", "pathways"}
+        else:
+            group_group_filter_raw = _as_ci_set(group_filter_input)
+
+        has_direct_gene_mode = any(
+            token in _DIRECT_GENE_TOKENS for token in group_group_filter_raw
         )
-        relationship_type_filter = _as_ci_set(self.param("relationship_types", ["in_pathway"]))
+        group_group_filter_raw = {
+            token for token in group_group_filter_raw if token not in _DIRECT_GENE_TOKENS
+        }
+
+        available_group_map = self._available_group_name_map()
+        group_group_filter, unresolved_groups = self._resolve_group_tokens(
+            tokens=group_group_filter_raw,
+            available_map=available_group_map,
+        )
+
+        if unresolved_groups and not group_group_filter and not has_direct_gene_mode:
+            raise ValueError(
+                "Invalid group_entity_groups: "
+                + ", ".join(unresolved_groups)
+                + ". "
+                + self._group_help_message(available_group_map)
+            )
+
+        if not group_group_filter and not has_direct_gene_mode:
+            raise ValueError(self._group_help_message(available_group_map))
+
+        group_data_sources_input = self.param("group_data_sources", None)
+        if group_data_sources_input is None:
+            group_data_sources_input = self.param("data_sources", None)
+        group_data_source_tokens = _as_ci_set(group_data_sources_input)
+        group_data_source_ids_filter: set[int] | None = None
+        data_source_name_by_id: dict[int, str] = {}
+        if group_data_source_tokens:
+            ds_name_to_id, data_source_name_by_id = self._available_data_source_maps()
+            resolved_ds_ids, unresolved_ds = self._resolve_data_source_tokens(
+                tokens=group_data_source_tokens,
+                name_to_id=ds_name_to_id,
+                id_to_name=data_source_name_by_id,
+            )
+            if unresolved_ds and not resolved_ds_ids:
+                raise ValueError(
+                    "Invalid group_data_sources: "
+                    + ", ".join(unresolved_ds)
+                    + ". "
+                    + self._data_source_help_message(data_source_name_by_id)
+                )
+            group_data_source_ids_filter = resolved_ds_ids if resolved_ds_ids else None
+        else:
+            _, data_source_name_by_id = self._available_data_source_maps()
+
+        # Disabled by default: keep all relationship types unless explicitly provided.
+        relationship_type_filter = _as_ci_set(self.param("relationship_types", None))
 
         group_entities_keys = _as_list_ci_ordered(self.param("group_entities", None))
 
@@ -895,49 +1191,71 @@ class SNPSNPModelReport(ReportBase):
         # Step 3: seed genes -> biological groups (pathways, etc.)
         # ------------------------------------------------------------------
         group_entity_ids_filter: set[int] | None = None
-        if group_entities_keys:
-            resolved_ids, found_keys = self._resolve_entities_by_alias(
-                alias_keys=group_entities_keys,
-                group_filter=group_group_filter,
+        seed_group_links: list[dict[str, Any]] = []
+        selected_group_ids: set[int] = set()
+
+        if group_group_filter:
+            if group_entities_keys:
+                resolved_ids, found_keys = self._resolve_entities_by_alias(
+                    alias_keys=group_entities_keys,
+                    group_filter=group_group_filter,
+                )
+                group_entity_ids_filter = resolved_ids
+                if emit_not_found_rows:
+                    missing = [k for k in group_entities_keys if k not in found_keys]
+                    for key in missing:
+                        row = self._base_row()
+                        row["row_type"] = "input"
+                        row["observation"] = "not_found"
+                        row["note"] = f"Group entity not resolved: {key}"
+                        row["input_original"] = key
+                        row["build"] = build
+                        row["window_bp"] = window_bp
+                        rows_out.append(row)
+
+            seed_group_links = self._query_seed_gene_to_groups(
+                seed_gene_ids=seed_gene_ids,
+                relationship_type_filter=relationship_type_filter,
+                gene_group_filter=gene_group_filter,
+                group_group_filter=group_group_filter,
+                group_entity_ids_filter=group_entity_ids_filter,
+                group_data_source_ids_filter=group_data_source_ids_filter,
             )
-            group_entity_ids_filter = resolved_ids
-            if emit_not_found_rows:
-                missing = [k for k in group_entities_keys if k not in found_keys]
-                for key in missing:
-                    row = self._base_row()
-                    row["row_type"] = "input"
-                    row["observation"] = "not_found"
-                    row["note"] = f"Group entity not resolved: {key}"
-                    row["input_original"] = key
-                    row["build"] = build
-                    row["window_bp"] = window_bp
-                    rows_out.append(row)
 
-        seed_group_links = self._query_seed_gene_to_groups(
-            seed_gene_ids=seed_gene_ids,
-            relationship_type_filter=relationship_type_filter,
-            gene_group_filter=gene_group_filter,
-            group_group_filter=group_group_filter,
-            group_entity_ids_filter=group_entity_ids_filter,
-        )
-
-        selected_group_ids: set[int] = {int(x["group_id"]) for x in seed_group_links}
+            selected_group_ids = {int(x["group_id"]) for x in seed_group_links}
 
         # ------------------------------------------------------------------
         # Step 4: selected groups -> expanded genes
         # ------------------------------------------------------------------
-        group_gene_links = self._query_groups_to_genes(
-            group_ids=selected_group_ids,
-            relationship_type_filter=relationship_type_filter,
-            gene_group_filter=gene_group_filter,
-            group_group_filter=group_group_filter,
-        )
+        group_gene_links: list[dict[str, Any]] = []
+        if selected_group_ids:
+            group_gene_links = self._query_groups_to_genes(
+                group_ids=selected_group_ids,
+                relationship_type_filter=relationship_type_filter,
+                gene_group_filter=gene_group_filter,
+                group_group_filter=group_group_filter,
+                group_data_source_ids_filter=group_data_source_ids_filter,
+            )
 
         group_to_gene_ids: dict[int, set[int]] = {}
+        group_to_data_source_ids: dict[int, set[int]] = {}
         for link in seed_group_links + group_gene_links:
             gid = int(link["group_id"])
             egid = int(link["gene_id"])
             group_to_gene_ids.setdefault(gid, set()).add(egid)
+            ds_id = _parse_int(link.get("data_source_id"))
+            if ds_id is not None:
+                group_to_data_source_ids.setdefault(gid, set()).add(int(ds_id))
+
+        group_to_gene_ids = _prune_group_to_gene_ids_for_scope(
+            group_to_gene_ids=group_to_gene_ids,
+            seed_gene_ids=seed_gene_ids,
+            scope=gene_pair_scope,
+        )
+        group_to_data_source_ids = {
+            group_id: group_to_data_source_ids.get(group_id, set())
+            for group_id in group_to_gene_ids
+        }
 
         expanded_gene_ids: set[int] = set(seed_gene_ids)
         for members in group_to_gene_ids.values():
@@ -947,13 +1265,36 @@ class SNPSNPModelReport(ReportBase):
         # Step 5: gene-gene from co-membership in selected groups
         # ------------------------------------------------------------------
         pair_to_group_ids: dict[tuple[int, int], set[int]] = {}
+        pair_to_data_source_ids: dict[tuple[int, int], set[int]] = {}
+        support_name_by_id: dict[int, str] = {}
+
         for group_id, members in group_to_gene_ids.items():
             for gene_1_id, gene_2_id in _iter_group_gene_pairs(
                 members=members,
                 seed_gene_ids=seed_gene_ids,
                 scope=gene_pair_scope,
             ):
-                pair_to_group_ids.setdefault((gene_1_id, gene_2_id), set()).add(int(group_id))
+                pair_key = (gene_1_id, gene_2_id)
+                pair_to_group_ids.setdefault(pair_key, set()).add(int(group_id))
+                pair_to_data_source_ids.setdefault(pair_key, set()).update(
+                    group_to_data_source_ids.get(int(group_id), set())
+                )
+
+        if has_direct_gene_mode:
+            direct_links = self._query_direct_gene_links(
+                seed_gene_ids=seed_gene_ids,
+                relationship_type_filter=relationship_type_filter,
+                gene_group_filter=gene_group_filter,
+                group_data_source_ids_filter=group_data_source_ids_filter,
+            )
+            for link in direct_links:
+                gene_pair = (int(link["gene_1_id"]), int(link["gene_2_id"]))
+                synthetic_support_id = -int(link["relationship_id"])
+                pair_to_group_ids.setdefault(gene_pair, set()).add(synthetic_support_id)
+                support_name_by_id[synthetic_support_id] = "Direct Gene"
+                ds_id = _parse_int(link.get("data_source_id"))
+                if ds_id is not None:
+                    pair_to_data_source_ids.setdefault(gene_pair, set()).add(int(ds_id))
 
         relationship_types_used = (
             ",".join(sorted(relationship_type_filter)) if relationship_type_filter else "any"
@@ -989,8 +1330,13 @@ class SNPSNPModelReport(ReportBase):
             gene_pair_scope_value = _seed_scope(seed_count)
             group_ids_sorted = sorted(support_groups)
             group_names = [
-                _entity_name(group_id)
+                support_name_by_id.get(group_id) or _entity_name(group_id)
                 for group_id in group_ids_sorted
+            ]
+            ds_ids_sorted = sorted(pair_to_data_source_ids.get((gene_1_id, gene_2_id), set()))
+            ds_names = [
+                data_source_name_by_id.get(data_source_id) or str(data_source_id)
+                for data_source_id in ds_ids_sorted
             ]
 
             model = {
@@ -1000,6 +1346,8 @@ class SNPSNPModelReport(ReportBase):
                 "gene_pair_seed_scope": gene_pair_scope_value,
                 "group_ids": group_ids_sorted,
                 "group_names": group_names,
+                "data_source_ids": ds_ids_sorted,
+                "data_source_names": ds_names,
             }
             gene_pair_models.append(model)
             genes_in_pair_models.add(int(gene_1_id))
@@ -1019,6 +1367,9 @@ class SNPSNPModelReport(ReportBase):
                 row["group_support_count"] = len(group_ids_sorted)
                 row["group_support_ids"] = "|".join(str(x) for x in group_ids_sorted)
                 row["group_support_names"] = "|".join(group_names)
+                row["data_source_support_count"] = len(ds_ids_sorted)
+                row["data_source_support_ids"] = "|".join(str(x) for x in ds_ids_sorted)
+                row["data_source_support_names"] = "|".join(ds_names)
                 rows_out.append(row)
 
         # ------------------------------------------------------------------
@@ -1106,6 +1457,13 @@ class SNPSNPModelReport(ReportBase):
                         row["group_support_count"] = len(model["group_ids"])
                         row["group_support_ids"] = "|".join(str(x) for x in model["group_ids"])
                         row["group_support_names"] = "|".join(model["group_names"])
+                        row["data_source_support_count"] = len(model["data_source_ids"])
+                        row["data_source_support_ids"] = "|".join(
+                            str(x) for x in model["data_source_ids"]
+                        )
+                        row["data_source_support_names"] = "|".join(
+                            model["data_source_names"]
+                        )
 
                         row["variant_1_id"] = id1
                         row["variant_1_rsid"] = v1.get("rsid")

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
+import pytest
 from sqlalchemy import (
     BigInteger,
     Column,
@@ -15,6 +16,8 @@ from sqlalchemy.orm import sessionmaker
 
 from biofilter.modules.db.base import Base
 from biofilter.modules.db.models import (
+    ETLDataSource,
+    ETLSourceSystem,
     Entity,
     EntityAlias,
     EntityGroup,
@@ -158,7 +161,31 @@ def _seed(session):
     )
 
     in_pathway = EntityRelationshipType(code="in_pathway", description="in pathway")
-    session.add(in_pathway)
+    interacts_with = EntityRelationshipType(
+        code="interacts_with",
+        description="direct interaction",
+    )
+    source_system = ETLSourceSystem(name="UNIT_TEST_SOURCE", active=True)
+    session.add(source_system)
+    session.flush()
+
+    reactome_ds = ETLDataSource(
+        name="Reactome",
+        source_system_id=source_system.id,
+        data_type="Pathway",
+        format="TSV",
+        dtp_script="tests/reactome.py",
+        active=True,
+    )
+    kegg_ds = ETLDataSource(
+        name="KEGG",
+        source_system_id=source_system.id,
+        data_type="Pathway",
+        format="TSV",
+        dtp_script="tests/kegg.py",
+        active=True,
+    )
+    session.add_all([in_pathway, interacts_with, reactome_ds, kegg_ds])
     session.flush()
 
     session.add_all(
@@ -169,6 +196,7 @@ def _seed(session):
                 entity_2_id=dna_repair.id,
                 entity_2_group_id=pathway.id,
                 relationship_type_id=in_pathway.id,
+                data_source_id=reactome_ds.id,
             ),
             EntityRelationship(
                 entity_1_id=brca1.id,
@@ -176,6 +204,7 @@ def _seed(session):
                 entity_2_id=dna_repair.id,
                 entity_2_group_id=pathway.id,
                 relationship_type_id=in_pathway.id,
+                data_source_id=reactome_ds.id,
             ),
             EntityRelationship(
                 entity_1_id=pten.id,
@@ -183,6 +212,16 @@ def _seed(session):
                 entity_2_id=dna_repair.id,
                 entity_2_group_id=pathway.id,
                 relationship_type_id=in_pathway.id,
+                data_source_id=kegg_ds.id,
+            ),
+            # Direct gene-gene edge for Direct Gene mode
+            EntityRelationship(
+                entity_1_id=tp53.id,
+                entity_1_group_id=gene.id,
+                entity_2_id=brca1.id,
+                entity_2_group_id=gene.id,
+                relationship_type_id=interacts_with.id,
+                data_source_id=kegg_ds.id,
             ),
         ]
     )
@@ -378,3 +417,72 @@ def test_non_snv_seed_position_is_reported_as_not_found():
     input_rows = df[df["row_type"] == "input"]
     assert len(input_rows) >= 1
     assert "not_found" in set(input_rows["observation"].tolist())
+
+
+def test_direct_gene_mode_builds_pairs_without_intermediate_group_entity():
+    session, vm = _make_session()
+    with session:
+        _seed(session)
+        _seed_variants(session, vm)
+
+        report = _report(
+            session,
+            input_data=["chr17:150", "chr17:280"],
+            group_entity_groups=["Direct Gene"],
+            gene_pair_scope="both_from_seed",
+            snp_pair_scope="both_from_seed",
+        )
+        df = report.run()
+
+    gene_rows = df[df["row_type"] == "gene_pair"]
+    snp_rows = df[df["row_type"] == "snp_pair"]
+
+    assert len(gene_rows) == 1
+    assert set(gene_rows["group_support_names"].tolist()) == {"Direct Gene"}
+    assert len(snp_rows) == 1
+    assert set(snp_rows["group_support_names"].tolist()) == {"Direct Gene"}
+
+
+def test_invalid_group_entity_groups_returns_helpful_error():
+    session, vm = _make_session()
+    with session:
+        _seed(session)
+        _seed_variants(session, vm)
+
+        report = _report(
+            session,
+            input_data=["chr17:150"],
+            group_entity_groups=["NOT_A_GROUP_TYPE"],
+        )
+        with pytest.raises(ValueError, match="group_entity_groups"):
+            report.run()
+
+
+def test_group_data_sources_filters_grouping_step_and_emits_ds_support():
+    session, vm = _make_session()
+    with session:
+        _seed(session)
+        _seed_variants(session, vm)
+
+        report = _report(
+            session,
+            input_data=["chr17:150"],
+            group_entity_groups=["Pathway"],
+            relationship_types=["in_pathway"],
+            group_data_sources=["Reactome"],
+        )
+        df = report.run()
+
+    gene_rows = df[df["row_type"] == "gene_pair"]
+    snp_rows = df[df["row_type"] == "snp_pair"]
+
+    assert len(gene_rows) == 1
+    grow = gene_rows.iloc[0]
+    assert {grow["gene_1_name"], grow["gene_2_name"]} == {"TP53", "BRCA1"}
+    assert grow["data_source_support_names"] == "Reactome"
+    assert int(grow["data_source_support_count"]) == 1
+
+    assert len(snp_rows) == 1
+    srow = snp_rows.iloc[0]
+    assert {srow["variant_1_rsid"], srow["variant_2_rsid"]} == {"rs111", "rs222"}
+    assert srow["data_source_support_names"] == "Reactome"

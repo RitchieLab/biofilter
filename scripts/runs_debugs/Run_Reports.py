@@ -96,20 +96,32 @@ df = bf.report.run(
     build=38,
     window_bp=0,
     group_entity_groups=['Pathways'],
+    gene_pair_scope='both_from_seed',
+)
+
+df = bf.report.run(
+    'snp_snp_model',
+    input_data=['chr7:128858174', 'chr17:12061622'],
+    build=38,
+    window_bp=0,
+    group_entity_groups=['Direct Gene'],
+    # group_data_sources=["biofilter"],
     # relationship_types=['in_pathway'],
     gene_pair_scope='both_from_seed',
     # snp_pair_scope='at_least_one_from_seed',
 )
 
-df = bf.report.run(
-    'snp_snp_model',
-    input_data=['chr19:44904604', 'chr1:13259', 'chr15:63279422'],
-    build=38,
-    window_bp=0,
-    group_entity_groups=['Pathways'],
-    gene_pair_scope='both_from_seed',
-)
+# df = bf.report.run(
+#     'snp_snp_model',
+#     input_data=['chr19:44904604', 'chr1:13259', 'chr15:63279422'],
+#     build=38,
+#     window_bp=0,
+#     group_entity_groups=['Pathways'],
+#     gene_pair_scope='both_from_seed',
+# )
 
+# 7 - 128830312-128859275
+# 17 - 12020828-12143830
 
 print('rows:', len(df))
 print(df)
