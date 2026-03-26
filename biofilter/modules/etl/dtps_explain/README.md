@@ -42,3 +42,4 @@ Available explain docs:
 - [`dtp_uniprot.md`](dtp_uniprot.md)
 - [`dtp_uniprot_relationships.md`](dtp_uniprot_relationships.md)
 - [`dtp_variant_gnomad.md`](dtp_variant_gnomad.md)
+- [`dtp_variant_alphamissense.md`](dtp_variant_alphamissense.md)

@@ -870,6 +870,19 @@
             "active": false,
             "dtp_version": "1.1.0",
             "schema_version": "3.1.0"
+        },
+        {
+            "source_system": "AlphaMissense",
+            "name": "alphamissense",
+            "data_type": "Variant",
+            "source_url": "https://storage.googleapis.com/dm_alphamissense/AlphaMissense_hg38.tsv.gz",
+            "format": "TSV.GZ",
+            "grch_version": "GRCh38",
+            "ucschg_version": "hg38",
+            "dtp_script": "dtp_variant_alphamissense",
+            "active": true,
+            "dtp_version": "1.0.0",
+            "schema_version": "4.1.0"
         }
     ]
 }

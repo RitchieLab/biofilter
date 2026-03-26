@@ -77,6 +77,12 @@
             "description": "Genome Aggregation Database.",
             "homepage": "https://gnomad.broadinstitute.org/",
             "active": true
+        },
+        {
+            "name": "AlphaMissense",
+            "description": "DeepMind AlphaMissense pathogenicity predictor for missense variants.",
+            "homepage": "https://console.cloud.google.com/storage/browser/dm_alphamissense",
+            "active": true
         }
     ]
 }

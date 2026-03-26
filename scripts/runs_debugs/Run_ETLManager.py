@@ -81,12 +81,13 @@ data_sources_to_process = [
     # "gnomad_chrx",
     # "gnomad_chry",
     # "gnomad_chrmt",
+    "alphamissense",
 
     #
     # DISEASE
     # -------
     # "mondo",
-    "clingen",
+    # "clingen",
     # "omim",
 
     # CHEMICAL
@@ -102,9 +103,9 @@ data_sources_to_process = [
 ]
 
 run_steps = [
-    "extract",
-    "transform",
-    # "load",
+    # "extract",
+    # "transform",
+    "load",
     # "all"
 ]  # noqa E501
 
