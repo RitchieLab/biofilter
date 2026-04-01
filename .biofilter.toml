@@ -1,5 +1,5 @@
 [database]
-db_uri = "postgresql+psycopg2://admin:admin@localhost/biofilter_dev"
+db_uri = "postgresql+psycopg2://bioadmin:bioadmin@109.199.114.191:5432/biofilter_prod"
 db_uri_local = "postgresql+psycopg2://admin:admin@localhost/biofilter_dev"
 db_uri_vps = "postgresql+psycopg2://bioadmin:bioadmin@127.0.0.1:5432/biofilter_dev"
 db_uri_vps_external = "postgresql+psycopg2://bioadmin:bioadmin@109.199.114.191:5432/biofilter_prod"

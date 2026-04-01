@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib
 import pkgutil
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Dict, Iterable, List, Optional, Type
@@ -246,12 +247,57 @@ class ReportManager:
             return cls(session=session, logger=self.logger, **kwargs)
 
     def run(self, identifier: str, **kwargs):
+        start_time = time.perf_counter()
+        report_name = identifier
+        self.logger.log(
+            (
+                f"Starting report '{identifier}'. Execution may take some time. "
+                "If the process is terminated, execution will be interrupted."
+            ),
+            "INFO",
+        )
+
         with self._session_factory() as session:
             try:
                 report = self.get(identifier, session=session, **kwargs)
-                return report.run()
+                report_name = getattr(report, "name", identifier)
+                result = report.run()
+
+                elapsed_seconds = time.perf_counter() - start_time
+                elapsed_minutes = elapsed_seconds / 60.0
+                self.logger.log(
+                    (
+                        f"Report '{report_name}' completed in {elapsed_minutes:.2f} "
+                        f"minutes ({elapsed_seconds:.2f} seconds)."
+                    ),
+                    "INFO",
+                )
+                return result
+            except KeyboardInterrupt:
+                elapsed_seconds = time.perf_counter() - start_time
+                elapsed_minutes = elapsed_seconds / 60.0
+                self.logger.log(
+                    (
+                        f"Report '{report_name}' was interrupted after "
+                        f"{elapsed_minutes:.2f} minutes."
+                    ),
+                    "WARNING",
+                )
+                try:
+                    session.rollback()
+                except Exception:
+                    pass
+                raise
             except Exception as e:
-                self.logger.log(f"Report '{identifier}' failed: {e}", "ERROR")
+                elapsed_seconds = time.perf_counter() - start_time
+                elapsed_minutes = elapsed_seconds / 60.0
+                self.logger.log(
+                    (
+                        f"Report '{report_name}' failed after "
+                        f"{elapsed_minutes:.2f} minutes: {e}"
+                    ),
+                    "ERROR",
+                )
                 try:
                     session.rollback()
                 except Exception:

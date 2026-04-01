@@ -1,0 +1,1 @@
+variant_key,variant_id_in_vcf,chromosome,position_start,position_end,reference_allele,alternate_allele,group_by,bin_type,bin_name,gene_entity_id,gene_symbol,maf_filter,maf_overall,maf_case,maf_control,af_overall,af_case,af_control,ac_overall,an_overall,ac_case,an_case,ac_control,an_control

@@ -1,0 +1,5 @@
+sample_id,phenotype_value,sample_class
+S1,1,case
+S2,1,case
+S3,0,control
+S4,0,control

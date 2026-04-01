@@ -1,0 +1,34 @@
+{
+  "report_name": "variant_binning",
+  "group_by": "locus_type",
+  "build": 38,
+  "maf_cutoff": 0.3,
+  "rare_case_control_requested": true,
+  "rare_case_control_active": true,
+  "overall_major_allele": true,
+  "include_zero_counts": true,
+  "phenotype_file": "tmp/variant_binning_tutorial/mini_phenotype.csv",
+  "resolved_phenotype_column": "Phenotype",
+  "samples_total_in_vcf": 4,
+  "samples_selected": 4,
+  "samples_case": 2,
+  "samples_control": 2,
+  "variants_processed": 2,
+  "variants_rare": 1,
+  "variants_with_gene_overlap": 1,
+  "variants_binned": 1,
+  "bins_generated": 1,
+  "artifacts": {
+    "bin_counts": "tmp/variant_binning_tutorial/out_locus_type/bin_counts.csv",
+    "variant_to_bin": "tmp/variant_binning_tutorial/out_locus_type/variant_to_bin.csv",
+    "bin_definitions": "tmp/variant_binning_tutorial/out_locus_type/bin_definitions.csv",
+    "bin_member_counts": "tmp/variant_binning_tutorial/out_locus_type/bin_member_counts.csv",
+    "sample_bin_long": "tmp/variant_binning_tutorial/out_locus_type/sample_bin_long.csv",
+    "summary_json": "tmp/variant_binning_tutorial/out_locus_type/summary.json"
+  },
+  "notes": {
+    "maf_internal_only": true,
+    "gnomad_external_maf_applied": false,
+    "rare_rule": "max(maf_case, maf_control) <= maf_cutoff"
+  }
+}

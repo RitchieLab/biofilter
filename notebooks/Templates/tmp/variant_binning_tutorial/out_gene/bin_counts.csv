@@ -1,0 +1,5 @@
+sample_id,phenotype_value,sample_class,DDX11L1
+S1,1,case,1
+S2,1,case,0
+S3,0,control,0
+S4,0,control,0
