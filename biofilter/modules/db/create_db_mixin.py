@@ -86,7 +86,11 @@ class CreateDBMixin:
         target_db = url.database
         admin_url = url.set(database="postgres")
 
-        admin_engine = create_engine(admin_url, future=True)
+        engine_kwargs = {"future": True}
+        builder = getattr(self, "_engine_kwargs", None)
+        if callable(builder):
+            engine_kwargs = builder(admin_url)
+        admin_engine = create_engine(admin_url, **engine_kwargs)
 
         # AUTOCOMMIT is required for CREATE DATABASE
         with admin_engine.connect().execution_options(

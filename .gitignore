@@ -158,3 +158,6 @@ biofilter_bundle
 ## KDC
 tests/test_data/kdc/
 
+# Notebook job files (large data files, outputs, scripts)
+notebooks/Andre/jobs/
+

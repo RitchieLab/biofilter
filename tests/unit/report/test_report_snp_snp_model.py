@@ -5,7 +5,9 @@ from types import SimpleNamespace
 import pytest
 from sqlalchemy import (
     BigInteger,
+    Boolean,
     Column,
+    Float,
     Integer,
     MetaData,
     String,
@@ -16,14 +18,14 @@ from sqlalchemy.orm import sessionmaker
 
 from biofilter.modules.db.base import Base
 from biofilter.modules.db.models import (
-    ETLDataSource,
-    ETLSourceSystem,
     Entity,
     EntityAlias,
     EntityGroup,
     EntityLocation,
     EntityRelationship,
     EntityRelationshipType,
+    ETLDataSource,
+    ETLSourceSystem,
     GenomeAssembly,
 )
 from biofilter.modules.report.reports.report_snp_snp_model import SNPSNPModelReport
@@ -56,9 +58,60 @@ def _create_variant_masters_table(engine):
         Column("alternate_allele", String(256), nullable=False),
         Column("allele_type", String(20), nullable=True),
         Column("rsid", String(32), nullable=True),
+        Column("an", BigInteger, nullable=True),
+        Column("grpmax", String(32), nullable=True),
+        Column("cadd_raw_score", Float, nullable=True),
+        Column("cadd_phred", Float, nullable=True),
     )
     metadata.create_all(engine)
     return vm
+
+
+def _create_variant_annotation_tables(engine):
+    metadata = MetaData()
+    vcg = Table(
+        "variant_consequence_groups",
+        metadata,
+        Column("id", Integer, primary_key=True, autoincrement=False),
+        Column("name", String(64), nullable=False),
+    )
+    vcc = Table(
+        "variant_consequence_categories",
+        metadata,
+        Column("id", Integer, primary_key=True, autoincrement=False),
+        Column("name", String(64), nullable=False),
+    )
+    vc = Table(
+        "variant_consequences",
+        metadata,
+        Column("id", Integer, primary_key=True, autoincrement=False),
+        Column("name", String(64), nullable=False),
+        Column("severity_rank", Integer, nullable=False),
+        Column("consequence_group_id", Integer, nullable=True),
+        Column("consequence_category_id", Integer, nullable=True),
+        Column("is_active", Boolean, nullable=False, default=True),
+    )
+    vme = Table(
+        "variant_molecular_effects",
+        metadata,
+        Column("chromosome", Integer, nullable=False),
+        Column("variant_id", Integer, nullable=False),
+        Column("transcript_id", String(32), nullable=False),
+        Column("consequence_id", Integer, nullable=False),
+        Column("lof_confidence", String(8), nullable=True),
+    )
+    vep = Table(
+        "variant_effect_predictions",
+        metadata,
+        Column("chromosome", Integer, nullable=False),
+        Column("variant_id", Integer, nullable=False),
+        Column("predictor_key", String(128), nullable=False),
+        Column("predictor_name", String(64), nullable=False),
+        Column("score", Float, nullable=True),
+        Column("classification", String(64), nullable=True),
+    )
+    metadata.create_all(engine)
+    return {"vcg": vcg, "vcc": vcc, "vc": vc, "vme": vme, "vep": vep}
 
 
 def _make_session():
@@ -241,6 +294,10 @@ def _seed_variants(session, vm):
                 "alternate_allele": "G",
                 "allele_type": "snv",
                 "rsid": "rs111",
+                "an": 100,
+                "grpmax": "nfe",
+                "cadd_raw_score": 2.1,
+                "cadd_phred": 15.2,
             },
             {
                 "variant_id": 2,
@@ -251,6 +308,10 @@ def _seed_variants(session, vm):
                 "alternate_allele": "T",
                 "allele_type": "snv",
                 "rsid": "rs222",
+                "an": 120,
+                "grpmax": "afr",
+                "cadd_raw_score": 0.5,
+                "cadd_phred": 7.0,
             },
             {
                 "variant_id": 3,
@@ -261,6 +322,10 @@ def _seed_variants(session, vm):
                 "alternate_allele": "A",
                 "allele_type": "snv",
                 "rsid": "rs333",
+                "an": None,
+                "grpmax": None,
+                "cadd_raw_score": None,
+                "cadd_phred": None,
             },
             # Same logical variant (same rsid) with another ALT allele.
             # Report should keep only one row after variant dedupe.
@@ -273,6 +338,10 @@ def _seed_variants(session, vm):
                 "alternate_allele": "G",
                 "allele_type": "snv",
                 "rsid": "rs222",
+                "an": None,
+                "grpmax": None,
+                "cadd_raw_score": None,
+                "cadd_phred": None,
             },
             # Non-SNV rows must be ignored by the report.
             {
@@ -284,6 +353,10 @@ def _seed_variants(session, vm):
                 "alternate_allele": "AG",
                 "allele_type": "ins",
                 "rsid": "rsINS150",
+                "an": None,
+                "grpmax": None,
+                "cadd_raw_score": None,
+                "cadd_phred": None,
             },
             {
                 "variant_id": 6,
@@ -294,6 +367,91 @@ def _seed_variants(session, vm):
                 "alternate_allele": "AT",
                 "allele_type": "ins",
                 "rsid": "rsINS155",
+                "an": None,
+                "grpmax": None,
+                "cadd_raw_score": None,
+                "cadd_phred": None,
+            },
+        ],
+    )
+    session.commit()
+
+
+def _seed_variant_annotations(session):
+    tables = _create_variant_annotation_tables(getattr(session, "bind", None))
+
+    session.execute(
+        tables["vcg"].insert(),
+        [
+            {"id": 1, "name": "Coding"},
+            {"id": 2, "name": "Regulatory"},
+        ],
+    )
+    session.execute(
+        tables["vcc"].insert(),
+        [
+            {"id": 1, "name": "Protein altering"},
+            {"id": 2, "name": "Non-coding"},
+        ],
+    )
+    session.execute(
+        tables["vc"].insert(),
+        [
+            {
+                "id": 10,
+                "name": "missense_variant",
+                "severity_rank": 4,
+                "consequence_group_id": 1,
+                "consequence_category_id": 1,
+                "is_active": True,
+            },
+            {
+                "id": 20,
+                "name": "intron_variant",
+                "severity_rank": 20,
+                "consequence_group_id": 2,
+                "consequence_category_id": 2,
+                "is_active": True,
+            },
+        ],
+    )
+    session.execute(
+        tables["vme"].insert(),
+        [
+            {
+                "chromosome": 17,
+                "variant_id": 1,
+                "transcript_id": "ENST000001",
+                "consequence_id": 10,
+                "lof_confidence": "HC",
+            },
+            {
+                "chromosome": 17,
+                "variant_id": 2,
+                "transcript_id": "ENST000002",
+                "consequence_id": 20,
+                "lof_confidence": "LC",
+            },
+        ],
+    )
+    session.execute(
+        tables["vep"].insert(),
+        [
+            {
+                "chromosome": 17,
+                "variant_id": 1,
+                "predictor_key": "alphamissense:v1:-",
+                "predictor_name": "alphamissense",
+                "score": 0.91,
+                "classification": "likely_pathogenic",
+            },
+            {
+                "chromosome": 17,
+                "variant_id": 2,
+                "predictor_key": "cadd:v1:-",
+                "predictor_name": "cadd",
+                "score": 7.0,
+                "classification": "moderate",
             },
         ],
     )
@@ -486,3 +644,87 @@ def test_group_data_sources_filters_grouping_step_and_emits_ds_support():
     srow = snp_rows.iloc[0]
     assert {srow["variant_1_rsid"], srow["variant_2_rsid"]} == {"rs111", "rs222"}
     assert srow["data_source_support_names"] == "Reactome"
+
+
+# Return old version without extended fields
+# def test_snp_pair_rows_include_variant_master_effect_and_prediction_fields():
+#     session, vm = _make_session()
+#     with session:
+#         _seed(session)
+#         _seed_variants(session, vm)
+#         _seed_variant_annotations(session)
+
+#         report = _report(
+#             session,
+#             input_data=["chr17:150", "chr17:280"],
+#             group_entity_groups=["Pathway"],
+#             relationship_types=["in_pathway"],
+#             gene_pair_scope="both_from_seed",
+#             snp_pair_scope="both_from_seed",
+#         )
+#         df = report.run()
+
+#     snp_rows = df[df["row_type"] == "snp_pair"]
+#     assert len(snp_rows) == 1
+#     srow = snp_rows.iloc[0]
+
+#     by_rsid = {
+#         srow["variant_1_rsid"]: {
+#             "an": srow["variant_1_an"],
+#             "grpmax": srow["variant_1_grpmax"],
+#             "cadd_raw_score": srow["variant_1_cadd_raw_score"],
+#             "cadd_phred": srow["variant_1_cadd_phred"],
+#             "consequence_ids": srow["variant_1_consequence_ids"],
+#             "consequence_names": srow["variant_1_consequence_names"],
+#             "consequence_groups": srow["variant_1_consequence_groups"],
+#             "consequence_categories": srow["variant_1_consequence_categories"],
+#             "lof_confidences": srow["variant_1_lof_confidences"],
+#             "predictor_names": srow["variant_1_predictor_names"],
+#             "prediction_scores": srow["variant_1_prediction_scores"],
+#             "prediction_classifications": srow[
+#                 "variant_1_prediction_classifications"
+#             ],
+#         },
+#         srow["variant_2_rsid"]: {
+#             "an": srow["variant_2_an"],
+#             "grpmax": srow["variant_2_grpmax"],
+#             "cadd_raw_score": srow["variant_2_cadd_raw_score"],
+#             "cadd_phred": srow["variant_2_cadd_phred"],
+#             "consequence_ids": srow["variant_2_consequence_ids"],
+#             "consequence_names": srow["variant_2_consequence_names"],
+#             "consequence_groups": srow["variant_2_consequence_groups"],
+#             "consequence_categories": srow["variant_2_consequence_categories"],
+#             "lof_confidences": srow["variant_2_lof_confidences"],
+#             "predictor_names": srow["variant_2_predictor_names"],
+#             "prediction_scores": srow["variant_2_prediction_scores"],
+#             "prediction_classifications": srow[
+#                 "variant_2_prediction_classifications"
+#             ],
+#         },
+#     }
+
+#     assert by_rsid["rs111"]["an"] == 100
+#     assert by_rsid["rs111"]["grpmax"] == "nfe"
+#     assert by_rsid["rs111"]["cadd_raw_score"] == 2.1
+#     assert by_rsid["rs111"]["cadd_phred"] == 15.2
+#     assert by_rsid["rs111"]["consequence_ids"] == "10"
+#     assert by_rsid["rs111"]["consequence_names"] == "missense_variant"
+#     assert by_rsid["rs111"]["consequence_groups"] == "Coding"
+#     assert by_rsid["rs111"]["consequence_categories"] == "Protein altering"
+#     assert by_rsid["rs111"]["lof_confidences"] == "HC"
+#     assert by_rsid["rs111"]["predictor_names"] == "alphamissense"
+#     assert by_rsid["rs111"]["prediction_scores"] == "0.91"
+#     assert by_rsid["rs111"]["prediction_classifications"] == "likely_pathogenic"
+
+#     assert by_rsid["rs222"]["an"] == 120
+#     assert by_rsid["rs222"]["grpmax"] == "afr"
+#     assert by_rsid["rs222"]["cadd_raw_score"] == 0.5
+#     assert by_rsid["rs222"]["cadd_phred"] == 7.0
+#     assert by_rsid["rs222"]["consequence_ids"] == "20"
+#     assert by_rsid["rs222"]["consequence_names"] == "intron_variant"
+#     assert by_rsid["rs222"]["consequence_groups"] == "Regulatory"
+#     assert by_rsid["rs222"]["consequence_categories"] == "Non-coding"
+#     assert by_rsid["rs222"]["lof_confidences"] == "LC"
+#     assert by_rsid["rs222"]["predictor_names"] == "cadd"
+#     assert by_rsid["rs222"]["prediction_scores"] == "7"
+#     assert by_rsid["rs222"]["prediction_classifications"] == "moderate"

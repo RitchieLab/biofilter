@@ -2,6 +2,16 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "TEMP - Reports Script",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/notebooks/Andre/jobs/run_snp_snp_interactions.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "envFile": "${workspaceFolder}/.env",
+            "justMyCode": true
+        },
+        {
             "name": "Bio - Start Project",
             "type": "debugpy",
             "request": "launch",

@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import re
+from bisect import bisect_right
 from collections import OrderedDict
 from itertools import combinations
 from typing import Any
 
 import pandas as pd
 from sqlalchemy import MetaData, Table, and_, func, or_, select
+from sqlalchemy.exc import NoSuchTableError
 from sqlalchemy.orm import aliased
 
 from biofilter.modules.db.models import (
@@ -270,11 +272,35 @@ class SNPSNPModelReport(ReportBase):
         "variant_1_chromosome",
         "variant_1_start",
         "variant_1_end",
+        "variant_1_an",
+        "variant_1_grpmax",
+        "variant_1_cadd_raw_score",
+        "variant_1_cadd_phred",
+        "variant_1_consequence_ids",
+        "variant_1_consequence_names",
+        "variant_1_consequence_groups",
+        "variant_1_consequence_categories",
+        "variant_1_lof_confidences",
+        "variant_1_predictor_names",
+        "variant_1_prediction_scores",
+        "variant_1_prediction_classifications",
         "variant_2_id",
         "variant_2_rsid",
         "variant_2_chromosome",
         "variant_2_start",
         "variant_2_end",
+        "variant_2_an",
+        "variant_2_grpmax",
+        "variant_2_cadd_raw_score",
+        "variant_2_cadd_phred",
+        "variant_2_consequence_ids",
+        "variant_2_consequence_names",
+        "variant_2_consequence_groups",
+        "variant_2_consequence_categories",
+        "variant_2_lof_confidences",
+        "variant_2_predictor_names",
+        "variant_2_prediction_scores",
+        "variant_2_prediction_classifications",
         "snp_pair_seed_scope",
         "snp_pair_seed_count",
         "group_support_count",
@@ -330,8 +356,279 @@ class SNPSNPModelReport(ReportBase):
         return scope
 
     def _table(self, table_name: str) -> Table:
+        table_resolver = getattr(self.db, "table", None)
+        if callable(table_resolver):
+            return table_resolver(table_name)
+
         metadata = MetaData()
         return Table(table_name, metadata, autoload_with=self.db.engine)
+
+    def _optional_table(self, table_name: str) -> Table | None:
+        try:
+            return self._table(table_name)
+        except NoSuchTableError:
+            return None
+
+    @staticmethod
+    def _variant_projection_columns(vm: Table) -> list[Any]:
+        cols: list[Any] = [
+            vm.c.variant_id,
+            vm.c.rsid,
+            vm.c.chromosome,
+            vm.c.position_start,
+            vm.c.position_end,
+            vm.c.reference_allele,
+            vm.c.alternate_allele,
+        ]
+        for col_name in ("an", "grpmax", "cadd_raw_score", "cadd_phred"):
+            if col_name in vm.c:
+                cols.append(vm.c[col_name])
+        return cols
+
+    @staticmethod
+    def _join_tokens(values: set[str]) -> str | None:
+        cleaned = sorted(
+            {_norm_str(value) for value in values if _norm_str(value)},
+            key=lambda x: x.lower(),
+        )
+        if not cleaned:
+            return None
+        return "|".join(cleaned)
+
+    @staticmethod
+    def _join_ints(values: set[int]) -> str | None:
+        if not values:
+            return None
+        return "|".join(str(v) for v in sorted(values))
+
+    @staticmethod
+    def _format_score(value: Any) -> str | None:
+        if value is None:
+            return None
+        try:
+            return format(float(value), "g")
+        except Exception:
+            out = _norm_str(value)
+            return out or None
+
+    def _query_variant_molecular_effect_annotations(
+        self,
+        variant_keys: set[tuple[int, int]],
+        chunk_size: int = 2000,
+    ) -> dict[tuple[int, int], dict[str, Any]]:
+        vme = self._optional_table("variant_molecular_effects")
+        if vme is None or not variant_keys:
+            return {}
+
+        has_consequence = "consequence_id" in vme.c
+        has_lof_conf = "lof_confidence" in vme.c
+        if not has_consequence and not has_lof_conf:
+            return {}
+
+        key_to_data: dict[tuple[int, int], dict[str, set[Any]]] = {}
+        all_consequence_ids: set[int] = set()
+        keys_by_chrom: dict[int, set[int]] = {}
+        for chrom, variant_id in variant_keys:
+            keys_by_chrom.setdefault(int(chrom), set()).add(int(variant_id))
+
+        query_cols = [vme.c.chromosome, vme.c.variant_id]
+        if has_consequence:
+            query_cols.append(vme.c.consequence_id)
+        if has_lof_conf:
+            query_cols.append(vme.c.lof_confidence)
+
+        for chrom, variant_ids in keys_by_chrom.items():
+            for chunk in self._iter_chunks(sorted(variant_ids), chunk_size):
+                stmt = select(*query_cols).where(
+                    and_(
+                        vme.c.chromosome == int(chrom),
+                        vme.c.variant_id.in_(chunk),
+                    )
+                )
+                rows = self.session.execute(stmt).mappings().all()
+                for row in rows:
+                    key = (int(row["chromosome"]), int(row["variant_id"]))
+                    bucket = key_to_data.setdefault(
+                        key,
+                        {
+                            "consequence_ids": set(),
+                            "lof_confidences": set(),
+                        },
+                    )
+                    if has_consequence and row.get("consequence_id") is not None:
+                        consequence_id = int(row["consequence_id"])
+                        bucket["consequence_ids"].add(consequence_id)
+                        all_consequence_ids.add(consequence_id)
+                    if has_lof_conf:
+                        lof_conf = _norm_str(row.get("lof_confidence"))
+                        if lof_conf:
+                            bucket["lof_confidences"].add(lof_conf)
+
+        consequence_meta: dict[int, dict[str, Any]] = {}
+        group_name_by_id: dict[int, str] = {}
+        category_name_by_id: dict[int, str] = {}
+
+        vc = self._optional_table("variant_consequences")
+        if vc is not None and all_consequence_ids:
+            vc_cols = [vc.c.id]
+            if "name" in vc.c:
+                vc_cols.append(vc.c.name)
+            if "consequence_group_id" in vc.c:
+                vc_cols.append(vc.c.consequence_group_id)
+            if "consequence_category_id" in vc.c:
+                vc_cols.append(vc.c.consequence_category_id)
+
+            for chunk in self._iter_chunks(sorted(all_consequence_ids), chunk_size):
+                stmt = select(*vc_cols).where(vc.c.id.in_(chunk))
+                for row in self.session.execute(stmt).mappings().all():
+                    cid = int(row["id"])
+                    consequence_meta[cid] = {
+                        "name": row.get("name"),
+                        "group_id": row.get("consequence_group_id"),
+                        "category_id": row.get("consequence_category_id"),
+                    }
+
+            group_ids = {
+                int(meta["group_id"])
+                for meta in consequence_meta.values()
+                if meta.get("group_id") is not None
+            }
+            category_ids = {
+                int(meta["category_id"])
+                for meta in consequence_meta.values()
+                if meta.get("category_id") is not None
+            }
+
+            vcg = self._optional_table("variant_consequence_groups")
+            if vcg is not None and group_ids and "name" in vcg.c:
+                for chunk in self._iter_chunks(sorted(group_ids), chunk_size):
+                    stmt = select(vcg.c.id, vcg.c.name).where(vcg.c.id.in_(chunk))
+                    for row in self.session.execute(stmt).mappings().all():
+                        group_name_by_id[int(row["id"])] = _norm_str(row["name"])
+
+            vcc = self._optional_table("variant_consequence_categories")
+            if vcc is not None and category_ids and "name" in vcc.c:
+                for chunk in self._iter_chunks(sorted(category_ids), chunk_size):
+                    stmt = select(vcc.c.id, vcc.c.name).where(vcc.c.id.in_(chunk))
+                    for row in self.session.execute(stmt).mappings().all():
+                        category_name_by_id[int(row["id"])] = _norm_str(row["name"])
+
+        out: dict[tuple[int, int], dict[str, Any]] = {}
+        for key, bucket in key_to_data.items():
+            consequence_ids = {
+                int(cid)
+                for cid in bucket.get("consequence_ids", set())
+                if cid is not None
+            }
+            consequence_names: set[str] = set()
+            consequence_groups: set[str] = set()
+            consequence_categories: set[str] = set()
+
+            for consequence_id in consequence_ids:
+                meta = consequence_meta.get(consequence_id)
+                if meta is None:
+                    continue
+                name = _norm_str(meta.get("name"))
+                if name:
+                    consequence_names.add(name)
+                group_id = _parse_int(meta.get("group_id"))
+                if group_id is not None:
+                    group_name = _norm_str(group_name_by_id.get(int(group_id)))
+                    if group_name:
+                        consequence_groups.add(group_name)
+                category_id = _parse_int(meta.get("category_id"))
+                if category_id is not None:
+                    category_name = _norm_str(category_name_by_id.get(int(category_id)))
+                    if category_name:
+                        consequence_categories.add(category_name)
+
+            out[key] = {
+                "consequence_ids": self._join_ints(consequence_ids),
+                "consequence_names": self._join_tokens(consequence_names),
+                "consequence_groups": self._join_tokens(consequence_groups),
+                "consequence_categories": self._join_tokens(consequence_categories),
+                "lof_confidences": self._join_tokens(
+                    {
+                        _norm_str(x)
+                        for x in bucket.get("lof_confidences", set())
+                        if _norm_str(x)
+                    }
+                ),
+            }
+        return out
+
+    def _query_variant_effect_prediction_annotations(
+        self,
+        variant_keys: set[tuple[int, int]],
+        chunk_size: int = 2000,
+    ) -> dict[tuple[int, int], dict[str, Any]]:
+        vep = self._optional_table("variant_effect_predictions")
+        if vep is None or not variant_keys:
+            return {}
+
+        has_predictor_name = "predictor_name" in vep.c
+        has_score = "score" in vep.c
+        has_classification = "classification" in vep.c
+        if not has_predictor_name and not has_score and not has_classification:
+            return {}
+
+        keys_by_chrom: dict[int, set[int]] = {}
+        for chrom, variant_id in variant_keys:
+            keys_by_chrom.setdefault(int(chrom), set()).add(int(variant_id))
+
+        query_cols = [vep.c.chromosome, vep.c.variant_id]
+        if has_predictor_name:
+            query_cols.append(vep.c.predictor_name)
+        if has_score:
+            query_cols.append(vep.c.score)
+        if has_classification:
+            query_cols.append(vep.c.classification)
+
+        raw: dict[tuple[int, int], dict[str, set[str]]] = {}
+        for chrom, variant_ids in keys_by_chrom.items():
+            for chunk in self._iter_chunks(sorted(variant_ids), chunk_size):
+                stmt = select(*query_cols).where(
+                    and_(
+                        vep.c.chromosome == int(chrom),
+                        vep.c.variant_id.in_(chunk),
+                    )
+                )
+                rows = self.session.execute(stmt).mappings().all()
+                for row in rows:
+                    key = (int(row["chromosome"]), int(row["variant_id"]))
+                    bucket = raw.setdefault(
+                        key,
+                        {
+                            "predictor_names": set(),
+                            "prediction_scores": set(),
+                            "prediction_classifications": set(),
+                        },
+                    )
+                    if has_predictor_name:
+                        predictor_name = _norm_str(row.get("predictor_name"))
+                        if predictor_name:
+                            bucket["predictor_names"].add(predictor_name)
+                    if has_score:
+                        score = self._format_score(row.get("score"))
+                        if score:
+                            bucket["prediction_scores"].add(score)
+                    if has_classification:
+                        classification = _norm_str(row.get("classification"))
+                        if classification:
+                            bucket["prediction_classifications"].add(classification)
+
+        out: dict[tuple[int, int], dict[str, Any]] = {}
+        for key, bucket in raw.items():
+            out[key] = {
+                "predictor_names": self._join_tokens(bucket.get("predictor_names", set())),
+                "prediction_scores": self._join_tokens(
+                    bucket.get("prediction_scores", set())
+                ),
+                "prediction_classifications": self._join_tokens(
+                    bucket.get("prediction_classifications", set())
+                ),
+            }
+        return out
 
     @staticmethod
     def _variant_dedupe_key(variant: dict[str, Any]) -> tuple[Any, ...]:
@@ -419,15 +716,7 @@ class SNPSNPModelReport(ReportBase):
         pos: int,
     ) -> list[dict[str, Any]]:
         stmt = (
-            select(
-                vm.c.variant_id,
-                vm.c.rsid,
-                vm.c.chromosome,
-                vm.c.position_start,
-                vm.c.position_end,
-                vm.c.reference_allele,
-                vm.c.alternate_allele,
-            )
+            select(*self._variant_projection_columns(vm))
             .where(
                 and_(
                     vm.c.chromosome == int(chrom),
@@ -442,6 +731,101 @@ class SNPSNPModelReport(ReportBase):
         rows = self.session.execute(stmt).mappings().all()
         return self._dedupe_variants([dict(row) for row in rows])
 
+    @staticmethod
+    def _iter_chunks(values: list[int], chunk_size: int):
+        size = max(1, int(chunk_size))
+        for i in range(0, len(values), size):
+            yield values[i : i + size]
+
+    def _query_seed_variants_for_inputs(
+        self,
+        vm: Table,
+        valid_inputs: list[dict[str, Any]],
+        chunk_size: int = 500,
+    ) -> tuple[dict[int, dict[str, Any]], set[tuple[int, int]]]:
+        """
+        Resolve seed variants for input positions with batched DB reads.
+
+        Fast path (default when `allele_type` exists):
+        - groups inputs by chromosome
+        - queries SNV rows with `position_start IN (...)` in chunks
+
+        Fallback path:
+        - keeps the previous per-position overlap query behavior
+        """
+        seed_variants_by_id: dict[int, dict[str, Any]] = {}
+        found_positions: set[tuple[int, int]] = set()
+
+        if not valid_inputs:
+            return seed_variants_by_id, found_positions
+
+        # If table does not expose allele_type, keep old exact behavior (range overlap).
+        # This avoids semantic changes in non-SNV datasets.
+        if "allele_type" not in vm.c:
+            for item in valid_inputs:
+                chrom = int(item["chromosome"])
+                pos = int(item["position"])
+                variants = self._query_variants_at_position(vm=vm, chrom=chrom, pos=pos)
+                if variants:
+                    found_positions.add((chrom, pos))
+                for variant in variants:
+                    seed_variants_by_id[int(variant["variant_id"])] = variant
+            return seed_variants_by_id, found_positions
+
+        positions_by_chrom: dict[int, set[int]] = {}
+        for item in valid_inputs:
+            chrom = int(item["chromosome"])
+            pos = int(item["position"])
+            positions_by_chrom.setdefault(chrom, set()).add(pos)
+
+        total_unique_positions = sum(len(positions) for positions in positions_by_chrom.values())
+        processed_positions = 0
+
+        for chrom in sorted(positions_by_chrom.keys()):
+            positions_sorted = sorted(positions_by_chrom[chrom])
+            for chunk in self._iter_chunks(positions_sorted, chunk_size):
+                stmt = (
+                    select(*self._variant_projection_columns(vm))
+                    .where(
+                        and_(
+                            vm.c.chromosome == int(chrom),
+                            vm.c.position_start.in_(chunk),
+                            func.lower(vm.c.allele_type) == "snv",
+                        )
+                    )
+                    .order_by(vm.c.position_start.asc(), vm.c.variant_id.asc())
+                )
+
+                rows = self.session.execute(stmt).mappings().all()
+                rows_by_pos: dict[int, list[dict[str, Any]]] = {}
+                for row in rows:
+                    drow = dict(row)
+                    pos_key = int(drow["position_start"])
+                    rows_by_pos.setdefault(pos_key, []).append(drow)
+
+                for pos_key, pos_rows in rows_by_pos.items():
+                    variants = self._dedupe_variants(pos_rows)
+                    if variants:
+                        found_positions.add((int(chrom), int(pos_key)))
+                    for variant in variants:
+                        seed_variants_by_id[int(variant["variant_id"])] = variant
+
+                processed_positions += len(chunk)
+                if (
+                    processed_positions == total_unique_positions
+                    or processed_positions % 200000 == 0
+                ):
+                    self.logger.log(
+                        (
+                            "Step 1 (seed variants): "
+                            f"{processed_positions:,}/{total_unique_positions:,} "
+                            "unique positions processed."
+                        ),
+                        "INFO",
+                    )
+
+        return seed_variants_by_id, found_positions
+
     def _query_variants_overlap(
         self,
         vm: Table,
@@ -451,15 +835,7 @@ class SNPSNPModelReport(ReportBase):
         limit: int,
     ) -> list[dict[str, Any]]:
         stmt = (
-            select(
-                vm.c.variant_id,
-                vm.c.rsid,
-                vm.c.chromosome,
-                vm.c.position_start,
-                vm.c.position_end,
-                vm.c.reference_allele,
-                vm.c.alternate_allele,
-            )
+            select(*self._variant_projection_columns(vm))
             .where(
                 and_(
                     vm.c.chromosome == int(chrom),
@@ -531,6 +907,134 @@ class SNPSNPModelReport(ReportBase):
                 }
             )
         return out
+
+    def _query_gene_locations_for_chrom(
+        self,
+        chrom: int,
+        build: int,
+        gene_group_filter: set[str],
+    ) -> list[dict[str, Any]]:
+        q = (
+            self.session.query(
+                EntityLocation.entity_id.label("entity_id"),
+                EntityLocation.start_pos.label("start_pos"),
+                EntityLocation.end_pos.label("end_pos"),
+            )
+            .join(Entity, Entity.id == EntityLocation.entity_id)
+            .join(EntityGroup, Entity.group_id == EntityGroup.id, isouter=True)
+            .filter(EntityLocation.build == int(build))
+            .filter(EntityLocation.chromosome == int(chrom))
+        )
+
+        if gene_group_filter:
+            q = q.filter(func.lower(EntityGroup.name).in_(list(gene_group_filter)))
+
+        rows = q.all()
+        out: list[dict[str, Any]] = []
+        for row in rows:
+            out.append(
+                {
+                    "entity_id": int(row.entity_id),
+                    "start_pos": int(row.start_pos),
+                    "end_pos": int(row.end_pos),
+                }
+            )
+        return out
+
+    @staticmethod
+    def _merge_seed_variant_windows(
+        seed_variants_by_id: dict[int, dict[str, Any]],
+        window_bp: int,
+    ) -> dict[int, list[tuple[int, int]]]:
+        windows_by_chrom: dict[int, list[tuple[int, int]]] = {}
+        for variant in seed_variants_by_id.values():
+            chrom = int(variant["chromosome"])
+            start = max(1, int(variant["position_start"]) - int(window_bp))
+            end = int(variant["position_end"]) + int(window_bp)
+            windows_by_chrom.setdefault(chrom, []).append((start, end))
+
+        merged_by_chrom: dict[int, list[tuple[int, int]]] = {}
+        for chrom, windows in windows_by_chrom.items():
+            if not windows:
+                merged_by_chrom[chrom] = []
+                continue
+            windows_sorted = sorted(windows, key=lambda x: (x[0], x[1]))
+            merged: list[tuple[int, int]] = []
+            cur_start, cur_end = windows_sorted[0]
+            for start, end in windows_sorted[1:]:
+                if start <= cur_end + 1:
+                    if end > cur_end:
+                        cur_end = end
+                    continue
+                merged.append((cur_start, cur_end))
+                cur_start, cur_end = start, end
+            merged.append((cur_start, cur_end))
+            merged_by_chrom[chrom] = merged
+        return merged_by_chrom
+
+    @staticmethod
+    def _partition_variants_by_seed(
+        variants: list[dict[str, Any]],
+        seed_variant_ids: set[int],
+    ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+        seed_list: list[dict[str, Any]] = []
+        non_seed_list: list[dict[str, Any]] = []
+        for variant in variants:
+            vid = int(variant["variant_id"])
+            if vid in seed_variant_ids:
+                seed_list.append(variant)
+            else:
+                non_seed_list.append(variant)
+        return seed_list, non_seed_list
+
+    @staticmethod
+    def _iter_snp_pair_candidates(
+        *,
+        scope: str,
+        v1_seed: list[dict[str, Any]],
+        v1_non_seed: list[dict[str, Any]],
+        v2_seed: list[dict[str, Any]],
+        v2_non_seed: list[dict[str, Any]],
+    ):
+        if scope == "both_from_seed":
+            for v1 in v1_seed:
+                for v2 in v2_seed:
+                    yield v1, v2, 2
+            return
+
+        if scope == "one_from_seed":
+            for v1 in v1_seed:
+                for v2 in v2_non_seed:
+                    yield v1, v2, 1
+            for v1 in v1_non_seed:
+                for v2 in v2_seed:
+                    yield v1, v2, 1
+            return
+
+        if scope == "at_least_one_from_seed":
+            for v1 in v1_seed:
+                for v2 in v2_seed:
+                    yield v1, v2, 2
+            for v1 in v1_seed:
+                for v2 in v2_non_seed:
+                    yield v1, v2, 1
+            for v1 in v1_non_seed:
+                for v2 in v2_seed:
+                    yield v1, v2, 1
+            return
+
+        # any_expanded
+        all_1 = [*v1_seed, *v1_non_seed]
+        all_2 = [*v2_seed, *v2_non_seed]
+        v1_seed_ids = {int(v["variant_id"]) for v in v1_seed}
+        v2_seed_ids = {int(v["variant_id"]) for v in v2_seed}
+        for v1 in all_1:
+            id1 = int(v1["variant_id"])
+            is_seed_1 = id1 in v1_seed_ids
+            for v2 in all_2:
+                id2 = int(v2["variant_id"])
+                is_seed_2 = id2 in v2_seed_ids
+                yield v1, v2, int(is_seed_1) + int(is_seed_2)
 
     def _resolve_entities_by_alias(
         self,
@@ -1020,7 +1524,8 @@ class SNPSNPModelReport(ReportBase):
         )
 
         gene_pair_scope = self._parse_scope(
-            self.param("gene_pair_scope", "at_least_one_from_seed"),
+            # self.param("gene_pair_scope", "at_least_one_from_seed"),  
+            self.param("gene_pair_scope", "both_from_seed"),
             "gene_pair_scope",
         )
         snp_pair_scope = self._parse_scope(
@@ -1121,14 +1626,16 @@ class SNPSNPModelReport(ReportBase):
         # ------------------------------------------------------------------
         # Step 1: seed variants from input chr:position # TODO melhor query por bloco ou por variant?
         # ------------------------------------------------------------------
-        seed_variants_by_id: dict[int, dict[str, Any]] = {}
-        for item in valid_inputs:
-            variants = self._query_variants_at_position(
-                vm=vm,
-                chrom=int(item["chromosome"]),
-                pos=int(item["position"]),
-            )
-            if not variants and emit_not_found_rows:
+        seed_variants_by_id, found_positions = self._query_seed_variants_for_inputs(
+            vm=vm,
+            valid_inputs=valid_inputs,
+        )
+
+        if emit_not_found_rows:
+            for item in valid_inputs:
+                key = (int(item["chromosome"]), int(item["position"]))
+                if key in found_positions:
+                    continue
                 row = self._base_row()
                 row["row_type"] = "input"
                 row["observation"] = "not_found"
@@ -1139,8 +1646,6 @@ class SNPSNPModelReport(ReportBase):
                 row["build"] = build
                 row["window_bp"] = window_bp
                 rows_out.append(row)
-            for variant in variants:
-                seed_variants_by_id[int(variant["variant_id"])] = variant
 
         if not seed_variants_by_id:
             df = pd.DataFrame(rows_out).reindex(columns=self.columns)
@@ -1152,25 +1657,60 @@ class SNPSNPModelReport(ReportBase):
         # ------------------------------------------------------------------
         seed_variant_ids = set(seed_variants_by_id.keys())
         seed_gene_ids: set[int] = set()
-        gene_overlap_cache: dict[tuple[int, int, int], list[dict[str, Any]]] = {}
 
-        for variant_id, variant in seed_variants_by_id.items():
-            vstart = max(1, int(variant["position_start"]) - window_bp)
-            vend = int(variant["position_end"]) + window_bp  # TODO vez se colocamos o windows aqui ou na variant (eu ach melhor aqui)
-            cache_key = (int(variant["chromosome"]), int(vstart), int(vend))
-            genes = gene_overlap_cache.get(cache_key)
-            if genes is None:
-                genes = self._query_genes_overlap(
-                    chrom=int(variant["chromosome"]),
-                    start=vstart,
-                    end=vend,
-                    build=build,
-                    gene_group_filter=gene_group_filter,
-                )
-                gene_overlap_cache[cache_key] = genes
+        merged_windows_by_chrom = self._merge_seed_variant_windows(
+            seed_variants_by_id=seed_variants_by_id,
+            window_bp=window_bp,
+        )
+        total_windows = sum(
+            len(intervals) for intervals in merged_windows_by_chrom.values()
+        )
+        self.logger.log(
+            (
+                "Step 2 (variant->gene): "
+                f"{len(seed_variants_by_id):,} variants merged into "
+                f"{total_windows:,} windows."
+            ),
+            "INFO",
+        )
 
-            gene_ids = {int(g["entity_id"]) for g in genes}
-            seed_gene_ids.update(gene_ids)
+        processed_chroms = 0
+        total_chroms = len(merged_windows_by_chrom)
+
+        for chrom, intervals in sorted(merged_windows_by_chrom.items()):
+            if not intervals:
+                continue
+
+            gene_rows = self._query_gene_locations_for_chrom(
+                chrom=chrom,
+                build=build,
+                gene_group_filter=gene_group_filter,
+            )
+            if not gene_rows:
+                processed_chroms += 1
+                continue
+
+            interval_starts = [start for start, _ in intervals]
+            for gene in gene_rows:
+                gene_start = int(gene["start_pos"])
+                gene_end = int(gene["end_pos"])
+
+                idx = bisect_right(interval_starts, gene_end) - 1
+                if idx < 0:
+                    continue
+                if int(intervals[idx][1]) < gene_start:
+                    continue
+                seed_gene_ids.add(int(gene["entity_id"]))
+
+            processed_chroms += 1
+            self.logger.log(
+                (
+                    "Step 2 (variant->gene): "
+                    f"chromosome {chrom} processed "
+                    f"({processed_chroms}/{total_chroms})."
+                ),
+                "INFO",
+            )
 
         if not seed_gene_ids:
             if emit_not_found_rows:
@@ -1389,6 +1929,7 @@ class SNPSNPModelReport(ReportBase):
             )
 
             gene_to_variants: dict[int, list[dict[str, Any]]] = {}
+            gene_to_variant_ids: dict[int, set[int]] = {}
             overlap_cache: dict[tuple[int, int, int], list[dict[str, Any]]] = {}
 
             for gloc in gene_locations:
@@ -1406,88 +1947,239 @@ class SNPSNPModelReport(ReportBase):
                         limit=limit_variants_per_gene,
                     )
                     overlap_cache[cache_key] = variants
-                bucket = gene_to_variants.setdefault(int(gloc["entity_id"]), [])
-                seen_variant_ids = {int(v["variant_id"]) for v in bucket}
+
+                gene_id = int(gloc["entity_id"])
+                bucket = gene_to_variants.setdefault(gene_id, [])
+                seen_variant_ids = gene_to_variant_ids.setdefault(gene_id, set())
+
+                if limit_variants_per_gene > 0 and len(seen_variant_ids) >= limit_variants_per_gene:
+                    continue
+
                 for variant in variants:
                     vid = int(variant["variant_id"])
                     if vid in seen_variant_ids:
                         continue
+                    if (
+                        limit_variants_per_gene > 0
+                        and len(seen_variant_ids) >= limit_variants_per_gene
+                    ):
+                        break
                     bucket.append(variant)
                     seen_variant_ids.add(vid)
 
+            gene_to_seed_variants: dict[int, list[dict[str, Any]]] = {}
+            gene_to_non_seed_variants: dict[int, list[dict[str, Any]]] = {}
+            for gene_id, variants in gene_to_variants.items():
+                seed_list, non_seed_list = self._partition_variants_by_seed(
+                    variants=variants,
+                    seed_variant_ids=seed_variant_ids,
+                )
+                gene_to_seed_variants[gene_id] = seed_list
+                gene_to_non_seed_variants[gene_id] = non_seed_list
+
+            self.logger.log(
+                (
+                    "Step 6 (snp expansion): "
+                    f"{len(gene_to_variants):,} genes with variants after limit."
+                ),
+                "INFO",
+            )
+
+            variant_keys_for_annotations: set[tuple[int, int]] = set()
+            for variants in gene_to_variants.values():
+                for variant in variants:
+                    chrom = _parse_int(variant.get("chromosome"))
+                    variant_id = _parse_int(variant.get("variant_id"))
+                    if chrom is None or variant_id is None:
+                        continue
+                    variant_keys_for_annotations.add((int(chrom), int(variant_id)))
+
+            molecular_effects_by_variant = self._query_variant_molecular_effect_annotations(
+                variant_keys=variant_keys_for_annotations
+            )
+            predictions_by_variant = self._query_variant_effect_prediction_annotations(
+                variant_keys=variant_keys_for_annotations
+            )
+
             snp_rows_count = 0
             stop = False
+            processed_gene_pairs = 0
+            total_gene_pairs = len(gene_pair_models)
 
             for model in gene_pair_models:
                 gene_1_id = int(model["gene_1_id"])
                 gene_2_id = int(model["gene_2_id"])
-                v1_list = gene_to_variants.get(gene_1_id, [])
-                v2_list = gene_to_variants.get(gene_2_id, [])
-                if not v1_list or not v2_list:
+                v1_seed = gene_to_seed_variants.get(gene_1_id, [])
+                v1_non_seed = gene_to_non_seed_variants.get(gene_1_id, [])
+                v2_seed = gene_to_seed_variants.get(gene_2_id, [])
+                v2_non_seed = gene_to_non_seed_variants.get(gene_2_id, [])
+                if (not v1_seed and not v1_non_seed) or (not v2_seed and not v2_non_seed):
+                    processed_gene_pairs += 1
                     continue
 
                 per_gene_pair_seen: set[tuple[int, int]] = set()
 
-                for v1 in v1_list:
-                    for v2 in v2_list:
-                        id1 = int(v1["variant_id"])
-                        id2 = int(v2["variant_id"])
-                        if id1 == id2:
-                            continue
+                for v1, v2, seed_count in self._iter_snp_pair_candidates(
+                    scope=snp_pair_scope,
+                    v1_seed=v1_seed,
+                    v1_non_seed=v1_non_seed,
+                    v2_seed=v2_seed,
+                    v2_non_seed=v2_non_seed,
+                ):
+                    id1 = int(v1["variant_id"])
+                    id2 = int(v2["variant_id"])
+                    if id1 == id2:
+                        continue
+                    dedup_key = (min(id1, id2), max(id1, id2))
+                    if dedup_key in per_gene_pair_seen:
+                        continue
+                    per_gene_pair_seen.add(dedup_key)
 
-                        dedup_key = (min(id1, id2), max(id1, id2))
-                        if dedup_key in per_gene_pair_seen:
-                            continue
-                        per_gene_pair_seen.add(dedup_key)
+                    row = self._base_row()
+                    row.update(stats)
+                    row["row_type"] = "snp_pair"
+                    row["observation"] = "ok"
+                    row["gene_1_id"] = gene_1_id
+                    row["gene_1_name"] = _entity_name(gene_1_id)
+                    row["gene_2_id"] = gene_2_id
+                    row["gene_2_name"] = _entity_name(gene_2_id)
+                    row["gene_pair_seed_scope"] = model["gene_pair_seed_scope"]
+                    row["gene_pair_seed_count"] = model["gene_pair_seed_count"]
+                    row["group_support_count"] = len(model["group_ids"])
+                    row["group_support_ids"] = "|".join(str(x) for x in model["group_ids"])
+                    row["group_support_names"] = "|".join(model["group_names"])
+                    row["data_source_support_count"] = len(model["data_source_ids"])
+                    row["data_source_support_ids"] = "|".join(
+                        str(x) for x in model["data_source_ids"]
+                    )
+                    row["data_source_support_names"] = "|".join(
+                        model["data_source_names"]
+                    )
 
-                        seed_count = int(id1 in seed_variant_ids) + int(id2 in seed_variant_ids)
-                        if not _scope_keep(snp_pair_scope, seed_count):
-                            continue
+                    row["variant_1_id"] = id1
+                    row["variant_1_rsid"] = v1.get("rsid")
+                    row["variant_1_chromosome"] = v1.get("chromosome")
+                    row["variant_1_start"] = v1.get("position_start")
+                    row["variant_1_end"] = v1.get("position_end")
+                    row["variant_1_an"] = v1.get("an")
+                    row["variant_1_grpmax"] = v1.get("grpmax")
+                    row["variant_1_cadd_raw_score"] = v1.get("cadd_raw_score")
+                    row["variant_1_cadd_phred"] = v1.get("cadd_phred")
 
-                        row = self._base_row()
-                        row.update(stats)
-                        row["row_type"] = "snp_pair"
-                        row["observation"] = "ok"
-                        row["gene_1_id"] = gene_1_id
-                        row["gene_1_name"] = _entity_name(gene_1_id)
-                        row["gene_2_id"] = gene_2_id
-                        row["gene_2_name"] = _entity_name(gene_2_id)
-                        row["gene_pair_seed_scope"] = model["gene_pair_seed_scope"]
-                        row["gene_pair_seed_count"] = model["gene_pair_seed_count"]
-                        row["group_support_count"] = len(model["group_ids"])
-                        row["group_support_ids"] = "|".join(str(x) for x in model["group_ids"])
-                        row["group_support_names"] = "|".join(model["group_names"])
-                        row["data_source_support_count"] = len(model["data_source_ids"])
-                        row["data_source_support_ids"] = "|".join(
-                            str(x) for x in model["data_source_ids"]
+                    row["variant_2_id"] = id2
+                    row["variant_2_rsid"] = v2.get("rsid")
+                    row["variant_2_chromosome"] = v2.get("chromosome")
+                    row["variant_2_start"] = v2.get("position_start")
+                    row["variant_2_end"] = v2.get("position_end")
+                    row["variant_2_an"] = v2.get("an")
+                    row["variant_2_grpmax"] = v2.get("grpmax")
+                    row["variant_2_cadd_raw_score"] = v2.get("cadd_raw_score")
+                    row["variant_2_cadd_phred"] = v2.get("cadd_phred")
+
+                    variant_1_key = (_parse_int(v1.get("chromosome")), id1)
+                    variant_2_key = (_parse_int(v2.get("chromosome")), id2)
+                    v1_mol = (
+                        molecular_effects_by_variant.get(
+                            (int(variant_1_key[0]), int(variant_1_key[1]))
                         )
-                        row["data_source_support_names"] = "|".join(
-                            model["data_source_names"]
+                        if variant_1_key[0] is not None
+                        else None
+                    )
+                    v2_mol = (
+                        molecular_effects_by_variant.get(
+                            (int(variant_2_key[0]), int(variant_2_key[1]))
                         )
+                        if variant_2_key[0] is not None
+                        else None
+                    )
+                    v1_pred = (
+                        predictions_by_variant.get(
+                            (int(variant_1_key[0]), int(variant_1_key[1]))
+                        )
+                        if variant_1_key[0] is not None
+                        else None
+                    )
+                    v2_pred = (
+                        predictions_by_variant.get(
+                            (int(variant_2_key[0]), int(variant_2_key[1]))
+                        )
+                        if variant_2_key[0] is not None
+                        else None
+                    )
 
-                        row["variant_1_id"] = id1
-                        row["variant_1_rsid"] = v1.get("rsid")
-                        row["variant_1_chromosome"] = v1.get("chromosome")
-                        row["variant_1_start"] = v1.get("position_start")
-                        row["variant_1_end"] = v1.get("position_end")
+                    row["variant_1_consequence_ids"] = (
+                        v1_mol.get("consequence_ids") if v1_mol else None
+                    )
+                    row["variant_1_consequence_names"] = (
+                        v1_mol.get("consequence_names") if v1_mol else None
+                    )
+                    row["variant_1_consequence_groups"] = (
+                        v1_mol.get("consequence_groups") if v1_mol else None
+                    )
+                    row["variant_1_consequence_categories"] = (
+                        v1_mol.get("consequence_categories") if v1_mol else None
+                    )
+                    row["variant_1_lof_confidences"] = (
+                        v1_mol.get("lof_confidences") if v1_mol else None
+                    )
+                    row["variant_1_predictor_names"] = (
+                        v1_pred.get("predictor_names") if v1_pred else None
+                    )
+                    row["variant_1_prediction_scores"] = (
+                        v1_pred.get("prediction_scores") if v1_pred else None
+                    )
+                    row["variant_1_prediction_classifications"] = (
+                        v1_pred.get("prediction_classifications") if v1_pred else None
+                    )
 
-                        row["variant_2_id"] = id2
-                        row["variant_2_rsid"] = v2.get("rsid")
-                        row["variant_2_chromosome"] = v2.get("chromosome")
-                        row["variant_2_start"] = v2.get("position_start")
-                        row["variant_2_end"] = v2.get("position_end")
+                    row["variant_2_consequence_ids"] = (
+                        v2_mol.get("consequence_ids") if v2_mol else None
+                    )
+                    row["variant_2_consequence_names"] = (
+                        v2_mol.get("consequence_names") if v2_mol else None
+                    )
+                    row["variant_2_consequence_groups"] = (
+                        v2_mol.get("consequence_groups") if v2_mol else None
+                    )
+                    row["variant_2_consequence_categories"] = (
+                        v2_mol.get("consequence_categories") if v2_mol else None
+                    )
+                    row["variant_2_lof_confidences"] = (
+                        v2_mol.get("lof_confidences") if v2_mol else None
+                    )
+                    row["variant_2_predictor_names"] = (
+                        v2_pred.get("predictor_names") if v2_pred else None
+                    )
+                    row["variant_2_prediction_scores"] = (
+                        v2_pred.get("prediction_scores") if v2_pred else None
+                    )
+                    row["variant_2_prediction_classifications"] = (
+                        v2_pred.get("prediction_classifications") if v2_pred else None
+                    )
 
-                        row["snp_pair_seed_count"] = seed_count
-                        row["snp_pair_seed_scope"] = _seed_scope(seed_count)
-                        rows_out.append(row)
+                    row["snp_pair_seed_count"] = seed_count
+                    row["snp_pair_seed_scope"] = _seed_scope(seed_count)
+                    rows_out.append(row)
 
-                        snp_rows_count += 1
-                        if max_snp_pairs and snp_rows_count >= max_snp_pairs:
-                            stop = True
-                            snp_pairs_truncated = True
-                            break
-                    if stop:
+                    snp_rows_count += 1
+                    if max_snp_pairs and snp_rows_count >= max_snp_pairs:
+                        stop = True
+                        snp_pairs_truncated = True
                         break
+
+                processed_gene_pairs += 1
+                if (
+                    processed_gene_pairs == total_gene_pairs
+                    or processed_gene_pairs % 5000 == 0
+                ):
+                    self.logger.log(
+                        (
+                            "Step 6 (snp pairs): "
+                            f"{processed_gene_pairs:,}/{total_gene_pairs:,} gene pairs "
+                            f"processed, {snp_rows_count:,} rows emitted."
+                        ),
+                        "INFO",
+                    )
                 if stop:
                     break
 

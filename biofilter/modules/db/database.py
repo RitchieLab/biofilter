@@ -7,7 +7,7 @@ from typing import Dict, Optional
 
 from sqlalchemy import Table, create_engine, text
 from sqlalchemy.engine import Engine
-from sqlalchemy.engine.url import make_url
+from sqlalchemy.engine.url import URL, make_url
 from sqlalchemy.orm import sessionmaker
 
 from biofilter.modules.db.base import Base
@@ -45,6 +45,49 @@ class Database(CreateDBMixin):
     # -------------------------------------------------------------------------
     # URI / Connection
     # -------------------------------------------------------------------------
+    @staticmethod
+    def _env_int(name: str, default: int) -> int:
+        raw = os.getenv(name)
+        if raw is None:
+            return int(default)
+        try:
+            return int(str(raw).strip())
+        except Exception:
+            return int(default)
+
+    def _engine_kwargs(self, url: URL | str) -> dict:
+        """
+        Build engine kwargs with safer defaults for long-running jobs.
+        """
+        parsed = make_url(str(url))
+        kwargs: dict = {"future": True}
+
+        if parsed.drivername.startswith("postgresql"):
+            connect_args = {
+                "connect_timeout": self._env_int("BIOFILTER_DB_CONNECT_TIMEOUT", 10),
+                "application_name": os.getenv(
+                    "BIOFILTER_DB_APPLICATION_NAME",
+                    "biofilter",
+                ),
+                # libpq TCP keepalive knobs (helps detect dead peers sooner)
+                "keepalives": self._env_int("BIOFILTER_DB_KEEPALIVES", 1),
+                "keepalives_idle": self._env_int("BIOFILTER_DB_KEEPALIVES_IDLE", 30),
+                "keepalives_interval": self._env_int(
+                    "BIOFILTER_DB_KEEPALIVES_INTERVAL",
+                    10,
+                ),
+                "keepalives_count": self._env_int("BIOFILTER_DB_KEEPALIVES_COUNT", 5),
+            }
+            kwargs.update(
+                {
+                    "pool_pre_ping": True,
+                    "pool_recycle": self._env_int("BIOFILTER_DB_POOL_RECYCLE", 1800),
+                    "connect_args": connect_args,
+                }
+            )
+
+        return kwargs
+
     def _normalize_uri(self, uri: str) -> str:
         """
         If user passes a filesystem path (no scheme), treat it as sqlite:///path.  # noqa E501
@@ -89,7 +132,7 @@ class Database(CreateDBMixin):
         start = time.perf_counter()
 
         # Create engine
-        self.engine = create_engine(self.db_uri, future=True)
+        self.engine = create_engine(self.db_uri, **self._engine_kwargs(self.db_uri))
 
         # CRITICAL: clear metadata AFTER we know we're switching engines
         # Base.metadata.clear()
@@ -156,7 +199,7 @@ class Database(CreateDBMixin):
                 if self.engine is not None:
                     engine = self.engine
                 else:
-                    temp_engine = create_engine(url, future=True)
+                    temp_engine = create_engine(url, **self._engine_kwargs(url))
                     engine = temp_engine
 
                 with engine.connect() as conn:
