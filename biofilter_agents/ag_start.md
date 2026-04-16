@@ -354,8 +354,7 @@ biofilter report run --name etl_packages
 
 ## 14) Internal References
 
-- ETL operation guide (PT): `biofilter_agents/ag_etl_pt.md`
-- ETL operation guide (EN): `biofilter_agents/ag_etl_en.md`
+- ETL operation guide: `biofilter_agents/ag_etl_en.md`
 - CLI command map: `biofilter/api/cli/ag_01_commands.md`
 - ETL CLI group: `biofilter/api/cli/groups/etl.py`
 - DB commands: `biofilter/api/cli/groups/db.py`

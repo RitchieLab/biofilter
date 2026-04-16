@@ -27,6 +27,7 @@ html_static_path = ["_static"]
 
 extensions = [
     "myst_parser",
+    "sphinxcontrib.mermaid",
 ]
 
 source_suffix = {

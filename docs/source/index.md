@@ -18,6 +18,7 @@ developer_extensions
 getting_started
 configuration
 database
+schema
 etl
 reports
 cli_reference
