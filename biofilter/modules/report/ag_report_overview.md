@@ -25,14 +25,14 @@ CLI:
 ```bash
 biofilter --db-uri sqlite:///biofilter_dev.db report explain --report-name etl_status
 biofilter --db-uri sqlite:///biofilter_dev.db report available-columns --report-name etl_status
-biofilter --db-uri sqlite:///biofilter_dev.db report example-input --report-name variant_molecular_effects
+biofilter --db-uri sqlite:///biofilter_dev.db report example-input --report-name entity_relationship_model
 ```
 
 API:
 ```python
 print(bf.report.explain("etl_status"))
 print(bf.report.available_columns("etl_status"))
-print(bf.report.example_input("variant_molecular_effects"))
+print(bf.report.example_input("entity_relationship_model"))
 ```
 
 ## Running Reports
@@ -70,4 +70,3 @@ print(df.head())
 - `reports_explain/report_platform_data_statistics.md`
 - `reports_explain/report_annotation_master_protein.md`
 - `reports_explain/report_template.md`
-- `reports_explain/report_variant_molecular_effects.md`

@@ -51,14 +51,12 @@
     "biofilter/modules/report/reports/report_etl_status.py",
     "biofilter/modules/report/reports/report_template.py",
     "biofilter/modules/report/reports/report_variant_gene_location_model.py",
-    "biofilter/modules/report/reports/report_variant_molecular_effects.py",
     "biofilter/modules/report/reports_explain/report_db_pg_index_stats.md",
     "biofilter/modules/report/reports_explain/report_db_pg_table_stats.md",
     "biofilter/modules/report/reports_explain/report_entity_filter.md",
     "biofilter/modules/report/reports_explain/report_etl_packages.md",
     "biofilter/modules/report/reports_explain/report_etl_status.md",
     "biofilter/modules/report/reports_explain/report_template.md",
-    "biofilter/modules/report/reports_explain/report_variant_molecular_effects.md",
     "biofilter_agents/ag_db_en.md",
     "biofilter_agents/ag_etl_en.md",
     "biofilter_agents/ag_report_en.md",
@@ -83,6 +81,6 @@
     "notebooks/Templates/reports__etl_status.ipynb",
     "notebooks/Templates/reports__qry_template.ipynb",
     "notebooks/Templates/reports__variant_gene_location_model.ipynb",
-    "notebooks/Templates/reports__variant_molecular_effects.ipynb"
+    "notebooks/Templates/reports__variant_gene_location_model.ipynb"
   ]
 }

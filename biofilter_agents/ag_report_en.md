@@ -203,12 +203,6 @@ df_rel = bf.report.run(
     relationship_scope="input_to_any",
 )
 
-df_effects = bf.report.run(
-    "variant_molecular_effects",
-    items=["chr1:55516888:55516888"],
-    range_up=50,
-    range_down=50,
-)
 ```
 
 Introspection in API:
@@ -227,7 +221,6 @@ print(bf.report.available_columns("etl_packages"))
 - `etl_packages`
 - `entity_filter`
 - `entity_relationship_model`
-- `variant_molecular_effects`
 - `variant_gene_location_model`
 - `db_pg_table_stats` (Postgres only)
 - `db_pg_index_stats` (Postgres only)
