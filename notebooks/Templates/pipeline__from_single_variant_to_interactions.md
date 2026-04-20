@@ -8,13 +8,41 @@
 
 ## Abstract
 
-We describe a computational pipeline for generating biologically-informed variant interaction pairs for SNP×SNP epistasis analysis. Starting from a single seed variant of interest, the pipeline (1) identifies genes sharing biological context with the seed gene via curated relationship databases, (2) collects and annotates all variants within those gene loci using gnomAD functional annotations, (3) intersects the annotated variant set with the study's genotyped variants, (4) applies linkage disequilibrium (LD) pruning to produce a statistically independent variant set, and (5) generates all pairwise interaction candidates with full annotation on both sides. The pipeline is implemented in Biofilter 4 and is designed to dramatically reduce the interaction search space relative to naive all-pairs approaches while preserving biological interpretability.
+We describe a computational pipeline for generating biologically-informed variant interaction pairs for SNP×SNP epistasis analysis. Starting from a single seed variant of interest, the pipeline (1) identifies functionally related genes by querying a multi-source biological knowledge base across user-selectable relationship contexts — including curated pathways (Reactome, KEGG), Gene Ontology terms, protein–protein interactions, and disease associations — allowing the analyst to define biological relevance according to the specific hypothesis under investigation; (2) collects and annotates all variants within those gene loci, applying configurable pathogenicity filters (VEP consequence class, LoF confidence, allele frequency, CADD, AlphaMissense, SIFT, PolyPhen-2) to retain only variants relevant to the biological context of the analysis; (3) intersects the annotated variant set with the study's genotyped variants; (4) applies linkage disequilibrium (LD) pruning to produce a statistically independent variant set; and (5) generates all pairwise interaction candidates with full annotation on both sides. The pipeline is implemented in Biofilter 4 and is designed to dramatically reduce the interaction search space relative to naive all-pairs approaches while preserving — and making explicit — the biological rationale for every pair tested.
 
 ---
 
 ## 1. Motivation
 
-Genome-wide association studies (GWAS) test each variant independently, ignoring epistatic interactions that may contribute substantially to complex trait heritability. Testing all possible SNP pairs in a typical GWAS dataset (500k–10M variants) is computationally intractable and statistically underpowered after multiple testing correction. Biologically-guided pre-selection of variant pairs — restricting analysis to variants in functionally related genes — reduces the search space by orders of magnitude and improves power by concentrating tests on mechanistically plausible interactions.
+Genome-wide association studies (GWAS) test each variant independently, ignoring epistatic interactions that may contribute substantially to complex trait heritability. Testing all possible SNP pairs in a typical GWAS dataset (500k–10M variants) is computationally intractable and statistically underpowered after multiple testing correction. Biologically-guided pre-selection of variant pairs addresses both problems, but existing approaches typically rely on a single biological context (e.g., a fixed pathway database) and apply uniform variant selection criteria, limiting their adaptability to different study designs.
+
+This pipeline introduces two key differentiators:
+
+**1. Flexible biological grouping.** The gene discovery step (Phase 1) is not bound to a single relationship type. The analyst selects the biological context most appropriate to the study hypothesis:
+
+| Context                      | Source                   | Use case                             |
+| ---------------------------- | ------------------------ | ------------------------------------ |
+| Biological pathways          | Reactome, KEGG           | Functional pathway interactions      |
+| Gene Ontology                | GO (BP, MF, CC)          | Shared molecular function or process |
+| Protein–protein interactions | BioGRID                  | Direct physical interactions         |
+| Disease associations         | DisGeNET, ClinGen, MONDO | Disease-relevant gene sets           |
+| Protein families             | Pfam                     | Structural/functional gene families  |
+
+The same seed variant can be analysed under multiple contexts in parallel, enabling hypothesis-driven comparison of interaction landscapes.
+
+**2. Context-aware pathogenicity filtering.** Phase 2 applies a configurable stack of functional filters directly in SQL before any data is transferred, ensuring that only variants relevant to the biological question enter the analysis. Filters span multiple prediction frameworks:
+
+| Filter tier            | Tools / annotations                              | Purpose                                     |
+| ---------------------- | ------------------------------------------------ | ------------------------------------------- |
+| Functional consequence | VEP impact (HIGH/MODERATE/LOW), consequence type | Remove synonymous and intergenic noise      |
+| Loss-of-function       | LOFTEE LoF confidence (HC/LC)                    | Isolate high-confidence truncating variants |
+| Allele frequency       | gnomAD AF (af_min, af_max)                       | Control common vs. rare variant analysis    |
+| Deleteriousness        | CADD Phred score                                 | Combined multi-annotation score             |
+| Missense pathogenicity | AlphaMissense classification                     | Deep learning structural pathogenicity      |
+| Splicing impact        | SpliceAI delta score                             | Splice-altering variant identification      |
+| Protein function       | SIFT, PolyPhen-2                                 | Evolutionary and structural constraint      |
+
+Any combination of filters can be applied independently, making the pipeline adaptable from rare high-impact LoF studies to common missense burden analyses without changes to the codebase.
 
 ---
 
