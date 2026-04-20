@@ -49,14 +49,52 @@ Any combination of filters can be applied independently, making the pipeline ada
 
 ## 2. Pipeline Architecture
 
-The pipeline is organized into five phases, alternating between Biofilter (biological annotation) and external tools (genotyping and LD computation):
+The pipeline alternates between Biofilter (biological annotation) and external tools (genotyping and LD computation):
 
 ```
-Phase 1   [Biofilter]  Biological network construction
-Phase 2   [Biofilter]  Variant annotation and filtering       → Lista A
-Phase 2.5 [Biofilter]  Genotype-annotation integration       → Lista C
-          [PLINK 1.9]  LD pruning on Lista C                 → Lista D
-Phase 3   [Biofilter]  Interaction pair generation           → Pairs
+╔══════════════════════════════════════════════════════════════════════╗
+║  [Biofilter]  Phase 1 — Biological Network Construction              ║
+║  Report: variant_single_gene_annotation                              ║
+║    Input : one seed variant (rsID or chr:pos)                        ║
+║    Output: seed gene + partner-gene list (pathway/disease context)   ║
+╚══════════════════════╦═══════════════════════════════════════════════╝
+                       ║  partner gene symbol list
+                       ▼
+╔══════════════════════════════════════════════════════════════════════╗
+║  [Biofilter]  Phase 2 — Variant Annotation and Filtering             ║
+║  Report: gene_to_variant_filtering                                   ║
+║    Input : gene symbols + pathogenicity filters                      ║
+║    Output: Lista A — biologically annotated variants (CSV)           ║
+╚══════════════════════╦═══════════════════════════════════════════════╝
+                       ║  lista_A.csv
+       ╔═══════════════╩═══════════════════════════╗
+       ║  [External]  Extract Lista B from PLINK   ║
+       ║  plink --bfile dataset --write-snplist    ║
+       ║    Output: lista_B (.bim / .txt / .vcf)   ║
+       ╚════════════════╦══════════════════════════╝
+                        ║  lista_A.csv + lista_B
+                        ▼
+╔══════════════════════════════════════════════════════════════════════╗
+║  [Biofilter]  Phase 2.5 — Genotype–Annotation Integration            ║
+║  Report: variant_list_intersect                                      ║
+║    Input : Lista A + Lista B                                         ║
+║    Output: Lista C — variants present in BOTH (PLINK --extract)      ║
+╚══════════════════════╦═══════════════════════════════════════════════╝
+                       ║  lista_C.txt
+       ╔═══════════════╩════════════════════════════════════╗
+       ║  [External — PLINK 1.9]  LD Pruning on Lista C     ║
+       ║  plink --extract lista_C.txt                       ║
+       ║        --indep-pairwise 50 5 0.2                   ║
+       ║    Output: Lista D — LD-independent variants       ║
+       ╚════════════════╦═══════════════════════════════════╝
+                        ║  lista_D.prune.in
+                        ▼
+╔══════════════════════════════════════════════════════════════════════╗
+║  [Biofilter]  Phase 3 — Interaction Pair Generation                  ║
+║  Report: snp_snp_pair_generator                                      ║
+║    Input : Lista D + Lista A annotations                             ║
+║    Output: annotated interaction pairs (one row per pair)            ║
+╚══════════════════════════════════════════════════════════════════════╝
 ```
 
 **Scale reduction example** (APOE seed, Reactome pathways):
