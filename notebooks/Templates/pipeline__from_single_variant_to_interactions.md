@@ -362,9 +362,9 @@ A CSV file (`phase3_pairs.csv`) with one row per variant pair. Each row contains
 - Chang CC, et al. [Second-generation PLINK: rising to the challenge of larger and richer datasets](https://pubmed.ncbi.nlm.nih.gov/25722852/) _Gigascience._ 2015;4:7.
 - Cheng J, et al. [Accurate proteome-wide missense variant effect prediction with AlphaMissense.](https://pubmed.ncbi.nlm.nih.gov/37733863/) _Science._ 2023;381(6664):eadg7492.
 - Rentzsch P, et al. [CADD: predicting the deleteriousness of variants throughout the human genome.](https://pubmed.ncbi.nlm.nih.gov/29617824/) _Nucleic Acids Res._ 2019;47(D1):D886–D894.
-- Karczewski KJ, et al. [The mutational constraint spectrum quantified from variation in 141,456 humans.](https://pubmed.ncbi.nlm.nih.gov/32259073/) _Nature._ 2020;581(7809):434–443. _(gnomAD v3)_
-- Jassal B, et al. [The reactome pathway knowledgebase.](https://pubmed.ncbi.nlm.nih.gov/31655076/) _Nucleic Acids Res._ 2020;48(D1):D498–D503.
-- McLaren W, et al. [The Ensembl Variant Effect Predictor.](https://pubmed.ncbi.nlm.nih.gov/27166835/) _Genome Biol._ 2016;17(1):122.
+- Karczewski KJ, et al. [The mutational constraint spectrum quantified from variation in 141,456 humans.](https://pubmed.ncbi.nlm.nih.gov/32461654/) _Nature._ 2020;581(7809):434–443. _(gnomAD v3)_
+- Jassal B, et al. [The reactome pathway knowledgebase.](https://pubmed.ncbi.nlm.nih.gov/37941124/) _Nucleic Acids Res._ 2020;48(D1):D498–D503.
+- McLaren W, et al. [The Ensembl Variant Effect Predictor.](https://pubmed.ncbi.nlm.nih.gov/27268795/) _Genome Biol._ 2016;17(1):122.
 
 ---
 
