@@ -239,10 +239,9 @@ _DIRECT_GENE_TOKENS = {
 class SNPSNPModelReport(ReportBase):
     name = "snp_snp_model"
     description = (
-        "Builds BF4 gene-gene and SNP-SNP candidate models from seed genomic positions "
-        "using SNV rows from variant_masters + entity_locations, collapsing "
-        "multi-allelic variant rows, then expands through biological group "
-        "relationships (for example pathways) or direct gene-gene links."
+        "[Legacy] Builds gene-gene and SNP-SNP candidate models from seed genomic positions, "
+        "expanding variants from gene loci in the DB. "
+        "For new work use `variant_modeling`, which restricts pairs to input variants only."
     )
 
     columns = [

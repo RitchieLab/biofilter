@@ -21,6 +21,7 @@ database
 schema
 etl
 reports
+report_catalog
 cli_reference
 troubleshooting
 ```

@@ -15,6 +15,8 @@ from .report_platform_data_statistics import PlatformDataStatisticsReport
 from .report_variant_annotation_expanded import VariantAnnotationExpandedReport
 from .report_variant_list_intersect import VariantListIntersectReport
 from .report_snp_snp_pair_generator import SNPSNPPairGeneratorReport
+from .report_variant_modeling import VariantModelingReport
+from .report_annotation_master_variant import AnnotationMasterVariantReport
 
 
 __all__ = [
@@ -36,4 +38,6 @@ __all__ = [
     "VariantAnnotationExpandedReport",
     "VariantListIntersectReport",
     "SNPSNPPairGeneratorReport",
+    "VariantModelingReport",
+    "AnnotationMasterVariantReport",
 ]

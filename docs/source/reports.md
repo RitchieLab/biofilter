@@ -2,6 +2,8 @@
 
 Reports are the main read interface over Biofilter knowledge and ETL provenance.
 
+For the complete index of all available reports with links to explain guides and notebook tutorials, see the **[Report Catalog](report_catalog.md)**.
+
 ## Discover and Inspect
 
 List reports:
