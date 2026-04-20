@@ -99,13 +99,13 @@ The pipeline alternates between Biofilter (biological annotation) and external t
 
 **Scale reduction example** (APOE seed, Reactome pathways):
 
-| Stage                                          | N                          |
-| ---------------------------------------------- | -------------------------- |
-| All possible variant pairs (gnomAD)            | ~260 M                     |
-| After Phase 2 filters (HIGH/MODERATE, AF < 5%) | ~405 k variants            |
-| After genotype intersection (Phase 2.5)        | ~350 k variants (estimate) |
-| After LD pruning (r² < 0.2)                    | ~50 k variants             |
-| Final interaction pairs (seed × partners)      | ~600 k pairs               |
+| Stage                                          | N                        |
+| ---------------------------------------------- | ------------------------ |
+| All possible variant pairs (gnomAD/no filter)  | ~260 M                   |
+| After Phase 2 filters (HIGH/MODERATE, AF < 5%) | ~N k variants            |
+| After genotype intersection (Phase 2.5)        | ~N k variants (estimate) |
+| After LD pruning (r² < 0.2)                    | ~N k variants            |
+| Final interaction pairs (seed × partners)      | ~N k pairs               |
 
 ---
 
@@ -115,10 +115,11 @@ The pipeline alternates between Biofilter (biological annotation) and external t
 | -------------------------- | ------------------------------------------------------------- | ----------------------- |
 | Biofilter 4 knowledge base | Gene loci, pathway membership, disease associations, GO terms | 4.1.2, GRCh38           |
 | Reactome                   | Curated biological pathways                                   | Current at DB ingestion |
+| KEGG                       | Curated biological pathways                                   | Current at DB ingestion |
 | gnomAD v4                  | Variant allele frequencies, functional annotations            | GRCh38                  |
-| Ensembl VEP                | Consequence annotations, LOFTEE LoF confidence                | GRCh38                  |
-| AlphaMissense              | Deep learning pathogenicity scores for missense variants      | v1                      |
-| CADD                       | Combined annotation-dependent depletion scores                | v1.7                    |
+| Ensembl VEP (by gnomAD)    | Consequence annotations, LOFTEE LoF confidence                | GRCh38                  |
+| AlphaMissense (by VEP)     | Deep learning pathogenicity scores for missense variants      | v1                      |
+| CADD (by gnomAD)           | Combined annotation-dependent depletion scores                | v1.7                    |
 | NCBI / HGNC                | Gene symbol resolution, canonical loci                        | Current at DB ingestion |
 
 ---
@@ -126,7 +127,9 @@ The pipeline alternates between Biofilter (biological annotation) and external t
 ## 4. Phase 1 — Biological Network Construction
 
 **Report:** `variant_single_gene_annotation`
-[Report Tutorial link](https://github.com/RitchieLab/biofilter/blob/biofilter3r/notebooks/Templates/reports__variant_single_gene_annotation.ipynb)
+
+1. [Report Tutorial link](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter/modules/report/reports_explain/report_variant_single_gene_annotation.md)
+2. [Report Example link] (https://github.com/RitchieLab/biofilter/blob/biofilter3r/notebooks/Templates/reports__variant_single_gene_annotation.ipynb)
 
 ### Input
 
@@ -147,7 +150,7 @@ A single seed variant specified as rsID (e.g., `rs429358`) or genomic coordinate
 
 ### Output
 
-A DataFrame with one row per (seed_gene × partner_gene × shared_pathway) relationship. The partner gene symbol list is extracted and passed to Phase 2.
+A DataFrame with one row per (seed_gene × partner_gene × shared_groups) relationship. The partner gene symbol list is extracted and passed to Phase 2.
 
 ### Scale
 
@@ -158,6 +161,9 @@ A DataFrame with one row per (seed_gene × partner_gene × shared_pathway) relat
 ## 5. Phase 2 — Variant Annotation and Filtering
 
 **Report:** `gene_to_variant_filtering`
+
+1. [Report Tutorial link](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter/modules/report/reports_explain/report_gene_to_variant_filtering.md)
+2. [Report Example link] (https://github.com/RitchieLab/biofilter/blob/biofilter3r/notebooks/Templates/reports__gene_to_variant_filtering.ipynb)
 
 ### Input
 
@@ -171,37 +177,41 @@ The gene symbol list from Phase 1.
 4. Variants are joined to functional annotation tables (`variant_molecular_effects`, `variant_effect_predictions`) to retrieve consequence, impact, prediction scores, and LoF confidence.
 5. All filters are applied at the SQL level before data transfer to minimize memory footprint.
 
-### Filters applied
+### Filters
 
-| Filter                  | Parameter          | Value            | Rationale                                                                                      |
-| ----------------------- | ------------------ | ---------------- | ---------------------------------------------------------------------------------------------- |
-| VEP impact              | `impact_filter`    | `HIGH, MODERATE` | Retains coding variants with functional potential; excludes synonymous and intergenic variants |
-| Allele frequency        | `af_max`           | `0.05`           | Excludes common variants (MAF > 5%) unlikely to drive rare functional interactions             |
-| Most severe consequence | `most_severe_only` | `True`           | One row per variant; avoids transcript-level redundancy in downstream pair generation          |
+All filters are optional and combinable. Filters marked **SQL** are applied server-side before data transfer; **Python** filters are applied post-query.
 
-Additional filters available but not applied in the default run:
-
-| Filter         | Parameter                      | Notes                                                             |
-| -------------- | ------------------------------ | ----------------------------------------------------------------- |
-| LoF confidence | `lof_confidence_filter`        | `HC` (high-confidence) or `LC` (low-confidence) LOFTEE annotation |
-| AlphaMissense  | `alphamissense_classification` | `likely_pathogenic`, `ambiguous`, `likely_benign`                 |
-| CADD Phred     | `cadd_phred_min`               | Minimum CADD score threshold                                      |
-| SIFT           | `sift_score_max`               | Maximum SIFT score (lower = more damaging)                        |
-| PolyPhen-2     | `polyphen_score_min`           | Minimum PolyPhen-2 score                                          |
+| Filter                  | Parameter                      | Example value                         | Engine       | Rationale                                                                                                                 |
+| ----------------------- | ------------------------------ | ------------------------------------- | ------------ | ------------------------------------------------------------------------------------------------------------------------- |
+| VEP impact              | `impact_filter`                | `["HIGH", "MODERATE"]`                | SQL          | Retains coding variants with functional potential; excludes synonymous and intergenic variants                            |
+| Consequence type        | `consequence_type_filter`      | `["missense_variant", "stop_gained"]` | SQL          | Fine-grained control over consequence class; accepts group, category, or individual consequence names                     |
+| Most severe per variant | `most_severe_only`             | `True`                                | SQL + Python | One row per variant (no transcript expansion); avoids redundancy in downstream pair generation                            |
+| Allele frequency max    | `af_max`                       | `0.05`                                | SQL          | Excludes common variants above MAF threshold                                                                              |
+| Allele frequency min    | `af_min`                       | `0.001`                               | SQL          | Excludes ultra-rare variants below MAF threshold                                                                          |
+| LoF confidence          | `lof_confidence_filter`        | `["HC", "LC"]`                        | SQL          | LOFTEE annotation: `HC` = high-confidence LoF; `LC` = low-confidence LoF; non-LoF variants excluded when filter is active |
+| AlphaMissense class     | `alphamissense_classification` | `["likely_pathogenic"]`               | Python       | Deep learning missense classification (`likely_pathogenic`, `ambiguous`, `likely_benign`)                                 |
+| AlphaMissense score     | `alphamissense_score_min`      | `0.564`                               | Python       | Continuous score threshold (0–1); 0.564 is the `likely_pathogenic` boundary                                               |
+| CADD Phred              | `cadd_phred_min`               | `20`                                  | SQL          | Combined multi-annotation deleteriousness score; Phred-scaled (20 = top 1% most deleterious)                              |
+| SIFT                    | `sift_score_max`               | `0.05`                                | SQL          | Evolutionary constraint score; lower = more damaging (≤ 0.05 is standard "deleterious" threshold)                         |
+| PolyPhen-2              | `polyphen_score_min`           | `0.85`                                | SQL          | Structural pathogenicity score; higher = more damaging (≥ 0.85 = "probably damaging")                                     |
+| Gene window             | `gene_window_bp`               | `2000`                                | SQL          | Extends gene boundaries on each side; captures upstream regulatory and splice-region variants                             |
 
 ### Output (Lista A)
 
 A CSV file (`lista_A.csv`) with one row per (gene × variant), carrying all annotation columns. Exported for use in Phase 2.5.
 
-### Scale
-
-~15,000–500,000 rows depending on gene list size and filters applied.
-
 ---
 
 ## 6. Phase 2.5 — Genotype–Annotation Integration
 
+Not all variants in Lista A will be present in the study's genotype data. Variants may be absent because they were not included on the genotyping array, failed quality control, or fall below the imputation threshold. Running LD pruning on the full Lista A would therefore be inefficient and potentially misleading — pruning variants that cannot be tested in the first place.
+
+This phase resolves that gap by intersecting Lista A with Lista B (the complete variant list from the study's genotype dataset), producing **Lista C**: the subset of biologically annotated variants that are actually available for statistical testing. Only Lista C proceeds to LD pruning and pair generation, ensuring that every variant in the final interaction pairs has both biological annotation and genotype data.
+
 **Report:** `variant_list_intersect`
+
+1. [Report Tutorial link](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter/modules/report/reports_explain/report_variant_list_intersect.md)
+2. [Report Example link]
 
 ### Input
 
