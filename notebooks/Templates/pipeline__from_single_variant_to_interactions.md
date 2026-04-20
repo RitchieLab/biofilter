@@ -277,6 +277,9 @@ The r² threshold of 0.2 is a commonly used conservative threshold for interacti
 
 **Report:** `snp_snp_pair_generator`
 
+1. [Report Tutorial link](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter/modules/report/reports_explain/report_variant_list_intersect.md)
+2. [Report Example link]
+
 ### Input
 
 - **Lista D** (`lista_D.prune.in`): LD-independent, genotyped, annotated variants
@@ -318,15 +321,16 @@ A CSV file (`phase3_pairs.csv`) with one row per variant pair. Each row contains
 
 ### Software versions
 
-| Tool       | Version          | Reference                                                    |
-| ---------- | ---------------- | ------------------------------------------------------------ |
-| Biofilter  | 4.1.2            | [biofilter.readthedocs.io](https://biofilter.readthedocs.io) |
-| Python     | 3.10+            |                                                              |
-| SQLAlchemy | 2.x              |                                                              |
-| PostgreSQL | 15+ (production) |                                                              |
-| PLINK      | 1.9              | Purcell et al., 2007; Chang et al., 2015                     |
-| pandas     | ≥ 2.0            |                                                              |
-| NumPy      | ≥ 1.24           |                                                              |
+| Tool       | Version          | Reference                                                                     |
+| ---------- | ---------------- | ----------------------------------------------------------------------------- | --- |
+| Biofilter  | 4.1.2            | [biofilter.readthedocs.io](https://biofilter.readthedocs.io)                  |
+| Python     | 3.10+            |                                                                               |
+| SQLAlchemy | 2.x              |                                                                               |
+| PostgreSQL | 15+ (production) | VPS Server                                                                    |
+| DB         | VPS Server PRD   | "postgresql+psycopg2://biousers:biousers@109.199.114.191:5432/biofilter_prod" |     |
+| PLINK      | 1.9              | Purcell et al., 2007; Chang et al., 2015                                      |
+| pandas     | ≥ 2.0            |                                                                               |
+| NumPy      | ≥ 1.24           |                                                                               |
 
 ### Reproducibility
 
@@ -338,9 +342,11 @@ A CSV file (`phase3_pairs.csv`) with one row per variant pair. Each row contains
 
 ## 10. Limitations and Considerations
 
-**Pathway annotation completeness.** The gene-gene relationships used in Phase 1 are limited to the biological databases ingested into Biofilter 4 (Reactome, KEGG, GO, DisGeNET, etc.). Genes with poor pathway annotation coverage may have fewer or no partner genes identified, even if biologically relevant interactions exist.
+**Pathway annotation completeness.** The gene-gene relationships used in Phase 1 are limited to the biological databases ingested into Biofilter 4 (Reactome, KEGG, GO, etc.). Genes with poor pathway annotation coverage may have fewer or no partner genes identified, even if biologically relevant interactions exist.
 
 **Variant annotation coverage.** Functional annotations (consequence, AlphaMissense, CADD) are available for gnomAD variants only. Variants present in the study cohort but absent from gnomAD will not appear in Lista A and therefore cannot be included in interaction pairs.
+
+> **Production database note.** The current Biofilter 4 instance running on the Ritchie Lab VPS server was loaded with a gnomAD filter of **allele count AC ≥ 5**, applied during the ETL process to reduce storage requirements. This excludes ultra-rare singletons and doubletons from the knowledge base. Studies requiring complete variant coverage (AC = 1–4) should provision a dedicated PostgreSQL instance with at least **3 TB of storage** and re-run the gnomAD ETL without the AC filter (`biofilter etl update --data-source variant_gnomad`).
 
 **LD pruning and rare variants.** LD pruning can remove rare functional variants when a common proxy variant is retained in the same LD block. For rare-variant studies (MAF < 1%), consider relaxing the r² threshold or performing burden-test aggregation before pair generation.
 
@@ -352,7 +358,7 @@ A CSV file (`phase3_pairs.csv`) with one row per variant pair. Each row contains
 
 ## 11. References
 
-- Purcell S, et al. PLINK: a tool set for whole-genome association and population-based linkage analyses. _Am J Hum Genet._ 2007;81(3):559–575.
+- Purcell S, et al. PLINK: [a tool set for whole-genome association and population-based linkage analyses.](https://pubmed.ncbi.nlm.nih.gov/17701901/) _Am J Hum Genet._ 2007;81(3):559–575.
 - Chang CC, et al. Second-generation PLINK: rising to the challenge of larger and richer datasets. _Gigascience._ 2015;4:7.
 - Cheng J, et al. Accurate proteome-wide missense variant effect prediction with AlphaMissense. _Science._ 2023;381(6664):eadg7492.
 - Rentzsch P, et al. CADD: predicting the deleteriousness of variants throughout the human genome. _Nucleic Acids Res._ 2019;47(D1):D886–D894.
