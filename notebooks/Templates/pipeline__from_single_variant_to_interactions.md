@@ -322,12 +322,12 @@ A CSV file (`phase3_pairs.csv`) with one row per variant pair. Each row contains
 ### Software versions
 
 | Tool       | Version          | Reference                                                                     |
-| ---------- | ---------------- | ----------------------------------------------------------------------------- | --- |
+| ---------- | ---------------- | ----------------------------------------------------------------------------- |
 | Biofilter  | 4.1.2            | [biofilter.readthedocs.io](https://biofilter.readthedocs.io)                  |
 | Python     | 3.10+            |                                                                               |
 | SQLAlchemy | 2.x              |                                                                               |
 | PostgreSQL | 15+ (production) | VPS Server                                                                    |
-| DB         | VPS Server PRD   | "postgresql+psycopg2://biousers:biousers@109.199.114.191:5432/biofilter_prod" |     |
+| DB         | VPS Server PRD   | "postgresql+psycopg2://biousers:biousers@109.199.114.191:5432/biofilter_prod" |
 | PLINK      | 1.9              | Purcell et al., 2007; Chang et al., 2015                                      |
 | pandas     | ≥ 2.0            |                                                                               |
 | NumPy      | ≥ 1.24           |                                                                               |
