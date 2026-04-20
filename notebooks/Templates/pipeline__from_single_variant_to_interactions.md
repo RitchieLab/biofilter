@@ -129,7 +129,7 @@ The pipeline alternates between Biofilter (biological annotation) and external t
 **Report:** `variant_single_gene_annotation`
 
 1. [Report Tutorial link](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter/modules/report/reports_explain/report_variant_single_gene_annotation.md)
-2. [Report Example link] (https://github.com/RitchieLab/biofilter/blob/biofilter3r/notebooks/Templates/reports__variant_single_gene_annotation.ipynb)
+2. [Report Example link](https://github.com/RitchieLab/biofilter/blob/biofilter3r/notebooks/Templates/reports__variant_single_gene_annotation.ipynb)
 
 ### Input
 
@@ -163,7 +163,7 @@ A DataFrame with one row per (seed_gene × partner_gene × shared_groups) relati
 **Report:** `gene_to_variant_filtering`
 
 1. [Report Tutorial link](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter/modules/report/reports_explain/report_gene_to_variant_filtering.md)
-2. [Report Example link] (https://github.com/RitchieLab/biofilter/blob/biofilter3r/notebooks/Templates/reports__gene_to_variant_filtering.ipynb)
+2. [Report Example link](https://github.com/RitchieLab/biofilter/blob/biofilter3r/notebooks/Templates/reports__gene_to_variant_filtering.ipynb)
 
 ### Input
 
@@ -210,7 +210,7 @@ This phase resolves that gap by intersecting Lista A with Lista B (the complete 
 
 **Report:** `variant_list_intersect`
 
-1. [Report Tutorial link](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter/modules/report/reports_explain/report_variant_list_intersect.md)
+1. [Report Tutorial link](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter/modules/report/reports_explain/report_variant_list_intersect.md).
 2. [Report Example link]
 
 ### Input
