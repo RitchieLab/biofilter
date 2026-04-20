@@ -8,7 +8,10 @@
 
 ## Abstract
 
-We describe a computational pipeline for generating biologically-informed variant interaction pairs for SNP×SNP epistasis analysis. Starting from a single seed variant of interest, the pipeline (1) identifies functionally related genes by querying a multi-source biological knowledge base across user-selectable relationship contexts — including curated pathways (Reactome, KEGG), Gene Ontology terms, protein–protein interactions, and disease associations — allowing the analyst to define biological relevance according to the specific hypothesis under investigation; (2) collects and annotates all variants within those gene loci, applying configurable pathogenicity filters (VEP consequence class, LoF confidence, allele frequency, CADD, AlphaMissense, SIFT, PolyPhen-2) to retain only variants relevant to the biological context of the analysis; (3) intersects the annotated variant set with the study's genotyped variants; (4) applies linkage disequilibrium (LD) pruning to produce a statistically independent variant set; and (5) generates all pairwise interaction candidates with full annotation on both sides. The pipeline is implemented in Biofilter 4 and is designed to dramatically reduce the interaction search space relative to naive all-pairs approaches while preserving — and making explicit — the biological rationale for every pair tested.
+_This document describes the theoretical design and methodological rationale of the pipeline. Each step is demonstrated in practice in the companion notebook:  
+[`pipeline__from_single_variant_to_interactions.ipynb`](https://github.com/RitchieLab/biofilter/blob/biofilter3r/notebooks/Templates/pipeline__from_single_variant_to_interactions.ipynb)_
+
+We describe a computational pipeline for generating biologically-informed variant interaction pairs for SNP×SNP epistasis analysis. Starting from a single seed variant of interest, the pipeline (1) identifies functionally related genes by querying a multi-source biological knowledge base across user-selectable relationship contexts — including curated pathways (Reactome, KEGG), Gene Ontology terms, protein–protein interactions, and disease associations — allowing the analyst to define biological relevance according to the specific hypothesis under investigation; (2) collects and annotates all variants within those gene loci, applying configurable pathogenicity filters (VEP consequence class, LoF confidence, allele frequency, CADD, AlphaMissense, and other) to retain only variants relevant to the biological context of the analysis; (3) intersects the annotated variant set with the study's genotyped variants; (4) applies linkage disequilibrium (LD) pruning to produce a statistically independent variant set; and (5) generates all pairwise interaction candidates with full annotation on both sides. The pipeline is implemented in Biofilter 4 and is designed to dramatically reduce the interaction search space relative to naive all-pairs approaches while preserving — and making explicit — the biological rationale for every pair tested.
 
 ---
 
@@ -20,13 +23,12 @@ This pipeline introduces two key differentiators:
 
 **1. Flexible biological grouping.** The gene discovery step (Phase 1) is not bound to a single relationship type. The analyst selects the biological context most appropriate to the study hypothesis:
 
-| Context                      | Source                   | Use case                             |
-| ---------------------------- | ------------------------ | ------------------------------------ |
-| Biological pathways          | Reactome, KEGG           | Functional pathway interactions      |
-| Gene Ontology                | GO (BP, MF, CC)          | Shared molecular function or process |
-| Protein–protein interactions | BioGRID                  | Direct physical interactions         |
-| Disease associations         | DisGeNET, ClinGen, MONDO | Disease-relevant gene sets           |
-| Protein families             | Pfam                     | Structural/functional gene families  |
+| Context                      | Source         | Use case                             |
+| ---------------------------- | -------------- | ------------------------------------ |
+| Biological pathways          | Reactome, KEGG | Functional pathway interactions      |
+| Gene Ontology                | GO             | Shared molecular function or process |
+| Protein–protein interactions | BioGRID, Pfam  | Direct physical interactions         |
+| Disease associations         | ClinGen, MONDO | Disease-relevant gene sets           |
 
 The same seed variant can be analysed under multiple contexts in parallel, enabling hypothesis-driven comparison of interaction landscapes.
 
@@ -40,7 +42,6 @@ The same seed variant can be analysed under multiple contexts in parallel, enabl
 | Deleteriousness        | CADD Phred score                                 | Combined multi-annotation score             |
 | Missense pathogenicity | AlphaMissense classification                     | Deep learning structural pathogenicity      |
 | Splicing impact        | SpliceAI delta score                             | Splice-altering variant identification      |
-| Protein function       | SIFT, PolyPhen-2                                 | Evolutionary and structural constraint      |
 
 Any combination of filters can be applied independently, making the pipeline adaptable from rare high-impact LoF studies to common missense burden analyses without changes to the codebase.
 
