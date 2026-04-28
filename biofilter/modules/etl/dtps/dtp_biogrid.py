@@ -4,8 +4,10 @@ import zipfile
 from itertools import product
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 import requests
+from sqlalchemy import text
 
 from biofilter.modules.db.models import (  # noqa E501
     EntityAlias,
@@ -37,8 +39,8 @@ class DTP(DTPBase):
         # DTP versioning
         self.dtp_name = "dtp_biogrid"
         self.dtp_version = "1.1.0"
-        self.compatible_schema_min = "0.0.0"
-        self.compatible_schema_max = "4.0.0"
+        self.compatible_schema_min = "4.1.0"
+        self.compatible_schema_max = "4.1.0"
 
     # -------------------------------------------------------------------------
     #                            EXTRACT METHOD
@@ -512,16 +514,48 @@ class DTP(DTPBase):
             )
 
             gene_aliases = (
-                self.session.query(EntityAlias.alias_value, EntityAlias.entity_id)
+                self.session.query(
+                    EntityAlias.alias_value,
+                    EntityAlias.entity_id,
+                    EntityAlias.alias_type,
+                    EntityAlias.is_primary,
+                )
                 .filter(EntityAlias.group_id == group_map["Genes"])
-                .filter(EntityAlias.alias_type == "symbol")
-                .filter(EntityAlias.is_primary.is_(True))
+                .filter(EntityAlias.alias_type.in_(["symbol", "prev_symbol"]))
                 .filter(EntityAlias.alias_value.in_(genes))
                 .all()
             )
             df_gene_map = pd.DataFrame(
-                gene_aliases, columns=["alias_value", "entity_id"]
+                gene_aliases,
+                columns=["alias_value", "entity_id", "alias_type", "is_primary"],
             )
+
+            # Resolve ambiguity: prefer current symbol (is_primary=True) over prev_symbol.
+            # priority = 3: symbol+primary, 2: symbol, 1: prev_symbol+primary, 0: prev_symbol
+            df_gene_map["priority"] = (
+                (df_gene_map["alias_type"] == "symbol").astype(int) * 2
+                + df_gene_map["is_primary"].astype(int)
+            )
+
+            ambiguous_mask = df_gene_map["alias_value"].duplicated(keep=False)
+            if ambiguous_mask.any():
+                ambiguous_values = (
+                    df_gene_map.loc[ambiguous_mask, "alias_value"].unique().tolist()
+                )
+                self.logger.log(
+                    f"⚠️  Ambiguous gene aliases resolved by priority "
+                    f"(symbol > prev_symbol): {ambiguous_values}",
+                    "WARNING",
+                )
+
+            df_gene_map = (
+                df_gene_map
+                .sort_values("priority", ascending=False)
+                .drop_duplicates(subset=["alias_value"], keep="first")
+                .drop(columns=["priority", "alias_type", "is_primary"])
+                .reset_index(drop=True)
+            )
+
             df_gene_map["group_name"] = "Genes"
             df_gene_map["source_name"] = "ENTREZ"
         except Exception as e:
@@ -532,20 +566,58 @@ class DTP(DTPBase):
         # 2.2 Proteins Maps
         try:
             proteins = (
-                df.loc[df["group_a"].eq("Proteins"), "value_a"].unique().tolist()
-                + df.loc[df["group_b"].eq("Proteins"), "value_b"].unique().tolist()
+                df.loc[df["group_a"].eq("Proteins"), "value_a"]
+                .unique()
+                .tolist()
+                + df.loc[df["group_b"].eq("Proteins"), "value_b"]
+                .unique()
+                .tolist()
             )
 
             protein_aliases = (
-                self.session.query(EntityAlias.alias_value, EntityAlias.entity_id)
+                self.session.query(
+                    EntityAlias.alias_value,
+                    EntityAlias.entity_id,
+                    EntityAlias.is_primary,
+                )
                 .filter(EntityAlias.group_id == group_map["Proteins"])
-                .filter(EntityAlias.alias_type != "name")  # evita nomes descritivos
+                .filter(EntityAlias.alias_type != "name")
                 .filter(EntityAlias.alias_value.in_(proteins))
                 .all()
             )
             df_protein_map = pd.DataFrame(
-                protein_aliases, columns=["alias_value", "entity_id"]
+                protein_aliases,
+                columns=["alias_value", "entity_id", "is_primary"],
             )
+
+            # Resolve ambiguity: prefer is_primary=True over secondary aliases.
+            df_protein_map["priority"] = (
+                df_protein_map["is_primary"].astype(int)
+            )
+
+            ambiguous_mask = df_protein_map["alias_value"].duplicated(
+                keep=False
+            )
+            if ambiguous_mask.any():
+                ambiguous_values = (
+                    df_protein_map.loc[ambiguous_mask, "alias_value"]
+                    .unique()
+                    .tolist()
+                )
+                self.logger.log(
+                    "⚠️  Ambiguous protein aliases resolved by priority "
+                    f"(is_primary=True wins): {ambiguous_values}",
+                    "WARNING",
+                )
+
+            df_protein_map = (
+                df_protein_map
+                .sort_values("priority", ascending=False)
+                .drop_duplicates(subset=["alias_value"], keep="first")
+                .drop(columns=["priority", "is_primary"])
+                .reset_index(drop=True)
+            )
+
             df_protein_map["group_name"] = "Proteins"
             df_protein_map["source_name"] = "UNIPROT"
         except Exception as e:
@@ -553,32 +625,9 @@ class DTP(DTPBase):
             self.logger.log(msg, "DEBUG")
             return False, msg  # ⧮ Leaving with ERROR
 
-        # 2.3 Chemicals Maps
-        try:
-            chems = (
-                df.loc[df["group_a"].eq("Chemicals"), "value_a"].unique().tolist()
-                + df.loc[df["group_b"].eq("Chemicals"), "value_b"].unique().tolist()
-            )
-            chem_aliases = (
-                self.session.query(EntityAlias.alias_value, EntityAlias.entity_id)
-                .filter(EntityAlias.group_id == group_map["Chemicals"])
-                .filter(EntityAlias.alias_type != "formula")
-                .filter(EntityAlias.alias_value.in_(chems))
-                .all()
-            )
-            df_chem_map = pd.DataFrame(
-                chem_aliases, columns=["alias_value", "entity_id"]
-            )
-            df_chem_map["group_name"] = "Chemicals"
-            df_chem_map["source_name"] = "CHEBI"
-        except Exception as e:
-            msg = f"⚠️  Failed to map Chemicals Entity data: {e}"
-            self.logger.log(msg, "DEBUG")
-            return False, msg  # ⧮ Leaving with ERROR
-
-        # 2.4 Merge all Entities IDs
+        # 2.3 Merge all Entities IDs
         map_dict = {}
-        for d in [df_gene_map, df_protein_map, df_chem_map]:
+        for d in [df_gene_map, df_protein_map]:
             for row in d.itertuples(index=False):
                 map_dict[(row.group_name, row.source_name, row.alias_value)] = (
                     row.entity_id
@@ -620,112 +669,180 @@ class DTP(DTPBase):
             self.logger.log(msg, "DEBUG")
             return False, msg  # ⧮ Leaving with ERROR
 
-        # ----= CHECK PREVIOUS DATA IN DB =----
-        # --------------------------------------
-
-        def normalize_pair(a, b):
-            """Returns (min, max) tuple to make the relationship symmetric."""
-            return (a, b) if a <= b else (b, a)
-
+        # ----= DEDUP CANDIDATES (within file) =----
+        # ------------------------------------------
+        # Symmetric dedup: (A,B) == (B,A) for interaction relationships.
+        # Builds a canonical key (min, max) on numpy arrays for speed.
         try:
-            msg = "🔍 Checking existing BioGRID relationships..."
-            self.logger.log(msg, "DEBUG")
-
-            # NOTE: We are consider all same Interaction Type
-            existing = (
-                self.session.query(
-                    EntityRelationship.entity_1_id,
-                    EntityRelationship.entity_2_id,
-                    # EntityRelationship.relationship_type_id,
-                )
-                .filter(EntityRelationship.data_source_id == self.data_source.id)
-                .all()
+            e1 = df_resolved["entity_1_id"].to_numpy()
+            e2 = df_resolved["entity_2_id"].to_numpy()
+            mins = np.minimum(e1, e2)
+            maxs = np.maximum(e1, e2)
+            df_resolved["_canonical_key"] = list(
+                zip(mins.tolist(), maxs.tolist())
             )
-            existing_set = {
-                normalize_pair(r.entity_1_id, r.entity_2_id) for r in existing
-            }
-            msg = f"📊 Found {len(existing_set):,} existing relationships"
-            self.logger.log(msg, "DEBUG")
+            df_resolved = (
+                df_resolved
+                .drop_duplicates(subset=["_canonical_key"])
+                .drop(columns=["_canonical_key"])
+                .reset_index(drop=True)
+            )
+            self.logger.log(
+                f"🧮 {len(df_resolved):,} unique candidate "
+                "relationships after symmetric dedup",
+                "INFO",
+            )
 
-            # Create key to match
-            df_resolved["rel_key"] = [
-                normalize_pair(a, b)
-                for a, b in zip(df_resolved["entity_1_id"], df_resolved["entity_2_id"])
-            ]
-            # Drop all records previous loaded
-            df_new = df_resolved[~df_resolved["rel_key"].isin(existing_set)].copy()
-            self.logger.log(f"🧮 {len(df_new):,} new relationships to insert", "INFO")
-
-            if df_new.empty:
-                self.logger.log("No new relationships to insert — skipping.", "INFO")
-                return True, "No new relationships"
+            if df_resolved.empty:
+                self.logger.log(
+                    "No candidate relationships — skipping.", "INFO"
+                )
+                return True, "No candidates"
         except Exception as e:
-            msg = f"Failed to keep only new interactions: {e}"
+            msg = f"Failed during candidate dedup: {e}"
             self.logger.log(msg, "DEBUG")
-            return False, msg  # ⧮ Leaving with ERROR
-
-        # ----= INSERT DATA IN DB =----
-        # --------------------------------------
-
-        # Drop Indexes
-        try:
-            self.drop_indexes(self.get_entity_relationship_index_specs)
-        except Exception as e:
-            self.session.rollback()
-            msg = f"❌ Error when delete old relationships: {e}"
             return False, msg
 
-        # Create Bulk
-        chunk_size = 10_000  # 🔧 ajuste conforme o desempenho do servidor
-        total = len(df_new)
+        # ----= LOAD VIA TEMP TABLE + SERVER-SIDE NOT EXISTS =----
+        # --------------------------------------------------------
+        # Strategy: instead of fetching all existing pairs to the client
+        # (memory + network heavy), we load candidates into a TEMP TABLE
+        # and let the server filter against existing relationships.
+
+        temp_table = "biogrid_load_candidates"
         insert_error = None
 
-        # Build relationships in chunks
-        rels = []
-        for i, row in enumerate(df_new.itertuples(index=False), start=1):
-            rels.append(
-                EntityRelationship(
-                    entity_1_id=int(row.entity_1_id),
-                    entity_1_group_id=int(row.entity_1_group_id),
-                    entity_2_id=int(row.entity_2_id),
-                    entity_2_group_id=int(row.entity_2_group_id),
-                    relationship_type_id=rel_type.id if rel_type else None,
-                    data_source_id=self.data_source.id,
-                    etl_package_id=self.package.id,
+        try:
+            # 1) Create TEMP TABLE
+            #    Note: we intentionally keep entity_relationships indexes
+            #    in place — NOT EXISTS needs them for fast lookup.
+            self.session.execute(
+                text(f"DROP TABLE IF EXISTS {temp_table}")
+            )
+            self.session.execute(
+                text(
+                    f"""
+                    CREATE TEMP TABLE {temp_table} (
+                        entity_1_id BIGINT NOT NULL,
+                        entity_1_group_id INTEGER,
+                        entity_2_id BIGINT NOT NULL,
+                        entity_2_group_id INTEGER,
+                        relationship_type_id INTEGER NOT NULL,
+                        data_source_id INTEGER NOT NULL,
+                        etl_package_id INTEGER
+                    )
+                    """
                 )
             )
+            self.session.commit()
 
-            # 🚀 Quando atingir o chunk_size ou o fim
-            if i % chunk_size == 0 or i == total:
-                chunk_number = ((i - 1) // chunk_size) + 1
-                try:
-                    self.session.bulk_save_objects(rels, return_defaults=False)
-                    self.session.commit()
-                    total_relationships += len(rels)
-                    self.logger.log(
-                        f"💾 Inserted chunk {chunk_number} ({len(rels):,} records)",
-                        "DEBUG",
+            # 2) Bulk-load candidates into temp table (Core insert,
+            #    chunked, dict-based — much faster than ORM objects)
+            chunk_size = 50_000
+            total_candidates = len(df_resolved)
+            rel_type_id = rel_type.id
+            data_source_id = self.data_source.id
+            etl_package_id = self.package.id
+
+            insert_sql = text(
+                f"""
+                INSERT INTO {temp_table} (
+                    entity_1_id, entity_1_group_id,
+                    entity_2_id, entity_2_group_id,
+                    relationship_type_id, data_source_id, etl_package_id
+                ) VALUES (
+                    :entity_1_id, :entity_1_group_id,
+                    :entity_2_id, :entity_2_group_id,
+                    :relationship_type_id, :data_source_id, :etl_package_id
+                )
+                """
+            )
+
+            for chunk_start in range(0, total_candidates, chunk_size):
+                chunk = df_resolved.iloc[
+                    chunk_start: chunk_start + chunk_size
+                ]
+                rows = [
+                    {
+                        "entity_1_id": int(r.entity_1_id),
+                        "entity_1_group_id": int(r.entity_1_group_id),
+                        "entity_2_id": int(r.entity_2_id),
+                        "entity_2_group_id": int(r.entity_2_group_id),
+                        "relationship_type_id": rel_type_id,
+                        "data_source_id": data_source_id,
+                        "etl_package_id": etl_package_id,
+                    }
+                    for r in chunk.itertuples(index=False)
+                ]
+                self.session.execute(insert_sql, rows)
+                self.session.commit()
+                chunk_number = (chunk_start // chunk_size) + 1
+                self.logger.log(
+                    f"📥 Staged chunk {chunk_number} "
+                    f"({len(rows):,} rows) into temp table",
+                    "DEBUG",
+                )
+
+            # 3) Server-side INSERT ... SELECT with symmetric NOT EXISTS
+            self.logger.log(
+                "🔍 Inserting deduplicated relationships server-side...",
+                "INFO",
+            )
+            result = self.session.execute(
+                text(
+                    f"""
+                    INSERT INTO entity_relationships (
+                        entity_1_id, entity_1_group_id,
+                        entity_2_id, entity_2_group_id,
+                        relationship_type_id,
+                        data_source_id, etl_package_id
                     )
-
-                except Exception as e:
-                    self.session.rollback()
-                    insert_error = (
-                        "⚠️ Error inserting chunk "
-                        f"{chunk_number} ending at record {i:,}: {str(e)}"
+                    SELECT
+                        c.entity_1_id, c.entity_1_group_id,
+                        c.entity_2_id, c.entity_2_group_id,
+                        c.relationship_type_id,
+                        c.data_source_id, c.etl_package_id
+                    FROM {temp_table} c
+                    WHERE NOT EXISTS (
+                        SELECT 1
+                        FROM entity_relationships er
+                        WHERE er.data_source_id = c.data_source_id
+                          AND (
+                              (er.entity_1_id = c.entity_1_id
+                               AND er.entity_2_id = c.entity_2_id)
+                              OR
+                              (er.entity_1_id = c.entity_2_id
+                               AND er.entity_2_id = c.entity_1_id)
+                          )
                     )
-                    self.logger.log(insert_error, "ERROR")
-                    rels.clear()
-                    break
-                rels.clear()  # libera memória
+                    """
+                )
+            )
+            total_relationships = result.rowcount or 0
+            self.session.commit()
 
-        # Create Index
-        try:
-            self.create_indexes(self.get_entity_relationship_index_specs)
+            self.logger.log(
+                f"💾 Inserted {total_relationships:,} new relationships",
+                "INFO",
+            )
+
+            # 4) Drop temp table
+            self.session.execute(
+                text(f"DROP TABLE IF EXISTS {temp_table}")
+            )
+            self.session.commit()
+
         except Exception as e:
-            idx_msg = f"⚠️ Failed to restore DB indexes: {e}"
-            self.logger.log(idx_msg, "WARNING")
-            if not insert_error:
-                insert_error = idx_msg
+            self.session.rollback()
+            insert_error = f"⚠️ Bulk insert failed: {e}"
+            self.logger.log(insert_error, "ERROR")
+            try:
+                self.session.execute(
+                    text(f"DROP TABLE IF EXISTS {temp_table}")
+                )
+                self.session.commit()
+            except Exception:
+                self.session.rollback()
 
         if insert_error:
             return False, insert_error

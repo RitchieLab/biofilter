@@ -1411,20 +1411,21 @@ class ETLManager:
         deleted_rows_by_table: dict[str, int] = {}
 
         for table in ordered:
-            # Optional: skip count unless debug
+            # Cheap probe: stops at first match, with or without index.
+            # Avoids issuing a DELETE on tables that have no rows for
+            # this data source (saves planning, locks, WAL overhead).
+            has_rows = session.execute(
+                select(table.c.data_source_id)
+                .where(table.c.data_source_id == ds_id)
+                .limit(1)
+            ).first()
+            if not has_rows:
+                continue
+
             if self.debug_mode:
-                cnt = (
-                    session.execute(
-                        select(func.count())
-                        .select_from(table)
-                        .where(table.c.data_source_id == ds_id)
-                    ).scalar()
-                    or 0
-                )
-                if cnt == 0:
-                    continue
                 self.logger.log(
-                    f"🗑️  Deleting {cnt} rows from {table.name} (data_source_id={ds_id})",  # noqa E501
+                    f"🗑️  Deleting rows from {table.name} "
+                    f"(data_source_id={ds_id})",
                     "INFO",
                 )
 
@@ -1462,19 +1463,18 @@ class ETLManager:
         deleted_rows_by_table: dict[str, int] = {}
 
         for table in ordered:
+            has_rows = session.execute(
+                select(table.c.etl_package_id)
+                .where(table.c.etl_package_id == package_id)
+                .limit(1)
+            ).first()
+            if not has_rows:
+                continue
+
             if self.debug_mode:
-                cnt = (
-                    session.execute(
-                        select(func.count())
-                        .select_from(table)
-                        .where(table.c.etl_package_id == package_id)
-                    ).scalar()
-                    or 0
-                )
-                if cnt == 0:
-                    continue
                 self.logger.log(
-                    f"🗑️  Deleting {cnt} rows from {table.name} (etl_package_id={package_id})",  # noqa E501
+                    f"🗑️  Deleting rows from {table.name} "
+                    f"(etl_package_id={package_id})",
                     "INFO",
                 )
 

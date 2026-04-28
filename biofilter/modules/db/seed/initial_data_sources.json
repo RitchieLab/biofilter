@@ -883,6 +883,19 @@
             "active": true,
             "dtp_version": "1.0.0",
             "schema_version": "4.1.0"
+        },
+        {
+            "source_system": "GTEx",
+            "name": "gtex_v10_brain_eqtl",
+            "data_type": "Variant",
+            "source_url": "https://storage.googleapis.com/adult-gtex/bulk-qtl/v10/single-tissue-cis-qtl/GTEx_Analysis_v10_eQTL.tar",
+            "format": "TAR",
+            "grch_version": "GRCh38",
+            "ucschg_version": "hg38",
+            "dtp_script": "dtp_variant_eqtl_gtex",
+            "active": true,
+            "dtp_version": "1.0.0",
+            "schema_version": "4.1.0"
         }
     ]
 }

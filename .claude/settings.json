@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -c \"import json; json.load\\(open\\('biofilter/modules/db/seed/initial_source_systems.json'\\)\\); json.load\\(open\\('biofilter/modules/db/seed/initial_data_sources.json'\\)\\); print\\('JSON OK'\\)\")",
+      "Bash(python -m py_compile biofilter/modules/etl/dtps/dtp_variant_eqtl_gtex.py)"
+    ]
+  }
+}

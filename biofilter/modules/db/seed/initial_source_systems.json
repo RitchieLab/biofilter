@@ -83,6 +83,12 @@
             "description": "DeepMind AlphaMissense pathogenicity predictor for missense variants.",
             "homepage": "https://console.cloud.google.com/storage/browser/dm_alphamissense",
             "active": true
+        },
+        {
+            "name": "GTEx",
+            "description": "Genotype-Tissue Expression project — multi-tissue eQTL/sQTL atlas for human samples.",
+            "homepage": "https://gtexportal.org/",
+            "active": true
         }
     ]
 }

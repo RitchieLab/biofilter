@@ -1,8 +1,8 @@
 [
     {
-        "schema_version": "1",
-        "schema_revision": "1",
-        "etl_version": "4.0.0",
+        "schema_version": "4.1.0",
+        "schema_revision": "4.1.0",
+        "etl_version": "4.1.0",
         "description": "Start Process"
     }
 ]

@@ -3,7 +3,7 @@ import time
 from biofilter import Biofilter
 
 # db_uri = "sqlite:///dev_biofilter_2.db"
-db_uri = "postgresql+psycopg2://admin:admin@localhost/biofilter_dev"
+# db_uri = "postgresql+psycopg2://admin:admin@localhost/biofilter_dev"
 
 # Configure below
 data_sources_to_process = [
@@ -81,7 +81,8 @@ data_sources_to_process = [
     # "gnomad_chrx",
     # "gnomad_chry",
     # "gnomad_chrmt",
-    "alphamissense",
+    # "alphamissense",
+    "gtex_v10_brain_eqtl",
 
     #
     # DISEASE
@@ -103,15 +104,15 @@ data_sources_to_process = [
 ]
 
 run_steps = [
-    # "extract",
+    "extract",
     # "transform",
-    "load",
+    # "load",
     # "all"
 ]  # noqa E501
 
 if __name__ == "__main__":
-    bf = Biofilter(db_uri, debug_mode=True)
-    # bf = Biofilter(db_uri)
+    # bf = Biofilter(db_uri, debug_mode=True)
+    bf = Biofilter()
 
     start_total = time.time()
 
