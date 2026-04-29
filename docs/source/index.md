@@ -10,12 +10,22 @@ This documentation is intentionally practical:
 
 ```{toctree}
 :maxdepth: 2
-:caption: Contents
+:caption: Getting Started
+
+getting_started/index
+getting_started/installing
+getting_started/connecting_db
+getting_started/finding_reports
+getting_started/running_reports
+```
+
+```{toctree}
+:maxdepth: 2
+:caption: Reference
 
 system_overview
 entity_and_omics
 developer_extensions
-getting_started
 configuration
 database
 schema

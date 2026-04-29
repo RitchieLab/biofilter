@@ -46,6 +46,7 @@ Reports for exploring the biological entity graph.
 |---|---|---|---|
 | `entity_filter` | Filter and list entities (genes, pathways, diseases, …) by type, source, or name pattern | [Guide](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter/modules/report/reports_explain/report_entity_filter.md) | [Tutorial](https://github.com/RitchieLab/biofilter/blob/biofilter3r/notebooks/Templates/reports__entity_filter.ipynb) |
 | `entity_relationship_model` | Retrieve all entities related to an input list through shared biological groups (pathways, diseases, GO, PPI) | — | [Tutorial](https://github.com/RitchieLab/biofilter/blob/biofilter3r/notebooks/Templates/reports__entity_relationship_model.ipynb) |
+| `entity_neighborhood_summary` | Resolve heterogeneous inputs (gene:, disease:, pathway:, …) and return a 1-hop neighborhood summary grouped by neighbor type | [Guide](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter/modules/report/reports_explain/report_entity_neighborhood_summary.md) | [Tutorial](https://github.com/RitchieLab/biofilter/blob/biofilter3r/notebooks/Templates/reports__entity_neighborhood_summary.ipynb) |
 
 ---
 
