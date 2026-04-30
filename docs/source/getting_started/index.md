@@ -8,7 +8,7 @@ This section walks you through your first run end-to-end. Pick the path that mat
 
 ### I just want to run reports against a database that already exists
 
-You have access to a Biofilter database (e.g. the Ritchie Lab shared instance, a colleague's setup, or a Docker container someone gave you). You don't need to do any data ingestion yourself.
+You have access to a Biofilter database, you don't need to do any data ingestion yourself.
 
 1. [Install Biofilter](installing.md) — pick **pip** (recommended) or **Docker**.
 2. [Connect to the database](connecting_db.md) — read **Option A: connect to an existing database**.
@@ -28,7 +28,7 @@ You want a local database (SQLite for testing or PostgreSQL for production), pop
 
 - **Python 3.10+** for pip-based installation, or **Docker** if you prefer containers.
 - A **database connection string** if you're connecting to an existing instance — get this from whoever administrates it.
-- Roughly **5 GB of disk space** if you're bootstrapping a local PostgreSQL with the full data.
+- Roughly **1 TB of disk space** if you're bootstrapping your own local DB with the full data.
 
 ## Where this guide stops
 

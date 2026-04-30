@@ -1,9 +1,11 @@
 # biofilter/api/cli/groups/db.py
 from __future__ import annotations
 
+import time
 from pathlib import Path
 
 import click
+from sqlalchemy import text
 
 from biofilter.biofilter import Biofilter
 from biofilter.api.cli.common import require_db_uri, local_db_uri_option
@@ -45,6 +47,68 @@ def create(db_uri: str, overwrite: bool, debug: bool):
     bf.db.create_db(db_uri=db_uri, overwrite=overwrite)
 
     # click.echo(f"🏗️ Biofilter project created at: {db_uri}")
+
+
+# -----------------------------------------------------------------------------
+# Ping (connectivity check)
+# -----------------------------------------------------------------------------
+
+
+@db.command("ping")
+@local_db_uri_option
+@click.option("--debug", is_flag=True, help="Enable debug logging.")
+@click.pass_context
+def ping(ctx, db_uri, debug: bool):
+    """
+    Test database connectivity and report engine, database name, and latency.
+
+    Tests reachability only — does not check whether the Biofilter schema
+    is present (use `biofilter db migrate --status` for that).
+
+    Exits with status 0 on success, 1 on failure.
+    """
+    import os
+    from sqlalchemy import create_engine, make_url
+    from sqlalchemy.exc import SQLAlchemyError
+
+    db_uri = require_db_uri(ctx, local_db_uri=db_uri)
+
+    url = make_url(db_uri)
+    backend = url.get_backend_name()
+    host = url.host or "local"
+    db_name = url.database or "(none)"
+
+    # SQLAlchemy's SQLite driver auto-creates missing files on connect.
+    # For ping semantics we must NOT side-effect: fail early if the file
+    # is absent. ":memory:" is always allowed (ephemeral by design).
+    if backend == "sqlite" and url.database and url.database != ":memory:":
+        if not os.path.exists(url.database):
+            click.echo(
+                f"❌ Database file does not exist: {url.database}",
+                err=True,
+            )
+            ctx.exit(1)
+
+    engine = create_engine(db_uri)
+    try:
+        start = time.perf_counter()
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+        elapsed_ms = (time.perf_counter() - start) * 1000.0
+    except SQLAlchemyError as e:
+        click.echo(
+            f"❌ Database unreachable ({backend} at {host}): {e}",
+            err=True,
+        )
+        ctx.exit(1)
+    finally:
+        engine.dispose()
+
+    click.echo("✅ Database is reachable")
+    click.echo(f"   • Engine:  {backend}")
+    click.echo(f"   • Host:    {host}")
+    click.echo(f"   • DB:      {db_name}")
+    click.echo(f"   • Latency: {elapsed_ms:.1f} ms")
 
 
 # NOTE: Need fix and apply Alembic

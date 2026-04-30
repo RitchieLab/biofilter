@@ -14,13 +14,13 @@ Use the catalog when you want to scan everything available.
 
 ## 2. Ask the GPT assistant
 
-For natural-language questions like *"I have a list of genes from a GWAS — which report should I run to see what pathways they touch?"*, BF4 ships with a GPT assistant kit in the `assistent/` folder of the repository. It contains:
+For natural-language questions like _"I have a list of genes from a GWAS — which report should I run to see what pathways they touch?"_, BF4 ships with a GPT assistant kit in the `assistent/` folder of the repository. It contains:
 
 - A system prompt tuned for BF4 terminology.
 - A FAQ.
 - A manifest of all reports with their inputs, outputs, and use cases.
 
-Load these into ChatGPT (or any LLM with file upload) to get conversational guidance — useful when you don't know what a report is called but you know what you want to do.
+Link to GPT BF4 Assistent: [BF4 Assistent](https://chatgpt.com/g/g-6887cf80355c8191ab3f88bbd8955e0d-biofilter-4-assistant)
 
 ## 3. Use the CLI to introspect
 
@@ -42,13 +42,13 @@ This prints the full Explain Guide directly in your terminal, including paramete
 
 If you're new and not sure where to start, these reports are good entry points:
 
-| Report | Use it when |
-|---|---|
-| `etl_status` | You want to see what data is loaded in the database |
-| `entity_filter` | You have a list of names and want to check which exist in BF4 |
+| Report                        | Use it when                                                           |
+| ----------------------------- | --------------------------------------------------------------------- |
+| `etl_status`                  | You want to see what data is loaded in the database                   |
+| `entity_filter`               | You have a list of names and want to check which exist in BF4         |
 | `entity_neighborhood_summary` | You have an entity and want to see everything connected to it (1-hop) |
-| `entity_relationship_model` | You want all relationships for a list of entities |
-| `annotation_master_gene` | You want to browse the full gene catalog |
+| `entity_relationship_model`   | You want all relationships for a list of entities                     |
+| `annotation_master_gene`      | You want to browse the full gene catalog                              |
 
 ## Next step
 

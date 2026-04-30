@@ -9,6 +9,37 @@ This branch (`biofilter3r`) contains the active development of **Biofilter 4**, 
 
 ---
 
+## Quick Start
+
+Install via pip:
+
+```bash
+pip install biofilter
+biofilter --help
+```
+
+Connect to a database (existing instance or local) and run your first report:
+
+```bash
+export DATABASE_URL="postgresql+psycopg2://user:password@host:5432/biofilter_prod"
+biofilter report list
+biofilter report run --report-name etl_status --output etl_status.csv
+```
+
+From Python:
+
+```python
+from biofilter import Biofilter
+
+bf = Biofilter()
+df = bf.report.run("entity_filter", input_data=["BRCA1", "TP53", "APOE"])
+df.head()
+```
+
+For Docker, source install, or bootstrapping a local database, see the [Getting Started guide](https://biofilter.readthedocs.io/en/latest/getting_started/index.html).
+
+---
+
 ## What is Biofilter 4?
 
 Biofilter 4 provides a **persistent, versioned biological knowledge base** that replaces traditional file-based annotation workflows with a reusable, query-driven platform.
@@ -34,7 +65,7 @@ Biofilter organizes biological knowledge around three core concepts:
   - Functional/omics contexts used to structure and interpret entities and their links.
 
 - **Entity Relationships**
-  - A relational layer that connects entities across domains and behaves like a graph traversal surface (including multi-hop relationship discovery) while staying in a SQL-native environment.
+  - A relational layer that connects entities across domains and behaves like a graph traversal surface while staying in a SQL-native environment.
 
 This design lets users recover cross-omics relationships and reuse them directly in reports for:
 
@@ -100,21 +131,30 @@ At a high level, Biofilter 4 consists of:
 
 ```text
 biofilter/
-├── alembic/          # Database migrations
-├── cli/              # CLI commands and entrypoints
-├── core/             # Core orchestration logic
-├── db/               # Database models and schema
-├── etl/              # ETL framework and DTPs
-├── report/           # Report framework
-├── tools/            # Developer and admin utilities
-├── utils/            # Shared helpers
-├── biofilter.py      # Main Biofilter entry point
-├── cli.py            # CLI bootstrap
+├── alembic/                   # Database migrations
+├── api/
+│   └── cli/                   # CLI commands and entrypoints
+├── core/
+│   ├── components/            # db, etl, report, settings components
+│   └── settings_manager.py
+├── modules/
+│   ├── db/                    # ORM models, seeds, schema
+│   ├── etl/                   # ETL framework and DTPs
+│   ├── io/                    # Input/output utilities
+│   └── report/                # Report framework and reports
+├── utils/                     # Shared helpers
+└── biofilter.py               # Python API facade
 
 docs/
-├── source/           # Sphinx documentation source
-└── requirements.txt  # Documentation build requirements
-````
+└── source/                    # Sphinx documentation source
+
+notebooks/
+└── Templates/                 # Ready-to-use report tutorials
+
+tests/
+├── unit/
+└── integration/
+```
 
 ---
 
@@ -134,6 +174,17 @@ The documentation covers:
 * Data access and report internals
 * Writing and extending reports
 * Developer tooling and project structure
+
+---
+
+## Resources
+
+- 🤖 **GPT Assistant** — conversational guidance for picking and using reports:
+  [Biofilter 4 Assistant](https://chatgpt.com/g/g-6887cf80355c8191ab3f88bbd8955e0d-biofilter-4-assistant)
+- 📓 **Notebook tutorials** — ready-to-run examples for every report:
+  [`notebooks/Templates/`](https://github.com/RitchieLab/biofilter/tree/biofilter3r/notebooks/Templates)
+- 📋 **Report Catalog** — full index of available reports with descriptions:
+  [Read the Docs](https://biofilter.readthedocs.io/en/latest/report_catalog.html)
 
 ---
 
@@ -185,10 +236,10 @@ For full container documentation (publishing, multi-arch, GitHub Actions), see:
 
 ## Status
 
-* **Current version**: Biofilter 4 (active development)
-* **Schema**: Entity-centric, versioned
+* **Current version**: 4.1.2
+* **Schema**: Entity-centric, versioned (4.1.x)
 * **ETL**: Modular DTP-based ingestion
-* **Stability**: Actively evolving; APIs and schema may continue to evolve prior to a formal 4.0 release
+* **Stability**: Actively evolving; APIs and schema may continue to change between minor releases
 
 ---
 

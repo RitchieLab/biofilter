@@ -42,11 +42,19 @@ export DATABASE_URL="postgresql+psycopg2://bioadmin:secret@db.example.com:5432/b
 
 ### Verify the connection
 
+Show the resolved configuration:
+
 ```bash
-biofilter config show
+biofilter db ping
 ```
 
-You're done. Skip to [Find a report that fits your need](finding_reports.md).
+Test that the database is actually reachable:
+
+```bash
+biofilter db ping
+```
+
+If the ping succeeds, you'll see the engine, host, database name, and latency. You're done — skip to [Find a report that fits your need](finding_reports.md).
 
 ---
 
@@ -54,10 +62,10 @@ You're done. Skip to [Find a report that fits your need](finding_reports.md).
 
 Use this when you want to run BF4 fully on your own machine. Two engines are supported:
 
-| Engine | Best for | Notes |
-|---|---|---|
-| **SQLite** | Quick start, single user, light datasets | No setup, file-based |
-| **PostgreSQL** | Production, multi-user, full data | Recommended for variants and large ETLs |
+| Engine         | Best for                                 | Notes                                   |
+| -------------- | ---------------------------------------- | --------------------------------------- |
+| **SQLite**     | Quick start, single user, light datasets | No setup, file-based                    |
+| **PostgreSQL** | Production, multi-user, full data        | Recommended for variants and large ETLs |
 
 ### 1. Initialize configuration
 
@@ -85,12 +93,15 @@ biofilter config show
 
 ### 2. Create the schema
 
+Confirm the database is reachable, then apply the schema:
+
 ```bash
+biofilter db ping
 biofilter db migrate --target head
 biofilter db upgrade
 ```
 
-The first command applies all schema migrations. The second loads the seed data (entity groups, relationship types, source systems).
+The ping returns engine, host, database name, and latency. The first migration applies all schema changes. The upgrade loads seed data (entity groups, relationship types, source systems).
 
 ### 3. Run your first ETL
 
