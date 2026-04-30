@@ -74,7 +74,8 @@ Here's a full session — install, connect, run:
 pip install biofilter
 
 # Configure
-export DATABASE_URL="postgresql+psycopg2://user:pass@host:5432/biofilter_prod"
+biofilter config init --path .
+biofilter config set database.db_uri "postgresql+psycopg2://user:password@db.example.com:5432/database_name"
 
 # Run
 biofilter report list

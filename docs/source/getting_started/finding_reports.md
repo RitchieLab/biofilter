@@ -47,7 +47,6 @@ If you're new and not sure where to start, these reports are good entry points:
 | `etl_status`                  | You want to see what data is loaded in the database                   |
 | `entity_filter`               | You have a list of names and want to check which exist in BF4         |
 | `entity_neighborhood_summary` | You have an entity and want to see everything connected to it (1-hop) |
-| `entity_relationship_model`   | You want all relationships for a list of entities                     |
 | `annotation_master_gene`      | You want to browse the full gene catalog                              |
 
 ## Next step
