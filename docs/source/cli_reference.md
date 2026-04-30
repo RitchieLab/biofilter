@@ -7,6 +7,7 @@ biofilter [--db-uri URI] [--debug] COMMAND ...
 ```
 
 Groups:
+
 - `config`
 - `db`
 - `etl`
@@ -21,6 +22,7 @@ Groups:
 
 ## DB
 
+- `biofilter db ping`
 - `biofilter db create-db`
 - `biofilter db migrate`
 - `biofilter db upgrade`
@@ -48,6 +50,7 @@ Groups:
 - `biofilter report run --report-name <name> [options]`
 
 Key `report run` options:
+
 - `--input`, `--input-file`, `--input-column`
 - `--param`, `--params-json`, `--params-file`
 - `--params-template`

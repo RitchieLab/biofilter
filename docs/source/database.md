@@ -8,6 +8,12 @@ Create DB:
 biofilter db create-db --db-uri "sqlite:///biofilter_dev.db"
 ```
 
+Check DB:
+
+```bash
+biofilter db ping --db-uri "sqlite:///biofilter_dev.db"
+```
+
 Migrate schema:
 
 ```bash

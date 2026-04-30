@@ -22,6 +22,7 @@ At the center of the schema:
   - directed link between two entities with provenance
 
 Practical effect:
+
 - you can resolve aliases from many sources to one entity identity
 - you can traverse relationships across domains without hardcoded paths
 
@@ -52,18 +53,6 @@ Domains with active schema + ETL/report usage today:
 - Gene Ontology
 - Diseases
 - Chemicals
-
-### Seeded/Planned Groups
-
-`entity_groups` seed also includes future groups to support expansion:
-
-- Epigenomics
-- Transcriptomics
-- Metabolomics
-- Clinical Trials
-- Microbiome
-- Phenotypes
-- Cell Types
 
 These groups define semantic space and allow gradual expansion without redesigning the core model.
 
