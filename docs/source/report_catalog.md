@@ -112,6 +112,17 @@ See the full pipeline tutorial and methods document for end-to-end guidance.
 
 ---
 
+## Pathway Burden Pipeline
+
+Pipeline for prioritising pathways given a list of significant genes (e.g., ExWAS hits) and a target pathway list, using cross-source convergence scoring.
+
+| Resource | Link |
+|---|---|
+| Pipeline notebook | [pipeline__pathway_burden_score.ipynb](https://github.com/RitchieLab/biofilter/blob/biofilter3r/notebooks/Templates/pipeline__pathway_burden_score.ipynb) |
+| Pipeline methods doc | [pipeline__pathway_burden_score.md](https://github.com/RitchieLab/biofilter/blob/biofilter3r/notebooks/Templates/pipeline__pathway_burden_score.md) |
+
+---
+
 ## Utilities
 
 | Report | Description | Explain | Notebook |
