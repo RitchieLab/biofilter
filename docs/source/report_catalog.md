@@ -78,6 +78,7 @@ Reports for annotating and filtering genomic variants.
 | `variant_annotation_expanded` | Full annotation expansion for a variant list (consequence, AF, predictions) | — | — |
 | `variant_single_gene_annotation` | **Phase 1** — Given a seed variant, returns the seed gene and all partner genes sharing biological context | [Guide](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter/modules/report/reports_explain/report_variant_single_gene_annotation.md) | [Tutorial](https://github.com/RitchieLab/biofilter/blob/biofilter3r/notebooks/Templates/reports__variant_single_gene_annotation.ipynb) |
 | `gene_to_variant_filtering` | **Phase 2** — Collect and filter variants across a gene list with SQL-level pathogenicity filters | [Guide](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter/modules/report/reports_explain/report_gene_to_variant_filtering.md) | [Tutorial](https://github.com/RitchieLab/biofilter/blob/biofilter3r/notebooks/Templates/reports__gene_to_variant_filtering.ipynb) |
+| `annotation_variant_regulatory_evidence` | Variant ↔ gene regulatory evidence (eQTL / sQTL). Accepts gene symbols, rsids, or chr:pos as input; returns one row per (variant × tissue × regulated gene) with effect size and p-value | [Guide](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter/modules/report/reports_explain/report_annotation_variant_regulatory_evidence.md) | [Tutorial](https://github.com/RitchieLab/biofilter/blob/biofilter3r/notebooks/Templates/reports__annotation_variant_regulatory_evidence.ipynb) |
 
 ---
 
@@ -135,8 +136,8 @@ Pipeline for prioritising pathways given a list of significant genes (e.g., ExWA
 
 | Status | Count |
 |---|---|
-| Reports with explain guide + notebook | 19 |
+| Reports with explain guide + notebook | 20 |
 | Reports with explain guide only | 2 (`variant_list_intersect`, `snp_snp_pair_generator` — covered by pipeline notebook) |
 | Reports with notebook only | 2 (`entity_relationship_model`, `variant_gene_location_model`) |
 | Reports with neither | 1 (`variant_annotation_expanded`) |
-| **Total** | **24** |
+| **Total** | **25** |
