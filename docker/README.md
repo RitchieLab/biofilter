@@ -2,6 +2,9 @@
 
 This folder contains the Biofilter 4 container image setup (application only, no bundled database).
 
+> Looking for a self-contained image that ships BF4 **together with PostgreSQL**
+> (HPC clusters, single-node deployments)? See [hpc/README.md](hpc/README.md).
+
 ## Build
 
 From the project root:
