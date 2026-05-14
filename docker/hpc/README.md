@@ -21,11 +21,11 @@ at [../Dockerfile](../Dockerfile).
 
 ## Quick start — pull a published image
 
-The image is published to Docker Hub. On the LPC (or any machine with
-Apptainer/Singularity), pull the `.sif` and run:
+The image is published to GitHub Container Registry. On the LPC (or any
+machine with Apptainer/Singularity), pull the `.sif` and run:
 
 ```bash
-apptainer pull bf4-hpc.sif docker://docker.io/ricoandre/biofilter-hpc:latest
+apptainer pull bf4-hpc.sif docker://ghcr.io/ritchielab/biofilter-hpc:latest
 
 mkdir -p ~/bf4-pgdata
 apptainer run \
@@ -37,12 +37,12 @@ apptainer run \
 For Docker locally:
 
 ```bash
-docker pull docker.io/ricoandre/biofilter-hpc:latest
+docker pull ghcr.io/ritchielab/biofilter-hpc:latest
 
 mkdir -p ./bf4-pgdata
 docker run --rm \
   -v "$(pwd)/bf4-pgdata:/var/lib/postgresql/data" \
-  docker.io/ricoandre/biofilter-hpc:latest \
+  ghcr.io/ritchielab/biofilter-hpc:latest \
   biofilter db migrate --target head
 ```
 
@@ -160,10 +160,10 @@ additional clients to it over the network.
 
 ## HPC deployment via Apptainer/Singularity
 
-The image is built to be Apptainer-compatible. Pull straight from Docker Hub:
+The image is built to be Apptainer-compatible. Pull straight from GHCR:
 
 ```bash
-apptainer pull bf4-hpc.sif docker://docker.io/ricoandre/biofilter-hpc:latest
+apptainer pull bf4-hpc.sif docker://ghcr.io/ritchielab/biofilter-hpc:latest
 
 apptainer run \
   --bind /project/<your>/bf4-pgdata:/var/lib/postgresql/data \

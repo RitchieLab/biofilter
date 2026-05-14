@@ -39,7 +39,7 @@ docker/hpc/                                 # NEW — self-contained image
 └── README.md                               # user-facing docs (build, run, Apptainer, Lmod)
 
 .github/workflows/
-└── docker-publish-hpc.yml                  # NEW — publishes to docker.io/ricoandre/biofilter-hpc
+└── docker-publish-hpc.yml                  # NEW — publishes to ghcr.io/ritchielab/biofilter-hpc
 
 docker/README.md                            # MODIFIED — link to hpc/ image
 ```
@@ -315,29 +315,27 @@ because BF4 builds the schema via the ORM (`Base.metadata.create_all`) inside
 
 ---
 
-## 8. Publishing to Docker Hub
+## 8. Publishing to GHCR
 
 The workflow at `.github/workflows/docker-publish-hpc.yml` publishes the HPC
-image to `docker.io/ricoandre/biofilter-hpc`. Triggers:
+image to `ghcr.io/<owner>/biofilter-hpc`. Triggers:
 
 - Push a Git tag matching `v*` (e.g., `v4.1.3`) — publishes that version tag plus `:latest`
 - Manual dispatch via GitHub Actions UI ("Publish HPC Docker Image" → "Run workflow")
 
-The workflow reuses the existing `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN`
-repo secrets (already configured for the app-only image at
-`.github/workflows/docker-publish.yml`). Docker Hub allows public images for
-free, so no GHCR / org-level package visibility setup is required.
+The workflow uses the auto-provided `GITHUB_TOKEN` — no additional secrets
+required. The owner segment is lowercased automatically so `RitchieLab` ends
+up as `ghcr.io/ritchielab/...`.
 
-Historical note: the first iteration of this workflow targeted GitHub
-Container Registry (`ghcr.io/<org>/biofilter-hpc`), but the `RitchieLab` org
-policy disables public packages, which would have forced authenticated pulls
-on the cluster. Docker Hub avoids that constraint without giving up anything
-that matters for this use case.
+**Public visibility gotcha:** the `RitchieLab` org currently disables public
+package creation. After the first publish, the package shows up as private
+and the LPC will need authenticated pulls (or org-admin action to flip the
+"allow public packages" setting). Pending coordination with the org admin.
 
 Once published, anyone on the cluster can do:
 
 ```bash
-apptainer pull bf4-hpc.sif docker://docker.io/ricoandre/biofilter-hpc:latest
+apptainer pull bf4-hpc.sif docker://ghcr.io/ritchielab/biofilter-hpc:latest
 ```
 
 ---
@@ -353,10 +351,10 @@ not the HPC itself):
 apptainer build bf4-hpc.sif docker-daemon://biofilter-hpc:latest
 ```
 
-Or pull directly from Docker Hub on the cluster (no Docker required):
+Or pull directly from GHCR on the cluster (no Docker required):
 
 ```bash
-apptainer pull bf4-hpc.sif docker://docker.io/ricoandre/biofilter-hpc:latest
+apptainer pull bf4-hpc.sif docker://ghcr.io/ritchielab/biofilter-hpc:latest
 ```
 
 ### 9.2 Run on the cluster
@@ -402,8 +400,11 @@ biofilter report list
 
 - [ ] Confirm with the LPC admin: `.sif` size limits, availability of a
       persistent / service node for long-lived PG, exact shared FS type
-- [ ] Build a `.sif` from the published Docker Hub image and smoke-test it on
-      the cluster
+- [ ] Coordinate with org admin to enable public package creation for the
+      `RitchieLab` GHCR (or get admin access). Currently the published image
+      is private, which blocks unauthenticated `apptainer pull` on the LPC.
+- [ ] Build a `.sif` from the published GHCR image and smoke-test it on the
+      cluster
 - [ ] Decide whether to add a `BIOFILTER_AUTO_BOOTSTRAP=1` env var that
       runs `create-db` + `migrate --stamp-head` automatically on the very
       first run (currently the user has to run two commands)
@@ -423,7 +424,7 @@ biofilter report list
 - [docker/hpc/entrypoint.sh](../../docker/hpc/entrypoint.sh) — first-run logic, PG lifecycle, restore hook
 - [docker/hpc/README.md](../../docker/hpc/README.md) — user-facing documentation
 - [docker/hpc/.env.example](../../docker/hpc/.env.example) — annotated env vars
-- [.github/workflows/docker-publish-hpc.yml](../../.github/workflows/docker-publish-hpc.yml) — Docker Hub publishing workflow
+- [.github/workflows/docker-publish-hpc.yml](../../.github/workflows/docker-publish-hpc.yml) — GHCR publishing workflow
 - [biofilter/modules/db/create_db_mixin.py](../../biofilter/modules/db/create_db_mixin.py) — `create_db` (creates DB + tables + seeds)
 - [biofilter/modules/db/migrate.py](../../biofilter/modules/db/migrate.py) — Alembic wrapper used by `db migrate`
 - [biofilter/api/cli/groups/db.py](../../biofilter/api/cli/groups/db.py) — CLI surface for `db create-db`, `db migrate`, `db upgrade`
