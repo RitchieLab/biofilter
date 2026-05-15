@@ -466,3 +466,43 @@ apptainer run \
 # Limpa
 
 rm -rf "${TMP_DIR}"
+
+## Full Process:
+
+# Load Module
+
+module load apptainer
+
+# Set DB and Image Path
+
+DB_DIR=/project/ritchie/datasets/bf4/20260514
+SIF=/project/ritchie/env/modules/biofilter/4.1.2/bf4-hpc.sif
+
+# Set temp to Postgres
+
+TMP_DIR=$(mktemp -d -t bf4-test-XXXXXX)
+mkdir -p "${TMP_DIR}/tmp" "${TMP_DIR}/pg-run"
+
+# Set output
+
+OUTPUT_DIR=/project/hall/analysis/biofilter/quick_runs
+mkdir -p "${OUTPUT_DIR}"
+
+# Run Container
+
+apptainer run \
+ --writable-tmpfs \
+ --pwd /tmp \
+ --bind "${DB_DIR}/pgdata:/var/lib/postgresql/data" \
+ --bind "${TMP_DIR}/tmp:/tmp" \
+ --bind "${TMP_DIR}/pg-run:/var/run/postgresql" \
+ --bind "${OUTPUT_DIR}:/workspace" \
+ "${SIF}" \
+ biofilter report run \
+ --name annotation_master_gene \
+ --input APOE \
+ --output /workspace/apoe_annotation.csv
+
+# Drop temp data
+
+rm -rf "${TMP_DIR}"
