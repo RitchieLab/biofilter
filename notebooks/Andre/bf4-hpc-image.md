@@ -1,7 +1,7 @@
 # BF4 HPC Image — Implementation Notes
 
 > Personal notes documenting the work that produced the `docker/hpc/` image and
-> the supporting GitHub Actions workflow. Captures the *why*, the layout of the
+> the supporting GitHub Actions workflow. Captures the _why_, the layout of the
 > new files, the first-run workflow we validated locally, the bugs we ran into
 > during testing, and what still has to be done on the cluster side.
 >
@@ -88,15 +88,15 @@ PostgreSQL) was left untouched.
 
 ## 4. Environment variables
 
-| Variable | Default | Purpose |
-|---|---|---|
-| `POSTGRES_USER` | `biofilter` | DB superuser created at initdb |
-| `POSTGRES_DB` | `biofilter` | Application database name |
-| `POSTGRES_PORT` | `5432` | PG port (inside container only) |
-| `PGDATA` | `/var/lib/postgresql/data` | Bind-mount target |
-| `BIOFILTER_AUTO_MIGRATE` | `0` | If `1`, run `biofilter db migrate --target head` at startup |
-| `BIOFILTER_RESTORE_DUMP` | _unset_ | Path inside container to a `pg_dump -Fc` archive. Restored on first run only |
-| `BIOFILTER_RESTORE_JOBS` | `4` | Parallelism for `pg_restore` |
+| Variable                 | Default                    | Purpose                                                                      |
+| ------------------------ | -------------------------- | ---------------------------------------------------------------------------- |
+| `POSTGRES_USER`          | `biofilter`                | DB superuser created at initdb                                               |
+| `POSTGRES_DB`            | `biofilter`                | Application database name                                                    |
+| `POSTGRES_PORT`          | `5432`                     | PG port (inside container only)                                              |
+| `PGDATA`                 | `/var/lib/postgresql/data` | Bind-mount target                                                            |
+| `BIOFILTER_AUTO_MIGRATE` | `0`                        | If `1`, run `biofilter db migrate --target head` at startup                  |
+| `BIOFILTER_RESTORE_DUMP` | _unset_                    | Path inside container to a `pg_dump -Fc` archive. Restored on first run only |
+| `BIOFILTER_RESTORE_JOBS` | `4`                        | Parallelism for `pg_restore`                                                 |
 
 ---
 
@@ -428,3 +428,41 @@ biofilter report list
 - [biofilter/modules/db/create_db_mixin.py](../../biofilter/modules/db/create_db_mixin.py) — `create_db` (creates DB + tables + seeds)
 - [biofilter/modules/db/migrate.py](../../biofilter/modules/db/migrate.py) — Alembic wrapper used by `db migrate`
 - [biofilter/api/cli/groups/db.py](../../biofilter/api/cli/groups/db.py) — CLI surface for `db create-db`, `db migrate`, `db upgrade`
+
+#
+
+module load apptainer
+
+# Variáveis
+
+DB_DIR=/project/ritchie/datasets/bf4/20260514
+SIF=/project/ritchie/env/modules/biofilter/4.1.2/bf4-hpc.sif
+
+# /tmp scratch local pro PG socket
+
+TMP_DIR=$(mktemp -d -t bf4-test-XXXXXX)
+mkdir -p "${TMP_DIR}/tmp" "${TMP_DIR}/pg-run"
+
+# Teste 1: status do Alembic (mesma coisa do job, confirma persistência)
+
+apptainer run \
+ --writable-tmpfs \
+ --bind "${DB_DIR}/pgdata:/var/lib/postgresql/data" \
+  --bind "${TMP_DIR}/tmp:/tmp" \
+ --bind "${TMP_DIR}/pg-run:/var/run/postgresql" \
+  "${SIF}" \
+ biofilter db migrate --status
+
+# Teste 2: listar reports (confirma que BF4 lê catálogo de funcionalidades)
+
+apptainer run \
+ --writable-tmpfs \
+ --bind "${DB_DIR}/pgdata:/var/lib/postgresql/data" \
+  --bind "${TMP_DIR}/tmp:/tmp" \
+ --bind "${TMP_DIR}/pg-run:/var/run/postgresql" \
+  "${SIF}" \
+ biofilter report list
+
+# Limpa
+
+rm -rf "${TMP_DIR}"
