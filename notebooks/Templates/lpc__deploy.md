@@ -1,289 +1,339 @@
-# Running Biofilter 4 on the Penn LPC
+# Deploying Biofilter 4 on the Penn LPC
 
-Copy-paste-ready guide to run BF4 reports on the LPC cluster. No installation,
-no PostgreSQL setup — just `module load apptainer` and go.
+Operational guide for the **maintainer** who installs or updates BF4 on the
+LPC cluster: pulling the Apptainer image, restoring the database from a
+production dump, and managing future updates.
 
-> **Audience:** LPC users (researchers, students) who want to query the BF4
-> knowledge base for their analyses. You don't need to know anything about
-> containers, databases, or Python to use this.
+> **Audience:** the person who owns the BF4 environment on the cluster.
+> If you just want to _run reports_, see [lpc\_\_quickstart.md](lpc__quickstart.md)
+> instead.
+
+> **Before you start:** every script in this guide expects `PROJECT` to be set
+> to your LPC project allocation name (the folder under `/project/` you have
+> write access to). Export it once per shell session:
+>
+> ```bash
+> export PROJECT=your-project-name
+> ```
 
 ---
 
-## TL;DR — the fastest possible report
+## 1. Directory layout
 
-Paste this into a terminal on the LPC. You'll get a CSV of gene annotations
-for `APOE` in your home directory.
+```
+/project/${PROJECT}/
+├── env/modules/biofilter/
+│   ├── <version>/
+│   │   └── bf4-hpc.sif                  ← the Apptainer image
+│   └── latest -> <version>              ← optional symlink
+└── datasets/bf4/
+    ├── <snapshot-date>/
+    │   └── pgdata/                      ← the PostgreSQL data directory
+    └── dumps/
+        └── biofilter-<date>.dump        ← raw pg_dump archives (kept after restore)
+```
+
+Versioning the image and dating the dataset folders lets you keep multiple
+generations side by side — useful for reproducibility and for testing a new
+release without breaking existing users.
+
+---
+
+## 2. Prerequisites
+
+- LPC account with write access to `/project/${PROJECT}/env/modules/` and `/project/${PROJECT}/datasets/bf4/`
+- `apptainer` module available on the cluster (`module load apptainer`)
+- Enough free space:
+  - **~2 GB** for each image version
+  - **~500 GB** for the uncompressed `pgdata/` of each snapshot (current production size)
+  - **~20 GB** for the compressed dump archive (kept for re-imports)
+- GitHub access to `ghcr.io/ritchielab/biofilter-hpc`
+  - If the package is **public**: no auth needed
+  - If still **private**: a GitHub PAT with `read:packages` scope
+
+---
+
+## 3. Pulling the image (first time and updates)
+
+### 3.1 Public image
 
 ```bash
 module load apptainer
 
-DB_DIR=/project/ritchie/datasets/bf4/20260514
-SIF=/project/ritchie/env/modules/biofilter/4.1.2/bf4-hpc.sif
-OUTPUT_DIR=$HOME/bf4_output
+VERSION=4.1.2
+mkdir -p /project/${PROJECT}/env/modules/biofilter/${VERSION}
+cd /project/${PROJECT}/env/modules/biofilter/${VERSION}
 
-TMP_DIR=$(mktemp -d -t bf4-XXXXXX)
-mkdir -p "${TMP_DIR}/tmp" "${TMP_DIR}/pg-run" "${OUTPUT_DIR}"
+apptainer pull bf4-hpc.sif docker://ghcr.io/ritchielab/biofilter-hpc:${VERSION}
+```
+
+For the very first install, you may also want a `latest` symlink so users can
+omit the version:
+
+```bash
+cd /project/${PROJECT}/env/modules/biofilter
+ln -sfn ${VERSION} latest
+```
+
+Verify:
+
+```bash
+apptainer inspect /project/${PROJECT}/env/modules/biofilter/${VERSION}/bf4-hpc.sif
+```
+
+### 3.2 Private image (PAT auth)
+
+If the GHCR package is still private:
+
+```bash
+# 1) On a machine where you have your PAT, log in to GHCR for Apptainer
+echo "<your_PAT>" | apptainer remote login \
+    --username <your_github_user> \
+    --password-stdin docker://ghcr.io
+
+# 2) Pull as in 3.1
+```
+
+The login persists in `~/.apptainer/docker-config.json` until you `apptainer
+remote logout`.
+
+---
+
+## 4. Database setup
+
+Two paths: restore from a VPS production dump (typical) or initialize a fresh
+empty database (rarely needed on the cluster).
+
+### 4.1 Restore from a production dump (typical)
+
+**On the VPS** (or wherever the live BF4 PostgreSQL runs):
+
+```bash
+pg_dump -Fc -d biofilter -f /tmp/biofilter-$(date +%Y%m%d).dump
+```
+
+Estimates for the current production DB:
+
+- Source size: ~480 GB
+- Compressed dump (`-Fc`): ~20 GB
+
+**Transfer to the LPC:**
+
+```bash
+rsync --partial --progress \
+  /tmp/biofilter-20260514.dump \
+  user@lpc:/project/${PROJECT}/datasets/bf4/dumps/biofilter-20260514.dump
+```
+
+Bandwidth permitting, 20 GB takes 1–4 hours.
+
+**Restore inside the BF4-HPC container:**
+
+```bash
+SNAPSHOT_DATE=20260514
+VERSION=4.1.2
+
+DB_DIR=/project/${PROJECT}/datasets/bf4/${SNAPSHOT_DATE}
+DUMP=/project/${PROJECT}/datasets/bf4/dumps/biofilter-${SNAPSHOT_DATE}.dump
+SIF=/project/${PROJECT}/env/modules/biofilter/${VERSION}/bf4-hpc.sif
+
+mkdir -p "${DB_DIR}/pgdata"
+
+TMP_DIR=$(mktemp -d -t bf4-restore-XXXXXX)
+mkdir -p "${TMP_DIR}/tmp" "${TMP_DIR}/pg-run"
 
 apptainer run \
   --writable-tmpfs \
   --pwd /tmp \
   --bind "${DB_DIR}/pgdata:/var/lib/postgresql/data" \
+  --bind "${DUMP}:/restore.dump:ro" \
   --bind "${TMP_DIR}/tmp:/tmp" \
   --bind "${TMP_DIR}/pg-run:/var/run/postgresql" \
-  --bind "${OUTPUT_DIR}:/workspace" \
+  --env BIOFILTER_RESTORE_DUMP=/restore.dump \
+  --env BIOFILTER_RESTORE_JOBS=8 \
   "${SIF}" \
-  biofilter report run \
-    --name annotation_master_gene \
-    --input APOE \
-    --output /workspace/apoe_annotation.csv
+  biofilter db migrate --status
 
 rm -rf "${TMP_DIR}"
 ```
 
-Result: `~/bf4_output/apoe_annotation.csv`.
+On first run with an empty `pgdata/` and `BIOFILTER_RESTORE_DUMP` set, the
+container's entrypoint runs `initdb`, creates the application database, then
+`pg_restore` with the specified parallelism, _before_ starting PG normally.
+The final `biofilter db migrate --status` is just a sanity check that
+PostgreSQL is up and the schema is reachable.
 
----
-
-## What's where on the LPC
-
-| Path | What it is |
-|---|---|
-| `/project/ritchie/env/modules/biofilter/<version>/bf4-hpc.sif` | The Apptainer image (contains BF4 + PostgreSQL bundled). Versioned. |
-| `/project/ritchie/datasets/bf4/<snapshot-date>/pgdata/` | The BF4 database snapshot. Dated. |
-| `$HOME/bf4_output/` | Your output folder (you choose where) |
-
-See what's available right now:
-
-```bash
-ls /project/ritchie/env/modules/biofilter/
-ls /project/ritchie/datasets/bf4/
-```
-
-Pick the **snapshot date** that matches your analysis cutoff. Newer snapshots
-include more curated data; older snapshots are kept for reproducibility of
-already-published work.
-
----
-
-## Reusable script template
-
-Save this as `~/scripts/run_bf4.sh`. Edit the `REPORT_*` variables, then run.
+Expected runtime for the production-sized dump on Lustre/GPFS-class storage:
+**3–8 hours**, dominated by `pg_restore`. Recommend running inside `screen`,
+`tmux`, or as a SLURM job:
 
 ```bash
 #!/bin/bash
-# Run a Biofilter 4 report on the LPC.
-# Edit the values below, then: bash run_bf4.sh
-set -euo pipefail
+#SBATCH --job-name=bf4-restore
+#SBATCH --output=bf4-restore-%j.log
+#SBATCH --time=12:00:00
+#SBATCH --mem=32G
+#SBATCH --cpus-per-task=8
 
-# ---------- What to run ----------
-REPORT_NAME="annotation_master_gene"
-REPORT_INPUT="APOE,TP53,BRCA1"            # comma-separated, OR use REPORT_INPUT_FILE
-REPORT_INPUT_FILE=""                       # absolute path to a file, OR leave empty
-REPORT_OUTPUT_NAME="my_report.csv"
-
-# ---------- Which BF4 / snapshot ----------
-BF4_VERSION="4.1.2"
-DB_VERSION="20260514"
-
-# ---------- Where outputs go ----------
-OUTPUT_DIR="${HOME}/bf4_output"
-
-# ---------- Don't edit below ----------
 module load apptainer
+# ... paste the apptainer block above ...
+```
 
-DB_DIR="/project/ritchie/datasets/bf4/${DB_VERSION}"
-SIF="/project/ritchie/env/modules/biofilter/${BF4_VERSION}/bf4-hpc.sif"
+### 4.2 Initialize a fresh empty database (no dump)
 
-TMP_DIR=$(mktemp -d -t bf4-XXXXXX)
-trap "rm -rf ${TMP_DIR}" EXIT
-mkdir -p "${TMP_DIR}/tmp" "${TMP_DIR}/pg-run" "${OUTPUT_DIR}"
+Only needed if there's no production dump to start from — e.g., setting up an
+isolated test environment.
 
-# Decide between --input and --input-file
-if [[ -n "${REPORT_INPUT_FILE}" ]]; then
-  cp "${REPORT_INPUT_FILE}" "${OUTPUT_DIR}/_input.txt"
-  INPUT_FLAGS=(--input-file /workspace/_input.txt)
-else
-  INPUT_FLAGS=(--input "${REPORT_INPUT}")
-fi
+```bash
+SNAPSHOT_DATE=test
+VERSION=4.1.2
 
-apptainer run \
-  --writable-tmpfs \
-  --pwd /tmp \
+DB_DIR=/project/${PROJECT}/datasets/bf4/${SNAPSHOT_DATE}
+SIF=/project/${PROJECT}/env/modules/biofilter/${VERSION}/bf4-hpc.sif
+mkdir -p "${DB_DIR}/pgdata"
+
+TMP_DIR=$(mktemp -d) && mkdir -p "${TMP_DIR}/tmp" "${TMP_DIR}/pg-run"
+
+# Step 1 — create the application DB, tables, and seeds
+apptainer run --writable-tmpfs --pwd /tmp \
   --bind "${DB_DIR}/pgdata:/var/lib/postgresql/data" \
   --bind "${TMP_DIR}/tmp:/tmp" \
   --bind "${TMP_DIR}/pg-run:/var/run/postgresql" \
-  --bind "${OUTPUT_DIR}:/workspace" \
   "${SIF}" \
+  sh -c 'biofilter db create-db --db-uri "$DATABASE_URL"'
+
+# Step 2 — stamp Alembic to head
+apptainer run --writable-tmpfs --pwd /tmp \
+  --bind "${DB_DIR}/pgdata:/var/lib/postgresql/data" \
+  --bind "${TMP_DIR}/tmp:/tmp" \
+  --bind "${TMP_DIR}/pg-run:/var/run/postgresql" \
+  "${SIF}" \
+  biofilter db migrate --stamp-head
+
+rm -rf "${TMP_DIR}"
+```
+
+Result: a fresh DB with the BF4 schema and master seeds, but no ETL data.
+To populate it, the ETL flow (`biofilter etl update-all`) has to run from a
+container that can reach the source data files — usually not what you want on
+the cluster.
+
+---
+
+## 5. Smoke test after install
+
+Run a tiny report against the new install. If this succeeds, the
+deployment is good.
+
+```bash
+SNAPSHOT_DATE=20260514
+VERSION=4.1.2
+OUT=$(mktemp -d)
+
+TMP_DIR=$(mktemp -d) && mkdir -p "${TMP_DIR}/tmp" "${TMP_DIR}/pg-run"
+
+apptainer run --writable-tmpfs --pwd /tmp \
+  --bind "/project/${PROJECT}/datasets/bf4/${SNAPSHOT_DATE}/pgdata:/var/lib/postgresql/data" \
+  --bind "${TMP_DIR}/tmp:/tmp" \
+  --bind "${TMP_DIR}/pg-run:/var/run/postgresql" \
+  --bind "${OUT}:/workspace" \
+  "/project/${PROJECT}/env/modules/biofilter/${VERSION}/bf4-hpc.sif" \
   biofilter report run \
-    --name "${REPORT_NAME}" \
-    "${INPUT_FLAGS[@]}" \
-    --output "/workspace/${REPORT_OUTPUT_NAME}"
-
-echo "✅ Done. Output: ${OUTPUT_DIR}/${REPORT_OUTPUT_NAME}"
-```
-
-Run it:
-```bash
-chmod +x ~/scripts/run_bf4.sh
-bash ~/scripts/run_bf4.sh
-```
-
----
-
-## Common examples
-
-### Gene annotations (input: gene symbols)
-
-```bash
-... biofilter report run \
     --name annotation_master_gene \
-    --input "TP53,BRCA1,APOE" \
-    --output /workspace/genes.csv
+    --input APOE \
+    --output /workspace/smoke.csv
+
+head -3 "${OUT}/smoke.csv"
+rm -rf "${TMP_DIR}" "${OUT}"
 ```
 
-### Variant annotations (input: rsIDs from a file)
-
-Create the input file in your output folder so the container can see it:
-
-```bash
-cat > $HOME/bf4_output/my_rsids.txt <<EOF
-rs429358
-rs7412
-rs1801133
-EOF
-```
-
-Then run:
-```bash
-... biofilter report run \
-    --name annotation_master_variant \
-    --input-file /workspace/my_rsids.txt \
-    --output /workspace/variants.csv
-```
-
-### Disease annotations
-
-```bash
-... biofilter report run \
-    --name annotation_master_disease \
-    --input "Alzheimer disease,MONDO:0004975" \
-    --output /workspace/diseases.csv
-```
-
-### List every available report
-
-```bash
-... biofilter report list
-```
-
-### Get help on a specific report's parameters
-
-```bash
-... biofilter report explain --report-name annotation_master_gene
-```
+Expected: 3 lines of CSV with the APOE annotation.
 
 ---
 
-## Running as a SLURM job (recommended for big runs)
+## 6. Updates
 
-For reports involving many genes/variants, submit to SLURM instead of running
-on the login node:
+### 6.1 New BF4 version
 
 ```bash
-#!/bin/bash
-#SBATCH --job-name=bf4-report
-#SBATCH --output=bf4-%j.log
-#SBATCH --time=2:00:00
-#SBATCH --mem=16G
-#SBATCH --cpus-per-task=4
-
 module load apptainer
+NEW_VERSION=4.1.3
 
-# ... paste the same body as the reusable script above ...
+mkdir -p /project/${PROJECT}/env/modules/biofilter/${NEW_VERSION}
+cd /project/${PROJECT}/env/modules/biofilter/${NEW_VERSION}
+apptainer pull bf4-hpc.sif docker://ghcr.io/ritchielab/biofilter-hpc:${NEW_VERSION}
+
+# Smoke-test the new image against the current snapshot before flipping latest
+# ... (see section 5) ...
+
+# Once green, flip the symlink so default invocations pick up the new version
+cd /project/${PROJECT}/env/modules/biofilter
+ln -sfn ${NEW_VERSION} latest
 ```
 
-Submit:
-```bash
-sbatch run_bf4.slurm
-```
-
-Quick guidance on resources:
-
-| Workload | Time | Memory |
-|---|---|---|
-| < 100 genes/variants | 5 min | 4 GB |
-| 100 – 10k genes/variants | 30 min | 8 GB |
-| > 10k or full-genome reports | 2-6 h | 16-32 GB |
-
----
-
-## File location rules (important!)
-
-The container has its own filesystem that is **not your home directory**.
-To give it access to your files:
-
-1. Put input files **inside the folder you mount as `/workspace`** (e.g., `$HOME/bf4_output/`)
-2. Reference them inside the container as `/workspace/<filename>`
-3. Outputs land in the same folder on the host
+If a new BF4 release includes schema migrations, after the symlink flip:
 
 ```bash
-# On the host
-echo -e "TP53\nBRCA1\nAPOE" > $HOME/bf4_output/genes.txt
-
-# In the container
---input-file /workspace/genes.txt
---output    /workspace/result.csv
+TMP_DIR=$(mktemp -d) && mkdir -p "${TMP_DIR}/tmp" "${TMP_DIR}/pg-run"
+apptainer run --writable-tmpfs --pwd /tmp \
+  --bind "/project/${PROJECT}/datasets/bf4/${SNAPSHOT_DATE}/pgdata:/var/lib/postgresql/data" \
+  --bind "${TMP_DIR}/tmp:/tmp" \
+  --bind "${TMP_DIR}/pg-run:/var/run/postgresql" \
+  "/project/${PROJECT}/env/modules/biofilter/${NEW_VERSION}/bf4-hpc.sif" \
+  biofilter db migrate --target head
+rm -rf "${TMP_DIR}"
 ```
 
-This is the **only** thing that trips up new users. Don't pass `--input-file /home/me/...` — the container can't see your home directly.
+### 6.2 New database snapshot
 
----
+Treat each snapshot as an immutable dated folder. Don't `pg_restore` over an
+existing one.
 
-## Troubleshooting
-
-**`apptainer: command not found`**  
-You forgot `module load apptainer`. Run it first.
-
-**`Permission denied` writing to output**  
-Check `ls -ld $HOME/bf4_output` — must be writable by you. Try `chmod u+w` or pick a different folder you own.
-
-**`No such file or directory: /home/...` inside the container**  
-The container can't see your home directly. Move the file into `$OUTPUT_DIR` and reference it as `/workspace/<filename>`.
-
-**Long startup before each run (~5–10 s)**  
-Normal. The container starts PostgreSQL on every invocation. For batch processing many inputs, prefer one report run with a big `--input-file` over many small runs.
-
-**Container exits immediately with no output**  
-Run with verbose Apptainer:
 ```bash
-apptainer --debug run ...
+# 1) Take a fresh dump on the VPS, transfer it (see 4.1)
+# 2) Create a new dated folder and restore into it
+NEW_SNAPSHOT=20260901
+mkdir -p /project/${PROJECT}/datasets/bf4/${NEW_SNAPSHOT}/pgdata
+
+# 3) Run the restore command from section 4.1 with SNAPSHOT_DATE=${NEW_SNAPSHOT}
+
+# 4) Smoke-test (section 5) against the new snapshot
+# 5) Announce the new date to users (update lpc__quickstart.md if needed)
 ```
-Common cause: missing `--bind` for one of the four required paths.
 
-**`pg_ctl: another server might be running`**  
-You ran two containers against the same `pgdata` at the same time. Only one process can read/write the DB. Kill the other, or use separate snapshot folders.
-
----
-
-## What is BF4?
-
-Biofilter 4 is an entity-centric biological knowledge platform: it lets you
-query and annotate **genes, variants, pathways, diseases, chemicals**, and
-the relationships among them, across many curated source databases (HGNC,
-Ensembl, UniProt, Reactome, KEGG, GO, MONDO, ClinGen, GWAS Catalog, gnomAD,
-AlphaMissense, …).
-
-On the LPC, you don't install BF4 — the production database snapshot lives
-on shared storage and the application runs inside an Apptainer image. You
-just `module load apptainer` and run.
-
-- Full documentation: <https://biofilter.readthedocs.io/>
-- Project repo: <https://github.com/RitchieLab/biofilter>
+Old snapshots can stay around as long as disk allows — they're reference data
+for reproducibility.
 
 ---
 
-## Getting help
+## 7. Backup
 
-- For BF4 usage questions: see `biofilter report explain --report-name <name>` and the `reports_explain/` folder in the repo
-- For the LPC environment itself (image, database, storage layout): contact
-  the maintainer — **Andre Rico** (<andreluis.rico@pennmedicine.upenn.edu>)
+The bind-mounted `pgdata/` is the only stateful asset. Back it up like
+any research data.
+
+**Cold backup** (when nobody is using that snapshot):
+
+```bash
+tar czf /project/${PROJECT}/datasets/bf4/backups/pgdata-${SNAPSHOT_DATE}-$(date +%Y%m%d).tar.gz \
+    -C /project/${PROJECT}/datasets/bf4/${SNAPSHOT_DATE} pgdata
+```
+
+**Logical backup** (while a container is running):
+
+```bash
+# inside any container pointed at this pgdata
+pg_dump -U biofilter -Fc biofilter > /workspace/backup-$(date +%Y%m%d).dump
+```
+
+The dumps in `datasets/bf4/dumps/` already function as the canonical backup
+for the corresponding snapshot — keep them.
+
+---
+
+---
+
+## 9. References
+
+- End-user usage: [lpc\_\_quickstart.md](lpc__quickstart.md)
+- Image source: [docker/hpc/](../../docker/hpc/) in the repo
+- GHCR publish workflow: [.github/workflows/docker-publish-hpc.yml](../../.github/workflows/docker-publish-hpc.yml)
