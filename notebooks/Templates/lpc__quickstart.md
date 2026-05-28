@@ -1,15 +1,5 @@
 # Biofilter 4 on the LPC — Quickstart
 
-Paste, run, get a CSV. That's it.
-
-> **Before you start:** set `PROJECT` to your LPC project allocation name
-> (the folder under `/project/` you have access to). Run this once per shell
-> session:
->
-> ```bash
-> export PROJECT=your-project-name
-> ```
-
 ---
 
 ## Run a query
@@ -20,11 +10,11 @@ mkdir -p ~/bf4_output
 
 TMP=$(mktemp -d) && mkdir -p "$TMP/tmp" "$TMP/pg-run" && \
 apptainer run --writable-tmpfs --pwd /tmp \
-  --bind /project/${PROJECT}/datasets/bf4/20260514/pgdata:/var/lib/postgresql/data \
+  --bind /project/hall_shared/biofilter/databases/20260514/pgdata:/var/lib/postgresql/data \
   --bind "$TMP/tmp:/tmp" \
   --bind "$TMP/pg-run:/var/run/postgresql" \
   --bind ~/bf4_output:/workspace \
-  /project/${PROJECT}/env/modules/biofilter/4.1.2/bf4-hpc.sif \
+  /project/hall_shared/biofilter/images/bf4-hpc-4.1.2.sif \
   biofilter report run \
     --name annotation_master_gene \
     --input APOE \
