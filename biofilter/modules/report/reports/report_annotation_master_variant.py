@@ -21,6 +21,9 @@ from biofilter.modules.report.reports.base_report import ReportBase
 
 _RSID_RE = re.compile(r"^rs\d+$", re.IGNORECASE)
 _CHR_POS_RE = re.compile(r"^(?:chr)?([0-9xyXYmMtT]+)\s*[:;,\s]\s*(\d+)$")
+_CHR_POS_ALLELE_RE = re.compile(
+    r"^(?:chr)?([0-9xyXYmMtT]+):(\d+):([ACGTacgt]+):([ACGTacgt]+)$"
+)
 
 
 def _norm(v: Any) -> str:
@@ -69,13 +72,29 @@ def _parse_input_item(item: Any) -> dict[str, Any]:
         "rsid": None,
         "chromosome": None,
         "position": None,
+        "reference_allele": None,
+        "alternate_allele": None,
         "note": None,
     }
     if isinstance(item, dict):
         c = _parse_chr(item.get("chromosome") or item.get("chr"))
         p = _parse_int(item.get("position") or item.get("pos"))
+        ref = item.get("reference_allele") or item.get("ref")
+        alt = item.get("alternate_allele") or item.get("alt")
         if c and p and p > 0:
-            out.update(kind="chr_pos", chromosome=c, position=p, raw=f"{_fmt_chr(c)}:{p}")
+            if ref and alt:
+                ref_u = str(ref).strip().upper()
+                alt_u = str(alt).strip().upper()
+                out.update(
+                    kind="chr_pos_allele",
+                    chromosome=c,
+                    position=p,
+                    reference_allele=ref_u,
+                    alternate_allele=alt_u,
+                    raw=f"{_fmt_chr(c)}:{p}:{ref_u}:{alt_u}",
+                )
+            else:
+                out.update(kind="chr_pos", chromosome=c, position=p, raw=f"{_fmt_chr(c)}:{p}")
         else:
             out["note"] = "Invalid dict — expected chromosome and position keys."
         return out
@@ -87,6 +106,19 @@ def _parse_input_item(item: Any) -> dict[str, Any]:
     if _RSID_RE.match(s):
         out.update(kind="rsid", rsid=s.lower())
         return out
+    m = _CHR_POS_ALLELE_RE.match(s)
+    if m:
+        c = _parse_chr(m.group(1))
+        p = _parse_int(m.group(2))
+        if c and p and p > 0:
+            out.update(
+                kind="chr_pos_allele",
+                chromosome=c,
+                position=p,
+                reference_allele=m.group(3).upper(),
+                alternate_allele=m.group(4).upper(),
+            )
+            return out
     m = _CHR_POS_RE.match(s)
     if m:
         c = _parse_chr(m.group(1))
@@ -94,7 +126,10 @@ def _parse_input_item(item: Any) -> dict[str, Any]:
         if c and p and p > 0:
             out.update(kind="chr_pos", chromosome=c, position=p)
             return out
-    out["note"] = "Expected rsID (rs12345) or chr:pos (chr1:100000)."
+    out["note"] = (
+        "Expected rsID (rs12345), chr:pos (chr1:100000), "
+        "or chr:pos:ref:alt (chr1:100000:A:G)."
+    )
     return out
 
 
@@ -187,7 +222,12 @@ class AnnotationMasterVariantReport(ReportBase):
     @classmethod
     def example_input(cls) -> dict:
         return {
-            "input_data": ["rs429358", "rs7412", "chr19:44908684"],
+            "input_data": [
+                "rs429358",
+                "rs7412",
+                "chr19:44908684",
+                "chr19:44908684:T:C",
+            ],
             "most_severe_only": False,
             "canonical_only": False,
         }
@@ -255,6 +295,7 @@ class AnnotationMasterVariantReport(ReportBase):
 
         rsid_inputs = [p for p in parsed_inputs if p["kind"] == "rsid"]
         pos_inputs = [p for p in parsed_inputs if p["kind"] == "chr_pos"]
+        pos_allele_inputs = [p for p in parsed_inputs if p["kind"] == "chr_pos_allele"]
 
         # rsID lookup — single query for all rsIDs
         if rsid_inputs:
@@ -272,7 +313,7 @@ class AnnotationMasterVariantReport(ReportBase):
             for p in rsid_inputs:
                 result[p["raw"]] = rsid_to_rows.get(p["rsid"], [])
 
-        # chr:pos lookup — one query per input
+        # chr:pos lookup — one query per input (all alleles at the position)
         for p in pos_inputs:
             chrom, pos = p["chromosome"], p["position"]
             stmt = vm.select().where(
@@ -284,6 +325,32 @@ class AnnotationMasterVariantReport(ReportBase):
             )
             if "allele_type" in vm.c:
                 stmt = stmt.where(func.lower(vm.c.allele_type) == "snv")
+            rows = conn.execute(stmt).mappings().fetchall()
+            seen: set[int] = set()
+            deduped = []
+            for row in rows:
+                vid = int(row["variant_id"])
+                if vid not in seen:
+                    seen.add(vid)
+                    deduped.append(dict(row))
+            result[p["raw"]] = deduped
+
+        # chr:pos:ref:alt lookup — exact allele match (no allele_type filter:
+        # the explicit ref/alt may describe an indel, not only an SNV)
+        for p in pos_allele_inputs:
+            chrom = p["chromosome"]
+            pos = p["position"]
+            ref = p["reference_allele"]
+            alt = p["alternate_allele"]
+            stmt = vm.select().where(
+                and_(
+                    vm.c.chromosome == chrom,
+                    vm.c.position_start <= pos,
+                    vm.c.position_end >= pos,
+                    func.upper(vm.c.reference_allele) == ref,
+                    func.upper(vm.c.alternate_allele) == alt,
+                )
+            )
             rows = conn.execute(stmt).mappings().fetchall()
             seen: set[int] = set()
             deduped = []

@@ -16,14 +16,19 @@ Complements the other annotation master reports (`annotation_master_gene`,
 
 ## Input
 
-Accepts rsID or chr:pos formats, mixed in the same list or from a file:
+Accepts rsID, chr:pos, or chr:pos:ref:alt formats, mixed in the same list or from a file:
 
-| Format | Example |
-|---|---|
-| rsID | `rs429358` |
-| chr:pos | `chr19:44908684` |
-| bare chr:pos | `19:44908684` |
-| file path | `./variants.txt` (one per line) |
+| Format | Example | Behavior |
+|---|---|---|
+| rsID | `rs429358` | Lookup by dbSNP rsID |
+| chr:pos | `chr19:44908684` | Returns **all** alleles at this position (SNVs only) |
+| bare chr:pos | `19:44908684` | Same as above |
+| chr:pos:ref:alt | `chr19:44908684:T:C` | Returns **only** the exact ref/alt variant (SNV or indel) |
+| bare chr:pos:ref:alt | `19:44908684:T:C` | Same as above |
+| file path | `./variants.txt` (one per line) | Mixed formats supported |
+
+When ref/alt are provided, the allele filter is exact (uppercased). Use this form to disambiguate
+multiallelic sites or to match credible-set variants reported as `chr:pos:ref:alt`.
 
 ---
 
@@ -31,11 +36,42 @@ Accepts rsID or chr:pos formats, mixed in the same list or from a file:
 
 | Parameter | Type | Default | Description |
 |---|---|---|---|
-| `input_data` | list \| path | required | rsID or chr:pos list; file path (one per line) also accepted |
-| `most_severe_only` | bool | `False` | Keep only the most-severe transcript annotation per variant |
-| `canonical_only` | bool | `False` | Keep only canonical transcript annotations |
+| `input_data` | list \| path | required | rsID, chr:pos, or chr:pos:ref:alt list; file path (one per line) also accepted |
+| `most_severe_only` | bool | `False` | Keep only the most-severe transcript annotation per variant (see below) |
+| `canonical_only` | bool | `False` | Keep only canonical transcript annotations (see below) |
 
-Both filters can be combined. If a filter produces no rows for a variant, the full set is returned.
+### `most_severe_only`
+
+A single variant typically has **one annotation per transcript** it overlaps — often 5–20 rows
+per variant. VEP flags one of those rows as the most biologically severe (the row with the
+lowest `consequence_rank`, e.g. `stop_gained` outranks `missense_variant`, which outranks
+`synonymous_variant`). The flag is stored as `is_most_severe_for_variant`.
+
+- `False` (default) — returns **all transcript annotations** for every variant.
+- `True` — returns **one row per variant**, picking the most-severe transcript. Use when you
+  want a compact 1-row-per-variant table for downstream merging or reporting.
+
+If no transcript has the flag set (rare; happens for some intergenic or regulatory hits), the
+filter falls back to the full set so the variant is never dropped silently.
+
+### `canonical_only`
+
+Most genes have one **canonical** transcript — the principal isoform used as the reference for
+HGVS notation, MANE Select recommendations, and most clinical pipelines. The `canonical`
+boolean column marks it.
+
+- `False` (default) — returns annotations from **all transcripts** (canonical + alternative).
+- `True` — keeps only annotations on the canonical transcript. Useful when comparing variants
+  across genes on equal footing (one isoform per gene).
+
+If a variant has no canonical-transcript annotation in the DB, the filter falls back to the
+full set for that variant rather than dropping it.
+
+### Combining both
+
+`most_severe_only=True` + `canonical_only=True` gives **one row per variant on the canonical
+transcript**, prioritised by severity — the most concise output. Both filters have the same
+fallback rule (never drop a variant entirely), so empty intersections degrade gracefully.
 
 ---
 
@@ -224,3 +260,18 @@ biofilter report run \
 | `annotation_master_go` | Gene Ontology terms |
 | `annotation_master_chemical` | Chemical compounds |
 | `annotation_master_variant` | **Variants** ← this report |
+
+---
+
+## Note — regulatory evidence (eQTL / sQTL) is **not** included here
+
+This report aggregates **coding-level** evidence: VEP molecular effects, LoF (LOFTEE),
+AlphaMissense, CADD, REVEL, SpliceAI, Pangolin, SIFT, PolyPhen, and gnomAD frequencies.
+It does **not** read from `variant_gene_regulatory_evidence` (eQTL / sQTL from GTEx,
+eQTLGen, etc.) — those tables answer a different question ("which gene does this variant
+*regulate*?" vs. "what does this variant *do to a transcript*?").
+
+For variant → regulated-gene mappings, use **[`annotation_variant_regulatory_evidence`](report_annotation_variant_regulatory_evidence.md)**.
+It accepts gene symbols, coordinates, or rsIDs and supports filters by `tissue`, `qtl_type`,
+and `p_value_max`. Run both reports side-by-side when a credible-set variant needs full
+coverage (coding effect *and* distal regulatory target).

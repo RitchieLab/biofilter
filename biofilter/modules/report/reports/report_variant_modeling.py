@@ -21,6 +21,9 @@ from biofilter.modules.report.reports.base_report import ReportBase
 
 _RSID_RE = re.compile(r"^rs\d+$", re.IGNORECASE)
 _CHR_POS_RE = re.compile(r"^(?:chr)?([0-9xyXYmMtT]+)\s*[:;,\s]\s*(\d+)$")
+_CHR_POS_ALLELE_RE = re.compile(
+    r"^(?:chr)?([0-9xyXYmMtT]+):(\d+):([ACGTacgt]+):([ACGTacgt]+)$"
+)
 
 
 def _norm(value: Any) -> str:
@@ -77,16 +80,40 @@ def _as_ci_set(value: Any) -> set[str]:
 
 
 def _parse_input_item(item: Any) -> dict[str, Any]:
-    """Returns dict with keys: raw, kind ('rsid'|'chr_pos'|'invalid'), rsid, chromosome, position."""
-    out: dict[str, Any] = {"raw": str(item), "kind": "invalid", "rsid": None, "chromosome": None, "position": None, "note": None}
+    """Returns dict with keys: raw, kind ('rsid'|'chr_pos'|'chr_pos_allele'|'invalid'),
+    rsid, chromosome, position, reference_allele, alternate_allele."""
+    out: dict[str, Any] = {
+        "raw": str(item),
+        "kind": "invalid",
+        "rsid": None,
+        "chromosome": None,
+        "position": None,
+        "reference_allele": None,
+        "alternate_allele": None,
+        "note": None,
+    }
 
     if isinstance(item, dict):
         chrom = item.get("chromosome") or item.get("chr")
         pos = item.get("position") or item.get("pos")
+        ref = item.get("reference_allele") or item.get("ref")
+        alt = item.get("alternate_allele") or item.get("alt")
         c = _parse_chr(chrom)
         p = _parse_int(pos)
         if c and p and p > 0:
-            out.update(kind="chr_pos", chromosome=c, position=p, raw=f"{_fmt_chr(c)}:{p}")
+            if ref and alt:
+                ref_u = str(ref).strip().upper()
+                alt_u = str(alt).strip().upper()
+                out.update(
+                    kind="chr_pos_allele",
+                    chromosome=c,
+                    position=p,
+                    reference_allele=ref_u,
+                    alternate_allele=alt_u,
+                    raw=f"{_fmt_chr(c)}:{p}:{ref_u}:{alt_u}",
+                )
+            else:
+                out.update(kind="chr_pos", chromosome=c, position=p, raw=f"{_fmt_chr(c)}:{p}")
         else:
             out["note"] = "Invalid dict input — expected chromosome and position keys."
         return out
@@ -101,6 +128,20 @@ def _parse_input_item(item: Any) -> dict[str, Any]:
         out.update(kind="rsid", rsid=s.lower())
         return out
 
+    m = _CHR_POS_ALLELE_RE.match(s)
+    if m:
+        c = _parse_chr(m.group(1))
+        p = _parse_int(m.group(2))
+        if c and p and p > 0:
+            out.update(
+                kind="chr_pos_allele",
+                chromosome=c,
+                position=p,
+                reference_allele=m.group(3).upper(),
+                alternate_allele=m.group(4).upper(),
+            )
+            return out
+
     m = _CHR_POS_RE.match(s)
     if m:
         c = _parse_chr(m.group(1))
@@ -109,18 +150,21 @@ def _parse_input_item(item: Any) -> dict[str, Any]:
             out.update(kind="chr_pos", chromosome=c, position=p)
             return out
 
-    out["note"] = "Expected rsID (rs12345) or chr:pos (chr1:100000)."
+    out["note"] = (
+        "Expected rsID (rs12345), chr:pos (chr1:100000), "
+        "or chr:pos:ref:alt (chr1:100000:A:G)."
+    )
     return out
 
 
 class VariantModelingReport(ReportBase):
     name = "variant_modeling"
     description = (
-        "Given an input list of variants (rsID or chr:pos), maps each to overlapping genes "
-        "(+ optional window_bp), connects genes via shared biological groups (pathways, GO, "
-        "diseases, …), and generates all variant×variant interaction pairs where BOTH variants "
-        "come from the input list. group_support_count is a weight reflecting how many distinct "
-        "groups link the gene pair."
+        "Given an input list of variants (rsID, chr:pos, or chr:pos:ref:alt), maps each to "
+        "overlapping genes (+ optional window_bp), connects genes via shared biological groups "
+        "(pathways, GO, diseases, …), and generates all variant×variant interaction pairs where "
+        "BOTH variants come from the input list. group_support_count is a weight reflecting how "
+        "many distinct groups link the gene pair."
     )
 
     columns = [
@@ -151,7 +195,13 @@ class VariantModelingReport(ReportBase):
     @classmethod
     def example_input(cls) -> dict:
         return {
-            "input_data": ["rs429358", "rs7412", "chr2:21044574", "chr4:186486470"],
+            "input_data": [
+                "rs429358",
+                "rs7412",
+                "chr2:21044574",
+                "chr4:186486470",
+                "chr19:44908684:T:C",
+            ],
             "build": 38,
             "window_bp": 0,
             "group_entity_groups": ["Pathway"],
@@ -209,6 +259,40 @@ class VariantModelingReport(ReportBase):
         )
         if "allele_type" in vm.c:
             stmt = stmt.where(func.lower(vm.c.allele_type) == "snv")
+        rows = self.session.execute(stmt).mappings().all()
+        seen: set[int] = set()
+        out = []
+        for row in rows:
+            vid = int(row["variant_id"])
+            if vid not in seen:
+                seen.add(vid)
+                out.append(dict(row))
+        return out
+
+    def _query_variant_at_position_allele(
+        self, vm: Table, chrom: int, pos: int, ref: str, alt: str
+    ) -> list[dict[str, Any]]:
+        """Exact (chrom, pos, ref, alt) lookup. No allele_type filter — caller may
+        have specified an indel."""
+        stmt = (
+            select(
+                vm.c.variant_id,
+                vm.c.rsid,
+                vm.c.chromosome,
+                vm.c.position_start,
+                vm.c.position_end,
+            )
+            .where(
+                and_(
+                    vm.c.chromosome == chrom,
+                    vm.c.position_start <= pos,
+                    vm.c.position_end >= pos,
+                    func.upper(vm.c.reference_allele) == ref,
+                    func.upper(vm.c.alternate_allele) == alt,
+                )
+            )
+            .order_by(vm.c.position_start.asc(), vm.c.variant_id.asc())
+        )
         rows = self.session.execute(stmt).mappings().all()
         seen: set[int] = set()
         out = []
@@ -509,6 +593,14 @@ class VariantModelingReport(ReportBase):
                 continue
             if item["kind"] == "rsid":
                 found = self._query_variant_by_rsid(vm, item["rsid"])
+            elif item["kind"] == "chr_pos_allele":
+                found = self._query_variant_at_position_allele(
+                    vm,
+                    item["chromosome"],
+                    item["position"],
+                    item["reference_allele"],
+                    item["alternate_allele"],
+                )
             else:
                 found = self._query_variants_at_position(
                     vm, item["chromosome"], item["position"]

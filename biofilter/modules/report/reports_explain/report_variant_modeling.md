@@ -8,7 +8,7 @@ where **both variants in every pair come from the input list**.
 The workflow mirrors the diagram below:
 
 ```
-Input variants (rsID or chr:pos)
+Input variants (rsID, chr:pos, or chr:pos:ref:alt)
     ↓  DB lookup + window_bp
 Genes overlapping input variants
     ↓  group membership (Pathway, GO, Disease, …)
@@ -39,7 +39,7 @@ epistasis between variants you already have genotyped.
 
 | Parameter | Type | Default | Description |
 |---|---|---|---|
-| `input_data` | list \| path | required | rsID or chr:pos variants; file path (one per line) also accepted |
+| `input_data` | list \| path | required | rsID, chr:pos, or chr:pos:ref:alt variants; file path (one per line) also accepted |
 | `build` | int | `38` | Genome build for gene overlap queries |
 | `window_bp` | int | `0` | Extend gene boundaries by N bp when assigning variants to genes |
 | `group_entity_groups` | list \| str | `"Pathway"` | Which group types define biological connections (Pathway, GO, Disease, …) |
@@ -57,9 +57,14 @@ Each item in `input_data` can be:
 | Format | Example | Resolution |
 |---|---|---|
 | rsID | `rs429358` | Exact rsID match in `variant_masters` |
-| chr:pos | `chr19:44908684` | Position overlap in `variant_masters` |
-| bare | `19:44908684` | Same as chr:pos |
-| file path | `./variants.txt` | One rsID or chr:pos per line |
+| chr:pos | `chr19:44908684` | Position overlap (returns **all** alleles at the position; SNVs only) |
+| bare chr:pos | `19:44908684` | Same as `chr:pos` |
+| chr:pos:ref:alt | `chr19:44908684:T:C` | **Exact** ref/alt match (SNV or indel; no allele_type filter) |
+| bare chr:pos:ref:alt | `19:44908684:T:C` | Same as `chr:pos:ref:alt` |
+| file path | `./variants.txt` | Mixed formats supported; one entry per line |
+
+Use `chr:pos:ref:alt` for credible-set / fine-mapping inputs to avoid multiallelic ambiguity.
+REF/ALT are case-insensitive (normalised to uppercase before the lookup) and must be in `[ACGT]+`.
 
 ---
 
@@ -136,7 +141,7 @@ df.sort_values("group_support_count", ascending=False).head(20)
 ```python
 df = bf.report.run(
     "variant_modeling",
-    input_data          = "./my_variants.txt",   # one rsID or chr:pos per line
+    input_data          = "./my_variants.txt",   # one rsID, chr:pos, or chr:pos:ref:alt per line
     group_entity_groups = ["Pathway", "GO"],
 )
 ```
@@ -183,7 +188,7 @@ biofilter report run --report-name variant_modeling --params-template
 
 | | `variant_modeling` | `snp_snp_model` (legacy) |
 |---|---|---|
-| Input | rsID or chr:pos | chr:pos only |
+| Input | rsID, chr:pos, or chr:pos:ref:alt | chr:pos only |
 | Variant source | Input list only | Expands from gene loci (up to 2000/gene) |
 | Both variants from input? | **Always** | Optional (scope parameter) |
 | group_support_count | Yes — built-in weight | No |
