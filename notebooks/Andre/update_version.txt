@@ -1,0 +1,108 @@
+Status do que você listou
+✅ Versão em pyproject.toml, version.py, CHANGELOG — já está em 4.1.4 (você fez)
+✅ Docs LPC user-facing atualizados — agora também em 4.1.4
+✅ Pasta docker/ não precisa de nenhuma alteração — o Dockerfile builda do source e pega a versão de pyproject.toml automaticamente
+
+Coisas que você pode estar esquecendo
+1. Ordem certa: commit ANTES de tag (você listou ao contrário)
+
+
+# 1. Confere o que está pendente
+git status
+git diff
+
+# 2. Commita tudo (version files + docs LPC bumpados)
+git add pyproject.toml biofilter/utils/version.py CHANGELOG \
+        notebooks/Templates/lpc__quickstart.md \
+        notebooks/Templates/lpc__deploy.md
+git commit -m "release: bump to 4.1.4"
+git push origin main
+
+# 3. SÓ ENTÃO cria a tag — aponta pra esse commit
+git tag v4.1.4
+git push origin v4.1.4
+2. A tag dispara automaticamente o workflow GHCR
+
+Você não precisa rodar workflow manual. O docker-publish-hpc.yml tem trigger on: push: tags: ['v*'], então git push origin v4.1.4 já faz tudo:
+
+Builda a imagem com o source na revisão v4.1.4
+Publica em ghcr.io/ritchielab/biofilter-hpc:4.1.4 + :latest
+Acompanha em https://github.com/RitchieLab/biofilter/actions ou gh run watch.
+
+3. PyPI publish (separado do GHCR)
+
+
+# Verifica que o credentials está configurado
+poetry config pypi-token.pypi  # ou: poetry config http-basic.pypi <user> <pass>
+
+# Build + publish
+poetry build
+poetry publish
+Se nunca rodou antes, vai precisar criar um API token em https://pypi.org/manage/account/token/ e configurar com poetry config pypi-token.pypi <token>.
+
+4. Imagem no LPC — depois do GHCR build terminar
+
+Não é "gerar nova imagem no LPC", é só pullar a que o workflow publicou:
+
+
+module load apptainer
+
+mkdir -p /project/hall_shared/biofilter/images
+cd /project/hall_shared/biofilter/images
+
+apptainer pull bf4-hpc-4.1.4.sif docker://ghcr.io/ritchielab/biofilter-hpc:4.1.4
+
+# Sanity test antes de promover (smoke test do lpc__deploy.md §5)
+# ... rodar um report rápido contra a DB existente ...
+
+# Se quiser facilitar pros usuários, atualiza um symlink:
+ln -sfn bf4-hpc-4.1.4.sif bf4-hpc-latest.sif
+5. Anúncio pros usuários (opcional)
+
+Como o schema não mudou, ninguém precisa rerodar nada. Mas vale avisar no Slack: "BF4 4.1.4 disponível em /project/hall_shared/biofilter/images/bf4-hpc-4.1.4.sif, com os novos campos variant_*_input/ref/alt no variant_modeling (ver CHANGELOG)".
+
+Checklist final em ordem
+
+[ ] git commit (incluindo as 2 docs LPC que acabei de bumpar)
+[ ] git push origin main
+[ ] git tag v4.1.4 && git push origin v4.1.4    ← dispara GHCR workflow
+[ ] poetry build && poetry publish              ← PyPI (paralelo ao workflow)
+[ ] Aguardar workflow GHCR finalizar (~5-10 min)
+[ ] No LPC: apptainer pull bf4-hpc-4.1.4.sif
+[ ] Smoke test no LPC
+[ ] Anúncio (opcional)
+Resposta direta à sua pergunta principal: não, nada na pasta docker/ precisa mudar entre versões — esse é o ponto do design.
+
+
+
+gh release create v4.1.4 \
+  --title "Biofilter 4.1.4" \
+  --latest \
+  --notes "$(awk '/^4\.1\.4/,/^4\.1\.3/' CHANGELOG | sed '$d')"
+Pré-requisito: a tag v4.1.4 precisa já estar no remote (git push origin v4.1.4 antes). Se ainda não criou, faz tudo em sequência:
+
+
+git tag v4.1.4
+git push origin v4.1.4
+gh release create v4.1.4 --title "Biofilter 4.1.4" --latest --notes "$(awk '/^4\.1\.4/,/^4\.1\.3/' CHANGELOG | sed '$d
+
+
+
+
+
+TMP=$(mktemp -d) && mkdir -p "$TMP/tmp" "$TMP/pg-run" && \
+apptainer run --writable-tmpfs --pwd /tmp \
+  --bind /project/hall_shared/biofilter/databases/20260514/pgdata:/var/lib/postgresql/data \
+  --bind "$TMP/tmp:/tmp" \
+  --bind "$TMP/pg-run:/var/run/postgresql" \
+  --bind ~/bf4_output:/workspace \
+  /project/hall_shared/biofilter/images/bf4-hpc-latest.sif \
+biofilter report run \
+  --report-name variant_modeling \
+  --input 1:11796321:G:A \
+  --input rs699 \
+  --input rs2228671 \
+  --input rs12740374 \
+  --input rs17464857 \
+  --param group_entity_groups=Pathway,GO,Disease \
+  --output /workspace/chr1_variant_pairs_rich.csv
