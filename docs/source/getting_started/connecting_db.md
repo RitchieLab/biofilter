@@ -45,7 +45,7 @@ export DATABASE_URL="postgresql+psycopg2://bioadmin:secret@db.example.com:5432/b
 Show the resolved configuration:
 
 ```bash
-biofilter db ping
+biofilter config show
 ```
 
 Test that the database is actually reachable:
@@ -93,15 +93,52 @@ biofilter config show
 
 ### 2. Create the schema
 
-Confirm the database is reachable, then apply the schema:
+The schema is built by `db create-db`, which creates **all tables** and loads the
+**seed data** (entity groups, relationship types, source systems, …) in a single
+step. This is the canonical bootstrap command — `db migrate` and `db upgrade`
+only handle version tracking and seed refresh on a database that already has a
+schema; they do **not** create the initial tables.
+
+**PostgreSQL** — the target database must already exist before BF4 can connect to
+it (the client connects on startup). Create the empty database first, then
+bootstrap:
 
 ```bash
+# create the empty database (role must have CREATEDB)
+createdb -O admin biofilter_dev
+
+# confirm it is reachable
 biofilter db ping
-biofilter db migrate --target head
-biofilter db upgrade
+
+# create tables + load seeds
+biofilter db create-db --db-uri "postgresql+psycopg2://admin:admin@localhost:5432/biofilter_dev" --overwrite
 ```
 
-The ping returns engine, host, database name, and latency. The first migration applies all schema changes. The upgrade loads seed data (entity groups, relationship types, source systems).
+`--overwrite` is required here because the (empty) database already exists; it is
+**not** destructive — table creation uses `create_all` (idempotent) and never drops
+data.
+
+**SQLite** — no pre-creation needed; `create-db` creates the file itself:
+
+```bash
+biofilter db create-db --db-uri "sqlite:///./biofilter_dev.sqlite3"
+```
+
+#### (Optional) Stamp the Alembic baseline and refresh seeds
+
+After the schema exists, you can baseline the migration version and re-apply seeds
+idempotently. This is useful so future incremental migrations have a known
+starting point:
+
+```bash
+biofilter db migrate --force   # stamps/applies migrations up to head
+biofilter db upgrade           # re-applies seeds (idempotent: created=0 on a fresh DB)
+```
+
+> **Note:** running `db migrate --target head` / `db upgrade` on an empty database
+> without first running `db create-db` will report "Schema up-to-date" but leave the
+> database without any domain tables — the Alembic head does not contain the table
+> DDL. Always bootstrap with `db create-db` first.
 
 ### 3. Run your first ETL
 

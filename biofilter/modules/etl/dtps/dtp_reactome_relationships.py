@@ -43,8 +43,8 @@ class DTP(DTPBase, EntityQueryMixin):
         # DTP versioning
         self.dtp_name = "dtp_reactome_relationships"
         self.dtp_version = "2.0.0"
-        self.compatible_schema_min = "4.1.0"
-        self.compatible_schema_max = "5.0.0"
+        self.compatible_schema_min = "4.0.0"
+        self.compatible_schema_max = "4.2.0"
 
     # -------------------------------------------------------------------------
     #                            EXTRACT METHOD

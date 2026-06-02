@@ -1,14 +1,40 @@
 CHANGELOG
 
-4.1.2:
+4.1.4 (02/06/2026):
+
+- Extended variant_modeling output with 6 new columns
+  - variant_1_input / variant_2_input — original input string(s) the user supplied (comma-joined when multiple inputs resolve to the same variant_id); usable as join key to merge results back into the caller's source table
+  - variant_1_ref / variant_2_ref — reference allele from variant_masters
+  - variant_1_alt / variant_2_alt — alternate allele from variant_masters
+- variant_modeling lookup queries now select reference_allele and alternate_allele alongside chromosome and position
+- Updated report_variant_modeling.md with new column descriptions and a "Merging results back to the caller's table" example using variant_*_input
+
+4.1.3 (01/06/2026):
+
+- Added chr:pos:ref:alt input format to annotation_master_variant and variant_modeling reports
+  - Returns the exact ref/alt variant when alleles are specified (SNV or indel)
+  - Falls back to all-alleles-at-position behavior when only chr:pos is given (existing format unchanged)
+  - REF/ALT are case-insensitive (uppercased on lookup); base validation [ACGT]+
+  - Resolves multiallelic ambiguity for credible-set / fine-mapping inputs
+- Expanded annotation_master_variant explain doc
+  - Detailed descriptions of most_severe_only and canonical_only (when to use, fallback behavior, combination)
+  - Note clarifying eQTL/sQTL data is not covered here; cross-reference to annotation_variant_regulatory_evidence
+- Added "Running on the UPenn LPC (Apptainer)" section to both report notebooks
+  - Heredoc pattern for input file preparation
+  - --params-file pattern for list parameters (avoids shell double-quote stripping inside the container)
+  - Cross-links to lpc__quickstart.md and lpc__deploy.md
+- Synced biofilter/utils/version.py with pyproject.toml (both now 4.1.3)
+
+4.1.2 (xx/xx/xxxx):
 
 - binning
 - DTP AphaMissense
 
-  4.1.1:
+4.1.1 (xx/xx/xxxx):
 
-Biofilter3R Juyter VPS
-4.1.0 (2026-03-21)
+- Biofilter3R Juyter VPS
+
+4.1.0 (21/03/2026):
 
 - Removed the server-first stack introduced in 4.0.0 to keep a lean core that runs without a dedicated server
 - Removed KaaS (Knowledge as a Service)
@@ -20,7 +46,7 @@ Biofilter3R Juyter VPS
 - Added gnomAD integration with a new partitioned table layout
 - Implemented two variant data models: variant_mastes and variant_molecular_effect
 
-  4.0.0 (Biofilter3R Project)
+4.0.0 (xx/xx/xxxx) — Biofilter3R Project:
 
 - Full system redesign with a new server-oriented architecture
 - Consolidated all project capabilities into a unified platform service
@@ -29,12 +55,12 @@ Biofilter3R Juyter VPS
 - Introduced a noSQL layer with knowledge extension in Parquet (Data Lake format), supported by KDC
 - Added Search and Data Mining layers to improve filter-input translation
 
-  3.0.0 (2025)
+3.0.0 (xx/xx/2025):
 
 - Full rebuild of Biofilter 2.4.4 for native Python 3
 - Reconstructed the entire codebase while preserving the user-facing schema and CLI contract
 
-  2.4.4 (2025-01-08)
+2.4.4 (08/01/2025):
 
 - Reorganized code into functional packages
 - Developed unit tests
@@ -43,23 +69,23 @@ Biofilter3R Juyter VPS
 - Fixed inconsistencies to ensure compatibility with Python versions 3.10 to 3.12
 - Added technical documentation for the project
 
-  2.4.3 (2023-09-15)
+2.4.3 (15/09/2023):
 
 - updated from Python2 to Python3
 - updated LOKI loaders
 
-  2.4.2 (2019-03-15)
+2.4.2 (15/03/2019):
 
 - fixed a bug in PARIS which may have inflated the reported permutation significance in some cases
 - modified PARIS output report formats to reduce redundancy and simplify batch processing
 - updated LOKI loaders for dbSNP, MINT and PharmGKB
 
-  2.4.1 (2017-04-17)
+2.4.1 (17/04/2017):
 
 - fixed a bug in PARIS which included non-gene regions
 - updated LOKI loaders for dbSNP, GO and PharmGKB
 
-  2.4.0 (2016-05-09)
+2.4.0 (09/05/2016):
 
 - implemented the PARIS algorithm with the corresponding --paris output option and other related configuration options
 - added limited support for user-defined knowledge (custom gene groups) in --filter and --paris modes
@@ -67,7 +93,7 @@ Biofilter3R Juyter VPS
 - fixed a bug in --region-match-bases with a negative value so that it correctly functions like --region-position-margin except for region-region matching
 - updated LOKI loaders for gwas and dbsnp
 
-  2.3.0 (2015-12-14)
+2.3.0 (14/12/2015):
 
 - changed default --report-genome-build option to 'yes'
 - added --grch-build-version and --ucsc-build-version options to specify the
@@ -78,7 +104,7 @@ Biofilter3R Juyter VPS
 - changed the any-namespace special tag from empty '' to '\*'
 - fixed a bug in installation on Windows platforms
 
-  2.2.0 (2014-06-04)
+2.2.0 (04/06/2014):
 
 - fixed a bug when matching gene regions to input regions of size 1
 - added support for "extra" input data to be stored with SNPs, positions,
@@ -89,7 +115,7 @@ Biofilter3R Juyter VPS
   mismatched data
 - (LOKI) added a tally of SNP role records with unrecognized Entrez GeneIDs
 
-  2.1.2 (2014-03-31)
+2.1.2 (31/03/2014):
 
 - fixed a bug in the 'biopolymer_chr' output column (which is part of
   the 'generegion' output shortcut) which caused a crash with certain
@@ -97,12 +123,12 @@ Biofilter3R Juyter VPS
 - (LOKI) added support for HTTP (but not SOCKS) proxy servers for downloading
   source data via HTTP
 
-  2.1.1 (2013-08-21)
+2.1.1 (21/08/2013):
 
 - fixed a bug in model expansion that caused some models to be duplicated in
   reverse order, and some types to be paired with themselves as a model
 
-  2.1.0 (2013-07-19)
+2.1.0 (19/07/2013):
 
 - REGION_POSITION_MARGIN is now applied when matching positions to
   upstream/downstream gene annotations
@@ -119,6 +145,6 @@ Biofilter3R Juyter VPS
 - fixed a bug in the LOKI updater which would mask the original error if the
   error-handler itself caused an additional error
 
-  2.0.0 (2013-02-14)
+2.0.0 (14/02/2013):
 
 - first public release

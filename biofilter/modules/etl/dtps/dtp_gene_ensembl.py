@@ -46,8 +46,8 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
         # DTP versioning
         self.dtp_name = "dtp_gene_hgnc"
         self.dtp_version = "1.1.0"
-        self.compatible_schema_min = "0.0.0"
-        self.compatible_schema_max = "4.0.0"
+        self.compatible_schema_min = "4.0.0"
+        self.compatible_schema_max = "4.2.0"
 
     # @staticmethod
     def _map_chrom_to_int(self, chrom_raw: str) -> int | None:

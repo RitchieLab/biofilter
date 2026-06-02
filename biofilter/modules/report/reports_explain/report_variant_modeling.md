@@ -72,10 +72,13 @@ REF/ALT are case-insensitive (normalised to uppercase before the lookup) and mus
 
 | Column | Description |
 |---|---|
+| `variant_1_input` / `variant_2_input` | Original input string(s) the user supplied for this variant — comma-joined when more than one input resolved to the same `variant_id`. Use this as a **join key** to merge results back into the caller's source table (credible set, GWAS hits, etc.) |
 | `variant_1_id` / `variant_2_id` | Internal DB IDs |
 | `variant_1_rsid` / `variant_2_rsid` | rsIDs (if available) |
-| `variant_1_chr` / `variant_2_chr` | Chromosome (chrX format) |
+| `variant_1_chr` / `variant_2_chr` | Chromosome (`chrN` format) |
 | `variant_1_pos` / `variant_2_pos` | Position start |
+| `variant_1_ref` / `variant_2_ref` | Reference allele from `variant_masters` |
+| `variant_1_alt` / `variant_2_alt` | Alternate allele from `variant_masters` |
 | `gene_1_name` / `gene_2_name` | Gene symbols |
 | `gene_1_id` / `gene_2_id` | Internal gene entity IDs |
 | `group_support_count` | **Weight** — # groups linking gene_1 to gene_2 |
@@ -86,6 +89,25 @@ REF/ALT are case-insensitive (normalised to uppercase before the lookup) and mus
 | `window_bp` | Window applied to gene boundaries |
 
 Output is sorted by `group_support_count DESC`, then gene names.
+
+### Merging results back to the caller's table
+
+Because `variant_*_input` carries the exact string the user supplied, joins back to the source
+table are straightforward — no need to reparse `chr:pos:ref:alt` or look up rsID-to-coords:
+
+```python
+# credible-set TSV has columns: locus, trait, SNP   (SNP in chr:pos:ref:alt form)
+merged = cs.merge(
+    pairs_df,
+    left_on="SNP",
+    right_on="variant_1_input",
+    how="inner",
+)
+```
+
+For chr:pos inputs that hit multiallelic positions (one input → N variants), `variant_*_input`
+will repeat the same string across all matching rows. The `variant_*_ref`/`variant_*_alt`
+columns disambiguate which allele each row refers to.
 
 ---
 

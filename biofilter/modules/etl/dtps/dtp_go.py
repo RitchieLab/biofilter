@@ -31,8 +31,8 @@ class DTP(DTPBase, EntityQueryMixin):
         # DTP versioning
         self.dtp_name = "dtp_go"
         self.dtp_version = "1.1.0"
-        self.compatible_schema_min = "0.0.0"
-        self.compatible_schema_max = "4.0.0"
+        self.compatible_schema_min = "4.0.0"
+        self.compatible_schema_max = "4.2.0"
 
     # -------------------------------------------------------------------------
     #                            EXTRACT METHOD

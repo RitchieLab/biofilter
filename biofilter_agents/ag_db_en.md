@@ -32,10 +32,17 @@ Main commands in the `db` group:
 
 Use this simple rule:
 
-1. **Apply schema**: `db migrate --target head`
-2. **Apply master data (seed upsert)**: `db upgrade`
+1. **Bootstrap a new database (schema + seeds)**: `db create-db` — this is the
+   only command that creates the domain tables. `db migrate` / `db upgrade` do
+   **not** create the initial schema (the Alembic head carries no table DDL).
+2. **Refresh seeds / version tracking on an existing schema**: `db upgrade`
+   (migrate to head + idempotent seed upsert)
 3. **Run ETL**: use `etl` group commands
 4. **Monitor**: `report etl_status` and `report etl_packages`
+
+> **PostgreSQL caveat:** the target database must already exist before BF4 can
+> connect to it. Create the empty database first (`createdb <name>`), then run
+> `db create-db ... --overwrite`.
 
 When moving data across environments:
 - physical snapshot: `backup` / `restore`
@@ -47,21 +54,30 @@ When moving data across environments:
 
 ## 3.1 `biofilter db create-db`
 
-Creates a new Biofilter database at the provided URI.
+The canonical bootstrap command. It creates **all domain tables** (`create_all`)
+and loads the **seed data** in a single step. Use this — not `migrate`/`upgrade` —
+to stand up a new database.
+
+**SQLite** — creates the file itself, no pre-creation needed:
 
 ```bash
 biofilter db create-db --db-uri "sqlite:///biofilter_dev.db"
 ```
 
-With overwrite:
+**PostgreSQL** — the database must already exist (BF4 connects on startup), so
+create it first, then bootstrap with `--overwrite`:
 
 ```bash
-biofilter db create-db --db-uri "sqlite:///biofilter_dev.db" --overwrite
+createdb -O admin biofilter_dev
+biofilter db create-db --db-uri "postgresql+psycopg2://admin:admin@localhost:5432/biofilter_dev" --overwrite
 ```
 
+`--overwrite` only bypasses the "database already exists" guard; it is **not**
+destructive — `create_all` is idempotent and never drops data.
+
 When to use:
-- new local environment (especially SQLite)
-- quick initial bootstrap
+- any new environment (SQLite or PostgreSQL)
+- the correct first step of a from-scratch bootstrap
 
 ---
 
@@ -107,7 +123,7 @@ Notes:
 
 ## 3.3 `biofilter db upgrade`
 
-Runs the canonical upgrade flow:
+Runs the upgrade flow on an **existing** schema:
 - migrate to `head`
 - apply seeds (idempotent upsert)
 
@@ -128,7 +144,9 @@ biofilter db upgrade --force
 ```
 
 Practical rule:
-- in most cases, prefer `db upgrade` for complete bootstrap.
+- `db upgrade` does **not** create the schema — it assumes the tables already
+  exist (built by `db create-db`). Use it to refresh seeds and align the Alembic
+  revision, not to bootstrap a fresh database.
 
 ---
 
@@ -221,9 +239,20 @@ When to use:
 
 ```bash
 biofilter config show
-biofilter db migrate --target head --force
+
+# PostgreSQL: create the empty database first
+createdb -O admin biofilter_dev
+
+# create schema + seeds (the actual bootstrap)
+biofilter db create-db --db-uri "postgresql+psycopg2://admin:admin@localhost:5432/biofilter_dev" --overwrite
+
+# (optional) baseline Alembic + refresh seeds
+biofilter db migrate --force
 biofilter db upgrade
 ```
+
+> SQLite is simpler — `biofilter db create-db --db-uri "sqlite:///biofilter_dev.db"`
+> creates the file, schema, and seeds in one go (no `createdb`, no `--overwrite`).
 
 ### 4.2 Safe deployment flow
 

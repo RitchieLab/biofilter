@@ -82,14 +82,14 @@ data_sources_to_process = [
     # "gnomad_chry",
     # "gnomad_chrmt",
     # "alphamissense",
-    "gtex_v10_brain_eqtl",
+    # "gtex_v10_brain_eqtl",
 
     #
     # DISEASE
     # -------
-    # "mondo",
-    # "clingen",
-    # "omim",
+    "mondo",
+    "clingen",
+    "omim",
 
     # CHEMICAL
     # --------
@@ -97,16 +97,16 @@ data_sources_to_process = [
 
     # RelationShips
     # -------------
-    # "reactome_relationships",
-    # "uniprot_relationships",
-    # "mondo_relationships",
-    # "biogrid",
+    "reactome_relationships",
+    "uniprot_relationships",
+    "mondo_relationships",
+    "biogrid",
 ]
 
 run_steps = [
     "extract",
-    # "transform",
-    # "load",
+    "transform",
+    "load",
     # "all"
 ]  # noqa E501
 

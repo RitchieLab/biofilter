@@ -42,8 +42,8 @@ class DTP(DTPBase, EntityQueryMixin, GeneQueryMixin):
         # DTP versioning
         self.dtp_name = "dtp_gene_hgnc"
         self.dtp_version = "1.0.0"
-        self.compatible_schema_min = "0.0.0"
-        self.compatible_schema_max = "5.0.0"
+        self.compatible_schema_min = "4.0.0"
+        self.compatible_schema_max = "4.2.0"
 
     # -------------------------------------------------------------------------
     #                            EXTRACT METHOD

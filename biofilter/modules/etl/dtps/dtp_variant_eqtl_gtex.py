@@ -195,8 +195,8 @@ class DTP(DTPBase):
 
         self.dtp_name = "dtp_variant_eqtl_gtex"
         self.dtp_version = "1.0.0"
-        self.compatible_schema_min = "4.1.0"
-        self.compatible_schema_max = "5.0.0"
+        self.compatible_schema_min = "4.0.0"
+        self.compatible_schema_max = "4.2.0"
 
     # ------------------------------------------------------------------
     # EXTRACT

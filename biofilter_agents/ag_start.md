@@ -6,7 +6,7 @@ This guide covers:
 - installation (`pip install biofilter` and source mode)
 - PostgreSQL database setup
 - `.biofilter.toml` initialization and config commands
-- schema bootstrap (`db migrate`, `db upgrade`)
+- schema bootstrap (`db create-db`; then optional `db migrate` / `db upgrade`)
 - first ETL commands
 - status/audit reports
 - notebook/API quickstart
@@ -119,16 +119,37 @@ biofilter config set etl.data_root "./biofilter_data"
 
 ## 5) Bootstrap Database Schema
 
-### 5.1 Run migrations to `head`
+The schema and seeds are created by `db create-db`. This is the **only** command
+that builds the domain tables — `db migrate` / `db upgrade` do not create the
+initial schema (the Alembic head carries no table DDL).
+
+### 5.1 Create schema + seeds (`db create-db`)
+
+**SQLite** — creates the file, tables, and seeds in one step:
 
 ```bash
-biofilter db migrate --target head
+biofilter db create-db --db-uri "sqlite:///biofilter_dev.db"
 ```
 
-Force mode (only when required):
+**PostgreSQL** — the database must already exist before BF4 can connect, so create
+the empty database first, then bootstrap with `--overwrite`:
 
 ```bash
-biofilter db migrate --target head --force
+createdb -O admin biofilter_dev
+biofilter db create-db --db-uri "postgresql+psycopg2://admin:admin@localhost:5432/biofilter_dev" --overwrite
+```
+
+`--overwrite` only bypasses the "already exists" guard; it is **not** destructive
+(`create_all` is idempotent and never drops data).
+
+### 5.2 (Optional) Baseline Alembic and refresh seeds
+
+After the schema exists, you can stamp the migration baseline and re-apply seeds
+idempotently:
+
+```bash
+biofilter db migrate --force   # applies/stamps migrations up to head
+biofilter db upgrade           # migrate to head + idempotent seed upsert
 ```
 
 Useful diagnostics:
@@ -138,44 +159,9 @@ biofilter db migrate --status
 biofilter db migrate --dry-run
 ```
 
-### 5.2 Apply master seeds (idempotent)
-
-```bash
-biofilter db upgrade
-```
-
-With explicit seed dir (default is `seed`):
-
-```bash
-biofilter db upgrade --seed-dir seed
-```
-
-Force flag is available:
-
-```bash
-biofilter db upgrade --force
-```
-
-Note:
-- `db upgrade` is equivalent to migration to head + seed upserts.
-
----
-
-## 6) Optional: Create DB via CLI
-
-For environments where creating the DB via CLI is desired:
-
-```bash
-biofilter db create-db --db-uri "sqlite:///biofilter_dev.db"
-```
-
-With overwrite:
-
-```bash
-biofilter db create-db --db-uri "sqlite:///biofilter_dev.db" --overwrite
-```
-
-For PostgreSQL, many teams prefer creating DB/user with `psql` first, then running `migrate` + `upgrade`.
+> **Pitfall:** running `db migrate --target head` / `db upgrade` on an empty
+> database *without* `db create-db` first reports "Schema up-to-date" but leaves
+> the database with no domain tables. Always bootstrap with `db create-db`.
 
 ---
 
@@ -309,8 +295,8 @@ Recommended sequence for an automation assistant:
 
 1. `biofilter config show`
 2. `biofilter db migrate --status`
-3. `biofilter db migrate --target head`
-4. `biofilter db upgrade`
+3. New database? `biofilter db create-db --db-uri <uri> [--overwrite]` (Postgres: `createdb` first) — creates schema + seeds
+4. Existing schema? `biofilter db upgrade` (migrate to head + seed refresh)
 5. `biofilter etl update-all --only-active`
 6. `biofilter etl status`
 7. `biofilter report run --name etl_status`
@@ -337,8 +323,13 @@ biofilter config init --path . \
 # 3) check config
 biofilter config show
 
-# 4) bootstrap DB
-biofilter db migrate --target head --force
+# 4) bootstrap DB (schema + seeds)
+#    Postgres must exist first; create-db is what builds the tables.
+createdb -O bioadmin biofilter_dev
+biofilter db create-db --db-uri "postgresql+psycopg2://bioadmin:change_me@localhost:5432/biofilter_dev" --overwrite
+
+#    (optional) baseline Alembic + refresh seeds
+biofilter db migrate --force
 biofilter db upgrade
 
 # 5) run ETL

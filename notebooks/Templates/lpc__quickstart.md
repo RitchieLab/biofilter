@@ -14,7 +14,7 @@ apptainer run --writable-tmpfs --pwd /tmp \
   --bind "$TMP/tmp:/tmp" \
   --bind "$TMP/pg-run:/var/run/postgresql" \
   --bind ~/bf4_output:/workspace \
-  /project/hall_shared/biofilter/images/bf4-hpc-4.1.2.sif \
+  /project/hall_shared/biofilter/images/bf4-hpc-4.1.4.sif \
   biofilter report run \
     --name annotation_master_gene \
     --input APOE \

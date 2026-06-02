@@ -168,16 +168,22 @@ class VariantModelingReport(ReportBase):
     )
 
     columns = [
+        "variant_1_input",
         "variant_1_id",
         "variant_1_rsid",
         "variant_1_chr",
         "variant_1_pos",
+        "variant_1_ref",
+        "variant_1_alt",
         "gene_1_id",
         "gene_1_name",
+        "variant_2_input",
         "variant_2_id",
         "variant_2_rsid",
         "variant_2_chr",
         "variant_2_pos",
+        "variant_2_ref",
+        "variant_2_alt",
         "gene_2_id",
         "gene_2_name",
         "group_support_count",
@@ -226,6 +232,8 @@ class VariantModelingReport(ReportBase):
             vm.c.chromosome,
             vm.c.position_start,
             vm.c.position_end,
+            vm.c.reference_allele,
+            vm.c.alternate_allele,
         ).where(func.lower(vm.c.rsid) == rsid.lower())
         rows = self.session.execute(stmt).mappings().all()
         seen: set[int] = set()
@@ -247,6 +255,8 @@ class VariantModelingReport(ReportBase):
                 vm.c.chromosome,
                 vm.c.position_start,
                 vm.c.position_end,
+                vm.c.reference_allele,
+                vm.c.alternate_allele,
             )
             .where(
                 and_(
@@ -281,6 +291,8 @@ class VariantModelingReport(ReportBase):
                 vm.c.chromosome,
                 vm.c.position_start,
                 vm.c.position_end,
+                vm.c.reference_allele,
+                vm.c.alternate_allele,
             )
             .where(
                 and_(
@@ -583,6 +595,12 @@ class VariantModelingReport(ReportBase):
         parsed = [_parse_input_item(item) for item in input_list]
 
         variant_by_id: dict[int, dict[str, Any]] = {}
+        # Track every original input string that resolved to a given variant_id.
+        # Multiple inputs may collapse to the same variant (e.g. rsID + chr:pos
+        # + chr:pos:ref:alt all pointing at the same row); we keep them all so
+        # users can join back on `variant_*_input` regardless of which form they
+        # provided.
+        variant_inputs: dict[int, list[str]] = {}
         not_found: list[str] = []
 
         for item in parsed:
@@ -609,7 +627,11 @@ class VariantModelingReport(ReportBase):
                 not_found.append(item["raw"])
                 self.logger.log(f"No variant found for input '{item['raw']}'", "WARNING")
             for v in found:
-                variant_by_id[int(v["variant_id"])] = v
+                vid = int(v["variant_id"])
+                variant_by_id[vid] = v
+                bucket = variant_inputs.setdefault(vid, [])
+                if item["raw"] not in bucket:
+                    bucket.append(item["raw"])
 
         if not variant_by_id:
             self.logger.log("No variants matched any input — returning empty DataFrame.", "WARNING")
@@ -764,16 +786,22 @@ class VariantModelingReport(ReportBase):
                     seen_pairs.add(dedup)
                     rows.append(
                         {
+                            "variant_1_input": ",".join(variant_inputs.get(id1, [])) or None,
                             "variant_1_id": id1,
                             "variant_1_rsid": v1.get("rsid"),
                             "variant_1_chr": _fmt_chr(v1.get("chromosome")),
                             "variant_1_pos": v1.get("position_start"),
+                            "variant_1_ref": v1.get("reference_allele"),
+                            "variant_1_alt": v1.get("alternate_allele"),
                             "gene_1_id": g1,
                             "gene_1_name": gene_name_map.get(g1, str(g1)),
+                            "variant_2_input": ",".join(variant_inputs.get(id2, [])) or None,
                             "variant_2_id": id2,
                             "variant_2_rsid": v2.get("rsid"),
                             "variant_2_chr": _fmt_chr(v2.get("chromosome")),
                             "variant_2_pos": v2.get("position_start"),
+                            "variant_2_ref": v2.get("reference_allele"),
+                            "variant_2_alt": v2.get("alternate_allele"),
                             "gene_2_id": g2,
                             "gene_2_name": gene_name_map.get(g2, str(g2)),
                             "group_support_count": len(support_group_ids),

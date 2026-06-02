@@ -60,7 +60,7 @@ release without breaking existing users.
 ```bash
 module load apptainer
 
-VERSION=4.1.2
+VERSION=4.1.4
 mkdir -p /project/${PROJECT}/env/modules/biofilter/${VERSION}
 cd /project/${PROJECT}/env/modules/biofilter/${VERSION}
 
@@ -131,7 +131,7 @@ Bandwidth permitting, 20 GB takes 1–4 hours.
 
 ```bash
 SNAPSHOT_DATE=20260514
-VERSION=4.1.2
+VERSION=4.1.4
 
 DB_DIR=/project/${PROJECT}/datasets/bf4/${SNAPSHOT_DATE}
 DUMP=/project/${PROJECT}/datasets/bf4/dumps/biofilter-${SNAPSHOT_DATE}.dump
@@ -186,7 +186,7 @@ isolated test environment.
 
 ```bash
 SNAPSHOT_DATE=test
-VERSION=4.1.2
+VERSION=4.1.4
 
 DB_DIR=/project/${PROJECT}/datasets/bf4/${SNAPSHOT_DATE}
 SIF=/project/${PROJECT}/env/modules/biofilter/${VERSION}/bf4-hpc.sif
@@ -227,7 +227,7 @@ deployment is good.
 
 ```bash
 SNAPSHOT_DATE=20260514
-VERSION=4.1.2
+VERSION=4.1.4
 OUT=$(mktemp -d)
 
 TMP_DIR=$(mktemp -d) && mkdir -p "${TMP_DIR}/tmp" "${TMP_DIR}/pg-run"
@@ -257,7 +257,7 @@ Expected: 3 lines of CSV with the APOE annotation.
 
 ```bash
 module load apptainer
-NEW_VERSION=4.1.3
+NEW_VERSION=4.1.5
 
 mkdir -p /project/${PROJECT}/env/modules/biofilter/${NEW_VERSION}
 cd /project/${PROJECT}/env/modules/biofilter/${NEW_VERSION}
