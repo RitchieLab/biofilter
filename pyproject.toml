@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "biofilter"
-version = "4.1.4"
+version = "4.2.0"
 description = "Biofilter: cloud-ready biological knowledge system"
 authors = ["Andre Rico <andreluis.rico@pennmedicine.upenn.edu>"]
 license = "MIT"
@@ -24,6 +24,8 @@ alembic = "^1.16.4"
 toml = "^0.10.2"
 requests = "^2.32.4"
 psycopg2-binary = "^2.9.10"
+duckdb = "^1.5.4"
+duckdb-engine = "^0.13.2"
 cyvcf2 = "^0.31.4"
 matplotlib = "^3.10.8"
 numpy = "^2.2.6"

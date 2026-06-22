@@ -40,5 +40,12 @@
         "type": "bool",
         "description": "If true, processed files will be kept for auditing.",
         "editable": true
+    },
+    {
+        "key": "gnomad_variant_min_ac",
+        "value": "1",
+        "type": "int",
+        "description": "Minimum allele count (inclusive) for a gnomAD variant to be loaded: kept when AC >= this value. Default 1 keeps all observed variants (AC > 0); set to 5 to require AC >= 5.",
+        "editable": true
     }
 ]

@@ -1,52 +1,54 @@
 # syntax=docker/dockerfile:1.7
 #
-# Biofilter 4 — HPC image (BF4 + PostgreSQL 16 in one container).
+# Biofilter 4 — HPC image (read-only, Parquet-backed via DuckDB).
 #
-# Use case: HPC clusters and standalone deployments where no external
-# PostgreSQL service is available. PGDATA must be bind-mounted to a host
-# directory so the database survives container removal.
+# Use case: HPC clusters where users run reports against a snapshot
+# Parquet bundle on shared storage. No PostgreSQL, no import phase,
+# no bind-mount of a PGDATA, no single-user lock — multiple processes
+# can read the same bundle concurrently.
 #
-# For deployments that point at an external PostgreSQL, prefer the app-only
-# image at docker/Dockerfile.
+# Point BIOFILTER_DB_URI (or pass --db-uri) at the bundle's tables/
+# directory:
+#
+#     parquet:///path/to/bundle/tables
+#
+# For deployments that point at an external PostgreSQL (VPS / ETL),
+# use the app-only image at docker/Dockerfile instead.
 
-FROM postgres:16-bookworm
+FROM python:3.12-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
-    VENV_PATH=/opt/biofilter/venv \
-    PATH=/opt/biofilter/venv/bin:/usr/lib/postgresql/16/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
-    POSTGRES_USER=biofilter \
-    POSTGRES_DB=biofilter \
-    POSTGRES_PORT=5432 \
-    PGDATA=/var/lib/postgresql/data \
-    BIOFILTER_AUTO_MIGRATE=0
-
-RUN apt-get update && apt-get install -y --no-install-recommends \
-        python3 \
-        python3-venv \
-        python3-pip \
-        ca-certificates \
-    && rm -rf /var/lib/apt/lists/*
-
-RUN python3 -m venv "$VENV_PATH" \
-    && "$VENV_PATH/bin/pip" install --upgrade pip setuptools wheel
+    PATH="/opt/biofilter/venv/bin:${PATH}"
 
 WORKDIR /app
+
+# Minimal system deps. libpq5 is kept so psycopg2-binary stays importable
+# (some BF4 utilities still touch it) but no PostgreSQL server is bundled.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        ca-certificates \
+        libpq5 \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN python3 -m venv /opt/biofilter/venv \
+    && /opt/biofilter/venv/bin/pip install --upgrade pip setuptools wheel
 
 COPY pyproject.toml poetry.lock README.md ./
 COPY biofilter ./biofilter
 
-RUN "$VENV_PATH/bin/pip" install . \
-    && chown -R postgres:postgres "$VENV_PATH" /app
+RUN /opt/biofilter/venv/bin/pip install .
 
-COPY docker/hpc/entrypoint.sh /usr/local/bin/hpc-entrypoint.sh
-RUN chmod +x /usr/local/bin/hpc-entrypoint.sh
+# Reuse the shared entrypoint from the app-only image — it just maps
+# DATABASE_URL / BIOFILTER_DB_URI into a --db-uri argument and execs.
+COPY docker/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh \
+    && useradd --create-home --shell /bin/bash biofilter \
+    && mkdir -p /workspace \
+    && chown -R biofilter:biofilter /workspace
 
-RUN mkdir -p /workspace && chown postgres:postgres /workspace
+USER biofilter
 WORKDIR /workspace
 
-EXPOSE 5432
-
-ENTRYPOINT ["/usr/local/bin/hpc-entrypoint.sh"]
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
 CMD ["biofilter", "--help"]

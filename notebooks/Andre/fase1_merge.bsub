@@ -1,0 +1,121 @@
+#!/bin/bash
+#BSUB -J bf4-merge-20260514
+#BSUB -W 4:00
+#BSUB -M 16384
+#BSUB -n 2
+#BSUB -R "rusage[mem=16384] span[hosts=1]"
+#BSUB -o /project/hall_shared/biofilter/databases/20260514/logs/merge-%J.out
+#BSUB -e /project/hall_shared/biofilter/databases/20260514/logs/merge-%J.err
+
+# =============================================================================
+# Phase 1 (MERGE): consolidate the 25 variant_molecular_effects_chr_*.parquet
+# children into a single variant_molecular_effects.parquet, then regenerate
+# the bundle manifest to cover all parquet files.
+#
+# Runs in the native BF4 venv (not the container) — uses pyarrow only.
+#
+# Submit:  bsub < fase1_merge.bsub
+# Monitor: bjobs / tail -f logs/merge-<jobid>.out
+# =============================================================================
+
+set -euo pipefail
+
+# ----- configuration -----
+ROOT=/project/hall_shared/biofilter
+SNAPSHOT=20260514
+VERSION=4.1.4
+VENV="${ROOT}/venv/bf4-4.1.4"
+JOBS_DIR="${ROOT}/jobs"
+
+BUNDLE_DIR="${ROOT}/databases/${SNAPSHOT}/bundle"
+TABLES_DIR="${BUNDLE_DIR}/tables"
+PARENT_FILE="${TABLES_DIR}/variant_molecular_effects.parquet"
+
+# ----- header -----
+echo "=== BF4 Bundle MERGE + manifest regen ==="
+echo "Started:  $(date)"
+echo "Host:     $(hostname)"
+echo "Job ID:   ${LSB_JOBID:-N/A}"
+echo "Bundle:   ${BUNDLE_DIR}"
+echo
+
+# ----- preflight checks -----
+[ -d "${TABLES_DIR}" ]    || { echo "ERROR: ${TABLES_DIR} not found"; exit 1; }
+[ -d "${VENV}" ]          || { echo "ERROR: venv not found at ${VENV}"; exit 1; }
+[ -f "${JOBS_DIR}/merge_variant_molecular_effects.py" ] || \
+    { echo "ERROR: merge script not found"; exit 1; }
+[ -f "${JOBS_DIR}/regen_manifest.py" ] || \
+    { echo "ERROR: regen_manifest script not found"; exit 1; }
+
+NUM_CHILDREN=$(ls "${TABLES_DIR}"/variant_molecular_effects_chr_*.parquet 2>/dev/null | wc -l)
+if [ "${NUM_CHILDREN}" -ne 25 ]; then
+    echo "WARNING: expected 25 variant_molecular_effects_chr_* files, found ${NUM_CHILDREN}"
+fi
+echo "Children to merge: ${NUM_CHILDREN}"
+echo
+
+if [ -f "${PARENT_FILE}" ]; then
+    SIZE=$(du -h "${PARENT_FILE}" | cut -f1)
+    echo "WARNING: ${PARENT_FILE} already exists (${SIZE}) — will be overwritten"
+fi
+echo
+
+# ----- environment -----
+module load python/3.12
+source "${VENV}/bin/activate"
+echo "Python:    $(python3 --version)"
+echo "Biofilter: $(biofilter --version 2>&1 || echo 'not on PATH')"
+echo
+
+# ----- Step 1: MERGE -----
+echo "=== Step 1: Merge variant_molecular_effects_chr_* → variant_molecular_effects.parquet ==="
+T0=$(date +%s)
+
+python "${JOBS_DIR}/merge_variant_molecular_effects.py" \
+    --in  "${TABLES_DIR}" \
+    --out "${PARENT_FILE}"
+
+ELAPSED=$(( $(date +%s) - T0 ))
+printf "Step 1 elapsed: %dh %02dm %02ds\n" $((ELAPSED/3600)) $(((ELAPSED%3600)/60)) $((ELAPSED%60))
+echo
+
+if [ -f "${PARENT_FILE}" ]; then
+    SIZE=$(du -h "${PARENT_FILE}" | cut -f1)
+    echo "Merged parent file: ${PARENT_FILE} (${SIZE})"
+else
+    echo "ERROR: merge step did not produce ${PARENT_FILE}"
+    exit 1
+fi
+echo
+
+# ----- Step 2: REGEN MANIFEST -----
+echo "=== Step 2: Regenerate manifest.json covering all parquet files ==="
+T1=$(date +%s)
+
+python "${JOBS_DIR}/regen_manifest.py" \
+    --bundle "${BUNDLE_DIR}" \
+    --biofilter-version "${VERSION}"
+
+ELAPSED=$(( $(date +%s) - T1 ))
+echo "Step 2 elapsed: ${ELAPSED}s"
+echo
+
+# ----- Step 3: summary -----
+echo "=== Final bundle state ==="
+echo
+echo "Bundle root:"
+ls -lh "${BUNDLE_DIR}"
+echo
+echo "Total parquet files:"
+ls -1 "${TABLES_DIR}"/*.parquet | wc -l
+echo
+echo "Total bundle size:"
+du -sh "${BUNDLE_DIR}"
+echo
+echo "Manifest preview (first 25 lines):"
+head -25 "${BUNDLE_DIR}/manifest.json"
+echo
+
+echo "Finished: $(date)"
+echo
+echo "NEXT STEP: submit fase3.bsub to run the SQLite import."

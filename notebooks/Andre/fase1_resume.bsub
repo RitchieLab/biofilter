@@ -1,0 +1,105 @@
+#!/bin/bash
+#BSUB -J bf4-export-resume-20260514
+#BSUB -W 8:00
+#BSUB -M 16384
+#BSUB -n 4
+#BSUB -R "rusage[mem=16384] span[hosts=1]"
+#BSUB -o /project/hall_shared/biofilter/databases/20260514/logs/export-resume-%J.out
+#BSUB -e /project/hall_shared/biofilter/databases/20260514/logs/export-resume-%J.err
+
+# =============================================================================
+# Phase 1 (RESUME): Export only the missing tables that didn't complete
+# in the previous run.
+#
+# The previous job was killed because the aggregated PARENT table
+# variant_molecular_effects was painfully slow (PG had to UNION 25 child
+# partitions on every chunk). This job exports the 25 children directly
+# (each is a fast direct SELECT) plus any other table not yet in the bundle.
+#
+# After this job, a separate merge script combines the children into a single
+# variant_molecular_effects.parquet (the consolidated parent).
+# =============================================================================
+
+set -euo pipefail
+
+# ----- configuration -----
+ROOT=/project/hall_shared/biofilter
+SNAPSHOT=20260514
+VERSION=4.1.4
+
+PGDATA="${ROOT}/databases/${SNAPSHOT}/pgdata"
+SIF="${ROOT}/images/bf4-hpc-${VERSION}.sif"
+BUNDLE_DIR="${ROOT}/databases/${SNAPSHOT}/bundle"
+
+# ----- header -----
+echo "=== BF4 Export RESUME (missing tables only) ==="
+echo "Started:  $(date)"
+echo "Host:     $(hostname)"
+echo "Job ID:   ${LSB_JOBID:-N/A}"
+echo "Bundle:   ${BUNDLE_DIR}"
+echo
+
+# ----- runtime setup -----
+module load apptainer
+
+TMP_DIR=$(mktemp -d -t bf4-export-XXXXXX)
+mkdir -p "${TMP_DIR}/tmp" "${TMP_DIR}/pg-run"
+trap "rm -rf ${TMP_DIR}" EXIT
+
+# ----- run -----
+echo "=== Exporting 25 chr partitions of variant_molecular_effects ==="
+T0=$(date +%s)
+
+apptainer run \
+  --writable-tmpfs \
+  --pwd /tmp \
+  --bind "${PGDATA}:/var/lib/postgresql/data" \
+  --bind "${TMP_DIR}/tmp:/tmp" \
+  --bind "${TMP_DIR}/pg-run:/var/run/postgresql" \
+  --bind "${BUNDLE_DIR}:/workspace" \
+  --bind "${ROOT}/images/patches/transfer.py:/opt/biofilter/venv/lib/python3.11/site-packages/biofilter/modules/db/transfer.py:ro" \
+  "${SIF}" \
+  biofilter db export \
+    --out /workspace \
+    --format parquet \
+    --schema-version "${VERSION}" \
+    --chunksize 100000 \
+    --table variant_molecular_effects_chr_1 \
+    --table variant_molecular_effects_chr_2 \
+    --table variant_molecular_effects_chr_3 \
+    --table variant_molecular_effects_chr_4 \
+    --table variant_molecular_effects_chr_5 \
+    --table variant_molecular_effects_chr_6 \
+    --table variant_molecular_effects_chr_7 \
+    --table variant_molecular_effects_chr_8 \
+    --table variant_molecular_effects_chr_9 \
+    --table variant_molecular_effects_chr_10 \
+    --table variant_molecular_effects_chr_11 \
+    --table variant_molecular_effects_chr_12 \
+    --table variant_molecular_effects_chr_13 \
+    --table variant_molecular_effects_chr_14 \
+    --table variant_molecular_effects_chr_15 \
+    --table variant_molecular_effects_chr_16 \
+    --table variant_molecular_effects_chr_17 \
+    --table variant_molecular_effects_chr_18 \
+    --table variant_molecular_effects_chr_19 \
+    --table variant_molecular_effects_chr_20 \
+    --table variant_molecular_effects_chr_21 \
+    --table variant_molecular_effects_chr_22 \
+    --table variant_molecular_effects_chr_23 \
+    --table variant_molecular_effects_chr_24 \
+    --table variant_molecular_effects_chr_25
+
+ELAPSED=$(( $(date +%s) - T0 ))
+printf "Elapsed: %dh %02dm %02ds\n" $((ELAPSED/3600)) $(((ELAPSED%3600)/60)) $((ELAPSED%60))
+
+echo
+echo "=== Children written ==="
+ls -lh "${BUNDLE_DIR}/tables/variant_molecular_effects_chr_"*.parquet
+echo
+du -sh "${BUNDLE_DIR}/tables/variant_molecular_effects_chr_"*.parquet | tail -1
+
+echo
+echo "Finished: $(date)"
+echo
+echo "NEXT STEP: run merge_variant_molecular_effects.py to consolidate children into parent.parquet"

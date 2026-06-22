@@ -1,37 +1,46 @@
-# Docker (BF4 + PostgreSQL — HPC image)
+# Docker (BF4 — HPC read-only image)
 
-Self-contained image that ships Biofilter 4 together with a PostgreSQL 16
-server inside the same container. The database files live in a host directory
-bind-mounted at `/var/lib/postgresql/data`, so the data survives container
-removal and can be moved between hosts as a plain folder.
+Lightweight container that ships Biofilter 4 configured to read a
+**Parquet bundle** directly via DuckDB. No PostgreSQL bundled, no
+import phase, no per-user data copy — multiple processes can read the
+same bundle on shared storage concurrently.
 
-Use this image when an external PostgreSQL is not available — HPC clusters
-(LPC, etc.), single-node deployments, sandbox/test environments. For
-deployments that connect to an existing PostgreSQL, use the app-only image
+Use this image on HPC clusters (LPC, etc.) and any other environment
+where the data ships as a Parquet snapshot. For deployments that need
+to connect to an external PostgreSQL (VPS, ETL), use the app-only image
 at [../Dockerfile](../Dockerfile).
 
 ## How it works
 
-- Base: `postgres:16-bookworm` (official PostgreSQL image)
+- Base: `python:3.12-slim` (~150 MB)
 - BF4 installed in an isolated Python venv at `/opt/biofilter/venv`
-- PostgreSQL listens **only on localhost** inside the container (trust auth, no password)
-- `DATABASE_URL` is assembled by the entrypoint and exported automatically — BF4 just sees a working database
-- First run detects an empty `PGDATA` and runs `initdb` + creates the application database; subsequent runs only start the server
-- Optional first-run restore from a `pg_dump -Fc` archive (see below)
+- DuckDB and `duckdb-engine` pulled in as BF4 dependencies
+- Entrypoint maps `DATABASE_URL` / `BIOFILTER_DB_URI` into a `--db-uri`
+  argument, so the bundle path is passed as plain env
+
+The bundle is **not** baked into the image. You bind-mount it at run
+time so the same image serves any snapshot. Image size: ~400-500 MB
+total (down from ~1.5 GB for the legacy PG-bundled variant).
 
 ## Quick start — pull a published image
 
 The image is published to GitHub Container Registry. On the LPC (or any
-machine with Apptainer/Singularity), pull the `.sif` and run:
+machine with Apptainer/Singularity):
 
 ```bash
 apptainer pull bf4-hpc.sif docker://ghcr.io/ritchielab/biofilter-hpc:latest
 
-mkdir -p ~/bf4-pgdata
+mkdir -p ~/bf4_output
+
 apptainer run \
-  --bind ~/bf4-pgdata:/var/lib/postgresql/data \
+  --bind /project/hall_shared/biofilter/databases/20260514/bundle/tables:/bundle:ro \
+  --bind ~/bf4_output:/workspace \
+  --env BIOFILTER_DB_URI=parquet:///bundle \
   bf4-hpc.sif \
-  biofilter db migrate --target head
+  biofilter report run \
+    --name annotation_master_gene \
+    --input APOE \
+    --output /workspace/apoe.csv
 ```
 
 For Docker locally:
@@ -39,11 +48,12 @@ For Docker locally:
 ```bash
 docker pull ghcr.io/ritchielab/biofilter-hpc:latest
 
-mkdir -p ./bf4-pgdata
 docker run --rm \
-  -v "$(pwd)/bf4-pgdata:/var/lib/postgresql/data" \
+  -v "$(pwd)/bundle:/bundle:ro" \
+  -v "$(pwd)/out:/workspace" \
+  -e BIOFILTER_DB_URI=parquet:///bundle \
   ghcr.io/ritchielab/biofilter-hpc:latest \
-  biofilter db migrate --target head
+  biofilter report run --name annotation_master_gene --input APOE --output /workspace/apoe.csv
 ```
 
 ## Build from source (development)
@@ -54,163 +64,82 @@ From the project root:
 docker build -t biofilter-hpc:latest -f docker/hpc/Dockerfile .
 ```
 
-Build directly from a Git ref (no local clone needed):
-
-```bash
-docker build -t biofilter-hpc:bf4 -f docker/hpc/Dockerfile \
-  "https://github.com/RitchieLab/biofilter.git#biofilter3r"
-```
-
-## Initialize from an existing dump
-
-Useful for migrating a populated database from another host (e.g., VPS → HPC).
-
-On the source host:
-
-```bash
-pg_dump -Fc -d biofilter -f biofilter.dump
-rsync --partial --progress biofilter.dump user@hpc:/path/to/biofilter.dump
-```
-
-On the target host, on the **first run**, mount the dump and set
-`BIOFILTER_RESTORE_DUMP`:
-
-```bash
-docker run --rm \
-  -v "$(pwd)/bf4-pgdata:/var/lib/postgresql/data" \
-  -v "$(pwd)/biofilter.dump:/restore.dump:ro" \
-  -e BIOFILTER_RESTORE_DUMP=/restore.dump \
-  -e BIOFILTER_RESTORE_JOBS=4 \
-  biofilter-hpc:latest \
-  biofilter db migrate --status
-```
-
-The entrypoint runs `pg_restore` with the indicated parallelism, then
-proceeds to start PostgreSQL normally. The variable is silently ignored on
-subsequent runs (PGDATA is already populated).
-
 ## Environment variables
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `POSTGRES_USER` | `biofilter` | DB superuser created on first init |
-| `POSTGRES_DB` | `biofilter` | Application database created on first init |
-| `POSTGRES_PORT` | `5432` | PostgreSQL port inside the container |
-| `PGDATA` | `/var/lib/postgresql/data` | Bind-mount target for the database files |
-| `BIOFILTER_AUTO_MIGRATE` | `0` | Set to `1` to run `biofilter db migrate --target head` on startup |
-| `BIOFILTER_RESTORE_DUMP` | _unset_ | Path inside the container to a `pg_dump -Fc` archive. Restored on first run only |
-| `BIOFILTER_RESTORE_JOBS` | `4` | Parallelism for `pg_restore` |
+| `BIOFILTER_DB_URI` | _unset_ | URI passed to `--db-uri`. Typical value: `parquet:///path/to/bundle/tables` |
+| `DATABASE_URL` | _unset_ | Mirrored to `BIOFILTER_DB_URI` for backwards-compat |
 
-A starter file is provided at [.env.example](.env.example).
+Pass them with `-e VAR=value` (Docker) or `--env VAR=value` (Apptainer).
 
 ## Common runs
 
-Migrate schema to head:
+Pull the image once, then:
 
 ```bash
-docker run --rm \
-  -v "$(pwd)/bf4-pgdata:/var/lib/postgresql/data" \
-  biofilter-hpc:latest \
-  biofilter db migrate --target head
+# Reusable handle (assumes the bundle is bind-mounted at /bundle)
+alias bf4hpc='docker run --rm \
+  -v "$BUNDLE_DIR:/bundle:ro" \
+  -v "$PWD:/workspace" \
+  -e BIOFILTER_DB_URI=parquet:///bundle \
+  ghcr.io/ritchielab/biofilter-hpc:latest'
+
+# List reports
+bf4hpc biofilter report list
+
+# Annotate genes
+bf4hpc biofilter report run \
+  --name annotation_master_gene \
+  --input "TP53,BRCA1,APOE" \
+  --output /workspace/genes.csv
+
+# Annotate variants from file
+bf4hpc biofilter report run \
+  --name annotation_master_variant \
+  --input-file /workspace/rsids.txt \
+  --output /workspace/variants.csv
 ```
 
-Run a report against mounted input/output:
+## What changed from the PG-bundled image (4.1.x)
 
-```bash
-docker run --rm \
-  -v "$(pwd)/bf4-pgdata:/var/lib/postgresql/data" \
-  -v "$(pwd):/workspace" \
-  biofilter-hpc:latest \
-  biofilter report run \
-    --report-name annotation_master_gene \
-    --input-file /workspace/gene.txt \
-    --output /workspace/annotation_master_gene.csv
-```
+- **PostgreSQL is gone.** The image previously embedded PG 16 with a
+  bind-mounted PGDATA at `/var/lib/postgresql/data`. With Parquet
+  reads, no DB server is needed.
+- **No more `PGDATA` permissions dance.** The old image required mode
+  `0700` and tripped on the GPFS `chown` semantics under Apptainer
+  fakeroot. Parquet bind-mounts are just regular read-only files.
+- **Multi-user concurrent access** is now native. The PG single-
+  postmaster constraint that forced per-user data copies is gone.
+- **No first-run init.** The old image ran `initdb` on first launch
+  and (optionally) `pg_restore` from a bind-mounted dump. The new
+  image just reads the Parquet files in place.
+- **Image size**: ~400 MB instead of ~1.5 GB.
 
-Interactive shell with both `biofilter` and `psql` available:
+The legacy PG-bundled image is preserved in git history at the tag
+`v4.1.4` if needed for ETL-on-cluster experiments. For production HPC
+deployments, this Parquet-backed image is the supported path going
+forward.
 
-```bash
-docker run --rm -it \
-  -v "$(pwd)/bf4-pgdata:/var/lib/postgresql/data" \
-  --entrypoint /bin/bash \
-  biofilter-hpc:latest
-```
+## HPC deployment
 
-## Persistence and backup
+See [../../notebooks/Templates/lpc__quickstart.md](../../notebooks/Templates/lpc__quickstart.md)
+for the LPC-specific quick-start (often you don't need the container at
+all — just `pip install biofilter` in a venv on the cluster and point at
+the Parquet bundle).
 
-The host directory bind-mounted at `PGDATA` is the only place data lives.
-Treat it like a project asset: back it up the same way you back up source
-code or research data.
-
-```bash
-# Logical backup against a running container (preferred)
-docker exec <container> pg_dump -U biofilter -Fc biofilter > backup.dump
-
-# Cold backup (only when no container is running against this PGDATA)
-tar czf bf4-pgdata-$(date +%Y%m%d).tar.gz bf4-pgdata/
-```
-
-## Concurrency
-
-PostgreSQL allows **only one** postmaster per `PGDATA`. Do not start a second
-container against the same bind-mounted directory while another is running —
-the second one will fail (or, worse on broken filesystems, corrupt data).
-For multi-user access, run a single long-lived container and connect
-additional clients to it over the network.
-
-## HPC deployment via Apptainer/Singularity
-
-The image is built to be Apptainer-compatible. Pull straight from GHCR:
-
-```bash
-apptainer pull bf4-hpc.sif docker://ghcr.io/ritchielab/biofilter-hpc:latest
-
-apptainer run \
-  --bind /project/<your>/bf4-pgdata:/var/lib/postgresql/data \
-  bf4-hpc.sif \
-  biofilter report list
-```
-
-Apptainer runs the container as the **invoking host user**, not as root. The
-bind-mounted `PGDATA` directory must therefore be readable and writable by
-that user.
-
-## Packaging as an Lmod module on the LPC
-
-LPC users are accustomed to `module load biofilter`. The `.sif` can be wrapped
-transparently so the user experience is identical:
-
-```lua
--- /opt/lmod/modulefiles/biofilter4/4.1.2.lua
-help([[Biofilter 4 — HPC image (BF4 + PostgreSQL).]])
-
-local sif  = "/opt/biofilter/bf4-hpc-4.1.2.sif"
-local data = os.getenv("BIOFILTER_PGDATA") or pathJoin(os.getenv("HOME"), "bf4-pgdata")
-
-set_alias("biofilter", "apptainer run --bind " .. data .. ":/var/lib/postgresql/data " .. sif .. " biofilter")
-setenv("BIOFILTER_SIF", sif)
-```
-
-End-user workflow on the cluster:
-
-```bash
-module load biofilter4
-biofilter db migrate --target head
-biofilter report list
-```
-
-The `.sif` and the user's `PGDATA` folder are the only artifacts IT needs to
-manage on the cluster.
+For Apptainer/Singularity packaging and module-wrapping, see
+[../../notebooks/Templates/lpc__deploy.md](../../notebooks/Templates/lpc__deploy.md).
 
 ## Limits and caveats
 
-- `BIOFILTER_AUTO_MIGRATE=1` is convenient for dev but risky against a
-  populated `PGDATA` created by a newer BF4 version — keep it off in
-  production environments and run migrations explicitly.
-- Trust auth is safe only because PostgreSQL is bound to localhost inside
-  the container. Do not publish port 5432 to the host (`-p 5432:5432`) without
-  switching to password or scram auth first.
-- File ownership on bind-mounted `PGDATA`: Docker writes as `postgres` user
-  (uid/gid 999 in the base image). If you need different ownership for
-  Apptainer or non-default deployments, pass `--user` at run time and make
-  sure the host directory is writable by that uid.
+- **Read-only.** All writes against `parquet://` views fail at the
+  DuckDB level. Do not point this image at a write workload (ETL,
+  `db create-db`, `db import`) — use the app-only image at
+  `../Dockerfile` with a real PostgreSQL.
+- **Schema-pinned to the bundle.** When BF4 ORM evolves, the Parquet
+  bundle has to be regenerated to match. Versions are tracked in the
+  bundle's `manifest.json`.
+- **Bundle path semantics.** `parquet:///foo/bar/tables` resolves to
+  the absolute path `/foo/bar/tables` inside the container. Make sure
+  the bind-mount target matches the URI.

@@ -1,0 +1,125 @@
+#!/bin/bash
+#BSUB -J bf4-export-20260514
+#BSUB -W 12:00
+#BSUB -M 65536
+#BSUB -n 8
+#BSUB -R "rusage[mem=65536] span[hosts=1]"
+#BSUB -o /project/hall_shared/biofilter/databases/20260514/logs/export-%J.out
+#BSUB -e /project/hall_shared/biofilter/databases/20260514/logs/export-%J.err
+# Add this line and set the queue name your LPC uses if different from default:
+##BSUB -q normal
+
+# =============================================================================
+# Phase 1: Export PostgreSQL database -> Parquet bundle.
+#
+# Runs the bf4-hpc Apptainer image against the existing pgdata snapshot and
+# writes a portable bundle (manifest.json + tables/*.parquet) that will be
+# imported into a SQLite database in Phase 3.
+#
+# Source:  databases/<SNAPSHOT>/pgdata   (read-only inside container)
+# Target:  databases/<SNAPSHOT>/bundle   (created if missing)
+# Image:   images/bf4-hpc-<VERSION>.sif
+#
+# Submit:  bsub < fase1.bsub
+# Monitor: bjobs
+# =============================================================================
+
+set -euo pipefail
+
+# ----- configuration -----
+ROOT=/project/hall_shared/biofilter
+SNAPSHOT=20260514
+VERSION=4.1.4
+
+PGDATA="${ROOT}/databases/${SNAPSHOT}/pgdata"
+SIF="${ROOT}/images/bf4-hpc-${VERSION}.sif"
+BUNDLE_DIR="${ROOT}/databases/${SNAPSHOT}/bundle"
+LOG_DIR="${ROOT}/databases/${SNAPSHOT}/logs"
+
+# ----- header -----
+echo "=== BF4 PG → Parquet export ==="
+echo "Started:  $(date)"
+echo "Host:     $(hostname)"
+echo "Job ID:   ${LSB_JOBID:-N/A}"
+echo "Snapshot: ${SNAPSHOT}"
+echo "Version:  ${VERSION}"
+echo "Source:   ${PGDATA}"
+echo "Target:   ${BUNDLE_DIR}"
+echo "Image:    ${SIF}"
+echo
+
+# ----- preflight checks -----
+[ -d "${PGDATA}" ] || { echo "ERROR: PGDATA not found at ${PGDATA}"; exit 1; }
+[ -f "${SIF}" ]    || { echo "ERROR: SIF not found at ${SIF}"; exit 1; }
+
+# Bundle dir: warn if non-empty (export overwrites)
+if [ -d "${BUNDLE_DIR}" ] && [ -n "$(ls -A "${BUNDLE_DIR}" 2>/dev/null)" ]; then
+    echo "WARNING: ${BUNDLE_DIR} is non-empty — contents will be overwritten."
+fi
+mkdir -p "${BUNDLE_DIR}" "${LOG_DIR}"
+
+# Free space check (warn under 250 GB)
+AVAIL_GB=$(df -BG "${BUNDLE_DIR}" | awk 'NR==2 {gsub(/G/,"",$4); print $4}')
+echo "Available space at target: ${AVAIL_GB} GB"
+if [ "${AVAIL_GB}" -lt 250 ]; then
+    echo "WARNING: less than 250 GB free at target. Parquet bundle may not fit."
+fi
+echo
+
+# ----- runtime setup -----
+module load apptainer
+
+# PG needs a writable /tmp and /var/run/postgresql; bind these to a per-job
+# scratch dir so concurrent jobs don't collide.
+TMP_DIR=$(mktemp -d -t bf4-export-XXXXXX)
+mkdir -p "${TMP_DIR}/tmp" "${TMP_DIR}/pg-run"
+trap "rm -rf ${TMP_DIR}" EXIT
+
+# ----- run -----
+echo "=== Running biofilter db export ==="
+T0=$(date +%s)
+
+apptainer run \
+  --writable-tmpfs \
+  --pwd /tmp \
+  --bind "${PGDATA}:/var/lib/postgresql/data" \
+  --bind "${TMP_DIR}/tmp:/tmp" \
+  --bind "${TMP_DIR}/pg-run:/var/run/postgresql" \
+  --bind "${BUNDLE_DIR}:/workspace" \
+  --bind "${ROOT}/images/patches/transfer.py:/opt/biofilter/venv/lib/python3.11/site-packages/biofilter/modules/db/transfer.py:ro" \
+  "${SIF}" \
+  biofilter db export \
+    --out /workspace \
+    --format parquet \
+    --schema-version "${VERSION}" \
+    --chunksize 100000
+
+ELAPSED=$(( $(date +%s) - T0 ))
+
+# ----- post-run summary -----
+echo
+echo "=== Export complete ==="
+printf "Elapsed: %dh %02dm %02ds\n" $((ELAPSED/3600)) $(((ELAPSED%3600)/60)) $((ELAPSED%60))
+echo
+
+echo "Bundle contents (top level):"
+ls -lh "${BUNDLE_DIR}"
+echo
+
+if [ -d "${BUNDLE_DIR}/tables" ]; then
+    NUM_TABLES=$(ls -1 "${BUNDLE_DIR}/tables/" | wc -l)
+    echo "Tables exported: ${NUM_TABLES}"
+fi
+
+echo
+echo "Total bundle size:"
+du -sh "${BUNDLE_DIR}"
+
+if [ -f "${BUNDLE_DIR}/manifest.json" ]; then
+    echo
+    echo "Manifest preview:"
+    head -30 "${BUNDLE_DIR}/manifest.json"
+fi
+
+echo
+echo "Finished: $(date)"

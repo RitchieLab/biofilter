@@ -131,7 +131,11 @@ class GnomadCyvcf2Config:
     consequences_prefix: str = "consequences_part_"
     parquet_compression: str = "snappy"
     min_qual: int = 1
-    min_ac: int = 5
+    # Minimum allele count (inclusive) required to keep a variant: a variant is
+    # kept when AC >= min_ac. Default 1 keeps every observed variant (AC > 0).
+    # Overridable at runtime via the system_config key "gnomad_variant_min_ac"
+    # (e.g. set it to 5 to require AC >= 5).
+    min_ac: int = 1
     postgres_fast_load: bool = True
     postgres_partition_refresh: bool = True
 
@@ -709,6 +713,27 @@ class DTP(DTPBase):
 
         # Extend config settings
         cfg = self.config
+
+        # Runtime override of the minimum allele-count threshold from
+        # system_config. Falls back to cfg.min_ac when the key is absent or the
+        # session is unavailable, so behaviour is unchanged for callers that do
+        # not seed the key.
+        if self.session is not None:
+            try:
+                from biofilter.core.settings_manager import SettingsManager
+
+                min_ac_cfg = SettingsManager(self.session).get(
+                    "gnomad_variant_min_ac", default=None
+                )
+                if min_ac_cfg is not None:
+                    cfg.min_ac = int(min_ac_cfg)
+            except Exception as e:
+                self.logger.log(
+                    f"⚠️ Could not read 'gnomad_variant_min_ac' from "
+                    f"system_config, using default {cfg.min_ac}: {e}",
+                    "WARNING",
+                )
+
         chunk_size = cfg.chunk_size
 
         part = 0  # Manager chunk files sequences
@@ -835,7 +860,9 @@ class DTP(DTPBase):
 
                 # Filtering at the variant level (before parsing INFO/VEP):
                 # -----------------------------------------------------------------
-                # 0. Minimal AC filter: skip variants with AC=0 (not observed in gnomAD)  # noqa E501
+                # 0. Minimal AC filter: skip variants with AC < cfg.min_ac
+                #    (default min_ac=1 drops only AC=0 / not-observed sites;
+                #     configurable via system_config "gnomad_variant_min_ac")
                 # 1. Variants with failing FILTER are skipped
                 # 2. Variants below the configured QUAL threshold are skipped
                 # 3. Variants with multiple ALTs in the same record are rejected  # noqa E501
@@ -843,8 +870,9 @@ class DTP(DTPBase):
                 pos = int(var.POS)
                 ref = var.REF
 
-                # Filter 0: Skip variants with AC=0
-                if var.INFO.get("AC") < cfg.min_ac:
+                # Filter 0: Skip variants with AC below the configured threshold
+                ac_val = var.INFO.get("AC")
+                if ac_val is None or ac_val < cfg.min_ac:
                     skipped_by_ac += 1
                     n_skipped += 1
                     continue

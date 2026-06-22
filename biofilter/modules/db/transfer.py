@@ -627,6 +627,27 @@ def import_full_clone(
             "Database engine is not initialized (db.engine is None). Connect first."  # noqa E501
         )
 
+    # Disable FK enforcement on SQLite for the duration of the import.
+    # Without this, DELETE FROM cannot use the truncate optimization
+    # (would iterate and FK-validate every row) and INSERT validates each
+    # FK on every row. With FK off, both become orders of magnitude
+    # faster. The bundle source DB enforced FKs, so the data is already
+    # referentially consistent — we just suspend re-checking during the
+    # mass load. Per-connection pragma via event listener so every pooled
+    # connection inherits the setting.
+    if detect_engine_name(engine) == "sqlite":
+        from sqlalchemy import event as _sa_event
+
+        @_sa_event.listens_for(engine, "connect")
+        def _disable_sqlite_fk(dbapi_conn, _conn_record):  # noqa
+            cur = dbapi_conn.cursor()
+            cur.execute("PRAGMA foreign_keys = OFF")
+            cur.close()
+
+        # Apply immediately to any already-open pool connections.
+        with engine.begin() as _conn:
+            _conn.execute(text("PRAGMA foreign_keys = OFF"))
+
     base = Path(in_dir).expanduser().resolve()
     manifest_path = base / "manifest.json"
     if not manifest_path.exists():
@@ -703,8 +724,14 @@ def import_full_clone(
             for chunk in pd.read_csv(file_path, chunksize=200_000):
                 _insert_df(engine, target_table, chunk, chunksize=chunksize)
         else:
-            df = pd.read_parquet(file_path)
-            _insert_df(engine, target_table, df, chunksize=chunksize)
+            # Stream parquet by row group batches so we never materialize
+            # the whole file in memory. Critical for tables like
+            # variant_molecular_effects (~1.79B rows would need 50+ GB
+            # of pandas memory if loaded as a single DataFrame).
+            pq_file = pq.ParquetFile(file_path)
+            for batch in pq_file.iter_batches(batch_size=200_000):
+                df = batch.to_pandas()
+                _insert_df(engine, target_table, df, chunksize=chunksize)
 
     # 3) Postgres sequences
     if reset_sequences and detect_engine_name(engine) in ("postgresql", "postgres"):  # noqa E501
@@ -749,11 +776,37 @@ def _export_table_parquet(
     writer: pq.ParquetWriter | None = None
     schema: pa.Schema | None = None
 
+    # Force server-side cursor so psycopg2 doesn't buffer the whole table.
+    # Without this, pd.read_sql chunksize only slices an already-materialized
+    # resultset and large tables (e.g. variant_masters) cause OOM.
+    streaming_conn = conn.execution_options(stream_results=True)
+
     try:
-        for chunk in pd.read_sql(text(sql), conn, chunksize=chunksize):
+        for chunk in pd.read_sql(text(sql), streaming_conn, chunksize=chunksize):  # noqa E501
             table = pa.Table.from_pandas(chunk, preserve_index=False)
 
             if writer is None:
+                # Promote null-type columns to nullable string. Without this,
+                # later chunks with actual string values fail to cast back
+                # (pyarrow can't cast string -> null). This commonly affects
+                # partitioned parent tables where early chunks come from a
+                # partition with all-null columns.
+                if any(pa.types.is_null(f.type) for f in table.schema):
+                    new_fields = []
+                    new_columns = []
+                    for i, field in enumerate(table.schema):
+                        if pa.types.is_null(field.type):
+                            new_fields.append(
+                                pa.field(field.name, pa.string(), nullable=True)  # noqa E501
+                            )
+                            new_columns.append(table.column(i).cast(pa.string()))  # noqa E501
+                        else:
+                            new_fields.append(field)
+                            new_columns.append(table.column(i))
+                    table = pa.Table.from_arrays(
+                        new_columns, schema=pa.schema(new_fields)
+                    )
+
                 schema = table.schema
                 writer = pq.ParquetWriter(str(out_path), schema=schema)
             elif table.schema != schema:

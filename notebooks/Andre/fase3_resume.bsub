@@ -1,0 +1,154 @@
+#!/bin/bash
+#BSUB -J bf4-import-resume-20260514
+#BSUB -W 24:00
+#BSUB -M 32768
+#BSUB -n 4
+#BSUB -R "rusage[mem=32768] span[hosts=1]"
+#BSUB -o /project/hall_shared/biofilter/databases/20260514/logs/import-resume-%J.out
+#BSUB -e /project/hall_shared/biofilter/databases/20260514/logs/import-resume-%J.err
+
+# =============================================================================
+# Phase 3 (RESUME): finish the import after the previous job was killed by
+# the 12h walltime.
+#
+# Tables already fully imported are preserved by filtering them OUT of the
+# bundle manifest before running `biofilter db import` (which doesn't accept
+# --exclude-table). The original manifest is restored on exit via trap.
+#
+# After this job, run `biofilter etl index --no-drop-first` to ensure every
+# curated index group is up-to-date.
+# =============================================================================
+
+set -euo pipefail
+
+# ----- configuration -----
+ROOT=/project/hall_shared/biofilter
+SNAPSHOT=20260514
+VERSION=4.1.4
+VENV="${ROOT}/venv/bf4-4.1.4"
+
+BUNDLE_DIR="${ROOT}/databases/${SNAPSHOT}/bundle"
+MANIFEST="${BUNDLE_DIR}/manifest.json"
+MANIFEST_BACKUP="${MANIFEST}.full"
+DB_FILE="${ROOT}/databases/${SNAPSHOT}/biofilter.db"
+
+# Tables already fully imported by the previous run — keep them intact.
+EXCLUDE=(
+    variant_masters
+    variant_gene_regulatory_evidence
+)
+
+# ----- header -----
+echo "=== BF4 Bundle → SQLite import (RESUME) ==="
+echo "Started:  $(date)"
+echo "Host:     $(hostname)"
+echo "Job ID:   ${LSB_JOBID:-N/A}"
+echo "Source:   ${BUNDLE_DIR}"
+echo "Target:   ${DB_FILE}"
+echo "Excluded: ${EXCLUDE[*]}"
+echo
+
+# ----- preflight -----
+[ -f "${MANIFEST}" ] || { echo "ERROR: manifest.json missing"; exit 1; }
+[ -f "${DB_FILE}" ]  || { echo "ERROR: ${DB_FILE} missing"; exit 1; }
+[ -d "${VENV}" ]     || { echo "ERROR: venv missing"; exit 1; }
+
+SIZE=$(du -h "${DB_FILE}" | cut -f1)
+echo "Existing SQLite size: ${SIZE}"
+echo
+
+# ----- manifest backup + restore on exit -----
+# Backup if not already backed up (allows safe retries).
+if [ ! -f "${MANIFEST_BACKUP}" ]; then
+    cp "${MANIFEST}" "${MANIFEST_BACKUP}"
+fi
+
+restore_manifest() {
+    if [ -f "${MANIFEST_BACKUP}" ]; then
+        echo
+        echo "[trap] Restoring original manifest from ${MANIFEST_BACKUP}"
+        cp "${MANIFEST_BACKUP}" "${MANIFEST}"
+    fi
+}
+trap restore_manifest EXIT INT TERM
+
+# ----- environment -----
+module load python/3.12
+source "${VENV}/bin/activate"
+echo "Python:    $(python3 --version)"
+echo "Biofilter: $(biofilter --version 2>&1 | head -1)"
+echo
+
+# ----- Step 0: write filtered manifest -----
+echo "=== Step 0: Filter manifest (exclude completed tables) ==="
+export MANIFEST_PATH="${MANIFEST}"
+export MANIFEST_BACKUP_PATH="${MANIFEST_BACKUP}"
+python3 - "${EXCLUDE[@]}" <<'PYEOF'
+import json, os, sys
+excluded = set(sys.argv[1:])
+src = os.environ["MANIFEST_BACKUP_PATH"]
+dst = os.environ["MANIFEST_PATH"]
+
+with open(src) as f:
+    m = json.load(f)
+
+orig = len(m["tables"])
+m["tables"] = [t for t in m["tables"] if t["name"] not in excluded]
+kept = len(m["tables"])
+
+with open(dst, "w") as f:
+    json.dump(m, f, indent=2)
+
+print(f"Manifest filtered: kept {kept} of {orig} ({orig - kept} excluded)")
+PYEOF
+echo
+
+# ----- Step 1: import (resume) -----
+echo "=== Step 1: db import (resume) ==="
+T0=$(date +%s)
+
+biofilter db import \
+    --db-uri "sqlite:///${DB_FILE}" \
+    --in "${BUNDLE_DIR}" \
+    --format parquet \
+    --allow-missing-tables
+
+ELAPSED=$(( $(date +%s) - T0 ))
+printf "Step 1 elapsed: %dh %02dm %02ds\n" $((ELAPSED/3600)) $(((ELAPSED%3600)/60)) $((ELAPSED%60))
+echo
+
+# ----- Step 2: ensure all BF4 curated indexes are present -----
+echo "=== Step 2: biofilter etl index (idempotent) ==="
+T1=$(date +%s)
+
+biofilter --db-uri "sqlite:///${DB_FILE}" etl index --no-drop-first
+
+ELAPSED=$(( $(date +%s) - T1 ))
+printf "Step 2 elapsed: %dh %02dm %02ds\n" $((ELAPSED/3600)) $(((ELAPSED%3600)/60)) $((ELAPSED%60))
+echo
+
+# ----- Step 3: validation -----
+echo "=== Step 3: Validation ==="
+ls -lh "${DB_FILE}"
+echo
+
+echo "Total tables in SQLite:"
+sqlite3 "${DB_FILE}" "SELECT count(*) FROM sqlite_master WHERE type='table';"
+
+echo
+echo "Total indexes in SQLite:"
+sqlite3 "${DB_FILE}" "SELECT count(*) FROM sqlite_master WHERE type='index';"
+
+echo
+echo "Row counts (key tables):"
+for tbl in entities entity_aliases entity_relationships \
+          gene_masters variant_masters disease_masters \
+          pathway_masters chemical_masters protein_masters \
+          variant_molecular_effects variant_gene_regulatory_evidence; do
+    cnt=$(sqlite3 "${DB_FILE}" "SELECT count(*) FROM ${tbl};" 2>/dev/null || echo "N/A")
+    printf "  %-40s %s\n" "${tbl}" "${cnt}"
+done
+
+echo
+echo "Finished: $(date)"
+# trap fires now: restores original manifest from .full backup

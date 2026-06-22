@@ -1,0 +1,121 @@
+#!/bin/bash
+#BSUB -J bf4-import-20260514
+#BSUB -W 12:00
+#BSUB -M 65536
+#BSUB -n 4
+#BSUB -R "rusage[mem=65536] span[hosts=1]"
+#BSUB -o /project/hall_shared/biofilter/databases/20260514/logs/import-%J.out
+#BSUB -e /project/hall_shared/biofilter/databases/20260514/logs/import-%J.err
+##BSUB -q normal
+
+# =============================================================================
+# Phase 3: Import Parquet bundle -> SQLite database.
+#
+# Uses the native BF4 venv (not the apptainer image) to:
+#   1. Create SQLite schema + seeds (`biofilter db create-db`)
+#   2. Import bundle with TRUNCATE + load + rebuild indexes
+#   3. Validate row counts in key tables
+#
+# Source: databases/<SNAPSHOT>/bundle  (manifest.json + tables/)
+# Target: databases/<SNAPSHOT>/biofilter.db
+#
+# Submit:  bsub < fase3.bsub
+# Monitor: bjobs / tail -f logs/import-<jobid>.out
+# =============================================================================
+
+set -euo pipefail
+
+# ----- configuration -----
+ROOT=/project/hall_shared/biofilter
+SNAPSHOT=20260514
+VERSION=4.1.4
+VENV="${ROOT}/venv/bf4-4.1.4"
+
+BUNDLE_DIR="${ROOT}/databases/${SNAPSHOT}/bundle"
+DB_FILE="${ROOT}/databases/${SNAPSHOT}/biofilter.db"
+
+# ----- header -----
+echo "=== BF4 Bundle → SQLite import ==="
+echo "Started:  $(date)"
+echo "Host:     $(hostname)"
+echo "Job ID:   ${LSB_JOBID:-N/A}"
+echo "Snapshot: ${SNAPSHOT}"
+echo "Version:  ${VERSION}"
+echo "Source:   ${BUNDLE_DIR}"
+echo "Target:   ${DB_FILE}"
+echo
+
+# ----- preflight checks -----
+[ -f "${BUNDLE_DIR}/manifest.json" ] || { echo "ERROR: manifest.json not found at ${BUNDLE_DIR}"; exit 1; }
+[ -d "${BUNDLE_DIR}/tables" ]        || { echo "ERROR: tables/ not found at ${BUNDLE_DIR}"; exit 1; }
+[ -d "${VENV}" ]                     || { echo "ERROR: venv not found at ${VENV}"; exit 1; }
+
+NUM_PARQUETS=$(ls -1 "${BUNDLE_DIR}/tables/" | wc -l)
+echo "Parquet files in bundle: ${NUM_PARQUETS}"
+echo "Total bundle size:"
+du -sh "${BUNDLE_DIR}"
+echo
+
+# Free space check at target (warn under 300 GB)
+AVAIL_GB=$(df -BG "${DB_FILE%/*}" | awk 'NR==2 {gsub(/G/,"",$4); print $4}')
+echo "Available space at target: ${AVAIL_GB} GB"
+if [ "${AVAIL_GB}" -lt 300 ]; then
+    echo "WARNING: less than 300 GB free at target. SQLite may not fit."
+fi
+
+# Backup existing SQLite if present
+if [ -f "${DB_FILE}" ]; then
+    BACKUP="${DB_FILE}.bak-$(date +%Y%m%d-%H%M%S)"
+    echo "WARNING: Existing SQLite at ${DB_FILE}"
+    echo "         Renaming to ${BACKUP} before fresh import."
+    mv "${DB_FILE}" "${BACKUP}"
+fi
+echo
+
+# ----- environment setup -----
+module load python/3.12
+source "${VENV}/bin/activate"
+biofilter --version
+echo
+
+# ----- run -----
+echo "=== Step 1: Create SQLite schema + seeds ==="
+T0=$(date +%s)
+biofilter db create-db --db-uri "sqlite:///${DB_FILE}"
+echo "  Step 1 elapsed: $(( $(date +%s) - T0 ))s"
+echo
+
+echo "=== Step 2: Import bundle ==="
+T1=$(date +%s)
+biofilter db import \
+  --db-uri "sqlite:///${DB_FILE}" \
+  --in "${BUNDLE_DIR}" \
+  --format parquet \
+  --allow-missing-tables
+ELAPSED=$(( $(date +%s) - T1 ))
+printf "  Step 2 elapsed: %dh %02dm %02ds\n" $((ELAPSED/3600)) $(((ELAPSED%3600)/60)) $((ELAPSED%60))
+echo
+
+echo "=== Step 3: Validation ==="
+ls -lh "${DB_FILE}"
+echo
+
+echo "Total tables in SQLite:"
+sqlite3 "${DB_FILE}" "SELECT count(*) FROM sqlite_master WHERE type='table';"
+
+echo
+echo "Row counts (key tables):"
+for tbl in entities entity_aliases entity_relationships \
+          gene_masters variant_masters disease_masters \
+          pathway_masters chemical_masters protein_masters \
+          variant_molecular_effects variant_gene_regulatory_evidence; do
+    cnt=$(sqlite3 "${DB_FILE}" "SELECT count(*) FROM ${tbl};" 2>/dev/null || echo "N/A")
+    printf "  %-40s %s\n" "${tbl}" "${cnt}"
+done
+echo
+
+echo "Total indexes in SQLite:"
+sqlite3 "${DB_FILE}" "SELECT count(*) FROM sqlite_master WHERE type='index';"
+
+echo
+echo "Finished: $(date)"
