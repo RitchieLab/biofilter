@@ -9,18 +9,26 @@ Paste, run, get a CSV. That's it.
 
 ---
 
-## One-time setup
+## Activate BF4
+
+A single shared helper script loads Python, activates the BF4 venv, and
+points it at the current Parquet bundle:
 
 ```bash
-module load python/3.12
-source /project/hall_shared/biofilter/venv/bf4-4.2.0/bin/activate
+source /project/hall_shared/biofilter/venv/bf4-activate.sh
 ```
 
-That's it — no container, no PostgreSQL, no bind mounts. The BF4 venv is
-already provisioned on shared storage.
+Expected output:
+```
+✅ BF4 biofilter 4.2.0
+DB: parquet:///project/hall_shared/biofilter/databases/20260514/bundle/tables ready (parquet bundle 20260514)
+```
 
-> _Optional:_ add the two lines above to a `~/bin/bf4-activate.sh` and
-> source it from your `~/.bashrc` so every shell is ready.
+That's it — no container, no PostgreSQL, no bind mounts. The venv lives
+on shared storage and is already configured.
+
+> _Optional:_ add the line above to your `~/.bashrc` so every shell
+> starts ready.
 
 ---
 
@@ -29,25 +37,23 @@ already provisioned on shared storage.
 ```bash
 mkdir -p ~/bf4_output
 
-biofilter \
-  --db-uri "parquet:///project/hall_shared/biofilter/databases/20260514/bundle/tables" \
-  report run \
-    --name annotation_master_gene \
-    --input APOE \
-    --output ~/bf4_output/apoe.csv
+biofilter report run \
+  --name annotation_master_gene \
+  --input APOE \
+  --output ~/bf4_output/apoe.csv
 ```
 
 Result: `~/bf4_output/apoe.csv`
 
-That's the whole thing — no container, no SLURM job, no temp dirs. BF4
-reads the Parquet bundle directly via DuckDB, in process. Memory peak
-under 100 MB for typical queries.
+That's the whole thing — no `--db-uri` needed (the activate script
+exports it). Memory peak typically under 100 MB; runs in under a
+second.
 
 ---
 
 ## Change the query
 
-Edit the last three flags (`--name`, `--input`, `--output`):
+Edit the three report flags:
 
 - `--name <report>` — which report to run (see list below)
 - `--input "APOE,TP53,BRCA1"` — comma-separated values
@@ -59,9 +65,7 @@ Edit the last three flags (`--name`, `--input`, `--output`):
 ## Available reports
 
 ```bash
-biofilter \
-  --db-uri "parquet:///project/hall_shared/biofilter/databases/20260514/bundle/tables" \
-  report list
+biofilter report list
 ```
 
 Most common:
@@ -82,37 +86,39 @@ Most common:
 ## Get help on a specific report
 
 ```bash
-biofilter \
-  --db-uri "parquet:///project/hall_shared/biofilter/databases/20260514/bundle/tables" \
-  report explain --report-name annotation_master_gene
+biofilter report explain --report-name annotation_master_gene
 ```
 
 Shows the parameters, accepted input formats, and output columns.
 
 ---
 
-## Tip: shorten the command
+## Pointing at a different bundle (advanced)
 
-The `--db-uri` is the same every time. Export it once per session:
+The activate script sets `BIOFILTER_DB_URI` to the current snapshot. If
+you need a different snapshot, override it after activating:
 
 ```bash
-export BIOFILTER_DB_URI="parquet:///project/hall_shared/biofilter/databases/20260514/bundle/tables"
+source /project/hall_shared/biofilter/venv/bf4-activate.sh
+export BIOFILTER_DB_URI="parquet:///project/hall_shared/biofilter/databases/<other-date>/bundle/tables"
 
-# Now every BF4 command picks it up automatically:
-biofilter report run --name annotation_master_gene --input APOE --output ~/bf4_output/apoe.csv
-biofilter report list
-biofilter report explain --report-name annotation_master_variant
+biofilter report list   # now reads from the other snapshot
 ```
 
-You can put that `export` in a `~/bin/bf4-activate.sh` alongside the
-`module load` and `source venv` so a single source covers everything.
+Or pass `--db-uri` explicitly to a single command without changing the
+env:
+
+```bash
+biofilter --db-uri "parquet:///path/to/other/bundle/tables" \
+  report run --name annotation_master_gene --input APOE --output out.csv
+```
 
 ---
 
 ## Heavy workloads (SLURM)
 
 For very large input sets or many reports back-to-back, submit as a
-SLURM job. BF4 is memory-light (typically < 1 GB even for 10k variants)
+SLURM job. BF4 is memory-light (typically < 1 GB even for 10k variants),
 so resource requests can be modest:
 
 ```bash
@@ -123,9 +129,7 @@ so resource requests can be modest:
 #BSUB -M 4000
 #BSUB -n 4
 
-module load python/3.12
-source /project/hall_shared/biofilter/venv/bf4-4.2.0/bin/activate
-export BIOFILTER_DB_URI="parquet:///project/hall_shared/biofilter/databases/20260514/bundle/tables"
+source /project/hall_shared/biofilter/venv/bf4-activate.sh
 
 biofilter report run \
   --name annotation_master_variant \
