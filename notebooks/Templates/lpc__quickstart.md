@@ -11,54 +11,52 @@ Paste, run, get a CSV. That's it.
 
 ## Activate BF4
 
-A single shared helper script loads Python, activates the BF4 venv, and
-points it at the current Parquet bundle:
+BF4 lives inside the lab's shared module tree. Two steps:
 
 ```bash
-source /project/hall_shared/biofilter/venv/bf4-activate.sh
+source /project/hall_shared/hall_shared.sh          # makes lab modules visible
+module load biofilter/4.2.0                # activates BF4 4.2.0 + bundle
 ```
 
-Expected output:
-```
-✅ BF4 biofilter 4.2.0
-DB: parquet:///project/hall_shared/biofilter/databases/20260514/bundle/tables ready (parquet bundle 20260514)
-```
+The `biofilter/4.2.0` module puts the CLI on your PATH and points it at
+the current Parquet snapshot — no `--db-uri` needed on every command.
 
-That's it — no container, no PostgreSQL, no bind mounts. The venv lives
-on shared storage and is already configured.
-
-> _Optional:_ add the line above to your `~/.bashrc` so every shell
+> _Optional:_ add the two lines above to your `~/.bashrc` so every shell
 > starts ready.
+
+Confirm it worked:
+
+```bash
+biofilter --version
+# Expected: biofilter 4.2.0
+```
 
 ---
 
 ## Run a query
 
 ```bash
-mkdir -p ~/bf4_output
-
 biofilter report run \
   --name annotation_master_gene \
   --input APOE \
-  --output ~/bf4_output/apoe.csv
+  --output apoe.csv
 ```
 
-Result: `~/bf4_output/apoe.csv`
+Result: `apoe.csv` in the current directory.
 
-That's the whole thing — no `--db-uri` needed (the activate script
-exports it). Memory peak typically under 100 MB; runs in under a
-second.
+That's the whole thing — no container, no PostgreSQL, no bind mounts.
+Memory peak typically under 100 MB; runs in under a second.
 
 ---
 
 ## Change the query
 
-Edit the three report flags:
+Edit the report flags:
 
 - `--name <report>` — which report to run (see list below)
 - `--input "APOE,TP53,BRCA1"` — comma-separated values
-- *or* `--input-file ~/bf4_output/genes.txt` — one item per line
-- `--output ~/bf4_output/<name>.csv` — your output filename
+- *or* `--input-file genes.txt` — one item per line
+- `--output <name>.csv` — your output filename
 
 ---
 
@@ -93,32 +91,37 @@ Shows the parameters, accepted input formats, and output columns.
 
 ---
 
-## Pointing at a different bundle (advanced)
+## Switching versions or snapshots (advanced)
 
-The activate script sets `BIOFILTER_DB_URI` to the current snapshot. If
-you need a different snapshot, override it after activating:
+**Different BF4 version** — if the lab publishes multiple versions,
+`module avail biofilter` lists them and you pick with `module load`:
 
 ```bash
-source /project/hall_shared/biofilter/venv/bf4-activate.sh
-export BIOFILTER_DB_URI="parquet:///project/hall_shared/biofilter/databases/<other-date>/bundle/tables"
-
-biofilter report list   # now reads from the other snapshot
+module avail biofilter
+module load biofilter/4.3.0                # example, if available
 ```
 
-Or pass `--db-uri` explicitly to a single command without changing the
-env:
+**Different data snapshot** — the module sets `BIOFILTER_DB_URI` to the
+current snapshot. To use another one for a single command:
 
 ```bash
-biofilter --db-uri "parquet:///path/to/other/bundle/tables" \
+biofilter --db-uri "parquet:///project/hall_shared/biofilter/databases/<other-date>/bundle/tables" \
   report run --name annotation_master_gene --input APOE --output out.csv
+```
+
+Or override the env for the whole session:
+
+```bash
+export BIOFILTER_DB_URI="parquet:///project/hall_shared/biofilter/databases/<other-date>/bundle/tables"
+biofilter report list                       # now reads from the other snapshot
 ```
 
 ---
 
-## Heavy workloads (SLURM)
+## Heavy workloads (LSF)
 
-For very large input sets or many reports back-to-back, submit as a
-SLURM job. BF4 is memory-light (typically < 1 GB even for 10k variants),
+For very large input sets or many reports back-to-back, submit as an
+LSF job. BF4 is memory-light (typically < 1 GB even for 10k variants),
 so resource requests can be modest:
 
 ```bash
@@ -129,7 +132,8 @@ so resource requests can be modest:
 #BSUB -M 4000
 #BSUB -n 4
 
-source /project/hall_shared/biofilter/venv/bf4-activate.sh
+source /project/hall_shared/hall_shared.sh
+module load biofilter/4.2.0
 
 biofilter report run \
   --name annotation_master_variant \
