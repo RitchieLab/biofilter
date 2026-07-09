@@ -9,8 +9,8 @@ Context guide for Claude Code to work on the Biofilter 4 project.
 Biofilter 4 (BF4) is a persistent, entity-centric biological knowledge platform developed at the Ritchie Lab (Penn Medicine). It replaces transient file-based annotation workflows with a versioned, reusable, and queryable knowledge base.
 
 **Author:** Andre Rico (`andreluis.rico@pennmedicine.upenn.edu`)  
-**Current version:** 4.1.2  
-**Active branch:** `biofilter3r` (active development — APIs and schema still evolving)  
+**Current version:** 4.2.0  
+**Active branch:** `main` (active development — APIs and schema still evolving)  
 **Docs (Sphinx / Read the Docs):** https://biofilter.readthedocs.io/en/latest/
 
 ---

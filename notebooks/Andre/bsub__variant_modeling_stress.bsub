@@ -1,0 +1,170 @@
+#!/bin/bash
+#BSUB -J bf4-vm-stress
+#BSUB -o /project/hall_shared/biofilter/tests/logs/vm-%J.out
+#BSUB -e /project/hall_shared/biofilter/tests/logs/vm-%J.err
+#BSUB -W 2:00
+#BSUB -M 8000
+#BSUB -n 4
+#BSUB -R "rusage[mem=8000] span[hosts=1]"
+
+# NOTE: do NOT add `#BSUB -L /bin/bash` — on this cluster the login-shell
+# path triggers a `/etc/profile` guard ("no direct access allowed") that
+# aborts the job silently. We initialise modules manually below instead.
+
+# =============================================================================
+# Stress test: variant_modeling against the Parquet bundle via DuckDB.
+#
+# Steps:
+#   1. Sample N chr:pos:ref:alt variants from variant_masters
+#   2. Run variant_modeling on that input
+#   3. Print timing / memory / output size
+#
+# Tuning knobs at the top of the script.
+# =============================================================================
+
+set -euo pipefail
+
+# ----- knobs -----
+N_VARIANTS="${N_VARIANTS:-500}"          # override with `bsub -env N_VARIANTS=1000 ...`
+RESULTS_DIR=/project/hall_shared/biofilter/tests/results
+LOGS_DIR=/project/hall_shared/biofilter/tests/logs
+mkdir -p "$RESULTS_DIR" "$LOGS_DIR"
+
+# ----- env -----
+# `#BSUB -L /bin/bash` above already asks LSF for a login shell so that
+# `module` is defined on any compute node. As a safety net, source the
+# targeted module init scripts if `module` still isn't visible. We do
+# NOT fall back to /etc/profile — some clusters have login guards there
+# (e.g., "no direct access allowed") that abort the job silently.
+if ! type module >/dev/null 2>&1; then
+    for init in \
+        /etc/profile.d/modules.sh \
+        /etc/profile.d/lmod.sh \
+        /usr/share/lmod/lmod/init/bash \
+        /usr/share/Modules/init/bash; do
+        if [ -r "$init" ]; then
+            # shellcheck disable=SC1090
+            source "$init"
+            type module >/dev/null 2>&1 && break
+        fi
+    done
+fi
+
+if ! type module >/dev/null 2>&1; then
+    echo "ERROR: 'module' command not available on $(hostname)." >&2
+    echo "       Add a targeted init or ask the cluster admin." >&2
+    exit 2
+fi
+
+source /project/hall_shared/hall_shared.sh
+module load biofilter/4.2.0
+
+BUNDLE="${BIOFILTER_DB_URI#parquet://}"    # strip scheme to get filesystem path
+
+echo "=== BF4 variant_modeling stress test ==="
+echo "Started:      $(date)"
+echo "Host:         $(hostname)"
+echo "Job ID:       ${LSB_JOBID:-N/A}"
+echo "Version:      $(biofilter --version 2>&1 | head -1)"
+echo "Bundle:       $BUNDLE"
+echo "N variants:   $N_VARIANTS"
+echo
+
+# ----- Step 1: sample N variants -----
+WORKDIR=$(mktemp -d -t bf4-vm-XXXXXX)
+trap "rm -rf $WORKDIR" EXIT
+
+INPUT="$WORKDIR/input.txt"
+
+echo "=== Step 1: sampling $N_VARIANTS variants from bundle ==="
+T0=$(date +%s)
+
+python3 <<PYEOF
+import duckdb
+con = duckdb.connect(":memory:")
+BUNDLE = "$BUNDLE"
+
+# Sample SNVs distributed across chromosomes (chr:pos:ref:alt format that
+# BF4 accepts for exact-allele match).
+sql = f"""
+    SELECT chromosome || ':' || position_start || ':' || reference_allele
+           || ':' || alternate_allele AS variant
+    FROM read_parquet('{BUNDLE}/variant_masters.parquet')
+    WHERE reference_allele IS NOT NULL
+      AND alternate_allele IS NOT NULL
+      AND length(reference_allele) = 1
+      AND length(alternate_allele) = 1
+    USING SAMPLE $N_VARIANTS ROWS
+"""
+rows = con.execute(sql).fetchall()
+
+with open("$INPUT", "w") as f:
+    for (v,) in rows:
+        f.write(v + "\n")
+
+print(f"Sampled {len(rows)} variants")
+PYEOF
+
+ELAPSED=$(( $(date +%s) - T0 ))
+echo "  Step 1 elapsed: ${ELAPSED}s"
+echo "  Input file:     $INPUT ($(wc -l < "$INPUT") lines)"
+echo "  Head of input:"
+head -5 "$INPUT" | sed 's/^/    /'
+echo
+
+# ----- Step 2: run variant_modeling -----
+OUTPUT="$WORKDIR/results.csv"
+
+echo "=== Step 2: variant_modeling on sampled input ==="
+T1=$(date +%s)
+
+# /usr/bin/time -v gives us max RSS + wall clock; some LSF images have it
+# under /usr/bin/time, some under gtime; fall back to shell `time` otherwise.
+if command -v /usr/bin/time >/dev/null 2>&1; then
+    /usr/bin/time -v biofilter report run \
+        --name variant_modeling \
+        --input-file "$INPUT" \
+        --output "$OUTPUT" \
+        2>&1
+else
+    time biofilter report run \
+        --name variant_modeling \
+        --input-file "$INPUT" \
+        --output "$OUTPUT"
+fi
+
+ELAPSED=$(( $(date +%s) - T1 ))
+printf "  Step 2 elapsed: %dh %02dm %02ds\n" $((ELAPSED/3600)) $(((ELAPSED%3600)/60)) $((ELAPSED%60))
+echo
+
+# ----- Step 3: report summary -----
+echo "=== Step 3: results summary ==="
+if [ -f "$OUTPUT" ]; then
+    # Persist artifacts FIRST — pipelines below use head/tail which can
+    # trip SIGPIPE with `set -o pipefail` and kill the script.
+    cp "$INPUT"  "$RESULTS_DIR/vm-${LSB_JOBID:-manual}-input.txt"
+    cp "$OUTPUT" "$RESULTS_DIR/vm-${LSB_JOBID:-manual}-output.csv"
+
+    N_OUT=$(wc -l < "$OUTPUT")
+    SIZE=$(du -h "$OUTPUT" | cut -f1)
+    echo "  Output rows:   $N_OUT (including header)"
+    echo "  Output size:   $SIZE"
+    echo "  Artifacts saved to:"
+    echo "    $RESULTS_DIR/vm-${LSB_JOBID:-manual}-input.txt"
+    echo "    $RESULTS_DIR/vm-${LSB_JOBID:-manual}-output.csv"
+    echo
+
+    # Display sections: relax pipefail so head/tail early-close doesn't abort
+    set +o pipefail
+    echo "  Columns produced:"
+    head -1 "$OUTPUT" | tr ',' '\n' | sed 's/^/    /'
+    echo
+    echo "  First 3 data rows:"
+    tail -n +2 "$OUTPUT" | head -3 | cut -c1-200 | sed 's/^/    /'
+    set -o pipefail
+else
+    echo "  ⚠️  Output file not produced. Check stderr above."
+fi
+
+echo
+echo "Finished: $(date)"

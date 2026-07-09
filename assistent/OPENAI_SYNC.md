@@ -54,11 +54,15 @@ python assistent/sync_to_openai_vector_store.py --vector-store-id vs_1234567890
 
 ## Restrict Upload to Specific Sources
 
-Source IDs come from `assistant_context_manifest.yaml` (`agents`, `docs`, `cli`, `etl`, `reports`, `notebooks`):
+Source IDs come from `assistant_context_manifest.yaml` (`docs`, `agents`, `reports_explain`, `notebooks`, `faq`):
 
 ```bash
-python assistent/sync_to_openai_vector_store.py --vector-store-id vs_123 --source agents --source docs
+python assistent/sync_to_openai_vector_store.py --vector-store-id vs_123 --source docs --source reports_explain
 ```
+
+Note: this assistant is user-facing, so the manifest deliberately excludes all
+Python source code (`**/*.py`). Grounding is docs + guides + report explain +
+notebook examples + FAQ.
 
 ## Test with Small Batch
 

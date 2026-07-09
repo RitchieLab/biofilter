@@ -54,8 +54,9 @@ Memory peak typically under 100 MB; runs in under a second.
 Edit the report flags:
 
 - `--name <report>` — which report to run (see list below)
-- `--input "APOE,TP53,BRCA1"` — comma-separated values
-- *or* `--input-file genes.txt` — one item per line
+- `--input APOE` — one value; repeat the flag for more
+  (`--input APOE --input TP53 --input BRCA1`)
+- *or* `--input-file genes.txt` — one item per line (best for long lists)
 - `--output <name>.csv` — your output filename
 
 ---
@@ -131,6 +132,19 @@ so resource requests can be modest:
 #BSUB -W 1:00
 #BSUB -M 4000
 #BSUB -n 4
+
+# Do NOT use `#BSUB -L /bin/bash` on this cluster — some compute nodes
+# have a `/etc/profile` guard ("no direct access allowed") that aborts
+# login shells silently. Initialise modules manually instead.
+if ! type module >/dev/null 2>&1; then
+    for init in \
+        /etc/profile.d/modules.sh \
+        /etc/profile.d/lmod.sh \
+        /usr/share/lmod/lmod/init/bash \
+        /usr/share/Modules/init/bash; do
+        [ -r "$init" ] && source "$init" && type module >/dev/null 2>&1 && break
+    done
+fi
 
 source /project/hall_shared/hall_shared.sh
 module load biofilter/4.2.0

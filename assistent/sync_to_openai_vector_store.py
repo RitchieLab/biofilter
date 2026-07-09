@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import fnmatch
+import io
 import json
 import os
 import sys
@@ -40,6 +41,31 @@ def _load_manifest(path: Path) -> dict:
 
 def _to_posix_relative(path: Path, root: Path) -> str:
     return path.resolve().relative_to(root.resolve()).as_posix()
+
+
+def ipynb_to_markdown(path: Path) -> str:
+    """
+    Convert a Jupyter notebook to plain Markdown for retrieval.
+
+    OpenAI File Search does not accept the .ipynb extension, and raw notebook
+    JSON is noisy (base64 outputs, metadata). This emits markdown cells as-is
+    and code cells fenced as ```python, dropping outputs — clean and
+    high-signal for RAG.
+    """
+    nb = json.loads(path.read_text(encoding="utf-8"))
+    blocks: list[str] = []
+    for cell in nb.get("cells", []):
+        src = cell.get("source", "")
+        if isinstance(src, list):
+            src = "".join(src)
+        src = src.rstrip()
+        if not src:
+            continue
+        if cell.get("cell_type") == "code":
+            blocks.append(f"```python\n{src}\n```")
+        else:  # markdown / raw
+            blocks.append(src)
+    return "\n\n".join(blocks) + "\n"
 
 
 def _match_any_glob(rel_path: str, globs: Iterable[str]) -> bool:
@@ -120,18 +146,50 @@ class OpenAIClient:
         self.session.headers.update(
             {
                 "Authorization": f"Bearer {api_key}",
+                # Vector store / file-batch endpoints live under the Assistants
+                # beta surface; harmless once they are GA.
+                "OpenAI-Beta": "assistants=v2",
             }
         )
 
-    def _raise_for_error(self, response: requests.Response) -> None:
-        if response.status_code < 400:
-            return
+    def _parse(self, response: requests.Response) -> dict:
+        """
+        Validate an OpenAI response and return its JSON body.
+
+        Surfaces the real HTTP status, content-type and a body snippet when
+        the response is an error OR is not JSON (e.g. an HTML page injected by
+        a corporate proxy, or an empty body), instead of a bare
+        JSONDecodeError.
+        """
+        ctype = response.headers.get("content-type", "")
+        body = response.text or ""
+        snippet = body.strip().replace("\n", " ")[:400] or "<empty body>"
+
+        if response.status_code >= 400:
+            try:
+                message = response.json().get("error", {}).get("message", snippet)
+            except Exception:
+                message = snippet
+            raise RuntimeError(
+                f"OpenAI API error {response.status_code} "
+                f"(content-type: {ctype or 'n/a'}): {message}"
+            )
+
+        if "application/json" not in ctype.lower():
+            raise RuntimeError(
+                f"Expected JSON but got status {response.status_code} "
+                f"content-type '{ctype or 'n/a'}'. Body: {snippet}\n"
+                "This usually means a proxy/gateway intercepted the request "
+                "(check REQUESTS_CA_BUNDLE / network) rather than OpenAI."
+            )
+
         try:
-            payload = response.json()
-        except Exception:
-            payload = {"error": {"message": response.text}}
-        message = payload.get("error", {}).get("message", "Unknown API error")
-        raise RuntimeError(f"OpenAI API error {response.status_code}: {message}")
+            return response.json()
+        except Exception as exc:
+            raise RuntimeError(
+                f"Malformed JSON from OpenAI (status {response.status_code}). "
+                f"Body: {snippet}"
+            ) from exc
 
     def create_vector_store(self, name: str) -> str:
         resp = self.session.post(
@@ -139,10 +197,22 @@ class OpenAIClient:
             json={"name": name},
             timeout=120,
         )
-        self._raise_for_error(resp)
-        return resp.json()["id"]
+        return self._parse(resp)["id"]
 
     def upload_file(self, path: Path, purpose: str = "assistants") -> str:
+        # .ipynb is not an accepted File Search extension: upload a converted
+        # markdown rendering instead, keeping the origin visible in the name.
+        if path.suffix.lower() == ".ipynb":
+            payload = ipynb_to_markdown(path).encode("utf-8")
+            file_tuple = (f"{path.stem}.ipynb.md", io.BytesIO(payload))
+            resp = self.session.post(
+                f"{self.base_url}/files",
+                data={"purpose": purpose},
+                files={"file": file_tuple},
+                timeout=300,
+            )
+            return self._parse(resp)["id"]
+
         with path.open("rb") as f:
             resp = self.session.post(
                 f"{self.base_url}/files",
@@ -150,8 +220,7 @@ class OpenAIClient:
                 files={"file": (path.name, f)},
                 timeout=300,
             )
-        self._raise_for_error(resp)
-        return resp.json()["id"]
+        return self._parse(resp)["id"]
 
     def create_file_batch(self, vector_store_id: str, file_ids: list[str]) -> str:
         resp = self.session.post(
@@ -159,16 +228,14 @@ class OpenAIClient:
             json={"file_ids": file_ids},
             timeout=120,
         )
-        self._raise_for_error(resp)
-        return resp.json()["id"]
+        return self._parse(resp)["id"]
 
     def get_file_batch(self, vector_store_id: str, batch_id: str) -> dict:
         resp = self.session.get(
             f"{self.base_url}/vector_stores/{vector_store_id}/file_batches/{batch_id}",
             timeout=120,
         )
-        self._raise_for_error(resp)
-        return resp.json()
+        return self._parse(resp)
 
 
 def _chunk(values: list[str], n: int) -> Iterable[list[str]]:

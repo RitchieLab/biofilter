@@ -1,3 +1,9 @@
+# BF4 Support FAQ
+
+
+
+<!-- ===== SOURCE FILE: assistent/assistant_faq_seed.md ===== -->
+
 # BF4 FAQ Seed
 
 High-signal answers to bootstrap end-user support. Organized by task:

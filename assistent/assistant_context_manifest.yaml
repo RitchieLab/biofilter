@@ -1,9 +1,28 @@
 assistant_name: "BF4 Assistant"
-assistant_version: "1.0.0"
-project_version_hint: "Biofilter 4.x"
+assistant_version: "2.0.0"
+project_version_hint: "Biofilter 4.2.x"
 default_language: "en"
 fallback_language:
   - "pt-BR"
+
+# -----------------------------------------------------------------------------
+# Audience
+# -----------------------------------------------------------------------------
+# This assistant serves END USERS, not developers. Its job is to help people:
+#   1) run reports and get results (CSV),
+#   2) update the knowledge base (ETL),
+#   3) install / create a new database — either by pointing at a shared
+#      Parquet bundle (parquet://, read-only, no server) or by building
+#      their own PostgreSQL/SQLite database from scratch.
+#
+# Because the audience is non-developer, the knowledge base intentionally
+# EXCLUDES Python source code. Grounding comes from user documentation,
+# operational guides, per-report explain docs, and runnable notebook
+# examples. If a question truly requires implementation details, the
+# assistant should say so and defer to the maintainer / source repo.
+# -----------------------------------------------------------------------------
+
+audience: "end_users"
 
 retrieval_policy:
   strategy: "hierarchical_rag"
@@ -13,76 +32,92 @@ retrieval_policy:
   rerank: true
 
 source_priority:
-  - id: agents
-    path: "biofilter_agents"
-    role: "operational_guides"
-    weight: 1.0
-    include_globs:
-      - "**/*.md"
-    exclude_globs:
-      - "**/.DS_Store"
-
+  # 1) Official user documentation (Sphinx / Read the Docs source).
   - id: docs
     path: "docs/source"
     role: "official_user_docs"
-    weight: 0.95
+    weight: 1.0
     include_globs:
       - "**/*.md"
     exclude_globs:
       - "**/_build/**"
       - "**/.DS_Store"
+      # Developer-only material — not relevant to end users.
+      - "**/developer_extensions.md"
+      - "**/schema.md"
 
-  - id: cli
-    path: "biofilter/api/cli"
-    role: "command_truth"
-    weight: 0.9
+  # 2) Operational guides (task-oriented, LLM-ready).
+  - id: agents
+    path: "biofilter_agents"
+    role: "operational_guides"
+    weight: 0.95
     include_globs:
-      - "**/*.py"
       - "**/*.md"
+    exclude_globs:
+      - "**/.DS_Store"
+      # Deep technical reference — out of scope for end users.
+      - "**/biobin_technical_reference.md"
 
-  - id: etl
-    path: "biofilter/modules/etl"
-    role: "etl_behavior_truth"
-    weight: 0.85
+  # 3) Per-report explain docs (parameters, inputs, output columns).
+  - id: reports_explain
+    path: "biofilter/modules/report/reports_explain"
+    role: "report_usage_truth"
+    weight: 0.95
     include_globs:
-      - "**/*.py"
       - "**/*.md"
+    exclude_globs:
+      - "**/.DS_Store"
+      # Developer scaffold template — not a real report.
+      - "**/report_template.md"
 
-  - id: reports
-    path: "biofilter/modules/report"
-    role: "report_behavior_truth"
-    weight: 0.85
-    include_globs:
-      - "**/*.py"
-      - "**/*.md"
-
+  # 4) Runnable examples: notebooks + user-facing markdown walkthroughs
+  #    (LPC quickstart/deploy, end-to-end pipelines).
   - id: notebooks
     path: "notebooks/Templates"
-    role: "examples_only"
-    weight: 0.65
+    role: "examples"
+    weight: 0.85
     include_globs:
       - "**/*.ipynb"
       - "**/*.md"
+    exclude_globs:
+      - "**/.ipynb_checkpoints/**"
+      - "**/.DS_Store"
     note: "Prefer docs/agents over notebooks when conflicts exist."
+
+  # 5) Curated support FAQ (compact, high-signal).
+  - id: faq
+    path: "assistent"
+    role: "support_faq"
+    weight: 0.8
+    include_globs:
+      - "assistant_faq_seed.md"
 
 global_exclusions:
   - "**/.git/**"
   - "**/.venv/**"
   - "**/__pycache__/**"
   - "**/*.log"
+  - "**/*.py"          # user-facing assistant: never ingest source code
   - "**/docs/build/**"
   - "**/.DS_Store"
 
 answering_rules:
-  - "Prefer high-priority sources on conflicts."
-  - "Mark assumptions explicitly."
+  - "Reports first: most users just want to run a report and get a CSV."
+  - "Explain the two ways to have a database: (a) point at a shared Parquet
+     bundle via parquet:// (read-only, no server, no ETL), or (b) build your
+     own PostgreSQL/SQLite DB with migrations + ETL."
+  - "Prefer high-priority sources on conflicts and mark assumptions."
   - "When unsure, suggest a discovery/verification command."
-  - "Do not invent unavailable commands."
+  - "Do not invent unavailable commands, report names, or flags."
+  - "This knowledge base has no source code — do not answer implementation
+     questions from it; defer to the maintainer or repository."
 
 maintenance:
   refresh_triggers:
     - "CLI options changed"
     - "new report added"
-    - "new DTP/data source added"
+    - "new DTP / data source added"
+    - "database backend or db_uri scheme changed (e.g. parquet://)"
     - "docs/source updated"
+    - "notebook examples updated"
   minimum_refresh_cadence: "weekly"

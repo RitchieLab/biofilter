@@ -327,9 +327,10 @@ def list_(ctx, db_uri, verbose, debug):
 @local_db_uri_option
 @click.option(
     "--report-name",
+    "--name",
     "identifier",
     required=True,
-    help="Report identifier (module/friendly/class name).",
+    help="Report identifier (module/friendly/class name). Alias: --name",
 )
 @click.option("--debug", is_flag=True, help="Enable debug logging.")
 @click.pass_context
@@ -350,9 +351,10 @@ def explain(ctx, db_uri, identifier, debug):
 @local_db_uri_option
 @click.option(
     "--report-name",
+    "--name",
     "identifier",
     required=True,
-    help="Report identifier (module/friendly/class name).",
+    help="Report identifier (module/friendly/class name). Alias: --name",
 )
 @click.option("--debug", is_flag=True, help="Enable debug logging.")
 @click.pass_context
@@ -373,9 +375,10 @@ def example_input(ctx, db_uri, identifier, debug):
 @local_db_uri_option
 @click.option(
     "--report-name",
+    "--name",
     "identifier",
     required=True,
-    help="Report identifier (module/friendly/class name).",
+    help="Report identifier (module/friendly/class name). Alias: --name",
 )
 @click.option("--debug", is_flag=True, help="Enable debug logging.")
 @click.pass_context
