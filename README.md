@@ -2,7 +2,7 @@
 
 **Biofilter 4** is a persistent, entity-centric biological knowledge platform designed to support gene-centric annotation, filtering, and modeling workflows through a unified and extensible data architecture.
 
-This branch (`biofilter3r`) contains the active development of **Biofilter 4**, representing a major evolution of the Biofilter framework with a redesigned schema, modern ETL architecture, and multiple interaction layers.
+This repository contains the active development of **Biofilter 4**, representing a major evolution of the Biofilter framework with a redesigned schema, modern ETL architecture, and multiple interaction layers.
 
 📚 **Documentation**:  
 👉 https://biofilter.readthedocs.io/en/latest/
@@ -37,6 +37,8 @@ df.head()
 ```
 
 For Docker, source install, or bootstrapping a local database, see the [Getting Started guide](https://biofilter.readthedocs.io/en/latest/getting_started/index.html).
+If you are on an HPC cluster where running a PostgreSQL server is not an option, see
+[Parquet Bundles](#parquet-bundles-hpc--no-database-server) below.
 
 ---
 
@@ -102,6 +104,7 @@ This design lets users recover cross-omics relationships and reuse them directly
 - **Multi-database support**
   - SQLite (local development)
   - PostgreSQL (production and large-scale deployments)
+  - Parquet bundle, read-only via DuckDB (HPC and shared environments without a database server)
 
 ---
 
@@ -182,9 +185,83 @@ The documentation covers:
 - 🤖 **GPT Assistant** — conversational guidance for picking and using reports:
   [Biofilter 4 Assistant](https://chatgpt.com/g/g-6887cf80355c8191ab3f88bbd8955e0d-biofilter-4-assistant)
 - 📓 **Notebook tutorials** — ready-to-run examples for every report:
-  [`notebooks/Templates/`](https://github.com/RitchieLab/biofilter/tree/biofilter3r/notebooks/Templates)
+  [`notebooks/Templates/`](https://github.com/RitchieLab/biofilter/tree/main/notebooks/Templates)
 - 📋 **Report Catalog** — full index of available reports with descriptions:
   [Read the Docs](https://biofilter.readthedocs.io/en/latest/report_catalog.html)
+
+---
+
+## Parquet Bundles (HPC / no database server)
+
+Not every environment can host a PostgreSQL server. On shared HPC clusters, users
+typically have no privileges to run a database daemon, no persistent service host,
+and no appetite for maintaining a multi-hundred-gigabyte `pgdata` directory per user.
+
+For these cases Biofilter 4 can read the knowledge base **directly from a Parquet
+bundle**, using DuckDB as a read-only query engine — no server, no container, no
+per-user copy of the data.
+
+Export a bundle once from any existing instance:
+
+```bash
+biofilter db export --db-uri "postgresql+psycopg2://user:password@host:5432/biofilter_prod" \
+  --out /shared/bundles/bf4_2026_06 \
+  --format parquet
+```
+
+> **Note:** on production-scale databases the variant tables are partitioned by
+> chromosome, which requires extra steps beyond this single command. See the
+> [LPC deployment guide](notebooks/Templates/lpc__deploy.md) for the full build
+> procedure.
+
+Then point Biofilter at the bundle's `tables/` directory using the `parquet://` URI scheme:
+
+```bash
+export DATABASE_URL="parquet:///shared/bundles/bf4_2026_06/tables"
+
+biofilter report run \
+  --report-name annotation_master_gene \
+  --input APOE \
+  --output apoe.csv
+```
+
+The same works from Python:
+
+```python
+from biofilter import Biofilter
+
+bf = Biofilter(db_uri="parquet:///shared/bundles/bf4_2026_06/tables")
+df = bf.report.run("annotation_master_variant", input_data=["rs429358"])
+```
+
+**How it works**
+
+- The `parquet://` URI is translated internally to an in-memory DuckDB engine.
+- One SQL `VIEW` is registered per `*.parquet` file in the directory, backed by
+  DuckDB's `read_parquet()`. Partition children named `*_chr_*` are skipped —
+  the consolidated parent tables are the ones queried.
+- All sessions share the same in-memory catalog, so the ORM resolves normally.
+- **Reports require no changes.** They run through the same ORM layer used by
+  PostgreSQL and SQLite, so every report in the catalog works unmodified.
+
+**Why it fits HPC**
+
+- No database server, no container runtime, no bind mounts.
+- The bundle is a plain directory on shared storage: **read-only and
+  multi-user-safe by construction**, so a single copy serves the whole group.
+- Queries are streamed from disk with column pruning and predicate pushdown,
+  keeping memory low even against billion-row tables. In lab benchmarks,
+  annotating 10,000 rsIDs against a 1.79-billion-row table completed in ~1.2s
+  on local NVMe (~15s over shared GPFS) with a peak of ~89 MB of RAM.
+
+**Limitations**
+
+- The backend is **read-only**. ETL runs, migrations, and any other write
+  operation require a SQLite or PostgreSQL target. DuckDB rejects writes against
+  `read_parquet` views, and the `Database.read_only` flag surfaces the same
+  information at the application layer.
+- The bundle is a point-in-time snapshot; refreshing the knowledge base means
+  exporting a new bundle.
 
 ---
 
@@ -236,9 +313,10 @@ For full container documentation (publishing, multi-arch, GitHub Actions), see:
 
 ## Status
 
-* **Current version**: 4.1.2
-* **Schema**: Entity-centric, versioned (4.1.x)
+* **Current version**: 4.2.0
+* **Schema**: Entity-centric, versioned (4.2.x)
 * **ETL**: Modular DTP-based ingestion
+* **Backends**: PostgreSQL, SQLite, and read-only Parquet bundles via DuckDB
 * **Stability**: Actively evolving; APIs and schema may continue to change between minor releases
 
 ---
