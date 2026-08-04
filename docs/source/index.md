@@ -28,6 +28,7 @@ entity_and_omics
 developer_extensions
 configuration
 database
+parquet_backend
 schema
 etl
 reports

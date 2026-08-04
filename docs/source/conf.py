@@ -9,7 +9,7 @@
 project = "Biofilter 4"
 copyright = "2026, Andre Rico"
 author = "Andre Rico"
-release = "4.1.1"
+release = "4.2.0"
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration

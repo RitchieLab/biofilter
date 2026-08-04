@@ -1,9 +1,10 @@
 # Connecting to a Database
 
-Biofilter needs a database to run any report. You have two options:
+Biofilter needs a data backend to run any report. You have three options:
 
 - **Option A** — connect to a database that already exists (someone else manages it).
 - **Option B** — bootstrap a new local database, then run the ETL to populate it.
+- **Option C** — read a Parquet bundle directly, with no database server at all.
 
 Pick the one that matches your situation.
 
@@ -152,6 +153,39 @@ biofilter etl status
 `etl status` shows which data sources are loaded and when. From here you can add more sources (`gene_ncbi`, `reactome`, `mondo`, …) as needed.
 
 For the full ETL operations guide, see [ETL](../etl.md).
+
+---
+
+## Option C — Read a Parquet bundle (no database server)
+
+Use this when someone has given you a **Parquet bundle** — a directory of
+`.parquet` files that is a point-in-time snapshot of the knowledge base. This
+is the standard setup on HPC clusters, where running a database server is not
+practical.
+
+Nothing to install or start: point Biofilter at the bundle's `tables/`
+directory using the `parquet://` scheme.
+
+```bash
+export BIOFILTER_DB_URI="parquet:///shared/bundles/bf4_2026_06/tables"
+
+biofilter report list
+biofilter report run --report-name annotation_master_gene --input APOE --output apoe.csv
+```
+
+Behind the scenes Biofilter queries the files with DuckDB. Every report works
+unchanged — they run through the same ORM layer as the other backends.
+
+Two things to know:
+
+- The backend is **read-only**. ETL runs and migrations need a PostgreSQL or
+  SQLite target. Refreshing the data means getting a new bundle.
+- The URI must point at `tables/`, not at the bundle root that holds
+  `manifest.json`.
+
+For the full reference — how views are registered, the partitioned-table
+caveat, performance numbers, and how bundles are produced — see
+[Parquet Backend](../parquet_backend.md).
 
 ---
 

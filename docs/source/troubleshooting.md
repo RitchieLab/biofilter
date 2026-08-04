@@ -18,6 +18,21 @@ If you pass `--input`/`--input-file`, do not also pass input keys through params
 
 `db_pg_table_stats` and `db_pg_index_stats` require PostgreSQL.
 
+## Parquet Backend Errors
+
+`No *.parquet files found in <dir>` — the `parquet://` URI must point at the
+bundle's `tables/` directory, not at the bundle root holding `manifest.json`.
+
+`parquet:// directory not found: <dir>` — the path does not exist or is not
+readable; check the mount.
+
+A write command failing (`etl update`, `db migrate`, `db upgrade`) is expected:
+the Parquet backend is read-only. Run those against PostgreSQL or SQLite.
+
+A missing table or a failing variant report usually means the bundle lacks the
+consolidated parent for a partitioned table — the `_chr_*` files alone are
+skipped by design. See [Parquet Backend](parquet_backend.md).
+
 ## Migration/Upgrade Issues
 
 Use:

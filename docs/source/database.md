@@ -41,6 +41,15 @@ biofilter db export --out ./exports/biofilter_bundle --format parquet
 biofilter db import --in ./exports/biofilter_bundle --format parquet
 ```
 
+A parquet bundle can also be **read directly**, without importing it into a
+database, by pointing `--db-uri` at its `tables/` directory:
+
+```bash
+biofilter --db-uri "parquet:///exports/biofilter_bundle/tables" report list
+```
+
+See [Parquet Backend](parquet_backend.md).
+
 ## Recommended Flow
 
 ```bash

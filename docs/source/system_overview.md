@@ -33,13 +33,16 @@ BF4 has four practical layers:
 
 ## Deployment Modes
 
-BF4 supports two common modes:
+BF4 supports these modes:
 
 - Local managed database (for development, isolated workflows)
 - Shared database (team/centralized operations)
 - Containerized app-only runtime with external database (portable execution)
+- Read-only Parquet bundle via DuckDB (HPC and other environments where no
+  database server is available) — see [Parquet Backend](parquet_backend.md)
 
-Both modes use the same CLI/API patterns.
+All modes use the same CLI/API patterns. The Parquet mode is read-only:
+reports work unchanged, but ETL and migrations require a writable backend.
 
 ## ETL Data Lifecycle
 
