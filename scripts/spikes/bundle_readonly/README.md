@@ -151,11 +151,17 @@ including full tracebacks.
 
 ## Recommended follow-up
 
-1. Apply the `json_deserializer` fix (finding #1) — one line, unblocks the
-   monitoring reports.
-2. Fix `export_full_clone()` parent/child selection (finding #2) — otherwise
-   every bundle ships at double size.
-3. Teach `_register_parquet_views()` to register partitioned **directories**
-   as datasets, replacing the current `_chr_` skip.
-4. Decide `db.read_only`: enforce or remove (finding #5).
-5. Cover the 5 unexercised reports with committed fixture inputs.
+Items 1–4 were addressed in the bundle-foundation work that followed this
+spike; `report_matrix.py` doubles as its regression test (run it *without*
+`SPIKE_JSON_FIX` and the post-fix column should reproduce).
+
+1. ~~Apply the `json_deserializer` fix (finding #1)~~ — done.
+2. ~~Fix `export_full_clone()` parent/child selection (finding #2)~~ — done.
+3. ~~Teach `_register_parquet_views()` to register partitioned
+   **directories** as datasets~~ — done.
+4. ~~Decide `db.read_only` (finding #5)~~ — documented as advisory; not
+   enforced, because reports legitimately create temp tables.
+5. Cover the 5 unexercised reports with committed fixture inputs — **still
+   open**.
+6. Audit the silent `except → return empty DataFrame` pattern (finding #6)
+   — **still open**.

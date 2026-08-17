@@ -11,6 +11,7 @@ from biofilter.modules.db.transfer import (
     export_full_clone,
     import_full_clone,
     restore_db,
+    verify_bundle,
 )
 
 ExportFormat = Literal["parquet", "csv"]
@@ -182,9 +183,14 @@ class DBComponent(BaseComponent):
         chunksize: int = 250_000,
         tables: Iterable[str] | None = None,
         exclude_tables: Iterable[str] | None = None,
+        include_partition_children: bool = False,
+        checksums: bool = True,
     ) -> Path:
         """
         Export a logical full-clone bundle (manifest + one file per table).
+
+        Partition children are skipped by default — the partitioned parent
+        already carries their rows, so including both doubles the bundle.
         """
         db = self.core.require_db()
         if not db.engine:
@@ -208,10 +214,32 @@ class DBComponent(BaseComponent):
             chunksize=chunksize,
             include_tables=tables,
             exclude_tables=exclude_tables,
+            include_partition_children=include_partition_children,
+            checksums=checksums,
         )
 
         self.core.logger.log(f"✅ Bundle exported: {bundle_dir}", "INFO")
         return bundle_dir
+
+    def verify(
+        self, in_dir: str | Path, *, check_hashes: bool = True
+    ) -> dict:
+        """
+        Validate a bundle against its manifest. Needs no DB connection.
+        """
+        report = verify_bundle(in_dir, check_hashes=check_hashes)
+        if report["ok"]:
+            self.core.logger.log(
+                f"✅ Bundle OK: {report['tables_verified']}"
+                f"/{report['tables_declared']} tables verified",
+                "INFO",
+            )
+        else:
+            self.core.logger.log(
+                f"❌ Bundle has {len(report['problems'])} problem(s)",
+                "ERROR",
+            )
+        return report
 
     def import_(
         self,

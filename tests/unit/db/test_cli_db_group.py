@@ -269,6 +269,8 @@ def test_export_calls_export_with_normalized_format(monkeypatch, tmp_path):
                 "chunksize": 123,
                 "tables": None,
                 "exclude_tables": None,
+                "include_partition_children": False,
+                "checksums": True,
             },
         )
     ]
@@ -310,6 +312,8 @@ def test_export_accepts_table_filters(monkeypatch, tmp_path):
                 "chunksize": 250000,
                 "tables": ["variants", "variant_consequences", "system_config"],
                 "exclude_tables": ["etl_status"],
+                "include_partition_children": False,
+                "checksums": True,
             },
         )
     ]

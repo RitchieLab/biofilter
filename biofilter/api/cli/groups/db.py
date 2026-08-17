@@ -323,6 +323,20 @@ def restore_cmd(ctx, db_uri, in_path: Path):
     multiple=True,
     help="Table name to exclude (repeatable or comma-separated).",
 )
+@click.option(
+    "--include-partition-children",
+    is_flag=True,
+    help=(
+        "Also export partition child tables. Off by default: the "
+        "partitioned parent already contains their rows, so including "
+        "both writes every variant row twice."
+    ),
+)
+@click.option(
+    "--no-checksums",
+    is_flag=True,
+    help="Skip per-file SHA-256 in the manifest (faster on big bundles).",
+)
 @click.pass_context
 def export_cmd(
     ctx,
@@ -333,6 +347,8 @@ def export_cmd(
     chunksize: int,
     tables,
     exclude_tables,
+    include_partition_children: bool,
+    no_checksums: bool,
 ):
     db_uri = require_db_uri(ctx, local_db_uri=db_uri)
     bf = Biofilter(db_uri=db_uri, debug_mode=False)
@@ -345,8 +361,52 @@ def export_cmd(
         chunksize=chunksize,
         tables=_to_list_or_none(tables),
         exclude_tables=_to_list_or_none(exclude_tables),
+        include_partition_children=include_partition_children,
+        checksums=not no_checksums,
     )
     click.echo(f"✅ Bundle exported: {bundle}")
+
+
+@db.command("verify")
+@click.option(
+    "--in",
+    "in_dir",
+    required=True,
+    type=click.Path(file_okay=False, readable=True, path_type=Path),
+    help="Bundle directory to validate (must contain manifest.json).",
+)
+@click.option(
+    "--no-hashes",
+    is_flag=True,
+    help="Only check presence and size; skip SHA-256 re-computation.",
+)
+def verify_cmd(in_dir: Path, no_hashes: bool):
+    """
+    Validate a bundle against its manifest. Requires no database.
+    """
+    from biofilter.modules.db.transfer import verify_bundle
+
+    report = verify_bundle(in_dir, check_hashes=not no_hashes)
+
+    click.echo(f"Bundle:            {report['root']}")
+    click.echo(f"Manifest version:  {report['manifest_version']}")
+    click.echo(f"Biofilter version: {report['biofilter_version']}")
+    click.echo(f"Schema version:    {report['schema_version']}")
+    click.echo(f"Created at:        {report['created_at']}")
+    click.echo(
+        f"Tables verified:   {report['tables_verified']}"
+        f"/{report['tables_declared']}"
+        f"{'' if report['hashes_checked'] else ' (hashes skipped)'}"
+    )
+
+    if report["ok"]:
+        click.echo("✅ Bundle is valid.")
+        return
+
+    click.echo(f"\n❌ {len(report['problems'])} problem(s):")
+    for p in report["problems"]:
+        click.echo(f"   • {p}")
+    raise SystemExit(1)
 
 
 @db.command("import")
