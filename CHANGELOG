@@ -1,5 +1,77 @@
 CHANGELOG
 
+4.2.1 (29/08/2026):
+
+- Parquet bundle foundation — turns the bundle into a first-class build
+  artifact rather than a one-off export
+  - `parquet://` now registers hive-partitioned datasets: a `<table>/`
+    directory becomes one VIEW over `<table>/**/*.parquet`, with the
+    partition key returned as a real column (e.g.
+    `variant_masters/chromosome=1/part-0.parquet`)
+  - One directory per chromosome preserves file-level pruning on
+    `WHERE chromosome = N` and lets a single chromosome be rebuilt
+    without rewriting the rest
+  - Flat `<table>.parquet` files still work; legacy `_chr_` sibling
+    files are dropped only when their parent is present, since an
+    orphan child is the only copy of its data
+  - `exists_db()` now recurses, so a bundle holding only partitioned
+    datasets is recognised
+- Manifest v2 and bundle verification
+  - Manifest gains per-file size and SHA-256, the payload format,
+    whether partition children were included, and ETL provenance
+    (source system, data source, version tag, package counts) — a
+    bundle can now report which DTP versions built it without access to
+    the originating database
+  - New command `biofilter db verify --in <bundle>` validates a bundle
+    against its manifest with no database connection and exits 1 on
+    problems, so CI can gate on it; `--no-hashes` checks presence and
+    size only
+  - New `db export` flags: `--include-partition-children` and
+    `--no-checksums`
+- Fix: JSON columns broke every report that selected them on the
+  Parquet backend
+  - psycopg2 returns JSON already decoded and SQLAlchemy's PostgreSQL
+    dialect disables its deserializer accordingly; duckdb_engine also
+    returns a dict, but the generic dialect still applied the
+    deserializer, so `json.loads()` was called on a dict
+  - `etl_status` raised; `etl_packages` swallowed the error in a bare
+    except and returned 0 rows instead of 55 — a silent wrong answer
+  - A tolerant deserializer is now installed on the DuckDB engine only;
+    PostgreSQL keeps the dialect's own handling
+- Fix: export duplicated all partitioned variant data
+  - `get_table_names()` returns both partitioned parents and their
+    children (43 + 125 on the dev database), while `SELECT *` on the
+    parent already returns every child's rows, so bundles stored each
+    variant row twice — and view registration then skipped the
+    duplicated half entirely
+  - Since import replays whatever the manifest lists, this also
+    double-inserted on round-trip
+  - Children are now excluded by default; detection filters on
+    `relkind`, because partitioned indexes also carry `relispartition`
+- Correction to the 4.2.0 notes: read-only is NOT enforced. A
+  `parquet://` connection is an in-memory DuckDB in which only the
+  parquet-backed VIEWs are immutable — `CREATE TEMP TABLE` works, and
+  several reports depend on it. `Database.read_only` was never read
+  anywhere in the codebase; it is now documented as advisory.
+- Validation harness (`scripts/spikes/bundle_readonly/`): every report
+  run against PostgreSQL and against a Parquet bundle built from the dev
+  database. 24 of 26 reach parity; the 2 that do not are PostgreSQL-only
+  by explicit design (`db_pg_index_stats`, `db_pg_table_stats`). 5
+  reports require external input files and remain unexercised. The
+  harness doubles as a regression test for this release.
+- New DTP `kegg_relationships` (20 active DTPs), with its explain guide
+  and registration in the data-source and ETL-process seeds; `dtp_kegg`
+  refactored alongside it
+- New helper `compute_files_hash()` for data sources made of several
+  downloaded files that need a single hash covering all of them, so the
+  ETL skip logic still applies
+- Documentation catches up with the move off the VPS: production is the
+  read-only Parquet bundle on the Penn LPC; the former PostgreSQL
+  deployment procedure is kept in `lpc__deploy.md` Appendix A;
+  `.biofilter.toml` drops the VPS connection strings, which carried
+  credentials and a public IP
+- No models, DDL, migrations or reports changed
+
 4.2.0 (22/06/2026):
 
 - New backend: read-only DuckDB over a Parquet bundle
