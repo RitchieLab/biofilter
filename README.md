@@ -313,7 +313,7 @@ For full container documentation (publishing, multi-arch, GitHub Actions), see:
 
 ## Status
 
-* **Current version**: 4.2.0
+* **Current version**: 4.2.1
 * **Schema**: Entity-centric, versioned (4.2.x)
 * **ETL**: Modular DTP-based ingestion
 * **Backends**: PostgreSQL, SQLite, and read-only Parquet bundles via DuckDB

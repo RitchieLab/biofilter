@@ -1,6 +1,7 @@
 # biofilter/modules/db/transfer.py
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import shutil
@@ -8,7 +9,7 @@ import subprocess
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Iterable, Literal
+from typing import Any, Iterable, Literal, Optional
 
 import numpy as np
 import pandas as pd
@@ -25,6 +26,11 @@ from biofilter.modules.db.database import Database
 # =============================================================================
 
 ExportFormat = Literal["parquet", "csv"]
+
+# Bundle manifest schema version.
+#   1 - name/rows/file per table only
+#   2 - adds bytes, sha256, format, provenance and partition handling
+MANIFEST_VERSION = 2
 
 
 @dataclass(frozen=True)
@@ -300,6 +306,102 @@ def _run_subprocess(cmd: list[str], err_msg: str) -> None:
 # Product B: Full Clone Bundle export/import (logical snapshot)
 # =============================================================================
 
+
+def sha256_file(path: Path, *, chunk_size: int = 1024 * 1024) -> Optional[str]:
+    """
+    SHA-256 of a file, streamed. Returns None if the file is unreadable.
+    """
+    if not path.is_file():
+        return None
+    digest = hashlib.sha256()
+    try:
+        with path.open("rb") as fh:
+            for block in iter(lambda: fh.read(chunk_size), b""):
+                digest.update(block)
+    except OSError:
+        return None
+    return digest.hexdigest()
+
+
+def collect_provenance(engine: Engine) -> list[dict]:
+    """
+    Summarize which data sources produced the data in this bundle.
+
+    Read from etl_packages so a bundle can answer "which DTP versions is
+    this built from?" without the originating database. Best-effort: a
+    bundle exported from a DB without the ETL tables still exports fine.
+    """
+    sql = """
+        SELECT s.name  AS source_system,
+               d.name  AS data_source,
+               p.version_tag,
+               p.status,
+               MAX(p.created_at) AS created_at,
+               COUNT(*)          AS packages
+        FROM etl_packages p
+        JOIN etl_data_sources d ON d.id = p.data_source_id
+        JOIN etl_source_systems s ON s.id = d.source_system_id
+        GROUP BY s.name, d.name, p.version_tag, p.status
+        ORDER BY s.name, d.name
+    """
+    try:
+        with engine.connect() as conn:
+            rows = conn.execute(text(sql)).mappings().all()
+    except Exception:
+        return []
+
+    return [
+        {
+            "source_system": r["source_system"],
+            "data_source": r["data_source"],
+            "version_tag": r["version_tag"],
+            "status": r["status"],
+            "created_at": (
+                r["created_at"].isoformat()
+                if hasattr(r["created_at"], "isoformat")
+                else r["created_at"]
+            ),
+            "packages": int(r["packages"]),
+        }
+        for r in rows
+    ]
+
+
+def partition_child_tables(engine: Engine) -> set[str]:
+    """
+    Return the names of tables that are partitions of another table.
+
+    Only PostgreSQL has declarative partitioning here (variant_masters,
+    variant_molecular_effects and friends are `PARTITION BY LIST
+    (chromosome)`); every other dialect returns an empty set.
+
+    This matters for export: `inspect(engine).get_table_names()` lists both
+    the partitioned parent and all of its children, while
+    `SELECT * FROM <parent>` already returns every child's rows. Exporting
+    both writes each row twice.
+    """
+    if detect_engine_name(engine) not in ("postgresql", "postgres"):
+        return set()
+
+    # relkind filter matters: partitioned *indexes* also carry
+    # relispartition, and an index name colliding with a table name would
+    # silently drop that table from the export.
+    sql = """
+        SELECT c.relname
+        FROM pg_class c
+        JOIN pg_namespace n ON n.oid = c.relnamespace
+        WHERE c.relispartition
+          AND c.relkind IN ('r', 'p', 'f')
+          AND n.nspname = current_schema()
+    """
+    try:
+        with engine.connect() as conn:
+            return {row[0] for row in conn.execute(text(sql))}
+    except Exception:
+        # Never let provenance detection break an export.
+        return set()
+
+
 # -----------------------------------------------------------------------------
 # Type helpers
 # -----------------------------------------------------------------------------
@@ -520,6 +622,8 @@ def export_full_clone(
     chunksize: int = 250_000,
     include_tables: Iterable[str] | None = None,
     exclude_tables: Iterable[str] | None = None,
+    include_partition_children: bool = False,
+    checksums: bool = True,
 ) -> Path:
     """
     Export a full-clone bundle:
@@ -529,6 +633,13 @@ def export_full_clone(
           <table>.parquet  (or .csv)
 
     Includes all tables (except alembic_version) and preserves PKs.
+
+    Partition children are excluded by default: their rows are already
+    covered by the partitioned parent, so exporting both stores every
+    variant row twice. Pass include_partition_children=True to override.
+
+    Set checksums=False to skip per-file SHA-256 (it re-reads every byte
+    written, which is significant on large bundles).
     """
     out = Path(out_dir).expanduser().resolve()
     tables_dir = out / "tables"
@@ -536,7 +647,18 @@ def export_full_clone(
 
     insp = inspect(engine)
     all_table_names = [t for t in insp.get_table_names() if t != "alembic_version"]
+
+    # Validation stays against everything the DB actually has, so naming a
+    # partition child explicitly still works; only the *default* selection
+    # drops them.
     available = set(all_table_names)
+
+    partition_children = (
+        set() if include_partition_children else partition_child_tables(engine)
+    )
+    default_table_names = [
+        t for t in all_table_names if t not in partition_children
+    ]
 
     selected = set(
         t.strip() for t in (include_tables or []) if isinstance(t, str) and t.strip()
@@ -554,7 +676,7 @@ def export_full_clone(
             )
         table_names = sorted(selected)
     else:
-        table_names = sorted(all_table_names)
+        table_names = sorted(default_table_names)
 
     if excluded:
         unknown_excluded = sorted(excluded - available)
@@ -591,17 +713,94 @@ def export_full_clone(
             else:
                 _export_table_parquet(conn, engine, t, file_path, chunksize=chunksize)  # noqa E501
 
-            rows_meta.append({"name": t, "rows": cnt, "file": f"tables/{file_name}"})  # noqa E501
+            entry: dict = {
+                "name": t,
+                "rows": cnt,
+                "file": f"tables/{file_name}",
+                "bytes": file_path.stat().st_size if file_path.exists() else None,  # noqa E501
+            }
+            if checksums:
+                entry["sha256"] = sha256_file(file_path)
+            rows_meta.append(entry)
 
     manifest = {
+        "manifest_version": MANIFEST_VERSION,
         "biofilter_version": biofilter_version,
         "schema_version": schema_version,
         "engine": detect_engine_name(engine),
         "created_at": utc_now_iso(),
+        "format": fmt,
+        "partition_children_included": bool(include_partition_children),
+        "provenance": collect_provenance(engine),
         "tables": rows_meta,
     }
     (out / "manifest.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")  # noqa E501
     return out
+
+
+def verify_bundle(in_dir: str | Path, *, check_hashes: bool = True) -> dict:
+    """
+    Validate a bundle against its manifest, without a database.
+
+    Checks that every table the manifest declares is present, that file
+    sizes match and — unless check_hashes is False — that SHA-256 digests
+    still match what was recorded at export time.
+
+    Returns a report dict with an `ok` flag and a list of `problems`.
+    Never raises for content problems; only for a missing/unreadable
+    manifest, which means "this is not a bundle".
+    """
+    root = Path(in_dir).expanduser().resolve()
+    manifest_path = root / "manifest.json"
+    if not manifest_path.is_file():
+        raise FileNotFoundError(f"No manifest.json found in {root}")
+
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    tables = manifest.get("tables") or []
+    problems: list[str] = []
+    verified = 0
+
+    for entry in tables:
+        name = entry.get("name")
+        rel = entry.get("file")
+        if not rel:
+            problems.append(f"{name}: manifest entry has no file path")
+            continue
+
+        path = root / rel
+        if not path.exists():
+            problems.append(f"{name}: missing file {rel}")
+            continue
+
+        expected_bytes = entry.get("bytes")
+        actual_bytes = path.stat().st_size
+        if expected_bytes is not None and actual_bytes != expected_bytes:
+            problems.append(
+                f"{name}: size mismatch "
+                f"(manifest {expected_bytes}, found {actual_bytes})"
+            )
+
+        expected_hash = entry.get("sha256")
+        if check_hashes and expected_hash:
+            actual = sha256_file(path)
+            if actual != expected_hash:
+                problems.append(f"{name}: sha256 mismatch")
+                continue
+
+        verified += 1
+
+    return {
+        "ok": not problems,
+        "root": str(root),
+        "manifest_version": manifest.get("manifest_version", 1),
+        "biofilter_version": manifest.get("biofilter_version"),
+        "schema_version": manifest.get("schema_version"),
+        "created_at": manifest.get("created_at"),
+        "tables_declared": len(tables),
+        "tables_verified": verified,
+        "hashes_checked": bool(check_hashes),
+        "problems": problems,
+    }
 
 
 def import_full_clone(

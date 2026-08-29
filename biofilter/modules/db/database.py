@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+import json
 import os
 import time
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from sqlalchemy import Table, create_engine, text
 from sqlalchemy.engine import Engine
@@ -23,6 +24,25 @@ from biofilter.utils.logger import Logger
 # *.parquet file in the directory (children with `_chr_N` suffix skipped).
 PARQUET_URI_SCHEME = "parquet://"
 
+# Bundle manifest filename, looked up next to (or one level above) the
+# directory a `parquet://` URI points at.
+MANIFEST_FILENAME = "manifest.json"
+
+
+def _tolerant_json_deserializer(value: Any) -> Any:
+    """
+    JSON deserializer that tolerates already-decoded values.
+
+    Drivers differ: psycopg2 hands back decoded objects (and SQLAlchemy's
+    PostgreSQL dialect disables its deserializer accordingly), while
+    duckdb_engine also returns decoded objects but leaves the generic
+    dialect's deserializer in place. Passing a dict to json.loads() raises,
+    so accept both forms.
+    """
+    if isinstance(value, (dict, list)):
+        return value
+    return json.loads(value)
+
 
 class Database(CreateDBMixin):
     """
@@ -40,9 +60,12 @@ class Database(CreateDBMixin):
     - `sqlite:///...` — local dev / single-file storage
     - `duckdb:///...` — DuckDB file (advanced)
     - `parquet:///path/to/bundle/tables` — read-only DuckDB over a parquet
-      bundle (HPC use case, no DB server required). Each .parquet file in
-      the directory becomes a SQL VIEW addressable by its stem. Writes are
-      blocked.
+      bundle (HPC use case, no DB server required). Each entry in the
+      directory becomes a SQL VIEW: a `<table>.parquet` file maps to a
+      view over that file, and a `<table>/` directory maps to a view over
+      the hive-partitioned dataset beneath it (e.g.
+      `variant_masters/chromosome=1/*.parquet`), so the partition key
+      comes back as a real column.
     """
 
     def __init__(self, db_uri: Optional[str] = None, log_level: str = "DEBUG"):
@@ -52,7 +75,14 @@ class Database(CreateDBMixin):
         self.engine: Optional[Engine] = None
         self.SessionLocal = None
         self.connected: bool = False
-        # Set when the active backend is read-only (parquet bundle).
+        # True when the backing *data* is immutable (parquet bundle): the
+        # registered VIEWs cannot be written through, so no ETL or import
+        # can target this connection.
+        #
+        # This is advisory, not enforced, and deliberately so — a
+        # `parquet://` connection is an in-memory DuckDB, and several
+        # reports legitimately CREATE TEMP TABLE against it to stage
+        # intermediate results. Blocking all writes would break them.
         self.read_only: bool = False
         # Set when the URI is `parquet://` — path to the tables/ dir.
         self._parquet_dir: Optional[Path] = None
@@ -107,15 +137,20 @@ class Database(CreateDBMixin):
                 }
             )
 
-        # In-memory DuckDB (used for parquet bundle reads) must share a
-        # single connection across sessions, otherwise each new connection
-        # gets a fresh DB without the registered VIEWs.
-        if parsed.drivername.startswith("duckdb") and parsed.database in (
-            ":memory:",
-            "",
-            None,
-        ):
-            kwargs.update({"poolclass": StaticPool})
+        if parsed.drivername.startswith("duckdb"):
+            # duckdb_engine already returns JSON columns decoded, but the
+            # generic dialect still applies SQLAlchemy's JSON deserializer,
+            # so json.loads() gets called on a dict and raises. (The
+            # PostgreSQL dialect disables the deserializer for this exact
+            # reason; duckdb_engine does not.) Any report selecting a JSON
+            # column — e.g. ETLPackage.stats — fails without this.
+            kwargs["json_deserializer"] = _tolerant_json_deserializer
+
+            # In-memory DuckDB (used for parquet bundle reads) must share a
+            # single connection across sessions, otherwise each new
+            # connection gets a fresh DB without the registered VIEWs.
+            if parsed.database in (":memory:", "", None):
+                kwargs.update({"poolclass": StaticPool})
 
         return kwargs
 
@@ -153,10 +188,82 @@ class Database(CreateDBMixin):
             return uri
         return f"sqlite:///{os.path.abspath(uri)}"
 
+    def _bundle_manifest(self) -> Optional[dict]:
+        """
+        Load the bundle manifest, if one is reachable.
+
+        A `parquet://` URI points at the tables directory, so the manifest
+        normally sits one level up. Both locations are accepted.
+        """
+        if not self._parquet_dir:
+            return None
+
+        for candidate in (
+            self._parquet_dir / MANIFEST_FILENAME,
+            self._parquet_dir.parent / MANIFEST_FILENAME,
+        ):
+            if candidate.is_file():
+                try:
+                    return json.loads(candidate.read_text(encoding="utf-8"))
+                except Exception:
+                    self.logger.log(
+                        f"⚠️ Unreadable bundle manifest: {candidate}",
+                        "WARNING",
+                    )
+                    return None
+        return None
+
+    def _discover_bundle_sources(self) -> List[tuple]:
+        """
+        Resolve which relations the bundle exposes, as
+        (view_name, duckdb read_parquet glob) pairs.
+
+        Two layouts are supported, and they can coexist:
+
+        - `<table>.parquet`        — a single file, one view over it
+        - `<table>/` (a directory) — a partitioned dataset, one view over
+          `<table>/**/*.parquet` with hive partitioning enabled, so
+          `chromosome=N/` path segments come back as a real column
+
+        Partitioned datasets are what variant tables use: keeping one
+        directory per chromosome preserves file-level pruning on
+        `WHERE chromosome = N` and lets a single chromosome be rebuilt
+        without rewriting the rest.
+        """
+        assert self._parquet_dir is not None
+        base = self._parquet_dir
+        sources: Dict[str, str] = {}
+
+        def sql_literal(path: Path) -> str:
+            return str(path).replace("'", "''")
+
+        for child in sorted(base.iterdir()):
+            if child.is_dir():
+                if any(child.rglob("*.parquet")):
+                    glob = sql_literal(child / "**" / "*.parquet")
+                    sources[child.name] = (
+                        f"read_parquet('{glob}', hive_partitioning = true, "
+                        f"union_by_name = true)"
+                    )
+            elif child.suffix == ".parquet":
+                sources[child.stem] = (
+                    f"read_parquet('{sql_literal(child)}')"
+                )
+
+        # Legacy bundles exported both the partitioned parent and its
+        # per-chromosome children as sibling files. The parent already
+        # carries every row, so the children are duplicates — drop them,
+        # but only when the parent they belong to is actually present.
+        for name in list(sources):
+            parent, sep, _ = name.partition("_chr_")
+            if sep and parent in sources:
+                del sources[name]
+
+        return sorted(sources.items())
+
     def _register_parquet_views(self) -> int:
         """
-        Register a SQL VIEW for every *.parquet under self._parquet_dir,
-        skipping partition children (filenames containing `_chr_`).
+        Register one SQL VIEW per relation exposed by the parquet bundle.
 
         Returns the number of views registered.
         """
@@ -168,29 +275,27 @@ class Database(CreateDBMixin):
                 f"parquet:// directory not found: {self._parquet_dir}"
             )
 
-        parquets = sorted(self._parquet_dir.glob("*.parquet"))
-        # Consolidated parents only — children carry duplicate data and
-        # the BF4 ORM doesn't declare per-chromosome tables.
-        parquets = [p for p in parquets if "_chr_" not in p.stem]
-
-        if not parquets:
+        sources = self._discover_bundle_sources()
+        if not sources:
             raise FileNotFoundError(
-                f"No *.parquet files found in {self._parquet_dir}"
+                f"No parquet files or partitioned datasets found in "
+                f"{self._parquet_dir}"
             )
 
         with self.engine.connect() as conn:
-            for p in parquets:
-                view_name = p.stem
-                path_literal = str(p).replace("'", "''")
+            for view_name, reader in sources:
+                # View names come from bundle file/directory names, which
+                # are table names; quote them so unusual names still work.
+                quoted = view_name.replace('"', '""')
                 conn.execute(
                     text(
-                        f"CREATE OR REPLACE VIEW {view_name} AS "
-                        f"SELECT * FROM read_parquet('{path_literal}')"
+                        f'CREATE OR REPLACE VIEW "{quoted}" AS '
+                        f"SELECT * FROM {reader}"
                     )
                 )
             conn.commit()
 
-        return len(parquets)
+        return len(sources)
 
     def connect(self, new_uri: Optional[str] = None, check_exists: bool = True) -> None:  # noqa E501
         """
@@ -298,7 +403,9 @@ class Database(CreateDBMixin):
         if self._parquet_dir is not None:
             if not self._parquet_dir.is_dir():
                 return False
-            return any(self._parquet_dir.glob("*.parquet"))
+            # Recursive: a bundle may hold only partitioned datasets
+            # (`<table>/chromosome=N/*.parquet`) and no top-level files.
+            return any(self._parquet_dir.rglob("*.parquet"))
 
         try:
             url = make_url(self._normalize_uri(self.db_uri))
