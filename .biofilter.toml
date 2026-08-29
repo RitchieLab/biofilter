@@ -1,7 +1,9 @@
 [database]
 db_uri = "postgresql+psycopg2://admin:admin@localhost/biofilter_dev"
-db_uri_vps = "postgresql+psycopg2://bioadmin:bioadmin@127.0.0.1:5432/biofilter_dev"
-db_uri_vps_external = "postgresql+psycopg2://bioadmin:bioadmin@109.199.114.191:5432/biofilter_prod"
+# Production is a read-only Parquet bundle on the LPC:
+#   db_uri = "parquet:///project/hall_shared/datasets/biofilter/<YYYYMMDD>/tables"
+# If a PostgreSQL server is provisioned again, keep credentials OUT of this file
+# (use the DATABASE_URL env var) — see lpc__deploy.md Appendix A.
 echo_sql = false
 auto_create = false
 

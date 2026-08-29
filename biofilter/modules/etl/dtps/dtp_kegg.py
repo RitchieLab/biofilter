@@ -7,7 +7,12 @@ import requests
 from biofilter.modules.db.models import PathwayMaster  # noqa E501
 from biofilter.modules.etl.mixins.base_dtp import DTPBase
 from biofilter.modules.etl.mixins.entity_query_mixin import EntityQueryMixin
-from biofilter.utils.file_hash import compute_file_hash
+from biofilter.utils.file_hash import compute_files_hash
+
+# Gene <-> pathway memberships. The catalog endpoint configured as
+# `source_url` lists pathways only, so this second endpoint carries the
+# gene data consumed by `dtp_kegg_relationships`.
+KEGG_LINK_URL = "https://rest.kegg.jp/link/hsa/pathway"
 
 
 class DTP(DTPBase, EntityQueryMixin):
@@ -29,7 +34,7 @@ class DTP(DTPBase, EntityQueryMixin):
 
         # DTP versioning
         self.dtp_name = "dtp_kegg"
-        self.dtp_version = "1.1.0"
+        self.dtp_version = "1.2.0"
         self.compatible_schema_min = "4.0.0"
         self.compatible_schema_max = "4.2.0"
 
@@ -38,8 +43,9 @@ class DTP(DTPBase, EntityQueryMixin):
     # -------------------------------------------------------------------------
     def extract(self, raw_dir: str):
         """
-        Downloads KEGG Pathway data. Uses the hash of 'KEGGPathways.txt' as
-        reference. Only proceeds with full extraction if the hash has changed.
+        Downloads the KEGG pathway catalog and the gene <-> pathway
+        memberships. Uses a composite hash of both files as reference, so
+        the run is skipped only when neither file changed.
         """
 
         msg = f"⬇️ Starting extraction of {self.data_source.name} data..."
@@ -63,30 +69,41 @@ class DTP(DTPBase, EntityQueryMixin):
             )
             os.makedirs(landing_path, exist_ok=True)
             file_path = os.path.join(landing_path, "kegg_pathways.txt")
-
-            # Download the OBO file
-            msg = f"⬇️  Fetching txt from URL: {source_url} ..."
-            self.logger.log(msg, "INFO")
+            link_path = os.path.join(
+                landing_path, "kegg_gene_pathway.txt"
+            )  # noqa E501
 
             headers = {
                 "Accept": "text/plain"
             }  # Optional, KEGG responds with TXT anyway
-            response = requests.get(source_url, headers=headers)
-            # Case if the file grows too large, we can use streaming
-            # response = requests.get(source_url, headers=headers, stream=True)
 
-            if response.status_code != 200:
-                msg = f"Failed to fetch data from KEGG: {response.status_code}"
-                self.logger.log(msg, "ERROR")
-                return False, msg, None
+            # Download the catalog and the memberships
+            for url, target in (
+                (source_url, file_path),
+                (KEGG_LINK_URL, link_path),
+            ):
+                msg = f"⬇️  Fetching txt from URL: {url} ..."
+                self.logger.log(msg, "INFO")
 
-            with open(file_path, "w", encoding="utf-8") as f:
-                f.write(response.text)
+                response = requests.get(url, headers=headers)
+                # Case if the file grows too large, we can use streaming
+                # response = requests.get(url, headers=headers, stream=True)
 
-            # Compute hash
-            current_hash = compute_file_hash(file_path)
+                if response.status_code != 200:
+                    msg = (
+                        f"Failed to fetch data from KEGG ({url}): "
+                        f"{response.status_code}"
+                    )
+                    self.logger.log(msg, "ERROR")
+                    return False, msg, None
 
-            msg = f"✅ GO file downloaded to {file_path}"
+                with open(target, "w", encoding="utf-8") as f:
+                    f.write(response.text)
+
+            # Composite hash: both files must be unchanged to skip the run
+            current_hash = compute_files_hash([file_path, link_path])
+
+            msg = f"✅ KEGG files downloaded to {landing_path}"
             self.logger.log(msg, "INFO")
             return True, msg, current_hash
 
@@ -100,7 +117,9 @@ class DTP(DTPBase, EntityQueryMixin):
     # -------------------------------------------------------------------------
     def transform(self, raw_dir: str, processed_dir: str):
         """
-        Transforms the KEGG raw_pathways.txt file into a structured CSV.
+        Transforms the KEGG raw files into structured parquet:
+        `master_data` (pathway catalog) and `relationship_data`
+        (gene <-> pathway memberships).
         """
 
         msg = f"🔧 Transforming the {self.data_source.name} data ..."
@@ -126,18 +145,21 @@ class DTP(DTPBase, EntityQueryMixin):
             # Ensure output directory exists
             output_path.mkdir(parents=True, exist_ok=True)
 
-            # Input file path
+            # Input file paths
             input_file = input_path / "kegg_pathways.txt"
-            if not input_file.exists():
-                msg = f"❌ Input file not found: {input_file}"
-                self.logger.log(msg, "ERROR")
-                return False, msg
+            link_file = input_path / "kegg_gene_pathway.txt"
+            for required in (input_file, link_file):
+                if not required.exists():
+                    msg = f"❌ Input file not found: {required}"
+                    self.logger.log(msg, "ERROR")
+                    return False, msg
 
             # Output files paths
             output_file_master = output_path / "master_data"
+            output_file_relationship = output_path / "relationship_data"
 
             # Delete existing files if they exist (both .csv and .parquet)
-            for f in [output_file_master]:
+            for f in [output_file_master, output_file_relationship]:
                 for ext in [".csv", ".parquet"]:
                     target_file = f.with_suffix(ext)
                     if target_file.exists():
@@ -175,10 +197,78 @@ class DTP(DTPBase, EntityQueryMixin):
                     output_file_master.with_suffix(".csv"), index=False
                 )  # noqa: E501
 
+            # --- GENE <-> PATHWAY MEMBERSHIPS ---
+            # Lines look like: 'path:hsa00010\thsa:10327'
+            # The number after 'hsa:' is the NCBI (Entrez) Gene ID.
+            valid_ids = set(df["pathway_id"])
+            skipped_pathways = set()
+            links = []
+
+            with open(link_file, "r", encoding="utf-8") as f:
+                for line in f:
+                    if not line.strip():
+                        continue
+                    parts = line.strip().split("\t")
+                    if len(parts) != 2:
+                        continue
+                    pid = parts[0].replace("path:", "")
+                    gene_id = parts[1].replace("hsa:", "")
+
+                    if not pid or not gene_id:
+                        continue
+
+                    # The catalog is the authority on existing pathways
+                    if pid not in valid_ids:
+                        skipped_pathways.add(pid)
+                        continue
+
+                    links.append(
+                        {
+                            "pathway_id": pid,
+                            "relation_type": "ncbi_gene",
+                            "relation": gene_id,
+                            "evidence": "curated",
+                        }
+                    )
+
+            if skipped_pathways:
+                self.logger.log(
+                    f"⚠️  {len(skipped_pathways)} pathway(s) present in the "
+                    "membership file but absent from the catalog were "
+                    f"skipped: {sorted(skipped_pathways)[:10]}",
+                    "WARNING",
+                )
+
+            df_relations = pd.DataFrame(
+                links,
+                columns=[
+                    "pathway_id",
+                    "relation_type",
+                    "relation",
+                    "evidence",
+                ],
+            )
+            df_relations.to_parquet(
+                output_file_relationship.with_suffix(".parquet"), index=False
+            )  # noqa: E501
+
+            if self.debug_mode:
+                df_relations.to_csv(
+                    output_file_relationship.with_suffix(".csv"), index=False
+                )  # noqa: E501
+
+            self.logger.log(
+                f"✅ KEGG links written with {len(df_relations)} links",
+                "INFO",
+            )
+
             self.logger.log(
                 f"✅ KEGG pathways transformed to CSV at {output_path}", "INFO"
             )
-            return True, f"{len(df)} pathways processed"
+            return True, (
+                f"{len(df)} pathways and {len(df_relations)} gene links "
+                "processed"
+            )
 
         except Exception as e:
             msg = f"❌ Transform failed: {str(e)}"

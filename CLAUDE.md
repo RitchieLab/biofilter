@@ -9,7 +9,7 @@ Context guide for Claude Code to work on the Biofilter 4 project.
 Biofilter 4 (BF4) is a persistent, entity-centric biological knowledge platform developed at the Ritchie Lab (Penn Medicine). It replaces transient file-based annotation workflows with a versioned, reusable, and queryable knowledge base.
 
 **Author:** Andre Rico (`andreluis.rico@pennmedicine.upenn.edu`)  
-**Current version:** 4.2.0  
+**Current version:** 4.2.1  
 **Active branch:** `main` (active development — APIs and schema still evolving)  
 **Docs (Sphinx / Read the Docs):** https://biofilter.readthedocs.io/en/latest/
 
@@ -53,7 +53,7 @@ temp/                    # Created during binning queries — disposable
 - Seeds in JSON: `biofilter/modules/db/seed/`
 
 ### 2. ETL layer (`modules/etl/`)
-- 19 active DTPs: `hgnc`, `gene_ncbi`, `gene_ensembl`, `uniprot`, `uniprot_relationships`, `reactome`, `reactome_relationships`, `kegg`, `go`, `pfam`, `mondo`, `mondo_relationships`, `biogrid`, `clingen`, `chebi`, `gwas`, `variant_gnomad`, `variant_alphamissense`, `variant_ncbi`
+- 20 active DTPs: `hgnc`, `gene_ncbi`, `gene_ensembl`, `uniprot`, `uniprot_relationships`, `reactome`, `reactome_relationships`, `kegg`, `kegg_relationships`, `go`, `pfam`, `mondo`, `mondo_relationships`, `biogrid`, `clingen`, `chebi`, `gwas`, `variant_gnomad`, `variant_alphamissense`, `variant_ncbi`
 - Pipeline: `extract → transform → load` with file-hash-based skip logic
 - Raw files → `<data_root>/downloads/`, processed → `<data_root>/processed/` (parquet)
 - `ETLManager` orchestrates execution, tracking, rollback, and resume
@@ -208,7 +208,8 @@ df_rel    = bf.report.run("entity_relationship_model",
 
 ## Infrastructure
 
-- **VPS server:** BF4 in production + PostgreSQL on the same server
+- **Production:** read-only Parquet bundle on the Penn LPC (`/project/hall_shared/datasets/biofilter/<YYYYMMDD>/tables`), accessed via `--db-uri parquet:///.../tables`. The VPS was decommissioned; its PostgreSQL deployment procedure is kept for reference in `notebooks/Templates/lpc__deploy.md` (Appendix A).
+- **Local dev:** PostgreSQL `biofilter_dev`. Note its entity IDs are a different ID space from the bundle — never export from it over the bundle.
 - **Docker:** available to run the CLI without installing BF4 locally (`docker/Dockerfile`)
 - **Tooling:** Poetry, tox, pytest, sphinx, testcontainers (Postgres in tests)
 - **Local config:** `.biofilter.toml` at project root (do not commit credentials)

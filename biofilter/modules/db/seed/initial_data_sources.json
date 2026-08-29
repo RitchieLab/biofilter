@@ -101,7 +101,20 @@
             "ucschg_version": "hg38",
             "dtp_script": "dtp_kegg",
             "active": true,
-            "dtp_version": "1.1.0",
+            "dtp_version": "1.2.0",
+            "schema_version": "3.1.0"
+        },
+        {
+            "source_system": "KEGG",
+            "name": "kegg_relationships",
+            "data_type": "Pathway",
+            "source_url": "not_applicable",
+            "format": "not_applicable",
+            "grch_version": "GRCh38",
+            "ucschg_version": "hg38",
+            "dtp_script": "dtp_kegg_relationships",
+            "active": true,
+            "dtp_version": "1.0.0",
             "schema_version": "3.1.0"
         },
         {

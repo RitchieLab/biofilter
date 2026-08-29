@@ -1,5 +1,5 @@
 {
-  "count": 72,
+  "count": 73,
   "files": [
     "assistent/assistant_faq_seed.md",
     "biofilter/modules/report/reports_explain/report_annotation_master_chemical.md",
@@ -39,6 +39,7 @@
     "docs/source/getting_started/installing.md",
     "docs/source/getting_started/running_reports.md",
     "docs/source/index.md",
+    "docs/source/parquet_backend.md",
     "docs/source/report_catalog.md",
     "docs/source/reports.md",
     "docs/source/system_overview.md",

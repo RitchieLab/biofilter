@@ -81,9 +81,10 @@ Treat each snapshot as **immutable** once published.
 The bundle is produced by `biofilter db export --format parquet`, which needs
 a live PostgreSQL to read from. Two options:
 
-- **On the VPS** (recommended going forward) — export against the production
-  database, then `rsync` only the bundle to the cluster. Avoids restoring a
-  ~480 GB `pgdata/` on the LPC entirely.
+- **On a dedicated PostgreSQL server** — export against it, then `rsync` only
+  the bundle to the cluster. Avoids restoring a ~480 GB `pgdata/` on the LPC
+  entirely. This was the VPS path; the VPS has since been decommissioned, so
+  it applies only if such a server is provisioned again.
 - **On the LPC** (what was done for the `20260514` snapshot) — restore the
   dump into a cluster-side `pgdata/` first (Appendix A, §A.2), then export
   using the legacy PG-bundled image. Documented below because it is the path

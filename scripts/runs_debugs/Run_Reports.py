@@ -10,9 +10,8 @@ from biofilter import Biofilter
 
 # db_uri = "sqlite:///dev_biofilter.db"
 # db_uri = "postgresql+psycopg2://bioadmin:bioadmin@localhost/biofilter_dev_2"
-# db_uri = "postgresql+psycopg2://bioadmin:Penn%402025@109.199.114.191:5432/biofilter?sslmode=require"
-
-# db_uri = "postgresql+psycopg://bioadmin:bioadmin@109.199.114.191:5432/biofilter?sslmode=require"
+# db_uri = "postgresql+psycopg2://<user>:<password>@<SERVER_IP>:5432/biofilter?sslmode=require"
+# db_uri = "parquet:///project/hall_shared/datasets/biofilter/<YYYYMMDD>/tables"
 
 bf = Biofilter()
 

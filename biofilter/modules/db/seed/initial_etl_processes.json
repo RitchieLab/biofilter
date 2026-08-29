@@ -246,6 +246,13 @@
             "extract_status": "pending",
             "transform_status": "pending",
             "load_status": "pending"
+        },
+        {
+            "data_source": "kegg_relationships",
+            "global_status": "pending",
+            "extract_status": "not_applicable",
+            "transform_status": "not_applicable",
+            "load_status": "pending"
         }
     ]
 }

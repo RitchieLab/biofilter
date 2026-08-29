@@ -10,28 +10,38 @@
 Pipeline role:
 - loads KEGG pathways into the Pathway domain
 - creates pathway entities and `PathwayMaster` rows
-- does not load pathway relationships in this DTP
+- stages gene <-> pathway memberships for `dtp_kegg_relationships`,
+  which is the DTP that actually writes `EntityRelationship` rows
 
 ## 2. Extract
 
-Source:
-- HTTP GET to `datasource.source_url`
-- expected response: plain text list (`path:<id>\t<description>`)
+Sources (two endpoints, both public and unauthenticated):
+- HTTP GET to `datasource.source_url` — the pathway catalog
+  (`https://rest.kegg.jp/list/pathway/hsa`), plain text
+  (`path:<id>\t<description>`)
+- HTTP GET to the module constant `KEGG_LINK_URL`
+  (`https://rest.kegg.jp/link/hsa/pathway`) — the gene memberships,
+  plain text (`path:<id>\thsa:<ncbi_gene_id>`)
+
+The catalog endpoint carries no gene data, which is why the second
+endpoint is fetched here rather than being derived from `source_url`.
 
 Raw output:
 - path pattern: `<raw_dir>/<source_system>/<data_source>/`
-- file: `kegg_pathways.txt`
+- files: `kegg_pathways.txt`, `kegg_gene_pathway.txt`
 
 Hash behavior:
-- computes hash from `kegg_pathways.txt`
+- composite SHA256 over both files (`compute_files_hash`), so the run is
+  skipped only when neither file changed
 - returns `(ok, message, current_hash)`
 
 ## 3. Transform
 
 Input:
 - `kegg_pathways.txt`
+- `kegg_gene_pathway.txt`
 
-Parsing logic:
+Parsing logic (catalog):
 - reads file line by line
 - skips empty lines
 - expects exactly 2 tab-separated columns
@@ -41,9 +51,24 @@ Produced fields:
 - `pathway_id`
 - `description`
 
+Parsing logic (memberships):
+- reads file line by line
+- expects exactly 2 tab-separated columns
+- removes `path:` prefix from the pathway ID and `hsa:` from the gene ID
+- the remaining gene number is the NCBI (Entrez) Gene ID
+- pathways absent from the catalog are skipped and logged as a warning —
+  the catalog is the authority on which pathways exist
+
+Produced fields (memberships):
+- `pathway_id`
+- `relation_type` (always `ncbi_gene`)
+- `relation` (NCBI Gene ID)
+- `evidence` (always `curated`)
+
 Output:
 - `<processed_dir>/<source_system>/<data_source>/master_data.parquet`
-- in debug mode also writes `master_data.csv`
+- `<processed_dir>/<source_system>/<data_source>/relationship_data.parquet`
+- in debug mode also writes the matching `.csv` files
 
 Filters:
 - malformed lines (`len(parts) != 2`) are ignored
@@ -87,4 +112,9 @@ Row-level skip:
 Operational behavior:
 - switches DB to write mode
 - drops/creates pathway and entity index groups around load
+
+Note:
+- this DTP never writes `EntityRelationship`. Run
+  `kegg_relationships` (see `dtp_kegg_relationships.md`) after this one
+  to load the gene memberships it stages.
 

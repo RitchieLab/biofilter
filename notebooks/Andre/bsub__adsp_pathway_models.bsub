@@ -1,0 +1,337 @@
+#!/bin/bash
+#BSUB -J bf4-adsp-pathway-models
+# Relative paths resolve against the submission directory, so logs land next
+# to the job. Absolute paths would need the directory to exist at submit time —
+# LSF opens these before the script runs, so an in-script mkdir is too late.
+#BSUB -o adsp-models-%J.out
+#BSUB -e adsp-models-%J.err
+#BSUB -W 12:00
+#BSUB -M 8000
+#BSUB -n 4
+#BSUB -R "rusage[mem=8000] span[hosts=1]"
+
+# NOTE: do NOT add `#BSUB -L /bin/bash` — on this cluster the login-shell
+# path triggers a `/etc/profile` guard ("no direct access allowed") that
+# aborts the job silently. We initialise modules manually below instead.
+
+# =============================================================================
+# ADSP pathway interaction models — the step_03 job.
+#
+# Stage A — seed set. Either reuse step_02/modeling_input.txt (set SEED_FILE)
+#           or regenerate it here from step_01's per-variant CSV. Set-based
+#           over the parquet bundle; seconds either way.
+#
+# Stage B — run `variant_modeling` on that seed set, grouping gene pairs by
+#           shared Reactome pathway membership. One row per variant x variant
+#           pair, weighted by how many pathways link the two genes.
+#
+# (Named Stage A/B, not Step 1/2, to avoid colliding with the step_01/02/03
+# directory layout this job lives in.)
+#
+# WHY THE SEED FILTER IS NOT OPTIONAL
+# -----------------------------------
+# variant_modeling is O(V^2) within pathway-connected gene pairs. Measured on
+# this dataset:
+#
+#   seed set                      variants   seed genes   gene pairs   variant pairs
+#   all coding (step_01 output)    355,795       15,424    9,668,936   4,259,133,802
+#   protein-altering, rank <= 14     2,866        2,277     ~251,000        ~399,000
+#   loss-of-function, rank <= 7        185          ~150      ~2,000          ~3,000
+#
+# Feeding the full coding set is not a report. The filter cuts it ~99% and is
+# also the defensible seed set: an interaction model over intronic variants is
+# noise.
+#
+# Submit:  bsub < bsub__adsp_pathway_models.bsub
+# Monitor: bjobs / tail -f adsp-models-<jobid>.out
+# =============================================================================
+
+set -euo pipefail
+
+# ----- paths -----
+#
+# Everything is derived from where the job was submitted, so the script has no
+# hardcoded home directory and travels with the adsp/ tree:
+#
+#   adsp/
+#     step_01/  adsp_per_variant.csv          <- INPUT_CSV
+#     step_02/  modeling_input.txt            <- SEED_FILE
+#               poc_select_modeling_input.py  <- SELECTOR
+#     step_03/  this file, logs, results      <- WORK  (submit from here)
+#
+# LSF starts the job in the submission directory when it is reachable, but
+# falls back to $HOME otherwise — so resolve it explicitly and cd there.
+JOB_DIR="${LSB_SUBCWD:-$PWD}"
+cd "$JOB_DIR"
+
+ADSP="${ADSP:-$(cd "$JOB_DIR/.." && pwd)}"
+
+# ----- knobs (override with `bsub -env "VAR=value" < this.bsub`) -----
+
+# Per-variant CSV produced by step_01
+INPUT_CSV="${INPUT_CSV:-$ADSP/step_01/adsp_per_variant.csv}"
+
+# The selector script, used only when the seed set has to be regenerated
+SELECTOR="${SELECTOR:-$ADSP/step_02/poc_select_modeling_input.py}"
+
+# Where inputs and results land
+WORK="${WORK:-$JOB_DIR}"
+
+# Seed list from step_02. When it exists, Stage A is skipped and the job runs
+# the model directly on the selection you already reviewed. When it does not,
+# the job regenerates it from INPUT_CSV. Set to empty to force regeneration.
+if [ -z "${SEED_FILE+x}" ]; then
+    SEED_FILE="$ADSP/step_02/modeling_input.txt"
+    [ -f "$SEED_FILE" ] || SEED_FILE=""
+fi
+
+# Consequence groups to keep. Default = protein-altering (synonymous excluded).
+# Smaller, higher-confidence alternative:
+#   CONSEQUENCE_GROUPS="frameshift,stop,start_stop,transcript_loss,splice"
+#
+# NOT named GROUPS: bash reserves that name for an array of the caller's group
+# IDs, so `GROUPS="${GROUPS:-...}"` silently expands to a numeric gid instead of
+# the default. Job 48617249 logged `Groups: 41162` because of exactly that.
+CONSEQUENCE_GROUPS="${CONSEQUENCE_GROUPS:-missense,frameshift,stop,splice,start_stop,inframe,protein_altering,transcript_loss,coding_other}"
+
+# VEP severity rank ceiling (lower rank = more severe). This is the sharp
+# lever, because the consequence groups are coarse: 'splice' spans rank 2
+# (splice_acceptor, true LoF) through rank 18 (splice_polypyrimidine_tract,
+# intronic and weak), and 'start_stop' mixes start_lost (7) with the silent
+# start_retained (20). Rank 14 keeps everything through missense and
+# protein_altering, and drops the weak splice tail.
+#   14 = protein-altering (recommended)
+#    7 = loss-of-function only
+#   empty = no ceiling, group filter alone
+MAX_SEVERITY_RANK="${MAX_SEVERITY_RANK:-14}"
+
+# Set to 1 to count only canonical transcripts. NOTE: dtp_variant_gnomad does
+# not populate variant_molecular_effects.canonical (verified 100% NULL), so
+# this currently aborts rather than silently emitting an empty seed set.
+# Left here for when the DTP is fixed.
+CANONICAL_ONLY="${CANONICAL_ONLY:-0}"
+
+# Grouping axis for the model, and the pair ceiling.
+GROUP_ENTITY_GROUPS="${GROUP_ENTITY_GROUPS:-Pathway}"
+MAX_PAIRS="${MAX_PAIRS:-2000000}"
+WINDOW_BP="${WINDOW_BP:-0}"
+BUILD="${BUILD:-38}"
+
+# Abort before Stage B if the seed set is this large. Pair count grows roughly
+# quadratically: ~1M pairs at 5,000 seeds, so 15,000 seeds is ~9M pairs and a
+# multi-GB CSV. Raise deliberately, not reflexively.
+SEED_MAX="${SEED_MAX:-15000}"
+
+mkdir -p "$WORK"
+
+# ----- env -----
+# Safety net if `module` isn't defined on the compute node. We do NOT fall
+# back to /etc/profile — the login guard there aborts the job silently.
+if ! type module >/dev/null 2>&1; then
+    for init in \
+        /etc/profile.d/modules.sh \
+        /etc/profile.d/lmod.sh \
+        /usr/share/lmod/lmod/init/bash \
+        /usr/share/Modules/init/bash; do
+        if [ -r "$init" ]; then
+            # shellcheck disable=SC1090
+            source "$init"
+            type module >/dev/null 2>&1 && break
+        fi
+    done
+fi
+
+if ! type module >/dev/null 2>&1; then
+    echo "ERROR: 'module' command not available on $(hostname)." >&2
+    exit 2
+fi
+
+source /project/hall_shared/hall_shared.sh
+module load biofilter/4.2.0
+
+BUNDLE="${BIOFILTER_DB_URI#parquet://}"    # strip scheme to get filesystem path
+
+SEED="$WORK/modeling_input.txt"
+AUDIT="$WORK/modeling_seed_audit.csv"
+OUTPUT="$WORK/adsp_pathway_models.csv"
+
+echo "=== BF4 ADSP pathway interaction models ==="
+echo "Started:        $(date)"
+echo "Host:           $(hostname)"
+echo "Job ID:         ${LSB_JOBID:-N/A}"
+echo "Version:        $(biofilter --version 2>&1 | head -1)"
+echo "Bundle:         $BUNDLE"
+echo "Seed source:    ${SEED_FILE:-"(generate from $INPUT_CSV)"}"
+echo "Work dir:       $WORK"
+echo "Groups:         $CONSEQUENCE_GROUPS"
+echo "Max severity:   ${MAX_SEVERITY_RANK:-no limit}"
+echo "Canonical only: $CANONICAL_ONLY"
+echo "Group axis:     $GROUP_ENTITY_GROUPS"
+echo "max_pairs:      $MAX_PAIRS"
+echo
+
+# ----- preflight -----
+[ -d "$BUNDLE" ] || { echo "ERROR: bundle dir not found at $BUNDLE" >&2; exit 1; }
+
+if [ -n "$SEED_FILE" ]; then
+    [ -f "$SEED_FILE" ] || { echo "ERROR: SEED_FILE not found at $SEED_FILE" >&2; exit 1; }
+else
+    [ -f "$INPUT_CSV" ] || { echo "ERROR: input CSV not found at $INPUT_CSV" >&2; exit 1; }
+    [ -f "$SELECTOR" ]  || { echo "ERROR: selector not found at $SELECTOR" >&2; exit 1; }
+fi
+
+if [ -f "$OUTPUT" ]; then
+    BACKUP="$OUTPUT.bak-$(date +%Y%m%d-%H%M%S)"
+    echo "NOTE: existing output found — moving to $BACKUP"
+    mv "$OUTPUT" "$BACKUP"
+fi
+echo
+
+# ----- Step 1: select the seed set -----
+if [ -n "$SEED_FILE" ]; then
+    echo "=== Stage A: SKIPPED — reusing seed list ==="
+    echo "  Source: $SEED_FILE"
+    # Copy rather than point at it, so $WORK holds everything this run used.
+    [ "$SEED_FILE" = "$SEED" ] || cp "$SEED_FILE" "$SEED"
+    echo
+else
+    echo "=== Stage A: select protein-altering seed variants ==="
+    T0=$(date +%s)
+
+    SELECTOR_ARGS=(
+        --input "$INPUT_CSV"
+        --groups "$CONSEQUENCE_GROUPS"
+        --out "$SEED"
+        --out-detail "$AUDIT"
+        --threads 4
+    )
+    [ -n "$MAX_SEVERITY_RANK" ] && SELECTOR_ARGS+=(--max-severity-rank "$MAX_SEVERITY_RANK")
+    [ "$CANONICAL_ONLY" = "1" ] && SELECTOR_ARGS+=(--canonical-only)
+
+    python3 "$SELECTOR" "${SELECTOR_ARGS[@]}"
+
+    echo "  Stage A elapsed: $(( $(date +%s) - T0 ))s"
+    echo
+fi
+
+# ----- guard: refuse to launch an unrunnable model -----
+N_SEED=$(wc -l < "$SEED")
+# Pairs scale ~quadratically; calibrated at ~988,000 pairs for 5,000 seeds.
+PROJECTED=$(( N_SEED * N_SEED / 25 ))
+
+echo "Seed variants:        $N_SEED"
+echo "Projected pair count: ~$PROJECTED  (rough, quadratic extrapolation)"
+
+if [ "$N_SEED" -eq 0 ]; then
+    echo "ERROR: seed set is empty. Check that $INPUT_CSV carries ref/alt alleles" >&2
+    echo "       and that its variants exist in the bundle." >&2
+    exit 3
+fi
+
+if [ "$N_SEED" -gt "$SEED_MAX" ]; then
+    echo "ERROR: seed set of $N_SEED exceeds SEED_MAX=$SEED_MAX." >&2
+    echo "       Projected ~$PROJECTED pairs would produce a multi-GB CSV." >&2
+    echo "       Tighten the seed set instead of raising the cap:" >&2
+    echo "         MAX_SEVERITY_RANK=7    # loss-of-function only" >&2
+    echo "         CONSEQUENCE_GROUPS='frameshift,stop,start_stop,transcript_loss,splice'" >&2
+    echo "       Seed list left at $SEED for inspection." >&2
+    exit 4
+fi
+
+if [ "$PROJECTED" -gt "$MAX_PAIRS" ]; then
+    echo "WARNING: projected pairs (~$PROJECTED) exceed max_pairs=$MAX_PAIRS."
+    echo "         variant_modeling will refuse and emit a 'pair_limit_exceeded'"
+    echo "         row rather than truncating. Raise MAX_PAIRS or tighten CONSEQUENCE_GROUPS."
+fi
+echo
+
+# ----- Step 2: run the model -----
+echo "=== Stage B: variant_modeling over $GROUP_ENTITY_GROUPS ==="
+T1=$(date +%s)
+
+# /usr/bin/time -v gives max RSS + wall clock; fall back to shell `time`.
+if command -v /usr/bin/time >/dev/null 2>&1; then
+    /usr/bin/time -v biofilter report run \
+        --name variant_modeling \
+        --input-file "$SEED" \
+        --param "group_entity_groups=$GROUP_ENTITY_GROUPS" \
+        --param "build=$BUILD" \
+        --param "window_bp=$WINDOW_BP" \
+        --param "max_pairs=$MAX_PAIRS" \
+        --output "$OUTPUT" \
+        2>&1
+else
+    time biofilter report run \
+        --name variant_modeling \
+        --input-file "$SEED" \
+        --param "group_entity_groups=$GROUP_ENTITY_GROUPS" \
+        --param "build=$BUILD" \
+        --param "window_bp=$WINDOW_BP" \
+        --param "max_pairs=$MAX_PAIRS" \
+        --output "$OUTPUT"
+fi
+
+ELAPSED=$(( $(date +%s) - T1 ))
+printf "  Stage B elapsed: %dh %02dm %02ds\n" $((ELAPSED/3600)) $(((ELAPSED%3600)/60)) $((ELAPSED%60))
+echo
+
+# ----- Step 3: summary -----
+echo "=== Summary ==="
+if [ ! -f "$OUTPUT" ]; then
+    echo "  ⚠️  Output file not produced. Check stderr above."
+    echo
+    echo "Finished: $(date)"
+    exit 5
+fi
+
+N_OUT=$(( $(wc -l < "$OUTPUT") - 1 ))
+SIZE=$(du -h "$OUTPUT" | cut -f1)
+echo "  Pair rows:  $N_OUT"
+echo "  Size:       $SIZE"
+echo "  Seed list:  $SEED ($N_SEED variants)"
+[ -f "$AUDIT" ] && echo "  Seed audit: $AUDIT"
+echo "  Models:     $OUTPUT"
+echo
+
+# variant_modeling emits a single 'pair_limit_exceeded' row instead of results
+# when the estimate blows the ceiling — catch that explicitly, it is not a
+# normal empty result.
+if head -1 "$OUTPUT" | grep -q "resolution_status"; then
+    echo "  ⚠️  variant_modeling refused the run — pair limit exceeded."
+    cat "$OUTPUT"
+    echo
+    echo "Finished: $(date)"
+    exit 6
+fi
+
+# Relax pipefail so head/tail early-close doesn't abort the script.
+set +o pipefail
+
+echo "  Columns produced:"
+head -1 "$OUTPUT" | tr ',' '\n' | sed 's/^/    /'
+echo
+
+echo "  Top pairs by pathway support:"
+tail -n +2 "$OUTPUT" | head -5 | cut -c1-200 | sed 's/^/    /'
+echo
+
+echo "  Distinct genes appearing in models:"
+python3 - "$OUTPUT" <<'PYEOF'
+import csv, sys
+genes, pathways = set(), set()
+with open(sys.argv[1], newline="") as fh:
+    for row in csv.DictReader(fh):
+        genes.add(row.get("gene_1_name"))
+        genes.add(row.get("gene_2_name"))
+        for p in (row.get("group_support_names") or "").split("|"):
+            if p:
+                pathways.add(p)
+genes.discard(None)
+print(f"    genes:    {len(genes):,}")
+print(f"    pathways: {len(pathways):,}")
+PYEOF
+
+set -o pipefail
+
+echo
+echo "Finished: $(date)"
