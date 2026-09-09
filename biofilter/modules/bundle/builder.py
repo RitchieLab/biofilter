@@ -429,6 +429,7 @@ class BundleBuilder:
         moved = self._move_variant_tables(tables_dir)
         bundle_id = self._finalise_manifest(out, moved)
         self._stamp_metadata(tables_dir, bundle_id)
+        self._resync_manifest_entry(out, "biofilter_metadata")
         self._write_build_record(out)
 
         self.logger.log(
@@ -535,6 +536,32 @@ class BundleBuilder:
         )
         self.logger.log(f"   bundle_id: {bundle_id}", "INFO")
         return bundle_id
+
+    def _resync_manifest_entry(self, out: Path, table_name: str) -> None:
+        """
+        Refresh one table's size in the manifest after rewriting its file.
+
+        `_stamp_metadata` rewrites `biofilter_metadata.parquet` after the
+        manifest has already recorded its size, so the declared bytes stop
+        matching the file. `db verify` catches that as a size mismatch —
+        which is the check doing its job, and the reason this exists.
+
+        The bundle id is unaffected: that table is excluded from the
+        fingerprint precisely because it is rewritten to carry the id.
+        """
+        manifest_path = out / "manifest.json"
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        for table in manifest.get("tables", []):
+            if table.get("name") != table_name:
+                continue
+            path = out / table["file"]
+            if path.is_file():
+                table["bytes"] = path.stat().st_size
+                if table.get("sha256"):
+                    table["sha256"] = None
+        manifest_path.write_text(
+            json.dumps(manifest, indent=2) + "\n", encoding="utf-8"
+        )
 
     def _stamp_metadata(self, tables_dir: Path, bundle_id: str) -> None:
         """

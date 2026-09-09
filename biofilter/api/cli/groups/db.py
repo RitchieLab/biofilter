@@ -294,13 +294,33 @@ def export_cmd(
     is_flag=True,
     help="Only check presence and size; skip SHA-256 re-computation.",
 )
-def verify_cmd(in_dir: Path, no_hashes: bool):
+@click.option(
+    "--schema",
+    is_flag=True,
+    help=(
+        "Also check that the tables present carry the columns this build "
+        "expects. Opening a bundle only warns about that, so a partial "
+        "bundle stays usable; this makes it an error, for gating."
+    ),
+)
+def verify_cmd(in_dir: Path, no_hashes: bool, schema: bool):
     """
     Validate a bundle against its manifest. Requires no database.
     """
     from biofilter.modules.db.transfer import verify_bundle
 
     report = verify_bundle(in_dir, check_hashes=not no_hashes)
+
+    if schema:
+        from biofilter.modules.db.database import Database
+
+        tables_dir = in_dir / "tables" if (in_dir / "tables").is_dir() else in_dir  # noqa: E501
+        db = Database(db_uri=f"parquet:///{tables_dir.resolve()}")
+        db.connect()
+        drift = db.schema_drift
+        if drift:
+            report["ok"] = False
+            report["problems"].extend(drift)
 
     click.echo(f"Bundle:            {report['root']}")
     click.echo(f"Manifest version:  {report['manifest_version']}")

@@ -86,6 +86,10 @@ class Database(CreateDBMixin):
         self.read_only: bool = False
         # Set when the URI is `parquet://` — path to the tables/ dir.
         self._parquet_dir: Optional[Path] = None
+        # Columns the models declare that this bundle does not carry.
+        # Populated when parquet views are registered; empty for a
+        # live database, which is the schema by definition.
+        self.schema_drift: List[str] = []
 
         # Cache of resolved SQLAlchemy Core Table objects
         self._tables: Dict[str, Table] = {}
@@ -317,7 +321,64 @@ class Database(CreateDBMixin):
                 )
             conn.commit()
 
+        self.schema_drift = self._report_schema_drift(
+            [name for name, _ in sources]
+        )
         return len(sources)
+
+    def _report_schema_drift(self, view_names: List[str]) -> List[str]:
+        """
+        Name what a bundle is missing, at connect time.
+
+        Parquet is self-describing, so compatibility is discovered rather
+        than declared (ADR-003 §2.7). The failure this prevents is a
+        DuckDB binder error thrown deep inside a report, naming a column
+        with no indication of which bundle lacks it.
+
+        Missing *tables* are not reported: a bundle built from a subset of
+        the sources legitimately has fewer, and refusing to connect would
+        make it unusable for the tables it does carry. A table that is
+        present but short a column is the real mismatch, because a query
+        that touches it will fail with no diagnosis.
+
+        Warns rather than raises, for the same reason. `db verify` is the
+        strict gate.
+        """
+        from biofilter.modules.db.base import Base
+
+        expected = {
+            table.name: {c.name for c in table.columns}
+            for table in Base.metadata.tables.values()
+        }
+        available = set(view_names)
+        problems: List[str] = []
+
+        with self.engine.connect() as conn:
+            for name in sorted(available & set(expected)):
+                quoted = name.replace('"', '""')
+                found = {
+                    row[0]
+                    for row in conn.execute(
+                        text(f'DESCRIBE SELECT * FROM "{quoted}"')
+                    )
+                }
+                missing = expected[name] - found
+                if missing:
+                    problems.append(
+                        f"{name}: missing {', '.join(sorted(missing))}"
+                    )
+
+        if problems:
+            self.logger.log(
+                f"⚠️  {len(problems)} table(s) in this bundle are missing "
+                f"columns this build expects. Queries touching them will "
+                f"fail:",
+                "WARNING",
+            )
+            for problem in problems:
+                self.logger.log(f"     {problem}", "WARNING")
+
+        return problems
 
     def connect(self, new_uri: Optional[str] = None, check_exists: bool = True) -> None:  # noqa E501
         """
