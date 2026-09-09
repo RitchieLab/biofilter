@@ -4,6 +4,7 @@ from __future__ import annotations
 import click
 
 from biofilter.api.cli.common import try_resolve_db_uri
+from biofilter.api.cli.groups.bundle import bundle
 from biofilter.api.cli.groups.config import config
 from biofilter.api.cli.groups.db import db
 
@@ -81,6 +82,7 @@ main.add_command(etl)
 main.add_command(report)
 main.add_command(config)
 main.add_command(db)
+main.add_command(bundle)
 
 if __name__ == "__main__":
     main()

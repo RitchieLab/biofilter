@@ -53,7 +53,7 @@ temp/                    # Created during binning queries — disposable
 - Seeds in JSON: `biofilter/modules/db/seed/`
 
 ### 2. ETL layer (`modules/etl/`)
-- 19 active DTPs: `hgnc`, `gene_ncbi`, `gene_ensembl`, `uniprot`, `uniprot_relationships`, `reactome`, `reactome_relationships`, `kegg`, `kegg_relationships`, `go`, `pfam`, `mondo`, `mondo_relationships`, `biogrid`, `clingen`, `chebi`, `gwas`, `variant_gnomad`, `variant_alphamissense`
+- 20 active DTPs: `hgnc`, `gene_ncbi`, `gene_ensembl`, `uniprot`, `uniprot_relationships`, `reactome`, `reactome_relationships`, `kegg`, `kegg_relationships`, `go`, `pfam`, `mondo`, `mondo_relationships`, `biogrid`, `clingen`, `chebi`, `gwas`, `variant_gnomad_joint`, `variant_gnomad_vep`, `variant_alphamissense`, `variant_eqtl_gtex`
 - Pipeline: `extract → transform → load` with file-hash-based skip logic
 - Raw files → `<data_root>/downloads/`, processed → `<data_root>/processed/` (parquet)
 - `ETLManager` orchestrates execution, tracking, rollback, and resume
