@@ -6,6 +6,8 @@ Decisions live in the ADR; this file tracks execution state only.
 **Branch:** `release/4.3.0`
 **Acceptance target:** the 4.2.0 bundle at `../../../bf_files/` — same table
 set, known row counts, per-file sha256 in its manifest.
+**Last updated:** 2026-09-09, after Phase 3 (variant branch) completed and
+was committed (`032bd91`, `c46c758`).
 
 Legend: `[ ]` todo · `[~]` in progress · `[x]` done · `[!]` blocked
 
@@ -31,23 +33,26 @@ Implementation style of the variant DTPs, which drives the effort:
 | `dtp_variant_ncbi`          | 635   | 1              | 1                   |
 | **`dtp_gwas`**              | 648   | 1              | **16**              |
 
-### ⚠ `dtp_gwas` is the exception — decide before starting §3
+### `dtp_gwas` — resolved 2026-09-09
 
-Four of the five variant DTPs already produce parquet in `transform` and
-touch the session only to load it. `dtp_gwas` does not: it inherits
-`EntityQueryMixin` (`dtp_gwas.py:26`) and writes through the ORM —
-`bulk_save_objects`, `session.execute(insert())`, raw `DELETE FROM`
-(lines 523–618).
+Flagged here as the hard case because of its 16 `self.session` uses. Most
+of them turned out not to be id resolution: `DELETE FROM` to clear a
+prior load (gone — bundles are immutable), a bulk `insert()`, and the
+rebuild of the `variant_gwas_snp` helper table.
 
-Its **output schema is clean**: `variant_gwas` has 27 columns and no
-entity surrogate (`mapped_trait_id` / `parent_trait_id` are EFO/MONDO
-strings; `variant_gwas_snp.variant_gwas_id` is internal to the pair). So
-it does not violate the ADR §2.3 invariant — but it is a rewrite, not a
-"delete the load step" like the other four.
+Rewritten parquet-native. The helper table is absorbed by exploding
+multi-SNP associations inline (336,159 rows carry a secondary SNP), the
+same treatment VEP consequences get. It stays a **single unpartitioned
+file**: its rows are associations (study x trait x SNP), not variants, so
+there is no 1:1 with `variant_masters`, and 16.4% carry no position to
+partition on.
 
-Options: (a) rewrite it parquet-native with the rest, (b) leave it in the
-core branch for 4.3.0 since its output is small (1.07 M + 0.91 M rows,
-70 MB) and move it later. **Not decided.**
+Two recoveries fell out of it: `platform` (10,186 distinct values) was
+commented out of the column selection while the model declared it, so the
+bundle holds it as all-null; and the 255-character truncation of every
+text field — a relational column limit — was cutting
+`initial_sample_size` at 255 where the source has 745. `cnv` stays
+dropped: populated on every source row but with a single distinct value.
 
 ---
 
@@ -67,7 +72,8 @@ core branch for 4.3.0 since its output is small (1.07 M + 0.91 M rows,
 - [ ] Decide `bundle_id` derivation: content-derived (reproducible,
       identical builds collide by design) vs build-derived (unique per
       run). ADR §6. Blocks Phase 4.
-- [ ] Decide the `dtp_gwas` question above. Blocks Phase 3.
+- [x] ~~Decide the `dtp_gwas` question~~ — resolved above; rewritten
+      parquet-native as a single unpartitioned file.
 
 ### New gnomAD DTPs — design settled 2026-09-08
 
@@ -181,22 +187,101 @@ Independent of the pipeline split; safe to do first.
 - [ ] Retain the SQLite as a build artifact outside the published bundle
       (ADR §4, Alternative E).
 
-## Phase 3 — Variant branch (parquet-direct)
+## Phase 3 — Variant branch (parquet-direct) ✅ done 2026-09-09
 
-- [ ] Promote `_write_parquet_part` output to final for `gnomad`
-      (`dtp_variant_gnomad.py:556`); delete the load step that re-reads
-      it and `COPY`s to PG (`:1092`, plus the stage-table helpers at
-      `:1016`–`:1083`).
-- [ ] Same for `alphamissense`, `gtex`, `ncbi` — one parquet write and
-      one session use each, so this should be mechanical.
-- [ ] Handle `gwas` per the Phase 0 decision.
-- [ ] Keep the three seed dimension lookups (`variant_consequences`,
-      `variant_impacts`, `variant_biotypes`) reading from seed, not from
-      a live session (`dtp_variant_gnomad.py:1976`).
-- [ ] Emit hive-partitioned directories (`<table>/chromosome=N/`) with
-      **no** duplicated `_chr_N` children — the 4.2.0 bundle sets
-      `partition_children_included: true` and pays 31 GB for 15.6 GB of
-      data (ADR §2.9).
+Every variant DTP now writes its final parquet directly, keyed by the
+natural key. Verified by running each end to end on real data, not by
+inspection.
+
+- [x] gnomAD joint — `variant_masters_chr<N>.parquet`. chr21: 2,490,587
+      variants from 12,719,368 alleles (`AC_joint >= 5`), 96 MB. A strict
+      superset of the 4.2.0 bundle's 2,025,847 with zero rows missing;
+      the 464,740 extra come from reading the joint callset where the old
+      pipeline read only genomes.
+- [x] gnomAD VEP — `variant_molecular_effects_chr<N>.parquet`, one row
+      per (variant x transcript x consequence). chr21: 30,196,789 rows
+      over 2,470,113 variants (12.2x fanout), 111 MB, zero rows orphaned
+      from the variants file.
+- [x] gnomAD rsID — `variant_rsid_chr<N>.parquet`, 9,850,326 keys on
+      chr21. See the note below: this exists because the joint callset
+      publishes no rsID at all.
+- [x] AlphaMissense — 25 files, 71,697,556 rows, 889 MB. The bundle holds
+      783,844 (1.1%): the old load's inner join against `variant_masters`
+      discarded every prediction whose variant had not been loaded.
+- [x] GTEx — 23 files, 18,470,502 rows, 634 MB, tissue selection moved to
+      JSON (see below).
+- [x] GWAS — single file, 1,208,545 rows, 36 MB.
+- [x] dbSNP/NCBI variant DTP removed entirely (26 data sources, the
+      `VariantSNPMerge` model, the `variant_snp_merges` table).
+- [x] Output layout: one file per chromosome named after its table
+      (`variant_masters_chr21.parquet`), **not** hive directories. See
+      the note below.
+- [x] `load()` on all five raises `NotImplementedError` with the reason,
+      keeping the old body as `_load_legacy` for comparison.
+
+### rsID: the joint callset has none
+
+`variant_masters` came out with `rsid` 100% null and reported success.
+The cause is that the joint VCF's ID column is empty on every record —
+only the exome and genome callsets carry rsIDs (24.4% and 70.8% of
+records sampled).
+
+The VEP DTP now also emits `variant_rsid_chr<N>.parquet`, captured
+**before** the AC filter: only ~25% of rsIDs survive `AC >= 5`, and the
+ones dropped are the rare variants that most need an identifier. Coverage
+on chr21 is 98.3% of variants; a LEFT JOIN adds 126 ms for a whole
+chromosome, 60 ms for an ADSP-sized list of 700,000 variants.
+
+It is a table of its own, not a column stamped onto `variant_masters`.
+Stamping would make the joint branch depend on this one having run first,
+and a missing map would degrade to silent nulls — which is exactly the
+failure being fixed. If the bundle should ship `variant_masters` with
+rsID already attached, bundle assembly is the place: both parquets exist
+there and neither DTP has to wait for the other.
+
+`min_ac` for the map is configurable and currently `null` (every rsID,
+~4.5 GB genome-wide). `3` is the safe lower bound for the joint's
+`AC >= 5`, since `AC_joint` is exactly `AC_exomes + AC_genomes` (verified
+on 250,000 records).
+
+### Layout: flat per-chromosome files, not hive
+
+ADR-003 §2.9 called for hive directories. Measured on 71.7 M rows both
+ways, that was revised:
+
+| layout | size | 1 chrom | 3 chroms | full scan | non-chrom filter |
+| ------ | ---- | ------- | -------- | --------- | ---------------- |
+| hive   | 888.9 MB | 10.7 ms | 7.8 ms | 22.8 ms | 40.5 ms |
+| flat   | 835.2 MB | 17.7 ms | 21.1 ms | 24.0 ms | 34.4 ms |
+
+Hive prunes a chromosome predicate faster, but the gap is milliseconds.
+What decided it: one file per chromosome gives the manifest one entry
+with one checksum, with none of the parent-plus-children ambiguity that
+made the 4.2.0 bundle store 15.6 GB twice, and
+`variant_masters_chr21.parquet` names its own table and partition where
+`part-0.parquet` means nothing without its parent directory.
+
+**The source is part of the file name** (`variant_alphamissense`,
+`variant_gtex`, `variant_rsid`) because a parquet is immutable once
+written: one file per source makes provenance a property of the layout
+rather than something a column has to be trusted for. The consequence is
+that a second missense predictor becomes its own table rather than rows
+in a shared one.
+
+### GTEx: tissue selection is configurable
+
+The DTP had a hardcoded `BRAIN_TISSUES_V10` frozenset filtering at three
+points. It now reads `config/dtp_variant_eqtl_gtex.json`, which lists all
+50 tissues with the size each occupies in the tarball.
+
+Default stays the 13 Brain tissues, so behaviour is unchanged; enabling
+all 50 takes the output from ~18.5 M rows to roughly 70 M. Note the
+selection controls **transform and output only** — GTEx ships all tissues
+in one 2.39 GB tarball and does not expose them individually (per-tissue
+URLs 404), so the download is all-or-nothing.
+
+The data source was renamed `gtex_v10_brain_eqtl` → `gtex_v10_eqtl`.
+
 
 ## Phase 4 — Bundle identity
 
@@ -226,6 +311,18 @@ Independent of the pipeline split; safe to do first.
       content per table (ordering included).
 - [ ] Acceptance run against `bf_files/`: compare row counts table by
       table, and content for the core's 29 tables.
+- [ ] **The extract/transform skip only checks the hash, never the
+      artifact.** Deleting the processed parquets and re-running reported
+      `up-to-date` and wrote nothing. That was survivable when the truth
+      lived in PostgreSQL and the processed files were scratch; now the
+      parquet *is* the product, so a build can declare success over a
+      table that is not there. Verify the output exists (and is
+      non-empty) before honouring a hash match.
+- [ ] **A DTP failure can leave its ETL package stuck in `running`.**
+      When the VEP transform raised on a schema mismatch, the CLI still
+      exited 0 and logged "ETL update process finished" while package 73
+      sat at `running` in the database. Whatever wraps a step should mark
+      it failed on the way out.
 
 ## Phase 6 — Documentation
 
@@ -241,11 +338,30 @@ Independent of the pipeline split; safe to do first.
 
 ---
 
+## Open decisions carried forward
+
+- [ ] **`min_ac` for the rsID map** — `null` (every rsID, ~4.5 GB
+      genome-wide) vs `3` (safe lower bound for the joint's `AC >= 5`,
+      no loss, some prunable orphans). One line in the VEP config plus a
+      transform re-run; the extract is cached.
+- [ ] **`min_ac` for the VEP annotations** — currently `5`, which leaves
+      0.8% of variants without annotation (they clear the combined
+      `AC_joint` without either callset clearing it alone). `3` removes
+      that loss at +34% on the intermediate parquet, with the orphans
+      prunable at bundle assembly.
+- [ ] **Whether `variant_masters` ships with rsID attached.** If yes,
+      bundle assembly does the join — not the joint DTP, which would
+      reintroduce the branch dependency.
+- [ ] **Raw data retention.** The full genome is 1.53 TB of downloads
+      against 348 GB free locally. Chromosomes must be processed and
+      discarded, or `data_root` must point at external storage. Still not
+      in the ADR.
+
 ## Deferred (not 4.3.0 scope)
 
-- **DTP slimming.** Dropping the "already inserted?" checks now that
-  every write is an insert. Direct consequence of ADR §2.1, but the
-  DTP-by-DTP review is its own pass.
+- **DTP slimming for the core branch.** Dropping the "already
+  inserted?" checks now that every write is an insert. Done for the
+  variant DTPs as part of Phase 3; the 16 core DTPs are their own pass.
 - **Failure semantics across branches.** If the variant branch fails
   after the core branch succeeded, is a partial bundle published or is
   the whole build discarded? (ADR §6)
