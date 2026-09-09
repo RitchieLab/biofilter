@@ -174,3 +174,77 @@ def plan_cmd(ctx, db_uri, out_path: Path, all_sources: bool, force: bool, debug:
         f"   variant: {n_var} of {len(variant)} sources included"
     )
     click.echo("   Edit 'include' flags, then run: biofilter bundle build")
+
+
+@bundle.command("build")
+@click.option(
+    "--plan",
+    "plan_path",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    default=Path("bundle_plan.json"),
+    show_default=True,
+    help="Plan to build from (see `bundle plan`).",
+)
+@click.option(
+    "--data-root",
+    type=click.Path(file_okay=False, path_type=Path),
+    default=Path("biofilter_data"),
+    show_default=True,
+    help="Where raw, processed and staging live.",
+)
+@click.option(
+    "--restart",
+    is_flag=True,
+    help=(
+        "Discard the staging database and start over. The default is to "
+        "resume: an interrupted build re-runs only what is still pending."
+    ),
+)
+@click.option(
+    "--keep-raw",
+    is_flag=True,
+    help=(
+        "Keep downloaded files after their output exists. Off by default "
+        "because a full genome is ~1.53 TB of raw input against ~126 GB "
+        "for the largest single chromosome."
+    ),
+)
+@click.option("--debug", is_flag=True, help="Enable debug logging.")
+def build_cmd(plan_path: Path, data_root: Path, restart: bool, keep_raw: bool, debug: bool):  # noqa: E501
+    """
+    Build a bundle from a plan.
+
+    Creates a throwaway SQLite under <data-root>/staging, runs every
+    included source against it, and assembles the bundle only once all of
+    them have succeeded. Re-running resumes: finished sources are skipped.
+    """
+    from biofilter.modules.bundle import BundleBuilder
+
+    plan = json.loads(plan_path.read_text(encoding="utf-8"))
+
+    bf = Biofilter(debug_mode=debug)
+    builder = BundleBuilder(
+        plan,
+        biofilter=bf,
+        data_root=data_root,
+        logger=bf.core.logger,
+        keep_raw=keep_raw,
+    )
+    result = builder.run(restart=restart)
+
+    click.echo("")
+    for outcome in result.outcomes:
+        mark = {"done": "✅", "failed": "❌", "skipped": "⏭️"}.get(outcome.status, "•")  # noqa: E501
+        freed = f"  (freed {outcome.raw_freed_mb:,.0f} MB)" if outcome.raw_freed_mb else ""  # noqa: E501
+        click.echo(f"  {mark} {outcome.name} [{outcome.branch}]{freed}")
+        if outcome.detail:
+            click.echo(f"      {outcome.detail}")
+
+    if not result.ok:
+        raise click.ClickException(
+            f"{len(result.failed)} source(s) failed; the bundle was not "
+            f"assembled. Run again to resume from where this stopped."
+        )
+
+    click.echo("")
+    click.echo(f"Staging database: {result.staging_db}")
