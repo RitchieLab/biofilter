@@ -110,7 +110,7 @@ Consequences:
 
 - `biofilter etl update` / `update-all` — **not supported**; run the ETL
   against PostgreSQL and export a new bundle.
-- `biofilter db migrate` / `db upgrade` / `db create-db` — **not supported**.
+- `db upgrade` / `db create-db` — **not supported** against a bundle.
 - Refreshing the data means producing a **new bundle**, not modifying the
   current one.
 

@@ -429,7 +429,53 @@ anything else that drives the ETL programmatically.
       as the last thing on screen. For an unattended multi-hour build the
       final line and the exit code should reflect the failure.
 
-## Phase 6 — Documentation
+## Phase 6 — Documentation — medium pass done 2026-09-09
+
+Scoped deliberately: fix what is factually wrong, and add the one
+document that makes the rest coherent. Sources were 2,002 lines with
+stale content across ten files, but the problem was never the count — the
+mental model changed. `database.md` opened with "create DB → ping →
+migrate", a sequence describing a persistent database an operator
+maintains, which no longer exists; `etl.md` never mentioned branch,
+bundle or SQLite, describing the ETL as an end in itself when it is now a
+step inside a build. Fixing mentions one by one would have produced
+internally inconsistent docs: correct commands describing a flow that is
+gone.
+
+- [x] **New `building_bundles.md`** — the plan/build/info flow, why the
+      build splits in two, the disk constraint, resume semantics, and the
+      two properties a reader has to know: ids are internal to one
+      bundle, and a bundle cannot be rebuilt.
+- [x] `database.md` rewritten — states up front that there is no
+      persistent database, keeps the commands that still apply.
+- [x] `etl.md` rewritten — the two branches, why variant DTPs need
+      explicit `--run-step`, the JSON field/tissue configs.
+- [x] `index.md`, `cli_reference.md`, `parquet_backend.md`,
+      `troubleshooting.md` — removed `db migrate`, added the bundle
+      commands.
+- [x] `CLAUDE.md` and `README.md` — Alembic, PostgreSQL-as-production and
+      the migration-based workflow replaced with the bundle flow.
+- [x] Sphinx still builds.
+
+### Deferred to the full pass
+
+Waiting on a build with all sixteen core sources, since several of these
+need numbers that run will produce:
+
+- [ ] `parquet_backend.md` (194 lines) — written against the old model
+      where a bundle was an export. Needs to describe it as the product.
+- [ ] `system_overview.md`, `schema.md` — the four-layer description
+      predates the branch split.
+- [ ] `report_catalog.md`, `configuration.md`, `entity_and_omics.md` —
+      light drift, unreviewed.
+- [ ] Retention policy for archived bundles, with real sizes.
+- [ ] Load timings and full-bundle size, once measured.
+- [ ] **Decide which document is the source of truth.** `CLAUDE.md`,
+      `docs/source/` and `biofilter_agents/*.md` all describe the same
+      system and will drift apart. Suggested: `docs/source/`, with the
+      other two pointing at it rather than restating it.
+
+
 
 - [ ] `CLAUDE.md`: architecture section still describes PostgreSQL as
       production and lists `db migrate` / `db upgrade` in the workflow.

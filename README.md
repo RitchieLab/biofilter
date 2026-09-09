@@ -103,7 +103,7 @@ This design lets users recover cross-omics relationships and reuse them directly
 
 - **Multi-database support**
   - SQLite (local development)
-  - PostgreSQL (production and large-scale deployments)
+  - PostgreSQL (still supported; no longer the production target)
   - Parquet bundle, read-only via DuckDB (HPC and shared environments without a database server)
 
 ---
@@ -134,7 +134,7 @@ At a high level, Biofilter 4 consists of:
 
 ```text
 biofilter/
-├── alembic/                   # Database migrations
+├── modules/bundle/            # Bundle builder (plan, build, assemble)
 ├── api/
 │   └── cli/                   # CLI commands and entrypoints
 ├── core/
@@ -256,7 +256,7 @@ df = bf.report.run("annotation_master_variant", input_data=["rs429358"])
 
 **Limitations**
 
-- The backend is **read-only**. ETL runs, migrations, and any other write
+- The backend is **read-only**. ETL runs and any other write
   operation require a SQLite or PostgreSQL target. DuckDB rejects writes against
   `read_parquet` views, and the `Database.read_only` flag surfaces the same
   information at the application layer.

@@ -4,7 +4,7 @@ Lightweight, user-focused documentation for running Biofilter today.
 
 This documentation is intentionally practical:
 - install/configure quickly (PyPI, source, or Docker)
-- bootstrap database and run ETL
+- build a parquet bundle and read it
 - run reports via CLI/API
 - troubleshoot common operational issues
 
@@ -27,6 +27,7 @@ system_overview
 entity_and_omics
 developer_extensions
 configuration
+building_bundles
 database
 parquet_backend
 schema

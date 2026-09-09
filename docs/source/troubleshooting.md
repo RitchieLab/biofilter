@@ -26,7 +26,7 @@ bundle's `tables/` directory, not at the bundle root holding `manifest.json`.
 `parquet:// directory not found: <dir>` — the path does not exist or is not
 readable; check the mount.
 
-A write command failing (`etl update`, `db migrate`, `db upgrade`) is expected:
+A write command failing (`etl update`, `db upgrade`) is expected:
 the Parquet backend is read-only. Run those against PostgreSQL or SQLite.
 
 A missing table or a failing variant report usually means the bundle lacks the
@@ -38,8 +38,7 @@ skipped by design. See [Parquet Backend](parquet_backend.md).
 Use:
 
 ```bash
-biofilter db migrate --status
-biofilter db migrate --target head
+biofilter db verify --in ./bundles/<YYYYMMDD> --schema
 biofilter db upgrade
 ```
 

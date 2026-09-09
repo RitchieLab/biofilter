@@ -23,8 +23,10 @@ Groups:
 ## DB
 
 - `biofilter db ping`
+- `biofilter bundle plan`
+- `biofilter bundle build`
+- `biofilter bundle info`
 - `biofilter db create-db`
-- `biofilter db migrate`
 - `biofilter db upgrade`
 - `biofilter db backup`
 - `biofilter db restore`

@@ -1,59 +1,69 @@
 # Database Operations
 
-## Core Commands
+Biofilter 4.3 has no persistent database. A build creates a throwaway
+SQLite, stages the core sources through it, and leaves a parquet bundle
+behind — see [Building Bundles](building_bundles.md).
 
-Create DB:
+The commands here remain for working with a database directly: creating
+one for development, inspecting it, and moving data in and out.
+
+## Creating and checking
 
 ```bash
 biofilter db create-db --db-uri "sqlite:///biofilter_dev.db"
-```
-
-Check DB:
-
-```bash
 biofilter db ping --db-uri "sqlite:///biofilter_dev.db"
 ```
 
-Migrate schema:
+`create-db` builds the schema with `create_all` and applies the master
+seeds. There is no migration step: 4.3 removed Alembic, because a
+database is built once and a schema change produces a new bundle rather
+than an in-place migration.
 
-```bash
-biofilter db migrate --target head
-biofilter db migrate --status
-```
-
-Upgrade schema + master seeds:
+Applying seed updates to an existing database:
 
 ```bash
 biofilter db upgrade
 ```
 
-Backup / restore:
+This is idempotent and seed-only. In earlier versions it also ran an
+Alembic upgrade first.
+
+## Backup and restore
+
+Physical snapshot of a database, engine-specific:
 
 ```bash
 biofilter db backup --out ./backups/dev.snapshot
 biofilter db restore --in ./backups/dev.snapshot
 ```
 
-Export / import logical bundle:
+## Bundles
+
+A bundle is normally produced by `bundle build`. `db export` writes one
+from an existing database, which is how bundles were made before 4.3:
 
 ```bash
 biofilter db export --out ./exports/biofilter_bundle --format parquet
 biofilter db import --in ./exports/biofilter_bundle --format parquet
 ```
 
-A parquet bundle can also be **read directly**, without importing it into a
-database, by pointing `--db-uri` at its `tables/` directory:
+Validate one without a database:
+
+```bash
+biofilter db verify --in ./exports/biofilter_bundle
+biofilter db verify --in ./exports/biofilter_bundle --no-hashes
+biofilter db verify --in ./exports/biofilter_bundle --schema
+```
+
+`--no-hashes` checks presence and size only. `--schema` also checks that
+the tables present carry the columns this build expects, and exits 1 on
+any problem, so CI can gate on it.
+
+A bundle can be read directly, without importing it:
 
 ```bash
 biofilter --db-uri "parquet:///exports/biofilter_bundle/tables" report list
 ```
 
-See [Parquet Backend](parquet_backend.md).
-
-## Recommended Flow
-
-```bash
-biofilter db migrate --target head
-biofilter db upgrade
-biofilter db migrate --status
-```
+See [Parquet Backend](parquet_backend.md) and
+[Building Bundles](building_bundles.md).

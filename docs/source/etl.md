@@ -1,78 +1,84 @@
 # ETL Operations
 
-ETL is how Biofilter ingests, normalizes, and versions knowledge from external sources.
+ETL is how Biofilter ingests, normalizes and versions knowledge from
+external sources. Each source is a **data source**, driven by a **DTP**
+(Data Transformation Package) through three steps: `extract`,
+`transform`, `load`.
 
-## Main Commands
+In 4.3 the ETL is a step inside a bundle build rather than an end in
+itself. `bundle build` runs it for every source in a plan; the commands
+here drive it directly, which is what you want when developing a DTP or
+re-running one source. See [Building Bundles](building_bundles.md).
 
-Update selected sources:
+## Two branches
+
+Sources fall into two groups, and they behave differently:
+
+**Core** — genes, proteins, pathways, diseases, GO, chemicals and the
+relationships between them. These DTPs resolve entities against each
+other, so they run in order and load into a relational store: the
+throwaway SQLite during a build, or whatever database you point them at
+directly.
+
+**Variant** — gnomAD, AlphaMissense, GTEx, GWAS. These write parquet
+directly and never load into a database. Their `load()` raises
+`NotImplementedError` by design, so run them with explicit steps:
+
+```bash
+biofilter etl update --data-source gnomad_joint_chr21 --run-step extract
+biofilter etl update --data-source gnomad_joint_chr21 --run-step transform
+```
+
+Variant tables link to genes by natural key — `HGNC_ID`, gene symbols —
+never by an entity id, which is what lets the two branches be built
+independently.
+
+## Commands
 
 ```bash
 biofilter etl update --data-source hgnc
-```
-
-Resumable batch update:
-
-```bash
+biofilter etl update --source-system KEGG
 biofilter etl update-all
-biofilter etl update-all --source-system NCBI
-biofilter etl update-all --drop-files
-```
-
-Status overview:
-
-```bash
 biofilter etl status
-biofilter etl status --source-system NCBI --only-active
-```
-
-Explain a DTP process:
-
-```bash
 biofilter etl explain --data-source hgnc
-biofilter etl explain --dtp-script dtp_gene_hgnc
 ```
 
-Restart with rollback + rerun:
+Restrict or force individual steps:
 
 ```bash
-biofilter etl restart --data-source gnomad_chr22
+biofilter etl update --data-source hgnc --run-step transform
+biofilter etl update --data-source hgnc --force-step transform
 ```
 
-Rollback only:
+A step is skipped when its input hash is unchanged **and** the output it
+produced still exists. Deleting a processed file causes it to be rebuilt.
 
-```bash
-biofilter etl rollback --package-id 123
-biofilter etl rollback --data-source gnomad_chr22 --delete-files
-```
+`etl update` exits non-zero when a source fails.
 
-## Monitoring Pair
+## Field and tissue selection
 
-- `biofilter etl status` for quick operational view.
-- `biofilter report run --report-name etl_packages` for detailed audit.
+The variant DTPs read a JSON config next to them in
+`biofilter/modules/etl/dtps/config/`, listing every field a source
+publishes with a `load` flag. They are include-lists: gnomAD's joint
+callset alone carries 664 INFO fields, so an exclude-list would silently
+adopt whatever a future release adds.
 
-## File Lifecycle (Raw and Processed)
+The same mechanism selects GTEx tissues — all 50 are listed, 13 enabled
+by default. Note that GTEx ships every tissue in one tarball and does not
+expose them individually, so the selection narrows the transform and the
+output, not the download.
 
-By default, BF4 uses:
+Frequency filters live in the same files. The gnomAD joint config
+defaults to `min_ac: 5`; setting it lower keeps rarer variants at
+proportionally larger output.
 
-- download path: `./downloads`
-- processed path: `./processed`
+## Adding a DTP
 
-For each data source, ETL stages typically use:
+1. `biofilter/modules/etl/dtps/dtp_<name>.py` with `extract()`,
+   `transform()` and, for a core source, `load()`
+2. `biofilter/modules/etl/dtps_explain/dtp_<name>.md` — source, behaviour,
+   caveats
+3. Register the data source in the seed
+4. Test with `biofilter etl update --data-source <name>`
 
-- raw files: `<download_path>/<source_system>/<data_source>/...`
-- processed outputs: `<processed_path>/<source_system>/<data_source>/...`
-
-You will commonly see parquet files in the processed stage (e.g., `master_data.parquet`, relationship datasets).
-
-`etl update-all --drop-files` can remove raw/processed directories after successful load for each data source.
-
-## ETL Package Tracking
-
-Each ETL run writes package metadata into the database, including:
-
-- operation type (`extract`, `transform`, `load`, `rollback`)
-- step status and timestamps
-- hash linkage to support skip/up-to-date behavior
-- error messages in package stats when failures happen
-
-This is the foundation for resumable updates and for ETL audit reports.
+See [Developer Extensions](developer_extensions.md).
