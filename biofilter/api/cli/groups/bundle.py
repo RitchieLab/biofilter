@@ -248,6 +248,17 @@ def plan_cmd(ctx, db_uri, out_path: Path, all_sources: bool, force: bool, debug:
     help="Where raw, processed and staging live.",
 )
 @click.option(
+    "--out",
+    "bundle_dir",
+    type=click.Path(file_okay=False, path_type=Path),
+    default=None,
+    help=(
+        "Where to write the bundle. Defaults to "
+        "<data-root>/bundles/<YYYYMMDD>. Refuses to overwrite a "
+        "directory that already holds one."
+    ),
+)
+@click.option(
     "--restart",
     is_flag=True,
     help=(
@@ -265,7 +276,7 @@ def plan_cmd(ctx, db_uri, out_path: Path, all_sources: bool, force: bool, debug:
     ),
 )
 @click.option("--debug", is_flag=True, help="Enable debug logging.")
-def build_cmd(plan_path: Path, data_root: Path, restart: bool, keep_raw: bool, debug: bool):  # noqa: E501
+def build_cmd(plan_path: Path, data_root: Path, bundle_dir, restart: bool, keep_raw: bool, debug: bool):  # noqa: E501
     """
     Build a bundle from a plan.
 
@@ -284,6 +295,7 @@ def build_cmd(plan_path: Path, data_root: Path, restart: bool, keep_raw: bool, d
         data_root=data_root,
         logger=bf.core.logger,
         keep_raw=keep_raw,
+        bundle_dir=bundle_dir,
     )
     result = builder.run(restart=restart)
 
@@ -303,3 +315,5 @@ def build_cmd(plan_path: Path, data_root: Path, restart: bool, keep_raw: bool, d
 
     click.echo("")
     click.echo(f"Staging database: {result.staging_db}")
+    if result.assembled:
+        click.echo(f"Bundle:           {builder.bundle_dir}")

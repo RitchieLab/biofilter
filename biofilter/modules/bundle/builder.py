@@ -13,6 +13,7 @@ See ADR-003 (notebooks/Andre/ADR/0003-parquet-native-build-pipeline.md).
 
 from __future__ import annotations
 
+import hashlib
 import json
 import shutil
 from dataclasses import dataclass, field
@@ -22,6 +23,16 @@ from typing import Dict, List, Optional
 
 VARIANT_BRANCH = "variant"
 CORE_BRANCH = "core"
+
+# Nothing is excluded. The ETL ledger looks like build state, but it is
+# the bundle's provenance: `etl_data_sources` and `etl_packages` are what
+# let a bundle answer which DTP versions and which source releases built
+# it, and the `etl_status` / `etl_packages` reports read them straight
+# from a `parquet://` bundle. The 4.2.0 bundle carries all of them.
+#
+# It matters more now than it did: a bundle cannot be rebuilt once its
+# sources move on, so what it says about itself is the only account left.
+CONTROL_TABLES: tuple = ()
 
 
 @dataclass
@@ -73,6 +84,7 @@ class BundleBuilder:
         data_root: Path,
         logger,
         keep_raw: bool = False,
+        bundle_dir: Optional[Path] = None,
     ):
         self.plan = plan
         self.bf = biofilter
@@ -83,6 +95,10 @@ class BundleBuilder:
         self.download_path = self.data_root / "raw"
         self.processed_path = self.data_root / "processed"
         self.staging_dir = self.data_root / "staging"
+        self.bundle_dir = Path(bundle_dir) if bundle_dir else (
+            self.data_root / "bundles"
+            / datetime.now(timezone.utc).strftime("%Y%m%d")
+        )
 
     # ------------------------------------------------------------------
     # Staging database
@@ -371,11 +387,198 @@ class BundleBuilder:
         missing a table looks exactly like a complete one to whoever reads
         it.
         """
-        self.logger.log(
-            "📦 All sources finished. Bundle assembly is not implemented "
-            "yet — the core branch still has to be dumped from SQLite to "
-            "parquet, and the manifest written. The staging database and "
-            "every parquet produced are in place for it.",
-            "WARNING",
+        from biofilter.modules.db.transfer import export_full_clone
+        from biofilter.utils.version import __version__
+
+        out = self.bundle_dir
+        if out.exists() and any(out.iterdir()):
+            self.logger.log(
+                f"❌ {out} already holds a bundle. Refusing to overwrite: a "
+                f"published bundle is the only surviving account of the "
+                f"data it carries, since the sources it was built from "
+                f"have moved on. Pass a different --out.",
+                "ERROR",
+            )
+            return False
+
+        out.mkdir(parents=True, exist_ok=True)
+        tables_dir = out / "tables"
+
+        self.logger.log(f"📦 Assembling bundle at {out}", "INFO")
+
+        # Core tables come straight out of the staging database. The ETL's
+        # own bookkeeping is build state, not bundle content.
+        engine = self.bf.core.require_db().engine
+
+        # Only exclude what is actually there: export_full_clone raises on
+        # an unknown name, and the staging database is built with
+        # create_all, so it has no alembic_version to exclude.
+        from sqlalchemy import inspect as sa_inspect
+
+        present = set(sa_inspect(engine).get_table_names())
+        export_full_clone(
+            engine,
+            out,
+            biofilter_version=__version__,
+            schema_version=__version__,
+            fmt="parquet",
+            exclude_tables=[t for t in CONTROL_TABLES if t in present],
+            checksums=False,
         )
-        return False
+
+        moved = self._move_variant_tables(tables_dir)
+        self._finalise_manifest(out, moved)
+        self._write_build_record(out)
+
+        self.logger.log(
+            f"✅ Bundle assembled: {out} "
+            f"({len(moved)} variant file(s) moved in)",
+            "INFO",
+        )
+        return True
+
+    def _move_variant_tables(self, tables_dir: Path) -> List[Path]:
+        """
+        Move each variant parquet into a directory named for its table.
+
+        A subdirectory per table is what makes the reader work. It groups
+        files two ways — `<table>.parquet` as one view, `<table>/` as one
+        view over everything beneath it — and has no rule for sibling
+        files sharing a prefix. Left flat, `variant_masters_chr1.parquet`
+        through `_chr25.parquet` would register as 25 separate views and
+        `variant_masters` would not exist at all.
+
+        Moved rather than copied: the variant parquets are the bulk of a
+        bundle (~15.6 GB for a full genome) and copying would need both
+        copies on disk at once. The cost is that `processed/` is left
+        empty, so re-assembling means re-running the transforms — which is
+        why the build refuses to overwrite an existing bundle rather than
+        quietly rebuilding one.
+        """
+        moved: List[Path] = []
+        for entry in self.included_sources(VARIANT_BRANCH):
+            src_dir = self.processed_path / entry["source_system"] / entry["name"]  # noqa: E501
+            if not src_dir.is_dir():
+                continue
+            for parquet in sorted(src_dir.rglob("*.parquet")):
+                table = self._table_of(parquet.stem)
+                target_dir = tables_dir / table
+                target_dir.mkdir(parents=True, exist_ok=True)
+                target = target_dir / parquet.name
+                shutil.move(str(parquet), str(target))
+                moved.append(target)
+        return moved
+
+    @staticmethod
+    def _table_of(stem: str) -> str:
+        """`variant_masters_chr21` -> `variant_masters`."""
+        marker = "_chr"
+        idx = stem.rfind(marker)
+        if idx == -1:
+            return stem
+        suffix = stem[idx + len(marker):]
+        return stem[:idx] if suffix.isdigit() else stem
+
+    def _finalise_manifest(self, out: Path, moved: List[Path]) -> None:
+        """
+        Fold the variant tables into the manifest and stamp the bundle id.
+
+        `export_full_clone` only sees what the engine holds, so the
+        variant parquets — produced outside any database — are absent from
+        the manifest it writes. Each is added with the branch that made
+        it, because the two branches carry different guarantees and a
+        reader should be able to tell them apart.
+
+        The id is derived from content, not from the run: the same tables
+        with the same rows yield the same id, so it identifies and
+        verifies the artifact instead of merely labelling an execution.
+        `created_at` is excluded for that reason.
+        """
+        manifest_path = out / "manifest.json"
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+
+        for table in manifest.get("tables", []):
+            table["branch"] = CORE_BRANCH
+
+        import pyarrow.parquet as pq
+
+        for path in moved:
+            manifest["tables"].append({
+                "name": path.stem,
+                "table": self._table_of(path.stem),
+                "branch": VARIANT_BRANCH,
+                "rows": pq.ParquetFile(path).metadata.num_rows,
+                "file": str(path.relative_to(out)),
+                "bytes": path.stat().st_size,
+            })
+
+        fingerprint = json.dumps(
+            sorted(
+                (t.get("name"), t.get("rows"), t.get("bytes"))
+                for t in manifest["tables"]
+            ),
+            sort_keys=True,
+        )
+        manifest["bundle_id"] = hashlib.sha256(
+            fingerprint.encode("utf-8")
+        ).hexdigest()[:16]
+        manifest["plan"] = "bundle_plan.json"
+        manifest["build_record"] = "build_record.json"
+
+        manifest_path.write_text(
+            json.dumps(manifest, indent=2) + "\n", encoding="utf-8"
+        )
+        self.logger.log(f"   bundle_id: {manifest['bundle_id']}", "INFO")
+
+    def _write_build_record(self, out: Path) -> None:
+        """
+        Write the plan and a record of how the build ran, beside the data.
+
+        These travel with the bundle because they are the only account of
+        it that survives. A source pinned to `current` will have moved on,
+        so the bundle cannot be rebuilt — what it holds has to be legible
+        from the bundle itself, years later.
+        """
+        from biofilter.modules.db.models import ETLDataSource, ETLPackage
+
+        (out / "bundle_plan.json").write_text(
+            json.dumps(self.plan, indent=2) + "\n", encoding="utf-8"
+        )
+
+        steps = []
+        with self.bf.core.require_db().get_session() as session:
+            rows = (
+                session.query(ETLPackage, ETLDataSource)
+                .join(ETLDataSource, ETLDataSource.id == ETLPackage.data_source_id)  # noqa: E501
+                .order_by(ETLPackage.id)
+                .all()
+            )
+            for pkg, ds in rows:
+                steps.append({
+                    "data_source": ds.name,
+                    "dtp_script": ds.dtp_script,
+                    "dtp_version": ds.dtp_version,
+                    "source_url": ds.source_url,
+                    "step": pkg.operation_type,
+                    "status": pkg.status,
+                    "hash": pkg.extract_hash,
+                    "started": str(
+                        pkg.extract_start or pkg.transform_start or pkg.load_start or ""  # noqa: E501
+                    ),
+                    "finished": str(
+                        pkg.load_end or pkg.transform_end or pkg.extract_end or ""  # noqa: E501
+                    ),
+                })
+
+        (out / "build_record.json").write_text(
+            json.dumps(
+                {
+                    "built_at": datetime.now(timezone.utc).isoformat(),
+                    "biofilter_version": self.plan.get("biofilter_version"),
+                    "steps": steps,
+                },
+                indent=2,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
