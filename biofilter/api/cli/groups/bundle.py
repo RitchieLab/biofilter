@@ -34,6 +34,52 @@ PLAN_VERSION = 1
 # each other while they load.
 VARIANT_DATA_TYPE = "Variant"
 
+# Execution order for the core branch. This is the dependency
+# declaration: sources run in the order the plan lists them, and the core
+# DTPs resolve entities against what earlier ones created.
+#
+# The database's own id order is *not* usable here — it is seed insertion
+# order, which has gene_ncbi at 1 and hgnc at 2, the reverse of what the
+# gene load needs. HGNC is the authoritative nomenclature and seeds the
+# gene entities; NCBI and Ensembl enrich what it created.
+#
+# Only the gene ordering is firm. `dtp_gene_ensembl` states its
+# requirement ("requires prior gene load (HGNC/NCBI)"); the rest follows
+# the rule that a master must precede the relationships drawn over it,
+# which is derivable but not declared anywhere. Anything not listed keeps
+# its database order, after everything that is.
+CORE_ORDER = [
+    # Genes first: everything downstream resolves against them.
+    "hgnc",
+    "gene_ncbi",
+    "ensembl",
+    # Domain masters. Pfam before UniProt: the protein load attaches
+    # domain families to the proteins it creates, so the families have to
+    # exist first.
+    "pfam",
+    "uniprot",
+    "reactome",
+    "kegg_pathways",
+    "gene_ontology",
+    "mondo",
+    "chebi",
+    # Relationships, each after the master it draws over.
+    "uniprot_relationships",
+    "reactome_relationships",
+    "kegg_relationships",
+    "mondo_relationships",
+    "biogrid",
+    "clingen",
+]
+
+
+def _core_sort_key(name: str) -> tuple:
+    """Position in CORE_ORDER; unlisted sources sort after, by name."""
+    try:
+        return (0, CORE_ORDER.index(name))
+    except ValueError:
+        return (1, name)
+
 
 @click.group()
 def bundle():
@@ -106,7 +152,7 @@ def plan_cmd(ctx, db_uri, out_path: Path, all_sources: bool, force: bool, debug:
         rows = (
             session.query(ETLDataSource, ETLSourceSystem.name)
             .join(ETLSourceSystem, ETLSourceSystem.id == ETLDataSource.source_system_id)  # noqa: E501
-            .order_by(ETLDataSource.data_type, ETLDataSource.name)
+            .order_by(ETLDataSource.id)
             .all()
         )
 
@@ -123,6 +169,8 @@ def plan_cmd(ctx, db_uri, out_path: Path, all_sources: bool, force: bool, debug:
             }
             (variant if ds.data_type == VARIANT_DATA_TYPE else core).append(entry)  # noqa: E501
 
+        core.sort(key=lambda e: _core_sort_key(e["name"]))
+
     plan = {
         "plan_version": PLAN_VERSION,
         "biofilter_version": __version__,
@@ -136,7 +184,14 @@ def plan_cmd(ctx, db_uri, out_path: Path, all_sources: bool, force: bool, debug:
             "The plan is recorded in the bundle manifest, so an archived",
             "plan identifies how a published bundle was produced.",
             "",
-            "Branches run independently and in parallel:",
+            "ORDER MATTERS. Sources run in the order they appear here,",
+            "and that order is the dependency declaration: the core branch",
+            "resolves entities against what earlier sources created, so",
+            "hgnc has to precede ensembl. Reordering this list reorders",
+            "the build. The generated order is the one the ETL has always",
+            "used (seed insertion order).",
+            "",
+            "Branches run independently:",
             "  core    - staged through a throwaway SQLite, then dumped to",
             "            parquet. These DTPs resolve entities against each",
             "            other, so they need a transactional store.",

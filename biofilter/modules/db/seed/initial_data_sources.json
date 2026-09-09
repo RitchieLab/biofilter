@@ -30,7 +30,7 @@
             "source_system": "Ensembl",
             "name": "ensembl",
             "data_type": "Gene",
-            "source_url": "https://ftp.ensembl.org/pub/current_gff3/homo_sapiens/Homo_sapiens.GRCh38.115.chr.gff3.gz",
+            "source_url": "https://ftp.ensembl.org/pub/current_gff3/homo_sapiens/Homo_sapiens.GRCh38.116.chr.gff3.gz",
             "format": "GFF3",
             "grch_version": "GRCh38",
             "ucschg_version": "hg38",

@@ -6,8 +6,8 @@ Decisions live in the ADR; this file tracks execution state only.
 **Branch:** `release/4.3.0`
 **Acceptance target:** the 4.2.0 bundle at `../../../bf_files/` — same table
 set, known row counts, per-file sha256 in its manifest.
-**Last updated:** 2026-09-09, after Phase 3 (variant branch) and the build
-orthestrator landed (`032bd91` … `d53f9c7`).
+**Last updated:** 2026-09-09, after the first end-to-end build ran: seven
+core sources through SQLite, resumed across a real failure.
 
 Legend: `[ ]` todo · `[~]` in progress · `[x]` done · `[!]` blocked
 
@@ -180,18 +180,70 @@ Independent of the pipeline split; safe to do first.
       and required by HGNC/MONDO/NCBI/ChEBI. Update the import in
       `utils/db_loader.py:19`.
 
-## Phase 2 — Core branch (SQLite staging)
+## Phase 2 — Core branch (SQLite staging) — validated 2026-09-09
 
-- [ ] Split the ETL orchestrator into core and variant branches, keyed
-      on `data_type == 'Variant'`. `ETLManager.start_process_all`
-      (`etl_manager.py:250`) is the entry point.
-- [ ] Independent resume per branch — a failed variant branch must not
-      force a core rebuild.
-- [ ] Point the core branch at a throwaway SQLite built with
-      `create_all`. Target size ~105 MB / 6.98 M rows.
-- [ ] Dump the SQLite core to parquet after the branch completes.
-- [ ] Retain the SQLite as a build artifact outside the published bundle
-      (ADR §4, Alternative E).
+Run end to end with `hgnc, gene_ncbi, ensembl, reactome, kegg_pathways,
+reactome_relationships, kegg_relationships`. Counts against the 4.2.0
+bundle, for the tables those seven own:
+
+| table | staging | bundle 4.2.0 |
+| ----- | ------- | ------------ |
+| gene_masters | 72,660 | 72,647 |
+| entity_locations | 39,306 | 38,882 |
+| pathway_masters | 3,255 | 3,220 |
+| genome_assemblies | 49 | 49 |
+
+Slightly above the bundle because the sources are newer (Ensembl 116 vs
+115). The tables far below it — entities, entity_aliases,
+entity_relationships — belong to the nine sources not included.
+
+**The core DTPs need no adaptation for SQLite.** Seven ran unchanged,
+including both relationship DTPs and Ensembl, which carries the only
+dialect-specific path in the core (`pg_insert` with `ON CONFLICT`) and
+had never been exercised on its SQLite branch.
+
+**The declared order holds.** Ensembl resolved against the genes HGNC and
+NCBI created; KEGG and Reactome resolved against the same universe.
+
+### ⚠ Time, not space, is what the core branch costs
+
+| step | hgnc |
+| ---- | ---- |
+| extract | 6 s |
+| transform | 1 s |
+| **load** | **518 s** |
+
+The load is 74x everything else, at roughly 85 entities/second. ADR-003
+argued the core is comfortable in SQLite because it is 105 MB — true
+about space, silent about time. At that rate the 4.06 M rows of
+`entity_relationships` alone extrapolate to ~13 hours.
+
+The cause is `get_or_create_*`: a SELECT then an INSERT per row through
+the ORM. The variant DTPs have bulk paths (`_bulk_insert_records`, `COPY`
+on Postgres); the core DTPs have none. ChEBI was dropped from this run
+for exactly this reason — it was still loading 117,265 chemicals when it
+was killed.
+
+- [ ] **Batch the core load.** Probably worth more than anything else
+      left in Phase 2.
+
+
+- [x] Split core and variant branches — done in `BundleBuilder`, not in
+      `ETLManager` as this item proposed. The ETL stayed a data-source
+      executor that knows nothing about branches; the plan declares them
+      and the builder passes different `run_steps`. Less invasive, and
+      build policy lives in one place.
+- [x] Resume — per source rather than per branch, which is finer. Proven
+      against a real failure: Ensembl 404'd because the source published
+      release 116 while the seed pinned 115; after fixing the URL, the
+      re-run skipped six sources and executed one.
+- [x] Throwaway SQLite via `create_all` (`prepare_staging`). 180 MB for
+      seven sources.
+- [ ] Dump the SQLite core to parquet — this is `_assemble()`, still a
+      stub. `export_full_clone` in `transfer.py` already does
+      database → parquet + manifest, so this is orchestration rather
+      than new code.
+- [x] The SQLite stays under `<data-root>/staging`, outside the bundle.
 
 ## Phase 3 — Variant branch (parquet-direct) ✅ done 2026-09-09
 
@@ -409,6 +461,24 @@ anything else that drives the ETL programmatically.
       against 348 GB free locally. Chromosomes must be processed and
       discarded, or `data_root` must point at external storage. Still not
       in the ADR.
+- [x] ~~Sources pinned to `current` break reproducibility~~ — resolved
+      2026-09-09, and not the way it was framed. Ensembl's URL points at
+      `current_gff3` with the release number in the file name, so it
+      404s whenever Ensembl publishes, and a rebuild would pull different
+      data than the original run.
+
+      The decision is that this is expected rather than a defect: when a
+      source changes, you build a **new** bundle against the new data,
+      and the old bundle stays a snapshot of a moment that can no longer
+      be recreated. Reproducibility lives in the retained artifact, not
+      in the ability to rebuild it — which is why bundles are backed up
+      and versioned as the record. Simpler than pinning every source, and
+      honest about what an upstream release actually means.
+
+      Consequence for Phase 4: the manifest has to be complete enough to
+      identify what a bundle contains, because it is the only account
+      that will survive. And bundle retention stops being housekeeping
+      and becomes the archive.
 
 ## Deferred (not 4.3.0 scope)
 
