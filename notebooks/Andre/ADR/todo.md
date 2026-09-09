@@ -6,8 +6,8 @@ Decisions live in the ADR; this file tracks execution state only.
 **Branch:** `release/4.3.0`
 **Acceptance target:** the 4.2.0 bundle at `../../../bf_files/` — same table
 set, known row counts, per-file sha256 in its manifest.
-**Last updated:** 2026-09-09, after Phase 3 (variant branch) completed and
-was committed (`032bd91`, `c46c758`).
+**Last updated:** 2026-09-09, after Phase 3 (variant branch) and the build
+orthestrator landed (`032bd91` … `d53f9c7`).
 
 Legend: `[ ]` todo · `[~]` in progress · `[x]` done · `[!]` blocked
 
@@ -144,7 +144,13 @@ Decisions taken:
       Uses the origin's `x-goog-hash` md5 as the package hash instead of
       re-reading a 20 GB file from disk; per-file hashes are folded into
       one composite digest for the extract skip-logic.
-- [x] `dtp_variant_gnomad` (old) left intact, as agreed.
+- [x] ~~`dtp_variant_gnomad` (old) left intact~~ — removed in
+      `38f754e`. Generating the first plan showed it and its 24 data
+      sources were still active, so a build would have run both
+      gnomAD pipelines over the same data. Its mentions in ADR-002
+      and ADR-003 are left alone: they are historical records, and
+      ADR-003 §1 cites measurements from it as the evidence for this
+      migration.
 - [ ] **ETL dependency module — deferred, not rejected.** There is no
       dependency model today (`start_process_all` orders by
       `data_source_id asc`; no `depends_on`, no topological sort). The
@@ -283,6 +289,52 @@ URLs 404), so the download is all-or-nothing.
 The data source was renamed `gtex_v10_brain_eqtl` → `gtex_v10_eqtl`.
 
 
+## Build orchestration ✅ landed 2026-09-09
+
+`bundle plan` writes the recipe; `bundle build` runs it. Verified on a
+real single-source plan, not by inspection.
+
+- [x] `bundle plan` enumerates every source with an `include` flag, its
+      DTP, version and config path, split into the two branches. Refuses
+      to overwrite without `--force`, since a plan may be the only record
+      of how a published bundle was made.
+- [x] `bundle build` creates a throwaway SQLite under
+      `<data-root>/staging`, runs each included source, reclaims disk, and
+      assembles only if every source succeeded.
+- [x] Resume is the default; `--restart` discards the staging database.
+      Tested: a clean build, a resume with everything already done (no
+      download at all), a resume after the parquet was deleted (rebuilds
+      it), and `--restart`.
+- [x] Per-branch discard: variant keeps its parquet and drops the raw
+      VCFs; core drops both once the rows are staged.
+- [x] All-or-nothing assembly. A partial bundle is indistinguishable from
+      a complete one to a reader.
+- [ ] `_assemble()` is a stub. Needs Phase 2 (core branch dumped from
+      SQLite to parquet) and Phase 4 (manifest).
+
+### Sequential, and why that is not a limitation
+
+The build runs sources one at a time. Requested as parallel; implemented
+sequential because parallelism works against the constraint that
+motivated the discard in the first place. Peak disk for one chromosome is
+~126 GB and the full download is ~1.53 TB, so N workers means N times the
+peak. Downloads gain nothing anyway — four parallel range streams
+measured 66.6 MB/s against 64.2 MB/s for one, since the local link
+saturates. Core and variant could overlap (core is 105 MB and does not
+strain disk), but they would contend on the same SQLite ledger for no
+wall-clock gain, as neither is CPU-bound while the other waits on the
+network.
+
+### `--data-root` has to be pinned into the staging database
+
+The ETL reads `download_path` and `processed_path` from `system_config`,
+not from its caller. A freshly seeded database carries the packaged
+defaults, so the ETL wrote under `./biofilter_data` while the builder
+reclaimed disk under `--data-root` — the discard deleted the wrong copy
+and the real download was never freed. The builder now writes both
+settings into the staging database before running. Worth remembering for
+anything else that drives the ETL programmatically.
+
 ## Phase 4 — Bundle identity
 
 - [ ] Write `biofilter_metadata` **from the build**, with a real
@@ -311,18 +363,19 @@ The data source was renamed `gtex_v10_brain_eqtl` → `gtex_v10_eqtl`.
       content per table (ordering included).
 - [ ] Acceptance run against `bf_files/`: compare row counts table by
       table, and content for the core's 29 tables.
-- [ ] **The extract/transform skip only checks the hash, never the
-      artifact.** Deleting the processed parquets and re-running reported
-      `up-to-date` and wrote nothing. That was survivable when the truth
-      lived in PostgreSQL and the processed files were scratch; now the
-      parquet *is* the product, so a build can declare success over a
-      table that is not there. Verify the output exists (and is
-      non-empty) before honouring a hash match.
-- [ ] **A DTP failure can leave its ETL package stuck in `running`.**
-      When the VEP transform raised on a schema mismatch, the CLI still
-      exited 0 and logged "ETL update process finished" while package 73
-      sat at `running` in the database. Whatever wraps a step should mark
-      it failed on the way out.
+- [x] ~~The extract/transform skip only checks the hash~~ — fixed in
+      `df9e15a`. Both steps verify their own product still exists. The
+      extract check had to be careful: requiring the raw file would
+      re-download 1.5 TB on every resume, since the build deletes raw on
+      purpose, so it skips when the raw is present *or* a transform
+      already completed for that hash.
+- [x] ~~A DTP failure can leave its package stuck in `running`~~ — fixed
+      in `df9e15a`. The three DTP calls mark the package failed with the
+      exception before re-raising.
+- [ ] **A failed step still ends with `✅ ETL update process finished`.**
+      Both failure tests logged the error and then printed a success line
+      as the last thing on screen. For an unattended multi-hour build the
+      final line and the exit code should reflect the failure.
 
 ## Phase 6 — Documentation
 
