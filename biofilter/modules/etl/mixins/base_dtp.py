@@ -1,4 +1,6 @@
+import base64
 import os
+import time
 from pathlib import Path
 from typing import Dict, Optional
 
@@ -96,6 +98,183 @@ class DTPBase(DBTuningMixin):
 
         msg = f"Downloaded {filename} to {landing_dir}"
         return True, msg
+
+    # ------------------------------------------------------------------
+    # Resumable download (large files)
+    # ------------------------------------------------------------------
+    def remote_file_info(self, url: str) -> Dict[str, Optional[str]]:
+        """
+        Probe a URL with HEAD and return size, server-side md5 and whether
+        the origin honours byte ranges.
+
+        Google Cloud Storage exposes the object's md5 through the
+        `x-goog-hash` header (base64), which lets us record a content hash
+        without reading a multi-gigabyte file back from disk.
+        """
+        info: Dict[str, Optional[str]] = {
+            "size": None,
+            "md5": None,
+            "accept_ranges": None,
+        }
+        try:
+            resp = requests.head(url, allow_redirects=True, timeout=60)
+        except Exception:
+            return info
+
+        if resp.status_code != 200:
+            return info
+
+        length = resp.headers.get("Content-Length")
+        if length and length.isdigit():
+            info["size"] = int(length)
+
+        info["accept_ranges"] = resp.headers.get("Accept-Ranges")
+
+        # `x-goog-hash` may carry several comma-separated algorithms.
+        raw_hash = resp.headers.get("x-goog-hash", "")
+        for part in raw_hash.split(","):
+            part = part.strip()
+            if part.startswith("md5="):
+                try:
+                    info["md5"] = base64.b64decode(part[4:]).hex()
+                except Exception:
+                    info["md5"] = None
+                break
+
+        if not info["md5"]:
+            etag = (resp.headers.get("ETag") or "").strip('"')
+            # A plain 32-hex ETag is the object md5; multipart ETags
+            # (which carry a `-N` suffix) are not, so they are ignored.
+            if len(etag) == 32 and all(c in "0123456789abcdef" for c in etag):
+                info["md5"] = etag
+
+        return info
+
+    def http_download_resumable(
+        self,
+        url: str,
+        landing_dir: str,
+        *,
+        max_retries: int = 5,
+        chunk_size: int = 8 * 1024 * 1024,
+        expected_size: Optional[int] = None,
+        expected_md5: Optional[str] = None,
+    ) -> tuple:
+        """
+        Download `url` into `landing_dir`, resuming a partial file instead
+        of restarting it.
+
+        Written for the gnomAD VCFs, where a single file is 2-11 GB and a
+        dropped connection several hours in must not cost the whole
+        transfer. Returns `(ok, message, md5)`.
+
+        A partial file is continued with a `Range` request; a file already
+        at the expected size is left alone and reported as complete.
+        """
+        filename = os.path.basename(url)
+        os.makedirs(landing_dir, exist_ok=True)
+        local_path = Path(landing_dir) / filename
+
+        total = expected_size
+        md5 = expected_md5
+        supports_range = True
+
+        if total is None or md5 is None:
+            info = self.remote_file_info(url)
+            if total is None:
+                total = info["size"]
+            if md5 is None:
+                md5 = info["md5"]
+            supports_range = (info["accept_ranges"] or "").lower() == "bytes"
+
+        existing = local_path.stat().st_size if local_path.exists() else 0
+
+        if total is not None and existing == total:
+            msg = f"✅ {filename} already complete ({existing:,} bytes)"
+            self.logger.log(msg, "INFO")
+            return True, msg, md5
+
+        if total is not None and existing > total:
+            # Longer than the origin: a truncated or corrupt artifact.
+            # Restarting is the only safe recovery.
+            self.logger.log(
+                f"⚠️  {filename} is larger than the remote file. Restarting.",
+                "WARNING",
+            )
+            local_path.unlink()
+            existing = 0
+
+        if existing and not supports_range:
+            self.logger.log(
+                f"⚠️  Origin does not accept ranges. Restarting {filename}.",
+                "WARNING",
+            )
+            local_path.unlink()
+            existing = 0
+
+        attempt = 0
+        while attempt < max_retries:
+            attempt += 1
+            headers = {}
+            mode = "wb"
+            if existing:
+                headers["Range"] = f"bytes={existing}-"
+                mode = "ab"
+                pct = f" ({100 * existing / total:.1f}%)" if total else ""
+                self.logger.log(
+                    f"⏭️  Resuming {filename} at {existing:,} bytes{pct}",
+                    "INFO",
+                )
+            else:
+                size_note = f" ({total:,} bytes)" if total else ""
+                self.logger.log(
+                    f"⬇️  Downloading {filename}{size_note}", "INFO"
+                )
+
+            try:
+                resp = requests.get(
+                    url, headers=headers, stream=True, timeout=120
+                )
+                if resp.status_code not in (200, 206):
+                    raise IOError(f"HTTP {resp.status_code}")
+                if existing and resp.status_code == 200:
+                    # Range was ignored; the body is the whole object.
+                    mode = "wb"
+                    existing = 0
+
+                with open(local_path, mode) as fh:
+                    for chunk in resp.iter_content(chunk_size=chunk_size):
+                        if chunk:
+                            fh.write(chunk)
+
+                existing = local_path.stat().st_size
+                if total is None or existing >= total:
+                    msg = f"✅ Downloaded {filename} ({existing:,} bytes)"
+                    self.logger.log(msg, "INFO")
+                    return True, msg, md5
+
+                self.logger.log(
+                    f"⚠️  {filename} incomplete "
+                    f"({existing:,}/{total:,}). Retrying.",
+                    "WARNING",
+                )
+            except Exception as exc:  # noqa: BLE001
+                existing = (
+                    local_path.stat().st_size if local_path.exists() else 0
+                )
+                self.logger.log(
+                    f"⚠️  {filename} failed on attempt {attempt}/"
+                    f"{max_retries}: {exc}",
+                    "WARNING",
+                )
+                if attempt < max_retries:
+                    time.sleep(min(2 ** attempt, 60))
+
+        msg = (
+            f"❌ Failed to download {filename} after {max_retries} attempts "
+            f"({existing:,}/{total or 0:,} bytes)"
+        )
+        return False, msg, md5
 
     def get_md5_from_url_file(self, url_md5: str) -> Optional[str]:
 

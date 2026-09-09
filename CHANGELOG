@@ -1,5 +1,10 @@
 CHANGELOG
 
+4.3.0 (in development):
+
+- Development branch `release/4.3.0` opened from 4.2.1
+- ETL layer under review — data root layout and DTP pipeline expected to change
+
 4.2.1 (29/08/2026):
 
 - Parquet bundle foundation — turns the bundle into a first-class build
