@@ -148,6 +148,10 @@ def test_start_process_normalizes_inputs_and_runs_each_datasource(monkeypatch):
     monkeypatch.setattr(manager, "_resolve_datasource_ids", fake_resolve)
     monkeypatch.setattr(manager, "_load_datasource", fake_load)
     monkeypatch.setattr(manager, "_run_one_datasource", fake_run_one_datasource)
+    # start_process no longer trusts the call returning: it confirms each
+    # step against the package ledger, because a DTP can report failure
+    # without raising.
+    monkeypatch.setattr(manager, "_datasource_steps_ok", lambda *a, **k: True)
 
     manager.start_process(
         source_system="NCBI",

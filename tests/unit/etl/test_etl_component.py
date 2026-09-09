@@ -63,6 +63,7 @@ def test_update_passes_paths_and_steps_to_manager(monkeypatch):
     class FakeManager:
         def start_process(self, **kwargs):
             called.update(kwargs)
+            return True
 
     core = DummyCore()
     component = etl_comp_mod.ETLComponent(core)

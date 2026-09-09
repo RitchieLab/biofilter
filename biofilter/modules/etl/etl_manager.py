@@ -7,7 +7,7 @@ import shutil
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Iterable, Optional, Sequence
+from typing import Any, Iterable, List, Optional, Sequence
 
 from sqlalchemy import MetaData, func, or_, select
 from sqlalchemy.exc import SQLAlchemyError
@@ -205,7 +205,7 @@ class ETLManager:
         processed_path: Optional[str] = None,
         run_steps: Optional[Sequence[str]] = None,
         force_steps: Optional[Sequence[str]] = None,
-    ) -> None:
+    ) -> bool:
         if run_steps is None:
             run_steps = ["extract", "transform", "load"]
         if force_steps is None:
@@ -223,7 +223,7 @@ class ETLManager:
         if not source_system and not data_sources:
             msg = "❌ No source_system or data_sources provided. Aborting."
             self.logger.log(msg, "ERROR")
-            return
+            return False
 
         # Query DataSources in a short-lived session
         with self.db.get_session() as session:
@@ -232,21 +232,69 @@ class ETLManager:
         if not ds_ids:
             msg = "⚠️ No matching active DataSources found."
             self.logger.log(msg, "WARNING")
-            return
+            return False
 
         # Run each datasource with its OWN session
         # (keeps package updates consistent per ds)
+        failed: List[str] = []
         for ds_id in ds_ids:
             with self.db.get_session() as session:
                 ds = self._load_datasource(session, ds_id)
-                self._run_one_datasource(
-                    session=session,
-                    ds=ds,
-                    download_path=download_path,
-                    processed_path=processed_path,
-                    run_steps=run_steps,
-                    force_steps=force_steps,
+                name = ds.name
+                try:
+                    self._run_one_datasource(
+                        session=session,
+                        ds=ds,
+                        download_path=download_path,
+                        processed_path=processed_path,
+                        run_steps=run_steps,
+                        force_steps=force_steps,
+                    )
+                except Exception:  # noqa: BLE001
+                    failed.append(name)
+                    continue
+                if not self._datasource_steps_ok(session, ds_id, run_steps):
+                    failed.append(name)
+
+        if failed:
+            self.logger.log(
+                f"❌ {len(failed)} data source(s) did not complete: "
+                f"{', '.join(failed)}",
+                "ERROR",
+            )
+        return not failed
+
+    def _datasource_steps_ok(
+        self,
+        session: Session,
+        ds_id: int,
+        run_steps: Sequence[str],
+    ) -> bool:
+        """
+        Whether every step this run asked for reached a terminal success.
+
+        Checked against the package ledger rather than inferred from the
+        call returning: a DTP that returns `(False, msg)` marks its package
+        failed without raising, so a caller watching only for exceptions
+        sees a clean run. That is how a failed step used to end with
+        "ETL update process finished" as the last line on screen.
+        """
+        ok_states = {"completed", "up-to-date", "not-applicable"}
+        for step in run_steps:
+            pkg = (
+                session.query(ETLPackage)
+                .filter(
+                    ETLPackage.data_source_id == ds_id,
+                    ETLPackage.operation_type == step,
                 )
+                .order_by(ETLPackage.id.desc())
+                .first()
+            )
+            if pkg is None:
+                return False
+            if str(getattr(pkg, f"{step}_status", "")) not in ok_states:
+                return False
+        return True
 
     def start_process_all(
         self,

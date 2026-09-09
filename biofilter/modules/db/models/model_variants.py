@@ -502,19 +502,13 @@ class VariantGWAS(Base):
     # Notes
     notes = Column(Text, nullable=True)
 
-    data_source_id = Column(
-        Integer,
-        ForeignKey("etl_data_sources.id", ondelete="CASCADE"),
-        nullable=True,
-    )
-    data_source = relationship("ETLDataSource", passive_deletes=True)
-
-    etl_package_id = Column(
-        Integer,
-        ForeignKey("etl_packages.id", ondelete="CASCADE"),
-        nullable=True,
-    )
-    etl_package = relationship("ETLPackage", passive_deletes=True)
+    # Provenance (no FK), matching the other variant tables. This one
+    # declared real constraints while its siblings did not, which stopped
+    # meaning anything once the variant branch began writing parquet with
+    # no database present — a constraint nothing can enforce is worse than
+    # none, because it suggests a guarantee that is not there.
+    data_source_id = Column(Integer, nullable=True)
+    etl_package_id = Column(Integer, nullable=True)
 
     snp_links = relationship(
         "VariantGWASSNP",

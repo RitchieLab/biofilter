@@ -20,6 +20,9 @@ class FakeETLFacade:
 
     def update(self, **kwargs):
         self.calls.append(("update", kwargs))
+        # update() reports completion now; the CLI exits non-zero when it
+        # is falsy, so the fake has to say the run succeeded.
+        return True
 
     def update_all(self, **kwargs):
         self.calls.append(("update_all", kwargs))
