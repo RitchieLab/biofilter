@@ -427,7 +427,8 @@ class BundleBuilder:
         )
 
         moved = self._move_variant_tables(tables_dir)
-        self._finalise_manifest(out, moved)
+        bundle_id = self._finalise_manifest(out, moved)
+        self._stamp_metadata(tables_dir, bundle_id)
         self._write_build_record(out)
 
         self.logger.log(
@@ -479,7 +480,7 @@ class BundleBuilder:
         suffix = stem[idx + len(marker):]
         return stem[:idx] if suffix.isdigit() else stem
 
-    def _finalise_manifest(self, out: Path, moved: List[Path]) -> None:
+    def _finalise_manifest(self, out: Path, moved: List[Path]) -> str:
         """
         Fold the variant tables into the manifest and stamp the bundle id.
 
@@ -512,23 +513,94 @@ class BundleBuilder:
                 "bytes": path.stat().st_size,
             })
 
+        # biofilter_metadata is excluded from the fingerprint because it
+        # is rewritten to carry the id itself; including it would make the
+        # id depend on its own value and stop it being recomputable from
+        # the finished bundle.
         fingerprint = json.dumps(
             sorted(
                 (t.get("name"), t.get("rows"), t.get("bytes"))
                 for t in manifest["tables"]
+                if t.get("name") != "biofilter_metadata"
             ),
             sort_keys=True,
         )
-        manifest["bundle_id"] = hashlib.sha256(
-            fingerprint.encode("utf-8")
-        ).hexdigest()[:16]
+        bundle_id = hashlib.sha256(fingerprint.encode("utf-8")).hexdigest()[:16]  # noqa: E501
+        manifest["bundle_id"] = bundle_id
         manifest["plan"] = "bundle_plan.json"
         manifest["build_record"] = "build_record.json"
 
         manifest_path.write_text(
             json.dumps(manifest, indent=2) + "\n", encoding="utf-8"
         )
-        self.logger.log(f"   bundle_id: {manifest['bundle_id']}", "INFO")
+        self.logger.log(f"   bundle_id: {bundle_id}", "INFO")
+        return bundle_id
+
+    def _stamp_metadata(self, tables_dir: Path, bundle_id: str) -> None:
+        """
+        Rewrite `biofilter_metadata` so the bundle stops misreporting itself.
+
+        The row is seeded when the database is created and nothing ever
+        updated it, so every bundle carried the values it was born with:
+        the 4.2.0 bundle claims schema 4.1.0 with a null build_hash and a
+        created_at from the day its source database was first made. A
+        reader taking the version from the tables — the normal path — got
+        the wrong answer.
+
+        Written here rather than during the ETL because the id is derived
+        from the finished tables, so it cannot exist any earlier.
+        """
+        import pyarrow as pa
+        import pyarrow.parquet as pq
+
+        from biofilter.utils.version import __version__
+
+        path = tables_dir / "biofilter_metadata.parquet"
+        if not path.is_file():
+            self.logger.log(
+                "⚠️  biofilter_metadata is absent from the bundle; the "
+                "version it reports cannot be corrected.",
+                "WARNING",
+            )
+            return
+
+        table = pq.read_table(path)
+        now = datetime.now(timezone.utc)
+        replacements = {
+            "schema_version": __version__,
+            "schema_revision": __version__,
+            "etl_version": __version__,
+            "build_hash": bundle_id,
+            "description": f"Bundle {bundle_id}",
+            "updated_at": now.replace(tzinfo=None),
+        }
+
+        columns, names = [], []
+        for field in table.schema:
+            names.append(field.name)
+            if field.name in replacements:
+                value = replacements[field.name]
+                # The column types come from whatever the export produced,
+                # and timestamps land as strings there, so coerce rather
+                # than assume.
+                if isinstance(value, datetime) and pa.types.is_string(field.type):  # noqa: E501
+                    value = value.isoformat(sep=" ")
+                columns.append(
+                    pa.array([value] * table.num_rows, type=field.type)
+                )
+            else:
+                columns.append(table.column(field.name))
+
+        pq.write_table(
+            pa.Table.from_arrays(columns, names=names),
+            path,
+            compression="zstd",
+        )
+        self.logger.log(
+            f"   biofilter_metadata: version {__version__}, "
+            f"build_hash {bundle_id}",
+            "INFO",
+        )
 
     def _write_build_record(self, out: Path) -> None:
         """

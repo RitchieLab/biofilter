@@ -262,6 +262,7 @@ class ReportManager:
                 report = self.get(identifier, session=session, **kwargs)
                 report_name = getattr(report, "name", identifier)
                 result = report.run()
+                result = self._stamp_bundle(result)
 
                 elapsed_seconds = time.perf_counter() - start_time
                 elapsed_minutes = elapsed_seconds / 60.0
@@ -309,6 +310,32 @@ class ReportManager:
                     session.rollback()
                 except Exception:
                     pass
+
+    def _stamp_bundle(self, result):
+        """
+        Record which bundle a result came from, when it came from one.
+
+        Ids in a result — entity_id, variant_id — are internal to a single
+        bundle (ADR-003 §2.5). The same integer means a different entity
+        in the next build, and the drift is small enough that a stale id
+        still resolves, to the wrong row. Carrying the bundle id alongside
+        the data is what makes that detectable.
+
+        Attached as a DataFrame attribute, which survives in memory and in
+        the notebook but not through a CSV export; stamping the export
+        itself is a separate change.
+        """
+        bundle_id = None
+        try:
+            if self.db is not None and hasattr(self.db, "bundle_id"):
+                bundle_id = self.db.bundle_id()
+        except Exception:  # noqa: BLE001
+            # Never let provenance bookkeeping fail a report that ran.
+            bundle_id = None
+
+        if bundle_id and hasattr(result, "attrs"):
+            result.attrs["bundle_id"] = bundle_id
+        return result
 
     def run_example(self, identifier: str, **kwargs):
         cls = self.get_class(identifier)

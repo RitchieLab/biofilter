@@ -317,3 +317,50 @@ def build_cmd(plan_path: Path, data_root: Path, bundle_dir, restart: bool, keep_
     click.echo(f"Staging database: {result.staging_db}")
     if result.assembled:
         click.echo(f"Bundle:           {builder.bundle_dir}")
+
+
+@bundle.command("info")
+@click.argument(
+    "bundle_path",
+    type=click.Path(exists=True, file_okay=False, path_type=Path),
+)
+def info_cmd(bundle_path: Path):
+    """
+    Show what a bundle says about itself.
+
+    A bundle cannot be rebuilt once its sources move on, so its manifest
+    is the only surviving account of what it holds — this prints it.
+    """
+    manifest_path = bundle_path / "manifest.json"
+    if not manifest_path.is_file():
+        manifest_path = bundle_path.parent / "manifest.json"
+    if not manifest_path.is_file():
+        raise click.ClickException(f"No manifest.json under {bundle_path}")
+
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    tables = manifest.get("tables", [])
+
+    click.echo(f"Bundle id:      {manifest.get('bundle_id', '(none)')}")
+    click.echo(f"Biofilter:      {manifest.get('biofilter_version')}")
+    click.echo(f"Schema:         {manifest.get('schema_version')}")
+    click.echo(f"Built:          {manifest.get('created_at')}")
+    click.echo(f"Built from:     {manifest.get('engine')}")
+    click.echo(f"Tables:         {len(tables)}")
+
+    by_branch: dict = {}
+    for table in tables:
+        branch = table.get("branch", "unknown")
+        entry = by_branch.setdefault(branch, [0, 0, 0])
+        entry[0] += 1
+        entry[1] += table.get("rows") or 0
+        entry[2] += table.get("bytes") or 0
+    for branch, (n, rows, size) in sorted(by_branch.items()):
+        click.echo(
+            f"  {branch:<10} {n:>3} table(s)  {rows:>14,} rows  "
+            f"{size / 1024 ** 2:>9,.1f} MB"
+        )
+
+    for extra, label in (("plan", "Plan"), ("build_record", "Build record")):
+        name = manifest.get(extra)
+        if name and (bundle_path / name).is_file():
+            click.echo(f"{label + ':':<16}{name}")

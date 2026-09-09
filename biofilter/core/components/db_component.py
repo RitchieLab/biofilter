@@ -96,6 +96,14 @@ class DBComponent(BaseComponent):
         return True
 
 
+    def bundle_id(self) -> Optional[str]:
+        """Identifier of the bundle behind this connection, or None."""
+        return self.require_db().bundle_id()
+
+    def bundle_manifest(self) -> Optional[dict]:
+        """Manifest of the bundle behind this connection, or None."""
+        return self.require_db().bundle_manifest()
+
     def get_session(self):
         """
         Convenience passthrough to the shared Database session context manager.

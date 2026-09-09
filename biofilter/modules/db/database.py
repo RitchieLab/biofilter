@@ -188,6 +188,28 @@ class Database(CreateDBMixin):
             return uri
         return f"sqlite:///{os.path.abspath(uri)}"
 
+    def bundle_manifest(self) -> Optional[dict]:
+        """
+        The manifest of the bundle this connection reads, if any.
+
+        Public because the id it carries is what identifies the data a
+        result came from. Returns None for a live database, which has no
+        bundle identity.
+        """
+        return self._bundle_manifest()
+
+    def bundle_id(self) -> Optional[str]:
+        """
+        Identifier of the bundle behind this connection, or None.
+
+        A bundle cannot be rebuilt once its sources move on, so this is
+        the handle that says *which* data an answer came from — and it is
+        derived from content, so it can be recomputed to check the bundle
+        has not changed underneath.
+        """
+        manifest = self._bundle_manifest()
+        return manifest.get("bundle_id") if manifest else None
+
     def _bundle_manifest(self) -> Optional[dict]:
         """
         Load the bundle manifest, if one is reachable.
