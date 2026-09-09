@@ -119,7 +119,7 @@ def _friendly_missing_dtp_doc_message(
 @click.option(
     "--data-source",
     multiple=True,
-    help="Data source name (repeatable). Example: --data-source dbsnp_sample",
+    help="Data source name (repeatable). Example: --data-source gnomad_joint_chr21",
 )
 @click.option(
     "--run-step",

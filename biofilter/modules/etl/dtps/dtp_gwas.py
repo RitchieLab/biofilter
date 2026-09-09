@@ -1,5 +1,6 @@
 import os
 import re
+from dataclasses import dataclass
 import shutil
 import time  # DEBUG MODE
 import zipfile
@@ -23,6 +24,16 @@ from biofilter.utils.file_hash import compute_file_hash
 """
 
 
+@dataclass
+class GWASConfig:
+    parquet_compression: str = "zstd"
+
+    # One consolidated file: GWAS is small (about 1 M associations) and
+    # 16.4% of rows have no position, so there is no chromosome to
+    # partition them by.
+    table_name: str = "variant_gwas"
+
+
 class DTP(DTPBase, EntityQueryMixin):
     def __init__(
         self,
@@ -38,6 +49,7 @@ class DTP(DTPBase, EntityQueryMixin):
         self.data_source = datasource
         self.package = package
         self.session = session
+        self.config = GWASConfig()
         self.db = db
 
         # DTP versioning
@@ -312,8 +324,12 @@ class DTP(DTPBase, EntityQueryMixin):
                     # "P-VALUE (TEXT)",
                     "OR or BETA",  # odds_ratio_beta
                     "95% CI (TEXT)",  # ci_text
-                    # "PLATFORM [SNPS PASSING QC]",  # platform
-                    # "CNV",  # cnv
+                    # 100% populated with 10,722 distinct values; it was
+                    # being dropped here despite the model declaring it.
+                    "PLATFORM [SNPS PASSING QC]",  # platform
+                    # CNV is left out: populated on every row of the
+                    # source but with a single distinct value, so it
+                    # carries no information.
                     "Disease trait",  # raw_trait
                     "EFO term",  # mapped_trait
                     "Parent term",  # parent_trait
@@ -349,8 +365,20 @@ class DTP(DTPBase, EntityQueryMixin):
             }
             merged.rename(columns=column_map, inplace=True)
 
-            # Save one master file
-            merged.to_parquet(output_path / "master_data.parquet", index=False)
+            # One table, exploded, unpartitioned (ADR-003). GWAS rows are
+            # associations (study x trait x SNP), not variants, so there is
+            # no 1:1 with variant_masters and no chromosome to partition
+            # on for the 16.4% of rows that carry no position.
+            merged = self._explode_snps(merged)
+            merged = self._add_provenance(merged)
+            merged = self._coerce_to_schema(merged, self._arrow_schema())
+            out_file = output_path / f"{self.config.table_name}.parquet"
+            merged.to_parquet(
+                out_file,
+                index=False,
+                compression=self.config.parquet_compression,
+                schema=self._arrow_schema(),
+            )
 
             if self.debug_mode:
                 merged.to_csv(output_path / "master_data.csv", index=False)
@@ -360,7 +388,12 @@ class DTP(DTPBase, EntityQueryMixin):
                 )  # noqa E501
                 self.logger.log(msg, "DEBUG")
 
-            msg = f"✅ GWAS transformed into at {output_path}"  # noqa E501
+            size_mb = out_file.stat().st_size / 1024 ** 2
+            msg = (
+                f"✅ {out_file.name}: {len(merged):,} rows "
+                f"({merged['snp_id'].nunique():,} distinct rsIDs), "
+                f"{size_mb:.1f} MB"
+            )
             self.logger.log(msg, "INFO")
             return True, msg
 
@@ -372,7 +405,130 @@ class DTP(DTPBase, EntityQueryMixin):
     # -------------------------------------------------------------------------
     #                            LOAD METHOD
     # -------------------------------------------------------------------------
+    # ------------------------------------------------------------------
+    # Parquet output (ADR-003)
+    # ------------------------------------------------------------------
+    def _explode_snps(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        One row per (association x SNP).
+
+        The GWAS Catalog packs multi-locus associations into a single
+        `snp_id` — "rs123 x rs456", "rs1;rs2". The old pipeline kept the
+        packed string and derived a `variant_gwas_snp` helper table to
+        make it searchable, because SQL cannot index inside a string.
+        Exploding here removes the helper table and the join with it, the
+        same way the VEP block is exploded rather than stored packed.
+
+        Only 0.5% of rows carry more than one SNP, so the duplication this
+        introduces is marginal.
+        """
+        col = df["snp_id"].fillna("").astype(str)
+        parts = col.str.split(r"\s*[xX,;]\s*", regex=True)
+
+        out = df.assign(_snps=parts).explode("_snps", ignore_index=True)
+        out["snp_id"] = out["_snps"].str.strip()
+        out = out.drop(columns=["_snps"])
+
+        # Rank within the original association, so a multi-SNP row stays
+        # reconstructable and the lead SNP is identifiable.
+        out["snp_rank"] = (
+            out.groupby(
+                ["pubmed_id", "raw_trait", "chr_id", "chr_pos"], dropna=False
+            )
+            .cumcount()
+            .astype("int32")
+        )
+        return out[out["snp_id"].astype(bool)].reset_index(drop=True)
+
+    def _add_provenance(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Stamp the source and package that produced these rows."""
+        df = df.copy()
+        df["data_source_id"] = getattr(self.data_source, "id", None)
+        df["etl_package_id"] = getattr(self.package, "id", None)
+        return df
+
+    @staticmethod
+    def _coerce_to_schema(df: pd.DataFrame, schema) -> pd.DataFrame:
+        """
+        Align the frame to the declared schema before writing.
+
+        Pandas infers types from the TSV — `pubmed_id` arrives as int64,
+        `chr_pos` as float because of its nulls — and pyarrow refuses to
+        write a frame whose dtypes disagree with the schema. Coercing
+        here, driven by the schema itself, means a new field cannot
+        silently land with whatever dtype the parse happened to produce.
+        """
+        import pyarrow as pa
+
+        out = df.copy()
+        for field in schema:
+            if field.name not in out.columns:
+                out[field.name] = None
+            col = out[field.name]
+            if pa.types.is_integer(field.type):
+                out[field.name] = pd.to_numeric(col, errors="coerce").astype("Int64")  # noqa: E501
+            elif pa.types.is_floating(field.type):
+                out[field.name] = pd.to_numeric(col, errors="coerce")
+            elif pa.types.is_string(field.type):
+                out[field.name] = col.astype("string")
+        return out[[f.name for f in schema]]
+
+    @staticmethod
+    def _arrow_schema():
+        """
+        Declare the schema rather than letting pandas infer it.
+
+        Every text field is written in full: the old load truncated *every*
+        string to 255 characters to fit the relational columns, silently
+        cutting fields like `initial_sample_size`, which is `Text` in the
+        model and routinely longer. Parquet has no such limit.
+        """
+        import pyarrow as pa
+
+        text = pa.string()
+        return pa.schema([
+            pa.field("pubmed_id", pa.int64()),
+            pa.field("raw_trait", text),
+            pa.field("mapped_trait", text),
+            pa.field("mapped_trait_id", text),
+            pa.field("parent_trait", text),
+            pa.field("parent_trait_id", text),
+            pa.field("chr_id", text),
+            pa.field("chr_pos", pa.int64()),
+            pa.field("reported_gene", text),
+            pa.field("mapped_gene", text),
+            pa.field("snp_id", text),
+            pa.field("snp_rank", pa.int32()),
+            pa.field("snp_risk_allele", text),
+            pa.field("risk_allele_frequency", pa.float64()),
+            pa.field("context", text),
+            pa.field("intergenic", text),
+            pa.field("p_value", pa.float64()),
+            pa.field("pvalue_mlog", pa.float64()),
+            pa.field("odds_ratio_beta", text),
+            pa.field("ci_text", text),
+            pa.field("initial_sample_size", text),
+            pa.field("replication_sample_size", text),
+            pa.field("platform", text),
+            pa.field("data_source_id", pa.int64()),
+            pa.field("etl_package_id", pa.int64()),
+        ])
+
     def load(self, processed_dir=None):
+        raise NotImplementedError(
+            "load() is not used by this DTP under ADR-003. The variant "
+            "branch writes parquet directly and is not staged through a "
+            "relational database.\n\n"
+            "The previous load did three things that no longer apply: it "
+            "DELETEd the prior rows before inserting (bundles are "
+            "immutable, every write is an insert); it rebuilt the "
+            "variant_gwas_snp helper table by splitting snp_id, which the "
+            "transform now does inline; and it truncated every string "
+            "field to 255 characters to fit the relational columns, "
+            "silently cutting fields that parquet stores in full."
+        )
+
+    def _load_legacy(self, processed_dir=None):
         """
         Load transformed GWAS Catalog into Biofilter3R schema.
 

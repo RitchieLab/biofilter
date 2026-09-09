@@ -441,28 +441,6 @@ def map_variant_gene_regulatory_evidence(engine, metadata):
     return variant_gene_regulatory_evidence
 
 
-class VariantSNPMerge(Base):
-
-    __tablename__ = "variant_snp_merges"
-
-    # Composite natural primary key
-    rs_obsolete_id = Column(BigInteger, primary_key=True)
-    rs_canonical_id = Column(BigInteger, primary_key=True)
-
-    # Provenance
-    data_source_id = Column(
-        Integer,
-        ForeignKey("etl_data_sources.id", ondelete="CASCADE"),
-        nullable=True,
-    )
-    data_source = relationship("ETLDataSource", passive_deletes=True)
-
-    etl_package_id = Column(
-        Integer,
-        ForeignKey("etl_packages.id", ondelete="CASCADE"),
-        nullable=True,
-    )
-    etl_package = relationship("ETLPackage", passive_deletes=True)
 
 
 class VariantGWAS(Base):

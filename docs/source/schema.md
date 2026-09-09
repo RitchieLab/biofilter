@@ -266,11 +266,6 @@ erDiagram
         bigint variant_gwas_id FK
         bigint snp_id
     }
-    variant_snp_merges {
-        bigint rs_obsolete_id PK
-        bigint rs_canonical_id PK
-    }
-
     %% ── RELATIONSHIPS ───────────────────────────────────────────────────────
 
     %% ETL

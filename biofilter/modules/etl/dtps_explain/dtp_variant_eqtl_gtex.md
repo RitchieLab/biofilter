@@ -2,7 +2,7 @@
 
 ## 1. Data source and pipeline role
 
-- `data_source.name`: recommended seed name `gtex_v10_brain_eqtl`
+- `data_source.name`: recommended seed name `gtex_v10_eqtl`
 - `source_system`: `GTEx`
 - release: GTEx v10 (significant cis-eQTL pairs)
 - input format: GTEx v10 single-tissue eQTL distribution (tarball of per-tissue

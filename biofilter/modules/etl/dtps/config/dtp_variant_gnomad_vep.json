@@ -1,0 +1,320 @@
+{
+  "_comment": [
+    "Field selection for the gnomAD exome/genome callsets (VEP parquet).",
+    "INCLUDE-list: 'load': true is what reaches the parquet.",
+    "Generated from the v4.1.1 chr21 header; the 46 VEP subfields are",
+    "identical between exomes and genomes, verified on chr21.",
+    "One output row per (variant x transcript x consequence): the VEP",
+    "block is exploded, not stored as the packed string gnomAD ships."
+  ],
+  "release": "4.1.1",
+  "sources": [
+    "exomes",
+    "genomes"
+  ],
+  "precedence": {
+    "_comment": [
+      "Order used when a variant carries VEP in both callsets. Measured on",
+      "chr21: only 1.9% of variants are in both, and their VEP blocks are",
+      "byte-identical in 5781/5782 cases \u2014 the single exception differs",
+      "only in the order of terms inside Consequence, which disappears",
+      "once the block is exploded. So this is a deterministic tie-break,",
+      "not a content decision."
+    ],
+    "order": [
+      "exomes",
+      "genomes"
+    ]
+  },
+  "explode": {
+    "_comment": "Split multi-term Consequence on '&', one row per term.",
+    "consequence_separator": "&"
+  },
+  "vep_fields": [
+    {
+      "name": "Allele",
+      "load": true,
+      "index": 0
+    },
+    {
+      "name": "Consequence",
+      "load": true,
+      "index": 1
+    },
+    {
+      "name": "IMPACT",
+      "load": true,
+      "index": 2
+    },
+    {
+      "name": "SYMBOL",
+      "load": true,
+      "index": 3
+    },
+    {
+      "name": "Gene",
+      "load": true,
+      "index": 4
+    },
+    {
+      "name": "Feature_type",
+      "load": true,
+      "index": 5
+    },
+    {
+      "name": "Feature",
+      "load": true,
+      "index": 6
+    },
+    {
+      "name": "BIOTYPE",
+      "load": true,
+      "index": 7
+    },
+    {
+      "name": "EXON",
+      "load": true,
+      "index": 8
+    },
+    {
+      "name": "INTRON",
+      "load": true,
+      "index": 9
+    },
+    {
+      "name": "HGVSc",
+      "load": true,
+      "index": 10
+    },
+    {
+      "name": "HGVSp",
+      "load": true,
+      "index": 11
+    },
+    {
+      "name": "cDNA_position",
+      "load": false,
+      "index": 12
+    },
+    {
+      "name": "CDS_position",
+      "load": false,
+      "index": 13
+    },
+    {
+      "name": "Protein_position",
+      "load": false,
+      "index": 14
+    },
+    {
+      "name": "Amino_acids",
+      "load": true,
+      "index": 15
+    },
+    {
+      "name": "Codons",
+      "load": true,
+      "index": 16
+    },
+    {
+      "name": "ALLELE_NUM",
+      "load": false,
+      "index": 17
+    },
+    {
+      "name": "DISTANCE",
+      "load": false,
+      "index": 18
+    },
+    {
+      "name": "STRAND",
+      "load": true,
+      "index": 19
+    },
+    {
+      "name": "FLAGS",
+      "load": false,
+      "index": 20
+    },
+    {
+      "name": "VARIANT_CLASS",
+      "load": true,
+      "index": 21
+    },
+    {
+      "name": "SYMBOL_SOURCE",
+      "load": true,
+      "index": 22
+    },
+    {
+      "name": "HGNC_ID",
+      "load": true,
+      "index": 23
+    },
+    {
+      "name": "CANONICAL",
+      "load": true,
+      "index": 24
+    },
+    {
+      "name": "MANE_SELECT",
+      "load": true,
+      "index": 25
+    },
+    {
+      "name": "MANE_PLUS_CLINICAL",
+      "load": true,
+      "index": 26
+    },
+    {
+      "name": "TSL",
+      "load": false,
+      "index": 27
+    },
+    {
+      "name": "APPRIS",
+      "load": false,
+      "index": 28
+    },
+    {
+      "name": "CCDS",
+      "load": false,
+      "index": 29
+    },
+    {
+      "name": "ENSP",
+      "load": true,
+      "index": 30
+    },
+    {
+      "name": "UNIPROT_ISOFORM",
+      "load": false,
+      "index": 31
+    },
+    {
+      "name": "SOURCE",
+      "load": false,
+      "index": 32
+    },
+    {
+      "name": "DOMAINS",
+      "load": false,
+      "index": 33
+    },
+    {
+      "name": "miRNA",
+      "load": false,
+      "index": 34
+    },
+    {
+      "name": "HGVS_OFFSET",
+      "load": false,
+      "index": 35
+    },
+    {
+      "name": "PUBMED",
+      "load": false,
+      "index": 36
+    },
+    {
+      "name": "MOTIF_NAME",
+      "load": false,
+      "index": 37
+    },
+    {
+      "name": "MOTIF_POS",
+      "load": false,
+      "index": 38
+    },
+    {
+      "name": "HIGH_INF_POS",
+      "load": false,
+      "index": 39
+    },
+    {
+      "name": "MOTIF_SCORE_CHANGE",
+      "load": false,
+      "index": 40
+    },
+    {
+      "name": "TRANSCRIPTION_FACTORS",
+      "load": false,
+      "index": 41
+    },
+    {
+      "name": "LoF",
+      "load": true,
+      "index": 42
+    },
+    {
+      "name": "LoF_filter",
+      "load": true,
+      "index": 43
+    },
+    {
+      "name": "LoF_flags",
+      "load": true,
+      "index": 44
+    },
+    {
+      "name": "LoF_info",
+      "load": true,
+      "index": 45
+    }
+  ],
+  "filters": {
+    "_comment": [
+      "Applied per callset against that callset's own AC, so this DTP",
+      "stays independent of the joint branch (ADR-003: the two data",
+      "sources must not depend on each other).",
+      "Measured on chr21, window pos<=7,261,905, with min_ac 5 on both",
+      "sides: VEP unfiltered is 300,000 keys against the joint's 45,702",
+      "(6.6x more annotation than the bundle can use); filtering here",
+      "yields 45,478 with ZERO rows orphaned from the joint output.",
+      "Cost: 224 joint variants (0.5%) clear the combined AC but not",
+      "either callset alone, so they land in the variants parquet with",
+      "no annotation. Set min_ac to null to keep them, at 6.6x the size.",
+      "Keep min_ac aligned with the joint config."
+    ],
+    "min_ac": 5,
+    "max_ac": null,
+    "min_af": null,
+    "max_af": null,
+    "ac_field": "AC",
+    "af_field": "AF"
+  },
+  "rsid_map": {
+    "_comment": [
+      "Side output: chromosome/position/ref/alt -> rsID, written as its",
+      "own table rather than stamped onto variant_masters.",
+      "The joint callset carries no rsID at all (its ID column is empty",
+      "on every record); only the exome and genome VCFs do, which is why",
+      "this is produced here.",
+      "IMPORTANT: rows are captured BEFORE the AC filter above. Measured",
+      "on chr21, only ~25% of rsIDs survive AC>=5, and the ones dropped",
+      "are the rare variants that most need an identifier.",
+      "min_ac tunes how much of the map is kept:",
+      "  null -> every rsID gnomAD publishes (chr21: 9.85 M keys,",
+      "          75 MB; extrapolates to ~4.5 GB genome-wide, about 30%",
+      "          on top of the bundle). Can translate any gnomAD rsID,",
+      "          including variants the bundle itself filtered out.",
+      "  3    -> safe lower bound for the joint's AC>=5: a variant can",
+      "          only reach a combined AC of 5 if one callset has at",
+      "          least 3, since AC_joint is exactly AC_exomes +",
+      "          AC_genomes (verified on 250,000 records). Loses no",
+      "          variant the bundle keeps.",
+      "  5    -> smallest map, but misses variants that clear the",
+      "          combined threshold without either callset doing so."
+    ],
+    "enabled": true,
+    "table_name": "variant_rsid",
+    "filters": {
+      "min_ac": null,
+      "max_ac": null,
+      "min_af": null,
+      "max_af": null,
+      "ac_field": "AC",
+      "af_field": "AF"
+    }
+  }
+}

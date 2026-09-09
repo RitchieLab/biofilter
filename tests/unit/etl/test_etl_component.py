@@ -70,14 +70,14 @@ def test_update_passes_paths_and_steps_to_manager(monkeypatch):
 
     ok = component.update(
         source_system=["NCBI"],
-        data_sources=["dbsnp_chr1"],
+        data_sources=["gnomad_joint_chr1"],
         run_steps=["extract", "transform"],
         force_steps=["load"],
     )
 
     assert ok is True
     assert called["source_system"] == ["NCBI"]
-    assert called["data_sources"] == ["dbsnp_chr1"]
+    assert called["data_sources"] == ["gnomad_joint_chr1"]
     assert called["download_path"] == "/tmp/raw"
     assert called["processed_path"] == "/tmp/processed"
     assert called["run_steps"] == ["extract", "transform"]
@@ -97,13 +97,13 @@ def test_restart_passes_paths_and_returns_manager_value(monkeypatch):
     monkeypatch.setattr(component, "_manager", lambda: FakeManager())
 
     out = component.restart(
-        data_source=["dbsnp_chr22"],
+        data_source=["gnomad_joint_chr22"],
         source_system=["NCBI"],
         delete_files=True,
     )
 
     assert out == {"ok": True}
-    assert called["data_source"] == ["dbsnp_chr22"]
+    assert called["data_source"] == ["gnomad_joint_chr22"]
     assert called["source_system"] == ["NCBI"]
     assert called["download_path"] == "/tmp/raw"
     assert called["processed_path"] == "/tmp/processed"
@@ -154,14 +154,14 @@ def test_rollback_passes_paths_and_returns_manager_value(monkeypatch):
 
     out = component.rollback(
         package_ids=[10, 11],
-        data_source=["dbsnp_chr22"],
+        data_source=["gnomad_joint_chr22"],
         source_system=["NCBI"],
         delete_files=True,
     )
 
     assert out == {"ok": True}
     assert called["package_ids"] == [10, 11]
-    assert called["data_source"] == ["dbsnp_chr22"]
+    assert called["data_source"] == ["gnomad_joint_chr22"]
     assert called["source_system"] == ["NCBI"]
     assert called["download_path"] == "/tmp/raw"
     assert called["processed_path"] == "/tmp/processed"

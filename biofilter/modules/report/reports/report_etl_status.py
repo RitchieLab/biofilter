@@ -53,7 +53,7 @@ class ETLStatusReport(ReportBase):
         )  # e.g. "NCBI" or ["NCBI","EBI"]
         data_sources = self.params.get(
             "data_sources"
-        )  # e.g. "dbsnp_chr1" or ["hgnc","mondo"]
+        )  # e.g. "gnomad_joint_chr1" or ["hgnc","mondo"]
         only_active = self.params.get("only_active", True)
 
         # ----------------------------

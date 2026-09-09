@@ -75,7 +75,7 @@ class ETLPackagesReport(ReportBase):
         source_system = self.params.get("source_system")  # "NCBI" or ["NCBI","EBI"]
         data_sources = self.params.get(
             "data_sources"
-        )  # "dbsnp_chr1" or ["hgnc","mondo"]
+        )  # "gnomad_joint_chr1" or ["hgnc","mondo"]
         only_active = self.params.get("only_active", True)
 
         try:

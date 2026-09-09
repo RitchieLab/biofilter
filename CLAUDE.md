@@ -9,8 +9,8 @@ Context guide for Claude Code to work on the Biofilter 4 project.
 Biofilter 4 (BF4) is a persistent, entity-centric biological knowledge platform developed at the Ritchie Lab (Penn Medicine). It replaces transient file-based annotation workflows with a versioned, reusable, and queryable knowledge base.
 
 **Author:** Andre Rico (`andreluis.rico@pennmedicine.upenn.edu`)  
-**Current version:** 4.2.1  
-**Active branch:** `main` (active development — APIs and schema still evolving)  
+**Current version:** 4.3.0  
+**Active branch:** `release/4.3.0` (active development — APIs and schema still evolving)  
 **Docs (Sphinx / Read the Docs):** https://biofilter.readthedocs.io/en/latest/
 
 ---
@@ -53,7 +53,7 @@ temp/                    # Created during binning queries — disposable
 - Seeds in JSON: `biofilter/modules/db/seed/`
 
 ### 2. ETL layer (`modules/etl/`)
-- 20 active DTPs: `hgnc`, `gene_ncbi`, `gene_ensembl`, `uniprot`, `uniprot_relationships`, `reactome`, `reactome_relationships`, `kegg`, `kegg_relationships`, `go`, `pfam`, `mondo`, `mondo_relationships`, `biogrid`, `clingen`, `chebi`, `gwas`, `variant_gnomad`, `variant_alphamissense`, `variant_ncbi`
+- 19 active DTPs: `hgnc`, `gene_ncbi`, `gene_ensembl`, `uniprot`, `uniprot_relationships`, `reactome`, `reactome_relationships`, `kegg`, `kegg_relationships`, `go`, `pfam`, `mondo`, `mondo_relationships`, `biogrid`, `clingen`, `chebi`, `gwas`, `variant_gnomad`, `variant_alphamissense`
 - Pipeline: `extract → transform → load` with file-hash-based skip logic
 - Raw files → `<data_root>/downloads/`, processed → `<data_root>/processed/` (parquet)
 - `ETLManager` orchestrates execution, tracking, rollback, and resume
@@ -223,4 +223,3 @@ df_rel    = bf.report.run("entity_relationship_model",
 
 ## Notes
 
-- `dtp_variant_ncbi.py` is kept as a backup DTP (replaced by gnomAD as primary variant source); no explain doc required for now

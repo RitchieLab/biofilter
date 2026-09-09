@@ -34,7 +34,6 @@ from .model_variants import (
     VariantGWAS,
     VariantGWASSNP,
     VariantImpact,
-    VariantSNPMerge,
 )
 
 __all__ = [
@@ -67,8 +66,6 @@ __all__ = [
     "OmicStatus",
 
     # VARIANTS MODELS
-    "VariantSNP",
-    "VariantSNPMerge",
     "VariantGWAS",
     "VariantGWASSNP",
     "VariantConsequenceGroup",

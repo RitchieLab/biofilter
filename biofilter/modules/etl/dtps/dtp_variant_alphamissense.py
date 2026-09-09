@@ -10,16 +10,22 @@ from pathlib import Path
 from typing import Any, Iterable, Optional
 
 import pandas as pd
+import pyarrow as pa
 from sqlalchemy import text
 
 from biofilter.modules.etl.mixins.base_dtp import DTPBase
+from biofilter.modules.etl.parquet_sink import ChromosomeFileWriter
 from biofilter.utils.file_hash import compute_file_hash
 
 
 @dataclass
 class AlphaMissenseConfig:
     chunk_size: int = 250_000
-    parquet_compression: str = "snappy"
+    parquet_compression: str = "zstd"
+
+    # Table the parquet feeds; also the file-name prefix, so a file
+    # names its own table and partition (variant_..._chr21.parquet).
+    table_name: str = "variant_alphamissense"
     predictor_name: str = "alphamissense"
     predictor_version: Optional[str] = None
 
@@ -434,6 +440,7 @@ class DTP(DTPBase):
 
     def transform(self, raw_dir: str, processed_dir: str):
         t0 = time.time()
+        sink = None
         msg = f"⚙️ Starting transform of {self.data_source.name} (AlphaMissense)..."
         self.logger.log(msg, "INFO")
 
@@ -499,11 +506,18 @@ class DTP(DTPBase):
                 if norm.empty:
                     continue
 
-                out_file = pred_dir / f"predictions_part_{part:04d}.parquet"
-                norm.to_parquet(
-                    out_file,
-                    index=False,
-                    compression=self.config.parquet_compression,
+                norm = self._add_provenance(norm)
+                if sink is None:
+                    sink = ChromosomeFileWriter(
+                        pred_dir,
+                        self._arrow_schema(),
+                        self.config.table_name,
+                        compression=self.config.parquet_compression,
+                    )
+                sink.write_table(
+                    pa.Table.from_pandas(
+                        norm, schema=self._arrow_schema(), preserve_index=False
+                    )
                 )
                 rows_out += len(norm.index)
                 part += 1
@@ -512,11 +526,15 @@ class DTP(DTPBase):
             msg = f"❌ ETL transform failed: {exc}"
             self.logger.log(msg, "ERROR")
             return False, msg
+        finally:
+            if sink is not None:
+                sink.close()
 
         dt = time.time() - t0
         msg = (
             f"✅ Transform done for {self.data_source.name}: "
-            f"parts={part} rows_in={rows_in} rows_out={rows_out} elapsed={dt:.1f}s"
+            f"chromosomes={len(sink.chromosomes) if sink else 0} "
+            f"rows_in={rows_in} rows_out={rows_out} elapsed={dt:.1f}s"
         )
         self.logger.log(msg, "INFO")
         return True, msg
@@ -707,7 +725,67 @@ class DTP(DTPBase):
         conn.execute(text(f"DROP TABLE IF EXISTS {stage_table}"))
         return matched_count, unmatched_count
 
+    # ------------------------------------------------------------------
+    # Parquet output (ADR-003)
+    # ------------------------------------------------------------------
+    def _add_provenance(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Stamp the rows with the data source and ETL package that produced
+        them. The old load step added these while inserting; the parquet
+        is now the final artifact, so they are written here.
+        """
+        df = df.copy()
+        df["data_source_id"] = getattr(self.data_source, "id", None)
+        df["etl_package_id"] = getattr(self.package, "id", None)
+        return df
+
+    @staticmethod
+    def _arrow_schema():
+        """
+        Declare the parquet schema instead of letting pandas infer it per
+        part. Inference is unstable across parts: a column that is empty
+        in one chunk is written as `null` type there and as a string in
+        the next, and the parts then cannot be read as one dataset.
+        """
+        import pyarrow as pa
+
+        return pa.schema([
+            pa.field("chromosome", pa.int32()),
+            pa.field("position_start", pa.int64()),
+            pa.field("position_end", pa.int64()),
+            pa.field("reference_allele", pa.string()),
+            pa.field("alternate_allele", pa.string()),
+            pa.field("predictor_key", pa.string()),
+            pa.field("transcript_id", pa.string()),
+            pa.field("predictor_name", pa.string()),
+            pa.field("predictor_version", pa.string()),
+            pa.field("score", pa.float64()),
+            pa.field("classification", pa.string()),
+            pa.field("details", pa.string()),
+            pa.field("data_source_id", pa.int64()),
+            pa.field("etl_package_id", pa.int64()),
+        ])
+
     def load(self, processed_dir=None):
+        raise NotImplementedError(
+            "load() is not used by this DTP under ADR-003. The variant "
+            "branch writes parquet directly and is not staged through a "
+            "relational database.\n\n"
+            "What the previous load did was resolve the natural key "
+            "(chromosome, position, ref, alt) against variant_masters to "
+            "swap it for a generated variant_id, then drop the natural "
+            "key. That surrogate is only valid inside one bundle "
+            "(ADR-003 §2.5), and resolving it made this DTP depend on the "
+            "variants branch having been loaded first. The transform now "
+            "keeps the natural key, so this DTP is independent and its "
+            "parquet is the final artifact.\n\n"
+            "It also dropped every prediction whose variant was absent "
+            "from variant_masters (the 'unmatched' count it logged). "
+            "Those rows are now kept; pruning them, if wanted, belongs to "
+            "bundle assembly, where the variants parquet is available."
+        )
+
+    def _load_legacy(self, processed_dir=None):
         t0 = time.time()
         msg = f"📥 Loading {self.data_source.name} AlphaMissense predictions..."
         self.logger.log(msg, "INFO")

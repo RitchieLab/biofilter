@@ -203,7 +203,7 @@ biofilter --db-uri sqlite:///biofilter_dev.db report run --report-name entity_re
 
 Example:
 ```bash
-biofilter --db-uri sqlite:///biofilter_dev.db etl update --data-source dbsnp_sample --run-step extract --run-step transform
+biofilter --db-uri sqlite:///biofilter_dev.db etl update --data-source gnomad_joint_chr21 --run-step extract --run-step transform
 ```
 
 ### `etl update-all`
@@ -235,7 +235,7 @@ biofilter --db-uri sqlite:///biofilter_dev.db etl update-all --source-system NCB
 
 Example:
 ```bash
-biofilter --db-uri sqlite:///biofilter_dev.db etl restart --data-source dbsnp_sample --delete-files
+biofilter --db-uri sqlite:///biofilter_dev.db etl restart --data-source gnomad_joint_chr21 --delete-files
 ```
 
 ### `etl rollback`

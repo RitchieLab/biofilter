@@ -1,0 +1,269 @@
+{
+  "_comment": [
+    "Tissue selection for the GTEx v10 single-tissue cis-eQTL release.",
+    "INCLUDE-list: only 'load': true reaches the parquet.",
+    "GTEx ships all 49 tissues in one 2.39 GB tarball and does not expose",
+    "them individually (per-tissue URLs return 404), so the download is",
+    "all-or-nothing and this list controls transform and output only.",
+    "Output stays one file per chromosome with the tissue carried in the",
+    "bio_context column; tissue is a dimension of this release, not a",
+    "separate source.",
+    "Default is the 13 Brain tissues, matching what the pipeline loaded",
+    "before this became configurable. Enabling all 49 takes the output",
+    "from ~18.5 M rows to roughly 70 M."
+  ],
+  "release": "v10",
+  "qtl_type": "eQTL",
+  "tissues": [
+    {
+      "name": "Adipose_Subcutaneous",
+      "load": false,
+      "bytes": 0
+    },
+    {
+      "name": "Adipose_Visceral_Omentum",
+      "load": false,
+      "bytes": 0
+    },
+    {
+      "name": "Adrenal_Gland",
+      "load": false,
+      "bytes": 0
+    },
+    {
+      "name": "Artery_Aorta",
+      "load": false,
+      "bytes": 0
+    },
+    {
+      "name": "Artery_Coronary",
+      "load": false,
+      "bytes": 0
+    },
+    {
+      "name": "Artery_Tibial",
+      "load": false,
+      "bytes": 0
+    },
+    {
+      "name": "Bladder",
+      "load": false,
+      "bytes": 0
+    },
+    {
+      "name": "Brain_Amygdala",
+      "load": true,
+      "bytes": 0
+    },
+    {
+      "name": "Brain_Anterior_cingulate_cortex_BA24",
+      "load": true,
+      "bytes": 0
+    },
+    {
+      "name": "Brain_Caudate_basal_ganglia",
+      "load": true,
+      "bytes": 0
+    },
+    {
+      "name": "Brain_Cerebellar_Hemisphere",
+      "load": true,
+      "bytes": 0
+    },
+    {
+      "name": "Brain_Cerebellum",
+      "load": true,
+      "bytes": 0
+    },
+    {
+      "name": "Brain_Cortex",
+      "load": true,
+      "bytes": 0
+    },
+    {
+      "name": "Brain_Frontal_Cortex_BA9",
+      "load": true,
+      "bytes": 0
+    },
+    {
+      "name": "Brain_Hippocampus",
+      "load": true,
+      "bytes": 0
+    },
+    {
+      "name": "Brain_Hypothalamus",
+      "load": true,
+      "bytes": 0
+    },
+    {
+      "name": "Brain_Nucleus_accumbens_basal_ganglia",
+      "load": true,
+      "bytes": 0
+    },
+    {
+      "name": "Brain_Putamen_basal_ganglia",
+      "load": true,
+      "bytes": 0
+    },
+    {
+      "name": "Brain_Spinal_cord_cervical_c-1",
+      "load": true,
+      "bytes": 0
+    },
+    {
+      "name": "Brain_Substantia_nigra",
+      "load": true,
+      "bytes": 0
+    },
+    {
+      "name": "Breast_Mammary_Tissue",
+      "load": false,
+      "bytes": 0
+    },
+    {
+      "name": "Cells_Cultured_fibroblasts",
+      "load": false,
+      "bytes": 0
+    },
+    {
+      "name": "Cells_EBV-transformed_lymphocytes",
+      "load": false,
+      "bytes": 0
+    },
+    {
+      "name": "Colon_Sigmoid",
+      "load": false,
+      "bytes": 0
+    },
+    {
+      "name": "Colon_Transverse",
+      "load": false,
+      "bytes": 0
+    },
+    {
+      "name": "Esophagus_Gastroesophageal_Junction",
+      "load": false,
+      "bytes": 0
+    },
+    {
+      "name": "Esophagus_Mucosa",
+      "load": false,
+      "bytes": 0
+    },
+    {
+      "name": "Esophagus_Muscularis",
+      "load": false,
+      "bytes": 0
+    },
+    {
+      "name": "Heart_Atrial_Appendage",
+      "load": false,
+      "bytes": 0
+    },
+    {
+      "name": "Heart_Left_Ventricle",
+      "load": false,
+      "bytes": 0
+    },
+    {
+      "name": "Kidney_Cortex",
+      "load": false,
+      "bytes": 0
+    },
+    {
+      "name": "Liver",
+      "load": false,
+      "bytes": 0
+    },
+    {
+      "name": "Lung",
+      "load": false,
+      "bytes": 0
+    },
+    {
+      "name": "Minor_Salivary_Gland",
+      "load": false,
+      "bytes": 0
+    },
+    {
+      "name": "Muscle_Skeletal",
+      "load": false,
+      "bytes": 0
+    },
+    {
+      "name": "Nerve_Tibial",
+      "load": false,
+      "bytes": 0
+    },
+    {
+      "name": "Ovary",
+      "load": false,
+      "bytes": 0
+    },
+    {
+      "name": "Pancreas",
+      "load": false,
+      "bytes": 0
+    },
+    {
+      "name": "Pituitary",
+      "load": false,
+      "bytes": 0
+    },
+    {
+      "name": "Prostate",
+      "load": false,
+      "bytes": 0
+    },
+    {
+      "name": "Skin_Not_Sun_Exposed_Suprapubic",
+      "load": false,
+      "bytes": 0
+    },
+    {
+      "name": "Skin_Sun_Exposed_Lower_leg",
+      "load": false,
+      "bytes": 0
+    },
+    {
+      "name": "Small_Intestine_Terminal_Ileum",
+      "load": false,
+      "bytes": 0
+    },
+    {
+      "name": "Spleen",
+      "load": false,
+      "bytes": 0
+    },
+    {
+      "name": "Stomach",
+      "load": false,
+      "bytes": 0
+    },
+    {
+      "name": "Testis",
+      "load": false,
+      "bytes": 0
+    },
+    {
+      "name": "Thyroid",
+      "load": false,
+      "bytes": 0
+    },
+    {
+      "name": "Uterus",
+      "load": false,
+      "bytes": 0
+    },
+    {
+      "name": "Vagina",
+      "load": false,
+      "bytes": 0
+    },
+    {
+      "name": "Whole_Blood",
+      "load": false,
+      "bytes": 0
+    }
+  ]
+}

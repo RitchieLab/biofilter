@@ -288,13 +288,8 @@ class DBTuningMixin:
             # Composite primary key: (rs_obsolete_id, rs_canonical_id)
             # PK also creates an index, but we expose them individually as well
             # for common lookup patterns.
-            ("variant_snp_merges", ["rs_obsolete_id"]),
-            ("variant_snp_merges", ["rs_canonical_id"]),
             # Provenance for merges
-            ("variant_snp_merges", ["data_source_id"]),
-            ("variant_snp_merges", ["etl_package_id"]),
             # (Optional) explicit composite index (even though PK already exists). # noqa E501
-            ("variant_snp_merges", ["rs_obsolete_id", "rs_canonical_id"]),
         ]
 
     @property

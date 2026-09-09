@@ -28,9 +28,12 @@ from pathlib import Path
 from typing import Any, Iterable, Optional
 
 import pandas as pd
+import pyarrow as pa
 from sqlalchemy import text
 
 from biofilter.modules.etl.mixins.base_dtp import DTPBase
+from biofilter.modules.etl.parquet_sink import ChromosomeFileWriter
+from biofilter.modules.etl.dtps.gnomad_shared import load_field_config
 from biofilter.utils.file_hash import compute_file_hash
 
 
@@ -40,28 +43,20 @@ from biofilter.utils.file_hash import compute_file_hash
 @dataclass
 class GTExEQTLConfig:
     chunk_size: int = 250_000
-    parquet_compression: str = "snappy"
+    parquet_compression: str = "zstd"
+
+    # Table the parquet feeds, and the file-name prefix. The source is
+    # part of the name on purpose: a parquet is immutable once written,
+    # so one file per source keeps provenance a property of the layout
+    # rather than something a column has to be trusted for.
+    table_name: str = "variant_gtex"
+
+    # Path to a JSON overriding the packaged tissue-selection config.
+    config_override: Optional[str] = None
     qtl_type: str = "eQTL"
     study_label: str = "GTEx_v10"
 
 
-# Canonical GTEx v10 brain tissue labels (also used in v8 — names stable).
-# These match the per-tissue file prefixes inside the eQTL tarball.
-BRAIN_TISSUES_V10: frozenset[str] = frozenset({
-    "Brain_Amygdala",
-    "Brain_Anterior_cingulate_cortex_BA24",
-    "Brain_Caudate_basal_ganglia",
-    "Brain_Cerebellar_Hemisphere",
-    "Brain_Cerebellum",
-    "Brain_Cortex",
-    "Brain_Frontal_Cortex_BA9",
-    "Brain_Hippocampus",
-    "Brain_Hypothalamus",
-    "Brain_Nucleus_accumbens_basal_ganglia",
-    "Brain_Putamen_basal_ganglia",
-    "Brain_Spinal_cord_cervical_c-1",
-    "Brain_Substantia_nigra",
-})
 
 
 # -----------------------------------------------------------------------------
@@ -192,6 +187,7 @@ class DTP(DTPBase):
         self.session = session
         self.db = db
         self.config = config or GTExEQTLConfig()
+        self._tissues = None
 
         self.dtp_name = "dtp_variant_eqtl_gtex"
         self.dtp_version = "1.0.0"
@@ -250,7 +246,7 @@ class DTP(DTPBase):
                 if current_hash is None:
                     current_hash = compute_file_hash(target)
 
-                self._unpack_brain_tissues(target, landing_path)
+                self._unpack_selected_tissues(target, landing_path)
                 msg = f"✅ Local GTEx tarball staged to {target}"
                 self.logger.log(msg, "INFO")
                 return True, msg, current_hash
@@ -264,7 +260,7 @@ class DTP(DTPBase):
             if current_hash is None and downloaded.exists():
                 current_hash = compute_file_hash(downloaded)
 
-            self._unpack_brain_tissues(downloaded, landing_path)
+            self._unpack_selected_tissues(downloaded, landing_path)
             msg = f"✅ {self.data_source.name} downloaded to {landing_path}"
             self.logger.log(msg, "INFO")
             return True, msg, current_hash
@@ -274,7 +270,7 @@ class DTP(DTPBase):
             self.logger.log(msg, "ERROR")
             return False, msg, None
 
-    def _unpack_brain_tissues(self, archive: Path, landing_path: Path) -> None:
+    def _unpack_selected_tissues(self, archive: Path, landing_path: Path) -> None:
         """Extract only brain-tissue significant-pairs files from the GTEx tarball.
 
         Other tissues are skipped to keep disk footprint bounded.
@@ -296,7 +292,7 @@ class DTP(DTPBase):
                 if "signif_pairs" not in base.lower():
                     continue
                 tissue = self._tissue_from_filename(base)
-                if tissue is None or tissue not in BRAIN_TISSUES_V10:
+                if tissue is None or tissue not in self.selected_tissues():
                     continue
                 target = out_dir / base
                 if target.exists():
@@ -344,7 +340,7 @@ class DTP(DTPBase):
                     if f in seen:
                         continue
                     tissue = self._tissue_from_filename(f.name)
-                    if tissue is None or tissue not in BRAIN_TISSUES_V10:
+                    if tissue is None or tissue not in self.selected_tissues():
                         continue
                     out.append((tissue, f))
                     seen.add(f)
@@ -525,6 +521,7 @@ class DTP(DTPBase):
 
     def transform(self, raw_dir: str, processed_dir: str):
         t0 = time.time()
+        sink = None
         msg = f"⚙️ Starting transform of {self.data_source.name} (GTEx v10 eQTL)..."
         self.logger.log(msg, "INFO")
 
@@ -544,8 +541,10 @@ class DTP(DTPBase):
             tissue_files = self._iter_tissue_files(raw_base)
             if not tissue_files:
                 msg = (
-                    f"❌ No brain-tissue significant-pairs files found under {raw_base}. "
-                    f"Expected one of {sorted(BRAIN_TISSUES_V10)}."
+                    f"❌ No significant-pairs files found under {raw_base} "
+                    f"for the {len(self.selected_tissues())} tissue(s) "
+                    f"enabled in the config: "
+                    f"{sorted(self.selected_tissues())}."
                 )
                 self.logger.log(msg, "ERROR")
                 return False, msg
@@ -579,11 +578,20 @@ class DTP(DTPBase):
                     if norm.empty:
                         continue
 
-                    out_file = evid_dir / f"evidence_part_{part:04d}.parquet"
-                    norm.to_parquet(
-                        out_file,
-                        index=False,
-                        compression=self.config.parquet_compression,
+                    norm = self._add_provenance(norm)
+                    if sink is None:
+                        sink = ChromosomeFileWriter(
+                            evid_dir,
+                            self._arrow_schema(),
+                            self.config.table_name,
+                            compression=self.config.parquet_compression,
+                        )
+                    sink.write_table(
+                        pa.Table.from_pandas(
+                            norm,
+                            schema=self._arrow_schema(),
+                            preserve_index=False,
+                        )
                     )
                     rows_out += len(norm.index)
                     part += 1
@@ -603,12 +611,18 @@ class DTP(DTPBase):
             msg = f"❌ ETL transform failed: {exc}"
             self.logger.log(msg, "ERROR")
             return False, msg
+        finally:
+            if sink is not None:
+                sink.close()
 
         dt = time.time() - t0
         msg = (
             f"✅ Transform done for {self.data_source.name}: "
-            f"tissues={len(tissue_files)} parts={part} "
-            f"rows_in={rows_in} rows_out={rows_out} elapsed={dt:.1f}s"
+            f"tissues={len(tissue_files)} "
+            f"chromosomes={len(sink.chromosomes) if sink else 0} "
+            f"rows_in={rows_in} rows_out={rows_out} "
+            f"size={(sink.total_bytes() / 1024 ** 2) if sink else 0:.1f} MB "
+            f"elapsed={dt:.1f}s"
         )
         self.logger.log(msg, "INFO")
         return True, msg
@@ -775,7 +789,92 @@ class DTP(DTPBase):
         conn.execute(text(f"DROP TABLE IF EXISTS {stage_table}"))
         return matched_count, unmatched_count
 
+    # ------------------------------------------------------------------
+    # Tissue selection
+    # ------------------------------------------------------------------
+    def selected_tissues(self) -> frozenset:
+        """
+        Tissues flagged `load: true` in the packaged JSON config.
+
+        GTEx ships all 50 tissues in one tarball and does not expose them
+        individually (per-tissue URLs 404), so the download is
+        all-or-nothing and this only narrows transform and output. The
+        list used to be a hardcoded brain-only frozenset; making it
+        config-driven is what lets a user load other tissues without
+        touching code.
+        """
+        if getattr(self, "_tissues", None) is None:
+            cfg = load_field_config(self.dtp_name, self.config.config_override)
+            self._tissues = frozenset(
+                t["name"] for t in cfg.get("tissues", []) if t.get("load")
+            )
+        return self._tissues
+
+    # ------------------------------------------------------------------
+    # Parquet output (ADR-003)
+    # ------------------------------------------------------------------
+    def _add_provenance(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Stamp rows with the data source and ETL package that produced
+        them. The old load added these while inserting; the parquet is
+        now the final artifact, so they are written here.
+        """
+        df = df.copy()
+        df["data_source_id"] = getattr(self.data_source, "id", None)
+        df["etl_package_id"] = getattr(self.package, "id", None)
+        return df
+
+    @staticmethod
+    def _arrow_schema():
+        """
+        Declare the schema instead of letting pandas infer it per chunk.
+
+        Inference is unstable across chunks: a column with no value in one
+        chunk is typed `null` there and as a string in the next, and the
+        files then cannot be read as one dataset. `details` and
+        `effect_allele` are both sparse enough for this to happen.
+        """
+        import pyarrow as pa
+
+        return pa.schema([
+            pa.field("chromosome", pa.int32()),
+            pa.field("position_start", pa.int64()),
+            pa.field("position_end", pa.int64()),
+            pa.field("reference_allele", pa.string()),
+            pa.field("alternate_allele", pa.string()),
+            pa.field("evidence_key", pa.string()),
+            pa.field("gene_id", pa.string()),
+            pa.field("bio_context", pa.string()),
+            pa.field("qtl_type", pa.string()),
+            pa.field("beta", pa.float64()),
+            pa.field("se", pa.float64()),
+            pa.field("p_value", pa.float64()),
+            pa.field("n", pa.int64()),
+            pa.field("effect_allele", pa.string()),
+            pa.field("details", pa.string()),
+            pa.field("data_source_id", pa.int64()),
+            pa.field("etl_package_id", pa.int64()),
+        ])
+
     def load(self, processed_dir=None):
+        raise NotImplementedError(
+            "load() is not used by this DTP under ADR-003. The variant "
+            "branch writes parquet directly and is not staged through a "
+            "relational database.\n\n"
+            "The previous load resolved the natural key (chromosome, "
+            "position, ref, alt) against variant_masters to swap it for a "
+            "generated variant_id, then dropped the natural key. That "
+            "surrogate is only valid inside one bundle (ADR-003 §2.5), "
+            "and resolving it made this DTP depend on the variants branch "
+            "being loaded first. The transform now keeps the natural key, "
+            "so this DTP is independent and its parquet is final.\n\n"
+            "It also dropped every eQTL whose variant was absent from "
+            "variant_masters (the 'unmatched' count it logged). Those "
+            "rows are kept now; pruning them belongs to bundle assembly, "
+            "where the variants parquet is available."
+        )
+
+    def _load_legacy(self, processed_dir=None):
         t0 = time.time()
         msg = f"📥 Loading {self.data_source.name} GTEx v10 eQTL evidence..."
         self.logger.log(msg, "INFO")

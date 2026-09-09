@@ -28,7 +28,7 @@ API:
 df = bf.report.run(
     "etl_status",
     source_system=["NCBI", "Ensembl"],
-    data_sources=["dbsnp_chr1", "hgnc"],
+    data_sources=["gnomad_joint_chr1", "hgnc"],
     only_active=True,
 )
 ```
