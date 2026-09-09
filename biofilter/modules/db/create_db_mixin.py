@@ -10,8 +10,8 @@ from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.engine.url import make_url
 
 from biofilter.modules.db.base import Base
+from biofilter.utils.version import __version__
 
-# from biofilter.modules.db.migrate import alembic_upgrade_head
 from biofilter.modules.db.core_ddl import (
     ddl_list_partitions,
     ddl_variant_effect_predictions,
@@ -20,7 +20,6 @@ from biofilter.modules.db.core_ddl import (
     ddl_variant_molecular_effect,
     ddl_variant_regulatory_elements,
 )
-from biofilter.modules.db.migrate import get_repo_heads, get_script_location
 from biofilter.utils.db_loader import bootstrap_models
 
 CORE_PARTITIONED = {
@@ -341,11 +340,14 @@ class CreateDBMixin:
             for item in records:
                 applied += 1
 
-                # --- Special: BiofilterMetadata schema_revision comes from Alembic heads ---  # noqa E501
+                # BiofilterMetadata used to take schema_revision from the
+                # Alembic head. With Alembic gone the schema is whatever
+                # create_all built, so the package version is the only
+                # meaningful revision. ADR-003 Phase 4 replaces this row
+                # wholesale at build time; until then it at least stops
+                # claiming a migration id that no longer exists.
                 if model_name == "BiofilterMetadata":
-                    script_location = get_script_location()
-                    schema_revision = ",".join(get_repo_heads(script_location))
-                    item["schema_revision"] = schema_revision
+                    item["schema_revision"] = __version__
 
                 # --- Parse datetime-like fields (if your seeds contain them) ---  # noqa E501
                 for k, v in list(item.items()):

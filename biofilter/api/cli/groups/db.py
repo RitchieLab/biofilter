@@ -63,7 +63,7 @@ def ping(ctx, db_uri, debug: bool):
     Test database connectivity and report engine, database name, and latency.
 
     Tests reachability only — does not check whether the Biofilter schema
-    is present (use `biofilter db migrate --status` for that).
+    is present.
 
     Exits with status 0 on success, 1 on failure.
     """
@@ -111,90 +111,6 @@ def ping(ctx, db_uri, debug: bool):
     click.echo(f"   • Latency: {elapsed_ms:.1f} ms")
 
 
-# NOTE: Need fix and apply Alembic
-# @db.command("migrate")
-# @local_db_uri_option
-# @click.option("--debug", is_flag=True, help="Enable debug logging.")
-# @click.pass_context
-# def migrate(ctx, db_uri, debug: bool):
-#     """
-#     Run database migrations.
-#     """
-#     # db_uri = require_db_uri(ctx)
-#     db_uri = require_db_uri(ctx, local_db_uri=db_uri)
-
-#     bf = Biofilter(db_uri=db_uri, debug_mode=debug)
-#     # bf.db.connect()
-#     bf.db.migrate()
-
-
-#     click.echo("✅ Database migration completed.")
-@db.command("migrate")
-@local_db_uri_option
-@click.option("--debug", is_flag=True, help="Enable debug logging.")
-@click.option("--status", is_flag=True, help="Show current DB revision and repo head.")
-@click.option(
-    "--stamp-head", is_flag=True, help="Stamp DB to Alembic head without running DDL."
-)
-@click.option(
-    "--dry-run",
-    is_flag=True,
-    help="Print SQL that would run for upgrade (no execution).",
-)
-@click.option(
-    "--force",
-    is_flag=True,
-    help="Force dangerous actions (e.g., stamp over existing version).",
-)
-@click.option(
-    "--target",
-    default="head",
-    show_default=True,
-    help="Target revision (default: head).",
-)
-@click.pass_context
-def migrate(
-    ctx,
-    db_uri,
-    debug: bool,
-    status: bool,
-    stamp_head: bool,
-    dry_run: bool,
-    force: bool,
-    target: str,
-):
-    """
-    Run database migrations.
-    """
-    db_uri = require_db_uri(ctx, local_db_uri=db_uri)
-
-    bf = Biofilter(db_uri=db_uri, debug_mode=debug)
-
-    # resolve action
-    action = "upgrade"
-    if status:
-        action = "status"
-    elif stamp_head:
-        action = "stamp-head"
-    elif dry_run:
-        action = "dry-run"
-
-    bf.db.migrate(action=action, target=target, force=force)
-
-    # Messages
-    if action == "status":
-        click.echo("✅ Status displayed.")
-    elif action == "stamp-head":
-        click.echo("✅ Database stamped to head.")
-    elif action == "dry-run":
-        click.echo("✅ Dry-run completed (SQL printed).")
-    else:
-        click.echo("✅ Database migration completed.")
-
-
-# -----------------------------------------------------------------------------
-# Upgrade (schema + seeds)
-# -----------------------------------------------------------------------------
 
 
 @db.command("upgrade")
@@ -212,10 +128,12 @@ def migrate(
 @click.pass_context
 def upgrade(ctx, db_uri, seed_dir: str, debug: bool, force: bool):
     """
-    Upgrade database to latest schema and apply master seeds (idempotent).
-    Equivalent to:
-      - db migrate --target head
-      - apply seed upserts
+    Apply master seeds to an existing database (idempotent).
+
+    This used to run an Alembic upgrade first. There is no migration
+    chain any more: a database is built once by `create-db` with
+    `create_all`, and a schema change produces a new bundle rather than
+    an in-place migration (ADR-003 §2.8).
     """
     db_uri = require_db_uri(ctx, local_db_uri=db_uri)
 
@@ -224,13 +142,9 @@ def upgrade(ctx, db_uri, seed_dir: str, debug: bool, force: bool):
     # Ensure DB engine/session exist
     bf.db.connect()
 
-    # 1) Schema upgrade
-    bf.db.migrate(action="upgrade", target="head", force=force)
-
-    # 2) Master seeds upsert
     bf.db.upgrade(seed_dir=seed_dir)
 
-    click.echo("✅ Database upgraded (schema + seeds).")
+    click.echo("✅ Seeds applied.")
 
 
 # -----------------------------------------------------------------------------

@@ -63,7 +63,8 @@ class BiofilterMetadata(Base):
 
     id = Column(Integer, primary_key=True)
     schema_version = Column(String(50), nullable=False)
-    # New field: Alembic revision hash (or comma-separated heads)
+    # Schema revision. Was an Alembic head; now the package version,
+    # since the schema is whatever create_all built (ADR-003 §2.8).
     schema_revision = Column(String(64), nullable=True)
     etl_version = Column(String(50), nullable=True)
     build_hash = Column(String(50), nullable=True)  # TODO: Use to Reports?!?
