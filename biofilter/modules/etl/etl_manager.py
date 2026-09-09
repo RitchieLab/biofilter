@@ -6,6 +6,7 @@ import os
 import shutil
 from dataclasses import dataclass
 from datetime import datetime
+from pathlib import Path
 from typing import Any, Iterable, Optional, Sequence
 
 from sqlalchemy import MetaData, func, or_, select
@@ -1062,6 +1063,61 @@ class ETLManager:
     # ---------------------------------------------------------------------
     # STEP: EXTRACT
     # ---------------------------------------------------------------------
+    def _mark_package_failed(
+        self,
+        session: Session,
+        pkg: ETLPackage,
+        step: str,
+        exc: BaseException,
+    ) -> None:
+        """
+        Record a raising step on its package before the exception leaves.
+
+        Without this the package keeps the `running` it was committed with
+        while the caller rolls the session back and logs, so the database
+        shows a step still in flight that will never finish — and a
+        resumed build cannot tell it apart from one genuinely in progress.
+        """
+        pkg.status = "failed"
+        setattr(pkg, f"{step}_status", "failed")
+        setattr(pkg, f"{step}_end", datetime.now())
+        pkg.stats = {
+            "error": f"{type(exc).__name__}: {exc}",
+            "step": step,
+        }
+        try:
+            session.commit()
+        except Exception:  # noqa: BLE001
+            session.rollback()
+
+    def _step_output_exists(
+        self,
+        base_path: Optional[str],
+        ds: ETLDataSource,
+    ) -> bool:
+        """
+        Whether this data source left any file under `base_path`.
+
+        The skip logic matched on hashes alone, so a step whose output had
+        been deleted still reported up-to-date and wrote nothing. That was
+        survivable when the relational database held the truth and the
+        files were scratch; under ADR-003 the parquet *is* the product,
+        and the bundle build deliberately deletes raw files once their
+        parquet exists — so a resumed build would skip straight past the
+        gap it was meant to fill.
+
+        Returns True when the path is unknown, so a missing setting
+        cannot silently force every step to re-run.
+        """
+        if not base_path:
+            return True
+        directory = (
+            Path(base_path) / ds.source_system.name / ds.name
+        )
+        if not directory.is_dir():
+            return False
+        return any(directory.iterdir())
+
     def _run_extract(
         self,
         session: Session,
@@ -1092,7 +1148,12 @@ class ETLManager:
             db=self.db,
         )
 
-        ok, message, file_hash = dtp.extract(raw_dir=download_path)
+        try:
+            ok, message, file_hash = dtp.extract(raw_dir=download_path)
+        except Exception as exc:  # noqa: BLE001
+            self._mark_package_failed(session, pkg, "extract", exc)
+            raise
+
 
         pkg.extract_end = datetime.now()
         pkg.extract_hash = file_hash
@@ -1107,7 +1168,27 @@ class ETLManager:
                 extra_filters=[ETLPackage.extract_hash == file_hash],
             )
 
-            if last_same_hash and "extract" not in force_steps:
+            # Skipping is only safe while the raw file is still there, or
+            # while a transform has already consumed it for this same
+            # hash — which is the normal state after the bundle build
+            # discards raw files it no longer needs.
+            raw_present = self._step_output_exists(download_path, ds)
+            transform_done = bool(
+                self._find_last_package(
+                    session=session,
+                    ds_id=ds.id,
+                    operation_type="transform",
+                    ok_statuses=["completed", "up-to-date", "not-applicable"],
+                    order_field=ETLPackage.transform_end,
+                    extra_filters=[ETLPackage.transform_hash == file_hash],
+                )
+            )
+
+            if (
+                last_same_hash
+                and "extract" not in force_steps
+                and (raw_present or transform_done)
+            ):
                 pkg.status = "up-to-date"
                 pkg.extract_status = "up-to-date"
                 pkg.stats = {
@@ -1186,7 +1267,16 @@ class ETLManager:
             extra_filters=[ETLPackage.transform_hash == last_extract.extract_hash],  # noqa E501
         )
 
-        if last_transform and "transform" not in force_steps:
+        processed_present = self._step_output_exists(processed_path, ds)
+        if not processed_present and last_transform:
+            self.logger.log(
+                f"♻️  Transform for '{ds.name}' is recorded as done for this "
+                f"hash, but no output remains under {processed_path}. "
+                f"Re-running it.",
+                "WARNING",
+            )
+
+        if last_transform and processed_present and "transform" not in force_steps:  # noqa: E501
             pkg = self._create_package(session, ds)
             if not pkg:
                 return
@@ -1236,7 +1326,12 @@ class ETLManager:
             db=self.db,
         )
 
-        ok, message = dtp.transform(download_path, processed_path)
+        try:
+            ok, message = dtp.transform(download_path, processed_path)
+        except Exception as exc:  # noqa: BLE001
+            self._mark_package_failed(session, pkg, "transform", exc)
+            raise
+
 
         pkg.transform_end = datetime.now()
 
@@ -1349,7 +1444,16 @@ class ETLManager:
             db=self.db,
         )
 
-        ok, message = dtp.load(processed_path)
+        try:
+
+            ok, message = dtp.load(processed_path)
+
+        except Exception as exc:  # noqa: BLE001
+
+            self._mark_package_failed(session, pkg, "load", exc)
+
+            raise
+
 
         pkg.load_end = datetime.now()
 
