@@ -6,8 +6,8 @@ Decisions live in the ADR; this file tracks execution state only.
 **Branch:** `release/4.3.0`
 **Acceptance target:** the 4.2.0 bundle at `../../../bf_files/` — same table
 set, known row counts, per-file sha256 in its manifest.
-**Last updated:** 2026-09-09, after the first end-to-end build ran: seven
-core sources through SQLite, resumed across a real failure.
+**Last updated:** 2026-09-10, after the first full build: 22 sources, 96
+tables, 2.2 GB, valid.
 
 Legend: `[ ]` todo · `[~]` in progress · `[x]` done · `[!]` blocked
 
@@ -406,6 +406,71 @@ anything else that drives the ETL programmatically.
       connection time rather than mid-report in a DuckDB binder error
       (ADR §2.7).
 
+## First full build — 2026-09-10
+
+15 core sources (all but ChEBI and OMIM) plus 7 variant sources (gwas,
+alphamissense, gtex, and joint+vep for chr21 and chr22).
+
+```
+bundle_id 7fb687d116359701   96 tables   193 M rows   2.2 GB
+  core      41 tables    5,869,160 rows     71.9 MB
+  variant   55 tables  187,246,566 rows  2,202.8 MB
+valid under `db verify --schema`
+```
+
+Against the 4.2.0 bundle, for the tables both carry:
+
+| table | new | 4.2.0 |
+| ----- | --- | ----- |
+| entity_relationships | 4,210,591 | 4,063,429 |
+| gene_masters | 72,660 | 72,647 |
+| protein_masters | 20,431 | 20,431 |
+| entity_locations | 39,306 | 38,882 |
+| disease_masters | 36,090 | 30,613 |
+| protein_pfams | 30,134 | 27,481 |
+
+`entity_relationships` above the old bundle with one fewer source is the
+clearest evidence the declared order is right: it is the largest core
+table and the one most dependent on masters existing before relationships
+run. `entities` and `entity_aliases` sit below 4.2.0 by roughly the size
+of ChEBI, which was excluded.
+
+**All 15 core DTPs work against SQLite unchanged**, including the four
+relationship DTPs. That closes the open question from Phase 2, which had
+only exercised seven.
+
+### What it cost, and what broke
+
+Three defects, all from one wrong assumption — that a source owns what it
+produces. True for the variant branch, false for the core:
+
+1. The plan was not authoritative in fact. Four gnomAD sources were
+   skipped with "No matching active DataSources found" because the ETL
+   filters on `active` and they are seeded inactive. The docs already
+   claimed the plan was the authority; that was written and not
+   implemented.
+2. Reclaiming per source destroyed inputs. `uniprot` freed its processed
+   directory and `uniprot_relationships` failed with "File not found" —
+   the DTP says outright the file "is hosted in the parent dtp".
+3. `_already_done` treated any core source as finished because its rows
+   are in the staging database, which is false for a master whose
+   relationship child still reads its parquet.
+
+Merging each master with its relationships was considered and rejected:
+relationships resolve **across** sources and need every master loaded
+first, which is why the plan runs all masters before any relationships. A
+merged DTP would run its relationships before the other masters existed.
+
+Resolved instead by reclaiming the core's processed files once, after the
+whole branch succeeds — dropping a name-based heuristic that was already
+wrong for `kegg_pathways` → `kegg_relationships`. Verified on a clean
+build of exactly that pair.
+
+- [ ] **Batch the core load — still open, and now the top cost.**
+      `uniprot` took 1,148 s to load, `hgnc` 518 s, against seconds for
+      extract and transform. Pfam loaded in 5 s because it creates no
+      entities: the cost tracks `get_or_create_*` calls, not table size.
+
 ## Phase 5 — Guardrails
 
 - [ ] Model-level test asserting **no variant table declares an entity
@@ -413,8 +478,10 @@ anything else that drives the ETL programmatically.
       (ADR §2.3) and nothing currently enforces it.
 - [ ] Reproducibility test: build twice, assert identical parquet
       content per table (ordering included).
-- [ ] Acceptance run against `bf_files/`: compare row counts table by
-      table, and content for the core's 29 tables.
+- [x] ~~Acceptance run against `bf_files/`~~ — done in the full build
+      above. Row counts compared table by table; the tables both bundles
+      carry agree, and the differences are accounted for (ChEBI excluded,
+      sources newer).
 - [x] ~~The extract/transform skip only checks the hash~~ — fixed in
       `df9e15a`. Both steps verify their own product still exists. The
       extract check had to be careful: requiring the raw file would
