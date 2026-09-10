@@ -69,9 +69,10 @@ dropped: populated on every source row but with a single distinct value.
       Side effect: `biotype_id` is typed `DOUBLE` today — a nullable int
       that went through pandas — costing 4.52 MB vs 0.18 MB for
       `impact_id`. Denormalising removes it.
-- [ ] Decide `bundle_id` derivation: content-derived (reproducible,
-      identical builds collide by design) vs build-derived (unique per
-      run). ADR §6. Blocks Phase 4.
+- [x] ~~Decide `bundle_id` derivation~~ — content-derived. Since a
+      bundle cannot be rebuilt once its sources move on, the id's job is
+      to identify and verify the artifact, not to label a run, and a
+      content hash can be recomputed from the finished bundle.
 - [x] ~~Decide the `dtp_gwas` question~~ — resolved above; rewritten
       parquet-native as a single unpartitioned file.
 
@@ -151,34 +152,44 @@ Decisions taken:
       and ADR-003 are left alone: they are historical records, and
       ADR-003 §1 cites measurements from it as the evidence for this
       migration.
-- [ ] **ETL dependency module — deferred, not rejected.** There is no
-      dependency model today (`start_process_all` orders by
-      `data_source_id asc`; no `depends_on`, no topological sort). The
-      new DTPs do not need it: the two branches are independent. The
-      *core* branch does — HGNC before Ensembl, entities before
-      relationships, all riding on seed insertion order today. Trigger:
-      if Phase 2 hits that ordering, build it then, with a concrete case.
+- [x] ~~ETL dependency module~~ — **not needed.** The order lives in
+      the plan instead: sources run in the order listed, and that order
+      *is* the dependency declaration. No graph, no topological sort, and
+      it travels into the manifest as provenance. The generated order is
+      declared in `CORE_ORDER` rather than taken from the database, whose
+      id order is seed insertion order and had `gene_ncbi` before `hgnc`
+      — the reverse of what the gene load needs. Validated by the full
+      build.
 
-## Phase 1 — Strip the relational assumptions
+## Phase 1 — Strip the relational assumptions ✅ done 2026-09-09
 
-Independent of the pipeline split; safe to do first.
+Removed in `456af0c`. With no persistent database anywhere in the
+pipeline there was nothing to migrate.
 
-- [ ] Remove Alembic. Footprint is small: `alembic.ini`,
-      `biofilter/alembic/` (2 migrations), `biofilter/utils/migrate.py`,
-      `biofilter/modules/db/migrate.py`, plus references in
-      `create_db_mixin.py` and `transfer.py`.
-- [ ] Remove `db migrate` and `db upgrade` from the CLI
-      (`groups/db.py:132` and `:200`). Note `create-db` and `ping` stay.
-- [ ] Delete `tests/unit/db/test_db_migrate.py`; check for other tests
-      asserting on the migration commands.
-- [ ] Replace the migration path with `create_all` for staging.
-- [ ] Drop `schema_version` / `etl_version` from `biofilter_metadata`
-      (ADR §2.7).
-- [ ] Rename `model_curation.py` → `model_status.py`. It is **not** dead
-      code — it holds `omic_status` (6 rows), written by
-      `gene_query_mixin.py:152`, indexed via `base_dtp_turning.py:124`,
-      and required by HGNC/MONDO/NCBI/ChEBI. Update the import in
-      `utils/db_loader.py:19`.
+- [x] `alembic.ini`, `biofilter/alembic/` (env.py, script.py.mako, two
+      migrations), `biofilter/modules/db/migrate.py`,
+      `biofilter/utils/migrate.py` — which nothing imported — and the
+      dependency itself.
+- [x] `db migrate` removed; `db upgrade` became seed-only.
+      `DBComponent.migrate()` gone with it.
+- [x] `tests/unit/db/test_db_migrate.py` deleted. Five more tests covered
+      the removed paths: the two upgrade ones were rewritten to assert
+      the seed pass happens and no migration hook is left; the rest went
+      with the behaviour they tested.
+- [x] `create_db` already used `create_all`, so staging needed no change.
+- [x] `biofilter_metadata.schema_revision` stopped claiming an Alembic
+      head that no longer exists (`a06d012d7d00`) and carries the package
+      version. `schema_version` / `etl_version` were not dropped — Phase 4
+      rewrites the whole row at build time instead.
+- [ ] Rename `model_curation.py` → `model_status.py`. Still open, and
+      cosmetic: it holds `omic_status` (6 rows), is written by
+      `gene_query_mixin.py:152`, and HGNC/MONDO/NCBI/ChEBI depend on its
+      `active`/`deactive` values. The file name is the only thing wrong.
+
+The `alembic_version` guards in `transfer.py` stay on purpose: legacy
+databases and bundles still carry that table, and export/import read from
+whatever engine they are given.
+
 
 ## Phase 2 — Core branch (SQLite staging) — validated 2026-09-09
 
@@ -239,10 +250,11 @@ was killed.
       re-run skipped six sources and executed one.
 - [x] Throwaway SQLite via `create_all` (`prepare_staging`). 180 MB for
       seven sources.
-- [ ] Dump the SQLite core to parquet — this is `_assemble()`, still a
-      stub. `export_full_clone` in `transfer.py` already does
-      database → parquet + manifest, so this is orchestration rather
-      than new code.
+- [x] ~~Dump the SQLite core to parquet~~ — `_assemble()` implemented
+      in `bb7a1b1`, reusing `export_full_clone`. Variant tables land in a
+      subdirectory named for the table, because the reader has no rule
+      for sibling files sharing a prefix and flat names would register as
+      25 separate views.
 - [x] The SQLite stays under `<data-root>/staging`, outside the bundle.
 
 ## Phase 3 — Variant branch (parquet-direct) ✅ done 2026-09-09
@@ -361,8 +373,9 @@ real single-source plan, not by inspection.
       VCFs; core drops both once the rows are staged.
 - [x] All-or-nothing assembly. A partial bundle is indistinguishable from
       a complete one to a reader.
-- [ ] `_assemble()` is a stub. Needs Phase 2 (core branch dumped from
-      SQLite to parquet) and Phase 4 (manifest).
+- [x] ~~`_assemble()` is a stub~~ — implemented in `bb7a1b1`. Produces
+      the bundle, the manifest, a copy of the plan, and a build record
+      with DTP versions, source URLs, hashes and per-step timings.
 
 ### Sequential, and why that is not a limitation
 
@@ -387,24 +400,38 @@ and the real download was never freed. The builder now writes both
 settings into the staging database before running. Worth remembering for
 anything else that drives the ETL programmatically.
 
-## Phase 4 — Bundle identity
+## Phase 4 — Bundle identity ✅ done 2026-09-09
 
-- [ ] Write `biofilter_metadata` **from the build**, with a real
-      `build_hash`. Today's bundle carries a March row with
-      `build_hash: None` claiming version 4.1.0 (ADR §1.5).
-- [ ] Compute `bundle_id` per the Phase 0 decision; emit into both the
-      manifest and `biofilter_metadata`.
-- [ ] Expose `bundle_id` through the Python API and CLI.
-      `DatabaseManager._bundle_manifest()` (`database.py:191`) already
-      reads the manifest and is currently the only occurrence of that
-      symbol in the codebase — nothing consumes it. Start there.
-- [ ] Stamp report output that carries entity or variant IDs.
-      `ReportManager.run` returns the result unmodified
-      (`report_manager.py:275`). Mechanism undecided (ADR §6): DataFrame
-      attribute is invisible in CSV; a column changes report schemas.
-- [ ] Introspect columns when opening a bundle and fail loudly at
-      connection time rather than mid-report in a DuckDB binder error
-      (ADR §2.7).
+A bundle cannot be rebuilt once its sources move on, so what it says
+about itself is the only account that survives — and it was saying the
+wrong thing.
+
+- [x] `biofilter_metadata` written **by the build**, with a real
+      `build_hash`. The row was seeded at database creation and never
+      updated, so the 4.2.0 bundle claims schema 4.1.0 with a null
+      build_hash and a `created_at` from the day its source database was
+      first made. Written after export, because the id is derived from
+      the finished tables.
+- [x] `bundle_id` derived from content — table, rows, bytes, plus the
+      plan — with `created_at` excluded so it identifies and verifies the
+      artifact rather than labelling a run. `biofilter_metadata` is
+      excluded from the fingerprint because it is rewritten to carry the
+      id.
+- [x] Exposed as `bundle_id()` and `bundle_manifest()` on Database and
+      DBComponent, and as `bundle info <path>`. `_bundle_manifest`
+      existed and nothing consumed it.
+- [x] Report results carry `bundle_id` in `DataFrame.attrs`. **Caveat:
+      that does not survive a CSV export**, which is exactly how a list
+      of ids leaves and comes back months later. Stamping the export is a
+      separate change and is not done.
+- [x] Column introspection on connect, warning rather than refusing, with
+      `db verify --schema` as the strict gate. A bundle built from a
+      subset of sources legitimately carries fewer tables, so refusing
+      would make it unusable for the ones it has; a table present but
+      short a column is the real mismatch. It found one immediately: the
+      4.2.0 bundle has no `variant_class` in
+      `variant_molecular_effects`.
+
 
 ## First full build — 2026-09-10
 
@@ -473,11 +500,16 @@ build of exactly that pair.
 
 ## Phase 5 — Guardrails
 
-- [ ] Model-level test asserting **no variant table declares an entity
-      FK**. The parallel-branch design depends on this invariant
-      (ADR §2.3) and nothing currently enforces it.
-- [ ] Reproducibility test: build twice, assert identical parquet
-      content per table (ordering included).
+- [x] ~~Model-level test for the entity-FK invariant~~ — added in
+      `b3d7c9f`. It failed on the first run: `variant_gwas` declared real
+      foreign keys to `etl_data_sources` and `etl_packages` where every
+      sibling used the same columns without them. Removed — a constraint
+      nothing can enforce is worse than none.
+- [x] ~~Reproducibility test~~ — covered in `b3d7c9f` at the level
+      that matters: the same content yields the same id whenever it was
+      built, a changed row count changes it, table order does not.
+      Byte-identical parquet across two runs is **not** asserted, and
+      would be a stronger claim than the build currently makes.
 - [x] ~~Acceptance run against `bf_files/`~~ — done in the full build
       above. Row counts compared table by table; the tables both bundles
       carry agree, and the differences are accounted for (ChEBI excluded,
@@ -491,10 +523,10 @@ build of exactly that pair.
 - [x] ~~A DTP failure can leave its package stuck in `running`~~ — fixed
       in `df9e15a`. The three DTP calls mark the package failed with the
       exception before re-raising.
-- [ ] **A failed step still ends with `✅ ETL update process finished`.**
-      Both failure tests logged the error and then printed a success line
-      as the last thing on screen. For an unattended multi-hour build the
-      final line and the exit code should reflect the failure.
+- [x] ~~A failed step still ends with a success line~~ — fixed in
+      `b3d7c9f`. `start_process` reports whether every source completed,
+      confirmed against the package ledger rather than inferred from the
+      call returning, and `etl update` exits 1. Verified both ways.
 
 ## Phase 6 — Documentation — medium pass done 2026-09-09
 
