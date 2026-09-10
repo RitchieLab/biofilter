@@ -181,10 +181,9 @@ pipeline there was nothing to migrate.
       head that no longer exists (`a06d012d7d00`) and carries the package
       version. `schema_version` / `etl_version` were not dropped — Phase 4
       rewrites the whole row at build time instead.
-- [ ] Rename `model_curation.py` → `model_status.py`. Still open, and
-      cosmetic: it holds `omic_status` (6 rows), is written by
-      `gene_query_mixin.py:152`, and HGNC/MONDO/NCBI/ChEBI depend on its
-      `active`/`deactive` values. The file name is the only thing wrong.
+- [x] ~~Rename `model_curation.py` → `model_status.py`~~ — done. The
+      file holds `omic_status`, not curation; the name was the only thing
+      wrong with it.
 
 The `alembic_version` guards in `transfer.py` stay on purpose: legacy
 databases and bundles still carry that table, and export/import read from
@@ -235,8 +234,8 @@ on Postgres); the core DTPs have none. ChEBI was dropped from this run
 for exactly this reason — it was still loading 117,265 chemicals when it
 was killed.
 
-- [ ] **Batch the core load.** Probably worth more than anything else
-      left in Phase 2.
+- [x] ~~Batch the core load~~ — partially. 518 s → 450 s for hgnc. See
+      "Core load speed" below: the rest is deferred to 4.3.1.
 
 
 - [x] Split core and variant branches — done in `BundleBuilder`, not in
@@ -493,10 +492,56 @@ whole branch succeeds — dropping a name-based heuristic that was already
 wrong for `kegg_pathways` → `kegg_relationships`. Verified on a clean
 build of exactly that pair.
 
-- [ ] **Batch the core load — still open, and now the top cost.**
-      `uniprot` took 1,148 s to load, `hgnc` 518 s, against seconds for
-      extract and transform. Pfam loaded in 5 s because it creates no
-      entities: the cost tracks `get_or_create_*` calls, not table size.
+### Core load speed — investigated 2026-09-10, deferred to 4.3.1
+
+Batching the commits landed and gave 13%: `hgnc` went from 518 s to
+450 s. Everything else tried did not work, and the investigation is
+recorded here so it is not repeated from scratch.
+
+**What shipped.** Every `get_or_create_*` helper committed on its own,
+and HGNC calls five of them per gene. They now commit every 1,000 writes
+through a shared `BatchedCommitMixin`, flushed by the ETL manager after
+`load()`.
+
+**What was tried and did not help:**
+
+| attempt | result |
+| ------- | ------ |
+| WAL journal mode | no change once genuinely applied |
+| Composite index on the alias lookup | query already ran in 0.01 ms |
+| Batching commits | 518 s → 450 s |
+
+**A real bug found on the way, and left alone.** `PRAGMA journal_mode` is
+silently ignored inside an open transaction — it returns the current mode
+and raises nothing — and every route through a Session has one open,
+including `session.connection()`. So `db_write_mode()` never applied any
+of its PRAGMAs: a staging database built by it comes out
+`journal=delete, synchronous=FULL`, the settings it exists to change.
+
+Fixing it (a connect-time engine listener) was reverted, because with WAL
+genuinely active two things broke: `locking_mode = EXCLUSIVE`, also set
+there, deadlocked the loader at 1% CPU waiting on its own connections;
+and `db_read_mode()` fails with "database is locked" trying to return to
+`journal_mode = DELETE`. The PRAGMA block needs reworking as a whole,
+not one line at a time.
+
+**Where the time actually goes**, from a cProfile of the HGNC load:
+234,367 SQL statements taking 325 s of 384 s — 1.39 ms each, across
+46,854 genes, so five statements per gene. WAL not helping means that
+1.39 ms is not fsync, and it has not been explained. Two threads worth
+pulling: SQLite's chosen index changes as the table grows during the load
+(measured only on the finished table, where the query is fast), and the
+five statements per gene include lookups that an in-memory cache would
+remove entirely.
+
+- [ ] **Rework the SQLite load path as a block in 4.3.1**, not
+      incrementally. Likely shape: apply PRAGMAs at connect, drop
+      `locking_mode`, retire `db_read_mode`'s journal switch, and cache
+      the lookups so the statement count per row drops. Four separate
+      attempts at one piece each produced 13% between them.
+
+**Not a blocker for 4.3.0.** A full build completes; this is throughput,
+not correctness.
 
 ## Phase 5 — Guardrails
 

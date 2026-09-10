@@ -73,6 +73,12 @@ class DTPBase(DBTuningMixin):
 
     # Call this at the end of each load()
     def finalize_load(self):
+        # Commit whatever the last batch left pending. get_or_create_*
+        # commits every COMMIT_BATCH_SIZE rows rather than every row, so
+        # the tail of a run would otherwise stay uncommitted.
+        flush = getattr(self, "flush_pending_writes", None)
+        if callable(flush):
+            flush()
         self._log_truncation_summary()
         # any other common epilogue
 

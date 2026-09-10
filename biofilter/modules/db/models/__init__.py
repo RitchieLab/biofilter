@@ -1,6 +1,6 @@
 from .model_chemicals import ChemicalMaster
 from .model_config import BiofilterMetadata, GenomeAssembly, SystemConfig
-from .model_curation import OmicStatus
+from .model_status import OmicStatus
 from .model_diseases import DiseaseGroup, DiseaseGroupMembership, DiseaseMaster
 from .model_entities import (
     Entity,

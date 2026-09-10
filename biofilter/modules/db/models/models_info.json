@@ -64,7 +64,7 @@
     "description": "Biological pathway definitions, integrated from Reactome and KEGG."
   },
   "OmicStatus": {
-    "path": "biofilter.db.models.model_curation.OmicStatus",
+    "path": "biofilter.db.models.model_status.OmicStatus",
     "description": "Optional status annotation applied to genes (e.g., 'Manually curated')."
   },
   "SystemConfig": {

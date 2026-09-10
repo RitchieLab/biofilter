@@ -16,7 +16,7 @@ def load_all_models():
     import_module("biofilter.modules.db.models.model_etl")
     import_module("biofilter.modules.db.models.model_entities")
     import_module("biofilter.modules.db.models.model_genes")
-    import_module("biofilter.modules.db.models.model_curation")
+    import_module("biofilter.modules.db.models.model_status")
     import_module("biofilter.modules.db.models.model_variants")
     import_module("biofilter.modules.db.models.model_pathways")
     import_module("biofilter.modules.db.models.model_proteins")

@@ -277,7 +277,7 @@ class CreateDBMixin:
         )
         self._seed_from_json(
             f"{seed_dir}/initial_omic_status.json",
-            "model_curation",
+            "model_status",
             "OmicStatus",
             key="omic_status",
         )

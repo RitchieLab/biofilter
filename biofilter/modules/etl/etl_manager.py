@@ -1493,14 +1493,21 @@ class ETLManager:
         )
 
         try:
-
             ok, message = dtp.load(processed_path)
-
         except Exception as exc:  # noqa: BLE001
-
             self._mark_package_failed(session, pkg, "load", exc)
-
             raise
+        finally:
+            # get_or_create_* commits every COMMIT_BATCH_SIZE rows rather
+            # than every row, so a run can end with a partial batch
+            # pending. The package update below commits anyway, but that
+            # is a coincidence of ordering rather than a guarantee.
+            flush = getattr(dtp, "flush_pending_writes", None)
+            if callable(flush):
+                try:
+                    flush()
+                except Exception:  # noqa: BLE001
+                    session.rollback()
 
 
         pkg.load_end = datetime.now()
