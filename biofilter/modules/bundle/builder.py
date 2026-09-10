@@ -136,7 +136,50 @@ class BundleBuilder:
             self.bf.db.create_db(db_uri=uri, overwrite=False)
 
         self._pin_paths()
+        self._sync_plan_selection()
         return uri
+
+    def _sync_plan_selection(self) -> None:
+        """
+        Make the staging database agree with the plan about what runs.
+
+        The ETL resolves data sources with an `active` filter, so a source
+        the plan includes but the database has inactive is silently
+        skipped with "No matching active DataSources found". The plan is
+        meant to be the authority for a build — that was documented and
+        not implemented, so the two disagreed and the build lost four
+        sources to it.
+
+        Only the staging database is touched. Whatever database the plan
+        was generated from keeps its own flags.
+        """
+        from biofilter.modules.db.models import ETLDataSource
+
+        wanted = {
+            entry["name"]
+            for branch in (CORE_BRANCH, VARIANT_BRANCH)
+            for entry in self.included_sources(branch)
+        }
+        if not wanted:
+            return
+
+        changed = 0
+        with self.bf.core.require_db().get_session() as session:
+            for row in (
+                session.query(ETLDataSource)
+                .filter(ETLDataSource.name.in_(wanted))
+                .all()
+            ):
+                if not row.active:
+                    row.active = True
+                    changed += 1
+            session.commit()
+
+        if changed:
+            self.logger.log(
+                f"   ⚙️  activated {changed} source(s) the plan includes",
+                "INFO",
+            )
 
     def _pin_paths(self) -> None:
         """
@@ -209,6 +252,9 @@ class BundleBuilder:
             )
             for entry in sources:
                 result.outcomes.append(self._run_source(entry, branch))
+
+            if branch == CORE_BRANCH and not self.keep_raw:
+                self._discard_core_processed(sources, result)
 
         if result.failed:
             names = ", ".join(o.name for o in result.failed)
@@ -290,13 +336,23 @@ class BundleBuilder:
         # The variant branch's parquet is the artifact and must survive;
         # the core branch's rows live in the staging database, and its
         # processed files are deliberately gone.
-        if branch == VARIANT_BRANCH:
-            produced = (
-                self.processed_path / entry["source_system"] / entry["name"]
-            )
-            return produced.is_dir() and any(produced.rglob("*.parquet"))
+        # The variant branch's parquet is the artifact, so it has to still
+        # be there. The core branch's rows live in the staging database
+        # and its processed files survive until the whole branch is done,
+        # so the ledger alone settles it.
+        if branch != VARIANT_BRANCH:
+            return True
 
-        return True
+        produced = self.processed_path / entry["source_system"] / entry["name"]  # noqa: E501
+        if produced.is_dir() and any(produced.rglob("*.parquet")):
+            return True
+
+        self.logger.log(
+            f"♻️  {entry['name']} is recorded as done, but its parquet is "
+            f"gone. Re-running it.",
+            "WARNING",
+        )
+        return False
 
     def _source_succeeded(self, name: str, steps: List[str]) -> bool:
         """
@@ -354,10 +410,6 @@ class BundleBuilder:
         instead of the ~126 GB one chromosome occupies.
         """
         targets = [self.download_path / entry["source_system"] / entry["name"]]
-        if branch == CORE_BRANCH:
-            targets.append(
-                self.processed_path / entry["source_system"] / entry["name"]
-            )
 
         freed = 0.0
         for directory in targets:
@@ -374,6 +426,56 @@ class BundleBuilder:
                 f"   🧹 freed {freed:,.0f} MB of intermediates", "INFO"
             )
         return freed
+
+
+    def _discard_core_processed(self, sources: List[dict], result) -> None:
+        """
+        Drop the core branch's processed files, once the branch is done.
+
+        Not per source, because a core source's processed output is not
+        private to it: every `*_relationships` DTP reads the parquet its
+        master wrote, from the master's directory. Worse, relationships
+        need *every* master loaded before they run — they resolve across
+        sources — so the masters cannot simply be paired with their
+        children and reclaimed early either.
+
+        Reclaiming per source deleted those inputs and cost two sources a
+        full re-run. Detecting the coupling by name was tried and was
+        already wrong: `kegg_relationships` reads `kegg_pathways`, which
+        no `<name>_relationships` rule matches.
+
+        Waiting costs nothing worth managing. The core branch's processed
+        files total about 72 MB, against gigabytes for a single variant
+        chromosome — this whole reclaim exists for the variant branch.
+
+        Skipped entirely if any core source failed, so a resumed build
+        still finds what it needs.
+        """
+        failed = {o.name for o in result.failed}
+        if failed:
+            self.logger.log(
+                f"   ↺ keeping processed files: {len(failed)} core "
+                f"source(s) failed and a resume will need them",
+                "INFO",
+            )
+            return
+
+        freed = 0.0
+        for entry in sources:
+            directory = (
+                self.processed_path / entry["source_system"] / entry["name"]
+            )
+            if not directory.is_dir():
+                continue
+            freed += sum(
+                f.stat().st_size for f in directory.rglob("*") if f.is_file()
+            ) / 1024 ** 2
+            shutil.rmtree(directory)
+
+        if freed:
+            self.logger.log(
+                f"   🧹 freed {freed:,.0f} MB of core intermediates", "INFO"
+            )
 
     # ------------------------------------------------------------------
     # Assembly
