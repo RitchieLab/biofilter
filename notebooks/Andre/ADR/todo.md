@@ -635,6 +635,13 @@ need numbers that run will produce:
 
 ## Open decisions carried forward
 
+- [ ] **Measure peak RAM during a build.** The full-genome run showed no
+      pressure on a 36 GB machine and 32 GB is the published figure, but
+      no peak was captured. Transforms stream in 250,000-row batches so
+      memory should not scale with chromosome size; the exception is the
+      rsID dedupe, which hands DuckDB a whole chromosome — ~80 M keys on
+      chr1. Worth instrumenting before claiming a minimum.
+
 - [ ] **`min_ac` for the rsID map** — `null` (every rsID, ~4.5 GB
       genome-wide) vs `3` (safe lower bound for the joint's `AC >= 5`,
       no loss, some prunable orphans). One line in the VEP config plus a

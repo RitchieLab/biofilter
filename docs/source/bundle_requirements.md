@@ -35,9 +35,26 @@ Without the discard the same build needs the full 1.57 TB. This is why
 `bundle build` reclaims per source and why it refuses to start one below
 a free-space floor (`--min-free-gb`, default 100 GB).
 
-**Recommendation: 150 GB free.** That is roughly twice the peak, which
-covers a larger future release and leaves room for the bundle to stay on
-the same volume.
+### What to provision
+
+| | |
+| --- | --- |
+| **Working space during a build** | **150 GB free** |
+| **Storage per retained bundle** | **30 GB** |
+
+150 GB is about twice the measured peak. It also keeps the default
+`--min-free-gb` floor of 100 GB workable: the floor is checked before
+each source starts, and between sources the space comes back, because raw
+is discarded while only parquet accumulates. At the last source there is
+still around 129 GB free.
+
+Provisioning exactly 100 GB would not work — the build would refuse to
+start, since free space at the peak drops below its own floor.
+
+30 GB per bundle rather than the 21 GB this one occupies: a later gnomAD
+release or adding ChEBI moves that number, and bundles are retained
+rather than rebuilt, so archive storage is *N* × 30 GB for however many
+you keep.
 
 ## Time
 
@@ -61,9 +78,13 @@ Transform is the target for anything faster, not download or load.
 
 ## Memory
 
-**Not measured.** The build ran without pressure on a 16 GB machine, but
-no peak was recorded, so treat this as an observation rather than a
-figure.
+**Provision 32 GB.**
+
+That is close to what was validated rather than an extrapolation: the
+machine that ran this build has 36 GB and showed no pressure. The peak
+itself was **not measured**, so 32 GB is a safe recommendation, not a
+derived requirement — a smaller machine may well be enough, and that is
+worth instrumenting on a future build.
 
 What is known about the shape: transforms stream in batches of 250,000
 rows and hold one writer per chromosome, so memory does not scale with
