@@ -85,12 +85,16 @@ class BundleBuilder:
         logger,
         keep_raw: bool = False,
         bundle_dir: Optional[Path] = None,
+        assemble: bool = True,
+        min_free_gb: float = 0.0,
     ):
         self.plan = plan
         self.bf = biofilter
         self.data_root = Path(data_root)
         self.logger = logger
         self.keep_raw = keep_raw
+        self.assemble = assemble
+        self.min_free_gb = min_free_gb
 
         self.download_path = self.data_root / "raw"
         self.processed_path = self.data_root / "processed"
@@ -266,6 +270,14 @@ class BundleBuilder:
                 f"and will be skipped.",
                 "ERROR",
             )
+        elif not self.assemble:
+            self.logger.log(
+                "⏸️  Every included source finished. Assembly skipped "
+                "(--no-assemble): this is one stage of a staged build, and "
+                "a bundle assembled now would hold only what has run so "
+                "far. Run the final stage without the flag.",
+                "INFO",
+            )
         else:
             result.assembled = self._assemble()
 
@@ -282,6 +294,16 @@ class BundleBuilder:
             if branch == VARIANT_BRANCH
             else ["extract", "transform", "load"]
         )
+
+        free_gb = self._free_gb()
+        if self.min_free_gb and free_gb < self.min_free_gb:
+            detail = (
+                f"only {free_gb:,.0f} GB free, below the {self.min_free_gb:,.0f} GB "  # noqa: E501
+                f"floor. A single gnomAD chromosome needs up to 67 GB of raw "
+                f"before its parquet exists and the raw can go."
+            )
+            self.logger.log(f"⛔️ {name}: {detail}", "ERROR")
+            return SourceOutcome(name, branch, "failed", detail)
 
         if self._already_done(entry, branch, steps):
             self.logger.log(f"⏭️  {name}: already complete, skipping", "INFO")
@@ -307,6 +329,12 @@ class BundleBuilder:
             freed = self._discard_raw(entry, branch)
 
         return SourceOutcome(name, branch, "done", raw_freed_mb=freed)
+
+    def _free_gb(self) -> float:
+        """Free space on the volume holding the data root."""
+        target = self.data_root if self.data_root.exists() else Path(".")
+        usage = shutil.disk_usage(target)
+        return usage.free / 1024 ** 3
 
     def _already_done(
         self,

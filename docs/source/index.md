@@ -28,6 +28,7 @@ entity_and_omics
 developer_extensions
 configuration
 building_bundles
+bundle_requirements
 database
 parquet_backend
 schema

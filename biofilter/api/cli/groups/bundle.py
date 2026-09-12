@@ -22,7 +22,7 @@ from pathlib import Path
 import click
 
 from biofilter.api.cli.common import local_db_uri_option, require_db_uri
-from biofilter.biofilter import Biofilter
+from biofilter.biofilter import NO_DATABASE, Biofilter
 from biofilter.modules.db.models import ETLDataSource, ETLSourceSystem
 from biofilter.utils.version import __version__
 
@@ -275,8 +275,27 @@ def plan_cmd(ctx, db_uri, out_path: Path, all_sources: bool, force: bool, debug:
         "for the largest single chromosome."
     ),
 )
+@click.option(
+    "--no-assemble",
+    is_flag=True,
+    help=(
+        "Run the sources but do not assemble. For a staged build, where "
+        "assembling early would publish a bundle holding only what has "
+        "run so far."
+    ),
+)
+@click.option(
+    "--min-free-gb",
+    type=float,
+    default=100.0,
+    show_default=True,
+    help=(
+        "Refuse to start a source below this much free space. One gnomAD "
+        "chromosome needs up to 67 GB of raw before its parquet exists."
+    ),
+)
 @click.option("--debug", is_flag=True, help="Enable debug logging.")
-def build_cmd(plan_path: Path, data_root: Path, bundle_dir, restart: bool, keep_raw: bool, debug: bool):  # noqa: E501
+def build_cmd(plan_path: Path, data_root: Path, bundle_dir, restart: bool, keep_raw: bool, no_assemble: bool, min_free_gb: float, debug: bool):  # noqa: E501
     """
     Build a bundle from a plan.
 
@@ -288,7 +307,12 @@ def build_cmd(plan_path: Path, data_root: Path, bundle_dir, restart: bool, keep_
 
     plan = json.loads(plan_path.read_text(encoding="utf-8"))
 
-    bf = Biofilter(debug_mode=debug)
+    # Start with no database at all. `Biofilter()` falls back to the URI
+    # in .biofilter.toml when none is given, so the command used to fail
+    # before it started whenever that database was absent — which is the
+    # normal state, since 4.3 has no persistent database to point at. The
+    # build creates and connects its own staging database moments later.
+    bf = Biofilter(db_uri=NO_DATABASE, debug_mode=debug)
     builder = BundleBuilder(
         plan,
         biofilter=bf,
@@ -296,6 +320,8 @@ def build_cmd(plan_path: Path, data_root: Path, bundle_dir, restart: bool, keep_
         logger=bf.core.logger,
         keep_raw=keep_raw,
         bundle_dir=bundle_dir,
+        assemble=not no_assemble,
+        min_free_gb=min_free_gb,
     )
     result = builder.run(restart=restart)
 

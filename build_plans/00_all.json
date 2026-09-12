@@ -1,0 +1,658 @@
+{
+  "plan_version": 1,
+  "biofilter_version": "4.3.0",
+  "created_at": "2026-09-10T14:43:47.206778+00:00",
+  "_comment": [
+    "Build plan for a parquet bundle (ADR-003).",
+    "Set 'include' to choose what the build covers. This file is",
+    "the authority for one build: the 'active' flag in the",
+    "database only seeded these defaults, and each DTP's own JSON",
+    "config still governs what is selected *within* a source.",
+    "The plan is recorded in the bundle manifest, so an archived",
+    "plan identifies how a published bundle was produced.",
+    "",
+    "ORDER MATTERS. Sources run in the order they appear here,",
+    "and that order is the dependency declaration: the core branch",
+    "resolves entities against what earlier sources created, so",
+    "hgnc has to precede ensembl. Reordering this list reorders",
+    "the build. The generated order is the one the ETL has always",
+    "used (seed insertion order).",
+    "",
+    "Branches run independently:",
+    "  core    - staged through a throwaway SQLite, then dumped to",
+    "            parquet. These DTPs resolve entities against each",
+    "            other, so they need a transactional store.",
+    "  variant - written straight to parquet, one file per",
+    "            chromosome. No relational hop.",
+    "",
+    "Disk, not CPU, is the binding constraint on the variant",
+    "branch: the full gnomAD download is ~1.53 TB while the",
+    "largest single chromosome is ~126 GB. The build processes and",
+    "discards raw files per chromosome rather than downloading",
+    "everything first."
+  ],
+  "branches": {
+    "core": {
+      "staging": "sqlite",
+      "sources": [
+        {
+          "name": "hgnc",
+          "include": true,
+          "source_system": "HGNC",
+          "data_type": "Gene",
+          "dtp_script": "dtp_gene_hgnc",
+          "dtp_version": "1.1.0",
+          "config_override": null
+        },
+        {
+          "name": "gene_ncbi",
+          "include": true,
+          "source_system": "NCBI",
+          "data_type": "Gene",
+          "dtp_script": "dtp_gene_ncbi",
+          "dtp_version": "1.1.0",
+          "config_override": null
+        },
+        {
+          "name": "ensembl",
+          "include": true,
+          "source_system": "Ensembl",
+          "data_type": "Gene",
+          "dtp_script": "dtp_gene_ensembl",
+          "dtp_version": "1.1.0",
+          "config_override": null
+        },
+        {
+          "name": "pfam",
+          "include": true,
+          "source_system": "EBI",
+          "data_type": "Protein",
+          "dtp_script": "dtp_pfam",
+          "dtp_version": "1.1.0",
+          "config_override": null
+        },
+        {
+          "name": "uniprot",
+          "include": true,
+          "source_system": "UniProt",
+          "data_type": "Protein",
+          "dtp_script": "dtp_uniprot",
+          "dtp_version": "1.1.0",
+          "config_override": null
+        },
+        {
+          "name": "reactome",
+          "include": true,
+          "source_system": "Reactome",
+          "data_type": "Pathway",
+          "dtp_script": "dtp_reactome",
+          "dtp_version": "1.1.0",
+          "config_override": null
+        },
+        {
+          "name": "kegg_pathways",
+          "include": true,
+          "source_system": "KEGG",
+          "data_type": "Pathway",
+          "dtp_script": "dtp_kegg",
+          "dtp_version": "1.2.0",
+          "config_override": null
+        },
+        {
+          "name": "gene_ontology",
+          "include": true,
+          "source_system": "GO",
+          "data_type": "GO",
+          "dtp_script": "dtp_go",
+          "dtp_version": "1.1.0",
+          "config_override": null
+        },
+        {
+          "name": "mondo",
+          "include": true,
+          "source_system": "MONDO",
+          "data_type": "Disease",
+          "dtp_script": "dtp_mondo",
+          "dtp_version": "1.1.0",
+          "config_override": null
+        },
+        {
+          "name": "chebi",
+          "include": true,
+          "source_system": "EBI",
+          "data_type": "Chemical",
+          "dtp_script": "dtp_chebi",
+          "dtp_version": "1.1.0",
+          "config_override": null
+        },
+        {
+          "name": "uniprot_relationships",
+          "include": true,
+          "source_system": "UniProt",
+          "data_type": "Protein",
+          "dtp_script": "dtp_uniprot_relationships",
+          "dtp_version": "1.1.0",
+          "config_override": null
+        },
+        {
+          "name": "reactome_relationships",
+          "include": true,
+          "source_system": "Reactome",
+          "data_type": "Pathway",
+          "dtp_script": "dtp_reactome_relationships",
+          "dtp_version": "1.1.0",
+          "config_override": null
+        },
+        {
+          "name": "kegg_relationships",
+          "include": true,
+          "source_system": "KEGG",
+          "data_type": "Pathway",
+          "dtp_script": "dtp_kegg_relationships",
+          "dtp_version": "1.0.0",
+          "config_override": null
+        },
+        {
+          "name": "mondo_relationships",
+          "include": true,
+          "source_system": "MONDO",
+          "data_type": "Disease",
+          "dtp_script": "dtp_mondo_relationships",
+          "dtp_version": "1.1.0",
+          "config_override": null
+        },
+        {
+          "name": "biogrid",
+          "include": true,
+          "source_system": "BioGRID",
+          "data_type": "Relationships",
+          "dtp_script": "dtp_biogrid",
+          "dtp_version": "1.1.0",
+          "config_override": null
+        },
+        {
+          "name": "clingen",
+          "include": true,
+          "source_system": "CLINGEN",
+          "data_type": "Disease Relationships",
+          "dtp_script": "dtp_clingen",
+          "dtp_version": "1.1.0",
+          "config_override": null
+        },
+        {
+          "name": "omim",
+          "include": false,
+          "source_system": "OMIM",
+          "data_type": "Disease Relationships",
+          "dtp_script": "dtp_omim",
+          "dtp_version": "1.1.0",
+          "config_override": null
+        }
+      ]
+    },
+    "variant": {
+      "staging": "none",
+      "sources": [
+        {
+          "name": "gwas",
+          "include": true,
+          "source_system": "EBI",
+          "data_type": "Variant",
+          "dtp_script": "dtp_gwas",
+          "dtp_version": "1.1.0",
+          "config_override": null
+        },
+        {
+          "name": "alphamissense",
+          "include": true,
+          "source_system": "AlphaMissense",
+          "data_type": "Variant",
+          "dtp_script": "dtp_variant_alphamissense",
+          "dtp_version": "1.0.0",
+          "config_override": null
+        },
+        {
+          "name": "gtex_v10_eqtl",
+          "include": true,
+          "source_system": "GTEx",
+          "data_type": "Variant",
+          "dtp_script": "dtp_variant_eqtl_gtex",
+          "dtp_version": "1.0.0",
+          "config_override": "biofilter/modules/etl/dtps/config/dtp_variant_eqtl_gtex.json"
+        },
+        {
+          "name": "gnomad_joint_chr1",
+          "include": false,
+          "source_system": "gnomAD",
+          "data_type": "Variant",
+          "dtp_script": "dtp_variant_gnomad_joint",
+          "dtp_version": "4.1",
+          "config_override": "biofilter/modules/etl/dtps/config/dtp_variant_gnomad_joint.json"
+        },
+        {
+          "name": "gnomad_vep_chr1",
+          "include": false,
+          "source_system": "gnomAD",
+          "data_type": "Variant",
+          "dtp_script": "dtp_variant_gnomad_vep",
+          "dtp_version": "4.1.1",
+          "config_override": "biofilter/modules/etl/dtps/config/dtp_variant_gnomad_vep.json"
+        },
+        {
+          "name": "gnomad_joint_chr2",
+          "include": false,
+          "source_system": "gnomAD",
+          "data_type": "Variant",
+          "dtp_script": "dtp_variant_gnomad_joint",
+          "dtp_version": "4.1",
+          "config_override": "biofilter/modules/etl/dtps/config/dtp_variant_gnomad_joint.json"
+        },
+        {
+          "name": "gnomad_vep_chr2",
+          "include": false,
+          "source_system": "gnomAD",
+          "data_type": "Variant",
+          "dtp_script": "dtp_variant_gnomad_vep",
+          "dtp_version": "4.1.1",
+          "config_override": "biofilter/modules/etl/dtps/config/dtp_variant_gnomad_vep.json"
+        },
+        {
+          "name": "gnomad_joint_chr3",
+          "include": false,
+          "source_system": "gnomAD",
+          "data_type": "Variant",
+          "dtp_script": "dtp_variant_gnomad_joint",
+          "dtp_version": "4.1",
+          "config_override": "biofilter/modules/etl/dtps/config/dtp_variant_gnomad_joint.json"
+        },
+        {
+          "name": "gnomad_vep_chr3",
+          "include": false,
+          "source_system": "gnomAD",
+          "data_type": "Variant",
+          "dtp_script": "dtp_variant_gnomad_vep",
+          "dtp_version": "4.1.1",
+          "config_override": "biofilter/modules/etl/dtps/config/dtp_variant_gnomad_vep.json"
+        },
+        {
+          "name": "gnomad_joint_chr4",
+          "include": false,
+          "source_system": "gnomAD",
+          "data_type": "Variant",
+          "dtp_script": "dtp_variant_gnomad_joint",
+          "dtp_version": "4.1",
+          "config_override": "biofilter/modules/etl/dtps/config/dtp_variant_gnomad_joint.json"
+        },
+        {
+          "name": "gnomad_vep_chr4",
+          "include": false,
+          "source_system": "gnomAD",
+          "data_type": "Variant",
+          "dtp_script": "dtp_variant_gnomad_vep",
+          "dtp_version": "4.1.1",
+          "config_override": "biofilter/modules/etl/dtps/config/dtp_variant_gnomad_vep.json"
+        },
+        {
+          "name": "gnomad_joint_chr5",
+          "include": false,
+          "source_system": "gnomAD",
+          "data_type": "Variant",
+          "dtp_script": "dtp_variant_gnomad_joint",
+          "dtp_version": "4.1",
+          "config_override": "biofilter/modules/etl/dtps/config/dtp_variant_gnomad_joint.json"
+        },
+        {
+          "name": "gnomad_vep_chr5",
+          "include": false,
+          "source_system": "gnomAD",
+          "data_type": "Variant",
+          "dtp_script": "dtp_variant_gnomad_vep",
+          "dtp_version": "4.1.1",
+          "config_override": "biofilter/modules/etl/dtps/config/dtp_variant_gnomad_vep.json"
+        },
+        {
+          "name": "gnomad_joint_chr6",
+          "include": false,
+          "source_system": "gnomAD",
+          "data_type": "Variant",
+          "dtp_script": "dtp_variant_gnomad_joint",
+          "dtp_version": "4.1",
+          "config_override": "biofilter/modules/etl/dtps/config/dtp_variant_gnomad_joint.json"
+        },
+        {
+          "name": "gnomad_vep_chr6",
+          "include": false,
+          "source_system": "gnomAD",
+          "data_type": "Variant",
+          "dtp_script": "dtp_variant_gnomad_vep",
+          "dtp_version": "4.1.1",
+          "config_override": "biofilter/modules/etl/dtps/config/dtp_variant_gnomad_vep.json"
+        },
+        {
+          "name": "gnomad_joint_chr7",
+          "include": false,
+          "source_system": "gnomAD",
+          "data_type": "Variant",
+          "dtp_script": "dtp_variant_gnomad_joint",
+          "dtp_version": "4.1",
+          "config_override": "biofilter/modules/etl/dtps/config/dtp_variant_gnomad_joint.json"
+        },
+        {
+          "name": "gnomad_vep_chr7",
+          "include": false,
+          "source_system": "gnomAD",
+          "data_type": "Variant",
+          "dtp_script": "dtp_variant_gnomad_vep",
+          "dtp_version": "4.1.1",
+          "config_override": "biofilter/modules/etl/dtps/config/dtp_variant_gnomad_vep.json"
+        },
+        {
+          "name": "gnomad_joint_chr8",
+          "include": false,
+          "source_system": "gnomAD",
+          "data_type": "Variant",
+          "dtp_script": "dtp_variant_gnomad_joint",
+          "dtp_version": "4.1",
+          "config_override": "biofilter/modules/etl/dtps/config/dtp_variant_gnomad_joint.json"
+        },
+        {
+          "name": "gnomad_vep_chr8",
+          "include": false,
+          "source_system": "gnomAD",
+          "data_type": "Variant",
+          "dtp_script": "dtp_variant_gnomad_vep",
+          "dtp_version": "4.1.1",
+          "config_override": "biofilter/modules/etl/dtps/config/dtp_variant_gnomad_vep.json"
+        },
+        {
+          "name": "gnomad_joint_chr9",
+          "include": false,
+          "source_system": "gnomAD",
+          "data_type": "Variant",
+          "dtp_script": "dtp_variant_gnomad_joint",
+          "dtp_version": "4.1",
+          "config_override": "biofilter/modules/etl/dtps/config/dtp_variant_gnomad_joint.json"
+        },
+        {
+          "name": "gnomad_vep_chr9",
+          "include": false,
+          "source_system": "gnomAD",
+          "data_type": "Variant",
+          "dtp_script": "dtp_variant_gnomad_vep",
+          "dtp_version": "4.1.1",
+          "config_override": "biofilter/modules/etl/dtps/config/dtp_variant_gnomad_vep.json"
+        },
+        {
+          "name": "gnomad_joint_chr10",
+          "include": false,
+          "source_system": "gnomAD",
+          "data_type": "Variant",
+          "dtp_script": "dtp_variant_gnomad_joint",
+          "dtp_version": "4.1",
+          "config_override": "biofilter/modules/etl/dtps/config/dtp_variant_gnomad_joint.json"
+        },
+        {
+          "name": "gnomad_vep_chr10",
+          "include": false,
+          "source_system": "gnomAD",
+          "data_type": "Variant",
+          "dtp_script": "dtp_variant_gnomad_vep",
+          "dtp_version": "4.1.1",
+          "config_override": "biofilter/modules/etl/dtps/config/dtp_variant_gnomad_vep.json"
+        },
+        {
+          "name": "gnomad_joint_chr11",
+          "include": false,
+          "source_system": "gnomAD",
+          "data_type": "Variant",
+          "dtp_script": "dtp_variant_gnomad_joint",
+          "dtp_version": "4.1",
+          "config_override": "biofilter/modules/etl/dtps/config/dtp_variant_gnomad_joint.json"
+        },
+        {
+          "name": "gnomad_vep_chr11",
+          "include": false,
+          "source_system": "gnomAD",
+          "data_type": "Variant",
+          "dtp_script": "dtp_variant_gnomad_vep",
+          "dtp_version": "4.1.1",
+          "config_override": "biofilter/modules/etl/dtps/config/dtp_variant_gnomad_vep.json"
+        },
+        {
+          "name": "gnomad_joint_chr12",
+          "include": false,
+          "source_system": "gnomAD",
+          "data_type": "Variant",
+          "dtp_script": "dtp_variant_gnomad_joint",
+          "dtp_version": "4.1",
+          "config_override": "biofilter/modules/etl/dtps/config/dtp_variant_gnomad_joint.json"
+        },
+        {
+          "name": "gnomad_vep_chr12",
+          "include": false,
+          "source_system": "gnomAD",
+          "data_type": "Variant",
+          "dtp_script": "dtp_variant_gnomad_vep",
+          "dtp_version": "4.1.1",
+          "config_override": "biofilter/modules/etl/dtps/config/dtp_variant_gnomad_vep.json"
+        },
+        {
+          "name": "gnomad_joint_chr13",
+          "include": false,
+          "source_system": "gnomAD",
+          "data_type": "Variant",
+          "dtp_script": "dtp_variant_gnomad_joint",
+          "dtp_version": "4.1",
+          "config_override": "biofilter/modules/etl/dtps/config/dtp_variant_gnomad_joint.json"
+        },
+        {
+          "name": "gnomad_vep_chr13",
+          "include": false,
+          "source_system": "gnomAD",
+          "data_type": "Variant",
+          "dtp_script": "dtp_variant_gnomad_vep",
+          "dtp_version": "4.1.1",
+          "config_override": "biofilter/modules/etl/dtps/config/dtp_variant_gnomad_vep.json"
+        },
+        {
+          "name": "gnomad_joint_chr14",
+          "include": false,
+          "source_system": "gnomAD",
+          "data_type": "Variant",
+          "dtp_script": "dtp_variant_gnomad_joint",
+          "dtp_version": "4.1",
+          "config_override": "biofilter/modules/etl/dtps/config/dtp_variant_gnomad_joint.json"
+        },
+        {
+          "name": "gnomad_vep_chr14",
+          "include": false,
+          "source_system": "gnomAD",
+          "data_type": "Variant",
+          "dtp_script": "dtp_variant_gnomad_vep",
+          "dtp_version": "4.1.1",
+          "config_override": "biofilter/modules/etl/dtps/config/dtp_variant_gnomad_vep.json"
+        },
+        {
+          "name": "gnomad_joint_chr15",
+          "include": false,
+          "source_system": "gnomAD",
+          "data_type": "Variant",
+          "dtp_script": "dtp_variant_gnomad_joint",
+          "dtp_version": "4.1",
+          "config_override": "biofilter/modules/etl/dtps/config/dtp_variant_gnomad_joint.json"
+        },
+        {
+          "name": "gnomad_vep_chr15",
+          "include": false,
+          "source_system": "gnomAD",
+          "data_type": "Variant",
+          "dtp_script": "dtp_variant_gnomad_vep",
+          "dtp_version": "4.1.1",
+          "config_override": "biofilter/modules/etl/dtps/config/dtp_variant_gnomad_vep.json"
+        },
+        {
+          "name": "gnomad_joint_chr16",
+          "include": false,
+          "source_system": "gnomAD",
+          "data_type": "Variant",
+          "dtp_script": "dtp_variant_gnomad_joint",
+          "dtp_version": "4.1",
+          "config_override": "biofilter/modules/etl/dtps/config/dtp_variant_gnomad_joint.json"
+        },
+        {
+          "name": "gnomad_vep_chr16",
+          "include": false,
+          "source_system": "gnomAD",
+          "data_type": "Variant",
+          "dtp_script": "dtp_variant_gnomad_vep",
+          "dtp_version": "4.1.1",
+          "config_override": "biofilter/modules/etl/dtps/config/dtp_variant_gnomad_vep.json"
+        },
+        {
+          "name": "gnomad_joint_chr17",
+          "include": false,
+          "source_system": "gnomAD",
+          "data_type": "Variant",
+          "dtp_script": "dtp_variant_gnomad_joint",
+          "dtp_version": "4.1",
+          "config_override": "biofilter/modules/etl/dtps/config/dtp_variant_gnomad_joint.json"
+        },
+        {
+          "name": "gnomad_vep_chr17",
+          "include": false,
+          "source_system": "gnomAD",
+          "data_type": "Variant",
+          "dtp_script": "dtp_variant_gnomad_vep",
+          "dtp_version": "4.1.1",
+          "config_override": "biofilter/modules/etl/dtps/config/dtp_variant_gnomad_vep.json"
+        },
+        {
+          "name": "gnomad_joint_chr18",
+          "include": false,
+          "source_system": "gnomAD",
+          "data_type": "Variant",
+          "dtp_script": "dtp_variant_gnomad_joint",
+          "dtp_version": "4.1",
+          "config_override": "biofilter/modules/etl/dtps/config/dtp_variant_gnomad_joint.json"
+        },
+        {
+          "name": "gnomad_vep_chr18",
+          "include": false,
+          "source_system": "gnomAD",
+          "data_type": "Variant",
+          "dtp_script": "dtp_variant_gnomad_vep",
+          "dtp_version": "4.1.1",
+          "config_override": "biofilter/modules/etl/dtps/config/dtp_variant_gnomad_vep.json"
+        },
+        {
+          "name": "gnomad_joint_chr19",
+          "include": false,
+          "source_system": "gnomAD",
+          "data_type": "Variant",
+          "dtp_script": "dtp_variant_gnomad_joint",
+          "dtp_version": "4.1",
+          "config_override": "biofilter/modules/etl/dtps/config/dtp_variant_gnomad_joint.json"
+        },
+        {
+          "name": "gnomad_vep_chr19",
+          "include": false,
+          "source_system": "gnomAD",
+          "data_type": "Variant",
+          "dtp_script": "dtp_variant_gnomad_vep",
+          "dtp_version": "4.1.1",
+          "config_override": "biofilter/modules/etl/dtps/config/dtp_variant_gnomad_vep.json"
+        },
+        {
+          "name": "gnomad_joint_chr20",
+          "include": false,
+          "source_system": "gnomAD",
+          "data_type": "Variant",
+          "dtp_script": "dtp_variant_gnomad_joint",
+          "dtp_version": "4.1",
+          "config_override": "biofilter/modules/etl/dtps/config/dtp_variant_gnomad_joint.json"
+        },
+        {
+          "name": "gnomad_vep_chr20",
+          "include": false,
+          "source_system": "gnomAD",
+          "data_type": "Variant",
+          "dtp_script": "dtp_variant_gnomad_vep",
+          "dtp_version": "4.1.1",
+          "config_override": "biofilter/modules/etl/dtps/config/dtp_variant_gnomad_vep.json"
+        },
+        {
+          "name": "gnomad_joint_chr21",
+          "include": true,
+          "source_system": "gnomAD",
+          "data_type": "Variant",
+          "dtp_script": "dtp_variant_gnomad_joint",
+          "dtp_version": "4.1",
+          "config_override": "biofilter/modules/etl/dtps/config/dtp_variant_gnomad_joint.json"
+        },
+        {
+          "name": "gnomad_vep_chr21",
+          "include": true,
+          "source_system": "gnomAD",
+          "data_type": "Variant",
+          "dtp_script": "dtp_variant_gnomad_vep",
+          "dtp_version": "4.1.1",
+          "config_override": "biofilter/modules/etl/dtps/config/dtp_variant_gnomad_vep.json"
+        },
+        {
+          "name": "gnomad_joint_chr22",
+          "include": true,
+          "source_system": "gnomAD",
+          "data_type": "Variant",
+          "dtp_script": "dtp_variant_gnomad_joint",
+          "dtp_version": "4.1",
+          "config_override": "biofilter/modules/etl/dtps/config/dtp_variant_gnomad_joint.json"
+        },
+        {
+          "name": "gnomad_vep_chr22",
+          "include": true,
+          "source_system": "gnomAD",
+          "data_type": "Variant",
+          "dtp_script": "dtp_variant_gnomad_vep",
+          "dtp_version": "4.1.1",
+          "config_override": "biofilter/modules/etl/dtps/config/dtp_variant_gnomad_vep.json"
+        },
+        {
+          "name": "gnomad_joint_chrx",
+          "include": false,
+          "source_system": "gnomAD",
+          "data_type": "Variant",
+          "dtp_script": "dtp_variant_gnomad_joint",
+          "dtp_version": "4.1",
+          "config_override": "biofilter/modules/etl/dtps/config/dtp_variant_gnomad_joint.json"
+        },
+        {
+          "name": "gnomad_vep_chrx",
+          "include": false,
+          "source_system": "gnomAD",
+          "data_type": "Variant",
+          "dtp_script": "dtp_variant_gnomad_vep",
+          "dtp_version": "4.1.1",
+          "config_override": "biofilter/modules/etl/dtps/config/dtp_variant_gnomad_vep.json"
+        },
+        {
+          "name": "gnomad_joint_chry",
+          "include": false,
+          "source_system": "gnomAD",
+          "data_type": "Variant",
+          "dtp_script": "dtp_variant_gnomad_joint",
+          "dtp_version": "4.1",
+          "config_override": "biofilter/modules/etl/dtps/config/dtp_variant_gnomad_joint.json"
+        },
+        {
+          "name": "gnomad_vep_chry",
+          "include": false,
+          "source_system": "gnomAD",
+          "data_type": "Variant",
+          "dtp_script": "dtp_variant_gnomad_vep",
+          "dtp_version": "4.1.1",
+          "config_override": "biofilter/modules/etl/dtps/config/dtp_variant_gnomad_vep.json"
+        }
+      ]
+    }
+  }
+}

@@ -16,6 +16,10 @@ from biofilter.utils.logger import Logger
 from biofilter.utils.version import __version__
 
 
+NO_DATABASE = "__no_database__"
+"""Sentinel: start with no database, ignoring the configured URI."""
+
+
 @dataclass
 class BiofilterCore:
     """
@@ -70,8 +74,17 @@ class BiofilterCore:
                 "🔧 Configuration file not found. Using defaults.", "WARNING"
             )
 
-        # db_uri priority: ctor > config > None
-        if not self.db_uri and self.config is not None:
+        # db_uri priority: ctor > config > None.
+        #
+        # NO_DATABASE is how a caller says it wants none, distinct from
+        # passing None to mean "use whatever is configured". `bundle
+        # build` needs it: it creates its own staging database, and
+        # falling back to the configured URI made it fail before starting
+        # whenever that database was absent — the normal state, since 4.3
+        # keeps no persistent database to point at.
+        if self.db_uri is NO_DATABASE:
+            self.db_uri = None
+        elif not self.db_uri and self.config is not None:
             self.db_uri = getattr(self.config, "db_uri", None)
 
         self.db: Optional[Database] = None
