@@ -9,7 +9,7 @@ lives in the exome/genome VCFs and is handled by
 (chromosome, position, ref, alt), so neither depends on the other and they
 can be built in any order.
 
-See ADR-003 (notebooks/Andre/ADR/0003-parquet-native-build-pipeline.md).
+See ADR-003 (adr/0003-parquet-native-build-pipeline.md).
 """
 
 from __future__ import annotations

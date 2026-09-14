@@ -6,7 +6,7 @@ separate data sources — they read different files and produce different
 parquets — but they resolve chromosomes and field selection the same way.
 That common part lives here so neither DTP has to import the other.
 
-See ADR-003 (notebooks/Andre/ADR/0003-parquet-native-build-pipeline.md).
+See ADR-003 (adr/0003-parquet-native-build-pipeline.md).
 """
 
 from __future__ import annotations

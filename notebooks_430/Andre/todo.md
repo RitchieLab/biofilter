@@ -1,6 +1,6 @@
 # TODO — ADR-003 implementation (4.3.0)
 
-Working checklist for [ADR-003](0003-parquet-native-build-pipeline.md).
+Working checklist for [ADR-003](../../adr/0003-parquet-native-build-pipeline.md).
 Decisions live in the ADR; this file tracks execution state only.
 
 **Branch:** `release/4.3.0`

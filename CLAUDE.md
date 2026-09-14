@@ -33,7 +33,8 @@ assistent/               # GPT assistant kit (system prompt, FAQ, manifest)
 biofilter_data/          # Downloads and processed files before DB ingestion
 biofilter_legacy/        # Archived legacy code (v2 and v3)
 docs/source/             # Sphinx documentation source
-notebooks/               # Tutorials and examples (Andre/, Templates/)
+notebooks_420/           # Analyses and docs from the 4.2.x era
+notebooks_430/           # Same, for 4.3.x (Andre/, Templates/)
 scripts/                 # Admin and debug scripts (target of launch.json configs)
 tests/                   # unit/, integration/, contract tests
 docker/                  # Dockerfile and container docs
@@ -209,7 +210,7 @@ df_rel    = bf.report.run("entity_relationship_model",
 
 ## Infrastructure
 
-- **Production:** read-only Parquet bundle, built by `bundle build`, on the Penn LPC (`/project/hall_shared/datasets/biofilter/<YYYYMMDD>/tables`), accessed via `--db-uri parquet:///.../tables`. The VPS was decommissioned; its PostgreSQL deployment procedure is kept for reference in `notebooks/Templates/lpc__deploy.md` (Appendix A).
+- **Production:** read-only Parquet bundle, built by `bundle build`, on the Penn LPC (`/project/hall_shared/datasets/biofilter/<YYYYMMDD>/tables`), accessed via `--db-uri parquet:///.../tables`. The VPS was decommissioned; its PostgreSQL deployment procedure is kept for reference in `notebooks_420/Templates/lpc__deploy.md` (Appendix A).
 - **Local dev:** PostgreSQL `biofilter_dev`. Note its entity IDs are a different ID space from the bundle — never export from it over the bundle.
 - **Docker:** available to run the CLI without installing BF4 locally (`docker/Dockerfile`)
 - **Tooling:** Poetry, tox, pytest, sphinx, testcontainers (Postgres in tests)
@@ -220,7 +221,9 @@ df_rel    = bf.report.run("entity_relationship_model",
 ## Known documentation gaps
 
 - Some `reports_explain/` files are minimal stubs — to be revisited
-- Notebooks in `notebooks/` have no index — acceptable if used for personal development
+- Notebooks are split by release (`notebooks_420/`, `notebooks_430/`) so an
+  analysis stays with the version of the data it was run against. Neither
+  has an index — acceptable for personal development work.
 
 ## Notes
 

@@ -14,7 +14,7 @@ This DTP never reads the joint file. Rows are keyed by the natural key
 (chromosome, position, ref, alt), so this branch and
 `dtp_variant_gnomad_joint` are independent and can run in any order.
 
-See ADR-003 (notebooks/Andre/ADR/0003-parquet-native-build-pipeline.md).
+See ADR-003 (adr/0003-parquet-native-build-pipeline.md).
 """
 
 from __future__ import annotations

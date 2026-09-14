@@ -8,7 +8,7 @@ what makes the build resumable: it holds the ETL package tracking for
 destination of the data differs — the core branch stages rows there, the
 variant branch writes parquet and uses it purely as a ledger.
 
-See ADR-003 (notebooks/Andre/ADR/0003-parquet-native-build-pipeline.md).
+See ADR-003 (adr/0003-parquet-native-build-pipeline.md).
 """
 
 from __future__ import annotations

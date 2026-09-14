@@ -146,7 +146,7 @@ The `tables/` subdirectory is what `parquet://` points at.
 > chunk. The bundle has to be assembled in stages instead — export the
 > partition children individually, then concatenate them outside the database.
 > The full procedure is documented in the
-> [LPC deployment guide](https://github.com/RitchieLab/biofilter/blob/main/notebooks/Templates/lpc__deploy.md).
+> [LPC deployment guide](https://github.com/RitchieLab/biofilter/blob/main/notebooks_420/Templates/lpc__deploy.md).
 
 ---
 

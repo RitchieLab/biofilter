@@ -22,7 +22,7 @@ Phase 2.5 variant_list_intersect         →  Lista C  (genotyped subset)
 Phase 3  snp_snp_pair_generator          →  this report — annotated pairs
 ```
 
-Full tutorial: `notebooks/Templates/pipeline__from_single_variant_to_interactions.ipynb`
+Full tutorial: `notebooks_420/Templates/pipeline__from_single_variant_to_interactions.ipynb`
 
 ---
 

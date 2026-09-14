@@ -151,7 +151,7 @@ biofilter/
 docs/
 └── source/                    # Sphinx documentation source
 
-notebooks/
+notebooks_430/
 └── Templates/                 # Ready-to-use report tutorials
 
 tests/
@@ -185,7 +185,7 @@ The documentation covers:
 - 🤖 **GPT Assistant** — conversational guidance for picking and using reports:
   [Biofilter 4 Assistant](https://chatgpt.com/g/g-6887cf80355c8191ab3f88bbd8955e0d-biofilter-4-assistant)
 - 📓 **Notebook tutorials** — ready-to-run examples for every report:
-  [`notebooks/Templates/`](https://github.com/RitchieLab/biofilter/tree/main/notebooks/Templates)
+  [`notebooks_420/Templates/`](https://github.com/RitchieLab/biofilter/tree/main/notebooks_420/Templates)
 - 📋 **Report Catalog** — full index of available reports with descriptions:
   [Read the Docs](https://biofilter.readthedocs.io/en/latest/report_catalog.html)
 
@@ -211,7 +211,7 @@ biofilter db export --db-uri "postgresql+psycopg2://user:password@host:5432/biof
 
 > **Note:** on production-scale databases the variant tables are partitioned by
 > chromosome, which requires extra steps beyond this single command. See the
-> [LPC deployment guide](notebooks/Templates/lpc__deploy.md) for the full build
+> [LPC deployment guide](notebooks_420/Templates/lpc__deploy.md) for the full build
 > procedure.
 
 Then point Biofilter at the bundle's `tables/` directory using the `parquet://` URI scheme:
