@@ -1,12 +1,32 @@
 # Pointing Biofilter at a Bundle
 
-A **bundle** is what Biofilter reads: a directory of parquet files plus a
-`manifest.json` describing them. There is no database server to install,
-start or connect to.
+## What a bundle is
 
-If someone has given you a bundle, this page is the whole setup. If you
-need to build one, see [Building Bundles](../building_bundles.md) — it
-takes about two days and 150 GB, so borrow one first if you can.
+A **bundle** is a folder. Inside it are the knowledge base's data —
+genes, proteins, pathways, diseases, variants and the relationships
+between them — already gathered from their original sources, cleaned up
+and written as parquet files. A `manifest.json` sits alongside them as
+the dictionary: what each file holds, how many rows, and which version of
+the data this is.
+
+Biofilter both writes bundles and reads them. The data lives in the
+folder, not in a server, so there is nothing to install, start or
+connect to. To run a query you give Biofilter the path and it does the
+rest.
+
+A bundle is a **photograph**: it captures the sources exactly as they
+were on the day it was built. Nothing inside it changes afterwards. When
+the sources move on — a new Ensembl release, a new gnomAD callset — you
+build a new bundle rather than update this one, and the old one stays
+readable for anyone who needs to reproduce work done against it.
+
+A full human-genome bundle is around **21 GB** and holds roughly three
+billion rows across 114 files. You can keep it on a laptop, a shared
+drive, or an HPC filesystem — anywhere you can read a folder.
+
+If someone has given you one, this page is the whole setup. If you need
+to build one yourself, see [Building Bundles](../building_bundles.md) —
+borrow one first if you can.
 
 ## Point at it
 
@@ -52,12 +72,7 @@ Tables:         114
 Reports work unchanged — the same code runs over parquet as over a
 database, with DuckDB underneath.
 
-## Two things worth knowing
-
-**A bundle is read-only.** Refreshing the data means getting a newer
-bundle, not updating this one. That is deliberate: a bundle is a
-point-in-time snapshot, and the sources it was built from have moved on
-since.
+## The one thing to watch
 
 **Ids belong to one bundle.** `entities.id`, `variant_id` and the rest
 are internal row identifiers, valid only inside the bundle that produced
