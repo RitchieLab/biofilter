@@ -43,7 +43,7 @@ biofilter config init --path .
 |---|---|---|
 | PostgreSQL | `postgresql+psycopg2://user:pass@host:5432/biofilter_prod` | yes |
 | SQLite | `sqlite:///biofilter_dev.db` | yes |
-| Parquet bundle | `parquet:///path/to/bundle/tables` | no (read-only) |
+| Parquet bundle | `parquet:///path/to/bundle` | no (read-only) |
 
 The `parquet://` scheme reads a Parquet bundle directly via DuckDB, for
 environments without a database server. See [Parquet Backend](parquet_backend.md).

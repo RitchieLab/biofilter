@@ -217,7 +217,7 @@ biofilter db export --db-uri "postgresql+psycopg2://user:password@host:5432/biof
 Then point Biofilter at the bundle's `tables/` directory using the `parquet://` URI scheme:
 
 ```bash
-export DATABASE_URL="parquet:///shared/bundles/bf4_2026_06/tables"
+export DATABASE_URL="parquet:///shared/bundles/bf4_2026_06"
 
 biofilter report run \
   --report-name annotation_master_gene \
@@ -230,7 +230,7 @@ The same works from Python:
 ```python
 from biofilter import Biofilter
 
-bf = Biofilter(db_uri="parquet:///shared/bundles/bf4_2026_06/tables")
+bf = Biofilter(db_uri="parquet:///shared/bundles/bf4_2026_06")
 df = bf.report.run("annotation_master_variant", input_data=["rs429358"])
 ```
 

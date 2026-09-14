@@ -30,10 +30,11 @@ borrow one first if you can.
 
 ## Point at it
 
-The URI goes to the bundle's `tables/` directory, not the bundle root:
+Give Biofilter the bundle folder. It finds the data and the manifest
+inside:
 
 ```bash
-export BIOFILTER_DB_URI="parquet:///shared/bundles/bf4_20260912/tables"
+export BIOFILTER_DB_URI="parquet:///shared/bundles/bf4_20260912"
 
 biofilter report list
 ```
@@ -41,18 +42,22 @@ biofilter report list
 Or per command:
 
 ```bash
-biofilter --db-uri "parquet:///shared/bundles/bf4_20260912/tables" report list
+biofilter --db-uri "parquet:///shared/bundles/bf4_20260912" report list
 ```
 
 Or in `.biofilter.toml`, if you use the same bundle every day:
 
 ```toml
 [database]
-db_uri = "parquet:///shared/bundles/bf4_20260912/tables"
+db_uri = "parquet:///shared/bundles/bf4_20260912"
 ```
 
 The path must be absolute, which is why the scheme carries three
 slashes: `parquet://` plus `/shared/...`.
+
+Pointing straight at the `tables/` subdirectory also works, and older
+setups do. Prefer the bundle folder: the manifest sits at that level, and
+it is what tells Biofilter which version of the data a result came from.
 
 ## Check it worked
 

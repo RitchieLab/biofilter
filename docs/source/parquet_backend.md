@@ -35,7 +35,7 @@ Point Biofilter at the bundle's `tables/` directory with the `parquet://` URI
 scheme:
 
 ```bash
-export BIOFILTER_DB_URI="parquet:///shared/bundles/bf4_2026_06/tables"
+export BIOFILTER_DB_URI="parquet:///shared/bundles/bf4_2026_06"
 
 biofilter report run \
   --report-name annotation_master_gene \
@@ -46,7 +46,7 @@ biofilter report run \
 `DATABASE_URL` works too, as does the `--db-uri` option for a single command:
 
 ```bash
-biofilter --db-uri "parquet:///shared/bundles/bf4_2026_06/tables" \
+biofilter --db-uri "parquet:///shared/bundles/bf4_2026_06" \
   report run --report-name annotation_master_variant --input rs429358 --output out.csv
 ```
 
@@ -55,7 +55,7 @@ From Python:
 ```python
 from biofilter import Biofilter
 
-bf = Biofilter(db_uri="parquet:///shared/bundles/bf4_2026_06/tables")
+bf = Biofilter(db_uri="parquet:///shared/bundles/bf4_2026_06")
 df = bf.report.run("annotation_master_variant", input_data=["rs429358"])
 ```
 

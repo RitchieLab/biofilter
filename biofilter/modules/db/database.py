@@ -19,7 +19,7 @@ from biofilter.utils.logger import Logger
 
 
 # BF4 shorthand URI scheme for "read this parquet bundle directly via DuckDB".
-# Format: parquet:///absolute/path/to/bundle/tables
+# Format: parquet:///absolute/path/to/bundle  (its tables/ also works)
 # Internally translated to an in-memory DuckDB engine with one VIEW per
 # *.parquet file in the directory (children with `_chr_N` suffix skipped).
 PARQUET_URI_SCHEME = "parquet://"
@@ -27,6 +27,10 @@ PARQUET_URI_SCHEME = "parquet://"
 # Bundle manifest filename, looked up next to (or one level above) the
 # directory a `parquet://` URI points at.
 MANIFEST_FILENAME = "manifest.json"
+
+# Subdirectory holding a bundle's parquet files. A `parquet://` URI
+# should name the bundle itself; this is where its data sits.
+BUNDLE_TABLES_DIR = "tables"
 
 
 def _tolerant_json_deserializer(value: Any) -> Any:
@@ -59,7 +63,7 @@ class Database(CreateDBMixin):
     - `postgresql://...` / `postgresql+psycopg2://...` — production writes
     - `sqlite:///...` — local dev / single-file storage
     - `duckdb:///...` — DuckDB file (advanced)
-    - `parquet:///path/to/bundle/tables` — read-only DuckDB over a parquet
+    - `parquet:///path/to/bundle` — read-only DuckDB over a parquet
       bundle (HPC use case, no DB server required). Each entry in the
       directory becomes a SQL VIEW: a `<table>.parquet` file maps to a
       view over that file, and a `<table>/` directory maps to a view over
@@ -86,6 +90,9 @@ class Database(CreateDBMixin):
         self.read_only: bool = False
         # Set when the URI is `parquet://` — path to the tables/ dir.
         self._parquet_dir: Optional[Path] = None
+        # Bundle root, when the URI named one; None when it pointed
+        # straight at a directory of parquet files.
+        self._bundle_root: Optional[Path] = None
         # Columns the models declare that this bundle does not carry.
         # Populated when parquet views are registered; empty for a
         # live database, which is the schema by definition.
@@ -163,13 +170,14 @@ class Database(CreateDBMixin):
         Translate user-facing URIs into a SQLAlchemy-acceptable form.
 
         - Bare filesystem path → `sqlite:///<abs path>`
-        - `parquet:///path/to/tables` → `duckdb:///:memory:` plus a stored
+        - `parquet:///path/to/bundle` → `duckdb:///:memory:` plus a stored
           path that connect() will use to register parquet VIEWs.
         - Other schemes pass through unchanged.
         """
         # Reset parquet state — successive calls (re-connect) shouldn't
         # carry the previous dir over.
         self._parquet_dir = None
+        self._bundle_root = None
 
         if uri.startswith(PARQUET_URI_SCHEME):
             raw_path = uri[len(PARQUET_URI_SCHEME):]
@@ -181,6 +189,27 @@ class Database(CreateDBMixin):
             # Strip leading slashes so both parquet://path and
             # parquet:///abs/path work; resolve to absolute.
             parquet_dir = Path(raw_path).expanduser().resolve()
+
+            # Point at the bundle, not at its tables/ subdirectory.
+            #
+            # The bundle root is what a user has a path to, and it is
+            # where manifest.json lives — the version of the data, the
+            # bundle id that stamps results, the plan that produced it.
+            # Pointing at tables/ reaches the parquet but leaves that
+            # behind one directory up.
+            #
+            # A root left unresolved failed quietly rather than loudly:
+            # view discovery would see tables/ as a directory holding
+            # parquet and register the whole bundle as a single view
+            # named `tables`.
+            if (parquet_dir / MANIFEST_FILENAME).is_file() and (
+                parquet_dir / BUNDLE_TABLES_DIR
+            ).is_dir():
+                self._bundle_root = parquet_dir
+                parquet_dir = parquet_dir / BUNDLE_TABLES_DIR
+            else:
+                self._bundle_root = None
+
             self._parquet_dir = parquet_dir
             self.read_only = True
             return "duckdb:///:memory:"

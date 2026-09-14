@@ -103,12 +103,11 @@ built it, when, and its tables broken down by branch.
 
 ## Reading a bundle
 
-Point `--db-uri` at the bundle's `tables/` directory. No import, no
-database:
+Point `--db-uri` at the bundle folder. No import, no database:
 
 ```bash
-biofilter --db-uri "parquet:///path/to/bundle/tables" report list
-biofilter --db-uri "parquet:///path/to/bundle/tables" \
+biofilter --db-uri "parquet:///path/to/bundle" report list
+biofilter --db-uri "parquet:///path/to/bundle" \
   report run --report-name etl_status
 ```
 
@@ -117,7 +116,7 @@ From Python:
 ```python
 from biofilter import Biofilter
 
-bf = Biofilter(db_uri="parquet:///path/to/bundle/tables")
+bf = Biofilter(db_uri="parquet:///path/to/bundle")
 bf.db.connect()
 
 print(bf.db.bundle_id())          # which data this is

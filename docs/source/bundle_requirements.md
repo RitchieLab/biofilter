@@ -139,11 +139,11 @@ holds, which is why they sit inside it.
 No import, no database:
 
 ```bash
-biofilter --db-uri "parquet:///path/to/bundle/tables" report list
+biofilter --db-uri "parquet:///path/to/bundle" report list
 ```
 
 ```python
-bf = Biofilter(db_uri="parquet:///path/to/bundle/tables")
+bf = Biofilter(db_uri="parquet:///path/to/bundle")
 bf.db.connect()
 print(bf.db.bundle_id())
 ```

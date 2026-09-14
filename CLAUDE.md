@@ -211,7 +211,7 @@ df_rel    = bf.report.run("entity_relationship_model",
 
 ## Infrastructure
 
-- **Production:** read-only Parquet bundle, built by `bundle build`, on the Penn LPC (`/project/hall_shared/datasets/biofilter/<YYYYMMDD>/tables`), accessed via `--db-uri parquet:///.../tables`. The VPS was decommissioned; its PostgreSQL deployment procedure is kept for reference in `biofilter_legacy/bf4_420/notebooks/Templates/lpc__deploy.md` (Appendix A).
+- **Production:** read-only Parquet bundle, built by `bundle build`, on the Penn LPC (`/project/hall_shared/datasets/biofilter/<YYYYMMDD>`), accessed via `--db-uri parquet:///...`. The VPS was decommissioned; its PostgreSQL deployment procedure is kept for reference in `biofilter_legacy/bf4_420/notebooks/Templates/lpc__deploy.md` (Appendix A).
 - **Local dev:** PostgreSQL `biofilter_dev`. Note its entity IDs are a different ID space from the bundle — never export from it over the bundle.
 - **Docker:** available to run the CLI without installing BF4 locally (`docker/Dockerfile`)
 - **Tooling:** Poetry, tox, pytest, sphinx, testcontainers (Postgres in tests)

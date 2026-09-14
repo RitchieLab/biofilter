@@ -314,8 +314,9 @@ def verify_cmd(in_dir: Path, no_hashes: bool, schema: bool):
     if schema:
         from biofilter.modules.db.database import Database
 
-        tables_dir = in_dir / "tables" if (in_dir / "tables").is_dir() else in_dir  # noqa: E501
-        db = Database(db_uri=f"parquet:///{tables_dir.resolve()}")
+        # The bundle root resolves on its own now, and carries the
+        # manifest the check reports against.
+        db = Database(db_uri=f"parquet:///{in_dir.resolve()}")
         db.connect()
         drift = db.schema_drift
         if drift:

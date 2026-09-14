@@ -41,7 +41,7 @@ bundle directory and somewhere to write results:
 docker run --rm -it \
   -v /shared/bundles/bf4_20260912:/bundle:ro \
   -v "$(pwd):/workspace" \
-  -e BIOFILTER_DB_URI="parquet:///bundle/tables" \
+  -e BIOFILTER_DB_URI="parquet:///bundle" \
   --entrypoint /bin/bash \
   biofilter:bf4
 ```
@@ -52,7 +52,7 @@ To run one report and keep the output:
 docker run --rm \
   -v /shared/bundles/bf4_20260912:/bundle:ro \
   -v "$(pwd)/outputs:/workspace/outputs" \
-  -e BIOFILTER_DB_URI="parquet:///bundle/tables" \
+  -e BIOFILTER_DB_URI="parquet:///bundle" \
   biofilter:bf4 \
   biofilter report run --report-name etl_status --output /workspace/outputs/etl_status.csv
 ```
