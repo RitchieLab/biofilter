@@ -14,7 +14,7 @@ This documentation is intentionally practical:
 
 getting_started/index
 getting_started/installing
-getting_started/connecting_db
+getting_started/reading_a_bundle
 getting_started/finding_reports
 getting_started/running_reports
 ```

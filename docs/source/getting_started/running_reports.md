@@ -67,22 +67,22 @@ Every report returns a pandas `DataFrame`, so you can chain it with the rest of 
 
 ## A complete first example
 
-Here's a full session — install, connect, run:
+Here's a full session — install, point, run:
 
 ```bash
 # Install
 pip install biofilter
 
-# Configure
-biofilter config init --path .
-biofilter config set database.db_uri "postgresql+psycopg2://user:password@db.example.com:5432/database_name"
+# Point at a bundle
+export BIOFILTER_DB_URI="parquet:///shared/bundles/bf4_20260912/tables"
 
 # Run
 biofilter report list
 biofilter report run --report-name etl_status --output etl_status.csv
 ```
 
-Open `etl_status.csv` in your favorite tool and you'll see the current state of every data source in the database.
+Open `etl_status.csv` and you'll see every data source that went into the
+bundle, with the version and timestamp of the run that produced it.
 
 ## Next steps
 

@@ -34,25 +34,31 @@ Build the application-only image:
 docker build -t biofilter:bf4 -f docker/Dockerfile "https://github.com/RitchieLab/biofilter.git#biofilter3r"
 ```
 
-Run any Biofilter command inside the container, passing the database URL via environment variable:
+Mount the bundle and point at it. The container needs read access to the
+bundle directory and somewhere to write results:
 
 ```bash
 docker run --rm -it \
-  -e DATABASE_URL="postgresql+psycopg2://user:pass@host:5432/biofilter_dev" \
+  -v /shared/bundles/bf4_20260912:/bundle:ro \
   -v "$(pwd):/workspace" \
+  -e BIOFILTER_DB_URI="parquet:///bundle/tables" \
   --entrypoint /bin/bash \
   biofilter:bf4
 ```
 
-To save report outputs to your local filesystem, mount a volume:
+To run one report and keep the output:
 
 ```bash
 docker run --rm \
-  -e DATABASE_URL="postgresql+psycopg2://user:pass@host:5432/biofilter_dev" \
+  -v /shared/bundles/bf4_20260912:/bundle:ro \
   -v "$(pwd)/outputs:/workspace/outputs" \
+  -e BIOFILTER_DB_URI="parquet:///bundle/tables" \
   biofilter:bf4 \
   biofilter report run --report-name etl_status --output /workspace/outputs/etl_status.csv
 ```
+
+The bundle is mounted read-only because nothing writes to it — refreshing
+data means a newer bundle, not an update to this one.
 
 ## From source
 
@@ -67,4 +73,4 @@ poetry run biofilter --help
 
 ## Next step
 
-Once installed, [connect to a database](connecting_db.md) — either an existing instance or a fresh local one.
+Once installed, [point Biofilter at a bundle](reading_a_bundle.md) — one URI, no server to set up.

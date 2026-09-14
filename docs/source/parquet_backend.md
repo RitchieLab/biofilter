@@ -189,6 +189,6 @@ Expected. The backend is read-only; see [Read-only enforcement](#read-only-enfor
 
 ## See also
 
-- [Connecting to a Database](getting_started/connecting_db.md) — all backend options
+- [Pointing Biofilter at a bundle](getting_started/reading_a_bundle.md) — the quick setup
 - [Database Operations](database.md) — export/import commands
 - [Configuration](configuration.md) — how `db_uri` is resolved
