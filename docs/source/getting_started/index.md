@@ -53,6 +53,6 @@ Once you can run a report, the rest goes deeper:
 - [Building bundles](../building_bundles.md) — the plan/build/inspect flow.
 - [What a build costs](../bundle_requirements.md) — measured disk, time, memory.
 - [Parquet backend](../parquet_backend.md) — how views are registered, performance.
-- [ETL](../etl.md) — data sources, DTPs, the two branches.
+- [Data sources and ingestion](../etl.md) — where the data comes from, and how it gets in.
 - [Configuration](../configuration.md) — `.biofilter.toml` options.
 - [Troubleshooting](../troubleshooting.md) — common errors.

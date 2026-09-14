@@ -65,15 +65,41 @@ returns, and how to call it.
 
 ## Good places to start
 
+Most reports fall into three kinds of work.
+
+**Filtering** — narrowing a list down to what the data recognises or
+supports.
+
 | Report | Use it when |
 | ------ | ----------- |
 | `entity_filter` | You have a list of names and want to know which ones BF4 recognises |
-| `entity_neighborhood_summary` | You have one entity and want everything connected to it |
+| `gene_to_variant_filtering` | You have genes and want the variants inside them |
+| `variant_list_intersect` | You have two variant lists and want what they share |
+
+**Annotation** — attaching what is known to something you already have.
+
+| Report | Use it when |
+| ------ | ----------- |
 | `annotation_master_gene` | You want to browse the gene catalog |
+| `variant_single_gene_annotation` | You have variants and want their effect on one gene |
+| `entity_neighborhood_summary` | You have one entity and want everything connected to it |
+
+**Modeling** — building the sets and pairs an analysis consumes.
+
+| Report | Use it when |
+| ------ | ----------- |
+| `variant_binning` | You want variants grouped into bins for burden testing |
+| `snp_snp_pair_generator` | You need SNP pairs for an interaction scan |
+| `entity_relationship_model` | You want the relationship graph around a set of entities |
+
+And one worth running once on any bundle you have just been handed:
+
+| Report | Use it when |
+| ------ | ----------- |
 | `etl_status` | You want to see which data sources went into this bundle, and when |
 
-The last one answers "what is actually in here?" — worth running once on
-a bundle you have just been given.
+It answers "what is actually in here?" — which version of each source,
+and whether it loaded.
 
 ## Next step
 
