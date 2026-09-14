@@ -21,22 +21,21 @@ This is the common case, and it takes minutes.
 
 ### I need to build a bundle
 
-Only if no one has one for the data you need. Budget **two days and
-150 GB** — the full human genome means 1.5 TB of downloads, processed and
-discarded as it goes.
+Only if no one has one for the data you need. The full human genome
+means 1.5 TB of downloads, processed and discarded as the build goes, so
+plan for **150 GB of working space**.
 
 1. [Install Biofilter](installing.md) — from source if you will change DTPs.
 2. [Build a bundle](../building_bundles.md) — `bundle plan`, then `bundle build`.
 3. [Run a report](running_reports.md) against what you built.
 
 [What it costs](../bundle_requirements.md) has the measured figures for
-disk, memory and time before you start.
+disk, memory and runtime before you start.
 
 ## What you'll need
 
 - **Python 3.10+**, or **Docker** if you prefer containers.
 - **A bundle** — a path you can read, local or on a shared filesystem.
-- Nothing else. No database to provision, no credentials to request.
 
 ## One thing to carry with you
 
