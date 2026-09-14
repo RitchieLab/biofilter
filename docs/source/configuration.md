@@ -2,7 +2,8 @@
 
 Biofilter resolves settings from:
 1. command-line options (highest priority)
-2. environment variables (`DATABASE_URL` or `BIOFILTER_DB_URI`)
+2. environment variables (`BIOFILTER_BUNDLE`, or `DATABASE_URL` /
+   `BIOFILTER_DB_URI` for a database)
 3. `.biofilter.toml`
 4. internal defaults
 

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
 
 import click
 
@@ -15,16 +16,47 @@ def _clean_db_uri(value: str | None) -> str | None:
     return value or None
 
 
-def try_resolve_db_uri(cli_db_uri: str | None) -> str | None:
+def bundle_to_uri(path: str | None) -> str | None:
+    """
+    Turn a bundle path into the URI the engine expects.
+
+    `--bundle /shared/bundles/bf4_20260912` is the shape a user has: a
+    folder someone handed them. `parquet://` is how the engine addresses
+    it, and the scheme only exists because Biofilter once spoke to several
+    backends. Keeping the translation here means the URI stays an
+    implementation detail rather than something to memorise — including
+    the triple slash, which trips people up every time.
+    """
+    if not path:
+        return None
+    resolved = Path(path).expanduser().resolve()
+    return f"parquet://{resolved}"
+
+
+def try_resolve_db_uri(
+    cli_db_uri: str | None,
+    cli_bundle: str | None = None,
+) -> str | None:
     """
     Resolve DB URI with priority:
     1) CLI --db-uri
     2) ENV DATABASE_URL / BIOFILTER_DB_URI
     3) .biofilter.toml (BiofilterConfig)
     """
+    # --bundle wins over --db-uri: it is the more specific request, and
+    # passing both is a mistake worth surfacing rather than resolving
+    # silently in one direction.
+    bundle_uri = bundle_to_uri(cli_bundle)
+    if bundle_uri:
+        return bundle_uri
+
     cli_db_uri = _clean_db_uri(cli_db_uri)
     if cli_db_uri:
         return cli_db_uri
+
+    env_bundle = bundle_to_uri(os.getenv("BIOFILTER_BUNDLE"))
+    if env_bundle:
+        return env_bundle
 
     env_db_uri = _clean_db_uri(
         os.getenv("DATABASE_URL") or os.getenv("BIOFILTER_DB_URI")

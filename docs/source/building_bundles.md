@@ -106,8 +106,8 @@ built it, when, and its tables broken down by branch.
 Point `--db-uri` at the bundle folder. No import, no database:
 
 ```bash
-biofilter --db-uri "parquet:///path/to/bundle" report list
-biofilter --db-uri "parquet:///path/to/bundle" \
+biofilter --bundle /path/to/bundle report list
+biofilter --bundle /path/to/bundle \
   report run --report-name etl_status
 ```
 

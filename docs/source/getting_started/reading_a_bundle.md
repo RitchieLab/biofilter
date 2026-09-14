@@ -34,30 +34,37 @@ Give Biofilter the bundle folder. It finds the data and the manifest
 inside:
 
 ```bash
-export BIOFILTER_DB_URI="parquet:///shared/bundles/bf4_20260912"
-
-biofilter report list
+biofilter --bundle /shared/bundles/bf4_20260912 report list
 ```
 
-Or per command:
+If you use the same bundle every day, set it once:
 
 ```bash
-biofilter --db-uri "parquet:///shared/bundles/bf4_20260912" report list
+export BIOFILTER_BUNDLE="/shared/bundles/bf4_20260912"
+
+biofilter report list
+biofilter report run --report-name etl_status
 ```
 
-Or in `.biofilter.toml`, if you use the same bundle every day:
+Or in `.biofilter.toml`:
 
 ```toml
 [database]
 db_uri = "parquet:///shared/bundles/bf4_20260912"
 ```
 
-The path must be absolute, which is why the scheme carries three
-slashes: `parquet://` plus `/shared/...`.
+Relative paths work; Biofilter resolves them.
 
-Pointing straight at the `tables/` subdirectory also works, and older
-setups do. Prefer the bundle folder: the manifest sits at that level, and
-it is what tells Biofilter which version of the data a result came from.
+### The older form
+
+`--db-uri "parquet:///shared/bundles/bf4_20260912"` does the same thing.
+The `parquet://` scheme dates from when Biofilter spoke to several
+database backends and you had to say which one. With bundles it carries
+no information, so `--bundle` is the plainer way to say it. `--db-uri`
+remains for the cases that really are a database: a staging SQLite during
+a build, or an existing PostgreSQL.
+
+Passing both is an error rather than a guess about which you meant.
 
 ## Check it worked
 

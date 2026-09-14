@@ -111,3 +111,38 @@ def test_local_and_global_db_uri_option_decorators():
 
     assert "db_uri" in local_opt_names
     assert "db_uri" in global_opt_names
+
+
+def test_bundle_path_becomes_a_parquet_uri(tmp_path):
+    """
+    `--bundle` takes the folder a user was handed; the engine wants a URI.
+
+    The translation lives in the CLI so the `parquet://` scheme — a
+    leftover from when Biofilter addressed several backends — stays an
+    implementation detail rather than something to memorise.
+    """
+    bundle = tmp_path / "bf4_20260912"
+    bundle.mkdir()
+    uri = cmod.bundle_to_uri(str(bundle))
+    assert uri == f"parquet://{bundle.resolve()}"
+
+
+def test_bundle_path_is_resolved_to_absolute(tmp_path, monkeypatch):
+    """A relative path has to survive the trip: the engine requires absolute."""
+    bundle = tmp_path / "bundle"
+    bundle.mkdir()
+    monkeypatch.chdir(tmp_path)
+    assert cmod.bundle_to_uri("bundle") == f"parquet://{bundle.resolve()}"
+
+
+def test_bundle_wins_over_db_uri():
+    """
+    The more specific request wins. The CLI rejects passing both outright;
+    this guards the resolution order for every other caller.
+    """
+    resolved = cmod.try_resolve_db_uri("sqlite:///ignored.db", "/tmp")
+    assert resolved.startswith("parquet://")
+
+
+def test_no_bundle_falls_back_to_db_uri():
+    assert cmod.try_resolve_db_uri("sqlite:///x.db", None) == "sqlite:///x.db"

@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import click
 
-from biofilter.api.cli.common import try_resolve_db_uri
+from biofilter.api.cli.common import bundle_to_uri, try_resolve_db_uri
 from biofilter.api.cli.groups.bundle import bundle
 from biofilter.api.cli.groups.config import config
 from biofilter.api.cli.groups.db import db
@@ -18,12 +18,14 @@ def _version_callback(ctx, param, value):
     if not value or ctx.resilient_parsing:
         return
 
-    db_uri = try_resolve_db_uri(ctx.params.get("db_uri"))
+    db_uri = try_resolve_db_uri(
+        ctx.params.get("db_uri"), ctx.params.get("bundle")
+    )
     click.echo(f"biofilter {current_version}")
     click.echo(
         f"DB: {db_uri}"
         if db_uri
-        else "DB: <not set> (use --db-uri, DATABASE_URL or .biofilter.toml)"
+        else "DB: <not set> (use --bundle, BIOFILTER_BUNDLE or .biofilter.toml)"
     )
     ctx.exit()
 
@@ -36,10 +38,22 @@ Biofilter 4 CLI - Omics Knowledge Platform
     invoke_without_command=True,
 )
 @click.option(
+    "--bundle",
+    required=False,
+    type=click.Path(exists=True, file_okay=False),
+    help=(
+        "Path to a bundle folder. The usual way to point Biofilter at "
+        "data (or set BIOFILTER_BUNDLE)."
+    ),
+)
+@click.option(
     "--db-uri",
     required=False,
     type=click.STRING,
-    help="Database URI (or set DATABASE_URL / .biofilter.toml).",
+    help=(
+        "Database URI, for a staging SQLite or an existing PostgreSQL. "
+        "Prefer --bundle for reading data."
+    ),
 )
 @click.option(
     "--debug",
@@ -56,17 +70,24 @@ Biofilter 4 CLI - Omics Knowledge Platform
     help="Show the version and exit.",
 )
 @click.pass_context
-def main(ctx, db_uri, debug):
+def main(ctx, bundle, db_uri, debug):
     ctx.ensure_object(dict)
 
-    if db_uri:
-        ctx.obj["db_uri"] = db_uri
+    if bundle and db_uri:
+        raise click.UsageError(
+            "Pass --bundle or --db-uri, not both. --bundle names a bundle "
+            "folder; --db-uri names a database."
+        )
+
+    resolved_uri = bundle_to_uri(bundle) or db_uri
+    if resolved_uri:
+        ctx.obj["db_uri"] = resolved_uri
     if debug:
         ctx.obj["debug"] = True
 
     # If user runs just `biofilter`, show help + resolved DB hint
     if ctx.invoked_subcommand is None:
-        resolved = try_resolve_db_uri(db_uri)
+        resolved = try_resolve_db_uri(db_uri, bundle)
         click.echo(ctx.get_help())
         click.echo()
         if resolved:

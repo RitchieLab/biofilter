@@ -62,7 +62,7 @@ any problem, so CI can gate on it.
 A bundle can be read directly, without importing it:
 
 ```bash
-biofilter --db-uri "parquet:///exports/biofilter_bundle" report list
+biofilter --bundle ./exports/biofilter_bundle report list
 ```
 
 See [Parquet Backend](parquet_backend.md) and

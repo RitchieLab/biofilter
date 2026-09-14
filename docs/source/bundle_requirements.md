@@ -139,7 +139,7 @@ holds, which is why they sit inside it.
 No import, no database:
 
 ```bash
-biofilter --db-uri "parquet:///path/to/bundle" report list
+biofilter --bundle /path/to/bundle report list
 ```
 
 ```python

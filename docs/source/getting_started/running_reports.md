@@ -74,7 +74,7 @@ Here's a full session — install, point, run:
 pip install biofilter
 
 # Point at a bundle
-export BIOFILTER_DB_URI="parquet:///shared/bundles/bf4_20260912"
+export BIOFILTER_BUNDLE="/shared/bundles/bf4_20260912"
 
 # Run
 biofilter report list
