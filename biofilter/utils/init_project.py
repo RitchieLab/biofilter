@@ -1,4 +1,3 @@
-# scripts/init_project.py
 from biofilter import Biofilter
 
 if __name__ == "__main__":

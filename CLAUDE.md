@@ -35,7 +35,8 @@ biofilter_legacy/        # Archived legacy code (v2 and v3)
 docs/source/             # Sphinx documentation source
 notebooks_420/           # Analyses and docs from the 4.2.x era
 notebooks_430/           # Same, for 4.3.x (Andre/, Templates/)
-scripts/                 # Admin and debug scripts (target of launch.json configs)
+notebooks_420/scripts/   # Admin and debug scripts from 4.2.x
+                         # (still the target of launch.json configs)
 tests/                   # unit/, integration/, contract tests
 docker/                  # Dockerfile and container docs
 temp/                    # Created during binning queries — disposable
