@@ -635,6 +635,24 @@ need numbers that run will produce:
 
 ## Open decisions carried forward
 
+- [ ] **Bring the build runtime down, then revisit the published figure.**
+      49 hours of work for a full genome — 6.5 extract, 40.3 transform,
+      2.3 load. `bundle_requirements.md` says "plan for about two days"
+      and Getting Started deliberately does not repeat it: on a first
+      page that number reads as a verdict on the tool rather than a fact
+      about genome-scale data.
+
+      Transform is where the time is, so that is where to look — not
+      download, which saturates the link at 64 MB/s whatever you do, and
+      not the load, which is 2.3 hours of the 49. Two threads: per-source
+      parallelism (which currently trades against the disk ceiling the
+      discard exists to hold, so it needs the raw-retention question
+      settled first), and the SQLite load rework already scoped for
+      4.3.1.
+
+      Update the figure in `bundle_requirements.md` when it moves. It is
+      measured, so it should not be quietly optimistic in the meantime.
+
 - [ ] **Measure peak RAM during a build.** The full-genome run showed no
       pressure on a 36 GB machine and 32 GB is the published figure, but
       no peak was captured. Transforms stream in 250,000-row batches so
