@@ -31,12 +31,12 @@ biofilter/               # Main Python package
 biofilter_agents/        # Operational guides (LLM-ready) for CLI/ETL/DB/Report
 assistent/               # GPT assistant kit (system prompt, FAQ, manifest)
 biofilter_data/          # Downloads and processed files before DB ingestion
-biofilter_legacy/        # Archived legacy code (v2 and v3)
-docs/source/             # Sphinx documentation source
-notebooks_420/           # Analyses and docs from the 4.2.x era
-notebooks_430/           # Same, for 4.3.x (Andre/, Templates/)
-notebooks_420/scripts/   # Admin and debug scripts from 4.2.x
-                         # (still the target of launch.json configs)
+docs/source/             # Sphinx documentation source (4.3.x)
+notebooks_430/           # Analyses and working docs for 4.3.x
+adr/                     # Architecture decisions, not tied to a release
+biofilter_legacy/
+  bf4_420/               # Frozen 4.2.x: notebooks, scripts, docs snapshot
+  bf2x_code/, loki_code/ # Archived v2/v3 code
 tests/                   # unit/, integration/, contract tests
 docker/                  # Dockerfile and container docs
 temp/                    # Created during binning queries — disposable
@@ -211,7 +211,7 @@ df_rel    = bf.report.run("entity_relationship_model",
 
 ## Infrastructure
 
-- **Production:** read-only Parquet bundle, built by `bundle build`, on the Penn LPC (`/project/hall_shared/datasets/biofilter/<YYYYMMDD>/tables`), accessed via `--db-uri parquet:///.../tables`. The VPS was decommissioned; its PostgreSQL deployment procedure is kept for reference in `notebooks_420/Templates/lpc__deploy.md` (Appendix A).
+- **Production:** read-only Parquet bundle, built by `bundle build`, on the Penn LPC (`/project/hall_shared/datasets/biofilter/<YYYYMMDD>/tables`), accessed via `--db-uri parquet:///.../tables`. The VPS was decommissioned; its PostgreSQL deployment procedure is kept for reference in `biofilter_legacy/bf4_420/notebooks/Templates/lpc__deploy.md` (Appendix A).
 - **Local dev:** PostgreSQL `biofilter_dev`. Note its entity IDs are a different ID space from the bundle — never export from it over the bundle.
 - **Docker:** available to run the CLI without installing BF4 locally (`docker/Dockerfile`)
 - **Tooling:** Poetry, tox, pytest, sphinx, testcontainers (Postgres in tests)
@@ -222,9 +222,10 @@ df_rel    = bf.report.run("entity_relationship_model",
 ## Known documentation gaps
 
 - Some `reports_explain/` files are minimal stubs — to be revisited
-- Notebooks are split by release (`notebooks_420/`, `notebooks_430/`) so an
-  analysis stays with the version of the data it was run against. Neither
-  has an index — acceptable for personal development work.
+- Only the current release's notebooks live at the root (`notebooks_430/`).
+  Everything from 4.2.x — notebooks, scripts and a snapshot of its docs —
+  is frozen under `biofilter_legacy/bf4_420/`, so `docs/` can be rewritten
+  for 4.3.0 without stranding anyone still reading a 4.2.0 bundle.
 
 ## Notes
 

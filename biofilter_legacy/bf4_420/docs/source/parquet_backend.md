@@ -110,7 +110,7 @@ Consequences:
 
 - `biofilter etl update` / `update-all` — **not supported**; run the ETL
   against PostgreSQL and export a new bundle.
-- `db upgrade` / `db create-db` — **not supported** against a bundle.
+- `biofilter db migrate` / `db upgrade` / `db create-db` — **not supported**.
 - Refreshing the data means producing a **new bundle**, not modifying the
   current one.
 
@@ -146,7 +146,7 @@ The `tables/` subdirectory is what `parquet://` points at.
 > chunk. The bundle has to be assembled in stages instead — export the
 > partition children individually, then concatenate them outside the database.
 > The full procedure is documented in the
-> [LPC deployment guide](https://github.com/RitchieLab/biofilter/blob/main/biofilter_legacy/bf4_420/notebooks/Templates/lpc__deploy.md).
+> [LPC deployment guide](https://github.com/RitchieLab/biofilter/blob/main/notebooks/Templates/lpc__deploy.md).
 
 ---
 

@@ -6,7 +6,7 @@
 | Date       | 2026-08-21                                                                                                                                   |
 | Author     | Andre Rico                                                                                                                                   |
 | Supersedes | (none)                                                                                                                                       |
-| Related    | [ADR-001](0001-duckdb-parquet-strategy.md) (parquet/DuckDB read mode), [poc_coding_gene_overlap.py](../notebooks_420/Andre/poc_coding_gene_overlap.py) (the POC) |
+| Related    | [ADR-001](0001-duckdb-parquet-strategy.md) (parquet/DuckDB read mode), [poc_coding_gene_overlap.py](../biofilter_legacy/bf4_420/notebooks/Andre/poc_coding_gene_overlap.py) (the POC) |
 
 ---
 
@@ -232,7 +232,7 @@ correct answer today without waiting on it.
 ## 5. POC results (2026-08-20)
 
 Executed on the LPC against the production parquet bundle, on the real
-712k ADSP list. Script: [poc_coding_gene_overlap.py](../notebooks_420/Andre/poc_coding_gene_overlap.py).
+712k ADSP list. Script: [poc_coding_gene_overlap.py](../biofilter_legacy/bf4_420/notebooks/Andre/poc_coding_gene_overlap.py).
 
 ```
 python poc_coding_gene_overlap.py \

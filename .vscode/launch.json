@@ -15,7 +15,7 @@
             "name": "Bio - Start Project",
             "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceFolder}/notebooks_420/scripts/runs_debugs/Start_Project.py",
+            "program": "${workspaceFolder}/biofilter_legacy/bf4_420/notebooks/scripts/runs_debugs/Start_Project.py",
             "console": "integratedTerminal",
             "cwd": "${workspaceFolder}",
             "envFile": "${workspaceFolder}/.env",
@@ -25,7 +25,7 @@
             "name": "Bio - ETL Manager",
             "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceFolder}/notebooks_420/scripts/runs_debugs/Run_ETLManager.py",
+            "program": "${workspaceFolder}/biofilter_legacy/bf4_420/notebooks/scripts/runs_debugs/Run_ETLManager.py",
             "console": "integratedTerminal",
             "cwd": "${workspaceFolder}",
             "envFile": "${workspaceFolder}/.env",
@@ -35,7 +35,7 @@
             "name": "Bio - Reports Script",
             "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceFolder}/notebooks_420/scripts/runs_debugs/Run_Reports.py",
+            "program": "${workspaceFolder}/biofilter_legacy/bf4_420/notebooks/scripts/runs_debugs/Run_Reports.py",
             "console": "integratedTerminal",
             "cwd": "${workspaceFolder}",
             "envFile": "${workspaceFolder}/.env",
@@ -331,7 +331,7 @@
             "id": "scriptPath",
             "type": "promptString",
             "description": "Path (relative to workspace) of script to run",
-            "default": "notebooks_420/scripts/runs_debugs/Run_Reports.py"
+            "default": "biofilter_legacy/bf4_420/notebooks/scripts/runs_debugs/Run_Reports.py"
         },
         {
             "id": "dbUri",

@@ -6,7 +6,7 @@
 | Date       | 2026-06-22                                                                                                                   |
 | Author     | Andre Rico                                                                                                                   |
 | Supersedes | (none)                                                                                                                       |
-| Related    | [bf4-hpc-image.md](../notebooks_420/Andre/bf4-hpc-image.md) (legacy SQLite/PG approach), [poc_duckdb_annotation.py](../notebooks_420/Andre/poc_duckdb_annotation.py) |
+| Related    | [bf4-hpc-image.md](../biofilter_legacy/bf4_420/notebooks/Andre/bf4-hpc-image.md) (legacy SQLite/PG approach), [poc_duckdb_annotation.py](../biofilter_legacy/bf4_420/notebooks/Andre/poc_duckdb_annotation.py) |
 
 ---
 
@@ -177,7 +177,7 @@ in the import phase without reaching completion. Root causes:
   is a multi-hour phase
 - Total observed throughput too slow for the LPC walltime budget
 
-Documented in detail in [bf4-hpc-image.md](../notebooks_420/Andre/bf4-hpc-image.md) and the
+Documented in detail in [bf4-hpc-image.md](../biofilter_legacy/bf4_420/notebooks/Andre/bf4-hpc-image.md) and the
 operational log in `databases/20260514/logs/`.
 
 ### Alternative B — PostgreSQL in bundled container (current state, retained for special cases)
@@ -245,7 +245,7 @@ Order of work (estimates assume one focused engineer):
 5. **HPC deployment update** (~2 h)
    - Drop PG from the `docker/hpc/` image; rebuild as a thin
      BF4-only image with `duckdb-engine`.
-   - Update [notebooks/Templates/lpc\_\_quickstart.md](../notebooks_420/Templates/lpc__quickstart.md)
+   - Update [notebooks/Templates/lpc\_\_quickstart.md](../biofilter_legacy/bf4_420/notebooks/Templates/lpc__quickstart.md)
      to show the DuckDB invocation.
 
 Total: roughly **3–4 days of focused work** end-to-end. Mostly testing,

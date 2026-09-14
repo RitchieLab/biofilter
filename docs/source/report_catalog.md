@@ -30,11 +30,11 @@ Reports for inspecting the state of the ETL pipeline and the knowledge base.
 
 | Report | Description | Explain | Notebook |
 |---|---|---|---|
-| `etl_status` | Current status of all ETL packages (active, last run, row counts) | [Guide](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter/modules/report/reports_explain/report_etl_status.md) | [Tutorial](https://github.com/RitchieLab/biofilter/blob/biofilter3r/notebooks_420/Templates/reports__etl_status.ipynb) |
-| `etl_packages` | Full provenance log of all ETL executions with timestamps and file hashes | [Guide](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter/modules/report/reports_explain/report_etl_packages.md) | [Tutorial](https://github.com/RitchieLab/biofilter/blob/biofilter3r/notebooks_420/Templates/reports__etl_packages.ipynb) |
-| `platform_data_statistics` | Row counts and coverage metrics across all master tables | [Guide](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter/modules/report/reports_explain/report_platform_data_statistics.md) | [Tutorial](https://github.com/RitchieLab/biofilter/blob/biofilter3r/notebooks_420/Templates/reports__platform_data_statistics.ipynb) |
-| `db_pg_table_stats` | PostgreSQL table sizes, row estimates, and bloat metrics *(PostgreSQL only)* | [Guide](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter/modules/report/reports_explain/report_db_pg_table_stats.md) | [Tutorial](https://github.com/RitchieLab/biofilter/blob/biofilter3r/notebooks_420/Templates/reports__db_pg_table_stats.ipynb) |
-| `db_pg_index_stats` | PostgreSQL index usage, size, and scan counts *(PostgreSQL only)* | [Guide](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter/modules/report/reports_explain/report_db_pg_index_stats.md) | [Tutorial](https://github.com/RitchieLab/biofilter/blob/biofilter3r/notebooks_420/Templates/reports__db_pg_index_stats.ipynb) |
+| `etl_status` | Current status of all ETL packages (active, last run, row counts) | [Guide](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter/modules/report/reports_explain/report_etl_status.md) | [Tutorial](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter_legacy/bf4_420/notebooks/Templates/reports__etl_status.ipynb) |
+| `etl_packages` | Full provenance log of all ETL executions with timestamps and file hashes | [Guide](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter/modules/report/reports_explain/report_etl_packages.md) | [Tutorial](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter_legacy/bf4_420/notebooks/Templates/reports__etl_packages.ipynb) |
+| `platform_data_statistics` | Row counts and coverage metrics across all master tables | [Guide](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter/modules/report/reports_explain/report_platform_data_statistics.md) | [Tutorial](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter_legacy/bf4_420/notebooks/Templates/reports__platform_data_statistics.ipynb) |
+| `db_pg_table_stats` | PostgreSQL table sizes, row estimates, and bloat metrics *(PostgreSQL only)* | [Guide](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter/modules/report/reports_explain/report_db_pg_table_stats.md) | [Tutorial](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter_legacy/bf4_420/notebooks/Templates/reports__db_pg_table_stats.ipynb) |
+| `db_pg_index_stats` | PostgreSQL index usage, size, and scan counts *(PostgreSQL only)* | [Guide](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter/modules/report/reports_explain/report_db_pg_index_stats.md) | [Tutorial](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter_legacy/bf4_420/notebooks/Templates/reports__db_pg_index_stats.ipynb) |
 
 ---
 
@@ -44,9 +44,9 @@ Reports for exploring the biological entity graph.
 
 | Report | Description | Explain | Notebook |
 |---|---|---|---|
-| `entity_filter` | Filter and list entities (genes, pathways, diseases, …) by type, source, or name pattern | [Guide](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter/modules/report/reports_explain/report_entity_filter.md) | [Tutorial](https://github.com/RitchieLab/biofilter/blob/biofilter3r/notebooks_420/Templates/reports__entity_filter.ipynb) |
-| `entity_relationship_model` | Retrieve all entities related to an input list through shared biological groups (pathways, diseases, GO, PPI) | — | [Tutorial](https://github.com/RitchieLab/biofilter/blob/biofilter3r/notebooks_420/Templates/reports__entity_relationship_model.ipynb) |
-| `entity_neighborhood_summary` | Resolve heterogeneous inputs (gene:, disease:, pathway:, …) and return a 1-hop neighborhood summary grouped by neighbor type | [Guide](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter/modules/report/reports_explain/report_entity_neighborhood_summary.md) | [Tutorial](https://github.com/RitchieLab/biofilter/blob/biofilter3r/notebooks_420/Templates/reports__entity_neighborhood_summary.ipynb) |
+| `entity_filter` | Filter and list entities (genes, pathways, diseases, …) by type, source, or name pattern | [Guide](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter/modules/report/reports_explain/report_entity_filter.md) | [Tutorial](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter_legacy/bf4_420/notebooks/Templates/reports__entity_filter.ipynb) |
+| `entity_relationship_model` | Retrieve all entities related to an input list through shared biological groups (pathways, diseases, GO, PPI) | — | [Tutorial](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter_legacy/bf4_420/notebooks/Templates/reports__entity_relationship_model.ipynb) |
+| `entity_neighborhood_summary` | Resolve heterogeneous inputs (gene:, disease:, pathway:, …) and return a 1-hop neighborhood summary grouped by neighbor type | [Guide](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter/modules/report/reports_explain/report_entity_neighborhood_summary.md) | [Tutorial](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter_legacy/bf4_420/notebooks/Templates/reports__entity_neighborhood_summary.ipynb) |
 
 ---
 
@@ -57,13 +57,13 @@ Useful for exploring available terms before using them as filters in other repor
 
 | Report | Description | Explain | Notebook |
 |---|---|---|---|
-| `annotation_master_gene` | All genes with HGNC symbol, Ensembl ID, locus, and source provenance | [Guide](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter/modules/report/reports_explain/report_annotation_master_gene.md) | [Tutorial](https://github.com/RitchieLab/biofilter/blob/biofilter3r/notebooks_420/Templates/reports__annotations_master_gene.ipynb) |
-| `annotation_master_pathway` | All pathways across all source systems (Reactome, KEGG, …) | [Guide](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter/modules/report/reports_explain/report_annotation_master_pathway.md) | [Tutorial](https://github.com/RitchieLab/biofilter/blob/biofilter3r/notebooks_420/Templates/reports__annotations_master_pathway.ipynb) |
-| `annotation_master_protein` | All proteins with UniProt IDs and gene mappings | [Guide](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter/modules/report/reports_explain/report_annotation_master_protein.md) | [Tutorial](https://github.com/RitchieLab/biofilter/blob/biofilter3r/notebooks_420/Templates/reports__annotations_master_protein.ipynb) |
-| `annotation_master_disease` | All diseases with MONDO/ClinGen IDs and gene associations | [Guide](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter/modules/report/reports_explain/report_annotation_master_disease.md) | [Tutorial](https://github.com/RitchieLab/biofilter/blob/biofilter3r/notebooks_420/Templates/reports__annotations_master_disease.ipynb) |
-| `annotation_master_go` | All Gene Ontology terms (BP, MF, CC) with gene memberships | [Guide](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter/modules/report/reports_explain/report_annotation_master_go.md) | [Tutorial](https://github.com/RitchieLab/biofilter/blob/biofilter3r/notebooks_420/Templates/reports__annotations_master_go.ipynb) |
-| `annotation_master_chemical` | All chemical compounds (ChEBI) with gene and pathway associations | [Guide](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter/modules/report/reports_explain/report_annotation_master_chemical.md) | [Tutorial](https://github.com/RitchieLab/biofilter/blob/biofilter3r/notebooks_420/Templates/reports__annotations_master_chemical.ipynb) |
-| `annotation_master_variant` | Full annotation for input variants: frequencies, pathogenicity scores, VEP consequences per transcript, AlphaMissense | [Guide](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter/modules/report/reports_explain/report_annotation_master_variant.md) | [Tutorial](https://github.com/RitchieLab/biofilter/blob/biofilter3r/notebooks_420/Templates/reports__annotations_master_variant.ipynb) |
+| `annotation_master_gene` | All genes with HGNC symbol, Ensembl ID, locus, and source provenance | [Guide](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter/modules/report/reports_explain/report_annotation_master_gene.md) | [Tutorial](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter_legacy/bf4_420/notebooks/Templates/reports__annotations_master_gene.ipynb) |
+| `annotation_master_pathway` | All pathways across all source systems (Reactome, KEGG, …) | [Guide](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter/modules/report/reports_explain/report_annotation_master_pathway.md) | [Tutorial](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter_legacy/bf4_420/notebooks/Templates/reports__annotations_master_pathway.ipynb) |
+| `annotation_master_protein` | All proteins with UniProt IDs and gene mappings | [Guide](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter/modules/report/reports_explain/report_annotation_master_protein.md) | [Tutorial](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter_legacy/bf4_420/notebooks/Templates/reports__annotations_master_protein.ipynb) |
+| `annotation_master_disease` | All diseases with MONDO/ClinGen IDs and gene associations | [Guide](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter/modules/report/reports_explain/report_annotation_master_disease.md) | [Tutorial](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter_legacy/bf4_420/notebooks/Templates/reports__annotations_master_disease.ipynb) |
+| `annotation_master_go` | All Gene Ontology terms (BP, MF, CC) with gene memberships | [Guide](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter/modules/report/reports_explain/report_annotation_master_go.md) | [Tutorial](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter_legacy/bf4_420/notebooks/Templates/reports__annotations_master_go.ipynb) |
+| `annotation_master_chemical` | All chemical compounds (ChEBI) with gene and pathway associations | [Guide](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter/modules/report/reports_explain/report_annotation_master_chemical.md) | [Tutorial](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter_legacy/bf4_420/notebooks/Templates/reports__annotations_master_chemical.ipynb) |
+| `annotation_master_variant` | Full annotation for input variants: frequencies, pathogenicity scores, VEP consequences per transcript, AlphaMissense | [Guide](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter/modules/report/reports_explain/report_annotation_master_variant.md) | [Tutorial](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter_legacy/bf4_420/notebooks/Templates/reports__annotations_master_variant.ipynb) |
 
 ---
 
@@ -73,12 +73,12 @@ Reports for annotating and filtering genomic variants.
 
 | Report | Description | Explain | Notebook |
 |---|---|---|---|
-| `variant_binning` | Assign variants to genomic bins; useful for burden-test preparation | [Guide](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter/modules/report/reports_explain/report_variant_binning.md) | [Tutorial](https://github.com/RitchieLab/biofilter/blob/biofilter3r/notebooks_420/Templates/reports__variant_binning.ipynb) |
-| `variant_gene_location_model` | Map variants to overlapping gene loci with distance and region annotations | — | [Tutorial](https://github.com/RitchieLab/biofilter/blob/biofilter3r/notebooks_420/Templates/reports__variant_gene_location_model.ipynb) |
+| `variant_binning` | Assign variants to genomic bins; useful for burden-test preparation | [Guide](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter/modules/report/reports_explain/report_variant_binning.md) | [Tutorial](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter_legacy/bf4_420/notebooks/Templates/reports__variant_binning.ipynb) |
+| `variant_gene_location_model` | Map variants to overlapping gene loci with distance and region annotations | — | [Tutorial](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter_legacy/bf4_420/notebooks/Templates/reports__variant_gene_location_model.ipynb) |
 | `variant_annotation_expanded` | Full annotation expansion for a variant list (consequence, AF, predictions) | — | — |
-| `variant_single_gene_annotation` | **Phase 1** — Given a seed variant, returns the seed gene and all partner genes sharing biological context | [Guide](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter/modules/report/reports_explain/report_variant_single_gene_annotation.md) | [Tutorial](https://github.com/RitchieLab/biofilter/blob/biofilter3r/notebooks_420/Templates/reports__variant_single_gene_annotation.ipynb) |
-| `gene_to_variant_filtering` | **Phase 2** — Collect and filter variants across a gene list with SQL-level pathogenicity filters | [Guide](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter/modules/report/reports_explain/report_gene_to_variant_filtering.md) | [Tutorial](https://github.com/RitchieLab/biofilter/blob/biofilter3r/notebooks_420/Templates/reports__gene_to_variant_filtering.ipynb) |
-| `annotation_variant_regulatory_evidence` | Variant ↔ gene regulatory evidence (eQTL / sQTL). Accepts gene symbols, rsids, or chr:pos as input; returns one row per (variant × tissue × regulated gene) with effect size and p-value | [Guide](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter/modules/report/reports_explain/report_annotation_variant_regulatory_evidence.md) | [Tutorial](https://github.com/RitchieLab/biofilter/blob/biofilter3r/notebooks_420/Templates/reports__annotation_variant_regulatory_evidence.ipynb) |
+| `variant_single_gene_annotation` | **Phase 1** — Given a seed variant, returns the seed gene and all partner genes sharing biological context | [Guide](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter/modules/report/reports_explain/report_variant_single_gene_annotation.md) | [Tutorial](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter_legacy/bf4_420/notebooks/Templates/reports__variant_single_gene_annotation.ipynb) |
+| `gene_to_variant_filtering` | **Phase 2** — Collect and filter variants across a gene list with SQL-level pathogenicity filters | [Guide](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter/modules/report/reports_explain/report_gene_to_variant_filtering.md) | [Tutorial](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter_legacy/bf4_420/notebooks/Templates/reports__gene_to_variant_filtering.ipynb) |
+| `annotation_variant_regulatory_evidence` | Variant ↔ gene regulatory evidence (eQTL / sQTL). Accepts gene symbols, rsids, or chr:pos as input; returns one row per (variant × tissue × regulated gene) with effect size and p-value | [Guide](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter/modules/report/reports_explain/report_annotation_variant_regulatory_evidence.md) | [Tutorial](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter_legacy/bf4_420/notebooks/Templates/reports__annotation_variant_regulatory_evidence.ipynb) |
 
 ---
 
@@ -89,7 +89,7 @@ Both variants in every pair come from the input — no DB expansion.
 
 | Report | Description | Explain | Notebook |
 |---|---|---|---|
-| `variant_modeling` | Input variants → gene overlap → group co-membership → Variant×Variant pairs with group_support_count weight | [Guide](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter/modules/report/reports_explain/report_variant_modeling.md) | [Tutorial](https://github.com/RitchieLab/biofilter/blob/biofilter3r/notebooks_420/Templates/reports__variant_modeling.ipynb) |
+| `variant_modeling` | Input variants → gene overlap → group co-membership → Variant×Variant pairs with group_support_count weight | [Guide](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter/modules/report/reports_explain/report_variant_modeling.md) | [Tutorial](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter_legacy/bf4_420/notebooks/Templates/reports__variant_modeling.ipynb) |
 
 ---
 
@@ -100,16 +100,16 @@ See the full pipeline tutorial and methods document for end-to-end guidance.
 
 | Resource | Link |
 |---|---|
-| Pipeline notebook | [pipeline__from_single_variant_to_interactions.ipynb](https://github.com/RitchieLab/biofilter/blob/biofilter3r/notebooks_420/Templates/pipeline__from_single_variant_to_interactions.ipynb) |
-| Pipeline methods doc | [pipeline__from_single_variant_to_interactions.md](https://github.com/RitchieLab/biofilter/blob/biofilter3r/notebooks_420/Templates/pipeline__from_single_variant_to_interactions.md) |
+| Pipeline notebook | [pipeline__from_single_variant_to_interactions.ipynb](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter_legacy/bf4_420/notebooks/Templates/pipeline__from_single_variant_to_interactions.ipynb) |
+| Pipeline methods doc | [pipeline__from_single_variant_to_interactions.md](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter_legacy/bf4_420/notebooks/Templates/pipeline__from_single_variant_to_interactions.md) |
 
 | Report | Phase | Description | Explain | Notebook |
 |---|---|---|---|---|
-| `variant_single_gene_annotation` | Phase 1 | Seed variant → partner gene list via biological network | [Guide](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter/modules/report/reports_explain/report_variant_single_gene_annotation.md) | [Tutorial](https://github.com/RitchieLab/biofilter/blob/biofilter3r/notebooks_420/Templates/reports__variant_single_gene_annotation.ipynb) |
-| `gene_to_variant_filtering` | Phase 2 | Gene list → filtered, annotated variant set (Lista A) | [Guide](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter/modules/report/reports_explain/report_gene_to_variant_filtering.md) | [Tutorial](https://github.com/RitchieLab/biofilter/blob/biofilter3r/notebooks_420/Templates/reports__gene_to_variant_filtering.ipynb) |
-| `variant_list_intersect` | Phase 2.5 | Lista A ∩ Lista B → Lista C (genotyped subset, PLINK-ready) | [Guide](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter/modules/report/reports_explain/report_variant_list_intersect.md) | [Pipeline notebook](https://github.com/RitchieLab/biofilter/blob/biofilter3r/notebooks_420/Templates/pipeline__from_single_variant_to_interactions.ipynb) |
-| `snp_snp_pair_generator` | Phase 3 | Lista D → annotated interaction pairs with configurable pairing strategy | [Guide](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter/modules/report/reports_explain/report_snp_snp_pair_generator.md) | [Pipeline notebook](https://github.com/RitchieLab/biofilter/blob/biofilter3r/notebooks_420/Templates/pipeline__from_single_variant_to_interactions.ipynb) |
-| `snp_snp_model` | Legacy | Earlier SNP×SNP pair model — expands variants from gene loci (superseded by `variant_modeling`) | [Guide](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter/modules/report/reports_explain/report_snp_snp_model.md) | [Tutorial](https://github.com/RitchieLab/biofilter/blob/biofilter3r/notebooks_420/Templates/reports__snp_snp_model.ipynb) |
+| `variant_single_gene_annotation` | Phase 1 | Seed variant → partner gene list via biological network | [Guide](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter/modules/report/reports_explain/report_variant_single_gene_annotation.md) | [Tutorial](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter_legacy/bf4_420/notebooks/Templates/reports__variant_single_gene_annotation.ipynb) |
+| `gene_to_variant_filtering` | Phase 2 | Gene list → filtered, annotated variant set (Lista A) | [Guide](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter/modules/report/reports_explain/report_gene_to_variant_filtering.md) | [Tutorial](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter_legacy/bf4_420/notebooks/Templates/reports__gene_to_variant_filtering.ipynb) |
+| `variant_list_intersect` | Phase 2.5 | Lista A ∩ Lista B → Lista C (genotyped subset, PLINK-ready) | [Guide](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter/modules/report/reports_explain/report_variant_list_intersect.md) | [Pipeline notebook](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter_legacy/bf4_420/notebooks/Templates/pipeline__from_single_variant_to_interactions.ipynb) |
+| `snp_snp_pair_generator` | Phase 3 | Lista D → annotated interaction pairs with configurable pairing strategy | [Guide](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter/modules/report/reports_explain/report_snp_snp_pair_generator.md) | [Pipeline notebook](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter_legacy/bf4_420/notebooks/Templates/pipeline__from_single_variant_to_interactions.ipynb) |
+| `snp_snp_model` | Legacy | Earlier SNP×SNP pair model — expands variants from gene loci (superseded by `variant_modeling`) | [Guide](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter/modules/report/reports_explain/report_snp_snp_model.md) | [Tutorial](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter_legacy/bf4_420/notebooks/Templates/reports__snp_snp_model.ipynb) |
 
 ---
 
@@ -119,8 +119,8 @@ Pipeline for prioritising pathways given a list of significant genes (e.g., ExWA
 
 | Resource | Link |
 |---|---|
-| Pipeline notebook | [pipeline__pathway_burden_score.ipynb](https://github.com/RitchieLab/biofilter/blob/biofilter3r/notebooks_420/Templates/pipeline__pathway_burden_score.ipynb) |
-| Pipeline methods doc | [pipeline__pathway_burden_score.md](https://github.com/RitchieLab/biofilter/blob/biofilter3r/notebooks_420/Templates/pipeline__pathway_burden_score.md) |
+| Pipeline notebook | [pipeline__pathway_burden_score.ipynb](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter_legacy/bf4_420/notebooks/Templates/pipeline__pathway_burden_score.ipynb) |
+| Pipeline methods doc | [pipeline__pathway_burden_score.md](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter_legacy/bf4_420/notebooks/Templates/pipeline__pathway_burden_score.md) |
 
 ---
 
@@ -128,7 +128,7 @@ Pipeline for prioritising pathways given a list of significant genes (e.g., ExWA
 
 | Report | Description | Explain | Notebook |
 |---|---|---|---|
-| `template` | Blank report template for development and testing | [Guide](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter/modules/report/reports_explain/report_template.md) | [Tutorial](https://github.com/RitchieLab/biofilter/blob/biofilter3r/notebooks_420/Templates/reports__qry_template.ipynb) |
+| `template` | Blank report template for development and testing | [Guide](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter/modules/report/reports_explain/report_template.md) | [Tutorial](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter_legacy/bf4_420/notebooks/Templates/reports__qry_template.ipynb) |
 
 ---
 

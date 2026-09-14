@@ -87,6 +87,6 @@ Open `etl_status.csv` in your favorite tool and you'll see the current state of 
 ## Next steps
 
 - Browse the [Report Catalog](../report_catalog.md) for what else you can do.
-- Each report has a notebook tutorial in [`biofilter_legacy/bf4_420/notebooks/Templates/`](https://github.com/RitchieLab/biofilter/tree/biofilter3r/biofilter_legacy/bf4_420/notebooks/Templates) — copy one and adapt it.
+- Each report has a notebook tutorial in [`notebooks/Templates/`](https://github.com/RitchieLab/biofilter/tree/biofilter3r/notebooks/Templates) — copy one and adapt it.
 - For deeper CLI options, see the [CLI Reference](../cli_reference.md).
 - For Python API patterns, see [Reports](../reports.md).
