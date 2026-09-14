@@ -29,23 +29,23 @@ B=".venv/bin/biofilter bundle build --data-root biofilter_data --no-assemble"
 OUT=biofilter_data/bundles/full_20260910
 
 # 1) Core: 15 sources, no chemicals. ~3-4 h, dominated by the load.
-$B --plan notebooks_430/db/bundle_lifecycle/01_core.json --out $OUT
+$B --plan notebooks_430/data/bundle_lifecycle/01_core.json --out $OUT
 
 # 2) gnomAD chr1-5: the heavy end. chr1 alone is 126 GB of raw.
-$B --plan notebooks_430/db/bundle_lifecycle/02_gnomad_1_5.json --out $OUT
+$B --plan notebooks_430/data/bundle_lifecycle/02_gnomad_1_5.json --out $OUT
 
 # 3) gnomAD chr6-13
-$B --plan notebooks_430/db/bundle_lifecycle/03_gnomad_6_13.json --out $OUT
+$B --plan notebooks_430/data/bundle_lifecycle/03_gnomad_6_13.json --out $OUT
 
 # 4) gnomAD chr14-22, X, Y
-$B --plan notebooks_430/db/bundle_lifecycle/04_gnomad_14_y.json --out $OUT
+$B --plan notebooks_430/data/bundle_lifecycle/04_gnomad_14_y.json --out $OUT
 
 # 5) AlphaMissense, GTEx, GWAS — genome-wide, not per chromosome
-$B --plan notebooks_430/db/bundle_lifecycle/05_other_variants.json --out $OUT
+$B --plan notebooks_430/data/bundle_lifecycle/05_other_variants.json --out $OUT
 
 # 6) Assemble. Everything is already done, so this only builds the bundle.
 .venv/bin/biofilter bundle build \
-  --plan notebooks_430/db/bundle_lifecycle/06_assemble.json \
+  --plan notebooks_430/data/bundle_lifecycle/06_assemble.json \
   --data-root biofilter_data \
   --out $OUT
 ```
