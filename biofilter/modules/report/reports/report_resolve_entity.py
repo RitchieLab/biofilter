@@ -24,10 +24,14 @@ from typing import Any, Sequence
 
 import pyarrow as pa
 
+from biofilter.modules.report.reports._resolution import (
+    ALIAS_KEY,
+    DEFAULT_SIMILARITY_THRESHOLD,
+    MATCH_MODES,
+    match_clause,
+    validate_match_mode,
+)
 from biofilter.modules.report.reports.base_report import ReportBase
-
-MATCH_MODES = ("exact", "like", "fuzzy")
-DEFAULT_SIMILARITY_THRESHOLD = 80.0
 
 
 class ResolveEntityReport(ReportBase):
@@ -77,11 +81,7 @@ class ResolveEntityReport(ReportBase):
         if not values:
             raise ValueError("input_data must contain at least one value.")
 
-        match_mode = str(self.param("match_mode", "exact") or "exact").lower()
-        if match_mode not in MATCH_MODES:
-            raise ValueError(
-                f"match_mode must be one of {MATCH_MODES}. Got: {match_mode!r}"
-            )
+        match_mode = validate_match_mode(self.param("match_mode", "exact"))
 
         threshold = float(
             self.param("similarity_threshold", DEFAULT_SIMILARITY_THRESHOLD)
@@ -91,12 +91,8 @@ class ResolveEntityReport(ReportBase):
 
         self.register_input(values, name="input_names", column="input_value")
 
-        # The alias key an input is compared against. Pre-normalised in
-        # the bundle, so exact matching is an equality join rather than a
-        # lower() around a column, which would cost the parquet statistics.
-        alias_key = "lower(coalesce(a.alias_norm, a.alias_value))"
-
-        join_on, score = self._match_clause(match_mode, alias_key, threshold)
+        alias_key = ALIAS_KEY
+        join_on, score = match_clause(match_mode, threshold)
         group_clause = (
             "AND lower(g.name) = lower(?)" if group_filter else ""
         )
@@ -189,32 +185,3 @@ class ResolveEntityReport(ReportBase):
             """,
             params,
         )
-
-    # ------------------------------------------------------------------
-    @staticmethod
-    def _match_clause(mode: str, alias_key: str, threshold: float) -> tuple[str, str]:
-        """
-        The join condition and the score column, per match mode.
-
-        Returns (join_on, score_expression).
-        """
-        if mode == "exact":
-            return f"{alias_key} = i.input_value_norm", "CAST(NULL AS DOUBLE)"
-
-        if mode == "like":
-            # One direction: the input occurs somewhere in the alias.
-            #
-            # Not the reverse. `contains(input, alias)` would make every
-            # one-character alias match every input that contains that
-            # character — asking for BRCA1 returned the aliases "1" and
-            # "a1" while this was symmetric.
-            return (
-                f"contains({alias_key}, i.input_value_norm)",
-                "CAST(NULL AS DOUBLE)",
-            )
-
-        # Scored in the join, so only rows above the threshold are ever
-        # built — the relational version scored every alias in the bundle
-        # in Python and then filtered.
-        similarity = f"jaro_winkler_similarity({alias_key}, i.input_value_norm) * 100"
-        return f"{similarity} >= {threshold}", similarity
