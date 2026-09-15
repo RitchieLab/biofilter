@@ -514,7 +514,75 @@ No version deadline. The module is deleted when it is empty, and
 `report list` keeps the remaining count visible (§2.9) so the debt does
 not go quiet.
 
-### 2.12 Not decided here
+### 2.12 Reports fall into six classes, and the class predicts the work
+
+Migrating seven reports made the shape of the remaining nineteen legible.
+The classes are not bureaucracy — they answer two practical questions:
+what does one output row mean, and where will the rewrite actually pay.
+
+| class | one row is | reports |
+| --- | --- | --- |
+| **resolution** | a candidate match for one input name | `entity_resolve` |
+| **annotation** | one input, enriched | the `annotation_master_*` family, `variant_single_gene_annotation`, `variant_annotation_expanded`, `annotation_variant_regulatory_evidence` |
+| **expansion** | a link — an input, and something reached from it | `entity_neighborhood_summary`, `entity_relationship_model`, `variant_gene_location_model`, `gene_to_variant_filtering` |
+| **pair generation** | a candidate pair to test downstream | `snp_snp_model`, `snp_snp_pair_generator`, `variant_modeling` |
+| **aggregation** | a bin, or the result of a set operation | `variant_binning`, `variant_list_intersect` |
+| **platform** | a fact about the bundle, not about biology | `etl_status`, `etl_packages`, `platform_data_statistics`, `db_pg_*` |
+
+**"Pair generation", not "modeling".** Three reports carry `model` or
+`modeling` in their names and none of them fits a model. They produce
+candidate pairs — variant x variant, gene x gene — for statistical or ML
+testing that happens elsewhere. The word is inherited from Biofilter 2
+and 3, where "SNP-SNP model" meant "the candidate set to test", and it is
+recorded here so nobody corrects it in the wrong direction. Whether the
+reports themselves get renamed is §2.14.
+
+**`entity_filter` became `entity_resolve`.** It filtered nothing. A
+filtering report reduces a set; this one expands — one input becomes
+every entity answering to it, so ambiguity surfaces as extra rows. Done
+now rather than later, while seven reports exist and no lab script
+depends on the name.
+
+### 2.13 The speed argument does not apply uniformly
+
+§5 measured 113x on materialisation and §1.1 blamed the fan-out. Both
+hold — for reports that fan out. Migrating `entity_resolve` showed where
+they do not.
+
+Legacy against native, same bundle, same inputs:
+
+| mode | 10 inputs | 100 | 500 |
+| --- | --- | --- | --- |
+| `exact` legacy | 0.08s | 0.04s | 0.04s |
+| `exact` native | 0.09s | 0.05s | 0.09s |
+| `fuzzy` legacy | 2.63s | 15.38s | 72.64s |
+| `fuzzy` native | 0.16s | 1.29s | 6.31s |
+
+In `exact` and `like` there is **no gain**, and at 500 inputs the
+relational version is marginally ahead — the native one pays a fixed cost
+to register the input relation. `like` returned the same 226 rows in the
+same 0.08s from both.
+
+The reason is worth stating plainly: the relational `entity_filter` was
+already a single SQL query, executed by DuckDB through the `parquet://`
+bridge. It had no fan-out and did no Python-side assembly, so there was
+nothing for the migration to recover. The annotation reports were slow
+because they issued nine to sixteen queries and merged the results in
+dictionaries; this one issued one.
+
+`fuzzy` is 12-16x because that mode *did* work in Python — it pulled all
+912,316 aliases in and scored them there. The row counts differ, 6
+against 79, because the scorers differ; it is not identical work.
+
+**So the class predicts the payoff.** Annotation and pair generation fan
+out, and will gain. Resolution and the platform reports mostly will not —
+they are migrated for the contract, the provenance and the tests, not for
+speed. Expansion and aggregation have to be measured one at a time.
+
+Claiming a speedup a report does not have would make the next measurement
+less believable, which is why this section exists.
+
+### 2.14 Not decided here
 
 - **Migration order.** Reports are migrated on request, one at a time;
   `annotation_master_gene` is first (§6). `db_pg_index_stats` and
@@ -528,6 +596,11 @@ not go quiet.
   predictors or eQTL evidence.
 - **Stopping the parent stubs** and the partition layout of ADR-003
   §2.9. Both are ADR-003 matters; §6 step 2 works either way.
+- **Whether the pair-generation reports get renamed** when they are
+  migrated (§2.12). `snp_snp_model` and `variant_modeling` produce
+  candidate pairs, not models. It is the same decision `entity_resolve`
+  already went through, and the same argument applies: cheaper now than
+  after the lab has scripted them.
 
 ---
 

@@ -1,5 +1,5 @@
 """
-entity_filter: does the bundle know this name, and unambiguously?
+entity_resolve: does the bundle know this name, and unambiguously?
 
 Not an annotation report. It returns one row per **match**, so an input
 that resolves to three entities produces three rows, each flagged — that
@@ -19,7 +19,7 @@ def run(fixture_bundle):
         manager = ReportManager(bundle=bundle)
 
         def _run(**params):
-            result = manager.run("entity_filter", **params)
+            result = manager.run("entity_resolve", **params)
             return result.table.to_pylist(), result
 
         yield _run
@@ -153,7 +153,7 @@ class TestContract:
 
         assert len(set(map(tuple, shapes.values()))) == 1
         assert shapes["exact"] == list(
-            ReportManager().get_class("entity_filter").COLUMNS
+            ReportManager().get_class("entity_resolve").COLUMNS
         )
 
     def test_provenance_names_the_bundle(self, run):

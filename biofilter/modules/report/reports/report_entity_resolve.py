@@ -1,11 +1,14 @@
 """
-Entity lookup: which entities a list of names resolves to, and how well.
+Resolution: which entities a list of names maps to, and how cleanly.
 
-Migrated from the relational layer (ADR-004 §6). This is not an
-annotation report — it answers "does the bundle know this name, and
-unambiguously?" — so it returns one row per match rather than one per
-input, and an input matching three entities produces three rows, each
-flagged.
+Migrated from the relational layer, where it was called `entity_filter`
+(ADR-004 §6, §2.12). The old name described the wrong thing — it filters
+nothing. A filtering report reduces a set; this one expands, turning one
+input into every entity that answers to it, so ambiguity shows up as
+extra rows rather than being resolved silently.
+
+It is the step before everything else: which of your inputs the bundle
+knows, which are ambiguous, and which it has never heard of.
 
 Fuzzy matching moved into the engine. The relational version pulled every
 alias in the bundle into Python and scored it with `rapidfuzz`; over 912
@@ -27,8 +30,8 @@ MATCH_MODES = ("exact", "like", "fuzzy")
 DEFAULT_SIMILARITY_THRESHOLD = 80.0
 
 
-class EntityFilterReport(ReportBase):
-    name = "entity_filter"
+class EntityResolveReport(ReportBase):
+    name = "entity_resolve"
     description = (
         "Resolve a list of names to entities, with conflict and status flags. "
         "match_mode: 'exact' (default), 'like' (substring either way), or "

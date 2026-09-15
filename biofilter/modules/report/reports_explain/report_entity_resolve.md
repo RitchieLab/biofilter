@@ -1,9 +1,13 @@
-# entity_filter
+# entity_resolve
 
 Does the bundle know these names, and unambiguously?
 
+> Called `entity_filter` before 4.3.0. The name changed because it
+> describes a resolution step, not a filter: filtering reduces a set,
+> this expands one — an ambiguous name comes back as several rows.
+
 ```bash
-biofilter report run --report-name entity_filter \
+biofilter report run --report-name entity_resolve \
     --input TP53 --input BRCA1 --input NOT_A_GENE \
     --output lookup.csv
 ```
