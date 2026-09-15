@@ -19,6 +19,7 @@ user actually has.
 | `reports__expand_entity_neighborhood.ipynb` | what is one hop from an entity, for a mixed list |
 | `reports__expand_entity_relationship.ipynb` | the links themselves, and how a set connects to itself |
 | `reports__annotate_gene.ipynb` | genes |
+| `reports__annotate_variant.ipynb` | variants: rsID / position / allele, one row per transcript |
 | `reports__annotate_disease.ipynb` | diseases, and the two ClinGen counts |
 | `reports__annotate_go.ipynb` | GO terms, and ontology edges vs relationships |
 | `reports__annotate_pathway.ipynb` | pathways, and the same biology curated twice |

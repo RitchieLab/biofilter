@@ -536,6 +536,89 @@ def _tables() -> dict[str, pa.Table]:
     }
 
 
+def _variant_tables() -> dict[str, pa.Table]:
+    """
+    The flat variant tables, and one variant annotated properly.
+    
+    17:150:A:G is the interesting one: three transcripts of one gene with
+    three different consequences, one of them canonical, and an
+    AlphaMissense score attached to that transcript by a **versioned**
+    id — which is how AlphaMissense spells transcripts and VEP does not.
+    """
+    return {
+        "variant_consequences": _t(
+            name=pa.array(["missense_variant", "synonymous_variant", "intron_variant"]),
+            severity_rank=pa.array([13, 20, 25], pa.int32()),
+            consequence_group=pa.array(["coding", "coding", "non-coding"]),
+            consequence_category=pa.array(["moderate", "low", "modifier"]),
+            description=pa.array([None, None, None], pa.string()),
+            is_active=pa.array([True, True, True]),
+        ),
+        "variant_impacts": _t(
+            name=pa.array(["MODERATE", "LOW", "MODIFIER"]),
+            severity_rank=pa.array([2, 3, 4], pa.int32()),
+            description=pa.array([None, None, None], pa.string()),
+        ),
+        "variant_rsid": _t(
+            chromosome=pa.array([17, 17, 22], pa.int32()),
+            position=pa.array([150, 200, 777], pa.int64()),
+            reference_allele=pa.array(["A", "A", "C"]),
+            alternate_allele=pa.array(["G", "G", "T"]),
+            rsid=pa.array(["rs101", "rs102", "rs103"]),
+        ),
+        "variant_predictions": _t(
+            chromosome=pa.array([17], pa.int32()),
+            position=pa.array([150], pa.int64()),
+            reference_allele=pa.array(["A"]),
+            alternate_allele=pa.array(["G"]),
+            cadd_raw_score=pa.array([3.5]),
+            cadd_phred=pa.array([23.6]),
+            revel_max=pa.array([0.198]),
+            sift_max=pa.array([0.01]),
+            polyphen_max=pa.array([0.806]),
+            spliceai_ds_max=pa.array([0.0]),
+            pangolin_largest_ds=pa.array([0.0]),
+            phylop=pa.array([2.1]),
+        ),
+        "variant_alphamissense": _t(
+            chromosome=pa.array([17], pa.int32()),
+            position=pa.array([150], pa.int64()),
+            reference_allele=pa.array(["A"]),
+            alternate_allele=pa.array(["G"]),
+            # Versioned, as AlphaMissense writes it.
+            transcript_id=pa.array(["ENST00000001.9"]),
+            predictor_key=pa.array(["am"]),
+            predictor_name=pa.array(["alphamissense"]),
+            score=pa.array([0.17]),
+            classification=pa.array(["likely_benign"]),
+        ),
+        "variant_molecular_effects": _t(
+            chromosome=pa.array([17, 17, 17, 17], pa.int32()),
+            position=pa.array([150, 150, 150, 200], pa.int64()),
+            reference_allele=pa.array(["A"] * 4),
+            alternate_allele=pa.array(["G"] * 4),
+            variant_key=pa.array(
+                ["17:150:A:G", "17:150:A:G", "17:150:A:G", "17:200:A:G"]
+            ),
+            # Unversioned, as VEP writes it.
+            feature=pa.array(
+                ["ENST00000001", "ENST00000002", "ENST00000003", "ENST00000009"]
+            ),
+            feature_type=pa.array(["Transcript"] * 4),
+            symbol=pa.array(["TP53", "TP53", "TP53", "BRCA1"]),
+            gene=pa.array(["ENSG0001", "ENSG0001", "ENSG0001", "ENSG0002"]),
+            biotype=pa.array(["protein_coding"] * 4),
+            consequence=pa.array(
+                ["missense_variant", "synonymous_variant", "intron_variant",
+                 "missense_variant"]
+            ),
+            impact=pa.array(["MODERATE", "LOW", "MODIFIER", "MODERATE"]),
+            canonical=pa.array(["YES", None, None, "YES"]),
+            mane_select=pa.array(["NM_000546.6", None, None, None]),
+        ),
+    }
+
+
 def _variant_partitions() -> dict[int, pa.Table]:
     """Three variants inside TP53's range (100-400), two elsewhere."""
     return {
@@ -603,6 +686,14 @@ def fixture_bundle(tmp_path: Path) -> Path:
             _conform_to_models(name, table),
             name=name,
             branch="core",
+        )
+
+    for name, table in _variant_tables().items():
+        write(
+            f"tables/{name}.parquet",
+            _conform_to_models(name, table),
+            name=name,
+            branch="variant",
         )
 
     for chrom, table in _variant_partitions().items():
