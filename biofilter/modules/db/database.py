@@ -75,6 +75,15 @@ class Database(CreateDBMixin):
     def __init__(self, db_uri: Optional[str] = None, log_level: str = "DEBUG"):
         self.logger = Logger(log_level=log_level)
         self.db_uri: Optional[str] = db_uri
+        # The URI as the caller wrote it. `_normalize_uri` rewrites
+        # `parquet://<bundle>` into `duckdb:///:memory:`, which carries no
+        # trace of the bundle — so a second connect() on the same object
+        # would normalize the already-normalized URI, find no
+        # `parquet://` scheme, and quietly bring up an empty in-memory
+        # DuckDB with none of the bundle's views. Since __init__ connects
+        # when given a URI, the documented `Biofilter(db_uri=...)` then
+        # `bf.db.connect()` was exactly that sequence.
+        self._requested_uri: Optional[str] = db_uri
 
         self.engine: Optional[Engine] = None
         self.SessionLocal = None
@@ -292,15 +301,25 @@ class Database(CreateDBMixin):
         def sql_literal(path: Path) -> str:
             return str(path).replace("'", "''")
 
+        partitioned: set = set()
         for child in sorted(base.iterdir()):
             if child.is_dir():
                 if any(child.rglob("*.parquet")):
+                    partitioned.add(child.name)
                     glob = sql_literal(child / "**" / "*.parquet")
                     sources[child.name] = (
                         f"read_parquet('{glob}', hive_partitioning = true, "
                         f"union_by_name = true)"
                     )
             elif child.suffix == ".parquet":
+                # A file named for a directory that is also here is the
+                # empty parent stub older builds exported beside the real
+                # data. Both keyed the same name and iteration order
+                # decided the winner, so every variant report against a
+                # bundle carrying stubs read zero rows without erroring.
+                # The directory holds the data; it wins.
+                if child.stem in partitioned:
+                    continue
                 sources[child.stem] = (
                     f"read_parquet('{sql_literal(child)}')"
                 )
@@ -419,6 +438,13 @@ class Database(CreateDBMixin):
         """
         if new_uri:
             self.db_uri = new_uri
+            self._requested_uri = new_uri
+
+        # Re-normalize from what the caller asked for, not from the
+        # result of the last normalization, so reconnecting to a bundle
+        # gives back the bundle.
+        if self._requested_uri:
+            self.db_uri = self._requested_uri
 
         if not self.db_uri:
             raise ValueError("db_uri must be provided to connect().")

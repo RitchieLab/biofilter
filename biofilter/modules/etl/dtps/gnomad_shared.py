@@ -17,6 +17,13 @@ from typing import Any, Dict, List, Optional
 
 GNOMAD_BASE = "https://storage.googleapis.com/gcp-public-data--gnomad/release"
 
+# Stamped into every parquet file name and footer these DTPs write. The
+# tables they fill — variant_masters, variant_molecular_effects,
+# variant_rsid — are named for what they hold, not for where it came
+# from, so without this a bundle gives no way to tell which callset a
+# file is from.
+SOURCE_TAG = "gnomad"
+
 CONFIG_DIR = Path(__file__).resolve().parent / "config"
 
 

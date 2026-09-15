@@ -165,3 +165,9 @@ notebooks/Andre/adsp/
 # Claude Code settings
 .claude/
 
+adsp/
+
+# Report output written next to wherever you ran it
+/*.csv
+/*.parquet
+*.provenance.json

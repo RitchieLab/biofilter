@@ -366,3 +366,40 @@ irreproducible to save storage that is not scarce.
 - **Failure semantics of the parallel branches.** If the variant branch
   fails after the core branch succeeded, is a partial bundle published,
   or is the whole build discarded?
+
+---
+
+## Amendment, 2026-09-14 — one source may depend on another within a release
+
+The two branches remain independent of each other. Within the variant
+branch, `gnomad_vep_chr<N>` now depends on `gnomad_joint_chr<N>`: it
+filters both tables it writes by semi-join against the `variant_masters`
+parquet the joint DTP produced for that chromosome.
+
+**Why the rule is relaxed here.** The independence rule exists so that
+no source can silently degrade another and so the branches can run in
+any order. The gnomAD joint, exome and genome callsets are three files
+of one release, split across two DTPs only because they are shaped
+differently — the joint carries frequencies and no VEP, the others carry
+VEP and the in-silico predictors. Treating them as unrelated sources was
+always a modelling convenience.
+
+**What it buys.** Exactness. The alternative, and what was implemented
+first, is to sum `AC_exomes + AC_genomes` and keep what reaches the
+threshold. That is a *proxy* for what the joint callset contains: the
+joint applies its own QC, so a variant can clear the sum and still not
+be in the bundle. The proxy leaves rows nothing can join to. The
+semi-join cannot be wrong about it.
+
+**What it costs.** A chromosome's joint source must precede its VEP
+source in a plan — which the generated order already does. A missing
+`variant_masters` is a hard failure with a message naming the source to
+run, not a fallback: a fallback would write a table filtered by a
+different rule than the one it claims.
+
+**What made the question worth revisiting.** The main VEP path filtered
+at `AC >= 5` per callset. Since `AC_joint = AC_exomes + AC_genomes`, a
+variant can clear the joint's bar without either callset reaching 5 —
+45,974 of them on chr22, **1.6% of the bundle's variants, carrying no
+VEP annotation at all**. The pre-filter is now 3, the lowest value that
+cannot lose a variant the joint kept, and the semi-join does the rest.

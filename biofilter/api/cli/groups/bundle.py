@@ -276,6 +276,16 @@ def plan_cmd(ctx, db_uri, out_path: Path, all_sources: bool, force: bool, debug:
     ),
 )
 @click.option(
+    "--keep-processed",
+    is_flag=True,
+    help=(
+        "Copy the variant parquet into the bundle instead of moving it, "
+        "so processed/ still holds it afterwards. For building a "
+        "chromosome-subset bundle to develop against without consuming "
+        "the files the eventual full bundle needs."
+    ),
+)
+@click.option(
     "--no-assemble",
     is_flag=True,
     help=(
@@ -295,7 +305,7 @@ def plan_cmd(ctx, db_uri, out_path: Path, all_sources: bool, force: bool, debug:
     ),
 )
 @click.option("--debug", is_flag=True, help="Enable debug logging.")
-def build_cmd(plan_path: Path, data_root: Path, bundle_dir, restart: bool, keep_raw: bool, no_assemble: bool, min_free_gb: float, debug: bool):  # noqa: E501
+def build_cmd(plan_path: Path, data_root: Path, bundle_dir, restart: bool, keep_raw: bool, keep_processed: bool, no_assemble: bool, min_free_gb: float, debug: bool):  # noqa: E501
     """
     Build a bundle from a plan.
 
@@ -319,6 +329,7 @@ def build_cmd(plan_path: Path, data_root: Path, bundle_dir, restart: bool, keep_
         data_root=data_root,
         logger=bf.core.logger,
         keep_raw=keep_raw,
+        keep_processed=keep_processed,
         bundle_dir=bundle_dir,
         assemble=not no_assemble,
         min_free_gb=min_free_gb,

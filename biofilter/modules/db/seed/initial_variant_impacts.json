@@ -1,0 +1,31 @@
+{
+  "_comment": [
+    "VEP's four impact classes, in the order Ensembl defines them.",
+    "The order is convention, not recoverable from the strings:",
+    "alphabetically HIGH sorts after LOW.",
+    "variant_molecular_effects carries the class per row; this is",
+    "what makes it sortable."
+  ],
+  "variant_impacts": [
+    {
+      "name": "HIGH",
+      "severity_rank": 1,
+      "description": "Assumed to have a disruptive impact on the protein, likely causing loss of function."
+    },
+    {
+      "name": "MODERATE",
+      "severity_rank": 2,
+      "description": "A non-disruptive variant that might change protein effectiveness."
+    },
+    {
+      "name": "LOW",
+      "severity_rank": 3,
+      "description": "Assumed to be mostly harmless or unlikely to change protein behaviour."
+    },
+    {
+      "name": "MODIFIER",
+      "severity_rank": 4,
+      "description": "Usually non-coding or with no evidence of impact; ranked last."
+    }
+  ]
+}

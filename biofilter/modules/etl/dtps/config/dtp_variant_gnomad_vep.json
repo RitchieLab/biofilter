@@ -264,19 +264,24 @@
   ],
   "filters": {
     "_comment": [
-      "Applied per callset against that callset's own AC, so this DTP",
-      "stays independent of the joint branch (ADR-003: the two data",
-      "sources must not depend on each other).",
-      "Measured on chr21, window pos<=7,261,905, with min_ac 5 on both",
-      "sides: VEP unfiltered is 300,000 keys against the joint's 45,702",
-      "(6.6x more annotation than the bundle can use); filtering here",
-      "yields 45,478 with ZERO rows orphaned from the joint output.",
-      "Cost: 224 joint variants (0.5%) clear the combined AC but not",
-      "either callset alone, so they land in the variants parquet with",
-      "no annotation. Set min_ac to null to keep them, at 6.6x the size.",
-      "Keep min_ac aligned with the joint config."
+      "A pre-filter, not the real one. Applied per callset against that",
+      "callset's own AC, so this DTP stays independent of the joint",
+      "branch (ADR-003: the two data sources must not depend on each",
+      "other).",
+      "3, not 5: a variant can only reach a combined AC of 5 if one",
+      "callset has at least 3, since AC_joint is exactly AC_exomes +",
+      "AC_genomes. So 3 keeps everything the bundle will want, while 5",
+      "silently dropped the variants that clear the combined bar without",
+      "either callset reaching it \u2014 45,974 of them on chr22, 1.6% of the",
+      "bundle's variants, left with no VEP annotation at all.",
+      "The real filter is the combined-AC pass after both VCFs are read,",
+      "which reduces variant_predictions to the variants whose summed AC",
+      "clears min_ac_combined and then semi-joins this table against it.",
+      "Setting this to null keeps every annotation gnomAD publishes, at",
+      "roughly 6.6x the intermediate size, with no effect on the final",
+      "table."
     ],
-    "min_ac": 5,
+    "min_ac": 3,
     "max_ac": null,
     "min_af": null,
     "max_af": null,
@@ -316,5 +321,112 @@
       "ac_field": "AC",
       "af_field": "AF"
     }
+  },
+  "predictors": {
+    "_comment": [
+      "Side output: the in-silico predictor scores gnomAD publishes as",
+      "INFO fields of the exome and genome sites VCFs \u2014 beside the CSQ",
+      "block this DTP was already reading, not inside it. Verified",
+      "against the header of gnomad.exomes.v4.1.1.sites.chr21.vcf.bgz:",
+      "415 INFO fields, of which these eight are the predictors, all",
+      "Number=1 Type=Float and therefore per site, not per transcript.",
+      "The joint callset does not carry them: its 664 INFO fields are",
+      "entirely frequency, count and QC, so no config change on the",
+      "joint DTP can recover them. 4.2.x read them from there.",
+      "A table of its own rather than columns on variant_masters, which",
+      "comes from the joint callset and does not carry these at all.",
+      "One row per variant allele: deduped across the two callsets, where",
+      "on chr22 all 901,714 variants present in both carry identical",
+      "scores, because a predictor is computed from the reference and the",
+      "allele, not by the callset.",
+      "The filter is the variant_master join above, not 'filters' below.",
+      "That one is a pre-filter that only bounds the intermediate."
+    ],
+    "enabled": true,
+    "table_name": "variant_predictions",
+    "fields": [
+      {
+        "name": "cadd_raw_score",
+        "load": true,
+        "type": "Float",
+        "description": "Raw CADD score; the extent to which the variant's annotation profile suggests deleteriousness."
+      },
+      {
+        "name": "cadd_phred",
+        "load": true,
+        "type": "Float",
+        "description": "CADD Phred-like scaled C-score, 1 to 99, by rank against all possible substitutions."
+      },
+      {
+        "name": "revel_max",
+        "load": true,
+        "type": "Float",
+        "description": "Maximum REVEL score at the site's MANE Select or canonical transcript; ensemble missense predictor."
+      },
+      {
+        "name": "sift_max",
+        "load": true,
+        "type": "Float",
+        "description": "Scaled probability that the amino acid substitution is tolerated, 0 to 1."
+      },
+      {
+        "name": "polyphen_max",
+        "load": true,
+        "type": "Float",
+        "description": "Predicted impact of the amino acid substitution on protein structure and function."
+      },
+      {
+        "name": "spliceai_ds_max",
+        "load": true,
+        "type": "Float",
+        "description": "SpliceAI max delta score; probability the variant is splice-altering."
+      },
+      {
+        "name": "pangolin_largest_ds",
+        "load": true,
+        "type": "Float",
+        "description": "Pangolin's largest delta score across two splicing consequences."
+      },
+      {
+        "name": "phylop",
+        "load": true,
+        "type": "Float",
+        "description": "Base-wise conservation across the 241 placental mammals of the Zoonomia project."
+      }
+    ],
+    "filters": {
+      "min_ac": 3,
+      "max_ac": null,
+      "min_af": null,
+      "max_af": null,
+      "ac_field": "AC",
+      "af_field": "AF",
+      "_comment": [
+        "A pre-filter, for size only. 3 rather than 5 for the same reason",
+        "as the main path: a variant can only reach a combined AC of 5 if",
+        "one callset has at least 3, so 3 cannot lose a variant the joint",
+        "callset kept. null keeps every score gnomAD publishes."
+      ]
+    }
+  },
+  "variant_master": {
+    "_comment": [
+      "Both output tables are filtered to the variants the bundle",
+      "carries, by semi-join against the variant_masters parquet this",
+      "chromosome's joint DTP wrote.",
+      "This is a deliberate exception to ADR-003's rule that the two",
+      "data sources must not depend on each other. The rule exists so",
+      "the branches can run in any order; it is relaxed here because",
+      "the joint, exome and genome callsets are three files of one",
+      "gnomAD release, split across two DTPs only because they are",
+      "shaped differently.",
+      "The alternative was to sum AC_exomes + AC_genomes and keep what",
+      "reached 5. That is a proxy: the joint callset applies its own",
+      "QC, so a variant can clear the sum and still not be in the",
+      "bundle. Filtering against the file itself cannot be wrong.",
+      "Consequence: in a plan, a chromosome's joint source must precede",
+      "its VEP source. A missing variant_masters is a hard failure."
+    ],
+    "source": "gnomad_joint_chr{chrom}"
   }
 }

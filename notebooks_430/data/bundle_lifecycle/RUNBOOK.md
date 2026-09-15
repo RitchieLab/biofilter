@@ -60,6 +60,7 @@ $B --plan notebooks_430/data/bundle_lifecycle/05_other_variants.json --out $OUT
 | 04_gnomad_14_y | 22 | chr14-22, X, Y |
 | 05_other_variants | 3 | AlphaMissense, GTEx, GWAS |
 | 06_assemble | 66 | all of the above; assembly only |
+| 07_chr22_predictors | 2 | chr22 joint + vep only, for report development |
 
 ## Checking on it
 
@@ -94,3 +95,54 @@ of needing the full 1.53 TB.
 **The core branch's processed files survive until the whole core stage
 finishes**, because the `*_relationships` DTPs read the parquet their
 masters wrote. They are ~72 MB, so the wait costs nothing.
+
+## A subset bundle to develop against
+
+Two changes landed after `20260910` was built and neither is in it:
+`variant_masters` now carries `grpmax_joint` and `af_grpmax_joint`, and
+`variant_predictions` exists at all. Getting them genome-wide means
+re-downloading 1.64 TB. Getting them for one chromosome means 29.5 GB.
+
+```bash
+biofilter bundle build \
+  --plan notebooks_430/data/bundle_lifecycle/07_chr22_predictors.json \
+  --data-root biofilter_data \
+  --out biofilter_data/bundles/<YYYYMMDD>_chr22 \
+  --keep-processed
+```
+
+**The core branch is excluded on purpose.** Assembly reads the staging
+database, which still holds every core row from the previous build, so
+no core source runs again — the subset bundle gets the complete core and
+chr22 variants.
+
+**`--keep-processed` is not optional here.** The build normally *moves*
+the variant parquet into the bundle, because those files are most of its
+size and copying would need both copies on disk at once. Moved, they
+would be gone from `processed/` — and the eventual full bundle would
+have to download and transform chr22 again. Copied, the full build finds
+them and skips the source.
+
+### Do not graft a re-run chromosome into an older bundle
+
+The views register with `union_by_name = true`, so a chr22 file carrying
+`grpmax_joint` beside 23 files that do not **does not error**:
+
+```
+chromosome  position  af_joint  grpmax_joint
+        21         1       0.1          None     <- built before the change
+        22         3       0.3           nfe     <- rebuilt after it
+```
+
+Every chromosome but the rebuilt one reads as null, which is
+indistinguishable from gnomAD not publishing a value. Keep the subset in
+its own bundle, and replace the old one only when every chromosome has
+been rebuilt.
+
+### The manifest does not change shape
+
+It records files, not columns — `name`, `table`, `branch`, `rows`,
+`file`, `bytes`. Parquet is self-describing, so a new column needs no
+manifest change; a new table needs only new entries. What does change is
+the `bundle_id`, which is derived from content, and what
+`db verify --schema` reports as drift.

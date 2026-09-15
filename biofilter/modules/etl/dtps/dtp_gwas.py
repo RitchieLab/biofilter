@@ -11,7 +11,6 @@ import pandas as pd
 import requests
 from sqlalchemy import text
 
-from biofilter.modules.db.models import VariantGWAS, VariantGWASSNP  # noqa E501
 from biofilter.modules.etl.mixins.base_dtp import DTPBase
 from biofilter.modules.etl.mixins.entity_query_mixin import EntityQueryMixin
 from biofilter.utils.file_hash import compute_file_hash
@@ -372,12 +371,23 @@ class DTP(DTPBase, EntityQueryMixin):
             merged = self._explode_snps(merged)
             merged = self._add_provenance(merged)
             merged = self._coerce_to_schema(merged, self._arrow_schema())
-            out_file = output_path / f"{self.config.table_name}.parquet"
+            # The source belongs in the file name and the footer: a
+            # bundle's tables/ holds files from several sources side by
+            # side, and `variant_gwas` says what the rows are, not where
+            # they came from.
+            source = "gwascatalog"
+            out_file = (
+                output_path / f"{self.config.table_name}_{source}.parquet"
+            )
+            schema = self._arrow_schema().with_metadata({
+                b"biofilter_table": self.config.table_name.encode("utf-8"),
+                b"biofilter_source": source.encode("utf-8"),
+            })
             merged.to_parquet(
                 out_file,
                 index=False,
                 compression=self.config.parquet_compression,
-                schema=self._arrow_schema(),
+                schema=schema,
             )
 
             if self.debug_mode:
@@ -528,277 +538,12 @@ class DTP(DTPBase, EntityQueryMixin):
             "silently cutting fields that parquet stores in full."
         )
 
-    def _load_legacy(self, processed_dir=None):
-        """
-        Load transformed GWAS Catalog into Biofilter3R schema.
 
-        In this version we overwrite all records in `variant_gwas`.
-        Entities not handled yet.
-        """
-        msg = f"📥 Loading {self.data_source.name} data into the database..."
-        self.logger.log(msg, "INFO")
-
-        self.check_compatibility()
-
-        if self.debug_mode:
-            start_total = time.time()
-
-        total_records = 0
-        total_warnings = 0
-
-        try:
-            if not processed_dir:
-                msg = "⚠️ processed_dir MUST be provided."
-                self.logger.log(msg, "ERROR")
-                return False, msg
-
-            processed_path = os.path.join(
-                processed_dir,
-                self.data_source.source_system.name,
-                self.data_source.name,
-            )
-            processed_file_name = os.path.join(processed_path, "master_data.parquet")  # noqa E501
-
-            if not os.path.exists(processed_file_name):
-                msg = f"⚠️ File not found: {processed_file_name}"
-                self.logger.log(msg, "ERROR")
-                return False, msg
-
-            df = pd.read_parquet(processed_file_name, engine="pyarrow")
-            if df.empty:
-                msg = "⚠️ DataFrame is empty."
-                self.logger.log(msg, "ERROR")
-                return False, msg
-
-            # df.fillna("", inplace=True)
-            str_cols = df.select_dtypes(include=["object"]).columns
-            df[str_cols] = df[str_cols].fillna("")
-
-        except Exception as e:
-            msg = f"⚠️ Failed to read processed data: {e}"
-            self.logger.log(msg, "ERROR")
-            return False, msg
-
-        # SET DB AND DROP INDEXES
-        try:
-            self.db_write_mode()
-            self.drop_indexes(self.get_variant_gwas_index_specs)
-        except Exception as e:
-            total_warnings += 1
-            msg = f"⚠️  Failed to switch DB to write mode or drop indexes: {e}"
-            self.logger.log(msg, "WARNING")
-            return False, msg  # ⧮ Leaving with ERROR
-
-        # Helpers
-        SENTINELS = {"", "NA", "N/A", "na", "null", "None", "Nan", "nan"}
-
-        def flatten_list(val):
-            if isinstance(val, (list, np.ndarray)):
-                vals = [str(v) for v in val if v is not None and str(v) != ""]
-                return ";".join(vals) if vals else None
-            s = None if pd.isna(val) else str(val)
-            return s if s and s not in SENTINELS else None
-
-        # Campos multivalorados -> string única (se existirem)
-        for col in [
-            "mapped_trait",
-            "mapped_trait_id",
-            "parent_trait",
-            "parent_trait_id",
-        ]:
-            if col in df.columns:
-                df[col] = df[col].apply(flatten_list)
-
-        # Numéricos: converta com coercion (''/NA -> NaN)
-        if "risk_allele_frequency" in df.columns:
-            df["risk_allele_frequency"] = pd.to_numeric(
-                df["risk_allele_frequency"], errors="coerce"
-            )
-
-        if "p_value" in df.columns:
-            df["p_value"] = pd.to_numeric(df["p_value"], errors="coerce")
-
-        if "pvalue_mlog" in df.columns:
-            df["pvalue_mlog"] = pd.to_numeric(df["pvalue_mlog"], errors="coerce")  # noqa E501
-
-        # chr_pos é INTEGER no modelo
-        if "chr_pos" in df.columns:
-            df["chr_pos"] = pd.to_numeric(df["chr_pos"], errors="coerce").astype(  # noqa E501
-                "Int64"
-            )  # pandas nullable int
-
-        # chr_id é TEXT; normalize vazios para None
-        if "chr_id" in df.columns:
-            df["chr_id"] = df["chr_id"].astype(str)
-            df.loc[df["chr_id"].isin(SENTINELS) | df["chr_id"].isna(), "chr_id"] = None  # noqa E501
-
-        # odds_ratio_beta é String(50) no modelo -> não converter para float
-        # (se quiser, padronize para string curta)
-        if "odds_ratio_beta" in df.columns:
-            df["odds_ratio_beta"] = df["odds_ratio_beta"].astype(str)
-            df.loc[df["odds_ratio_beta"].isin(SENTINELS), "odds_ratio_beta"] = None  # noqa E501
-            df["odds_ratio_beta"] = df["odds_ratio_beta"].str.slice(0, 50)
-
-        # Campos textuais comuns: normalize vazios para None (sem quebrar numéricos)  # noqa E501
-        text_cols = [
-            "pubmed_id",
-            "raw_trait",
-            "mapped_trait",
-            "mapped_trait_id",
-            "parent_trait",
-            "parent_trait_id",
-            "reported_gene",
-            "mapped_gene",
-            "snp_id",
-            "snp_risk_allele",
-            "context",
-            "intergenic",
-            "ci_text",
-            "initial_sample_size",
-            "replication_sample_size",
-            "platform",
-            "cnv",
-            "notes",
-        ]
-        for col in text_cols:
-            if col in df.columns:
-                df[col] = df[col].astype(str)
-                df.loc[df[col].isin(SENTINELS) | df[col].isna(), col] = None
-
-        # IDs de sistema
-        df["data_source_id"] = self.data_source.id
-        df["etl_package_id"] = self.package.id
-
-        # Converta todos os NaN/NaT restantes para None (p/ psycopg2)
-        df = df.where(pd.notna(df), None)
-
-        # # --- DB operations ---
-        try:
-            # 1. Clear old data
-
-            dialect = self.session.get_bind().dialect.name
-            if dialect == "postgresql":
-                self.session.execute(
-                    text("TRUNCATE variant_gwas_snp RESTART IDENTITY CASCADE")
-                )
-                self.session.execute(
-                    text("TRUNCATE variant_gwas RESTART IDENTITY CASCADE")
-                )
-
-            else:  # SQLite (or others)
-                self.session.execute(text("DELETE FROM variant_gwas_snp"))
-                self.session.execute(text("DELETE FROM variant_gwas"))
-            self.session.commit()
-
-            records = df.to_dict(orient="records")
-
-            # NOTE: Keep only 255 per record (Rethink next versions)
-            for r in records:
-                for k, v in r.items():
-                    if isinstance(v, str) and len(v) > 255:
-                        r[k] = v[:255]  # corta para 255 caracteres
-
-            self.session.execute(VariantGWAS.__table__.insert(), records)
-            self.session.commit()
-
-            """
-            Rebuilds the VariantGWASSNP helper table from VariantGWAS.snp_id
-            using pure SQLAlchemy / Python logic (DB-agnostic).
-            """
-
-            self.logger.log(
-                "🧹 Cleaning and rebuilding variant_gwas_snp helper table for this data source...",  # noqa E501
-                "INFO",
-            )
-
-            # 2) Rebuild helper rows from VariantGWAS.snp_id
-            q = (
-                self.session.query(VariantGWAS)
-                # .filter(VariantGWAS.data_source_id == self.data_source.id)
-            )
-
-            batch = []
-            total_rows = 0
-            total_snps = 0
-            BATCH_SIZE = 1000
-
-            for vg in q.yield_per(1000):
-                if not vg.snp_id:
-                    continue
-
-                # Split on "x", "X", ",", ";" with optional spaces
-                parts = re.split(r"\s*[xX,;]\s*", vg.snp_id)
-                rank = 0
-
-                for token in parts:
-                    token = token.strip()
-                    if not token:
-                        continue
-
-                    # Accept forms like "rs12345" (case-insensitive)
-                    if not re.match(r"^[rR][sS]\d+$", token):
-                        continue
-
-                    try:
-                        numeric_id = int(token[2:])  # strip "rs"
-                    except ValueError:
-                        self.logger.log(
-                            f"⚠️ Failed to parse rs-number from '{token}' (snp_id='{vg.snp_id}')",  # noqa E501
-                            "WARNING",
-                        )
-                        continue
-
-                    helper = VariantGWASSNP(
-                        variant_gwas_id=vg.id,
-                        snp_id=numeric_id,
-                        snp_label=token,
-                        snp_rank=rank,
-                    )
-                    batch.append(helper)
-                    total_snps += 1
-                    rank += 1
-
-                total_rows += 1
-
-                if len(batch) >= BATCH_SIZE:
-                    self.session.bulk_save_objects(batch)
-                    self.session.flush()
-                    batch.clear()
-
-            # Flush remaining
-            if batch:
-                self.session.bulk_save_objects(batch)
-                self.session.flush()
-                batch.clear()
-
-            self.session.commit()
-
-            self.logger.log(
-                f"✅ Rebuilt variant_gwas_snp: {total_snps} SNP links from {total_rows} GWAS rows "  # noqa E501
-                f"for data_source_id={self.data_source.id}",
-                "INFO",
-            )
-
-        except Exception as e:
-            self.session.rollback()
-            msg = f"❌ Error inserting records: {e}"
-            self.logger.log(msg, "ERROR")
-            return False, msg
-
-        finally:
-            # Recreate indexes
-            try:
-                self.create_indexes(self.get_variant_gwas_index_specs)
-            except Exception as e:
-                total_warnings += 1
-                msg = f"⚠️ Failed to recreate indexes: {e}"
-                self.logger.log(msg, "WARNING")
-
-        # --- Wrap up ---
-        end_time = time.time() - start_total if self.debug_mode else None
-        msg = f"✅ Loaded {total_records} GWAS associations into variant_gwas"
-        if end_time:
-            msg += f" in {end_time:.2f}s"
-
-        self.logger.log(msg, "INFO")
-        return True, msg
+    # `_load_legacy` is gone with `variant_gwas_snp`.
+    #
+    # It was the 4.2.x relational load: DELETE the prior rows, insert,
+    # rebuild the rsID helper table, truncate every string to 255 chars
+    # to fit the columns. `load()` has raised since ADR-003, so none of
+    # it had run — and it held the last reference to VariantGWASSNP,
+    # whose foreign key pointed at a `variant_gwas.id` that the parquet
+    # never had.

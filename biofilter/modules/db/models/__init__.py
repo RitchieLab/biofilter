@@ -32,7 +32,6 @@ from .model_variants import (
     VariantConsequenceCategory,
     VariantConsequenceGroup,
     VariantGWAS,
-    VariantGWASSNP,
     VariantImpact,
 )
 
@@ -67,7 +66,6 @@ __all__ = [
 
     # VARIANTS MODELS
     "VariantGWAS",
-    "VariantGWASSNP",
     "VariantConsequenceGroup",
     "VariantConsequenceCategory",
     "VariantConsequence",

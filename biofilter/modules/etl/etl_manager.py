@@ -1156,6 +1156,13 @@ class ETLManager:
 
         Returns True when the path is unknown, so a missing setting
         cannot silently force every step to re-run.
+
+        A *file* has to be there, at any depth. Checking for directory
+        entries was not enough: the bundle build moves the parquet out
+        of `processed/<system>/<source>/<subdir>/` and leaves `<subdir>/`
+        behind, so a source whose output had already been folded into a
+        previous bundle still looked present, its transform was skipped
+        as not-applicable, and the next bundle silently lost the table.
         """
         if not base_path:
             return True
@@ -1164,7 +1171,7 @@ class ETLManager:
         )
         if not directory.is_dir():
             return False
-        return any(directory.iterdir())
+        return any(entry.is_file() for entry in directory.rglob("*"))
 
     def _run_extract(
         self,

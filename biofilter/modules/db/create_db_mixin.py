@@ -45,9 +45,10 @@ SEED_UNIQUE_KEYS: Dict[str, List[str]] = {
     "EntityRelationshipType": ["id"],
     "OmicStatus": ["name"],
     # --- variants dims ---
-    "VariantConsequenceGroup": ["name"],
-    "VariantConsequenceCategory": ["name"],
+    # Both are keyed by name in 4.3.0: the parquet carries the term, so
+    # the term is the join key.
     "VariantConsequence": ["name"],
+    "VariantImpact": ["name"],
     # --- genome ---
     "GenomeAssembly": ["accession"],
 }
@@ -281,17 +282,13 @@ class CreateDBMixin:
             "OmicStatus",
             key="omic_status",
         )
+        # No groups/categories seeding: VariantConsequence carries both
+        # as strings, which is how the seed always held them.
         self._seed_from_json(
-            f"{seed_dir}/initial_variant_consequence_groups.json",
+            f"{seed_dir}/initial_variant_impacts.json",
             "model_variants",
-            "VariantConsequenceGroup",
-            key="variant_consequence_groups",
-        )
-        self._seed_from_json(
-            f"{seed_dir}/initial_variant_consequence_categories.json",
-            "model_variants",
-            "VariantConsequenceCategory",
-            key="variant_consequence_categories",
+            "VariantImpact",
+            key="variant_impacts",
         )
         self._seed_from_json(
             f"{seed_dir}/initial_variant_consequences.json",
@@ -395,48 +392,15 @@ class CreateDBMixin:
                     item["data_source_id"] = fk_obj.id
 
                 if model_name == "VariantConsequence":
-                    if "group" in item and "consequence_group" not in item:
+                    # The seed names them `group` and `category`; the
+                    # columns are `consequence_group` and
+                    # `consequence_category`. Both are plain strings —
+                    # the id lookup that used to sit here resolved
+                    # foreign keys that no longer exist.
+                    if "group" in item:
                         item["consequence_group"] = item.pop("group")
-                    if "category" in item and "consequence_category" not in item:
+                    if "category" in item:
                         item["consequence_category"] = item.pop("category")
-
-                    if "consequence_group" in item:
-                        group_name = item.pop("consequence_group")
-                        VariantConsequenceGroup = import_module(
-                            "biofilter.modules.db.models.model_variants"
-                        ).VariantConsequenceGroup
-                        group_obj = (
-                            session.query(VariantConsequenceGroup)
-                            .filter_by(name=group_name)
-                            .first()
-                        )
-                        if not group_obj:
-                            self.logger.log(
-                                f"Variant Consequence Group not found for name: {group_name}",  # noqa E501
-                                "WARNING",
-                            )
-                            skipped += 1
-                            continue
-                        item["consequence_group_id"] = group_obj.id
-
-                    if "consequence_category" in item:
-                        category_name = item.pop("consequence_category")
-                        VariantConsequenceCategory = import_module(
-                            "biofilter.modules.db.models.model_variants"
-                        ).VariantConsequenceCategory
-                        category_obj = (
-                            session.query(VariantConsequenceCategory)
-                            .filter_by(name=category_name)
-                            .first()
-                        )
-                        if not category_obj:
-                            self.logger.log(
-                                f"Variant Consequence Category not found for name: {category_name}",  # noqa E501
-                                "WARNING",
-                            )
-                            skipped += 1
-                            continue
-                        item["consequence_category_id"] = category_obj.id
 
                 # --- Build lookup from natural key(s) ---
                 lookup = {k: item.get(k) for k in unique_keys}

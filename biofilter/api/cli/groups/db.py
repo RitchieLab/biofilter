@@ -334,8 +334,17 @@ def verify_cmd(in_dir: Path, no_hashes: bool, schema: bool):
         f"{'' if report['hashes_checked'] else ' (hashes skipped)'}"
     )
 
+    empty = report.get("empty_tables") or []
+    if empty:
+        click.echo(f"\nℹ️  {len(empty)} declared table(s) hold no rows:")
+        click.echo(f"   {', '.join(empty)}")
+        click.echo(
+            "   That is expected when the bundle was built from a subset "
+            "of the sources, and a defect when it was not."
+        )
+
     if report["ok"]:
-        click.echo("✅ Bundle is valid.")
+        click.echo("\n✅ Bundle is valid.")
         return
 
     click.echo(f"\n❌ {len(report['problems'])} problem(s):")

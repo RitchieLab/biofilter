@@ -20,6 +20,7 @@ See ADR-003 (adr/0003-parquet-native-build-pipeline.md).
 from __future__ import annotations
 
 import hashlib
+import json
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, List, Optional
@@ -28,6 +29,7 @@ from biofilter.modules.etl.mixins.base_dtp import DTPBase
 from biofilter.modules.etl.parquet_sink import ChromosomeFileWriter
 from biofilter.modules.etl.dtps.gnomad_shared import (
     GNOMAD_BASE,
+    SOURCE_TAG,
     build_filters,
     chromosome_from_datasource_name,
     describe_filters,
@@ -295,8 +297,45 @@ class DTP(DTPBase):
                 out_dir,
                 self._rsid_schema(),
                 rsid_cfg.get("table_name", "variant_rsid"),
+                source=SOURCE_TAG,
                 compression=self.config.parquet_compression,
             )
+
+        # Predictor side table. The in-silico scores are INFO fields of
+        # these same VCFs, beside the CSQ block rather than inside it —
+        # the joint callset has none of them. Kept apart from
+        # variant_masters because that table comes from the joint
+        # callset, and a variant in both exomes and genomes has two
+        # values with no principled rule for choosing between them; the
+        # `callset` column keeps both.
+        pred_cfg = cfg.get("predictors", {}) or {}
+        pred_filters = build_filters(pred_cfg)
+        pred_fields = [
+            f["name"] for f in pred_cfg.get("fields", []) if f.get("load")
+        ]
+        pred_sink = None
+        pred_batch: List[dict] = []
+        pred_stats = {"rows": 0}
+        if pred_cfg.get("enabled", False) and pred_fields:
+            pred_sink = ChromosomeFileWriter(
+                out_dir,
+                self._predictor_schema(pred_fields),
+                pred_cfg.get("table_name", "variant_predictions"),
+                source=SOURCE_TAG,
+                compression=self.config.parquet_compression,
+            )
+            self.logger.log(
+                f"   predictors: {len(pred_fields)} field(s) "
+                f"({', '.join(pred_fields)})",
+                "INFO",
+            )
+
+        # Resolved before reading a byte of VCF: this is what both
+        # tables are filtered against, and discovering it is missing
+        # after an hour of transform helps nobody.
+        self._check_prefilter_bound(cfg, filters)
+        master_path = self._variant_master_path(cfg, processed_dir, chrom)
+        self.logger.log(f"   filtering against {master_path.name}", "INFO")
 
         writer = None
         batch: List[dict] = []
@@ -345,6 +384,39 @@ class DTP(DTPBase):
                                 rsid_stats["rows"] += len(rsid_batch)
                                 rsid_batch = []
 
+                    # Before the AC filter, as with the rsID map: a
+                    # predictor is most worth having on a rare variant,
+                    # and these are the rows the filter removes.
+                    if pred_sink is not None:
+                        p_ac = self._scalar(
+                            record.INFO.get(pred_filters["ac_field"])
+                        )
+                        p_af = self._scalar(
+                            record.INFO.get(pred_filters["af_field"])
+                        )
+                        if passes_filters(p_ac, p_af, pred_filters):
+                            scores = {
+                                name: self._scalar(record.INFO.get(name))
+                                for name in pred_fields
+                            }
+                            # A record with no score at all is a row of
+                            # nulls keyed by a variant — nothing to say.
+                            if any(v is not None for v in scores.values()):
+                                pred_batch.extend(
+                                    {
+                                        "chromosome": chrom_num,
+                                        "position": record.POS,
+                                        "reference_allele": record.REF,
+                                        "alternate_allele": alt,
+                                        **scores,
+                                    }
+                                    for alt in record.ALT
+                                )
+                                if len(pred_batch) >= self.config.batch_size:
+                                    pred_sink.write_rows(pred_batch)
+                                    pred_stats["rows"] += len(pred_batch)
+                                    pred_batch = []
+
                     if not passes_filters(ac, af, filters):
                         continue
 
@@ -355,7 +427,7 @@ class DTP(DTPBase):
                             continue
                         rows = self._explode(
                             raw_vep, idx, keep, sep, alt,
-                            chrom, chrom_num, record, label,
+                            chrom, chrom_num, record,
                         )
                         if not rows:
                             continue
@@ -379,11 +451,16 @@ class DTP(DTPBase):
             if rsid_sink is not None and rsid_batch:
                 rsid_sink.write_rows(rsid_batch)
                 rsid_stats["rows"] += len(rsid_batch)
+            if pred_sink is not None and pred_batch:
+                pred_sink.write_rows(pred_batch)
+                pred_stats["rows"] += len(pred_batch)
         finally:
             if writer is not None:
                 writer.close()
             if rsid_sink is not None:
                 rsid_sink.close()
+            if pred_sink is not None:
+                pred_sink.close()
 
         if writer is None:
             msg = (
@@ -395,26 +472,79 @@ class DTP(DTPBase):
 
         rsid_note = ""
         if rsid_sink is not None:
-            kept = self._dedupe_rsid_files(rsid_sink)
+            kept = self._dedupe_files(rsid_sink)
             rsid_note = (
                 f"; {rsid_sink.table_name}: {kept:,} keys "
                 f"({rsid_stats['rows']:,} before dedupe, "
                 f"{rsid_sink.total_bytes() / 1024 ** 2:.1f} MB)"
             )
 
+        # Both tables are reduced to the variants the bundle carries,
+        # against the file that defines them.
+        before_effects = stats["rows"]
+        stats["rows"] = self._filter_effects_to_master(writer, master_path)
+        effects_note = (
+            f", from {before_effects:,} over {stats['variants']:,} variants "
+            f"read"
+        )
+
+        pred_note = ""
+        if pred_sink is not None:
+            pred_kept = self._reduce_predictor_files(
+                pred_sink, pred_fields, master_path
+            )
+            pred_note = (
+                f"; {pred_sink.table_name}: {pred_kept:,} variants "
+                f"({pred_stats['rows']:,} before, "
+                f"{pred_sink.total_bytes() / 1024 ** 2:.1f} MB)"
+            )
+
         size_mb = writer.total_bytes() / 1024 ** 2
         files = ", ".join(
             p.name for p in map(writer.path_for, writer.chromosomes)
         )
-        fanout = stats["rows"] / max(stats["variants"], 1)
+        # Counted after the filter, so the two numbers describe the same
+        # rows. `stats["variants"]` counts what was read, which is a
+        # larger set — reporting a fanout across the two would divide
+        # kept rows by read variants and understate it.
+        self._warn_unranked_consequences(writer)
+        kept_variants = self._count_variants(writer)
+        fanout = stats["rows"] / max(kept_variants, 1)
         msg = (
             f"✅ {files}: {stats['rows']:,} rows over "
-            f"{stats['variants']:,} variants ({fanout:.1f}x fanout), "
+            f"{kept_variants:,} variants ({fanout:.1f}x fanout), "
             f"{stats['skipped_dup']:,} already annotated by an earlier "
-            f"callset, {size_mb:.1f} MB{rsid_note}"
+            f"callset{effects_note}, {size_mb:.1f} MB{rsid_note}{pred_note}"
         )
         self.logger.log(msg, "INFO")
         return True, msg
+
+    @staticmethod
+    def _predictor_schema(fields: List[str]):
+        """
+        Schema of the predictor side table.
+
+        Declared rather than inferred. Parquet types a column from the
+        first batch it sees, and a predictor that is null for every
+        record in that batch — `phylop` on a run of unscored sites, say
+        — would be typed `null` and then reject every later batch that
+        did carry a value.
+        """
+        import pyarrow as pa
+
+        return pa.schema([
+            pa.field("chromosome", pa.int32()),
+            pa.field("position", pa.int64()),
+            pa.field("reference_allele", pa.string()),
+            pa.field("alternate_allele", pa.string()),
+            # No `callset` column. It was here on the assumption that
+            # exomes and genomes could disagree and that nothing could
+            # choose between them. They do not disagree — see
+            # `_dedupe_files` — so the column recorded which VCF a row
+            # happened to be read from, and bought a duplicate row for
+            # every variant in both.
+            *[pa.field(name, pa.float64()) for name in fields],
+        ])
 
     @staticmethod
     def _rsid_schema():
@@ -429,22 +559,320 @@ class DTP(DTPBase):
             pa.field("rsid", pa.string()),
         ])
 
+    def _check_prefilter_bound(self, cfg, filters) -> None:
+        """
+        Refuse a pre-filter that could lose a variant the joint kept.
+
+        The AC threshold is decided in one place — `min_ac` in the joint
+        DTP's config, which is what puts a variant in `variant_masters`.
+        The two `min_ac` settings on this side are not second decisions;
+        they bound the intermediate, and they are only safe while they
+        stay at or below what the joint's threshold implies.
+
+        `AC_joint = AC_exomes + AC_genomes`, so a variant reaching
+        `min_ac` in the joint must reach `ceil(min_ac / 2)` in at least
+        one callset. Filtering above that silently annotates less than
+        the bundle carries: at 5 here against the joint's 5 it left
+        45,974 chr22 variants — 1.6% — with no VEP at all, which is what
+        sent this code back to the drawing board.
+
+        Checked rather than derived, so the coupling is visible in the
+        config instead of computed out of sight.
+        """
+        joint = load_field_config("dtp_variant_gnomad_joint", None)
+        joint_min = (joint.get("filters") or {}).get("min_ac")
+        if joint_min is None:
+            return
+
+        bound = (int(joint_min) + 1) // 2
+        offenders = [
+            (label, value)
+            for label, value in (
+                ("filters.min_ac", filters.get("min_ac")),
+                ("predictors.filters.min_ac",
+                 ((cfg.get("predictors") or {}).get("filters") or {}).get("min_ac")),
+            )
+            if value is not None and int(value) > bound
+        ]
+        if not offenders:
+            return
+
+        listed = ", ".join(f"{label}={value}" for label, value in offenders)
+        raise ValueError(
+            f"{listed} would drop variants the joint callset keeps. "
+            f"The joint filters at AC_joint >= {joint_min}, and since "
+            f"AC_joint = AC_exomes + AC_genomes, such a variant need only "
+            f"reach {bound} in one callset. Set these to {bound} or lower "
+            f"(null keeps everything); the semi-join against "
+            f"variant_masters is what does the real filtering."
+        )
+
+    def _variant_master_path(self, cfg, processed_dir, chrom) -> Path:
+        """
+        The `variant_masters` parquet this chromosome's joint DTP wrote.
+
+        A deliberate exception to ADR-003's rule that the two data
+        sources must not depend on each other. The rule exists so the
+        branches can run in any order and neither can silently degrade
+        the other; it is relaxed here because the joint, exome and genome
+        callsets are three files of one gnomAD release, read by two DTPs
+        only because they are shaped differently.
+
+        What the dependency buys is exactness. The alternative was to sum
+        `AC_exomes + AC_genomes` and keep what reached the threshold,
+        which is a *proxy* for what the joint callset contains: the joint
+        applies its own QC, so a variant can clear the sum and still not
+        be in the bundle. Filtering against the file itself cannot be
+        wrong about it.
+
+        Missing is a hard failure, not a fallback. A fallback here would
+        write a table filtered by a different rule than the one it
+        claims, which is the whole class of defect this work has been
+        removing.
+        """
+        master_cfg = cfg.get("variant_master") or {}
+        source = master_cfg.get("source", "gnomad_joint_chr{chrom}").format(
+            chrom=chrom
+        )
+        directory = (
+            Path(processed_dir) / self.data_source.source_system.name / source
+        )
+        matches = sorted(directory.glob("variant_masters*.parquet"))
+        if not matches:
+            raise FileNotFoundError(
+                f"{self.data_source.name} filters against the variants "
+                f"'{source}' produced, and none are under {directory}. "
+                f"Run '{source}' first — in a plan the joint source for a "
+                f"chromosome must precede its VEP source. If it has "
+                f"already run and been assembled into a bundle, its "
+                f"parquet was moved there; re-run it with "
+                f"--keep-processed, or rebuild both together."
+            )
+        return matches[0]
+
+    def _warn_unranked_consequences(self, writer) -> None:
+        """
+        Name any consequence term the severity seed does not rank.
+
+        `variant_consequences` is what gives the bundle an ordering, and
+        it is joined by name. A term VEP emits that the seed does not
+        list joins to nothing: an inner join drops the row, a left join
+        ranks it null and sorts it last. Either way the variant quietly
+        stops being the most severe thing it is.
+
+        Checked here because it is cheap here — one DISTINCT over a
+        low-cardinality column of the file just written, 31 values on
+        chr22 — and because this is the moment the mismatch is created.
+
+        A warning, not a failure: a new Sequence Ontology term is a
+        reason to update the seed, not to throw away a chromosome's
+        transform.
+        """
+        import duckdb
+
+        seed = (
+            Path(__file__).resolve().parents[2]
+            / "db" / "seed" / "initial_variant_consequences.json"
+        )
+        try:
+            data = json.loads(seed.read_text(encoding="utf-8"))
+        except Exception:  # noqa: BLE001 — a missing seed is not fatal here
+            return
+        rows = data if isinstance(data, list) else data.get("variant_consequences", [])  # noqa: E501
+        ranked = {r["name"] for r in rows}
+        if not ranked:
+            return
+
+        observed: set = set()
+        con = duckdb.connect()
+        try:
+            for chrom in writer.chromosomes:
+                path = writer.path_for(chrom)
+                if not path.exists():
+                    continue
+                observed.update(
+                    r[0] for r in con.execute(
+                        f"SELECT DISTINCT consequence FROM read_parquet('{path}')"  # noqa: E501
+                    ).fetchall()
+                )
+        finally:
+            con.close()
+
+        unranked = sorted(t for t in observed if t and t not in ranked)
+        if not unranked:
+            return
+
+        self.logger.log(
+            f"⚠️  {len(unranked)} consequence term(s) have no severity_rank "
+            f"in initial_variant_consequences.json: "
+            f"{', '.join(unranked)}. Reports that order by severity will "
+            f"treat them as unranked. Add them to the seed.",
+            "WARNING",
+        )
+
     @staticmethod
-    def _dedupe_rsid_files(sink) -> int:
+    def _count_variants(writer) -> int:
+        """Distinct variants in what the writer actually kept."""
+        import duckdb
+
+        key = "chromosome, position, reference_allele, alternate_allele"
+        total = 0
+        con = duckdb.connect()
+        try:
+            for chrom in writer.chromosomes:
+                path = writer.path_for(chrom)
+                if not path.exists():
+                    continue
+                total += con.execute(
+                    f"SELECT count(*) FROM (SELECT DISTINCT {key} "
+                    f"FROM read_parquet('{path}'))"
+                ).fetchone()[0]
+        finally:
+            con.close()
+        return total
+
+    @staticmethod
+    def _filter_effects_to_master(writer, master_path) -> int:
+        """
+        Drop annotations for variants the bundle does not carry.
+
+        The pre-filter on the main path keeps a record whose *own*
+        callset reaches `min_ac`, set to 3 rather than 5 on purpose: a
+        variant can only reach a combined AC of 5 if one callset has at
+        least 3, so 3 cannot lose a variant the joint callset kept, while
+        5 dropped the ones that clear the combined bar without either
+        callset reaching it — 45,974 on chr22, 1.6% of the bundle's
+        variants, left with no annotation at all.
+
+        So the pre-filter is deliberately loose and this is where it is
+        made exact, against the `variant_masters` the joint DTP wrote.
+
+        A semi-join rather than the grouping the predictors use: this
+        table has ~14 rows per variant and all of them survive together.
+        """
+        import duckdb
+        import pyarrow.parquet as pq
+
+        key = [
+            "chromosome", "position", "reference_allele", "alternate_allele",
+        ]
+        on = " AND ".join(f"e.{c} = v.{c}" for c in key)
+
+        total = 0
+        con = duckdb.connect()
+        try:
+            for chrom in writer.chromosomes:
+                path = writer.path_for(chrom)
+                if not path.exists():
+                    continue
+                tmp = path.with_suffix(".kept.parquet")
+                reader = con.execute(
+                    f"SELECT e.* FROM read_parquet('{path}') e "
+                    f"SEMI JOIN read_parquet('{master_path}') v ON {on}"
+                ).to_arrow_reader()
+                w = pq.ParquetWriter(
+                    tmp, writer.schema, compression=writer.compression
+                )
+                try:
+                    for batch in reader:
+                        w.write_batch(batch)
+                        total += batch.num_rows
+                finally:
+                    w.close()
+                tmp.replace(path)
+        finally:
+            con.close()
+        return total
+
+    @staticmethod
+    def _reduce_predictor_files(sink, fields, master_path) -> int:
+        """
+        One row per variant, restricted to the variants the bundle holds.
+
+        Two steps in one grouping pass.
+
+        *Collapse.* A variant in both callsets is written twice with the
+        same scores — measured on chr22, all 901,714 such variants are
+        byte-identical across all eight predictors, because a predictor
+        is computed from the reference and the allele, not by the
+        callset. `max()` over an identical pair is that value.
+
+        *Restrict.* A semi-join against the `variant_masters` this
+        chromosome's joint DTP wrote. gnomAD scores every variant it
+        publishes, five times more than the bundle carries, and a
+        predictor for a variant no table can join to is dead weight.
+        """
+        import duckdb
+        import pyarrow.parquet as pq
+
+        key = [
+            "chromosome", "position", "reference_allele", "alternate_allele",
+        ]
+        scores = ", ".join(f"max({f}) AS {f}" for f in fields)
+        on = " AND ".join(f"p.{c} = v.{c}" for c in key)
+
+        total = 0
+        con = duckdb.connect()
+        try:
+            for chrom in sink.chromosomes:
+                path = sink.path_for(chrom)
+                if not path.exists():
+                    continue
+                tmp = path.with_suffix(".reduced.parquet")
+                reader = con.execute(
+                    f"SELECT p.* FROM ("
+                    f"  SELECT {', '.join(key)}, {scores} "
+                    f"  FROM read_parquet('{path}') "
+                    f"  GROUP BY {', '.join(key)}"
+                    f") p SEMI JOIN read_parquet('{master_path}') v ON {on}"
+                ).to_arrow_reader()
+                writer = pq.ParquetWriter(
+                    tmp, sink.schema, compression=sink.compression
+                )
+                try:
+                    for batch in reader:
+                        writer.write_batch(batch)
+                        total += batch.num_rows
+                finally:
+                    writer.close()
+                tmp.replace(path)
+        finally:
+            con.close()
+        return total
+
+    @staticmethod
+    def _dedupe_files(sink) -> int:
         """
         Collapse duplicate keys, rewriting each chromosome file in place.
 
-        A variant present in both callsets is written twice, with the same
-        rsID — it is dbSNP's identifier for that allele, not something the
-        callset decides. Left undeduped, a join against this table would
-        multiply rows on the ~1.9% of variants that appear in both.
+        Both side tables need this, for the same reason. A variant present
+        in both callsets is written twice, and what is written is the same
+        both times: an rsID is dbSNP's identifier for that allele, and a
+        predictor score is computed from the reference and the allele.
+        Neither is something the callset decides. Left undeduped, a join
+        against either table multiplies rows on the variants that appear
+        in both.
+
+        Measured on chr22: of 15,551,628 distinct variants, 901,714 are in
+        both callsets, and in **every one** of them all eight predictors
+        are identical — no disagreement, and no case of one callset
+        scoring where the other is null. Joined to `variant_masters` the
+        undeduped table returned 3,383,651 rows for 2,889,803 variants.
 
         Done as a pass over the finished file rather than with an
         in-memory seen-set: chr21 alone yields 9.85 M keys, and a Python
         set of tuples at that scale costs gigabytes on the larger
         chromosomes.
+
+        DuckDB does the DISTINCT, but the file is written by pyarrow from
+        its output, streamed batch by batch. `COPY ... TO ... (FORMAT
+        parquet)` would be shorter and writes a file with no key-value
+        metadata — which silently stripped the `biofilter_table` stamp
+        the sink had put in the footer, so the build fell back to parsing
+        the name and registered the table as `variant_rsid_gnomad`.
         """
         import duckdb
+        import pyarrow.parquet as pq
 
         total = 0
         con = duckdb.connect()
@@ -454,13 +882,18 @@ class DTP(DTPBase):
                 if not path.exists():
                     continue
                 tmp = path.with_suffix(".dedupe.parquet")
-                con.execute(
-                    f"COPY (SELECT DISTINCT * FROM read_parquet('{path}')) "
-                    f"TO '{tmp}' (FORMAT parquet, COMPRESSION zstd)"
+                reader = con.execute(
+                    f"SELECT DISTINCT * FROM read_parquet('{path}')"
+                ).to_arrow_reader()
+                writer = pq.ParquetWriter(
+                    tmp, sink.schema, compression=sink.compression
                 )
-                total += con.execute(
-                    f"SELECT count(*) FROM read_parquet('{tmp}')"
-                ).fetchone()[0]
+                try:
+                    for batch in reader:
+                        writer.write_batch(batch)
+                        total += batch.num_rows
+                finally:
+                    writer.close()
                 tmp.replace(path)
         finally:
             con.close()
@@ -478,7 +911,7 @@ class DTP(DTPBase):
         return desc.split("Format: ")[1].strip('"').split("|")
 
     def _explode(
-        self, raw_vep, idx, keep, sep, alt, chrom, chrom_num, record, label,
+        self, raw_vep, idx, keep, sep, alt, chrom, chrom_num, record,
     ) -> List[dict]:
         """Expand one packed VEP block into one row per consequence term."""
         rows: List[dict] = []
@@ -508,7 +941,6 @@ class DTP(DTPBase):
                 "reference_allele": record.REF,
                 "alternate_allele": alt,
                 "variant_key": variant_key,
-                "callset": label,
             }
             for name in keep:
                 if name != "Consequence":
@@ -563,7 +995,13 @@ class DTP(DTPBase):
             pa.field("reference_allele", pa.string()),
             pa.field("alternate_allele", pa.string()),
             pa.field("variant_key", pa.string()),
-            pa.field("callset", pa.string()),
+            # No `callset`. It recorded which VCF a row was read from,
+            # not anything about the annotation: a variant in both is
+            # annotated once, from whichever `precedence` reads first,
+            # and measured on chr22 the two callsets produce identical
+            # VEP output for 3,038 of the 3,039 alleles they share. What
+            # differs between them is which variants they contain, and
+            # that is what `variant_masters` already records, per callset.
         ]
         cols += [
             pa.field(name.lower(), pa.string())
@@ -580,6 +1018,7 @@ class DTP(DTPBase):
                 out_path,
                 schema,
                 self.config.table_name,
+                source=SOURCE_TAG,
                 compression=self.config.parquet_compression,
             )
         writer.write_rows(batch)

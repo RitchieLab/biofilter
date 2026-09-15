@@ -1300,7 +1300,7 @@
     },
     {
       "name": "AF_grpmax_joint",
-      "load": false,
+      "load": true,
       "type": "Float",
       "number": "A",
       "description": "Maximum allele frequency across genetic ancestry groups in joint dataset"
@@ -3911,7 +3911,7 @@
     },
     {
       "name": "grpmax_joint",
-      "load": false,
+      "load": true,
       "type": "String",
       "number": "A",
       "description": "Genetic ancestry group with the maximum allele frequency in joint dataset"

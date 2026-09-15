@@ -758,6 +758,7 @@ def verify_bundle(in_dir: str | Path, *, check_hashes: bool = True) -> dict:
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     tables = manifest.get("tables") or []
     problems: list[str] = []
+    empty: list[str] = []
     verified = 0
 
     for entry in tables:
@@ -787,6 +788,9 @@ def verify_bundle(in_dir: str | Path, *, check_hashes: bool = True) -> dict:
                 problems.append(f"{name}: sha256 mismatch")
                 continue
 
+        if entry.get("rows") == 0:
+            empty.append(str(name))
+
         verified += 1
 
     return {
@@ -800,6 +804,12 @@ def verify_bundle(in_dir: str | Path, *, check_hashes: bool = True) -> dict:
         "tables_verified": verified,
         "hashes_checked": bool(check_hashes),
         "problems": problems,
+        # Not a problem in itself — a bundle built from a subset of the
+        # sources legitimately carries empty tables. Reported separately
+        # because the other reason a table is empty is a source that was
+        # planned, was skipped, and contributed nothing, which until now
+        # looked identical to a valid bundle.
+        "empty_tables": sorted(empty),
     }
 
 

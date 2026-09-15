@@ -5,7 +5,7 @@ Under ADR-003 the parquet a DTP writes *is* the artifact — there is no
 load step that reshapes it — so the layout it lands in is the layout the
 bundle serves. Each chromosome becomes one self-describing file:
 
-    <base>/<table>_chr<N>.parquet
+    <base>/<table>_<source>_chr<N>.parquet
 
 Chosen over hive directories (`<table>/chromosome=N/part-0.parquet`)
 after measuring both on the 71.7 M-row AlphaMissense output:
@@ -22,9 +22,11 @@ under RLE), and flat wins when the predicate is not on chromosome.
 What decided it was not speed: one file per chromosome gives the
 manifest one entry with one checksum, with none of the parent-plus-
 children ambiguity that made the 4.2.0 bundle store 15.6 GB twice; and
-`variant_masters_chr21.parquet` names its own table and partition, so
-the same name can be used in reports and model mappings, where
-`part-0.parquet` means nothing without its parent directory.
+`variant_masters_gnomad_chr21.parquet` names its table, its source and
+its partition, where `part-0.parquet` means nothing without its parent
+directory. The table and source are stamped into the file footer as
+well, so the build maps a file back to its table by reading it rather
+than by parsing the name.
 """
 
 from __future__ import annotations
@@ -56,12 +58,29 @@ class ChromosomeFileWriter:
         schema: pa.Schema,
         table_name: str,
         *,
+        source: str | None = None,
         compression: str = "zstd",
         chromosome_column: str = "chromosome",
     ):
         self.base_dir = Path(base_dir)
-        self.schema = schema
         self.table_name = table_name
+        # Where the rows came from, carried in every file name. A bundle
+        # holds tables assembled from several callsets — `variant_masters`
+        # from gnomAD's joint release, `variant_molecular_effects` from
+        # its exomes and genomes — and once the files are in one
+        # directory the table name is all that is left to say so. Omitted
+        # where the table name is already the source, as in
+        # `variant_alphamissense`.
+        self.source = source
+        # The same pair is stamped into each file's footer, because the
+        # build has to map a file back to its table and reading it from
+        # the footer cannot be confused by a name that happens to end in
+        # `_chr<N>`.
+        self.schema = schema.with_metadata({
+            **(schema.metadata or {}),
+            b"biofilter_table": table_name.encode("utf-8"),
+            **({b"biofilter_source": source.encode("utf-8")} if source else {}),
+        })
         self.compression = compression
         self.chromosome_column = chromosome_column
         self._writers: Dict[int, pq.ParquetWriter] = {}
@@ -76,7 +95,11 @@ class ChromosomeFileWriter:
         matching `variant_masters` in the existing bundles, so the file
         name and the column agree.
         """
-        return self.base_dir / f"{self.table_name}_chr{chrom}.parquet"
+        stem = (
+            f"{self.table_name}_{self.source}" if self.source
+            else self.table_name
+        )
+        return self.base_dir / f"{stem}_chr{chrom}.parquet"
 
     def write_rows(self, rows: List[dict]) -> None:
         """Write a batch of dicts, splitting it by chromosome."""

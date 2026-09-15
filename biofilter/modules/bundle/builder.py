@@ -34,6 +34,50 @@ CORE_BRANCH = "core"
 # sources move on, so what it says about itself is the only account left.
 CONTROL_TABLES: tuple = ()
 
+# Declared by the models, never written by 4.3.0, and therefore never
+# exported. Each was part of the relational model a bundle replaced:
+#
+#   variant_consequence_categories, variant_consequence_groups,
+#   variant_biotypes
+#       Dimensions of `variant_molecular_effects`, which used to carry
+#       `consequence_id`, `impact_id` and `biotype_id`. The parquet the
+#       VEP DTP writes carries the strings, so nothing points here.
+#
+#       `variant_consequences` and `variant_impacts` were on this list
+#       and came back off it. They were removed for the same reason, and
+#       the reason was wrong about them: their join key went away, but
+#       they also carry `severity_rank`, which the annotation does not
+#       have and which cannot be derived from it. Dropping them took the
+#       only ordering out of the bundle.
+#
+#   variant_effect_predictions, variant_gene_regulatory_evidence
+#       Superseded by the per-source tables the DTPs write straight to
+#       parquet — `variant_alphamissense` and `variant_gtex`, the same
+#       shapes keyed by `chrom:pos:ref:alt` instead of `variant_id`.
+#
+#   variant_regulatory_elements
+#       Never had a producer.
+#
+#   variant_gwas_snp
+#       An rsID index built during `load`; the variant branch has no
+#       load step, and the GWAS DTP now explodes `SNPS` into
+#       `variant_gwas` itself.
+#
+# They shipped as empty tables in every bundle, which is worse than
+# absent: `db verify` counted them present, and a report joining one got
+# zero rows instead of an error. The models outlive them only because
+# `modules/report/` still imports them; they go when ADR-004 §2.2
+# retires that module.
+RETIRED_TABLES: tuple = (
+    "variant_biotypes",
+    "variant_consequence_categories",
+    "variant_consequence_groups",
+    "variant_effect_predictions",
+    "variant_gene_regulatory_evidence",
+    "variant_gwas_snp",
+    "variant_regulatory_elements",
+)
+
 
 @dataclass
 class SourceOutcome:
@@ -84,6 +128,7 @@ class BundleBuilder:
         data_root: Path,
         logger,
         keep_raw: bool = False,
+        keep_processed: bool = False,
         bundle_dir: Optional[Path] = None,
         assemble: bool = True,
         min_free_gb: float = 0.0,
@@ -93,6 +138,14 @@ class BundleBuilder:
         self.data_root = Path(data_root)
         self.logger = logger
         self.keep_raw = keep_raw
+        # Copy the variant parquet into the bundle instead of moving it.
+        # Moving is right for a full build — the files are most of the
+        # bundle's size and two copies would need both on disk at once.
+        # It is wrong when the same parquet has to serve a second build:
+        # assembling a chromosome-subset bundle to develop against would
+        # otherwise consume the very files the eventual full bundle
+        # needs, forcing that chromosome to be downloaded again.
+        self.keep_processed = keep_processed
         self.assemble = assemble
         self.min_free_gb = min_free_gb
 
@@ -552,11 +605,30 @@ class BundleBuilder:
             biofilter_version=__version__,
             schema_version=__version__,
             fmt="parquet",
-            exclude_tables=[t for t in CONTROL_TABLES if t in present],
+            exclude_tables=[
+                t for t in CONTROL_TABLES + RETIRED_TABLES if t in present
+            ],
             checksums=False,
         )
 
         moved = self._move_variant_tables(tables_dir)
+
+        missing = self._sources_without_output(moved)
+        if missing:
+            self.logger.log(
+                f"❌ {', '.join(missing)} contributed no table. The plan "
+                f"includes them, so a bundle without them is not the "
+                f"bundle that was asked for — and nothing downstream can "
+                f"tell the difference. Re-run those sources (add "
+                f"--force-steps transform if their ledger says they are "
+                f"already done) before assembling.",
+                "ERROR",
+            )
+            shutil.rmtree(out, ignore_errors=True)
+            return False
+
+        self._drop_parent_stubs(out, tables_dir, moved)
+        self._drop_empty_tables(out, tables_dir)
         bundle_id = self._finalise_manifest(out, moved)
         self._stamp_metadata(tables_dir, bundle_id)
         self._resync_manifest_entry(out, "biofilter_metadata")
@@ -588,18 +660,88 @@ class BundleBuilder:
         quietly rebuilding one.
         """
         moved: List[Path] = []
+        self._moved_by_source = {}
         for entry in self.included_sources(VARIANT_BRANCH):
+            contributed = self._moved_by_source.setdefault(entry["name"], [])
             src_dir = self.processed_path / entry["source_system"] / entry["name"]  # noqa: E501
             if not src_dir.is_dir():
                 continue
             for parquet in sorted(src_dir.rglob("*.parquet")):
-                table = self._table_of(parquet.stem)
+                table = self._declared_table(parquet)
+                if table is None:
+                    table = self._table_of(parquet.stem)
+                    self.logger.log(
+                        f"⚠️  {parquet.name} carries no table stamp in its "
+                        f"footer; falling back to its name, which gives "
+                        f"'{table}'. Check that is the table you expect — "
+                        f"the fallback cannot tell a source suffix from "
+                        f"part of a table name.",
+                        "WARNING",
+                    )
                 target_dir = tables_dir / table
                 target_dir.mkdir(parents=True, exist_ok=True)
                 target = target_dir / parquet.name
-                shutil.move(str(parquet), str(target))
+                if self.keep_processed:
+                    shutil.copy2(str(parquet), str(target))
+                else:
+                    shutil.move(str(parquet), str(target))
                 moved.append(target)
+                contributed.append(target)
+            if not self.keep_processed:
+                self._prune_empty_dirs(src_dir)
         return moved
+
+    @staticmethod
+    def _prune_empty_dirs(root: Path) -> None:
+        """
+        Remove the directories a move left behind, `root` included.
+
+        Moving the parquet out empties `processed/<system>/<source>/` but
+        leaves its subdirectories standing, and an empty subdirectory
+        reads as output to the ETL's skip check — which is how a source
+        whose files had already gone into a previous bundle came back as
+        `transform not-applicable` and contributed no table to the next
+        one. Leaving no directory behind leaves nothing to misread.
+        """
+        if not root.is_dir():
+            return
+        for path in sorted(root.rglob("*"), key=lambda p: len(p.parts), reverse=True):  # noqa: E501
+            if path.is_dir() and not any(path.iterdir()):
+                path.rmdir()
+        if not any(root.iterdir()):
+            root.rmdir()
+
+    @staticmethod
+    def _declared_table(path: Path) -> Optional[str]:
+        """The table this file's footer names, or None if it carries none."""
+        import pyarrow.parquet as pq
+
+        try:
+            metadata = pq.ParquetFile(path).schema_arrow.metadata or {}
+        except Exception:  # noqa: BLE001 — an unreadable footer is not fatal
+            return None
+        declared = metadata.get(b"biofilter_table")
+        return declared.decode("utf-8") if declared else None
+
+    @classmethod
+    def _table_for(cls, path: Path) -> str:
+        """
+        Which table a parquet file belongs to.
+
+        Read from the file's own footer, where the sink stamps it. The
+        file name carries the source as well as the table now
+        (`variant_masters_gnomad_chr21.parquet`), and no amount of
+        parsing tells `<table>_<source>` apart from a table whose name
+        happens to contain an underscore. The footer says it outright.
+
+        Falls back to the name for files written before the stamp
+        existed, so an older `processed/` tree still assembles. The
+        fallback is guesswork and gets it wrong on exactly the names the
+        stamp was added for — `variant_rsid_gnomad_chr22` reads as table
+        `variant_rsid_gnomad` — so callers warn when they take it.
+        """
+        declared = cls._declared_table(path)
+        return declared if declared else cls._table_of(path.stem)
 
     @staticmethod
     def _table_of(stem: str) -> str:
@@ -610,6 +752,131 @@ class BundleBuilder:
             return stem
         suffix = stem[idx + len(marker):]
         return stem[:idx] if suffix.isdigit() else stem
+
+    def _sources_without_output(self, moved: List[Path]) -> List[str]:
+        """
+        Variant sources the plan includes that left no parquet behind.
+
+        Only the variant branch can be checked this way. A core source
+        writes rows into tables it shares with every other core source —
+        `gene_ncbi` adds aliases to the same table `hgnc` created — so
+        "which table did this one produce" has no answer there. On the
+        variant branch each source owns its files, and producing none is
+        unambiguous.
+
+        This is the check the `20260910` bundle needed: `alphamissense`
+        and `gtex_v10_eqtl` were both recorded as done, both skipped
+        their transform, and the bundle was published without either
+        table and without a warning.
+        """
+        del moved  # the per-source breakdown is what settles this
+        return [
+            name
+            for name, files in getattr(self, "_moved_by_source", {}).items()
+            if not files
+        ]
+
+    def _drop_parent_stubs(
+        self,
+        out: Path,
+        tables_dir: Path,
+        moved: List[Path],
+    ) -> None:
+        """
+        Remove the empty `<table>.parquet` sitting beside `<table>/`.
+
+        The staging database is created with `create_all`, so it holds an
+        empty table for every variant model whether or not the variant
+        branch ever touched it — and `export_full_clone` faithfully
+        exports each one. The result is a zero-row `variant_masters.parquet`
+        next to the `variant_masters/` directory holding 177 million rows.
+
+        Which of the two a reader picks up is a matter of iteration
+        order, and the stub wins often enough to matter: every variant
+        report against `20260910` returned zero rows, with no error.
+        ADR-003 §2.9 called for dropping them; this is where they go.
+
+        The manifest entry goes with the file, so nothing declares a
+        table that is not there.
+        """
+        partitioned = {self._table_for(path) for path in moved}
+        if not partitioned:
+            return
+
+        manifest_path = out / "manifest.json"
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+
+        dropped: List[str] = []
+        for table in partitioned:
+            stub = tables_dir / f"{table}.parquet"
+            if stub.is_file():
+                stub.unlink()
+                dropped.append(table)
+
+        if not dropped:
+            return
+
+        manifest["tables"] = [
+            t for t in manifest.get("tables", [])
+            if t.get("name") not in dropped
+        ]
+        manifest_path.write_text(
+            json.dumps(manifest, indent=2) + "\n", encoding="utf-8"
+        )
+        self.logger.log(
+            f"   🧹 dropped {len(dropped)} empty parent stub(s): "
+            f"{', '.join(sorted(dropped))}",
+            "INFO",
+        )
+
+    def _drop_empty_tables(self, out: Path, tables_dir: Path) -> None:
+        """
+        Leave out every table that came out with no rows.
+
+        A declared, empty table is the worst of both: `db verify` counts
+        it as present, and a report joining it gets zero rows instead of
+        an error. Absence is the honest signal, and the reader already
+        handles it — a bundle built from a subset of the sources
+        legitimately carries fewer tables, which is why connecting warns
+        about missing *columns* and says nothing about missing tables.
+
+        This is what makes deactivating a source enough on its own.
+        `chebi` is off, so nothing writes `chemical_masters`, and the
+        table simply does not appear rather than appearing empty.
+
+        `biofilter_metadata` is exempt: it is rewritten after this to
+        carry the bundle id, and a bundle that cannot say what it is is
+        not usable.
+        """
+        manifest_path = out / "manifest.json"
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+
+        dropped: List[str] = []
+        for table in manifest.get("tables", []):
+            name = table.get("name")
+            if name == "biofilter_metadata" or table.get("rows") != 0:
+                continue
+            rel = table.get("file")
+            if rel:
+                path = out / rel
+                if path.is_file():
+                    path.unlink()
+            dropped.append(str(name))
+
+        if not dropped:
+            return
+
+        manifest["tables"] = [
+            t for t in manifest["tables"] if t.get("name") not in dropped
+        ]
+        manifest_path.write_text(
+            json.dumps(manifest, indent=2) + "\n", encoding="utf-8"
+        )
+        self.logger.log(
+            f"   🧹 left out {len(dropped)} table(s) with no rows: "
+            f"{', '.join(sorted(dropped))}",
+            "INFO",
+        )
 
     def _finalise_manifest(self, out: Path, moved: List[Path]) -> str:
         """
@@ -637,7 +904,7 @@ class BundleBuilder:
         for path in moved:
             manifest["tables"].append({
                 "name": path.stem,
-                "table": self._table_of(path.stem),
+                "table": self._table_for(path),
                 "branch": VARIANT_BRANCH,
                 "rows": pq.ParquetFile(path).metadata.num_rows,
                 "file": str(path.relative_to(out)),

@@ -23,6 +23,7 @@ from biofilter.modules.etl.mixins.base_dtp import DTPBase
 from biofilter.modules.etl.parquet_sink import ChromosomeFileWriter
 from biofilter.modules.etl.dtps.gnomad_shared import (
     GNOMAD_BASE,
+    SOURCE_TAG,
     build_filters,
     chromosome_from_datasource_name,
     describe_filters,
@@ -346,6 +347,7 @@ class DTP(DTPBase):
                 out_path,
                 schema,
                 self.config.table_name,
+                source=SOURCE_TAG,
                 compression=self.config.parquet_compression,
             )
         writer.write_rows(batch)
