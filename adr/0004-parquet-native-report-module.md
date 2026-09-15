@@ -264,9 +264,28 @@ the legacy module once, up front, means new code is born at its final
 path and the migration ends with a deletion rather than a rename.
 
 Migration is report by report. A report is migrated when someone needs
-it; `report_legacy` shrinks and is deleted when empty. Both modules are
-live simultaneously, and the `parquet://` ORM bridge stays supported
-until `report_legacy` is gone.
+it; `report_legacy` shrinks and is deleted when empty.
+
+**Amended 2026-09-15: the frozen module is reference, not a fallback.**
+The original plan kept both live, with the CLI resolving native-first
+and falling through. That was abandoned once the first report moved,
+for a reason the migration made plain: the frozen reports are not a
+working fallback. They were written against a relational database and
+the 4.2.x variant schema, and several cannot run at all — they select
+columns like `variant_masters.variant_id` that 4.3.0 bundles do not
+carry. Presenting them in `report list` as things a user could run was
+a promise the code could not keep.
+
+So nothing imports `report_legacy`. Its package `__init__` no longer
+exports anything, no manager instantiates it, and no URI reaches it.
+What survives is the reason to keep the files: rewriting a report is
+easier with the original in front of you. `report list` reports how many
+are still waiting, counted from the directory listing rather than by
+importing anything.
+
+The cost is stated plainly: **24 reports are unavailable until they are
+rewritten.** That is the price of the schema change in ADR-003, not of
+this decision — it only stops hiding it.
 
 `reports_bkp/` is deleted outright. It is superseded code, and git
 retains it.
@@ -452,10 +471,16 @@ input data, `--param KEY=VALUE` for options, `--bundle` for the bundle
 path, `report list`, `report explain`, automatic discovery with no
 support-code changes.
 
-`report run --report-name X` resolves X against the new module first,
-then `report_legacy`, and states which served it. `report list` marks
-each report's engine, so migration progress is visible without reading
-the tree.
+`report list` shows the reports that run, then how many are still
+waiting to be rewritten — the migration's progress bar, and it reaches
+zero when `report_legacy/reports/` empties.
+
+Metadata commands open nothing. `report list`, `explain`,
+`example-input` and `available-columns` answer from the installed
+package, so a dead URI in `.biofilter.toml` no longer stops someone
+asking what reports exist. `report run` needs a bundle and says so in
+those words, rather than the generic "DB not set" left over from when a
+database was an option.
 
 Two additions the native path makes cheap:
 
@@ -525,13 +550,13 @@ not go quiet.
 
 ### Negative
 
-- Two report modules coexist for the duration of the migration. `report
-  list` will show a mixed inventory, and the CLI carries routing logic
-  that exists only to be deleted later.
+- **24 reports are unavailable** until they are rewritten. Most could
+  not have run against a 4.3.0 bundle anyway (§1.4), but the ones that
+  could are gone too, and that is a real loss for anyone using them.
 - Losing the ORM means losing static column names. §2.10 replaces it
   with a test, which catches the same errors later in the cycle.
-- The `parquet://` ORM bridge must be maintained while unmigrated
-  reports depend on it — this ADR does not let us delete it yet.
+- The `parquet://` ORM bridge is no longer needed by reports, but
+  `db verify --schema` still uses it, so it stays.
 - Rebuilding 9 test files onto a fixture bundle is mechanical work with
   no visible output.
 - A report written in SQL is harder to compose than one written in
@@ -546,8 +571,9 @@ not go quiet.
 - **SQL injection**, introduced by native SQL, is removed by §2.5 —
   which was already required for performance.
 - **`report_legacy` becoming permanent** is the realistic failure mode
-  of any parallel-module migration. Mitigation: `report list` shows the
-  split, so the remaining debt is visible in normal use.
+  of any parallel-module migration. Mitigation: `report list` prints the
+  outstanding count every time it runs, so the debt is visible in normal
+  use rather than by reading the tree.
 - **Dialect portability** is lost by design, per §2.1.
 - **The speed gain is not uniform.** It concentrates in variant-scale
   reports. `etl_status` and `etl_packages` become manifest reads and

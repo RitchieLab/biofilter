@@ -5,6 +5,7 @@ from pathlib import Path
 from click.testing import CliRunner
 
 import biofilter.api.cli.groups.report as report_cli_mod
+from biofilter.biofilter import NO_DATABASE
 
 
 class FakeDataFrame:
@@ -30,6 +31,10 @@ class FakeReportFacade:
         self.available_columns_result = ["col_a", "col_b"]
         self.run_result = FakeDataFrame()
         self.run_error = None
+        self.pending_result = []
+
+    def pending_migration(self):
+        return self.pending_result
 
     def list(self, verbose=False):
         self.calls.append(("list", {"verbose": verbose}))
@@ -95,8 +100,10 @@ def test_report_list_verbose_prints_description_and_module(monkeypatch):
     assert "etl_status" in result.output
     assert "ETL Status report" in result.output
     assert "module: report_etl_status" in result.output
-    assert capture["db_uri"] == "sqlite:///test.db"
     assert capture["debug_mode"] is False
+    # Listing reads the installed package, not data: nothing is opened,
+    # so --db-uri is accepted and ignored rather than connected to.
+    assert capture["db_uri"] == NO_DATABASE
 
 
 def test_report_list_empty_prints_no_reports(monkeypatch):
@@ -559,3 +566,35 @@ def test_report_run_invalid_name_prints_friendly_error_without_traceback(monkeyp
     assert "etl_status" in result.output
     assert "biofilter report list" in result.output
     assert "Traceback" not in result.output
+
+
+def test_report_list_reports_what_is_still_pending(monkeypatch):
+    """
+    The count of reports awaiting rewrite is the migration's progress
+    bar; it has to reach the user, not just the tree.
+    """
+    runner = CliRunner()
+    facade = FakeReportFacade()
+    facade.list_result = [{"name": "annotation_master_gene", "module": "x"}]
+    facade.pending_result = ["snp_snp_model", "variant_binning"]
+    _patch_biofilter(monkeypatch, facade, {})
+
+    result = runner.invoke(
+        report_cli_mod.report, ["list", "--db-uri", "sqlite:///t.db", "--verbose"]
+    )
+
+    assert result.exit_code == 0, result.output
+    assert "2 more await rewriting" in result.output
+    assert "- snp_snp_model" in result.output
+
+
+def test_report_list_says_nothing_when_nothing_is_pending(monkeypatch):
+    runner = CliRunner()
+    facade = FakeReportFacade()
+    facade.list_result = [{"name": "annotation_master_gene", "module": "x"}]
+    _patch_biofilter(monkeypatch, facade, {})
+
+    result = runner.invoke(report_cli_mod.report, ["list", "--db-uri", "sqlite:///t.db"])
+
+    assert result.exit_code == 0, result.output
+    assert "await rewriting" not in result.output

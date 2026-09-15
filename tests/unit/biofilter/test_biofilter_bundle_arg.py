@@ -18,7 +18,7 @@ def test_a_bundle_path_opens_without_a_uri(bundle_dir):
     bf = Biofilter(bundle=bundle_dir)
 
     assert bf.core.db_uri == f"parquet://{bundle_dir}"
-    assert bf.report.engine_for("annotation_master_gene") == "native"
+    assert "annotation_master_gene" in [r["name"] for r in bf.report.list()]
 
 
 def test_a_string_path_works_too(bundle_dir):

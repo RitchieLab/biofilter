@@ -10,8 +10,13 @@ from typing import Any
 
 import click
 
-from biofilter.api.cli.common import local_db_uri_option, require_db_uri
-from biofilter.biofilter import Biofilter
+from biofilter.api.cli.common import (
+    _clean_db_uri,
+    get_ctx_db_uri,
+    local_db_uri_option,
+    try_resolve_db_uri,
+)
+from biofilter.biofilter import NO_DATABASE, Biofilter
 from biofilter.modules.report.result import ReportResult
 
 
@@ -299,26 +304,22 @@ def _build_run_kwargs(
 @click.option("--debug", is_flag=True, help="Enable debug logging.")
 @click.pass_context
 def list_(ctx, db_uri, verbose, debug):
-    db_uri = require_db_uri(ctx, local_db_uri=db_uri)
-
-    bf = Biofilter(db_uri=db_uri, debug_mode=debug)
+    # Metadata only: which reports exist, what they take, what they
+    # return. None of it reads data, so nothing is opened — a dead
+    # URI in .biofilter.toml should not stop you asking.
+    bf = Biofilter(db_uri=NO_DATABASE, debug_mode=debug)
 
     rows = bf.report.list(verbose=False)  # returns list[dict]
     if not rows:
         click.echo("No reports found.")
         return
 
-    native = sum(1 for r in rows if r.get("engine") == "native")
     click.echo("📊 Available Reports:\n")
     for i, r in enumerate(rows, start=1):
-        name = r.get("name", "")
         desc = r.get("description", "") or ""
         module = r.get("module", "") or ""
-        # The marker is the migration progress bar. It stays until the
-        # legacy module is empty, and then both it and the module go.
-        mark = "" if r.get("engine") == "native" else "  (legacy)"
 
-        click.echo(f"{i}. {name}{mark}")
+        click.echo(f"{i}. {r.get('name', '')}")
         if verbose:
             if desc:
                 click.echo(f"   {desc}")
@@ -326,11 +327,17 @@ def list_(ctx, db_uri, verbose, debug):
                 click.echo(f"   module: {module}")
         click.echo("")
 
-    if rows:
+    # What is left to rewrite, counted from the directory rather than by
+    # importing anything. It disappears when that directory empties.
+    pending = bf.report.pending_migration()
+    if pending:
         click.echo(
-            f"{native} of {len(rows)} reports read the bundle natively; "
-            f"{len(rows) - native} still run on the legacy layer."
+            f"{len(pending)} more await rewriting for the bundle and cannot be "
+            f"run yet — see biofilter/modules/report_legacy/reports/."
         )
+        if verbose:
+            for name in pending:
+                click.echo(f"   - {name}")
 
 
 # TESTADO
@@ -346,9 +353,10 @@ def list_(ctx, db_uri, verbose, debug):
 @click.option("--debug", is_flag=True, help="Enable debug logging.")
 @click.pass_context
 def explain(ctx, db_uri, identifier, debug):
-    db_uri = require_db_uri(ctx, local_db_uri=db_uri)
-
-    bf = Biofilter(db_uri=db_uri, debug_mode=debug)
+    # Metadata only: which reports exist, what they take, what they
+    # return. None of it reads data, so nothing is opened — a dead
+    # URI in .biofilter.toml should not stop you asking.
+    bf = Biofilter(db_uri=NO_DATABASE, debug_mode=debug)
 
     try:
         text = bf.report.explain(identifier)
@@ -370,9 +378,10 @@ def explain(ctx, db_uri, identifier, debug):
 @click.option("--debug", is_flag=True, help="Enable debug logging.")
 @click.pass_context
 def example_input(ctx, db_uri, identifier, debug):
-    db_uri = require_db_uri(ctx, local_db_uri=db_uri)
-
-    bf = Biofilter(db_uri=db_uri, debug_mode=debug)
+    # Metadata only: which reports exist, what they take, what they
+    # return. None of it reads data, so nothing is opened — a dead
+    # URI in .biofilter.toml should not stop you asking.
+    bf = Biofilter(db_uri=NO_DATABASE, debug_mode=debug)
 
     try:
         text = bf.report.example_input(identifier)
@@ -394,9 +403,10 @@ def example_input(ctx, db_uri, identifier, debug):
 @click.option("--debug", is_flag=True, help="Enable debug logging.")
 @click.pass_context
 def available_columns(ctx, db_uri, identifier, debug):
-    db_uri = require_db_uri(ctx, local_db_uri=db_uri)
-
-    bf = Biofilter(db_uri=db_uri, debug_mode=debug)
+    # Metadata only: which reports exist, what they take, what they
+    # return. None of it reads data, so nothing is opened — a dead
+    # URI in .biofilter.toml should not stop you asking.
+    bf = Biofilter(db_uri=NO_DATABASE, debug_mode=debug)
 
     try:
         text = bf.report.available_columns(identifier, print_output=False)
@@ -410,9 +420,10 @@ def available_columns(ctx, db_uri, identifier, debug):
 @click.option("--debug", is_flag=True, help="Enable debug logging.")
 @click.pass_context
 def refresh(ctx, db_uri, debug):
-    db_uri = require_db_uri(ctx, local_db_uri=db_uri)
-
-    bf = Biofilter(db_uri=db_uri, debug_mode=debug)
+    # Metadata only: which reports exist, what they take, what they
+    # return. None of it reads data, so nothing is opened — a dead
+    # URI in .biofilter.toml should not stop you asking.
+    bf = Biofilter(db_uri=NO_DATABASE, debug_mode=debug)
     bf.report.refresh()
     click.echo("✅ Report cache refreshed.")
 
@@ -482,7 +493,14 @@ def run(
     output,
     debug,
 ):
-    db_uri = require_db_uri(ctx, local_db_uri=db_uri)
+    # Running reads data, and reports read a bundle. Say that, rather
+    # than the generic "DB not set" — there is no relational path left.
+    db_uri = try_resolve_db_uri(_clean_db_uri(db_uri) or get_ctx_db_uri(ctx))
+    if not db_uri:
+        raise click.UsageError(
+            "No bundle. Use --bundle <path>, set BIOFILTER_BUNDLE, or define "
+            "db_uri in .biofilter.toml."
+        )
 
     bf = Biofilter(db_uri=db_uri, debug_mode=debug)
 

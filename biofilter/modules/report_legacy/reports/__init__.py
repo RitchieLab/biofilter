@@ -1,41 +1,15 @@
-# from .report_etl_status import ETLStatusReport
-from .report_template import TemplateReport
-from .report_entity_filter import EntityFilterReport
-from .report_entity_relationship_model import EntityRelationshipModelReport
-from .report_variant_gene_location_model import VariantGeneLocationModelReport
-from .report_variant_binning import VariantBinningReport
-from .report_snp_snp_model import SNPSNPModelReport
-from .report_annotation_master_pathway import AnnotationMasterPathwayReport
-from .report_annotation_master_protein import AnnotationMasterProteinReport
-from .report_annotation_master_disease import AnnotationMasterDiseaseReport
-from .report_annotation_master_go import AnnotationMasterGOReport
-from .report_annotation_master_chemical import AnnotationMasterChemicalReport
-from .report_platform_data_statistics import PlatformDataStatisticsReport
-from .report_variant_annotation_expanded import VariantAnnotationExpandedReport
-from .report_variant_list_intersect import VariantListIntersectReport
-from .report_snp_snp_pair_generator import SNPSNPPairGeneratorReport
-from .report_variant_modeling import VariantModelingReport
-from .report_annotation_master_variant import AnnotationMasterVariantReport
+"""
+Reports awaiting rewrite. Reference material, not running code.
 
+These were written against a relational database and the 4.2.x variant
+schema. Several no longer run at all — they select columns like
+`variant_masters.variant_id` that 4.3.0 bundles do not carry — and none
+of them is reachable from the CLI or the Python facade any more.
 
-__all__ = [
-    # Mapping all Reports
-    # "ETLStatusReport",
-    "TemplateReport",
-    "EntityFilterReport",
-    "EntityRelationshipModelReport",
-    "VariantGeneLocationModelReport",
-    "VariantBinningReport",
-    "SNPSNPModelReport",
-    "AnnotationMasterPathwayReport",
-    "AnnotationMasterProteinReport",
-    "AnnotationMasterDiseaseReport",
-    "AnnotationMasterGOReport",
-    "AnnotationMasterChemicalReport",
-    "PlatformDataStatisticsReport",
-    "VariantAnnotationExpandedReport",
-    "VariantListIntersectReport",
-    "SNPSNPPairGeneratorReport",
-    "VariantModelingReport",
-    "AnnotationMasterVariantReport",
-]
+They are kept because rewriting a report is easier with the original in
+front of you: what it returned, which edge cases it handled, what its
+columns meant. Read them; do not import them.
+
+A report leaves this directory when its replacement lands in
+`biofilter/modules/report/reports/`. The directory goes when it empties.
+"""
