@@ -87,7 +87,10 @@ class BiofilterCore:
         if self.db_uri is NO_DATABASE:
             self.db_uri = None
         elif not self.db_uri and self.config is not None:
-            self.db_uri = getattr(self.config, "db_uri", None)
+            # Same precedence the CLI uses: a configured bundle first.
+            self.db_uri = bundle_to_uri(
+                getattr(self.config, "bundle", None)
+            ) or getattr(self.config, "db_uri", None)
 
         self.db: Optional[Database] = None
 

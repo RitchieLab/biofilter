@@ -229,7 +229,9 @@ also needs its line in that package's `reports/__init__.py` and its
 - **Local dev:** PostgreSQL `biofilter_dev`. Note its entity IDs are a different ID space from the bundle — never export from it over the bundle.
 - **Docker:** available to run the CLI without installing BF4 locally (`docker/Dockerfile`)
 - **Tooling:** Poetry, tox, pytest, sphinx, testcontainers (Postgres in tests)
-- **Local config:** `.biofilter.toml` at project root (do not commit credentials)
+- **Local config:** `.biofilter.toml` at project root — `[database] bundle` for
+  reading (a directory, relative to the file), `db_uri` only for writing;
+  bundle wins. Do not commit credentials.
 
 ---
 

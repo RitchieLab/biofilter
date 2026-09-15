@@ -1,9 +1,22 @@
 [database]
-db_uri = "postgresql+psycopg2://admin:admin@localhost/biofilter_dev"
-# Production is a read-only Parquet bundle on the LPC:
-#   db_uri = "parquet:///project/hall_shared/datasets/biofilter/<YYYYMMDD>/tables"
-# If a PostgreSQL server is provisioned again, keep credentials OUT of this file
-# (use the DATABASE_URL env var) — see lpc__deploy.md Appendix A.
+# Where reports read from. A bundle is a directory — the one holding
+# manifest.json, not its tables/ subdirectory: pointing at tables/ reaches
+# the parquet but leaves behind the bundle id, the plan, and the table map
+# the reader resolves its views from.
+#
+# A relative path is relative to THIS FILE, so it means the same thing from
+# the project root and from a notebook two levels down.
+#
+# On the LPC:
+#   bundle = "/project/hall_shared/datasets/biofilter/<YYYYMMDD>"
+bundle = "./biofilter_data/bundles/20260914"
+
+# Only for writing — ETL runs and bundle builds. Reports never use it, and
+# a bundle above takes precedence over it.
+# Keep credentials OUT of this file; use the DATABASE_URL env var.
+# See lpc__deploy.md Appendix A if a PostgreSQL server is provisioned again.
+# db_uri = "postgresql+psycopg2://user:pass@localhost/biofilter_dev"
+
 echo_sql = false
 auto_create = false
 

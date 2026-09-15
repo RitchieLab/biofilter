@@ -87,6 +87,25 @@ class BiofilterConfig:
         return v if v else None
 
     @property
+    def bundle(self):
+        """
+        `[database] bundle` — the directory, resolved.
+
+        A relative path is taken **relative to this config file**, not to
+        the working directory. The file is found by walking up from wherever
+        you are, so `bundle = "./biofilter_data/bundles/20260914"` has to
+        mean the same thing from the project root and from a notebook two
+        levels down, or it means nothing reliable.
+        """
+        value = self.get("database", "bundle")
+        if not value:
+            return None
+        path = Path(str(value)).expanduser()
+        if not path.is_absolute():
+            path = self.path.parent / path
+        return str(path.resolve())
+
+    @property
     def etl_root(self):
         return self.get("etl", "data_root")
 

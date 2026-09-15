@@ -498,8 +498,8 @@ def run(
     db_uri = try_resolve_db_uri(_clean_db_uri(db_uri) or get_ctx_db_uri(ctx))
     if not db_uri:
         raise click.UsageError(
-            "No bundle. Use --bundle <path>, set BIOFILTER_BUNDLE, or define "
-            "db_uri in .biofilter.toml."
+            "No bundle. Use --bundle <path>, set BIOFILTER_BUNDLE, or add "
+            'bundle = "<path>" under [database] in .biofilter.toml.'
         )
 
     bf = Biofilter(db_uri=db_uri, debug_mode=debug)

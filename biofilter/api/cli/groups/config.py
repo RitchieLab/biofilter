@@ -50,10 +50,18 @@ def show(ctx):
             else:
                 click.echo(f"  {name}: {value}")
 
-    # db_uri resolution
+    # What reports will actually read, and where it came from. Showing
+    # only db_uri reported "<not set>" on a session that was perfectly
+    # well configured — with a bundle, which is the normal case now.
+    bundle = getattr(cfg, "bundle", None) if cfg else None
     if cli_db_uri:
         show_value("db_uri", cli_db_uri, "from CLI")
+        show_value("bundle", bundle, "overridden by --db-uri" if bundle else None)
+    elif bundle:
+        show_value("bundle", bundle, "reports read this")
+        show_value("db_uri", getattr(cfg, "db_uri", None), "writes only")
     else:
+        show_value("bundle", None)
         show_value("db_uri", getattr(cfg, "db_uri", None) if cfg else None)
 
     show_value("download_path", getattr(cfg, "download_path", None) if cfg else None)

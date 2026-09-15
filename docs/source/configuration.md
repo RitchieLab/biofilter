@@ -7,6 +7,31 @@ Biofilter resolves settings from:
 3. `.biofilter.toml`
 4. internal defaults
 
+## Where the data is
+
+Reports read a **bundle**; the ETL and bundle builds write to a
+**database**. Both live under `[database]`, and a configured bundle wins
+over a configured `db_uri` — the same precedence `--bundle` has over
+`--db-uri`.
+
+```toml
+[database]
+# Where reports read from. A bundle is a directory — the one holding
+# manifest.json, not its tables/ subdirectory. Pointing at tables/
+# reaches the parquet but leaves behind the bundle id, the plan, and the
+# table map the reader resolves its views from.
+#
+# A relative path is relative to THIS FILE, not the working directory, so
+# it means the same thing from the project root and from a notebook two
+# levels down.
+bundle = "./biofilter_data/bundles/20260914"
+
+# Only for writing. Keep credentials out of this file — use DATABASE_URL.
+# db_uri = "postgresql+psycopg2://user:pass@host/biofilter_dev"
+```
+
+`biofilter config show` prints which one is in effect.
+
 ## Common Commands
 
 Show resolved config:

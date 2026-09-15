@@ -50,9 +50,17 @@ def try_resolve_db_uri(
 
     try:
         cfg = BiofilterConfig()
-        return _clean_db_uri(getattr(cfg, "db_uri", None))
     except FileNotFoundError:
         return None
+
+    # A configured bundle wins over a configured db_uri for the same
+    # reason --bundle wins over --db-uri: reports read bundles, and a
+    # db_uri left over from a PostgreSQL era should not shadow one.
+    cfg_bundle = bundle_to_uri(getattr(cfg, "bundle", None))
+    if cfg_bundle:
+        return cfg_bundle
+
+    return _clean_db_uri(getattr(cfg, "db_uri", None))
 
 
 def resolve_db_uri(cli_db_uri: str | None) -> str:
@@ -60,7 +68,9 @@ def resolve_db_uri(cli_db_uri: str | None) -> str:
     if db_uri:
         return db_uri
     raise click.UsageError(
-        "DB not set. Use --db-uri, DATABASE_URL, or define db_uri in .biofilter.toml."
+        "No data source. Use --bundle <path> (or --db-uri for a writable "
+        "database), set BIOFILTER_BUNDLE, or configure one under [database] "
+        "in .biofilter.toml."
     )
 
 

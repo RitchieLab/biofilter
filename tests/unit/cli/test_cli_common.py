@@ -64,7 +64,9 @@ def test_resolve_db_uri_returns_value_or_raises(monkeypatch):
     assert cmod.resolve_db_uri(None) == "sqlite:///ok.db"
 
     monkeypatch.setattr(cmod, "try_resolve_db_uri", lambda v: None)
-    with pytest.raises(click.UsageError, match="DB not set"):
+    # The message names --bundle first: reports read bundles, and a
+    # writable database is now the exception.
+    with pytest.raises(click.UsageError, match="--bundle"):
         cmod.resolve_db_uri(None)
 
 
