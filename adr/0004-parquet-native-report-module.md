@@ -585,9 +585,16 @@ less believable, which is why this section exists.
 ### 2.14 Not decided here
 
 - **Migration order.** Reports are migrated on request, one at a time;
-  `annotate_gene` is first (§6). `db_pg_index_stats` and
-  `db_pg_table_stats` are PostgreSQL-only and meaningless against a
-  bundle — candidates for deletion rather than migration.
+  `annotate_gene` was first (§6).
+
+  **Settled 2026-09-15 for two of them: `db_pg_index_stats` and
+  `db_pg_table_stats` were deleted rather than migrated.** They read
+  `pg_stat_user_indexes` and `pg_stat_user_tables` — PostgreSQL's own
+  catalogue, which a bundle does not have and could not have. The
+  question they answered, "how big is this and how is it laid out", is
+  now the `storage` section of `platform_data_statistics`, read from the
+  manifest. Retiring a report is as legitimate an outcome as migrating
+  one, and this is the first case where it was the right one.
 - **How `model_variants.py` is realigned with what the ETL writes**
   (§1.4). The direction is settled in §2.1; the table-by-table work
   belongs to the model and build layers.
