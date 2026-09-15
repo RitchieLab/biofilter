@@ -13,7 +13,11 @@ user actually has.
 | --- | --- |
 | `reports__101.ipynb` | start here — how reports work against a bundle |
 | `reports__TEMPLATE.ipynb` | copy this when migrating or writing a report |
-| `reports__<name>.ipynb` | one per report |
+| `reports__annotation_master_gene.ipynb` | genes |
+| `reports__annotation_master_disease.ipynb` | diseases, and the two ClinGen counts |
+| `reports__annotation_master_go.ipynb` | GO terms, and ontology edges vs relationships |
+| `reports__annotation_master_pathway.ipynb` | pathways, and the same biology curated twice |
+| `reports__annotation_master_protein.ipynb` | proteins, and isoform resolution |
 
 ## Running them
 

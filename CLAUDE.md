@@ -190,10 +190,11 @@ A report is three artifacts, and all three ship together:
 5. Validate: `biofilter --bundle <path> report list` + `report explain --report-name <name>`
 
 Reports are discovered by being in the package — nothing to register.
-A report in the native module shadows a same-named one in
-`report_legacy`, which is how migration works; removing the legacy copy
-also needs its line in that package's `reports/__init__.py` and its
-`__all__` entry.
+Migrating one means writing it here and deleting the file under
+`biofilter/modules/report_legacy/reports/`, which is reference material
+that nothing imports. Shared SQL for the annotation family lives in
+`reports/_annotation.py`; a module there that does not start with
+`report_` is not discovered as a report.
 
 ---
 

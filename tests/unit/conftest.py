@@ -23,11 +23,22 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 import pytest
 
-# Entity ids. Genes are 1-3; the neighbours they relate to are 10 and 20.
-TP53, BRCA1, NOLOC = 1, 2, 3
-PROTEIN, PATHWAY = 10, 20
+# Entity ids, grouped by what they are.
+#
+# DGENE exists so the disease fixtures can add relationships without
+# changing the counts the gene tests assert on TP53 and BRCA1.
+TP53, BRCA1, NOLOC, DGENE = 1, 2, 3, 4
+PROTEIN, PROTEIN_ISO = 10, 11
+PATHWAY = 20
+DISEASE, DISEASE_BARE = 30, 31
+GO_PARENT, GO_CHILD = 40, 41
 
 GROUP_GENES, GROUP_PROTEINS, GROUP_PATHWAYS = 1, 2, 3
+GROUP_DISEASES, GROUP_GO = 4, 5
+
+# Data sources, so provenance and the ClinGen-only summary have something
+# to distinguish.
+DS_HGNC, DS_UNIPROT, DS_REACTOME, DS_MONDO, DS_GO, DS_CLINGEN = 1, 2, 3, 4, 5, 6
 
 
 def _t(**columns) -> pa.Table:
@@ -38,18 +49,61 @@ def _tables() -> dict[str, pa.Table]:
     """The core tables, as a bundle spells them."""
     return {
         "entity_groups": _t(
-            id=pa.array([GROUP_GENES, GROUP_PROTEINS, GROUP_PATHWAYS], pa.int64()),
-            name=pa.array(["Genes", "Proteins", "Pathways"]),
-            description=pa.array([None, None, None], pa.string()),
-        ),
-        "entities": _t(
-            id=pa.array([TP53, BRCA1, NOLOC, PROTEIN, PATHWAY], pa.int64()),
-            group_id=pa.array(
-                [GROUP_GENES, GROUP_GENES, GROUP_GENES, GROUP_PROTEINS, GROUP_PATHWAYS],
+            id=pa.array(
+                [GROUP_GENES, GROUP_PROTEINS, GROUP_PATHWAYS, GROUP_DISEASES, GROUP_GO],
                 pa.int64(),
             ),
-            has_conflict=pa.array([False] * 5),
-            is_active=pa.array([True] * 5),
+            name=pa.array(
+                ["Genes", "Proteins", "Pathways", "Diseases", "Gene Ontology"]
+            ),
+            description=pa.array([None] * 5, pa.string()),
+        ),
+        "entities": _t(
+            id=pa.array(
+                [
+                    TP53, BRCA1, NOLOC, DGENE,
+                    PROTEIN, PROTEIN_ISO, PATHWAY,
+                    DISEASE, DISEASE_BARE, GO_PARENT, GO_CHILD,
+                ],
+                pa.int64(),
+            ),
+            group_id=pa.array(
+                [
+                    GROUP_GENES, GROUP_GENES, GROUP_GENES, GROUP_GENES,
+                    GROUP_PROTEINS, GROUP_PROTEINS, GROUP_PATHWAYS,
+                    GROUP_DISEASES, GROUP_DISEASES, GROUP_GO, GROUP_GO,
+                ],
+                pa.int64(),
+            ),
+            has_conflict=pa.array([False] * 11),
+            is_active=pa.array([True] * 11),
+        ),
+        "etl_source_systems": _t(
+            id=pa.array(
+                [DS_HGNC, DS_UNIPROT, DS_REACTOME, DS_MONDO, DS_GO, DS_CLINGEN],
+                pa.int64(),
+            ),
+            name=pa.array(
+                ["HGNC", "UniProt", "Reactome", "MONDO", "GO", "ClinGen"]
+            ),
+            description=pa.array([None] * 6, pa.string()),
+        ),
+        "etl_data_sources": _t(
+            id=pa.array(
+                [DS_HGNC, DS_UNIPROT, DS_REACTOME, DS_MONDO, DS_GO, DS_CLINGEN],
+                pa.int64(),
+            ),
+            name=pa.array(
+                ["hgnc", "uniprot", "reactome", "mondo", "gene_ontology", "clingen"]
+            ),
+            source_system_id=pa.array(
+                [DS_HGNC, DS_UNIPROT, DS_REACTOME, DS_MONDO, DS_GO, DS_CLINGEN],
+                pa.int64(),
+            ),
+            data_type=pa.array(
+                ["Gene", "Protein", "Pathway", "Disease", "GO", "Disease Relationships"]
+            ),
+            active=pa.array([True] * 6),
         ),
         "omic_status": _t(
             id=pa.array([1], pa.int64()),
@@ -126,6 +180,65 @@ def _tables() -> dict[str, pa.Table]:
             ),
             is_active=pa.array([True] * 10),
         ),
+        "entity_aliases_extra": _t(
+            id=pa.array(list(range(11, 22)), pa.int64()),
+            entity_id=pa.array(
+                [
+                    DGENE,
+                    PROTEIN, PROTEIN, PROTEIN_ISO,
+                    PATHWAY,
+                    DISEASE, DISEASE, DISEASE_BARE,
+                    GO_PARENT, GO_CHILD, GO_CHILD,
+                ],
+                pa.int64(),
+            ),
+            alias_value=pa.array(
+                [
+                    "DGENE1",
+                    "P04637", "TP53_HUMAN", "P04637-2",
+                    "R-HSA-0001",
+                    "MONDO:0001", "breast cancer", "MONDO:0002",
+                    "GO:0000001", "GO:0000002", "apoptosis",
+                ]
+            ),
+            alias_norm=pa.array(
+                [
+                    "dgene1",
+                    "p04637", "tp53_human", "p04637-2",
+                    "r-hsa-0001",
+                    "mondo:0001", "breast cancer", "mondo:0002",
+                    "go:0000001", "go:0000002", "apoptosis",
+                ]
+            ),
+            alias_type=pa.array(
+                [
+                    "symbol",
+                    "code", "name", "code",
+                    "code",
+                    "code", "name", "code",
+                    "code", "code", "synonym",
+                ]
+            ),
+            xref_source=pa.array(
+                [
+                    "HGNC",
+                    "UNIPROT", "UNIPROT", "UNIPROT",
+                    "REACTOME",
+                    "MONDO", "MONDO", "MONDO",
+                    "GO", "GO", "GO",
+                ]
+            ),
+            is_primary=pa.array(
+                [
+                    True,
+                    True, False, True,
+                    True,
+                    True, False, True,
+                    True, True, False,
+                ]
+            ),
+            is_active=pa.array([True] * 11),
+        ),
         # NOLOC deliberately has none: it is the `partial` case.
         "entity_locations": _t(
             id=pa.array([1, 2], pa.int64()),
@@ -135,19 +248,118 @@ def _tables() -> dict[str, pa.Table]:
             start_pos=pa.array([100, 5000], pa.int64()),
             end_pos=pa.array([400, 5400], pa.int64()),
         ),
+        # --- Diseases ------------------------------------------------
+        "disease_masters": _t(
+            id=pa.array([301, 302], pa.int64()),
+            entity_id=pa.array([DISEASE, DISEASE_BARE], pa.int64()),
+            disease_id=pa.array(["MONDO:0001", "MONDO:0002"]),
+            label=pa.array(["breast cancer", "bare disease"]),
+            description=pa.array(["a tumour of the breast", None]),
+            omic_status_id=pa.array([1, 1], pa.int64()),
+            data_source_id=pa.array([DS_MONDO, DS_MONDO], pa.int64()),
+            etl_package_id=pa.array([71, 71], pa.int64()),
+        ),
+        "disease_groups": _t(
+            id=pa.array([1], pa.int64()),
+            name=pa.array(["neoplasm"]),
+            description=pa.array([None], pa.string()),
+        ),
+        "disease_group_memberships": _t(
+            id=pa.array([1], pa.int64()),
+            disease_id=pa.array([301], pa.int64()),
+            group_id=pa.array([1], pa.int64()),
+        ),
+        # --- Gene Ontology -------------------------------------------
+        # GO_PARENT is_a-parent of GO_CHILD, so one side of each pair has
+        # a parent and the other a child.
+        "go_masters": _t(
+            id=pa.array([401, 402], pa.int64()),
+            entity_id=pa.array([GO_PARENT, GO_CHILD], pa.int64()),
+            go_id=pa.array(["GO:0000001", "GO:0000002"]),
+            name=pa.array(["cell death", "apoptotic process"]),
+            namespace=pa.array(["biological_process", "biological_process"]),
+            data_source_id=pa.array([DS_GO, DS_GO], pa.int64()),
+            etl_package_id=pa.array([72, 72], pa.int64()),
+        ),
+        "go_relations": _t(
+            id=pa.array([1], pa.int64()),
+            parent_id=pa.array([401], pa.int64()),
+            child_id=pa.array([402], pa.int64()),
+            relation_type=pa.array(["is_a"]),
+        ),
+        # --- Pathways -------------------------------------------------
+        "pathway_masters": _t(
+            id=pa.array([201], pa.int64()),
+            entity_id=pa.array([PATHWAY], pa.int64()),
+            pathway_id=pa.array(["R-HSA-0001"]),
+            description=pa.array(["apoptosis signalling"]),
+            data_source_id=pa.array([DS_REACTOME], pa.int64()),
+            etl_package_id=pa.array([73], pa.int64()),
+        ),
+        # --- Proteins -------------------------------------------------
+        # One protein, one isoform of it. The isoform has no relationships
+        # of its own — following to the canonical entity is what makes an
+        # isoform input report anything at all.
+        "protein_masters": _t(
+            id=pa.array([101], pa.int64()),
+            protein_id=pa.array(["P04637"]),
+            function=pa.array(["tumour suppressor"]),
+            location=pa.array(["nucleus"]),
+            tissue_expression=pa.array(["ubiquitous"]),
+            pseudogene_note=pa.array([None], pa.string()),
+            data_source_id=pa.array([DS_UNIPROT], pa.int64()),
+            etl_package_id=pa.array([74], pa.int64()),
+        ),
+        "protein_entities": _t(
+            id=pa.array([1, 2], pa.int64()),
+            entity_id=pa.array([PROTEIN, PROTEIN_ISO], pa.int64()),
+            protein_id=pa.array([101, 101], pa.int64()),
+            is_isoform=pa.array([False, True]),
+            isoform_accession=pa.array([None, "P04637-2"]),
+        ),
+        "protein_pfams": _t(
+            id=pa.array([1, 2], pa.int64()),
+            pfam_acc=pa.array(["PF00870", "PF08563"]),
+            pfam_id=pa.array(["P53", "P53_TAD"]),
+            description=pa.array(["P53 DNA-binding domain", "P53 transactivating"]),
+            type=pa.array(["Domain", "Family"]),
+        ),
+        "protein_pfam_links": _t(
+            protein_id=pa.array([101, 101], pa.int64()),
+            pfam_pk_id=pa.array([1, 2], pa.int64()),
+        ),
         # TP53 on the left once and on the right once, so the report has
         # to count both directions.
         "entity_relationships": _t(
-            id=pa.array([1, 2, 3], pa.int64()),
-            entity_1_id=pa.array([TP53, TP53, PATHWAY], pa.int64()),
+            id=pa.array([1, 2, 3, 4, 5, 6], pa.int64()),
+            entity_1_id=pa.array(
+                [TP53, TP53, PATHWAY, DISEASE, DISEASE, DISEASE], pa.int64()
+            ),
             entity_1_group_id=pa.array(
-                [GROUP_GENES, GROUP_GENES, GROUP_PATHWAYS], pa.int64()
+                [
+                    GROUP_GENES, GROUP_GENES, GROUP_PATHWAYS,
+                    GROUP_DISEASES, GROUP_DISEASES, GROUP_DISEASES,
+                ],
+                pa.int64(),
             ),
-            entity_2_id=pa.array([PROTEIN, PATHWAY, TP53], pa.int64()),
+            entity_2_id=pa.array(
+                [PROTEIN, PATHWAY, TP53, DGENE, DGENE, PROTEIN], pa.int64()
+            ),
             entity_2_group_id=pa.array(
-                [GROUP_PROTEINS, GROUP_PATHWAYS, GROUP_GENES], pa.int64()
+                [
+                    GROUP_PROTEINS, GROUP_PATHWAYS, GROUP_GENES,
+                    GROUP_GENES, GROUP_GENES, GROUP_PROTEINS,
+                ],
+                pa.int64(),
             ),
-            relationship_type_id=pa.array([1, 1, 1], pa.int64()),
+            relationship_type_id=pa.array([1] * 6, pa.int64()),
+            # The disease has two ClinGen assertions naming the SAME gene
+            # and one MONDO link to a protein: so its ClinGen gene count
+            # is 1, its ClinGen relationship count 2, and its total 3.
+            data_source_id=pa.array(
+                [DS_HGNC, DS_REACTOME, DS_REACTOME, DS_CLINGEN, DS_CLINGEN, DS_MONDO],
+                pa.int64(),
+            ),
         ),
     }
 
@@ -191,7 +403,13 @@ def fixture_bundle(tmp_path: Path) -> Path:
             }
         )
 
-    for name, table in _tables().items():
+    tables = _tables()
+    # Written as one relation: split in the source only so each domain's
+    # aliases sit next to the rest of that domain.
+    tables["entity_aliases"] = pa.concat_tables(
+        [tables["entity_aliases"], tables.pop("entity_aliases_extra")]
+    )
+    for name, table in tables.items():
         write(f"tables/{name}.parquet", table, name=name, branch="core")
 
     for chrom, table in _variant_partitions().items():

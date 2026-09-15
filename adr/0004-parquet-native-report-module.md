@@ -738,10 +738,19 @@ caller can consume batches without materialising the 4 GB at all.
 
 ## 7. Open questions
 
-- **Composition.** How shared SQL is reused across reports — a CTE
-  library, templates, or view definitions in the bundle itself. The
-  pilots should answer this; it is the main thing Python gave us for
-  free and SQL does not.
+- ~~**Composition.**~~ **Answered 2026-09-15 by the annotation family.**
+  `annotation_master_gene` was written alone; migrating disease, GO,
+  pathway and protein showed its shape was the shape of all of them.
+  `reports/_annotation.py` holds what repeats — the resolution step, and
+  functions returning CTE text for relationships, aliases, cross-
+  references and provenance. Each report still writes its own query.
+
+  Two things kept it from becoming a framework. It is **SQL text and one
+  method**, not a class hierarchy that owns execution; and a report
+  overrides by simply not calling a helper, as `annotation_master_protein`
+  does when it rewrites `resolved` to follow an isoform to its canonical
+  entity. Whether this holds for the variant reports, whose shape is
+  genuinely different, is still open.
 - **Where `ReportResult.artifacts` files are written**, and whether the
   CLI or the report owns the naming.
 - **What `db verify` should assert about schema.** It is the right home

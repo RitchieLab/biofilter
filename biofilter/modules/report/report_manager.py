@@ -134,12 +134,16 @@ class ReportManager:
         module = importlib.import_module(
             f"{reports_pkg.__name__}.{module_name}"
         )
+        # Defined here, not merely imported here. Reports share base
+        # classes (see _annotation.py), and an imported base is not a
+        # second report in the module.
         candidates = [
             obj
             for attr in dir(module)
             if isinstance(obj := getattr(module, attr), type)
             and issubclass(obj, ReportBase)
             and obj is not ReportBase
+            and obj.__module__ == module.__name__
         ]
         if not candidates:
             raise ImportError(f"No ReportBase subclass in '{module_name}'.")
