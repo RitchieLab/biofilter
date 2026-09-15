@@ -106,3 +106,44 @@ class TestThroughTheCLI:
         assert result.exit_code != 0
         assert "Traceback" not in result.output
         assert "Point at the bundle itself" in result.output
+
+
+class TestPresentation:
+    def test_ipython_gets_the_message_without_the_traceback(self, tmp_path):
+        """
+        In a notebook the frames are noise: nothing between
+        `Biofilter(...)` and the check tells the reader anything, and the
+        traceback buries the one line that matters. IPython calls this
+        hook when an exception defines it.
+        """
+        error = BundlePathError("No such directory: /nope")
+        rendered = error._render_traceback_()
+
+        assert rendered == ["BundlePathError: No such directory: /nope"]
+
+    def test_a_multiline_message_survives_rendering(self):
+        error = BundlePathError("line one\n  line two")
+        assert "line two" in "\n".join(error._render_traceback_())
+
+
+class TestHintIsOnlyACourtesy:
+    def test_an_unlistable_parent_still_produces_the_error(self, monkeypatch, tmp_path):
+        """
+        The sibling hint walks whatever directory the path sits in, which
+        can be the filesystem root — and macOS has entries there that
+        raise on stat. Failing to build the hint must not replace the
+        error the caller needs.
+        """
+        from biofilter.utils import bundle_path as bp
+
+        def explode(self):
+            raise OSError(22, "Invalid argument")
+
+        monkeypatch.setattr(Path, "iterdir", explode)
+
+        with pytest.raises(BundlePathError, match="No such directory"):
+            check_bundle_path(bundle_to_uri(tmp_path / "missing"))
+
+    def test_the_root_directory_does_not_crash(self):
+        with pytest.raises(BundlePathError, match="not a bundle"):
+            check_bundle_path("parquet:///")

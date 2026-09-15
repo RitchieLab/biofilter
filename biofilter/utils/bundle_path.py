@@ -36,9 +36,59 @@ def bundle_to_uri(path: str | Path | None) -> Optional[str]:
 class BundlePathError(ValueError):
     """The path given for a bundle is not one, with a reason."""
 
+    def _render_traceback_(self) -> list[str]:
+        """
+        What IPython prints instead of a traceback.
+
+        The frames are noise for this error. Nothing in the call stack
+        between `Biofilter(...)` and here tells a reader anything the
+        message does not already say, and in a notebook the traceback
+        buries the one line that matters. IPython calls this hook when an
+        exception defines it; a plain Python run still gets the full
+        traceback, which is what you want when debugging the library
+        rather than using it.
+        """
+        return [f"BundlePathError: {self}"]
+
 
 def _looks_like_bundle(path: Path) -> bool:
-    return (path / "manifest.json").is_file()
+    # Tolerant on purpose: the sibling scan below walks whatever
+    # directory the caller's path sits in, which can be the filesystem
+    # root, and macOS has entries there that raise on stat.
+    try:
+        return (path / "manifest.json").is_file()
+    except OSError:
+        return False
+
+
+def _siblings_hint(path: Path, limit: int = 8) -> str:
+    """
+    The bundles sitting next to the one that was not found.
+
+    A courtesy, not part of the error: if the parent cannot be listed —
+    it may not exist, and on macOS the filesystem root holds entries that
+    raise on stat — the hint is simply omitted rather than replacing the
+    error the caller needs to see.
+    """
+    try:
+        siblings = sorted(
+            child.name
+            for child in path.parent.iterdir()
+            if child.is_dir() and _looks_like_bundle(child)
+        )
+    except OSError:
+        return ""
+
+    if not siblings:
+        return ""
+
+    listed = "\n    ".join(siblings[:limit])
+    more = (
+        f"\n    ... and {len(siblings) - limit} more"
+        if len(siblings) > limit
+        else ""
+    )
+    return f"\n\n  Bundles in {path.parent}:\n    {listed}{more}"
 
 
 def check_bundle_path(uri: str) -> None:
@@ -61,23 +111,7 @@ def check_bundle_path(uri: str) -> None:
         return
 
     if not path.exists():
-        hint = ""
-        parent = path.parent
-        if parent.is_dir():
-            siblings = sorted(
-                child.name
-                for child in parent.iterdir()
-                if child.is_dir() and _looks_like_bundle(child)
-            )
-            if siblings:
-                listed = "\n    ".join(siblings[:8])
-                more = (
-                    f"\n    ... and {len(siblings) - 8} more"
-                    if len(siblings) > 8
-                    else ""
-                )
-                hint = f"\n\n  Bundles in {parent}:\n    {listed}{more}"
-        raise BundlePathError(f"No such directory: {path}{hint}")
+        raise BundlePathError(f"No such directory: {path}{_siblings_hint(path)}")
 
     if not path.is_dir():
         raise BundlePathError(f"Not a directory: {path}")
