@@ -55,7 +55,7 @@ From Python:
 ```python
 from biofilter import Biofilter
 
-bf = Biofilter(db_uri="parquet:///shared/bundles/bf4_2026_06")
+bf = Biofilter(bundle="/shared/bundles/bf4_2026_06")
 df = bf.report.run("annotation_master_variant", input_data=["rs429358"])
 ```
 

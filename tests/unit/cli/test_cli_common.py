@@ -146,3 +146,13 @@ def test_bundle_wins_over_db_uri():
 
 def test_no_bundle_falls_back_to_db_uri():
     assert cmod.try_resolve_db_uri("sqlite:///x.db", None) == "sqlite:///x.db"
+
+
+def test_bundle_to_uri_has_one_implementation():
+    """
+    The CLI and the Python facade must translate a bundle path the same
+    way; two copies would drift. `common` re-exports the canonical one.
+    """
+    from biofilter.utils.bundle_path import bundle_to_uri as canonical
+
+    assert cmod.bundle_to_uri is canonical

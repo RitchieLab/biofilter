@@ -6,6 +6,7 @@ from pathlib import Path
 
 import click
 
+from biofilter.utils.bundle_path import bundle_to_uri
 from biofilter.utils.config import BiofilterConfig
 
 
@@ -14,23 +15,6 @@ def _clean_db_uri(value: str | None) -> str | None:
         return None
     value = value.strip()
     return value or None
-
-
-def bundle_to_uri(path: str | None) -> str | None:
-    """
-    Turn a bundle path into the URI the engine expects.
-
-    `--bundle /shared/bundles/bf4_20260912` is the shape a user has: a
-    folder someone handed them. `parquet://` is how the engine addresses
-    it, and the scheme only exists because Biofilter once spoke to several
-    backends. Keeping the translation here means the URI stays an
-    implementation detail rather than something to memorise — including
-    the triple slash, which trips people up every time.
-    """
-    if not path:
-        return None
-    resolved = Path(path).expanduser().resolve()
-    return f"parquet://{resolved}"
 
 
 def try_resolve_db_uri(

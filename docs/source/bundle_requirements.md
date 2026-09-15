@@ -143,7 +143,7 @@ biofilter --bundle /path/to/bundle report list
 ```
 
 ```python
-bf = Biofilter(db_uri="parquet:///path/to/bundle")
+bf = Biofilter(bundle="/path/to/bundle")
 bf.db.connect()
 print(bf.db.bundle_id())
 ```

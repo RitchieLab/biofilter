@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Optional
 from urllib.parse import urlsplit, urlunsplit
 
@@ -11,6 +12,7 @@ from biofilter.core.components import (
     SettingsComponent,
 )
 from biofilter.modules.db.database import Database
+from biofilter.utils.bundle_path import bundle_to_uri
 from biofilter.utils.config import BiofilterConfig
 from biofilter.utils.logger import Logger
 from biofilter.utils.version import __version__
@@ -128,15 +130,28 @@ class Biofilter:
     Public facade.
 
     Usage:
-        bf = Biofilter("sqlite:///./biofilter.db")
-        bf.db.connect()
-        bf.etl.update(...)
+        bf = Biofilter(bundle="/path/to/bundles/20260914")
         bf.report.list()
-        bf.report.run("gene_to_snp", {...})
+        bf.report.run("annotation_master_gene", input_data=["TP53"])
+
+    A bundle is a directory — point at the directory, not at its
+    tables/. `db_uri=` still takes any SQLAlchemy URI, for the ETL and
+    the reports that have not been migrated yet.
     """
 
-    def __init__(self, db_uri: str | None = None, debug_mode: bool = False):
-        self.core = BiofilterCore(db_uri=db_uri, debug_mode=debug_mode)
+    def __init__(
+        self,
+        db_uri: str | None = None,
+        debug_mode: bool = False,
+        bundle: "str | Path | None" = None,
+    ):
+        # `bundle` is the shape a user has: a folder someone handed them.
+        # It wins over db_uri for the same reason --bundle does on the
+        # CLI — it is the more specific request, and it saves memorising
+        # a URI scheme with three slashes.
+        self.core = BiofilterCore(
+            db_uri=bundle_to_uri(bundle) or db_uri, debug_mode=debug_mode
+        )
 
         # Components
         self.db = DBComponent(self.core)

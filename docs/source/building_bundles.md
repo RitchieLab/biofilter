@@ -116,7 +116,7 @@ From Python:
 ```python
 from biofilter import Biofilter
 
-bf = Biofilter(db_uri="parquet:///path/to/bundle")
+bf = Biofilter(bundle="/path/to/bundle")
 bf.db.connect()
 
 print(bf.db.bundle_id())          # which data this is

@@ -69,7 +69,7 @@ temp/                    # Created during binning queries — disposable
 
 ### 4. Interaction layer (`api/cli/` + `biofilter.py`)
 - Click CLI with 4 command groups: `config`, `db`, `etl`, `report`
-- Python facade: `Biofilter(db_uri=...)` exposing `.db`, `.etl`, `.report`, `.settings`
+- Python facade: `Biofilter(bundle=...)` for a bundle, or `Biofilter(db_uri=...)` for any SQLAlchemy URI; exposes `.db`, `.etl`, `.report`, `.settings`
 - Supports `DATABASE_URL` env var (Docker-ready)
 
 ---
@@ -133,17 +133,21 @@ biofilter report explain --report-name <name>
 ```python
 from biofilter import Biofilter
 
-bf = Biofilter(db_uri="postgresql+psycopg2://user:pass@localhost:5432/biofilter_dev")
-bf.db.connect()
+# Reading: a bundle is a directory — point at the directory, not at its
+# tables/. A bundle is read-only, so reports work and the ETL does not.
+bf = Biofilter(bundle="./biofilter_data/bundles/20260914")
 
-# ETL
-summary = bf.etl.update_all(only_active=True)
+result = bf.report.run("annotation_master_gene", input_data=["TP53", "BRCA1"])
+df = result.to_pandas()          # migrated reports return a ReportResult
+result.provenance["bundle_id"]   # which build these ids belong to
+result.write("genes.csv")        # writes genes.csv.provenance.json beside it
 
-# Reports
+# Reports still on the legacy layer return a DataFrame directly.
 df_status = bf.report.run("etl_status", only_active=False)
-df_rel    = bf.report.run("entity_relationship_model",
-                           input_data=["TP53", "BRCA1"],
-                           relationship_scope="input_to_any")
+
+# Writing: the ETL needs a writable URI, never a bundle.
+bf_dev = Biofilter(db_uri="postgresql+psycopg2://user:pass@localhost:5432/biofilter_dev")
+summary = bf_dev.etl.update_all(only_active=True)
 ```
 
 ---
