@@ -20,6 +20,19 @@ user actually has.
 | `reports__annotate_pathway.ipynb` | pathways, and the same biology curated twice |
 | `reports__annotate_protein.ipynb` | proteins, and isoform resolution |
 
+## Where results go
+
+Every notebook defines `OUTPUT_DIR` and writes through it:
+
+```
+notebooks/templates/outputs/
+```
+
+The directory is gitignored. It is resolved from the project root — the
+folder holding `.biofilter.toml` — rather than from the working
+directory, because VS Code and Jupyter disagree about what a notebook's
+working directory is, and a bare filename lands wherever they decided.
+
 ## Running them
 
 Every notebook starts with a bundle path to edit:

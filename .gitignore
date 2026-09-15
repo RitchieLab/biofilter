@@ -167,7 +167,11 @@ notebooks/Andre/adsp/
 
 adsp/
 
-# Report output written next to wherever you ran it
+# Where the template notebooks write their results.
+notebooks/templates/outputs/
+
+# Safety net: report output landing at the repository root, which is what
+# happens when something writes a bare filename from the wrong directory.
 /*.csv
 /*.parquet
-*.provenance.json
+/*.provenance.json
