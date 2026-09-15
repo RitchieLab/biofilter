@@ -20,6 +20,21 @@ from biofilter.modules.report.bundle import Bundle
 from biofilter.modules.report.result import Artifact, ReportResult
 
 
+#: What DuckDB says when a name genuinely is not in the data, as opposed
+#: to the many other things a binder error can mean.
+_MISSING_PHRASES = (
+    "does not have a column named",
+    "not found in from clause",
+    "table with name",
+    "does not exist",
+)
+
+
+def _is_missing_from_bundle(exc: Exception) -> bool:
+    message = str(exc).lower()
+    return any(phrase in message for phrase in _MISSING_PHRASES)
+
+
 class BundleSchemaMismatch(RuntimeError):
     """The bundle does not carry something the report asked for."""
 
@@ -57,6 +72,11 @@ class ReportBase:
         self.params = params
         self.logger = logger or self._default_logger()
         self.artifacts: list[Artifact] = []
+        #: Decisions the report made that the parameters do not show —
+        #: a default that was taken, a mode that was chosen. Merged into
+        #: the result's provenance, because "which of two mechanisms
+        #: produced this" is not recoverable from the rows.
+        self.provenance_extra: dict[str, Any] = {}
         # One cursor per execution. Views are shared; temp tables and
         # registered relations are not, so two reports in one process
         # cannot collide.
@@ -101,6 +121,11 @@ class ReportBase:
         try:
             cur = self.con.execute(query, list(params) if params else None)
         except duckdb.BinderException as exc:
+            if not _is_missing_from_bundle(exc):
+                # Not every binder error is the bundle's fault. A bad
+                # ORDER BY or an ambiguous name is the report's own bug,
+                # and blaming the data sends the reader somewhere useless.
+                raise
             raise BundleSchemaMismatch(self._schema_message(exc)) from exc
         return cur.to_arrow_table()
 
@@ -204,6 +229,17 @@ class ReportBase:
         raise ValueError(
             f"{param_name} must be a list of values or a path to a text file."
         )
+
+    def note_provenance(self, key: str, value: Any) -> None:
+        """
+        Record something about how this result was produced.
+
+        Parameters are already recorded, but only as passed — a default
+        taken silently leaves no trace, and for a report with two
+        mutually exclusive mechanisms that is the one thing a reader
+        most needs.
+        """
+        self.provenance_extra[key] = value
 
     def add_artifact(
         self, name: str, path: str | Path, kind: str = "log", description: str = ""

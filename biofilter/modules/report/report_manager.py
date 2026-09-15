@@ -178,6 +178,7 @@ class ReportManager:
         report = cls(bundle=bundle, logger=self.logger, **params)
         try:
             produced = report.run()
+            extra = dict(report.provenance_extra)
         finally:
             report.close()
 
@@ -200,6 +201,8 @@ class ReportManager:
             rows=result.num_rows,
             coverage=self._coverage(cls, bundle),
         )
+        # What the report decided, not only what it was told.
+        result.provenance.update(extra)
 
         elapsed = time.perf_counter() - started
         self.logger.log(

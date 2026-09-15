@@ -595,6 +595,19 @@ less believable, which is why this section exists.
   now the `storage` section of `platform_data_statistics`, read from the
   manifest. Retiring a report is as legitimate an outcome as migrating
   one, and this is the first case where it was the right one.
+
+  **Settled 2026-09-15 for two more: `gene_to_variant_filtering` and
+  `variant_annotation_expanded` were replaced by the single
+  `expand_gene_to_variant`.** The first mapped genes to variants by
+  positional overlap; the second was the same query with no filters and
+  a gene list scraped out of another report's CSV by column name. The
+  replacement keeps positional overlap, adds an optional window, and adds
+  a second mechanism — VEP's own gene assignment — which the caller must
+  choose between explicitly, because the two return different variants
+  and nothing in the rows reveals which ran. Chaining is deliberately
+  not carried over: a user who needs one report's output as another's
+  input writes the file and reads the column, which is a thing they can
+  look at.
 - **How `model_variants.py` is realigned with what the ETL writes**
   (§1.4). The direction is settled in §2.1; the table-by-table work
   belongs to the model and build layers.

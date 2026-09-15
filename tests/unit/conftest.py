@@ -580,17 +580,24 @@ def _variant_tables() -> dict[str, pa.Table]:
             pangolin_largest_ds=pa.array([0.0]),
             phylop=pa.array([2.1]),
         ),
+        # 17:150 is scored on the transcript VEP also calls most severe,
+        # so both join grains agree there.
+        #
+        # 17:200 is scored on ENST00000099 — a transcript VEP never
+        # reports for it. That is the common case in the real bundle:
+        # AlphaMissense picks its own transcript, and requiring it to
+        # match VEP's most-severe one drops ~97% of the scores.
         "variant_alphamissense": _t(
-            chromosome=pa.array([17], pa.int32()),
-            position=pa.array([150], pa.int64()),
-            reference_allele=pa.array(["A"]),
-            alternate_allele=pa.array(["G"]),
+            chromosome=pa.array([17, 17], pa.int32()),
+            position=pa.array([150, 200], pa.int64()),
+            reference_allele=pa.array(["A", "A"]),
+            alternate_allele=pa.array(["G", "G"]),
             # Versioned, as AlphaMissense writes it.
-            transcript_id=pa.array(["ENST00000001.9"]),
-            predictor_key=pa.array(["am"]),
-            predictor_name=pa.array(["alphamissense"]),
-            score=pa.array([0.17]),
-            classification=pa.array(["likely_benign"]),
+            transcript_id=pa.array(["ENST00000001.9", "ENST00000099.3"]),
+            predictor_key=pa.array(["am", "am"]),
+            predictor_name=pa.array(["alphamissense", "alphamissense"]),
+            score=pa.array([0.17, 0.91]),
+            classification=pa.array(["likely_benign", "likely_pathogenic"]),
         ),
         # eQTL evidence. Deliberately not all brain: which tissues a
         # bundle carries is a build flag (50 in the GTEx catalogue, 13

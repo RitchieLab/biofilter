@@ -19,6 +19,7 @@ user actually has.
 | `reports__expand_entity_neighborhood.ipynb` | what is one hop from an entity, for a mixed list |
 | `reports__expand_entity_relationship.ipynb` | the links themselves, and how a set connects to itself |
 | `reports__expand_variant_regulatory.ipynb` | which genes a variant regulates, and in which tissue |
+| `reports__expand_gene_to_variant.ipynb` | the variants in a gene — by coordinate or by VEP, and you pick which |
 | `reports__annotate_gene.ipynb` | genes |
 | `reports__annotate_variant.ipynb` | variants: rsID / position / allele, one row per transcript |
 | `reports__annotate_disease.ipynb` | diseases, and the two ClinGen counts |
