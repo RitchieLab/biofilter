@@ -13,6 +13,7 @@ user actually has.
 | --- | --- |
 | `reports__101.ipynb` | start here — how reports work against a bundle |
 | `reports__TEMPLATE.ipynb` | copy this when migrating or writing a report |
+| `reports__platform_etl.ipynb` | what ran to build this bundle, and whether it holds up |
 | `reports__resolve_entity.ipynb` | **start here for a new input list** — does the bundle know these names |
 | `reports__expand_entity_neighborhood.ipynb` | what is one hop from an entity, for a mixed list |
 | `reports__expand_entity_relationship.ipynb` | the links themselves, and how a set connects to itself |

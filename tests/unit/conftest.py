@@ -39,6 +39,7 @@ GROUP_DISEASES, GROUP_GO = 4, 5
 # Data sources, so provenance and the ClinGen-only summary have something
 # to distinguish.
 DS_HGNC, DS_UNIPROT, DS_REACTOME, DS_MONDO, DS_GO, DS_CLINGEN = 1, 2, 3, 4, 5, 6
+DS_VARIANT = 7
 
 
 def _t(**columns) -> pa.Table:
@@ -120,30 +121,140 @@ def _tables() -> dict[str, pa.Table]:
         ),
         "etl_source_systems": _t(
             id=pa.array(
-                [DS_HGNC, DS_UNIPROT, DS_REACTOME, DS_MONDO, DS_GO, DS_CLINGEN],
+                [DS_HGNC, DS_UNIPROT, DS_REACTOME, DS_MONDO, DS_GO, DS_CLINGEN,
+                 DS_VARIANT],
                 pa.int64(),
             ),
             name=pa.array(
-                ["HGNC", "UniProt", "Reactome", "MONDO", "GO", "ClinGen"]
+                ["HGNC", "UniProt", "Reactome", "MONDO", "GO", "ClinGen", "gnomAD"]
             ),
-            description=pa.array([None] * 6, pa.string()),
+            active=pa.array([True] * 7),
         ),
         "etl_data_sources": _t(
             id=pa.array(
-                [DS_HGNC, DS_UNIPROT, DS_REACTOME, DS_MONDO, DS_GO, DS_CLINGEN],
+                [DS_HGNC, DS_UNIPROT, DS_REACTOME, DS_MONDO, DS_GO, DS_CLINGEN,
+                 DS_VARIANT],
                 pa.int64(),
             ),
             name=pa.array(
-                ["hgnc", "uniprot", "reactome", "mondo", "gene_ontology", "clingen"]
+                ["hgnc", "uniprot", "reactome", "mondo", "gene_ontology", "clingen",
+                 "gnomad_test"]
             ),
             source_system_id=pa.array(
-                [DS_HGNC, DS_UNIPROT, DS_REACTOME, DS_MONDO, DS_GO, DS_CLINGEN],
+                [DS_HGNC, DS_UNIPROT, DS_REACTOME, DS_MONDO, DS_GO, DS_CLINGEN,
+                 DS_VARIANT],
                 pa.int64(),
             ),
             data_type=pa.array(
-                ["Gene", "Protein", "Pathway", "Disease", "GO", "Disease Relationships"]
+                ["Gene", "Protein", "Pathway", "Disease", "GO",
+                 "Disease Relationships", "Variant"]
             ),
-            active=pa.array([True] * 6),
+            active=pa.array([True] * 7),
+        ),
+        # One data source per pipeline state the status report reports.
+        #
+        #   hgnc           extract -> transform -> load, one hash carried
+        #                  through            ........................ ok
+        #   gnomad_test    extract -> transform, no load: the variant
+        #                  branch writes parquet straight ........... ok
+        #   uniprot        every stage ran, no hashes anywhere . unverifiable
+        #   gene_ontology  transform ran on a different extract . misaligned
+        #   reactome       core source with no load ............. incomplete
+        #   mondo          no packages at all .................... never_run
+        #   clingen        failed once, then succeeded ..... ok + an error
+        "etl_packages": _t(
+            id=pa.array(list(range(1, 15)), pa.int64()),
+            data_source_id=pa.array(
+                [
+                    DS_HGNC, DS_HGNC, DS_HGNC,
+                    DS_VARIANT, DS_VARIANT,
+                    DS_UNIPROT, DS_UNIPROT, DS_UNIPROT,
+                    DS_GO, DS_GO, DS_GO,
+                    DS_REACTOME,
+                    DS_CLINGEN, DS_CLINGEN,
+                ],
+                pa.int64(),
+            ),
+            operation_type=pa.array(
+                [
+                    "extract", "transform", "load",
+                    "extract", "transform",
+                    "extract", "transform", "load",
+                    "extract", "transform", "load",
+                    "extract",
+                    "extract", "extract",
+                ]
+            ),
+            status=pa.array(
+                [
+                    "completed", "completed", "completed",
+                    "completed", "completed",
+                    "completed", "completed", "completed",
+                    "completed", "completed", "completed",
+                    "completed",
+                    "failed", "completed",
+                ]
+            ),
+            extract_status=pa.array(
+                [
+                    "completed", None, None,
+                    "up-to-date", None,
+                    "completed", None, None,
+                    "completed", None, None,
+                    "completed",
+                    "failed", "completed",
+                ]
+            ),
+            transform_status=pa.array(
+                [
+                    None, "completed", None,
+                    None, "completed",
+                    None, "completed", None,
+                    None, "completed", None,
+                    None,
+                    None, None,
+                ]
+            ),
+            load_status=pa.array(
+                [
+                    None, None, "completed",
+                    None, None,
+                    None, None, "completed",
+                    None, None, "completed",
+                    None,
+                    None, None,
+                ]
+            ),
+            extract_hash=pa.array(
+                [
+                    "aaa", None, None,
+                    "vvv", None,
+                    None, None, None,
+                    "ggg", None, None,
+                    "rrr",
+                    None, None,
+                ]
+            ),
+            transform_hash=pa.array(
+                [
+                    None, "aaa", None,
+                    None, "vvv",
+                    None, None, None,
+                    None, "OTHER", None,
+                    None,
+                    None, None,
+                ]
+            ),
+            load_hash=pa.array(
+                [
+                    None, None, "aaa",
+                    None, None,
+                    None, None, None,
+                    None, None, "OTHER",
+                    None,
+                    None, None,
+                ]
+            ),
         ),
         "omic_status": _t(
             id=pa.array([1], pa.int64()),
