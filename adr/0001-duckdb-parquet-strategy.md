@@ -287,7 +287,7 @@ bundle (`/project/hall_shared/biofilter/databases/20260514/bundle/tables`,
 DuckDB configuration: `--threads 4 --memory-limit 8GB` (in-memory catalog,
 parquet read from GPFS shared FS).
 
-Three-stage query pattern equivalent to `annotation_master_variant`:
+Three-stage query pattern equivalent to `annotate_variant`:
 
 - **Stage A:** lookup variants by rsID in `variant_masters`
 - **Stage B:** Stage A + JOIN `variant_molecular_effects`

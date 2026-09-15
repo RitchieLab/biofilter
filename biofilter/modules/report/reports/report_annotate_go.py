@@ -23,8 +23,8 @@ from biofilter.modules.report.reports._annotation import (
 DEFAULT_MAX_TERMS_PER_SIDE = 25
 
 
-class AnnotationMasterGOReport(AnnotationReportBase):
-    name = "annotation_master_go"
+class AnnotateGOReport(AnnotationReportBase):
+    name = "annotate_go"
     description = (
         "Gene Ontology annotation for input terms or aliases: GO id, name and "
         "namespace, how many parents and children the term has in the ontology, "

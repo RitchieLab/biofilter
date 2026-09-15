@@ -29,8 +29,8 @@ from biofilter.modules.report.reports._annotation import (
 )
 
 
-class AnnotationMasterProteinReport(AnnotationReportBase):
-    name = "annotation_master_protein"
+class AnnotateProteinReport(AnnotationReportBase):
+    name = "annotate_protein"
     description = (
         "Protein annotation for input proteins or aliases: canonical accession, "
         "function, location and tissue expression, isoform resolution, Pfam "

@@ -21,7 +21,7 @@ take `--name` (the older `--report-name` still works as an alias). Both
 
 ```bash
 biofilter report run \
-  --name annotation_master_gene \
+  --name annotate_gene \
   --input APOE \
   --output apoe.csv
 ```
@@ -31,7 +31,7 @@ Result: `apoe.csv` in the current directory.
 To pass several values, repeat `--input` (there is no comma-separated form):
 
 ```bash
-biofilter report run --name annotation_master_gene \
+biofilter report run --name annotate_gene \
   --input APOE --input TP53 --input BRCA1 --output genes.csv
 ```
 
@@ -48,19 +48,19 @@ Commonly used, user-facing reports:
 
 | Report | Typical input |
 |---|---|
-| `annotation_master_gene` | Gene symbols (e.g. `APOE`) |
-| `annotation_master_variant` | rsIDs (`rs429358`), `chr:pos`, or `chr:pos:ref:alt` |
-| `annotation_master_disease` | Disease names or MONDO IDs |
-| `annotation_master_pathway` | Pathway names or Reactome/KEGG IDs |
-| `annotation_master_chemical` | Chemical names or ChEBI IDs |
-| `annotation_master_protein` | UniProt accessions |
-| `annotation_master_go` | GO terms |
+| `annotate_gene` | Gene symbols (e.g. `APOE`) |
+| `annotate_variant` | rsIDs (`rs429358`), `chr:pos`, or `chr:pos:ref:alt` |
+| `annotate_disease` | Disease names or MONDO IDs |
+| `annotate_pathway` | Pathway names or Reactome/KEGG IDs |
+| `annotate_chemical` | Chemical names or ChEBI IDs |
+| `annotate_protein` | UniProt accessions |
+| `annotate_go` | GO terms |
 | `variant_modeling` | rsIDs — builds SNP×SNP pairs via shared biological groups |
 
 ### A3) How do I know what a report accepts (inputs, params, columns)?
 
 ```bash
-biofilter report explain --name annotation_master_variant
+biofilter report explain --name annotate_variant
 ```
 
 Shows accepted input formats, parameters, and output columns.
@@ -70,14 +70,14 @@ Shows accepted input formats, parameters, and output columns.
 One item per line:
 
 ```bash
-biofilter report run --name annotation_master_gene \
+biofilter report run --name annotate_gene \
   --input-file genes.txt --output genes.csv
 ```
 
 CSV file — pick the column:
 
 ```bash
-biofilter report run --name annotation_master_gene \
+biofilter report run --name annotate_gene \
   --input-file cohort.csv --input-column symbol --output genes.csv
 ```
 
@@ -141,14 +141,14 @@ Point at a Parquet bundle — read-only via DuckDB, no server, no ETL:
 
 ```bash
 export BIOFILTER_DB_URI="parquet:///abs/path/to/bundle/tables"
-biofilter report run --name annotation_master_gene --input APOE --output apoe.csv
+biofilter report run --name annotate_gene --input APOE --output apoe.csv
 ```
 
 Or per command:
 
 ```bash
 biofilter --db-uri "parquet:///abs/path/to/bundle/tables" \
-  report run --name annotation_master_gene --input APOE --output apoe.csv
+  report run --name annotate_gene --input APOE --output apoe.csv
 ```
 
 `parquet://` cannot modify or delete data — it is safe for read-only querying
@@ -160,7 +160,7 @@ and safe for many concurrent users on shared storage.
 source /project/hall_shared/hall_shared.sh
 module load biofilter/4.2.0        # puts BF4 on PATH and sets the snapshot URI
 biofilter --version                # expected: biofilter 4.2.0
-biofilter report run --name annotation_master_gene --input APOE --output apoe.csv
+biofilter report run --name annotate_gene --input APOE --output apoe.csv
 ```
 
 The module sets `BIOFILTER_DB_URI` for you, so no `--db-uri` is needed.

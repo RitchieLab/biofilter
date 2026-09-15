@@ -26,7 +26,7 @@ no header, one column. The question is a **cohort-level aggregate**:
 
 | Report | Blocker |
 | --- | --- |
-| `annotation_master_variant` | Parses `chr:pos:ref:alt` natively, but `_lookup_variants()` issues **one SQL query per input variant**. 712k inputs = 712k round-trips. It also emits one DataFrame row per variant × transcript, so the result set explodes well past memory before any aggregation happens. |
+| `annotate_variant` | Parses `chr:pos:ref:alt` natively, but `_lookup_variants()` issues **one SQL query per input variant**. 712k inputs = 712k round-trips. It also emits one DataFrame row per variant × transcript, so the result set explodes well past memory before any aggregation happens. |
 | `variant_gene_location_model` | `_detect_mode()` / `_parse_region_str()` cannot parse `1:633963:C:T` — it reads the string as a region and fails on the `C:T` tail. Also loops per input. |
 | everything else | Wrong grain: entity-centric or gene-centric, not "classify a list of positions". |
 
@@ -102,7 +102,7 @@ over inputs. This is the whole reason the report is feasible:
 
 | Approach | 712k inputs |
 | --- | --- |
-| Per-variant queries (`annotation_master_variant` shape) | not viable — 712k round-trips |
+| Per-variant queries (`annotate_variant` shape) | not viable — 712k round-trips |
 | Set-based over PostgreSQL | ~2.5 min |
 | Set-based over the parquet bundle via DuckDB | **4.6 s** |
 
@@ -187,7 +187,7 @@ Everything needed is already in the bundle exported today:
 
 ## 4. Alternatives Considered
 
-### Alternative A — Extend `annotation_master_variant` with an aggregate mode
+### Alternative A — Extend `annotate_variant` with an aggregate mode
 
 Add a `summarize=True` parameter that skips the per-variant frame.
 
@@ -327,7 +327,7 @@ Total: roughly **1.5 days**.
   `variant_molecular_effects.consequence_id` →
   `variant_consequences.consequence_group_id` →
   `variant_consequence_groups`, the way
-  `annotation_master_variant._load_consequence_map()` already does.
+  `annotate_variant._load_consequence_map()` already does.
   Verified 2026-08-21. The denormalised columns should still be
   populated — they exist precisely to avoid that two-hop join on a
   1.79-billion-row table.

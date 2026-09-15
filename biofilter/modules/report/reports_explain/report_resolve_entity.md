@@ -1,4 +1,4 @@
-# entity_resolve
+# resolve_entity
 
 Does the bundle know these names, and unambiguously?
 
@@ -7,7 +7,7 @@ Does the bundle know these names, and unambiguously?
 > this expands one — an ambiguous name comes back as several rows.
 
 ```bash
-biofilter report run --report-name entity_resolve \
+biofilter report run --report-name resolve_entity \
     --input TP53 --input BRCA1 --input NOT_A_GENE \
     --output lookup.csv
 ```

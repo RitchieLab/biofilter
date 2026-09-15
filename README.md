@@ -220,7 +220,7 @@ Then point Biofilter at the bundle's `tables/` directory using the `parquet://` 
 export DATABASE_URL="parquet:///shared/bundles/bf4_2026_06"
 
 biofilter report run \
-  --report-name annotation_master_gene \
+  --report-name annotate_gene \
   --input APOE \
   --output apoe.csv
 ```
@@ -231,7 +231,7 @@ The same works from Python:
 from biofilter import Biofilter
 
 bf = Biofilter(db_uri="parquet:///shared/bundles/bf4_2026_06")
-df = bf.report.run("annotation_master_variant", input_data=["rs429358"])
+df = bf.report.run("annotate_variant", input_data=["rs429358"])
 ```
 
 **How it works**

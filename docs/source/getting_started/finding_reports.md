@@ -80,7 +80,7 @@ supports.
 
 | Report | Use it when |
 | ------ | ----------- |
-| `annotation_master_gene` | You want to browse the gene catalog |
+| `annotate_gene` | You want to browse the gene catalog |
 | `variant_single_gene_annotation` | You have variants and want their effect on one gene |
 | `entity_neighborhood_summary` | You have one entity and want everything connected to it |
 

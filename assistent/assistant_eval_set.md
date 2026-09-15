@@ -18,7 +18,7 @@ For each test, verify:
 ### Test 1
 Prompt: "I have a list of genes. How do I annotate them and get a CSV?"
 Expected:
-- `biofilter report run --name annotation_master_gene --input "..."` or `--input-file`
+- `biofilter report run --name annotate_gene --input "..."` or `--input-file`
 - `--output <file>.csv`
 
 ### Test 2
@@ -27,9 +27,9 @@ Expected:
 - `biofilter report list --verbose`
 
 ### Test 3
-Prompt: "What inputs does annotation_master_variant accept?"
+Prompt: "What inputs does annotate_variant accept?"
 Expected:
-- `biofilter report explain --name annotation_master_variant`
+- `biofilter report explain --name annotate_variant`
 - mentions rsID / chr:pos / chr:pos:ref:alt
 
 ### Test 4

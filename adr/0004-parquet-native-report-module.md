@@ -320,7 +320,7 @@ path that class of problem does not arise.
 raw connection 14 times (`session.connection()`, `session.bind`,
 `session.get_bind`) — `pd.read_sql(sql, self.session.bind)` in the
 `pg_*` reports, `conn = self.session.connection()` in
-`annotation_master_variant.py:293`. The remaining 8 uses are
+`annotate_variant.py:293`. The remaining 8 uses are
 `session.flush()`, a unit-of-work call in a read-only report, needed
 only because three reports INSERT into temp tables.
 
@@ -522,8 +522,8 @@ what does one output row mean, and where will the rewrite actually pay.
 
 | class | one row is | reports |
 | --- | --- | --- |
-| **resolution** | a candidate match for one input name | `entity_resolve` |
-| **annotation** | one input, enriched | the `annotation_master_*` family, `variant_single_gene_annotation`, `variant_annotation_expanded`, `annotation_variant_regulatory_evidence` |
+| **resolution** | a candidate match for one input name | `resolve_entity` |
+| **annotation** | one input, enriched | the `annotate_*` family, `variant_single_gene_annotation`, `variant_annotation_expanded`, `annotation_variant_regulatory_evidence` |
 | **expansion** | a link — an input, and something reached from it | `entity_neighborhood_summary`, `entity_relationship_model`, `variant_gene_location_model`, `gene_to_variant_filtering` |
 | **pair generation** | a candidate pair to test downstream | `snp_snp_model`, `snp_snp_pair_generator`, `variant_modeling` |
 | **aggregation** | a bin, or the result of a set operation | `variant_binning`, `variant_list_intersect` |
@@ -537,7 +537,7 @@ and 3, where "SNP-SNP model" meant "the candidate set to test", and it is
 recorded here so nobody corrects it in the wrong direction. Whether the
 reports themselves get renamed is §2.14.
 
-**`entity_filter` became `entity_resolve`.** It filtered nothing. A
+**`entity_filter` became `resolve_entity`.** It filtered nothing. A
 filtering report reduces a set; this one expands — one input becomes
 every entity answering to it, so ambiguity surfaces as extra rows. Done
 now rather than later, while seven reports exist and no lab script
@@ -546,7 +546,7 @@ depends on the name.
 ### 2.13 The speed argument does not apply uniformly
 
 §5 measured 113x on materialisation and §1.1 blamed the fan-out. Both
-hold — for reports that fan out. Migrating `entity_resolve` showed where
+hold — for reports that fan out. Migrating `resolve_entity` showed where
 they do not.
 
 Legacy against native, same bundle, same inputs:
@@ -585,7 +585,7 @@ less believable, which is why this section exists.
 ### 2.14 Not decided here
 
 - **Migration order.** Reports are migrated on request, one at a time;
-  `annotation_master_gene` is first (§6). `db_pg_index_stats` and
+  `annotate_gene` is first (§6). `db_pg_index_stats` and
   `db_pg_table_stats` are PostgreSQL-only and meaningless against a
   bundle — candidates for deletion rather than migration.
 - **How `model_variants.py` is realigned with what the ETL writes**
@@ -598,7 +598,7 @@ less believable, which is why this section exists.
   §2.9. Both are ADR-003 matters; §6 step 2 works either way.
 - **Whether the pair-generation reports get renamed** when they are
   migrated (§2.12). `snp_snp_model` and `variant_modeling` produce
-  candidate pairs, not models. It is the same decision `entity_resolve`
+  candidate pairs, not models. It is the same decision `resolve_entity`
   already went through, and the same argument applies: cheaper now than
   after the lab has scripted them.
 
@@ -793,7 +793,7 @@ caller can consume batches without materialising the 4 GB at all.
    `ReportManager`, `ReportResult`, input registration (§2.5) and
    provenance export (§2.7).
 6. Build the fixture bundle (§2.10).
-7. Pilot A — `annotation_master_gene` (687 lines, 9 queries). It reads
+7. Pilot A — `annotate_gene` (687 lines, 9 queries). It reads
    eight populated core tables plus the partitioned `variant_masters`,
    so it exercises the fan-out collapse, input registration, aliases,
    groups, locations and relationships in one report. Every table it
@@ -812,7 +812,7 @@ caller can consume batches without materialising the 4 GB at all.
 ## 7. Open questions
 
 - ~~**Composition.**~~ **Answered 2026-09-15 by the annotation family.**
-  `annotation_master_gene` was written alone; migrating disease, GO,
+  `annotate_gene` was written alone; migrating disease, GO,
   pathway and protein showed its shape was the shape of all of them.
   `reports/_annotation.py` holds what repeats — the resolution step, and
   functions returning CTE text for relationships, aliases, cross-
@@ -820,7 +820,7 @@ caller can consume batches without materialising the 4 GB at all.
 
   Two things kept it from becoming a framework. It is **SQL text and one
   method**, not a class hierarchy that owns execution; and a report
-  overrides by simply not calling a helper, as `annotation_master_protein`
+  overrides by simply not calling a helper, as `annotate_protein`
   does when it rewrites `resolved` to follow an isoform to its canonical
   entity. Whether this holds for the variant reports, whose shape is
   genuinely different, is still open.

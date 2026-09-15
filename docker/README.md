@@ -103,12 +103,12 @@ docker run --rm \
   -e DATABASE_URL="postgresql+psycopg2://user:password@host:5432/biofilter" \
   -v "$(pwd):/workspace" \
   biofilter:bf4 report run \
-    --report-name annotation_master_gene \
+    --report-name annotate_gene \
     --input-file /workspace/gene.txt \
     --param include_relationships=true \
     --param include_variant_summary=true \
     --param emit_not_found_rows=true \
-    --output /workspace/annotation_master_gene.csv
+    --output /workspace/annotate_gene.csv
 ```
 
 ### 4) Open an interactive shell in the container

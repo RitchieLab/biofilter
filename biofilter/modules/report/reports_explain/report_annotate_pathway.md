@@ -1,9 +1,9 @@
-# annotation_master_pathway
+# annotate_pathway
 
 What the bundle knows about a list of pathways, one row per input.
 
 ```bash
-biofilter report run --report-name annotation_master_pathway \
+biofilter report run --report-name annotate_pathway \
     --input R-HSA-109581 --input hsa04210 \
     --output pathways.csv
 ```

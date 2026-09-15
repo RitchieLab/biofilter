@@ -1,10 +1,10 @@
-# annotation_master_go
+# annotate_go
 
 What the bundle knows about a list of Gene Ontology terms, one row per
 input.
 
 ```bash
-biofilter report run --report-name annotation_master_go \
+biofilter report run --report-name annotate_go \
     --input GO:0006915 --input GO:0008150 \
     --output go_terms.csv
 ```

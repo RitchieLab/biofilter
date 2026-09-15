@@ -38,7 +38,7 @@ apptainer run \
   --env BIOFILTER_DB_URI=parquet:///bundle \
   bf4-hpc.sif \
   biofilter report run \
-    --name annotation_master_gene \
+    --name annotate_gene \
     --input APOE \
     --output /workspace/apoe.csv
 ```
@@ -53,7 +53,7 @@ docker run --rm \
   -v "$(pwd)/out:/workspace" \
   -e BIOFILTER_DB_URI=parquet:///bundle \
   ghcr.io/ritchielab/biofilter-hpc:latest \
-  biofilter report run --name annotation_master_gene --input APOE --output /workspace/apoe.csv
+  biofilter report run --name annotate_gene --input APOE --output /workspace/apoe.csv
 ```
 
 ## Build from source (development)
@@ -90,13 +90,13 @@ bf4hpc biofilter report list
 
 # Annotate genes
 bf4hpc biofilter report run \
-  --name annotation_master_gene \
+  --name annotate_gene \
   --input "TP53,BRCA1,APOE" \
   --output /workspace/genes.csv
 
 # Annotate variants from file
 bf4hpc biofilter report run \
-  --name annotation_master_variant \
+  --name annotate_variant \
   --input-file /workspace/rsids.txt \
   --output /workspace/variants.csv
 ```

@@ -1,9 +1,9 @@
-# annotation_master_disease
+# annotate_disease
 
 What the bundle knows about a list of diseases, one row per input.
 
 ```bash
-biofilter report run --report-name annotation_master_disease \
+biofilter report run --report-name annotate_disease \
     --input MONDO:0007254 --input "breast cancer" \
     --output diseases.csv
 ```

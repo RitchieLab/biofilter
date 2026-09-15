@@ -30,8 +30,8 @@ MATCH_MODES = ("exact", "like", "fuzzy")
 DEFAULT_SIMILARITY_THRESHOLD = 80.0
 
 
-class EntityResolveReport(ReportBase):
-    name = "entity_resolve"
+class ResolveEntityReport(ReportBase):
+    name = "resolve_entity"
     description = (
         "Resolve a list of names to entities, with conflict and status flags. "
         "match_mode: 'exact' (default), 'like' (substring either way), or "

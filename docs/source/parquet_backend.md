@@ -38,7 +38,7 @@ scheme:
 export BIOFILTER_DB_URI="parquet:///shared/bundles/bf4_2026_06"
 
 biofilter report run \
-  --report-name annotation_master_gene \
+  --report-name annotate_gene \
   --input APOE \
   --output apoe.csv
 ```
@@ -47,7 +47,7 @@ biofilter report run \
 
 ```bash
 biofilter --db-uri "parquet:///shared/bundles/bf4_2026_06" \
-  report run --report-name annotation_master_variant --input rs429358 --output out.csv
+  report run --report-name annotate_variant --input rs429358 --output out.csv
 ```
 
 From Python:
@@ -56,7 +56,7 @@ From Python:
 from biofilter import Biofilter
 
 bf = Biofilter(bundle="/shared/bundles/bf4_2026_06")
-df = bf.report.run("annotation_master_variant", input_data=["rs429358"])
+df = bf.report.run("annotate_variant", input_data=["rs429358"])
 ```
 
 Both `parquet://relative/path` and `parquet:///absolute/path` are accepted;
@@ -159,7 +159,7 @@ stays low even against billion-row tables. Measured on the production snapshot:
 |---|---|---|---|
 | 10,000 rsIDs against `variant_molecular_effects` (1.79 B rows) | local NVMe | 1.18 s | 89 MB |
 | Same workload | shared GPFS | 15.52 s | 89 MB |
-| End-to-end CLI report (`annotation_master_variant`, 3 rsIDs) | local NVMe | 1.22 s | — |
+| End-to-end CLI report (`annotate_variant`, 3 rsIDs) | local NVMe | 1.22 s | — |
 
 Shared network storage costs roughly an order of magnitude in wall clock and
 still lands well inside interactive range.

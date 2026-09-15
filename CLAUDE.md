@@ -137,7 +137,7 @@ from biofilter import Biofilter
 # tables/. A bundle is read-only, so reports work and the ETL does not.
 bf = Biofilter(bundle="./biofilter_data/bundles/20260914")
 
-result = bf.report.run("annotation_master_gene", input_data=["TP53", "BRCA1"])
+result = bf.report.run("annotate_gene", input_data=["TP53", "BRCA1"])
 df = result.to_pandas()          # migrated reports return a ReportResult
 result.provenance["bundle_id"]   # which build these ids belong to
 result.write("genes.csv")        # writes genes.csv.provenance.json beside it

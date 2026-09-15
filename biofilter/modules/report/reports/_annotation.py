@@ -1,7 +1,7 @@
 """
 What the annotation reports have in common.
 
-`annotation_master_gene` was written alone, and its shape turned out to
+`annotate_gene` was written alone, and its shape turned out to
 be the shape of all of them: resolve an input to an entity of some group,
 then hang facts off that entity — its master row, its cross-references,
 who it is related to, what else it is called.

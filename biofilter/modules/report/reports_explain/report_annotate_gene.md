@@ -1,10 +1,10 @@
-# annotation_master_gene
+# annotate_gene
 
 Everything the bundle knows about a list of genes, one row per input.
 
 ```bash
 biofilter --bundle /path/to/bundle report run \
-    --report-name annotation_master_gene \
+    --report-name annotate_gene \
     --input TP53 --input BRCA1 \
     --output genes.csv
 ```

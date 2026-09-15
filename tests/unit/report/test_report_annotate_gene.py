@@ -1,4 +1,4 @@
-"""annotation_master_gene, against the fixture bundle."""
+"""annotate_gene, against the fixture bundle."""
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ def run(fixture_bundle):
         manager = ReportManager(bundle=bundle)
 
         def _run(**params):
-            result = manager.run("annotation_master_gene", **params)
+            result = manager.run("annotate_gene", **params)
             return {row["input_value"]: row for row in result.table.to_pylist()}, result
 
         yield _run
@@ -158,11 +158,11 @@ class TestVariantCount:
 class TestContract:
     def test_columns_match_what_is_declared(self, run):
         _, result = run(input_data=["TP53"])
-        from biofilter.modules.report.reports.report_annotation_master_gene import (
-            AnnotationMasterGeneReport,
+        from biofilter.modules.report.reports.report_annotate_gene import (
+            AnnotateGeneReport,
         )
 
-        assert result.columns == list(AnnotationMasterGeneReport.COLUMNS)
+        assert result.columns == list(AnnotateGeneReport.COLUMNS)
 
     def test_provenance_names_the_bundle(self, run):
         _, result = run(input_data=["TP53"])

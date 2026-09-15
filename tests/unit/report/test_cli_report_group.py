@@ -407,7 +407,7 @@ def test_report_run_with_input_file_csv_and_column(monkeypatch, tmp_path):
             "--db-uri",
             "sqlite:///test.db",
             "--name",
-            "entity_resolve",
+            "resolve_entity",
             "--input-file",
             str(input_file),
             "--input-column",
@@ -435,7 +435,7 @@ def test_report_run_with_input_file_csv_numeric_column_skips_header(monkeypatch,
             "--db-uri",
             "sqlite:///test.db",
             "--name",
-            "entity_resolve",
+            "resolve_entity",
             "--input-file",
             str(input_file),
             "--input-column",
@@ -463,7 +463,7 @@ def test_report_run_input_column_without_csv_file_errors(monkeypatch, tmp_path):
             "--db-uri",
             "sqlite:///test.db",
             "--name",
-            "entity_resolve",
+            "resolve_entity",
             "--input-file",
             str(input_file),
             "--input-column",
@@ -526,7 +526,7 @@ def test_report_run_params_json_list_maps_to_input_data(monkeypatch):
             "--db-uri",
             "sqlite:///test.db",
             "--name",
-            "entity_resolve",
+            "resolve_entity",
             "--params-json",
             '["TP53", "BRCA1"]',
         ],
@@ -575,7 +575,7 @@ def test_report_list_reports_what_is_still_pending(monkeypatch):
     """
     runner = CliRunner()
     facade = FakeReportFacade()
-    facade.list_result = [{"name": "annotation_master_gene", "module": "x"}]
+    facade.list_result = [{"name": "annotate_gene", "module": "x"}]
     facade.pending_result = ["snp_snp_model", "variant_binning"]
     _patch_biofilter(monkeypatch, facade, {})
 
@@ -591,7 +591,7 @@ def test_report_list_reports_what_is_still_pending(monkeypatch):
 def test_report_list_says_nothing_when_nothing_is_pending(monkeypatch):
     runner = CliRunner()
     facade = FakeReportFacade()
-    facade.list_result = [{"name": "annotation_master_gene", "module": "x"}]
+    facade.list_result = [{"name": "annotate_gene", "module": "x"}]
     _patch_biofilter(monkeypatch, facade, {})
 
     result = runner.invoke(report_cli_mod.report, ["list", "--db-uri", "sqlite:///t.db"])

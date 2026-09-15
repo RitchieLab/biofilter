@@ -2,7 +2,7 @@
 Disease annotation: what the bundle knows about a list of diseases.
 
 Migrated from the relational layer (ADR-004 §6). The shape is
-`annotation_master_gene`'s, and the resolution step is shared with it —
+`annotate_gene`'s, and the resolution step is shared with it —
 see `_annotation.py`.
 """
 
@@ -27,8 +27,8 @@ from biofilter.modules.report.reports._annotation import (
 CLINGEN = "clingen"
 
 
-class AnnotationMasterDiseaseReport(AnnotationReportBase):
-    name = "annotation_master_disease"
+class AnnotateDiseaseReport(AnnotationReportBase):
+    name = "annotate_disease"
     description = (
         "Disease annotation for input diseases or aliases: canonical IDs, label "
         "and description, disease groups, cross-references by source, and "

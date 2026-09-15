@@ -97,7 +97,7 @@ So pin the bundle, not the id. Every report result carries the bundle it
 came from:
 
 ```python
-df = bf.report.run("annotation_master_gene", input_data=["APOE"])
+df = bf.report.run("annotate_gene", input_data=["APOE"])
 df.attrs["bundle_id"]     # 'e29a11604a326d2e'
 ```
 

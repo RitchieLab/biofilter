@@ -21,8 +21,8 @@ from biofilter.modules.report.reports._annotation import (
 )
 
 
-class AnnotationMasterPathwayReport(AnnotationReportBase):
-    name = "annotation_master_pathway"
+class AnnotatePathwayReport(AnnotationReportBase):
+    name = "annotate_pathway"
     description = (
         "Pathway annotation for input pathways or aliases: canonical id and "
         "description, which source contributed it, and relationship counts by "

@@ -35,8 +35,8 @@ class ReportComponent(BaseComponent):
     """
     Usage:
         bf.report.list()
-        bf.report.explain("annotation_master_gene")
-        bf.report.run("annotation_master_gene", input_data=["TP53"])
+        bf.report.explain("annotate_gene")
+        bf.report.run("annotate_gene", input_data=["TP53"])
     """
 
     def __init__(self, core):

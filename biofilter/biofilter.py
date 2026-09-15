@@ -135,7 +135,7 @@ class Biofilter:
     Usage:
         bf = Biofilter(bundle="/path/to/bundles/20260914")
         bf.report.list()
-        bf.report.run("annotation_master_gene", input_data=["TP53"])
+        bf.report.run("annotate_gene", input_data=["TP53"])
 
     A bundle is a directory — point at the directory, not at its
     tables/. `db_uri=` still takes any SQLAlchemy URI, for the ETL and

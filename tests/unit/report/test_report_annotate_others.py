@@ -1,7 +1,7 @@
 """
 The other annotation reports: disease, GO, pathway, protein.
 
-They share a shape with `annotation_master_gene` — resolve an input to an
+They share a shape with `annotate_gene` — resolve an input to an
 entity, hang facts off it — so what is tested here is what each does
 *differently*, plus the parts the shared scaffolding has to get right for
 all of them.
@@ -27,7 +27,7 @@ def run(fixture_bundle):
 
 
 class TestDisease:
-    REPORT = "annotation_master_disease"
+    REPORT = "annotate_disease"
 
     def test_resolves_and_annotates(self, run):
         rows, _ = run(self.REPORT, input_data=["MONDO:0001"])
@@ -87,7 +87,7 @@ class TestDisease:
 
 
 class TestGeneOntology:
-    REPORT = "annotation_master_go"
+    REPORT = "annotate_go"
 
     def test_a_child_term_reports_its_parent(self, run):
         rows, _ = run(self.REPORT, input_data=["GO:0000002"])
@@ -128,7 +128,7 @@ class TestGeneOntology:
 
 
 class TestPathway:
-    REPORT = "annotation_master_pathway"
+    REPORT = "annotate_pathway"
 
     def test_resolves_and_annotates(self, run):
         rows, _ = run(self.REPORT, input_data=["R-HSA-0001"])
@@ -146,7 +146,7 @@ class TestPathway:
 
 
 class TestProtein:
-    REPORT = "annotation_master_protein"
+    REPORT = "annotate_protein"
 
     def test_canonical_input_annotates_itself(self, run):
         rows, _ = run(self.REPORT, input_data=["P04637"])
@@ -201,10 +201,10 @@ class TestSharedBehaviour:
     """What the scaffolding has to get right for every one of them."""
 
     REPORTS = [
-        ("annotation_master_disease", "MONDO:0001"),
-        ("annotation_master_go", "GO:0000002"),
-        ("annotation_master_pathway", "R-HSA-0001"),
-        ("annotation_master_protein", "P04637"),
+        ("annotate_disease", "MONDO:0001"),
+        ("annotate_go", "GO:0000002"),
+        ("annotate_pathway", "R-HSA-0001"),
+        ("annotate_protein", "P04637"),
     ]
 
     @pytest.mark.parametrize("report,value", REPORTS)
@@ -230,9 +230,9 @@ class TestSharedBehaviour:
         assert set(rows) == {value}
 
     @pytest.mark.parametrize("report,expected", [
-        ("annotation_master_disease", {"MONDO:0001", "MONDO:0002"}),
-        ("annotation_master_go", {"GO:0000001", "GO:0000002"}),
-        ("annotation_master_pathway", {"R-HSA-0001"}),
+        ("annotate_disease", {"MONDO:0001", "MONDO:0002"}),
+        ("annotate_go", {"GO:0000001", "GO:0000002"}),
+        ("annotate_pathway", {"R-HSA-0001"}),
     ])
     def test_all_returns_every_entity_of_the_group(self, run, report, expected):
         rows, _ = run(report, input_data="__ALL__")

@@ -37,10 +37,10 @@ Additional policy layer for answer quality. The audience is end users
 - Warn about input conflicts: keep inputs in `--input`/`--input-file`; do not
   pass `input_data` through `--param`.
 - Prefer the user-facing annotation reports for examples
-  (`annotation_master_gene`, `annotation_master_variant`,
-  `annotation_master_disease`, `annotation_master_pathway`,
-  `annotation_master_chemical`, `annotation_master_protein`,
-  `annotation_master_go`, `variant_modeling`). Treat monitoring reports
+  (`annotate_gene`, `annotate_variant`,
+  `annotate_disease`, `annotate_pathway`,
+  `annotate_chemical`, `annotate_protein`,
+  `annotate_go`, `variant_modeling`). Treat monitoring reports
   (`etl_status`, `etl_packages`, `db_pg_*`) as admin/diagnostic.
 
 ## Database access — guidance rules

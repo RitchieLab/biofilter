@@ -47,8 +47,8 @@ def _parse_bool(value: Any, default: bool) -> bool:
     return default
 
 
-class AnnotationMasterGeneReport(ReportBase):
-    name = "annotation_master_gene"
+class AnnotateGeneReport(ReportBase):
+    name = "annotate_gene"
     description = (
         "Gene annotation for input genes or aliases: canonical IDs, gene "
         "metadata, build 38 coordinates, relationship counts by related entity "

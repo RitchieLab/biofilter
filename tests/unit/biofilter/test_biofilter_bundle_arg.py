@@ -18,7 +18,7 @@ def test_a_bundle_path_opens_without_a_uri(bundle_dir):
     bf = Biofilter(bundle=bundle_dir)
 
     assert bf.core.db_uri == f"parquet://{bundle_dir}"
-    assert "annotation_master_gene" in [r["name"] for r in bf.report.list()]
+    assert "annotate_gene" in [r["name"] for r in bf.report.list()]
 
 
 def test_a_string_path_works_too(bundle_dir):
@@ -52,7 +52,7 @@ def test_no_bundle_leaves_db_uri_alone(tmp_path):
 
 def test_reports_run_through_the_facade(bundle_dir):
     bf = Biofilter(bundle=bundle_dir)
-    result = bf.report.run("annotation_master_gene", input_data=["TP53"])
+    result = bf.report.run("annotate_gene", input_data=["TP53"])
 
     assert result.num_rows == 1
     assert result.provenance["bundle_id"] == "fixturebundle0001"

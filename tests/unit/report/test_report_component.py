@@ -49,17 +49,17 @@ class TestWithoutABundle:
         `require_db()` and failed wherever none was reachable.
         """
         names = [r["name"] for r in bundleless.list()]
-        assert "annotation_master_gene" in names
+        assert "annotate_gene" in names
 
     def test_explain_needs_no_bundle(self, bundleless):
-        assert "gene" in bundleless.explain("annotation_master_gene").lower()
+        assert "gene" in bundleless.explain("annotate_gene").lower()
 
     def test_available_columns_needs_no_bundle(self, bundleless):
-        assert "entity_id" in bundleless.available_columns("annotation_master_gene")
+        assert "entity_id" in bundleless.available_columns("annotate_gene")
 
     def test_running_says_how_to_supply_one(self, bundleless):
         with pytest.raises(ValueError, match="--bundle"):
-            bundleless.run("annotation_master_gene", input_data=["TP53"])
+            bundleless.run("annotate_gene", input_data=["TP53"])
 
 
 class TestWithABundle:
@@ -67,7 +67,7 @@ class TestWithABundle:
         assert component._bundle_root() == fixture_bundle
 
     def test_running_returns_a_result_with_provenance(self, component):
-        result = component.run("annotation_master_gene", input_data=["TP53", "NOPE"])
+        result = component.run("annotate_gene", input_data=["TP53", "NOPE"])
 
         assert isinstance(result, ReportResult)
         assert result.num_rows == 2
@@ -108,7 +108,7 @@ class TestPendingMigration:
         assert pending == sorted(pending)
 
     def test_a_migrated_report_is_no_longer_pending(self):
-        assert "annotation_master_gene" not in (
+        assert "annotate_gene" not in (
             rcmod.ReportComponent.pending_migration()
         )
 

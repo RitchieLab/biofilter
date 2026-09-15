@@ -1,9 +1,9 @@
-# annotation_master_protein
+# annotate_protein
 
 What the bundle knows about a list of proteins, one row per input.
 
 ```bash
-biofilter report run --report-name annotation_master_protein \
+biofilter report run --report-name annotate_protein \
     --input P04637 --input Q09472 \
     --output proteins.csv
 ```
