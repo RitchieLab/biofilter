@@ -12,6 +12,7 @@ import click
 
 from biofilter.api.cli.common import local_db_uri_option, require_db_uri
 from biofilter.biofilter import Biofilter
+from biofilter.modules.report.result import ReportResult
 
 
 @click.group()
@@ -307,19 +308,29 @@ def list_(ctx, db_uri, verbose, debug):
         click.echo("No reports found.")
         return
 
+    native = sum(1 for r in rows if r.get("engine") == "native")
     click.echo("📊 Available Reports:\n")
     for i, r in enumerate(rows, start=1):
         name = r.get("name", "")
         desc = r.get("description", "") or ""
         module = r.get("module", "") or ""
+        # The marker is the migration progress bar. It stays until the
+        # legacy module is empty, and then both it and the module go.
+        mark = "" if r.get("engine") == "native" else "  (legacy)"
 
-        click.echo(f"{i}. {name}")
+        click.echo(f"{i}. {name}{mark}")
         if verbose:
             if desc:
                 click.echo(f"   {desc}")
             if module:
                 click.echo(f"   module: {module}")
         click.echo("")
+
+    if rows:
+        click.echo(
+            f"{native} of {len(rows)} reports read the bundle natively; "
+            f"{len(rows) - native} still run on the legacy layer."
+        )
 
 
 # TESTADO
@@ -500,10 +511,29 @@ def run(
     )
 
     try:
-        df = bf.report.run(identifier, **report_kwargs)
+        result = bf.report.run(identifier, **report_kwargs)
     except Exception as e:
         _raise_report_cli_error(bf, identifier, e, action="run")
 
+    if isinstance(result, ReportResult):
+        # A native result knows which bundle produced it. Exporting drops
+        # that unless it is written somewhere, so it goes in a sidecar
+        # next to the file (ADR-004 §2.7).
+        if output:
+            written = result.write(output)
+            click.echo(f"✅ Report exported to: {written[0]}")
+            if len(written) > 1:
+                click.echo(f"   provenance:       {written[1]}")
+            for artifact in result.artifacts:
+                click.echo(f"   {artifact.kind}: {artifact.path}")
+        else:
+            click.echo(result.to_pandas().to_string(index=False))
+            bundle_id = result.provenance.get("bundle_id")
+            if bundle_id:
+                click.echo(f"\nbundle: {bundle_id}")
+        return
+
+    df = result
     if output:
         df.to_csv(output, index=False)
         click.echo(f"✅ Report exported to: {output}")
