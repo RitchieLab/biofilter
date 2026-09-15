@@ -45,6 +45,46 @@ def _t(**columns) -> pa.Table:
     return pa.table(columns)
 
 
+def _arrow_type(sa_type) -> pa.DataType:
+    """A usable Arrow type for a SQLAlchemy column, for padding nulls."""
+    try:
+        python_type = sa_type.python_type
+    except NotImplementedError:
+        return pa.string()
+    return {
+        bool: pa.bool_(),
+        int: pa.int64(),
+        float: pa.float64(),
+    }.get(python_type, pa.string())
+
+
+def _conform_to_models(name: str, table: pa.Table) -> pa.Table:
+    """
+    Pad a fixture table with the columns the models declare.
+
+    The tables above spell out only what the tests care about. Everything
+    else — provenance ids, timestamps, descriptions — is filled with
+    nulls from the model definition, so the fixture has a real bundle's
+    shape without every test fixture restating it.
+
+    Three reports have failed against this fixture for a column the real
+    tables carry and the fixture omitted. Padding from the contract is
+    what stops the fourth.
+    """
+    from biofilter.modules.db.base import Base
+
+    declared = Base.metadata.tables.get(name)
+    if declared is None:
+        return table
+
+    for column in declared.columns:
+        if column.name not in table.column_names:
+            table = table.append_column(
+                column.name, pa.nulls(table.num_rows, _arrow_type(column.type))
+            )
+    return table.select([c.name for c in declared.columns])
+
+
 def _tables() -> dict[str, pa.Table]:
     """The core tables, as a bundle spells them."""
     return {
@@ -342,6 +382,11 @@ def _tables() -> dict[str, pa.Table]:
             protein_id=pa.array([101, 101], pa.int64()),
             pfam_pk_id=pa.array([1, 2], pa.int64()),
         ),
+        "entity_relationship_types": _t(
+            id=pa.array([1, 2], pa.int64()),
+            code=pa.array(["interacts_with", "in_pathway"]),
+            description=pa.array(["physical interaction", "member of pathway"]),
+        ),
         # TP53 on the left once and on the right once, so the report has
         # to count both directions.
         "entity_relationships": _t(
@@ -366,7 +411,8 @@ def _tables() -> dict[str, pa.Table]:
                 ],
                 pa.int64(),
             ),
-            relationship_type_id=pa.array([1] * 6, pa.int64()),
+            # Mixed types, so a type filter has something to filter.
+            relationship_type_id=pa.array([1, 2, 2, 1, 1, 1], pa.int64()),
             # The disease has two ClinGen assertions naming the SAME gene
             # and one MONDO link to a protein: so its ClinGen gene count
             # is 1, its ClinGen relationship count 2, and its total 3.
@@ -374,6 +420,7 @@ def _tables() -> dict[str, pa.Table]:
                 [DS_HGNC, DS_REACTOME, DS_REACTOME, DS_CLINGEN, DS_CLINGEN, DS_MONDO],
                 pa.int64(),
             ),
+            etl_package_id=pa.array([81] * 6, pa.int64()),
         ),
     }
 
@@ -396,6 +443,22 @@ def _variant_partitions() -> dict[int, pa.Table]:
             variant_key=pa.array(["22:777:C:T"]),
         ),
     }
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _models_bootstrapped():
+    """
+    Populate `Base.metadata`.
+
+    Several variant tables are mapped by function rather than by a
+    declarative class, so they only reach the metadata once bootstrap has
+    run against an engine.
+    """
+    from sqlalchemy import create_engine
+
+    from biofilter.utils.db_loader import bootstrap_models
+
+    bootstrap_models(create_engine("sqlite:///:memory:"))
 
 
 @pytest.fixture
@@ -424,12 +487,17 @@ def fixture_bundle(tmp_path: Path) -> Path:
         [tables["entity_aliases"], tables.pop("entity_aliases_extra")]
     )
     for name, table in tables.items():
-        write(f"tables/{name}.parquet", table, name=name, branch="core")
+        write(
+            f"tables/{name}.parquet",
+            _conform_to_models(name, table),
+            name=name,
+            branch="core",
+        )
 
     for chrom, table in _variant_partitions().items():
         write(
             f"tables/variant_masters/variant_masters_chr{chrom}.parquet",
-            table,
+            _conform_to_models("variant_masters", table),
             name=f"variant_masters_chr{chrom}",
             table="variant_masters",
             branch="variant",

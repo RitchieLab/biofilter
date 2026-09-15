@@ -15,6 +15,7 @@ user actually has.
 | `reports__TEMPLATE.ipynb` | copy this when migrating or writing a report |
 | `reports__resolve_entity.ipynb` | **start here for a new input list** — does the bundle know these names |
 | `reports__expand_entity_neighborhood.ipynb` | what is one hop from an entity, for a mixed list |
+| `reports__expand_entity_relationship.ipynb` | the links themselves, and how a set connects to itself |
 | `reports__annotate_gene.ipynb` | genes |
 | `reports__annotate_disease.ipynb` | diseases, and the two ClinGen counts |
 | `reports__annotate_go.ipynb` | GO terms, and ontology edges vs relationships |
