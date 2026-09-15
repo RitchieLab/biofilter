@@ -18,30 +18,17 @@ from typing import Any, Optional, Sequence
 
 import pyarrow as pa
 
+from biofilter.modules.report.reports import _variants as _v
 from biofilter.modules.report.reports.base_report import ReportBase
 
-_RSID = re.compile(r"^rs\d+$", re.IGNORECASE)
-_CHR_POS_ALLELE = re.compile(r"^([^:\s]+)[:\-_\s]+(\d+)[:\-_\s]+([ACGTN*]+)[:\-_\s]+([ACGTN*]+)$", re.I)
-_CHR_POS = re.compile(r"^([^:\s]+)[:\-_\s]+(\d+)$")
-
-#: Non-numeric chromosomes, as the build encodes them.
-_CHROMOSOME_CODES = {"x": 23, "y": 24, "m": 25, "mt": 25}
-
-
-def _parse_chromosome(value: Any) -> Optional[int]:
-    text = str(value or "").strip().lower()
-    for prefix in ("chromosome", "chrom", "chr"):
-        if text.startswith(prefix):
-            text = text[len(prefix):]
-            break
-    text = text.strip()
-    if text in _CHROMOSOME_CODES:
-        return _CHROMOSOME_CODES[text]
-    try:
-        number = int(text)
-    except ValueError:
-        return None
-    return number if 1 <= number <= 25 else None
+# Parsing a variant the user typed lives in `_variants`, shared with
+# every other report that accepts the same shapes. Re-exported here
+# because callers already import these names from this module.
+_RSID = _v._RSID
+_CHR_POS_ALLELE = _v._CHR_POS_ALLELE
+_CHR_POS = _v._CHR_POS
+_CHROMOSOME_CODES = _v._CHROMOSOME_CODES
+_parse_chromosome = _v.parse_chromosome
 
 
 class AnnotateVariantReport(ReportBase):

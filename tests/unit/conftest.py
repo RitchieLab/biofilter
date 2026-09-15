@@ -695,7 +695,72 @@ def _models_bootstrapped():
 
 @pytest.fixture
 def fixture_bundle(tmp_path: Path) -> Path:
-    root = tmp_path / "20260101"
+    return _write_bundle(
+        tmp_path / "20260101", _tables(), _variant_tables(), _variant_partitions()
+    )
+
+
+@pytest.fixture
+def pairing_bundle(tmp_path: Path) -> Path:
+    """
+    The same bundle, plus what it takes to make a pair.
+
+    `pair_variants` needs two things the shared fixture deliberately does
+    not have, because adding them there would change counts a dozen other
+    tests assert on: a connector entity reaching two *different* genes,
+    and variants inside the second of those genes.
+
+    PATHWAY reaches TP53 and BRCA1 — two genes, so one pair. DISEASE
+    reaches three (TP53, BRCA1, DGENE), so `max_group_size=2` drops the
+    disease and keeps the pathway, which is exactly what that parameter
+    is for.
+    """
+    tables = _tables()
+    tables["entity_relationships"] = pa.concat_tables(
+        [tables["entity_relationships"], _pair_links()]
+    )
+    partitions = _variant_partitions()
+    partitions[17] = pa.concat_tables([partitions[17], _brca1_variants()])
+    return _write_bundle(
+        tmp_path / "20260102", tables, _variant_tables(), partitions
+    )
+
+
+def _pair_links() -> pa.Table:
+    """Connectors that reach more than one gene."""
+    return _t(
+        id=pa.array([7, 8, 9], pa.int64()),
+        entity_1_id=pa.array([PATHWAY, DISEASE, DISEASE], pa.int64()),
+        entity_1_group_id=pa.array(
+            [GROUP_PATHWAYS, GROUP_DISEASES, GROUP_DISEASES], pa.int64()
+        ),
+        entity_2_id=pa.array([BRCA1, TP53, BRCA1], pa.int64()),
+        entity_2_group_id=pa.array(
+            [GROUP_GENES, GROUP_GENES, GROUP_GENES], pa.int64()
+        ),
+        relationship_type_id=pa.array([2, 1, 1], pa.int64()),
+        data_source_id=pa.array([DS_REACTOME, DS_CLINGEN, DS_CLINGEN], pa.int64()),
+        etl_package_id=pa.array([81] * 3, pa.int64()),
+    )
+
+
+def _brca1_variants() -> pa.Table:
+    """Two variants inside BRCA1 (5000-5400), so a pair has two sides."""
+    return _t(
+        chromosome=pa.array([17, 17], pa.int32()),
+        position=pa.array([5100, 5200], pa.int64()),
+        reference_allele=pa.array(["A", "A"]),
+        alternate_allele=pa.array(["G", "G"]),
+        variant_key=pa.array(["17:5100:A:G", "17:5200:A:G"]),
+    )
+
+
+def _write_bundle(
+    root: Path,
+    tables: dict[str, pa.Table],
+    variant_tables: dict[str, pa.Table],
+    partitions: dict[int, pa.Table],
+) -> Path:
     tables_dir = root / "tables"
     entries: list[dict] = []
 
@@ -712,7 +777,6 @@ def fixture_bundle(tmp_path: Path) -> Path:
             }
         )
 
-    tables = _tables()
     # Written as one relation: split in the source only so each domain's
     # aliases sit next to the rest of that domain.
     tables["entity_aliases"] = pa.concat_tables(
@@ -726,7 +790,7 @@ def fixture_bundle(tmp_path: Path) -> Path:
             branch="core",
         )
 
-    for name, table in _variant_tables().items():
+    for name, table in variant_tables.items():
         write(
             f"tables/{name}.parquet",
             _conform_to_models(name, table),
@@ -734,7 +798,7 @@ def fixture_bundle(tmp_path: Path) -> Path:
             branch="variant",
         )
 
-    for chrom, table in _variant_partitions().items():
+    for chrom, table in partitions.items():
         write(
             f"tables/variant_masters/variant_masters_chr{chrom}.parquet",
             _conform_to_models("variant_masters", table),

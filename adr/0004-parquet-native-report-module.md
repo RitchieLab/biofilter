@@ -608,6 +608,30 @@ less believable, which is why this section exists.
   not carried over: a user who needs one report's output as another's
   input writes the file and reads the column, which is a thing they can
   look at.
+
+  **Settled 2026-09-15 for four more: `variant_gene_location_model`,
+  `variant_single_gene_annotation`, `snp_snp_model` and `variant_modeling`
+  became the single `pair_variants`.** They were one pipeline written in
+  three eras, each re-implementing the stages before it — and each
+  carrying its own copy of the chromosome and rsID parsers, which had
+  already drifted. Stage 1 places the input on genes; stage 2 connects
+  those genes through a shared entity; stage 3 pairs the variants.
+  `variant_gene_location_model` stopped after stage 1,
+  `variant_single_gene_annotation` after stage 2, and the only difference
+  between the remaining two was whether both sides of a pair had to come
+  from the input — now the `membership` parameter. The pipeline's own
+  vocabulary settles §2.12's open question: these reports generate
+  candidate pairs, so the class is **pair generation** and the report is
+  named for it.
+
+  Two findings shaped the result rather than being footnotes to it. The
+  bundle carries 38,092 Gene Ontology entities and **zero** GO
+  relationships, so the legacy `group_entity_type='GO'` returned nothing
+  and read as a finding; a group type the bundle cannot use is now
+  refused by name. And group size is not a performance knob: a pathway
+  naming 2,615 genes links its members while saying nothing about any of
+  them. `max_group_size` defaults to 300, which keeps 98% of pathways
+  while cutting the gene pairs they generate from 37.1 M to 6.9 M.
 - **How `model_variants.py` is realigned with what the ETL writes**
   (§1.4). The direction is settled in §2.1; the table-by-table work
   belongs to the model and build layers.
