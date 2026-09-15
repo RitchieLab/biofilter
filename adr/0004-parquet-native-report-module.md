@@ -1,0 +1,730 @@
+# ADR-004: A Parquet-Native Report Module (4.3.0)
+
+| Field      | Value                                                                                                                                                                              |
+| ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Status     | **Proposed** (measurements taken 2026-09-14 against the 20260910 bundle)                                                                                                            |
+| Date       | 2026-09-14                                                                                                                                                                          |
+| Author     | Andre Rico                                                                                                                                                                          |
+| Supersedes | [ADR-001](0001-duckdb-parquet-strategy.md) §2 item 3 (ORM-based reports as the read path)                                                                                            |
+| Related    | [ADR-002](0002-cohort-coding-gene-overlap-report.md) D2 (set-based execution), [ADR-003](0003-parquet-native-build-pipeline.md) §2.5–2.6 (bundle-scoped IDs, provenance), §2.9 (partition layout) |
+
+---
+
+## 1. Context
+
+ADR-003 made the bundle the product: immutable, versioned, parquet. The
+build pipeline was rewritten for it. The report layer was not — it still
+carries the shape it had when PostgreSQL was the canonical store, and it
+reaches the bundle through a compatibility bridge rather than natively.
+
+### 1.1 What the layer looks like today
+
+25 reports, 16,443 lines in `modules/report/reports/`, plus 5,692 lines
+of superseded copies in `reports_bkp/`.
+
+The dominant shape is fan-out then merge in Python: a report issues one
+ORM query per facet, materialises each with `.all()`, and joins the
+results with dictionaries and loops before building a DataFrame.
+
+| pattern                       | occurrences |
+| ----------------------------- | ----------- |
+| `session.query` / `.execute`  | 160         |
+| `.all()`                      | 142         |
+| `pd.DataFrame(...)`           | 115         |
+
+Per report, the fan-out reaches 16 separate queries
+(`gene_to_variant_filtering`), 15 (`variant_single_gene_annotation`), 14
+(`annotation_variant_regulatory_evidence`). Against a relational server
+with a warm buffer pool this was reasonable. Against a bundle it means N
+independent passes over the same parquet files, with the join executed
+in CPython — the slowest engine in the stack — instead of in DuckDB, the
+fastest.
+
+§5 measures what that costs.
+
+### 1.2 The bridge works, and that is the problem
+
+`parquet://` registers one DuckDB view per relation, so ORM queries
+resolve to `read_parquet()` unchanged. That was the right call for the
+migration: it made the bundle readable without touching 25 reports.
+
+But the bridge is transparent in both directions — it also hides the
+engine from the report author, who cannot tell a pruning-friendly
+predicate from one that scans 6 GB. Measured on `variant_rsid`
+(712,358,067 rows, 24 files, 6.0 GB) in the 20260910 bundle:
+
+| predicate                                              | time    |
+| ------------------------------------------------------ | ------- |
+| `chromosome = 21 AND position BETWEEN ...`             | 97 ms   |
+| `position BETWEEN ...` (no chromosome)                 | 551 ms  |
+| `CAST(chromosome AS VARCHAR) = '21' AND position ...`  | 535 ms  |
+
+The third row is the finding: wrapping the partition column in an
+expression costs 5.5x on a narrow range, and the gap widens with scan
+width. The layer does exactly this today —
+`func.lower(vm.c.rsid).in_(rsids_norm)` in
+`report_variant_gene_location_model.py:477` scans the `rsid` column of
+every file, every time.
+
+Nothing in the ORM discourages that, and nothing in review catches it.
+
+### 1.3 Relations are resolved by guessing at the directory
+
+View discovery keys directories and same-named files identically
+(`database.py:295-306`). `sorted()` orders `variant_masters` before
+`variant_masters.parquet`, so the file overwrites the directory:
+
+| view                        | resolves to              | rows served | rows available   |
+| --------------------------- | ------------------------ | ----------- | ---------------- |
+| `variant_masters`           | `.parquet` stub (3.7 KB) | **0**       | 177,520,333      |
+| `variant_molecular_effects` | `.parquet` stub (6 KB)   | **0**       | 2,238,929,441    |
+| `variant_gwas`              | `.parquet` stub (4 KB)   | **0**       | 1,208,545        |
+| `variant_rsid`              | directory (no sibling)   | 712,358,067 | 712,358,067      |
+
+Every variant report returns empty against the current bundle, without
+error.
+
+This is not a one-off slip. The ADSP analysis
+(`biofilter_legacy/bf4_420/notebooks/Andre/adsp/step_01/`) resolves
+bundle tables with its own helper, written independently, and it makes
+the same choice in the same direction — `flat.exists()` first, the
+partitioned directory only as a fallback
+(`bf4_map_coding_genes.py:77-85`). It worked on the 4.2.0 bundle, where
+the flat file was the real one. Against 20260910 it would read the
+stubs.
+
+Two independently written code paths, one ambiguity, the same wrong
+answer. The defect is not the ordering; it is that both are
+reconstructing by inspection something the bundle already states.
+
+**The manifest already carries the mapping.** It declares 114 entries,
+22.33 GB against 21 GB on disk, and each partitioned child names its
+logical table:
+
+```json
+{"name": "variant_masters",      "rows": 0,        "file": "tables/variant_masters.parquet"}
+{"name": "variant_masters_chr1", "table": "variant_masters", "branch": "variant",
+ "rows": 14090551, "file": "tables/variant_masters/variant_masters_chr1.parquet"}
+```
+
+Nothing has to be inferred. §2.3 is the consequence.
+
+A second instance of the same class: `connect()` re-normalises an
+already-normalised URI and clears `_parquet_dir`, so calling it twice
+silently drops every view. The example in `CLAUDE.md` does exactly that.
+
+### 1.4 The models and the data have diverged
+
+The stub is not merely an empty `variant_masters`. It is a **different
+table**:
+
+| | stub `variant_masters.parquet` | data `variant_masters/` |
+| --- | --- | --- |
+| rows | 0 | 177,520,333 |
+| columns | 23 | 25 |
+| position | `position_start`, `position_end` | `position` |
+| identity | `variant_id` | `variant_key` |
+| frequencies | `af`, `ac`, `an` | `af_joint`, `ac_exomes`, `af_genomes`, … |
+| predictors | `cadd_phred`, `revel_max`, `sift_max` | (absent) |
+
+**Four columns in common out of 25.**
+
+The stub matches the ORM model — `model_variants.py:109-170` declares
+`position_start`, `position_end`, `variant_id`. The data matches what
+the ETL actually writes — `dtp_variant_gnomad_joint.py:323-326` declares
+an Arrow schema with `position` and `variant_key`. The stub is generated
+from the model via the SQLite staging branch; the real rows come from
+the variant branch, written parquet-native by the DTPs. The two branches
+drifted and nothing compared them.
+
+Three consequences:
+
+- **12 of the 25 reports** reference `position_start` or `VariantMaster`
+  and are written against a schema the bundle does not carry. This is
+  not a performance question; they cannot run.
+- **`db verify --schema` gives a false pass.** Run against 20260910 it
+  reports `drift entries: 0`. It compares the models against the stub,
+  which matches the models perfectly. The check exists, runs, passes,
+  and is looking at the wrong file.
+- **The variant tables are denormalised.**
+  `variant_molecular_effects` carries `symbol`, `gene`, `biotype` and
+  `consequence` as text, not as foreign keys. The lookup joins the
+  reports perform (`biotype_id`, `consequence_id`) have nothing to join
+  against. This is consistent with ADR-003 §1.3 — variants are
+  schema-isolated by design — but it means the reports' whole approach
+  to variants does not translate.
+
+**The predictors are not merely relocated — they are absent.** The stub
+declares `cadd_phred`, `revel_max`, `sift_max`, `polyphen_max`,
+`spliceai_ds_max` and `pangolin_largest_ds`. None appear in
+`variant_molecular_effects`, `variant_effect_predictions` is empty and
+still carries the old schema, and `dtp_variant_gnomad_vep.json` does not
+reference them. The DTPs that would produce them write to
+`variant_alphamissense` and `variant_gtex`
+(`dtp_variant_alphamissense.py:28`, `dtp_variant_eqtl_gtex.py:52`), and
+neither table exists in the bundle — although `bundle_plan.json`
+includes both sources. `build_record.json` shows why: on the 2026-09-12
+rebuild both transformed as `not-applicable`, so nothing was produced
+and nothing was moved. `gwas`, which transformed for real, is present
+with 1,208,545 rows.
+
+Ten of the 114 declared tables are empty: `chemical_masters`,
+`variant_biotypes`, `variant_effect_predictions`,
+`variant_gene_regulatory_evidence`, `variant_impacts`,
+`variant_regulatory_elements`, `variant_gwas_snp`, and the three parent
+stubs. `report_annotation_variant_regulatory_evidence` (918 lines) has
+nothing to read.
+
+That is a build-pipeline problem, not a report one, and it belongs to
+ADR-003. It is recorded here because it defines the ground the migration
+stands on.
+
+The variant reports have to be rewritten whatever this ADR decides. That
+moves the migration from an optimisation to a repair.
+
+### 1.5 The built bundle deviates from ADR-003 §2.9
+
+§2.9 specified hive-partitioned directories only
+(`<table>/chromosome=N/`), parents dropped. The 20260910 bundle emits
+flat per-chromosome files (`variant_masters/variant_masters_chr21.parquet`)
+**and** keeps the parents as stubs. So `hive_partitioning = true` is a
+no-op — `chromosome` survives only because it is a real column in the
+files, and pruning happens through row-group statistics rather than
+partition elimination.
+
+This works, and §1.2 shows the statistics do prune. It is recorded here
+because §1.3 and §1.4 are both downstream of the parent stubs existing
+at all.
+
+### 1.6 Provenance stops at the export boundary
+
+ADR-003 §2.6 requires bundle identity to travel with results.
+`ReportManager._stamp_bundle()` implements half of it, attaching
+`bundle_id` to `DataFrame.attrs` — and its own docstring records the
+gap: the attribute does not survive CSV export. The CLI exports with
+`df.to_csv(output, index=False)` (`groups/report.py:508`), so every
+result written to a file today loses its provenance.
+
+ADR-003 left two questions open: how `bundle_id` should be derived, and
+which stamping mechanism to use. This ADR closes both.
+
+### 1.7 The target is already demonstrated
+
+ADR-002 D2 built one report set-based over the bundle and measured it:
+
+| approach                                | 712k inputs |
+| --------------------------------------- | ----------- |
+| per-input queries (current report shape) | not viable  |
+| set-based over PostgreSQL                | ~2.5 min    |
+| set-based over the parquet bundle        | **4.6 s**   |
+
+The ADSP analysis is the same argument at production scale, on the LPC,
+for a real cohort. Both were written report-by-report, outside the
+report layer, by authors who knew to avoid it. This ADR makes that
+shape the property of a module rather than of an author's discipline.
+
+§5 reproduces the ADSP question on the 20260910 bundle.
+
+---
+
+## 2. Decision
+
+### 2.1 Reports read parquet only
+
+The report layer drops SQLite and PostgreSQL support. A report runs
+against a bundle or it does not run.
+
+This does **not** remove the ORM from the project. The models stay as
+the schema contract: the ETL writes through them, `bundle build` stages
+the core in SQLite through them (ADR-003 §2.3), and `db verify --schema`
+compares a bundle against them. The boundary is directional — **models
+are the write and validation path; DuckDB is the read path** — and this
+ADR moves the report layer to the correct side of it.
+
+§1.4 shows the write side has its own problem. Fixing it is a
+precondition (§6), not part of this decision — but the direction is
+settled: **the models follow the data.** The 4.3.0 variant schema is
+intentional, and it follows one rule — **one table per source, no
+cross-source joins, with the fields each source contributes declared in
+that DTP's JSON config** (`dtps/config/dtp_*.json`). A report that wants
+AlphaMissense reads the AlphaMissense table; it does not reconstruct it
+by joining a shared predictions table.
+
+### 2.2 A new module beside the old one; the legacy one is renamed and frozen
+
+`biofilter/modules/report/` is renamed to
+`biofilter/modules/report_legacy/` and frozen: bug fixes only, no new
+reports, no new features. A new `biofilter/modules/report/` is created
+with the contract below.
+
+The rename happens **first**, not last. Naming the new module
+provisionally would mean every migrated report, test and guide written
+during the migration carries an import path that changes later. Renaming
+the legacy module once, up front, means new code is born at its final
+path and the migration ends with a deletion rather than a rename.
+
+Migration is report by report. A report is migrated when someone needs
+it; `report_legacy` shrinks and is deleted when empty. Both modules are
+live simultaneously, and the `parquet://` ORM bridge stays supported
+until `report_legacy` is gone.
+
+`reports_bkp/` is deleted outright. It is superseded code, and git
+retains it.
+
+### 2.3 Bundles are opened from the manifest, not connected
+
+A bundle is not a database and the new module does not connect to one.
+It opens a directory:
+
+```
+Bundle.open(path)  →  validate (cheap tier, below)
+                      read manifest.json
+                      duckdb.connect()
+                      register one view per logical table, from the manifest
+    .con           →  the DuckDB connection
+    .manifest / .bundle_id
+    .cursor()      →  one per report execution
+```
+
+Views are built from the manifest's table entries, grouped by their
+`table` field. There is no directory scan, no filename convention to
+interpret, and no ordering to depend on — which removes §1.3 as a class
+rather than patching its symptom.
+
+**What this deletes.** No `Engine`, no `sessionmaker`, no `StaticPool`,
+no `bootstrap_models`, no `Session`. The `_tolerant_json_deserializer`
+goes too — it exists only because SQLAlchemy's generic dialect decodes
+JSON a second time over `duckdb-engine`, and without SQLAlchemy in the
+path that class of problem does not arise.
+
+**The Session is already being bypassed.** Reports reach past it to the
+raw connection 14 times (`session.connection()`, `session.bind`,
+`session.get_bind`) — `pd.read_sql(sql, self.session.bind)` in the
+`pg_*` reports, `conn = self.session.connection()` in
+`annotation_master_variant.py:293`. The remaining 8 uses are
+`session.flush()`, a unit-of-work call in a read-only report, needed
+only because three reports INSERT into temp tables.
+
+**Temp tables get real isolation.** Those three reports use fixed names
+(`_bf_vre_ranges`, `_bf_gene_ranges`). Over `parquet://`,
+`_engine_kwargs` forces `StaticPool` — "must share a single connection
+across sessions", or the views vanish — and a DuckDB TEMP TABLE is
+connection-scoped. So "one session per report" is today one connection
+for everybody, and two reports in one process collide on the same name.
+`con.cursor()` gives a thread-local connection over the same database:
+the same per-execution shape, with the isolation that does not currently
+exist.
+
+`report_variant_annotation_expanded.py:40` states why the temp tables
+are there: *"Uses a PostgreSQL TEMPORARY TABLE to accumulate results in
+batches"* — a workaround for memory pressure. §5 shows DuckDB bounds
+memory by declaration, so the workaround loses its reason to exist.
+
+**Read-only stops being advisory.** ADR-003 notes the `read_only` flag
+is "advisory, not enforced". A `Bundle` that can only open parquet has
+no write path to disrespect.
+
+**Verification is tiered**, because hashing 21 GB on every `report run`
+is not an option:
+
+| tier | checks | cost |
+| --- | --- | --- |
+| on open, always | manifest parses, `manifest_version` known, declared files present and the right size | 114 `stat()` calls — the size is free in the same syscall as presence |
+| `db verify` | the same, explicitly, plus schema drift | milliseconds |
+| `db verify --hashes` | full SHA-256 re-read | minutes; for after a transfer |
+
+Note what "integrity" means today: **0 of the 114 tables carry a
+`sha256`**, because the build runs with `checksums=False`. Presence and
+size is a real check for the likely failure — a truncated copy to the
+LPC — but it is not corruption detection, and `--no-hashes` is currently
+inert.
+
+**Enabling checksums is explicitly deferred.** The bundle already
+identifies itself well enough for this work: `manifest.json` carries
+`bundle_id`, and `build_record.json` carries the per-step provenance
+behind it — DTP script, DTP version, source URL, extract hash and
+timings. Identity and provenance are answered; integrity can wait until
+something needs it.
+
+### 2.4 Native DuckDB SQL, not the ORM query builder
+
+Reports are written as DuckDB SQL. The reason is not ORM call overhead —
+it is that the ORM cannot express what makes this workload fast:
+
+- **Range joins.** Overlapping a gene interval with variant positions is
+  the central Biofilter operation, and DuckDB has a dedicated operator
+  for it (IEJoin), plus `ASOF JOIN` for nearest-position semantics.
+  Through the ORM, `variant_gene_location_model` does the only thing
+  available to it: iterates gene by gene, one query per region, with a
+  hand-rolled "does this chromosome have variants?" cache
+  (`report_variant_gene_location_model.py:493-508`). Natively this is one
+  join, planned by the engine.
+- **Arrow output.** `.all()` → `Row` → `dict` → `pd.DataFrame(records)`
+  is the current path. §5 measures the alternative.
+- **Set aggregation.** `QUALIFY`, `PIVOT`, `list_aggregate`, `UNNEST`
+  collapse the Python grouping loops that dominate the annotation
+  reports.
+
+A secondary benefit, and not a small one for this lab: a report becomes
+readable SQL, reviewable by a bioinformatician who does not read
+SQLAlchemy.
+
+The cost is losing the models as a compile-time check on column names.
+Mitigation in §2.10 — and §1.4 shows that check was not working anyway.
+
+### 2.5 Input is a registered relation, never an interpolated literal
+
+Input lists are registered as an Arrow table and joined. They are never
+interpolated into SQL text, and never expanded into an `IN (...)` list
+of literals.
+
+This is one decision serving two purposes. It removes SQL injection as a
+category — the risk native SQL would otherwise introduce — and it turns
+the `IN (10,000 literals)` pattern into a hash join, which is what makes
+the `__ALL__` modes viable. ADR-002 D2 reached the same conclusion for
+one report; here it is a rule.
+
+### 2.6 A report returns a result object, not a DataFrame
+
+```
+ReportResult(
+    table,        # Arrow table — the result
+    provenance,   # bundle_id, report, params, biofilter version, timestamp
+    artifacts=[], # additional outputs; empty for every report at first
+)
+```
+
+`artifacts` is specified now and used later. The need already exists —
+`report_variant_binning.py:1098` writes its own sidecar JSON with no
+contract for it — and adding the field now costs nothing, while adding
+it later means a second pass over every migrated report.
+
+Rejected-row logs, inconsistency reports and multi-file outputs are
+**not** designed here. Only the return type capable of carrying them is.
+
+Returning Arrow rather than a DataFrame also keeps the streaming option
+open: DuckDB's `.arrow()` yields a `RecordBatchReader`, so a caller that
+does not need the whole result in memory does not have to materialise
+it. The current path cannot offer that at all.
+
+### 2.7 Results stay CSV and DataFrame; provenance rides alongside
+
+The result of a report is what a person opens, so the output format
+follows the reader, not the storage decision:
+
+- **CLI:** CSV by default. It is what the lab opens, and nothing about
+  parquet storage obliges a parquet result.
+- **Notebook / Python API:** a DataFrame, as today.
+- **Parquet:** available for a result large enough to warrant it.
+
+Because CSV has nowhere honest to put metadata, **provenance is written
+as a sidecar** `<output>.provenance.json` on every CLI export — the
+primary mechanism, not a fallback. It carries `bundle_id`, the report
+name, the parameters, the Biofilter version and the timestamp, which is
+enough to find the matching `build_record.json` later. For a DataFrame,
+`result.attrs` already carries `bundle_id` and keeps doing so; when the
+output is parquet, provenance also goes into its key-value metadata.
+
+`ReportResult.artifacts` (§2.6) — error logs, rejected rows,
+inconsistency reports — are JSON or parquet, since nobody reads those in
+a spreadsheet.
+
+This closes ADR-003's open question on the stamping mechanism. An added
+column was rejected: it changes every report's schema to carry one
+constant.
+
+### 2.8 `bundle_id` is build-derived, and is labelled as such
+
+`bundle_id` is a SHA-256 over each table's `(name, rows, bytes)`
+(`builder.py:651-659`), with per-file checksums disabled. It answers
+"which build produced this result" and does not attempt to answer "has
+this data been altered" — parquet rewriting is not byte-reproducible, so
+identical data can yield a different id.
+
+That is the right trade for an identifier, and this ADR keeps it,
+closing ADR-003's open question. It is recorded explicitly so the
+guarantee is not overread later.
+
+### 2.9 The CLI surface is preserved, then improved
+
+Unchanged, because they are correct: `--input` / `--input-file` for
+input data, `--param KEY=VALUE` for options, `--bundle` for the bundle
+path, `report list`, `report explain`, automatic discovery with no
+support-code changes.
+
+`report run --report-name X` resolves X against the new module first,
+then `report_legacy`, and states which served it. `report list` marks
+each report's engine, so migration progress is visible without reading
+the tree.
+
+Two additions the native path makes cheap:
+
+- **`--explain-plan`** prints the DuckDB plan and the files the query
+  will touch, without running it. On a 21 GB bundle, knowing a report is
+  about to scan every chromosome is worth more than the report.
+- **Provenance on export**, per §2.7.
+
+**A bundle this Biofilter does not understand is an error, not a
+degraded mode.** If the manifest declares a `manifest_version` or schema
+newer than this install supports, `Bundle.open()` fails and says to
+update Biofilter — which is a package upgrade, not a data migration. No
+partial reads, no guessing at an unfamiliar layout.
+
+### 2.10 Tests move to a fixture bundle
+
+Report tests run against `sqlite:///:memory:` today
+(`test_report_variant_gene_location_model.py:162`), across 9 test
+files. Parquet-only makes that impossible, and the replacement is
+better: a small committed fixture bundle — a few hundred rows per table,
+with 2–3 partitioned chromosomes so pruning is exercised, and a parent
+stub present so §1.3 stays fixed.
+
+The fixture bundle also carries the column-name check that §2.4 gives
+up: a report referencing a column the bundle does not have fails in
+tests rather than in production. §1.4 is what happens without it.
+
+### 2.11 `report_legacy` ends when the last report leaves
+
+No version deadline. The module is deleted when it is empty, and
+`report list` keeps the remaining count visible (§2.9) so the debt does
+not go quiet.
+
+### 2.12 Not decided here
+
+- **Migration order.** Reports are migrated on request, one at a time;
+  `annotation_master_gene` is first (§6). `db_pg_index_stats` and
+  `db_pg_table_stats` are PostgreSQL-only and meaningless against a
+  bundle — candidates for deletion rather than migration.
+- **How `model_variants.py` is realigned with what the ETL writes**
+  (§1.4). The direction is settled in §2.1; the table-by-table work
+  belongs to the model and build layers.
+- **Why `alphamissense` and `gtex_v10_eqtl` produced nothing** (§1.4).
+  An ADR-003 matter, and a precondition for any report that needs
+  predictors or eQTL evidence.
+- **Stopping the parent stubs** and the partition layout of ADR-003
+  §2.9. Both are ADR-003 matters; §6 step 2 works either way.
+
+---
+
+## 3. Consequences
+
+### Positive
+
+- Reports are planned as whole queries by DuckDB instead of assembled
+  row by row in CPython. §5 measures 113x on the materialisation step
+  alone, at one fifth of the memory.
+- Memory becomes a declared ceiling (`SET memory_limit`) instead of
+  whatever Python allocates, and DuckDB spills rather than dying.
+- Range joins over variant positions become a first-class operation
+  rather than a per-gene loop.
+- Relations resolve from the manifest, so §1.3 cannot recur.
+- Provenance survives export, closing the gap in ADR-003 §2.6.
+- Reports become reviewable by people who read SQL and not SQLAlchemy.
+- Migration is incremental and reversible per report.
+- ~5,700 lines of superseded code leave the tree immediately.
+
+### Negative
+
+- Two report modules coexist for the duration of the migration. `report
+  list` will show a mixed inventory, and the CLI carries routing logic
+  that exists only to be deleted later.
+- Losing the ORM means losing static column names. §2.10 replaces it
+  with a test, which catches the same errors later in the cycle.
+- The `parquet://` ORM bridge must be maintained while unmigrated
+  reports depend on it — this ADR does not let us delete it yet.
+- Rebuilding 9 test files onto a fixture bundle is mechanical work with
+  no visible output.
+- A report written in SQL is harder to compose than one written in
+  Python. Shared logic needs a deliberate answer (CTE library, SQL
+  templates) rather than falling out of inheritance.
+- Opening from the manifest makes the manifest load-bearing. A bundle
+  with a stale or hand-edited manifest fails to open rather than
+  degrading — which is the intent, but it is a new failure mode.
+
+### Neutral / mitigations
+
+- **SQL injection**, introduced by native SQL, is removed by §2.5 —
+  which was already required for performance.
+- **`report_legacy` becoming permanent** is the realistic failure mode
+  of any parallel-module migration. Mitigation: `report list` shows the
+  split, so the remaining debt is visible in normal use.
+- **Dialect portability** is lost by design, per §2.1.
+- **The speed gain is not uniform.** It concentrates in variant-scale
+  reports. `etl_status` and `etl_packages` become manifest reads and
+  gain nothing measurable, because they were never slow.
+
+---
+
+## 4. Alternatives Considered
+
+### Alternative A — Optimise the reports in place, keep the ORM
+
+Fix the predicates, collapse the fan-out, keep SQLAlchemy. Cheapest, and
+it would recover much of the performance. Rejected because it does not
+change what the layer encourages: the next report written under the same
+contract reintroduces the same patterns, and the ORM still cannot
+express a range join. §1.4 also means the variant reports need rewriting
+regardless, which removes most of the cost saving.
+
+### Alternative B — A subpackage inside the existing module
+
+`modules/report/reports_native/`, discovered by the same manager.
+Smaller diff, no rename. Rejected because the two contracts genuinely
+differ — session plus DataFrame versus DuckDB connection plus
+`ReportResult` — so one manager would carry two code paths with no
+forcing function to ever remove one.
+
+### Alternative C — Name the new module provisionally, rename at the end
+
+Rejected in §2.2: it makes every file written during the migration carry
+a path that changes later, which is strictly more churn than renaming
+the frozen module once.
+
+### Alternative D — Rewrite all 25 reports at once
+
+A clean cut with no coexistence and no routing. Rejected: 16,443 lines
+rewritten before anything ships, with no incremental validation. The
+reports also differ enormously in value — some are load-bearing, some
+have never been run twice.
+
+### Alternative E — pandas/pyarrow directly, no SQL layer
+
+Rejected for the same reason ADR-001 Alternative C rejected it: it
+discards the query planner, and range joins and set aggregation would be
+hand-written against 2.2 billion rows.
+
+### Alternative F — Keep the Database/session machinery, swap only the query style
+
+Write native SQL but keep `Engine`, `Session` and the `parquet://`
+bridge underneath. Rejected: the Session contributes nothing to a
+read-only analytical query, reports already bypass it 14 times to reach
+the raw connection (§2.3), and keeping `StaticPool` keeps the temp-table
+collision. The machinery is not neutral overhead; it is actively in the
+way.
+
+---
+
+## 5. POC results (2026-09-14)
+
+Measured on the 20260910 bundle (21 GB, 114 declared tables), macOS, 6
+threads, `memory_limit = 12GB`. Peak memory is `maximum resident set
+size` from `/usr/bin/time -l`.
+
+### 5.1 A production-scale question, end to end
+
+The ADSP step_01 question — which of a cohort's variants map to a
+protein-coding gene — rewritten against the 4.3.0 schema. 711,836 input
+variants against `variant_masters` (177,520,333 rows) and
+`variant_molecular_effects` (2,238,929,441 rows).
+
+```
+parse input                         0.2s
+coding genes                        0.0s
+match variant_masters (177M)        2.5s
+join molecular_effects (2.2B)       8.9s
+coding filter + aggregate           0.1s
+─────────────────────────────────────────
+TOTAL                              11.9s     peak RSS: 1.87 GB
+```
+
+| | |
+| --- | ---: |
+| inputs (autosomal) | 711,836 |
+| matched in `variant_masters` | 711,651 |
+| VEP annotation rows | 8,163,820 |
+| variants with a coding gene | 356,082 |
+
+The ADSP run on the 4.2.0 bundle reported 355,710 for the same cohort —
+0.1% apart. The rewritten query is a simplification (it matches on
+`symbol` only, without the Ensembl-id fallback or the `locus_type`
+filter), so the agreement is a sanity check, not an equivalence proof.
+
+Peak memory was 1.87 GB against a declared ceiling of 12 GB.
+
+### 5.2 Materialisation, isolated
+
+The same query, the same 69,973,856 rows (`variant_molecular_effects`,
+chromosomes 21–22, 8 columns), changing **only** how the result is
+handed back:
+
+| | time | peak RSS |
+| --- | ---: | ---: |
+| `fetchall()` → dicts → `pd.DataFrame` — the current shape | **442.0 s** | **20.98 GB** |
+| `fetch_arrow_table()` | **3.9 s** | **4.04 GB** |
+
+**113x in time, 5.2x in memory**, for the materialisation step alone —
+before the fan-out of §1.1 or the predicate shape of §1.2 is addressed.
+The difference is 70 million Python dictionaries against columnar
+buffers.
+
+The 20.98 GB also explains the batch-accumulation temp tables of §2.3:
+they are not fastidiousness, they are what keeps the process alive.
+
+A third tier exists that the current path cannot reach: `.arrow()`
+without `read_all()` returns a streaming `RecordBatchReader`, so a
+caller can consume batches without materialising the 4 GB at all.
+
+### 5.3 What is *not* claimed
+
+- The 113x is the materialisation step, not a report end to end. A
+  variant-scale report should gain more, since the fan-out also
+  disappears; `etl_status` gains nothing, because it was never slow.
+- Opening from the manifest (§2.3) contributes **no** measurable speed.
+  It trades 114 `stat()` calls for one JSON read. Its value is
+  correctness: §1.3 and §1.4.
+- No head-to-head against the current reports was possible. They query
+  `variant_masters.position_start`, which the bundle does not carry
+  (§1.4), so they cannot run against this data at all.
+
+---
+
+## 6. Implementation outline
+
+1. **Realign `model_variants.py` with what the ETL writes** (§1.4), and
+   make `db verify --schema` compare against the partitioned data rather
+   than the stub. Nothing below is trustworthy until the models, the
+   data and the check agree.
+2. Register views from the manifest (§2.3), and fix the
+   double-`connect()` reset. This retires §1.3 for `report_legacy` too,
+   which is what lets unmigrated reports keep working.
+3. Delete `reports_bkp/`.
+4. Rename `modules/report/` → `modules/report_legacy/`; update imports,
+   the CLI and tests. No behaviour change.
+5. Create `modules/report/` with `Bundle`, `ReportBase`,
+   `ReportManager`, `ReportResult`, input registration (§2.5) and
+   provenance export (§2.7).
+6. Build the fixture bundle (§2.10).
+7. Pilot A — `annotation_master_gene` (687 lines, 9 queries). It reads
+   eight populated core tables plus the partitioned `variant_masters`,
+   so it exercises the fan-out collapse, input registration, aliases,
+   groups, locations and relationships in one report. Every table it
+   needs has rows (§1.4).
+8. Pilot B — `variant_gene_location_model` (946 lines). The range-join
+   case, and a report §1.4 has already broken; this is what proves §2.4.
+9. Pilot C — `etl_status` and `etl_packages`. Both read provenance the
+   manifest and `build_record.json` already carry, so they become
+   manifest readers with no query at all.
+10. Review the contract against what the three pilots taught before
+    migrating anything else.
+11. CLI routing and `report list` engine markers (§2.9).
+
+---
+
+## 7. Open questions
+
+- **Composition.** How shared SQL is reused across reports — a CTE
+  library, templates, or view definitions in the bundle itself. The
+  pilots should answer this; it is the main thing Python gave us for
+  free and SQL does not.
+- **Where `ReportResult.artifacts` files are written**, and whether the
+  CLI or the report owns the naming.
+- **What `db verify` should assert about schema.** It is the right home
+  — it already exists, needs no database, and is where an operator
+  looks. Two changes are needed and their shape is open: compare the
+  models against the partitioned data rather than the parent stub
+  (§1.4), and add a check that each DTP's declared Arrow schema matches
+  the model it feeds, so §1.4 becomes self-defending.
+- **Whether `db verify` should flag empty declared tables.** Ten are
+  empty today and the command reports the bundle as valid. Some
+  emptiness is legitimate (`chemical_masters` was never loaded); some is
+  a silent build failure (§1.4).
