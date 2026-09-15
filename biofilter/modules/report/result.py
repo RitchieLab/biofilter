@@ -44,6 +44,7 @@ def make_provenance(
     params: Optional[dict[str, Any]] = None,
     biofilter_version: Optional[str] = None,
     rows: Optional[int] = None,
+    coverage: Optional[dict[str, Any]] = None,
 ) -> dict[str, Any]:
     """
     Build the provenance record that travels with a result.
@@ -53,6 +54,10 @@ def make_provenance(
     only interpretable next to the build that produced them. It is a
     build identity, not a content hash — it answers "which build", not
     "has this been altered".
+
+    `coverage` records what the bundle was missing: optional tables the
+    report would have used, and which chromosomes its variants span. Both
+    show up in the result as nulls and absences that look like answers.
     """
     return {
         "report": report,
@@ -62,6 +67,10 @@ def make_provenance(
         "params": _jsonable(params or {}),
         "rows": rows,
         "generated_at": datetime.now(timezone.utc).isoformat(),
+        # What the bundle did not have. A column that is null because the
+        # source was never built looks exactly like one that is null
+        # because the answer is null, and only this tells them apart.
+        "coverage": coverage or {},
     }
 
 

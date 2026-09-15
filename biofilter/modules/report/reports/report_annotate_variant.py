@@ -58,6 +58,15 @@ class AnnotateVariantReport(ReportBase):
         "variant_rsid",
     )
 
+    #: Used when present. Their absence leaves whole column groups null,
+    #: which is why the provenance records which ones were missing.
+    optional = (
+        "variant_predictions",
+        "variant_alphamissense",
+        "variant_consequences",
+        "variant_impacts",
+    )
+
     COLUMNS = (
         # what was asked
         "input_value",

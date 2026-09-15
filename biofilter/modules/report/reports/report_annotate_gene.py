@@ -69,6 +69,10 @@ class AnnotateGeneReport(ReportBase):
         "omic_status",
     )
 
+    #: Used for `variant_count_in_gene_range`. Without it the column is
+    #: null, which the provenance explains.
+    optional = ("variant_masters",)
+
     COLUMNS = (
         "input_value",
         "input_matched_alias",

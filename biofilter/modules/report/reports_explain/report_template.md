@@ -41,6 +41,11 @@ another build recognisable as one.
 built without a source into one sentence, checked before the report
 starts.
 
+**Declare what you read only when it is there.** `optional = (...)` names
+tables the report works without. Their absence is recorded in the
+result's provenance, because a column that is null because the source was
+never built looks exactly like one whose answer is null.
+
 **Register input, never interpolate it.** `register_input()` puts the
 user's values in an Arrow relation to JOIN against. That is what keeps
 injection out, and what makes a 700,000-value input a hash join rather

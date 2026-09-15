@@ -13,10 +13,19 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Iterable, Optional, Sequence
 
+import duckdb
 import pyarrow as pa
 
 from biofilter.modules.report.bundle import Bundle
 from biofilter.modules.report.result import Artifact, ReportResult
+
+
+class BundleSchemaMismatch(RuntimeError):
+    """The bundle does not carry something the report asked for."""
+
+    def _render_traceback_(self) -> list[str]:
+        """IPython prints the message; the frames add nothing."""
+        return [f"BundleSchemaMismatch: {self}"]
 
 
 class ReportBase:
@@ -28,6 +37,13 @@ class ReportBase:
     #: bundle built without a source says so in one line rather than
     #: failing somewhere inside the third query.
     requires: tuple[str, ...] = ()
+
+    #: Tables the report uses when the bundle has them, and does without
+    #: when it does not. Their absence is not an error — it is a silent
+    #: hole in the result, so the manager records which ones were missing
+    #: in the provenance rather than leaving a reader to wonder why a
+    #: column is all null.
+    optional: tuple[str, ...] = ()
 
     def __init__(
         self,
@@ -82,8 +98,33 @@ class ReportBase:
         For a list of values use `register_input()` and join against it —
         a scalar placeholder is for a scalar.
         """
-        cur = self.con.execute(query, list(params) if params else None)
+        try:
+            cur = self.con.execute(query, list(params) if params else None)
+        except duckdb.BinderException as exc:
+            raise BundleSchemaMismatch(self._schema_message(exc)) from exc
         return cur.to_arrow_table()
+
+    def _schema_message(self, exc: Exception) -> str:
+        """
+        Say which bundle is missing what, instead of a bare binder error.
+
+        A report asking for a column an older bundle never carried fails
+        with `Binder Error: ... does not have a column named X`, which
+        names neither the report nor the bundle. The usual cause is a
+        bundle built before the column existed, and that is worth saying
+        outright rather than leaving to be deduced.
+        """
+        return (
+            f"Report '{self.name}' asked this bundle for something it does not "
+            f"carry.\n"
+            f"  bundle: {self.bundle.root}\n"
+            f"  built:  {self.bundle.created_at} by Biofilter "
+            f"{self.bundle.biofilter_version}\n"
+            f"  {exc}\n"
+            f"  A bundle built before a column existed will fail here. "
+            f"`biofilter db verify --in <bundle> --schema` compares it against "
+            f"this install."
+        )
 
     def stream(self, query: str, params: Optional[Sequence[Any]] = None):
         """

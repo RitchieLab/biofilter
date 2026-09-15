@@ -77,6 +77,10 @@ class Bundle:
     manifest: dict[str, Any]
     tables: dict[str, BundleTable]
     con: duckdb.DuckDBPyConnection = field(repr=False)
+    #: Cached per table; a scan, cheap but not free.
+    _chromosomes: dict[str, Optional[list[int]]] = field(
+        default_factory=dict, repr=False
+    )
 
     # ------------------------------------------------------------------
     # Opening
@@ -258,6 +262,35 @@ class Bundle:
 
     def has(self, table: str) -> bool:
         return table in self.tables
+
+    def chromosomes(self, table: str = "variant_masters") -> Optional[list[int]]:
+        """
+        Which chromosomes this bundle's variants cover.
+
+        Grouped from the data rather than read off filenames, and cached:
+        it is a parquet-metadata scan, about 0.2s across 177 million rows,
+        and every report that touches variants wants it for provenance.
+
+        None when the bundle carries no such table at all.
+        """
+        if table in self._chromosomes:
+            return self._chromosomes[table]
+        if not self.has(table):
+            self._chromosomes[table] = None
+            return None
+        try:
+            rows = self.con.execute(
+                f'SELECT DISTINCT chromosome FROM "{table}" ORDER BY 1'
+            ).fetchall()
+        except duckdb.Error:
+            # Not every variant table spells it `chromosome` —
+            # `variant_gwas` carries the GWAS Catalog's own `chr_id`.
+            # Coverage is a courtesy; failing to compute it must not
+            # fail the report that asked.
+            self._chromosomes[table] = None
+            return None
+        self._chromosomes[table] = [int(r[0]) for r in rows if r[0] is not None]
+        return self._chromosomes[table]
 
     def require(self, *names: str) -> None:
         """

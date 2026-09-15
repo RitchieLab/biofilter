@@ -198,6 +198,7 @@ class ReportManager:
             params=params,
             biofilter_version=bundle.biofilter_version,
             rows=result.num_rows,
+            coverage=self._coverage(cls, bundle),
         )
 
         elapsed = time.perf_counter() - started
@@ -207,6 +208,30 @@ class ReportManager:
             "INFO",
         )
         return result
+
+    @staticmethod
+    def _coverage(cls: Type[ReportBase], bundle: Bundle) -> dict[str, Any]:
+        """
+        What the bundle did not have, recorded alongside the result.
+
+        A report that declares optional tables works without them, and
+        the columns they would have filled come back null — which is
+        indistinguishable from a null answer unless someone writes down
+        that the source was absent. Same for chromosomes: a bundle built
+        for one of them returns honest zeros everywhere else.
+        """
+        optional = tuple(getattr(cls, "optional", ()))
+        absent = [name for name in optional if not bundle.has(name)]
+
+        coverage: dict[str, Any] = {"optional_tables_absent": absent}
+        if any(
+            name.startswith("variant_")
+            for name in tuple(getattr(cls, "requires", ())) + optional
+        ):
+            chromosomes = bundle.chromosomes()
+            if chromosomes is not None:
+                coverage["chromosomes"] = chromosomes
+        return coverage
 
     def run_example(self, identifier: str, **params: Any) -> ReportResult:
         cls = self.get_class(identifier)

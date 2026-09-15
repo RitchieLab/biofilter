@@ -135,3 +135,65 @@ class TestRequires:
                 manager.run("template", input_data=["TP53"])
         finally:
             cls.requires = original
+
+
+class TestCoverage:
+    """
+    What the bundle was missing, recorded beside the result.
+
+    A column that is null because the source was never built looks
+    exactly like one that is null because the answer is null.
+    """
+
+    def test_absent_optional_tables_are_named(self, bundle, monkeypatch):
+        manager = ReportManager(bundle=bundle)
+        cls = manager.get_class("template")
+        monkeypatch.setattr(cls, "optional", ("variant_gtex", "gene_masters"))
+
+        result = manager.run("template", input_data=["TP53"])
+        coverage = result.provenance["coverage"]
+
+        assert coverage["optional_tables_absent"] == ["variant_gtex"]
+
+    def test_nothing_missing_is_an_empty_list_not_a_missing_key(self, bundle):
+        """A predictable shape is worth more than a terse one."""
+        result = ReportManager(bundle=bundle).run("template", input_data=["TP53"])
+        assert result.provenance["coverage"]["optional_tables_absent"] == []
+
+    def test_a_variant_report_records_which_chromosomes_it_could_see(self, bundle):
+        result = ReportManager(bundle=bundle).run("annotate_variant", input_data=["rs101"])
+        assert result.provenance["coverage"]["chromosomes"] == [17, 22]
+
+    def test_a_report_that_touches_no_variants_omits_chromosomes(self, bundle):
+        result = ReportManager(bundle=bundle).run("template", input_data=["TP53"])
+        assert "chromosomes" not in result.provenance["coverage"]
+
+    def test_coverage_reaches_the_sidecar(self, bundle, tmp_path):
+        result = ReportManager(bundle=bundle).run("annotate_variant", input_data=["rs101"])
+        sidecar = result.write(tmp_path / "out.csv")[1]
+
+        written = json.loads(sidecar.read_text())
+        assert written["coverage"]["chromosomes"] == [17, 22]
+
+
+class TestSchemaMismatch:
+    def test_a_missing_column_names_the_bundle_and_the_report(self, bundle):
+        """
+        A bundle built before a column existed fails with a bare
+        `Binder Error` that names neither. That is the usual cause, and
+        worth saying outright.
+        """
+        from biofilter.modules.report.reports.base_report import BundleSchemaMismatch
+
+        manager = ReportManager(bundle=bundle)
+        report = manager.get_class("template")(bundle=bundle, input_data=["TP53"])
+        try:
+            with pytest.raises(BundleSchemaMismatch) as caught:
+                report.sql("SELECT no_such_column FROM gene_masters")
+        finally:
+            report.close()
+
+        message = str(caught.value)
+        assert "template" in message
+        assert str(bundle.root) in message
+        assert "db verify" in message

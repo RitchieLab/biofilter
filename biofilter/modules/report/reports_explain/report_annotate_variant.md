@@ -70,7 +70,20 @@ whatever the ETL believed when it wrote the row.
 
 **A bundle built for a subset of chromosomes returns `not_found` for
 everything outside it.** That is true of the bundle, not of the genome.
-`platform_data_statistics` shows which chromosomes are present.
+
+You do not have to remember to check: the `.provenance.json` written
+beside every result records it.
+
+```json
+"coverage": {
+  "optional_tables_absent": ["variant_predictions", "variant_alphamissense"],
+  "chromosomes": [22]
+}
+```
+
+An empty `optional_tables_absent` means every source this report can use
+was present. A non-empty one names the column groups that came back null
+for want of data rather than for want of an answer.
 
 **rsIDs come from `variant_rsid`, not from `variant_masters.rsid`.** That
 column exists and is entirely null in 4.3.0 bundles — 0 of 2,889,803 rows

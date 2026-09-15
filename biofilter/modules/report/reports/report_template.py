@@ -5,6 +5,9 @@ What this shows, and what every report should do:
 
 - name what it reads in `requires`, so a bundle missing a source fails
   with one sentence instead of a query error
+- name what it reads *when present* in `optional`, so the provenance can
+  record which sources were absent — a column that is null because the
+  source was never built looks exactly like one whose answer is null
 - turn the user's input into a relation and JOIN it, never into a list
   of SQL literals
 - express the whole question as one statement and let DuckDB plan it,

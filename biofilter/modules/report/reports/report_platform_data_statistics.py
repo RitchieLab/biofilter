@@ -54,6 +54,15 @@ class PlatformDataStatisticsReport(ReportBase):
 
     requires = ("entities", "entity_groups")
 
+    #: Each one is a section that simply does not appear without it.
+    optional = (
+        "entity_relationships",
+        "entity_relationship_types",
+        "etl_data_sources",
+        "etl_packages",
+        "etl_source_systems",
+    ) + VARIANT_TABLES
+
     COLUMNS = (
         "section",
         "metric",
