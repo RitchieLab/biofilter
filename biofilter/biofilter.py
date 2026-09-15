@@ -12,7 +12,7 @@ from biofilter.core.components import (
     SettingsComponent,
 )
 from biofilter.modules.db.database import Database
-from biofilter.utils.bundle_path import bundle_to_uri
+from biofilter.utils.bundle_path import bundle_to_uri, check_bundle_path
 from biofilter.utils.config import BiofilterConfig
 from biofilter.utils.logger import Logger
 from biofilter.utils.version import __version__
@@ -159,6 +159,9 @@ class Biofilter:
         # Components
         self.db = DBComponent(self.core)
         if self.core.db_uri:
+            # Check the bundle path before the engine does, so a typo is
+            # reported as a typo rather than as a missing in-memory DuckDB.
+            check_bundle_path(self.core.db_uri)
             self.db.connect()
 
         self.settings = SettingsComponent(self.core)
