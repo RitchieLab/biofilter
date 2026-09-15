@@ -151,7 +151,7 @@ biofilter/
 docs/
 └── source/                    # Sphinx documentation source
 
-notebooks_430/
+notebooks/
 └── Templates/                 # Ready-to-use report tutorials
 
 tests/

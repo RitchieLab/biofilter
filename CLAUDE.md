@@ -32,7 +32,7 @@ biofilter_agents/        # Operational guides (LLM-ready) for CLI/ETL/DB/Report
 assistent/               # GPT assistant kit (system prompt, FAQ, manifest)
 biofilter_data/          # Downloads and processed files before DB ingestion
 docs/source/             # Sphinx documentation source (4.3.x)
-notebooks_430/           # Analyses and working docs for 4.3.x
+notebooks/           # Analyses and working docs for 4.3.x
 adr/                     # Architecture decisions, not tied to a release
 biofilter_legacy/
   bf4_420/               # Frozen 4.2.x: notebooks, scripts, docs snapshot
@@ -185,7 +185,7 @@ A report is three artifacts, and all three ship together:
 
 1. `biofilter/modules/report/reports/report_<name>.py` — `name`, `description`, `requires`, `run()`, `available_columns()`, `example_input()`
 2. `biofilter/modules/report/reports_explain/report_<name>.md` — reference: parameters, columns, how to read the result
-3. `notebooks_430/templates/reports__<name>.ipynb` — worked example; copy `reports__TEMPLATE.ipynb`
+3. `notebooks/templates/reports__<name>.ipynb` — worked example; copy `reports__TEMPLATE.ipynb`
 4. `tests/unit/report/test_report_<name>.py` — against the fixture bundle in `tests/unit/report/conftest.py`
 5. Validate: `biofilter --bundle <path> report list` + `report explain --report-name <name>`
 
@@ -239,7 +239,11 @@ that nothing imports. Shared SQL for the annotation family lives in
 ## Known documentation gaps
 
 - Some `reports_explain/` files are minimal stubs — to be revisited
-- Only the current release's notebooks live at the root (`notebooks_430/`).
+- Only the current release's notebooks live at the root (`notebooks/`),
+  unversioned on purpose: the directory carried a `_430` suffix while the
+  4.2.x set sat beside it, and that set has moved under
+  `biofilter_legacy/`. Versioning the path again would mean renaming it,
+  and every reference to it, each release.
   Everything from 4.2.x — notebooks, scripts and a snapshot of its docs —
   is frozen under `biofilter_legacy/bf4_420/`, so `docs/` can be rewritten
   for 4.3.0 without stranding anyone still reading a 4.2.0 bundle.

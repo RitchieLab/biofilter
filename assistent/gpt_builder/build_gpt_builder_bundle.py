@@ -20,7 +20,7 @@ def _default_sources() -> list[dict]:
             "path": "biofilter/modules/report/reports_explain",
             "ext": {".md"},
         },
-        {"id": "notebooks", "path": "notebooks/Templates", "ext": {".ipynb", ".md"}},
+        {"id": "notebooks", "path": "notebooks/templates", "ext": {".ipynb", ".md"}},
     ]
 
 

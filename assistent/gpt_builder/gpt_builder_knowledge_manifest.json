@@ -1,5 +1,5 @@
 {
-  "count": 29,
+  "count": 38,
   "files": [
     "assistent/assistant_faq_seed.md",
     "biofilter/modules/report/reports_explain/report_annotate_disease.md",
@@ -29,6 +29,15 @@
     "docs/source/report_catalog.md",
     "docs/source/reports.md",
     "docs/source/system_overview.md",
-    "docs/source/troubleshooting.md"
+    "docs/source/troubleshooting.md",
+    "notebooks/templates/README.md",
+    "notebooks/templates/reports__101.ipynb.md",
+    "notebooks/templates/reports__TEMPLATE.ipynb.md",
+    "notebooks/templates/reports__annotate_disease.ipynb.md",
+    "notebooks/templates/reports__annotate_gene.ipynb.md",
+    "notebooks/templates/reports__annotate_go.ipynb.md",
+    "notebooks/templates/reports__annotate_pathway.ipynb.md",
+    "notebooks/templates/reports__annotate_protein.ipynb.md",
+    "notebooks/templates/reports__resolve_entity.ipynb.md"
   ]
 }
