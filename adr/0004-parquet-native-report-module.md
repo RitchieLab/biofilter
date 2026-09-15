@@ -632,6 +632,29 @@ less believable, which is why this section exists.
   naming 2,615 genes links its members while saying nothing about any of
   them. `max_group_size` defaults to 300, which keeps 98% of pathways
   while cutting the gene pairs they generate from 37.1 M to 6.9 M.
+
+  **Settled 2026-09-15: `annotation_master_chemical` was deleted rather
+  than migrated.** Not because a bundle could not hold chemicals — unlike
+  the `db_pg_*` pair, this one is about data that is simply not there
+  yet. The `Chemicals` entity group exists in the seeded taxonomy and
+  holds **zero** entities; there is no `chemical_masters` table in the
+  bundle; and the `chebi` source has no ETL package at all, meaning it
+  has never run. Nine of the fourteen seeded groups are empty the same
+  way: the taxonomy was seeded ahead of the data.
+
+  Rewriting a report against a table that does not exist would mean
+  guessing at its shape, which is the mistake §1.3 records and §2.1
+  forbids. When a bundle carries chemicals, the report gets written
+  against that bundle.
+
+  **Deferred, not decided: `variant_binning`.** It bins a cohort's rare
+  variants into gene, gene-group, locus-type or pathway bins, so it needs
+  both the user's VCF and the bundle's gene ranges. The current bundle
+  carries chromosome 22 only, and binning a whole-genome VCF against it
+  would not fail — it would return bins covering one chromosome's worth
+  of the cohort and say nothing about the rest. That is the failure mode
+  this ADR exists to stop, so the report waits for a bundle with every
+  chromosome rather than shipping with a caveat.
 - **How `model_variants.py` is realigned with what the ETL writes**
   (§1.4). The direction is settled in §2.1; the table-by-table work
   belongs to the model and build layers.
