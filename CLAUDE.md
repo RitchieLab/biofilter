@@ -177,9 +177,19 @@ df_rel    = bf.report.run("entity_relationship_model",
 
 ## Extending: new Report
 
-1. `biofilter/modules/report/reports/report_<name>.py` — `name`, `description`, `run()`, `available_columns()`, `example_input()`
-2. `biofilter/modules/report/reports_explain/report_<name>.md` — tutorial, parameters, column descriptions
-3. Validate: `biofilter report list --verbose` + `biofilter report explain --report-name <name>`
+A report is three artifacts, and all three ship together:
+
+1. `biofilter/modules/report/reports/report_<name>.py` — `name`, `description`, `requires`, `run()`, `available_columns()`, `example_input()`
+2. `biofilter/modules/report/reports_explain/report_<name>.md` — reference: parameters, columns, how to read the result
+3. `notebooks_430/templates/reports__<name>.ipynb` — worked example; copy `reports__TEMPLATE.ipynb`
+4. `tests/unit/report/test_report_<name>.py` — against the fixture bundle in `tests/unit/report/conftest.py`
+5. Validate: `biofilter --bundle <path> report list` + `report explain --report-name <name>`
+
+Reports are discovered by being in the package — nothing to register.
+A report in the native module shadows a same-named one in
+`report_legacy`, which is how migration works; removing the legacy copy
+also needs its line in that package's `reports/__init__.py` and its
+`__all__` entry.
 
 ---
 
