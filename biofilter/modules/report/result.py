@@ -122,7 +122,7 @@ class ReportResult:
         if fmt == "parquet":
             pq.write_table(self._table_with_metadata(), path)
         elif fmt == "csv":
-            pacsv.write_csv(self.table, path)
+            pacsv.write_csv(flatten_for_csv(self.table), path)
         else:
             raise ValueError(f"Unsupported output format: {fmt!r} (csv, parquet)")
 
@@ -154,6 +154,36 @@ class ReportResult:
         merged = dict(existing)
         merged[b"biofilter_provenance"] = json.dumps(self.provenance).encode()
         return self.table.replace_schema_metadata(merged)
+
+
+def flatten_for_csv(table: pa.Table) -> pa.Table:
+    """
+    Render nested columns as JSON so CSV can hold them.
+
+    A gene's groups and its relationship counts per related group are
+    genuinely lists, and Arrow and parquet keep them that way. CSV has no
+    nested type at all — pyarrow refuses to write one — so the choice is
+    how to spell a list in one cell.
+
+    JSON, because it is unambiguous and reversible: `["A","B"]` reads as
+    a list to a person and parses back for a program. A separator-joined
+    string does neither once a value contains the separator.
+    """
+    columns = []
+    changed = False
+    for column in table.columns:
+        if pa.types.is_nested(column.type):
+            rendered = [
+                None if v is None else json.dumps(v, separators=(",", ":"))
+                for v in column.to_pylist()
+            ]
+            columns.append(pa.array(rendered, type=pa.string()))
+            changed = True
+        else:
+            columns.append(column)
+    if not changed:
+        return table
+    return pa.table(columns, names=table.column_names)
 
 
 def _infer_format(path: Path) -> str:

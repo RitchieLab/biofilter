@@ -5,7 +5,6 @@ from .report_entity_relationship_model import EntityRelationshipModelReport
 from .report_variant_gene_location_model import VariantGeneLocationModelReport
 from .report_variant_binning import VariantBinningReport
 from .report_snp_snp_model import SNPSNPModelReport
-from .report_annotation_master_gene import AnnotationMasterGeneReport
 from .report_annotation_master_pathway import AnnotationMasterPathwayReport
 from .report_annotation_master_protein import AnnotationMasterProteinReport
 from .report_annotation_master_disease import AnnotationMasterDiseaseReport
@@ -28,7 +27,6 @@ __all__ = [
     "VariantGeneLocationModelReport",
     "VariantBinningReport",
     "SNPSNPModelReport",
-    "AnnotationMasterGeneReport",
     "AnnotationMasterPathwayReport",
     "AnnotationMasterProteinReport",
     "AnnotationMasterDiseaseReport",
