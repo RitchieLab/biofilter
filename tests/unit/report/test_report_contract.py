@@ -129,9 +129,9 @@ class TestRequires:
         manager = ReportManager(bundle=bundle)
         cls = manager.get_class("template")
         original = cls.requires
-        cls.requires = ("gene_masters", "variant_gtex")
+        cls.requires = ("gene_masters", "variant_gwas")
         try:
-            with pytest.raises(BundleIncomplete, match="variant_gtex"):
+            with pytest.raises(BundleIncomplete, match="variant_gwas"):
                 manager.run("template", input_data=["TP53"])
         finally:
             cls.requires = original
@@ -148,12 +148,12 @@ class TestCoverage:
     def test_absent_optional_tables_are_named(self, bundle, monkeypatch):
         manager = ReportManager(bundle=bundle)
         cls = manager.get_class("template")
-        monkeypatch.setattr(cls, "optional", ("variant_gtex", "gene_masters"))
+        monkeypatch.setattr(cls, "optional", ("variant_gwas", "gene_masters"))
 
         result = manager.run("template", input_data=["TP53"])
         coverage = result.provenance["coverage"]
 
-        assert coverage["optional_tables_absent"] == ["variant_gtex"]
+        assert coverage["optional_tables_absent"] == ["variant_gwas"]
 
     def test_nothing_missing_is_an_empty_list_not_a_missing_key(self, bundle):
         """A predictable shape is worth more than a terse one."""

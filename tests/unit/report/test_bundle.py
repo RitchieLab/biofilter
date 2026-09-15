@@ -87,8 +87,8 @@ class TestRefusal:
     def test_require_names_what_is_missing(self, fixture_bundle):
         with Bundle.open(fixture_bundle) as bundle:
             bundle.require("gene_masters", "variant_masters")
-            with pytest.raises(BundleIncomplete, match="variant_gtex"):
-                bundle.require("gene_masters", "variant_gtex")
+            with pytest.raises(BundleIncomplete, match="variant_gwas"):
+                bundle.require("gene_masters", "variant_gwas")
 
 
 class TestIsolation:

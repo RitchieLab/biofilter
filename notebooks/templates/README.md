@@ -18,6 +18,7 @@ user actually has.
 | `reports__resolve_entity.ipynb` | **start here for a new input list** — does the bundle know these names |
 | `reports__expand_entity_neighborhood.ipynb` | what is one hop from an entity, for a mixed list |
 | `reports__expand_entity_relationship.ipynb` | the links themselves, and how a set connects to itself |
+| `reports__expand_variant_regulatory.ipynb` | which genes a variant regulates, and in which tissue |
 | `reports__annotate_gene.ipynb` | genes |
 | `reports__annotate_variant.ipynb` | variants: rsID / position / allele, one row per transcript |
 | `reports__annotate_disease.ipynb` | diseases, and the two ClinGen counts |

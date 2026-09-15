@@ -592,6 +592,37 @@ def _variant_tables() -> dict[str, pa.Table]:
             score=pa.array([0.17]),
             classification=pa.array(["likely_benign"]),
         ),
+        # eQTL evidence. Deliberately not all brain: which tissues a
+        # bundle carries is a build flag (50 in the GTEx catalogue, 13
+        # loaded today), so nothing about tissue may be hardcoded.
+        #
+        # The variant sits inside TP53's range and regulates BRCA1 —
+        # which is the point of the report: the gene a variant is *in*
+        # and the gene it *regulates* are usually different.
+        "variant_gtex": _t(
+            chromosome=pa.array([17, 17, 17, 17], pa.int32()),
+            position=pa.array([150, 150, 150, 200], pa.int64()),
+            reference_allele=pa.array(["A"] * 4),
+            alternate_allele=pa.array(["G"] * 4),
+            gene_id=pa.array(
+                [
+                    "ENSG00000012048",  # BRCA1, which the bundle knows
+                    "ENSG00000012048",
+                    "ENSG09999999999",  # no BF4 entity for this one
+                    "ENSG00000012048",
+                ]
+            ),
+            bio_context=pa.array(
+                ["Brain_Cortex", "Liver", "Brain_Cortex", "Liver"]
+            ),
+            qtl_type=pa.array(["eQTL", "eQTL", "eQTL", "sQTL"]),
+            beta=pa.array([1.2, 0.8, -0.4, 0.1]),
+            se=pa.array([0.1, 0.2, 0.3, 0.4]),
+            p_value=pa.array([1e-20, 1e-5, 1e-3, 0.4]),
+            n=pa.array([200, 150, 200, 150], pa.int64()),
+            effect_allele=pa.array(["G"] * 4),
+            evidence_key=pa.array(["k1", "k2", "k3", "k4"]),
+        ),
         "variant_molecular_effects": _t(
             chromosome=pa.array([17, 17, 17, 17], pa.int32()),
             position=pa.array([150, 150, 150, 200], pa.int64()),
