@@ -179,12 +179,16 @@ def _tables() -> dict[str, pa.Table]:
                  True, False]
             ),
             is_active=pa.array([True] * 10),
+            data_source_id=pa.array([DS_HGNC] * 10, pa.int64()),
         ),
+        # Aliases for everything that is not a gene, plus one name
+        # deliberately shared by two entities so entity_filter has
+        # something ambiguous to flag.
         "entity_aliases_extra": _t(
-            id=pa.array(list(range(11, 22)), pa.int64()),
+            id=pa.array(list(range(11, 24)), pa.int64()),
             entity_id=pa.array(
                 [
-                    DGENE,
+                    NOLOC, DGENE, DGENE,
                     PROTEIN, PROTEIN, PROTEIN_ISO,
                     PATHWAY,
                     DISEASE, DISEASE, DISEASE_BARE,
@@ -194,7 +198,7 @@ def _tables() -> dict[str, pa.Table]:
             ),
             alias_value=pa.array(
                 [
-                    "DGENE1",
+                    "AMBIGUOUS", "AMBIGUOUS", "DGENE1",
                     "P04637", "TP53_HUMAN", "P04637-2",
                     "R-HSA-0001",
                     "MONDO:0001", "breast cancer", "MONDO:0002",
@@ -203,7 +207,7 @@ def _tables() -> dict[str, pa.Table]:
             ),
             alias_norm=pa.array(
                 [
-                    "dgene1",
+                    "ambiguous", "ambiguous", "dgene1",
                     "p04637", "tp53_human", "p04637-2",
                     "r-hsa-0001",
                     "mondo:0001", "breast cancer", "mondo:0002",
@@ -212,7 +216,7 @@ def _tables() -> dict[str, pa.Table]:
             ),
             alias_type=pa.array(
                 [
-                    "symbol",
+                    "synonym", "synonym", "symbol",
                     "code", "name", "code",
                     "code",
                     "code", "name", "code",
@@ -221,7 +225,7 @@ def _tables() -> dict[str, pa.Table]:
             ),
             xref_source=pa.array(
                 [
-                    "HGNC",
+                    "HGNC", "HGNC", "HGNC",
                     "UNIPROT", "UNIPROT", "UNIPROT",
                     "REACTOME",
                     "MONDO", "MONDO", "MONDO",
@@ -230,14 +234,24 @@ def _tables() -> dict[str, pa.Table]:
             ),
             is_primary=pa.array(
                 [
-                    True,
+                    False, False, True,
                     True, False, True,
                     True,
                     True, False, True,
                     True, True, False,
                 ]
             ),
-            is_active=pa.array([True] * 11),
+            is_active=pa.array([True] * 13),
+            data_source_id=pa.array(
+                [
+                    DS_HGNC, DS_HGNC, DS_HGNC,
+                    DS_UNIPROT, DS_UNIPROT, DS_UNIPROT,
+                    DS_REACTOME,
+                    DS_MONDO, DS_MONDO, DS_MONDO,
+                    DS_GO, DS_GO, DS_GO,
+                ],
+                pa.int64(),
+            ),
         ),
         # NOLOC deliberately has none: it is the `partial` case.
         "entity_locations": _t(
