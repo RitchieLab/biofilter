@@ -1,308 +1,273 @@
 # AG Report - Report Operations in Biofilter (CLI/API/Explain Guides)
 
-Detailed guide for working with the Biofilter report layer.
+The full report workflow: find the right one, run it, read what comes back.
 
-Covers:
-- report discovery and introspection
-- report execution via CLI and API
-- dynamic parameter passing (`--input`, `--param`, JSON/YAML)
-- explain guide architecture (`reports_explain`)
-- authoring pattern for new reports
-- LLM assistant playbook
+Audience: someone with a bundle. If you have not pointed Biofilter at one yet,
+start with `ag_start.md`.
 
 ---
 
 ## 1) Goal
 
-This guide helps you run and maintain reports in a way that scales as new reports are added, without changing CLI support code for each report.
+Reports are the read interface. Each takes a list of things you have — gene
+symbols, rsIDs, disease names, a cohort's variants — and returns a table.
 
-Key design principles:
-- report logic lives in `modules/report/reports/report_*.py`
-- report explain/tutorial content lives in `modules/report/reports_explain/report_*.md`
-- CLI is generic and dynamic (`report run` with generic parameter injection)
+You do not write queries and you do not need to know how the data is laid out.
 
 ---
 
-## 2) Report Architecture
+## 2) How a report works
 
-Each report is composed of:
+A report writes SQL against the bundle and returns an Arrow table, which the
+manager wraps with a record of how it was produced. Three consequences you
+will notice:
 
-1. Python report module:
-- path: `biofilter/modules/report/reports/report_<something>.py`
-- typically defines:
-  - `name`
-  - `description`
-  - `run()`
-  - `available_columns()`
-  - `example_input()`
-  - optional `explain()` fallback
+- **Input is joined, not interpolated.** Your list is registered as a relation
+  and joined, which is why a ten-thousand-value filter is as fast as a
+  ten-value one.
+- **Each execution is isolated.** Two reports in the same process cannot
+  collide.
+- **The result carries its origin.** Which bundle, which parameters, and what
+  the bundle was missing.
 
-2. Explain/Tutorial markdown:
-- path: `biofilter/modules/report/reports_explain/report_<something>.md`
-- used by `biofilter report explain`
+Each report ships three things besides the code:
 
-Explain resolution behavior:
-- first tries `reports_explain/report_<module>.md`
-- then tries legacy paths (if present)
-- if no guide exists, falls back to report class `explain()`
-
-This gives you dynamic explain docs per report while keeping backwards compatibility.
+| Artifact | Where |
+|---|---|
+| the explain guide | `biofilter/modules/report/reports_explain/report_<name>.md` |
+| a worked notebook | `notebooks/templates/reports__<name>.ipynb` |
+| its declared needs | `requires` / `optional` on the class — see §9 |
 
 ---
 
-## 3) Discover and Inspect Reports (CLI)
-
-List reports:
+## 3) Discover and inspect
 
 ```bash
-biofilter report list
-biofilter report list --verbose
+biofilter report list                  # names
+biofilter report list --verbose        # names, descriptions, modules
+
+biofilter report explain --report-name annotate_variant
+biofilter report example-input --report-name annotate_variant
+biofilter report available-columns --report-name annotate_variant
+biofilter report run --report-name annotate_variant --params-template
 ```
 
-Show explain/tutorial:
+`explain` prints the report's full guide and is the authority for that report.
+This document describes the workflow; the guide describes the report.
 
-```bash
-biofilter report explain --report-name etl_status
-```
+Discovery needs no bundle — it asks about the installed package. Only `run`
+reads data.
 
-Show expected example input from report class:
-
-```bash
-biofilter report example-input --report-name entity_relationship_model
-```
-
-Show available output columns:
-
-```bash
-biofilter report available-columns --report-name etl_packages
-```
-
-Refresh report cache:
-
-```bash
-biofilter report refresh
-```
+`report refresh` rebuilds the index after a report is added. You will not need
+it otherwise.
 
 ---
 
-## 4) Run Reports (CLI)
-
-Basic run:
-
-```bash
-biofilter report run --report-name etl_status
-```
-
-Export CSV:
-
-```bash
-biofilter report run --report-name etl_packages --output ./etl_packages.csv
-```
-
-Show params template (from `example_input()`):
-
-```bash
-biofilter report run --report-name entity_relationship_model --params-template
-```
-
-Pass direct inputs:
-
-```bash
-biofilter report run --report-name entity_filter --input BRCA1 --input TP53
-```
-
-Pass input file:
-
-```bash
-biofilter report run --report-name entity_filter --input-file ./entities.txt
-biofilter report run --report-name entity_filter --input-file ./entities.csv --input-column symbol
-```
-
-Pass generic parameters:
+## 4) Run (CLI)
 
 ```bash
 biofilter report run \
-  --report-name entity_relationship_model \
+  --report-name annotate_gene \
   --input TP53 --input BRCA1 \
-  --param relationship_scope=input_to_any \
-  --param deduplicate_pairs=true
+  --output genes.csv
 ```
 
-Pass parameter files:
+With an explicit bundle:
 
 ```bash
-biofilter report run --report-name entity_relationship_model --params-file ./params.yaml
-biofilter report run --report-name entity_relationship_model --params-json '{"relationship_scope":"input_to_any"}'
+biofilter --bundle /path/to/bundles/20260914 \
+  report run --report-name annotate_gene --input TP53 --output genes.csv
 ```
 
-Large value from file in a single param:
+`--output` takes its format from the extension — `.csv`, or `.parquet` to keep
+the provenance inside the file. Writing also produces
+`<output>.provenance.json` beside it.
+
+`--report-name` also accepts the shorter `--name`.
+
+---
+
+## 5) Inputs vs params (important rule)
+
+They are separate channels, and mixing them is an error rather than a guess.
+
+**Input — the records you are asking about.** One channel at a time:
 
 ```bash
-biofilter report run \
-  --report-name entity_relationship_model \
-  --input TP53 \
-  --param relationship_types=@./relationship_types.txt
+--input TP53 --input BRCA1                      # repeat the flag
+--input-file genes.txt                          # one value per line
+--input-file cohort.csv --input-column symbol   # a CSV column
 ```
 
-Note:
-- `--report-name` is the canonical option (`--name` is still accepted as alias).
+**There is no comma-separated form.** `--input "TP53,BRCA1"` is one value
+named `TP53,BRCA1`, and it will not match anything.
+
+**Params — everything else:** filters, modes, thresholds.
+
+```bash
+--param mapping=annotation
+--param af_max=0.01
+```
+
+Do not pass `input_data`, `items` or `input_path` through `--param`.
 
 ---
 
-## 5) Inputs vs Params (Important Rule)
+## 6) Parameter parsing
 
-Use:
-- `--input` / `--input-file` for report inputs (`input_data`)
-- `--param` for report options (scope, filters, toggles, limits, etc.)
+Values are coerced in this order: `true`/`false`, `null`/`none`, then JSON,
+then Python literal, else a plain string.
 
-Avoid mixing input channels:
-- if `--input`/`--input-file` is provided, do not pass `input_data`, `items`, or `input_path` through `--param`/JSON/YAML.
-- CLI enforces this and returns a friendly error to prevent ambiguous execution.
+```bash
+--param most_severe_only=true          # boolean
+--param af_max=0.01                    # number
+--param impact_filter='["HIGH","MODERATE"]'   # list, as JSON
+--param consequence_type_filter=@./terms.txt  # @ reads from a file
+--param note=@@literal_at_sign                # @@ escapes a leading @
+```
 
----
+For anything longer, pass the whole option set at once:
 
-## 6) Parameter Parsing Behavior
+```bash
+--params-json '{"mapping":"annotation","af_max":0.01}'
+--params-file ./params.yaml            # .json, .yml or .yaml
+```
 
-`--param KEY=VALUE` coercion rules:
-- `true` / `false` -> boolean
-- `null` / `none` -> `None`
-- JSON/py-literal values are parsed when possible:
-  - lists: `["a","b"]`
-  - dicts: `{"k":"v"}`
-  - numbers: `123`, `4.5`
-- `@path` loads value from file
-- `@@something` escapes a literal `@something`
-
-`--params-file` supports:
-- `.json`
-- `.yml`
-- `.yaml`
-
-If JSON/YAML root is not a dict, it is mapped to `{"input_data": <value>}`.
+`--params-template` prints what a report accepts, filled with its own example
+values — the fastest way to see the surface.
 
 ---
 
-## 7) Run Reports via API (Notebook/Python)
-
-Setup:
+## 7) Run via API (notebook / Python)
 
 ```python
 from biofilter import Biofilter
 
-bf = Biofilter(db_uri="sqlite:///biofilter_dev.db", debug_mode=False)
-```
+bf = Biofilter(bundle="/path/to/bundles/20260914")
 
-Examples:
-
-```python
-df_status = bf.report.run("etl_status", only_active=False)
-
-df_rel = bf.report.run(
-    "entity_relationship_model",
-    input_data=["TP53", "BRCA1", "NOT_FOUND_ENTITY"],
-    relationship_scope="input_to_any",
+result = bf.report.run(
+    "expand_gene_to_variant",
+    input_data=["BRCA1", "CHEK2"],
+    mapping="annotation",
+    impact_filter="HIGH",
+    af_max=0.01,
 )
 
+df = result.to_pandas()
+result.write("candidates.csv")
 ```
 
-Introspection in API:
+`run()` returns a result object, not a DataFrame. `.to_pandas()` gives you
+one; the wrapper is what carries `.provenance`, `.num_rows` and `.columns`.
+
+---
+
+## 8) The reports
+
+Sixteen, in six families. `biofilter report list --verbose` is always the
+authority for what your install has.
+
+| Family | Reports |
+|---|---|
+| `annotate_*` | `annotate_gene`, `annotate_variant`, `annotate_protein`, `annotate_disease`, `annotate_pathway`, `annotate_go` |
+| `expand_*` | `expand_gene_to_variant`, `expand_variant_regulatory`, `expand_entity_neighborhood`, `expand_entity_relationship` |
+| `resolve_*` | `resolve_entity` |
+| `pair_*` | `pair_variants` |
+| `aggregate_*` | `aggregate_cohort_variants` |
+| `platform_*` | `platform_data_statistics`, `platform_etl_status`, `platform_etl_packages` |
+
+By the question instead:
+
+| You have | Start with |
+|---|---|
+| names that may not match | `resolve_entity` |
+| genes, want what is known | `annotate_gene` |
+| rsIDs or positions | `annotate_variant` |
+| genes, want the variants in them | `expand_gene_to_variant` |
+| variants, want what they regulate | `expand_variant_regulatory` |
+| variants, want candidate pairs | `pair_variants` |
+| a cohort | `aggregate_cohort_variants` |
+| a bundle you do not know | `platform_data_statistics` |
+
+The full index, organized by question, is in
+`docs/source/report_catalog.md`.
+
+---
+
+## 9) Read the result honestly
+
+A short table is not the same as a negative answer.
+
+**Per-row status.** Reports that resolve input keep the inputs that produced
+nothing, with a reason:
+
+| Status | Means |
+|---|---|
+| `not_found` | the name did not resolve in this bundle |
+| `no_location` | it resolved, but there are no coordinates for it |
+| `no_variants` | it resolved and nothing met your criteria — a real negative |
+
+**Coverage.** Each report declares what it needs:
+
+- `requires` — tables it cannot work without. Checked before the query runs,
+  so a bundle built without GTEx says so in one line.
+- `optional` — tables it uses when present. Their absence is not an error,
+  which is the risk: the columns come back null, and a null because the source
+  was never built looks exactly like a null answer.
+
+So every result records which optional tables were missing, and which
+chromosomes the bundle spans:
 
 ```python
-print(bf.report.explain("etl_status"))
-print(bf.report.example_input("entity_relationship_model"))
-print(bf.report.available_columns("etl_packages"))
+result.provenance["coverage"]
+result.provenance["bundle_id"]
+result.provenance["version_mismatch"]   # None unless built by another release
 ```
 
----
-
-## 8) Built-in Reports (Current)
-
-- `etl_status`
-- `etl_packages`
-- `entity_filter`
-- `entity_relationship_model`
-- `variant_gene_location_model`
-- `db_pg_table_stats` (Postgres only)
-- `db_pg_index_stats` (Postgres only)
-- `qry_template`
-
-Always use `biofilter report list --verbose` to confirm what is available in your runtime.
-
----
-
-## 9) Authoring New Reports (Recommended Pattern)
-
-For a new report `my_report`:
-
-1. Create Python module:
-- `biofilter/modules/report/reports/report_my_report.py`
-
-2. Define:
-- `name = "my_report"`
-- `description`
-- `run()`
-- `available_columns()`
-- `example_input()`
-
-3. Create explain guide:
-- `biofilter/modules/report/reports_explain/report_my_report.md`
-
-4. Add tests:
-- unit tests for report behavior
-- optional integration tests via CLI/API
-
-5. Validate:
-
-```bash
-biofilter report list --verbose
-biofilter report explain --report-name my_report
-biofilter report run --report-name my_report --params-template
-```
-
-Result:
-- new reports become self-documented and executable without changing CLI support code.
+**Ids are bundle-scoped.** Valid only inside the bundle that produced them,
+and a stale id still resolves — to a different gene, with no error. Pin the
+bundle, not the id.
 
 ---
 
 ## 10) Troubleshooting
 
-If report is not found:
-- run `biofilter report list`
-- check exact report name
-- use friendly suggestions from CLI output
+| Symptom | Do this |
+|---|---|
+| "report not found" | `biofilter report list --verbose`, use an exact name. 4.2.x names (`entity_filter`, `etl_status`, `annotation_master_*`, `variant_binning`) are gone. |
+| "input conflict" | keep records in `--input`/`--input-file`; do not also send `input_data` via `--param` |
+| parameter rejected | `--params-template` first; use `--params-json` for anything structured; watch shell quoting |
+| `<name> does not carry: <tables>` | the bundle lacks a source this report requires — `platform_data_statistics` shows what it has |
+| explain shows nothing | check `reports_explain/report_<name>.md` exists and matches the module name |
+| a column is entirely null | check `provenance["coverage"]` before concluding the answer is null |
+| everything is slow | first run on a cold cache reads from disk; a variant-scale join over billions of rows is seconds, not minutes — if it is minutes, check you are not on slow network storage |
 
-If explain does not show markdown:
-- verify file exists at `reports_explain/report_<module>.md`
-- ensure filename matches report module pattern
+More detail:
 
-If parameter parsing fails:
-- test with `--params-template` first
-- use `--params-json` or `--params-file` for complex objects
-- quote JSON properly in shell
-
-If Postgres-only reports fail:
-- confirm DB is PostgreSQL for `db_pg_table_stats` and `db_pg_index_stats`
+```bash
+biofilter --debug report run --report-name <name> --input <value>
+```
 
 ---
 
 ## 11) LLM Assistant Playbook
 
-When an assistant runs reports:
+1. **Discover** — `report list --verbose`. Never recommend a report name
+   without confirming it here; the 4.2.x names are gone and several are
+   plausible-sounding.
+2. **Understand** — `report explain --report-name <name>` and
+   `--params-template` before composing a command.
+3. **Execute** — start minimal, add `--input` and `--param` progressively,
+   `--output` when the user wants a file.
+4. **Interpret** — check status values and `provenance["coverage"]` before
+   reporting a result as empty. Say which bundle produced it.
+5. **Defer** — building a bundle and running the ETL are maintainer tasks.
+   Name the guide and the cost; do not improvise a pipeline.
 
-1. Discover:
-- `report list --verbose`
+---
 
-2. Understand:
-- `report explain --report-name <report>`
-- `report run --report-name <report> --params-template`
+## 12) Authoring a new report
 
-3. Execute:
-- start with minimal command
-- add `--input` / `--param` progressively
-- export with `--output` when needed
-
-4. Diagnose:
-- prefer `etl_packages` for ETL-level audit
-- prefer `etl_status` for quick consolidated health
-
-This flow keeps report operations deterministic, explainable, and easy to automate.
+Out of scope here — this guide is about running them. See
+`docs/source/technical/developer_extensions.md`, which covers the class
+contract, the SQL helpers, and the four artifacts that ship together.

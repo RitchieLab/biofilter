@@ -1,432 +1,216 @@
 # AG DB - Database Operations in Biofilter (CLI/API)
 
-Detailed guide for database administration in Biofilter.
+Maintainer guide for the `biofilter db` group.
 
-Covers:
-- database creation
-- migrations and upgrade (schema + seeds)
-- backup and restore (physical snapshot)
-- export and import (logical table-level clone)
-- validation commands
-- API usage
-- LLM assistant playbook
+**Read this first:** Biofilter 4.3 has no persistent database. The product is
+a **bundle** — a directory of parquet plus a manifest — produced by
+`bundle build`, which creates its own throwaway SQLite and leaves the bundle
+behind. See `ag_start.md` for reading one and
+`docs/source/technical/building_bundles.md` for building one.
 
----
-
-## 1) Goal
-
-This guide helps you operate `biofilter db` safely in dev, staging, and production.
-
-Main commands in the `db` group:
-- `create-db`
-- `migrate`
-- `upgrade`
-- `backup`
-- `restore`
-- `export`
-- `import`
+The `db` group remains for the jobs around that: creating the small registry a
+build plans from, validating a bundle, and moving data between environments.
 
 ---
 
-## 2) Strategy Overview
+## 1) The commands
 
-Use this simple rule:
+```
+create-db   build the schema and apply seeds
+ping        reachability and latency only
+upgrade     re-apply seeds to an existing database (idempotent)
+verify      validate a bundle against its manifest — needs no database
+export      write a bundle from a database you already have
+import      read one back in
+backup      physical snapshot
+restore     read a snapshot back
+```
 
-1. **Bootstrap a new database (schema + seeds)**: `db create-db` — this is the
-   only command that creates the domain tables. `db migrate` / `db upgrade` do
-   **not** create the initial schema (the Alembic head carries no table DDL).
-2. **Refresh seeds / version tracking on an existing schema**: `db upgrade`
-   (migrate to head + idempotent seed upsert)
-3. **Run ETL**: use `etl` group commands
-4. **Monitor**: `report etl_status` and `report etl_packages`
-
-> **PostgreSQL caveat:** the target database must already exist before BF4 can
-> connect to it. Create the empty database first (`createdb <name>`), then run
-> `db create-db ... --overwrite`.
-
-When moving data across environments:
-- physical snapshot: `backup` / `restore`
-- logical table bundle: `export` / `import`
+There is **no migration command and no migration chain.** A database is built
+once by `create-db` with `create_all`, and a schema change produces a new
+bundle rather than an in-place upgrade. If you are following an older note
+that mentions `db migrate` or Alembic, it predates 4.3.
 
 ---
 
-## 3) DB Commands (CLI)
-
-## 3.1 `biofilter db create-db`
-
-The canonical bootstrap command. It creates **all domain tables** (`create_all`)
-and loads the **seed data** in a single step. Use this — not `migrate`/`upgrade` —
-to stand up a new database.
-
-**SQLite** — creates the file itself, no pre-creation needed:
+## 2) `db create-db`
 
 ```bash
-biofilter db create-db --db-uri "sqlite:///biofilter_dev.db"
+biofilter db create-db --db-uri "sqlite:///biofilter_registry.sqlite"
+biofilter db create-db --db-uri "postgresql+psycopg2://user:pass@host:5432/bf_dev"
 ```
 
-**PostgreSQL** — the database must already exist (BF4 connects on startup), so
-create it first, then bootstrap with `--overwrite`:
+| Option | Does |
+|---|---|
+| `--db-uri` | required — where to create it |
+| `--overwrite` | replace an existing one |
 
-```bash
-createdb -O admin biofilter_dev
-biofilter db create-db --db-uri "postgresql+psycopg2://admin:admin@localhost:5432/biofilter_dev" --overwrite
-```
+Builds the schema with `create_all` and applies the JSON seeds from
+`biofilter/modules/db/seed/`, including `initial_data_sources.json`.
 
-`--overwrite` only bypasses the "database already exists" guard; it is **not**
-destructive — `create_all` is idempotent and never drops data.
+**This is the prerequisite for `bundle plan`,** which reads the data source
+registry from a database. It is a registry, not a data store: the build
+creates its own staging database and never writes here.
 
-When to use:
-- any new environment (SQLite or PostgreSQL)
-- the correct first step of a from-scratch bootstrap
+> **PostgreSQL:** the target database must exist before Biofilter can connect.
+> `createdb <name>` first, then `create-db`.
 
 ---
 
-## 3.2 `biofilter db migrate`
-
-Runs Alembic migrations.
-
-Upgrade to head:
-
-```bash
-biofilter db migrate --target head
-```
-
-Revision status:
-
-```bash
-biofilter db migrate --status
-```
-
-Dry-run SQL:
-
-```bash
-biofilter db migrate --dry-run
-```
-
-Stamp head without DDL (advanced):
-
-```bash
-biofilter db migrate --stamp-head --force
-```
-
-Upgrade with force:
-
-```bash
-biofilter db migrate --target head --force
-```
-
-Notes:
-- `--force` is for risky/advanced scenarios.
-- `--stamp-head` should be used carefully in controlled environments.
-
----
-
-## 3.3 `biofilter db upgrade`
-
-Runs the upgrade flow on an **existing** schema:
-- migrate to `head`
-- apply seeds (idempotent upsert)
-
-```bash
-biofilter db upgrade
-```
-
-With explicit seed dir:
+## 3) `db upgrade`
 
 ```bash
 biofilter db upgrade --seed-dir seed
 ```
 
-With force:
-
-```bash
-biofilter db upgrade --force
-```
-
-Practical rule:
-- `db upgrade` does **not** create the schema — it assumes the tables already
-  exist (built by `db create-db`). Use it to refresh seeds and align the Alembic
-  revision, not to bootstrap a fresh database.
+Re-applies the master seeds to an existing schema. Idempotent, and seed-only —
+there is nothing else for it to do.
 
 ---
 
-## 3.4 `biofilter db backup`
-
-Creates a physical snapshot of the current database.
+## 4) `db verify` — the one you will use most
 
 ```bash
-biofilter db backup --out ./backups/biofilter_dev.snapshot
+biofilter db verify --in ./bundles/20260914
+biofilter db verify --in ./bundles/20260914 --no-hashes
+biofilter db verify --in ./bundles/20260914 --schema
 ```
 
-Examples:
-- SQLite: file copy
-- PostgreSQL: dump flow compatible with restore
+Validates a bundle against its own manifest, and **needs no database at all**.
 
-Best practices:
-- create backups before sensitive migrations
-- include timestamp/version in backup path naming
+| Tier | Checks |
+|---|---|
+| default | every declared file present, at the declared size |
+| + SHA-256 | only where the manifest recorded a digest |
+| `--schema` | that the tables carry the columns this build expects |
+
+Two things worth knowing:
+
+- **`--schema` exits non-zero on drift,** which is what makes it usable as a
+  gate in a script or CI.
+- **The hash tier is currently a no-op for bundles from `bundle build`**,
+  which records size but not SHA-256. For those, `verify` is checking presence
+  and size whether or not you pass `--no-hashes`.
+
+Opening a bundle only *warns* when a table is missing columns, deliberately:
+a bundle built from a subset of sources legitimately has fewer, and refusing
+would make it unusable for the sources it does have. `--schema` turns that
+warning into an error.
 
 ---
 
-## 3.5 `biofilter db restore`
+## 5) `db export` / `db import`
 
-Restores a physical snapshot.
+`bundle build` is how bundles are normally produced. `db export` writes one
+from a database you already have, which is useful for a development snapshot.
 
 ```bash
-biofilter db restore --in ./backups/biofilter_dev.snapshot
+biofilter db export --out ./exports/dev_bundle --format parquet
+biofilter db import --in ./exports/dev_bundle --format parquet
 ```
 
-Warning:
-- restore overwrites current target DB state.
-- confirm target `db_uri` before execution.
+| `export` | |
+|---|---|
+| `--out`, `--format` | destination and format |
+| `--table`, `--exclude-table` | narrow the selection |
+| `--chunksize` | rows per batch |
+| `--schema-version` | stamp a version |
+| `--no-checksums` | skip SHA-256 |
+| `--include-partition-children` | emit partition children as separate files |
+
+| `import` | |
+|---|---|
+| `--in`, `--format` | source and format |
+| `--allow-missing-tables` | tolerate a partial bundle |
+| `--no-rebuild-indexes`, `--no-reset-sequences` | skip post-load steps |
+
+**Confirm the target before importing.** It writes into whatever `--db-uri`
+resolves to.
 
 ---
 
-## 3.6 `biofilter db export`
+## 6) `db backup` / `db restore`
 
-Exports a logical clone bundle (`manifest.json` + `tables/`).
-
-```bash
-biofilter db export --out ./exports/biofilter_bundle --format parquet
-```
-
-With table filters:
+Physical snapshot, engine-specific.
 
 ```bash
-biofilter db export \
-  --out ./exports/biofilter_bundle \
-  --format csv \
-  --table variants,variant_consequences \
-  --exclude-table etl_status
+biofilter db backup  --out ./backups/dev.snapshot
+biofilter db restore --in  ./backups/dev.snapshot
 ```
 
-Useful options:
-- `--schema-version`
-- `--chunksize`
-- `--table` (include)
-- `--exclude-table` (exclude)
+**`restore` overwrites.** Never run it automatically, and confirm the target
+environment first.
 
 ---
 
-## 3.7 `biofilter db import`
-
-Imports a previously exported logical bundle.
+## 7) `db ping`
 
 ```bash
-biofilter db import --in ./exports/biofilter_bundle --format parquet
+biofilter db ping --db-uri "postgresql+psycopg2://user:pass@host:5432/bf_dev"
 ```
 
-Variants:
-
-```bash
-biofilter db import \
-  --in ./exports/biofilter_bundle \
-  --format csv \
-  --no-rebuild-indexes \
-  --no-reset-sequences \
-  --allow-missing-tables
-```
-
-When to use:
-- replicate state across environments
-- load a controlled logical snapshot
+Reports engine, host, database and latency. Tests reachability only — it does
+not check whether the Biofilter schema is present.
 
 ---
 
-## 4) Recommended Flows
+## 8) Typical flows
 
-### 4.1 First bootstrap (new environment)
-
-```bash
-biofilter config show
-
-# PostgreSQL: create the empty database first
-createdb -O admin biofilter_dev
-
-# create schema + seeds (the actual bootstrap)
-biofilter db create-db --db-uri "postgresql+psycopg2://admin:admin@localhost:5432/biofilter_dev" --overwrite
-
-# (optional) baseline Alembic + refresh seeds
-biofilter db migrate --force
-biofilter db upgrade
-```
-
-> SQLite is simpler — `biofilter db create-db --db-uri "sqlite:///biofilter_dev.db"`
-> creates the file, schema, and seeds in one go (no `createdb`, no `--overwrite`).
-
-### 4.2 Safe deployment flow
+### Preparing to build a bundle
 
 ```bash
-biofilter db backup --out ./backups/pre_deploy.snapshot
-biofilter db migrate --status
-biofilter db migrate --target head
-biofilter db upgrade
-biofilter db migrate --status
+biofilter db create-db --db-uri sqlite:///$SCRATCH/bf_registry.sqlite
+biofilter bundle plan  --db-uri sqlite:///$SCRATCH/bf_registry.sqlite --out plan.json
+# edit plan.json, then:
+biofilter bundle build --plan plan.json --out ./bundles/$(date +%Y%m%d)
 ```
 
-### 4.3 Logical replication across environments
-
-Source:
+### Gating a bundle before publishing
 
 ```bash
-biofilter db export --out ./exports/prod_bundle --format parquet
+biofilter bundle info  ./bundles/20260914
+biofilter db verify --in ./bundles/20260914 --schema || exit 1
+biofilter --bundle ./bundles/20260914 report run \
+  --report-name annotate_variant --input rs429358 --output /tmp/smoke.csv
 ```
 
-Target:
-
-```bash
-biofilter db import --in ./exports/prod_bundle --format parquet
-```
+The variant report is the smoke test that matters — a gene report exercises
+only the core branch and proves nothing about the partitioned tables.
 
 ---
 
-## 5) Post-Operation Quick Validation
-
-Check revision:
-
-```bash
-biofilter db migrate --status
-```
-
-Check active config:
-
-```bash
-biofilter config show
-```
-
-Check ETL support reports:
-
-```bash
-biofilter report run --name etl_status
-biofilter report run --name etl_packages
-```
-
----
-
-## 6) API Usage (Python)
-
-`DBComponent` usage example:
+## 9) API usage
 
 ```python
 from biofilter import Biofilter
 
-bf = Biofilter(db_uri="postgresql+psycopg2://bioadmin:change_me@localhost:5432/biofilter_dev")
+bf = Biofilter(db_uri="sqlite:///biofilter_registry.sqlite")
 bf.db.connect()
-
-# migrate
-bf.db.migrate(action="upgrade", target="head", force=False)
-
-# upgrade (schema + seed upsert)
-bf.db.upgrade(seed_dir="seed")
-
-# backup
-bf.db.backup("./backups/dev.snapshot")
-
-# export bundle
-bf.db.export(out_dir="./exports/dev_bundle", fmt="parquet")
+bf.db.create_db(db_uri="sqlite:///biofilter_registry.sqlite", overwrite=False)
 ```
 
-Higher-risk actions:
-
-```python
-# restore
-bf.db.restore("./backups/dev.snapshot")
-
-# import bundle
-bf.db.import_(
-    in_dir="./exports/dev_bundle",
-    fmt="parquet",
-    rebuild_indexes=True,
-    reset_postgres_sequences=True,
-    allow_missing_tables=False,
-)
-```
+Reading is a different constructor — `Biofilter(bundle="...")`. Reading takes
+a directory, writing takes a URI, and the two are never the same argument.
 
 ---
 
-## 7) Common Errors and Fixes
+## 10) Safety
 
-- **DB connection error**
-  - validate `database.db_uri` with `biofilter config show`
-  - test host/port/user/password at PostgreSQL level
+| Command | Why care |
+|---|---|
+| `db restore` | overwrites the target |
+| `db import` | writes into whatever `--db-uri` resolves to |
+| `db create-db --overwrite` | replaces an existing database |
 
-- **Schema mismatch with code**
-  - run `biofilter db migrate --status`
-  - apply `biofilter db migrate --target head`
-
-- **Seeds not reflected**
-  - run `biofilter db upgrade`
-
-- **Import failing due to missing tables**
-  - use `--allow-missing-tables` when appropriate
-  - or re-export a complete bundle
-
-- **Postgres sequence problems after import**
-  - avoid `--no-reset-sequences` unless you know what you are doing
+None of these should run unattended. And none of them can damage a published
+bundle: the read path has no write capability, and a published bundle should
+additionally be `chmod -R a-w`.
 
 ---
 
-## 8) LLM Assistant Playbook (DB Ops)
+## 11) See also
 
-Minimum checklist before destructive commands:
-- confirm target environment (`db_uri`)
-- confirm recent backup availability
-- confirm maintenance window (for production)
-
-Recommended assistant sequence:
-
-1. `biofilter config show`
-2. `biofilter db migrate --status`
-3. If needed, `biofilter db backup --out ...`
-4. `biofilter db migrate --target head`
-5. `biofilter db upgrade`
-6. `biofilter db migrate --status`
-7. Validate with ETL support reports
-
-Safety rules:
-- never execute `restore` without explicit confirmation
-- never use `stamp-head` without clear justification
-- always provide a final summary (action, environment, result, risks)
-
-Suggested base prompt:
-
-```text
-You are operating the Biofilter DB module.
-1) Show active config and migration status.
-2) Execute migration to head and seed upgrade.
-3) Validate final status.
-4) Report summary with risks and next step.
-Do not execute restore/stamp-head without explicit confirmation.
-```
-
----
-
-## 9) Short Reference Script (DB Day-0)
-
-```bash
-# validate context
-biofilter config show
-biofilter db --help
-
-# bootstrap schema + seeds
-biofilter db migrate --target head --force
-biofilter db upgrade
-
-# validate
-biofilter db migrate --status
-
-# optional: snapshot
-biofilter db backup --out ./backups/post_upgrade.snapshot
-```
-
----
-
-## 10) Internal References
-
-- start guide: `biofilter_agents/ag_start.md`
-- ETL guide (PT): `biofilter_agents/ag_etl_pt.md`
-- ETL guide (EN): `biofilter_agents/ag_etl_en.md`
-- command map: `biofilter/api/cli/ag_01_commands.md`
-- DB CLI group: `biofilter/api/cli/groups/db.py`
-- DB component API: `biofilter/core/components/db_component.py`
-
+- `docs/source/technical/building_bundles.md` — where bundles come from
+- `docs/source/technical/database.md` — the same commands, user-facing
+- `ag_etl_en.md` — running one data source at a time
+- `notebooks/lpc__deploy.md` — the cluster deployment
