@@ -655,6 +655,43 @@ less believable, which is why this section exists.
   of the cohort and say nothing about the rest. That is the failure mode
   this ADR exists to stop, so the report waits for a bundle with every
   chromosome rather than shipping with a caveat.
+
+  **Settled 2026-09-16, and the migration is finished.** The last three
+  legacy reports are gone. `snp_snp_pair_generator` was retired into
+  `pair_variants`: `seed_vs_all` is `membership='either'`, `cross_gene`
+  is guaranteed because every pair is across two distinct genes, and
+  `all_vs_all` was dropped — pairing without biology is
+  `itertools.combinations`, n²/2 rows carrying no information, and the
+  legacy code itself pushed callers away from it.
+
+  `variant_list_intersect` and `variant_binning` became
+  `aggregate_cohort_variants`, because the first is the second stopped
+  early: read the cohort's file, match it against the bundle, and only
+  then aggregate into bins. `output_grain` chooses where to stop. This
+  also tightens §2.12's definition of the aggregation class, which read
+  "a bin, or the result of a set operation" and covered two unrelated
+  row meanings; they are now stages of one pipeline.
+
+  **The binning rewrite happened before the data to validate it exists,
+  deliberately.** The bundle carries chromosome 22 only, so every real
+  cohort file hits the case that matters most: variants on chromosomes
+  the bundle cannot place. Writing that guard now means it is exercised
+  by real data; once a full bundle lands the situation becomes rare and
+  hard to test. What cannot be settled yet is performance at whole-genome
+  scale, and §2.13 applies — no claim is made about it until a full
+  bundle and a real VCF exist to measure. The shape is chosen for that
+  day: DuckDB has no VCF reader, so cyvcf2 parses and numpy does the
+  per-variant genotype arithmetic, while every join against the bundle
+  and the final aggregation are SQL.
+
+  Two arithmetic facts became guards while building it. A cohort of N
+  samples cannot observe a minor allele frequency below 1/(2N), so a
+  `maf_cutoff` under that keeps only variants nobody carries and empties
+  every bin — correctly, and invisibly. And the legacy report's
+  `gene_window_size=500000` was a spatial-index bucket size, not a
+  biological window; carrying it over as one would have placed every
+  variant in every gene within half a megabase. In DuckDB the index
+  disappears into a range join and the parameter with it.
 - **How `model_variants.py` is realigned with what the ETL writes**
   (§1.4). The direction is settled in §2.1; the table-by-table work
   belongs to the model and build layers.
