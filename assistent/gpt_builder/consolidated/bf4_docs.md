@@ -2,43 +2,1276 @@
 
 
 
-<!-- ===== SOURCE FILE: docs/source/building_bundles.md ===== -->
+<!-- ===== SOURCE FILE: docs/source/cli_reference.md ===== -->
+
+# CLI Reference
+
+Every command, with the options that matter. The groups split by what they
+do: `report` reads a bundle, `bundle` / `etl` / `db` build one, `config`
+inspects settings.
+
+## Global
+
+```bash
+biofilter [--bundle PATH] [--db-uri URI] [--debug] COMMAND ...
+biofilter --version
+```
+
+| Option | For |
+|---|---|
+| `--bundle PATH` | The bundle to read. What `report` needs. |
+| `--db-uri URI` | A writable SQLAlchemy URI. What `etl`, `db` and `bundle plan` need. |
+| `--debug` | Debug logging. Accepted by most commands individually too. |
+
+`--bundle` wins over `--db-uri`. Both fall back to the environment
+(`BIOFILTER_BUNDLE`, `DATABASE_URL`, `BIOFILTER_DB_URI`) and then to
+`.biofilter.toml`.
+
+## report
+
+Reads a bundle. Never writes.
+
+| Command | Options |
+|---|---|
+| `report list` | `--verbose` |
+| `report explain` | `--report-name` |
+| `report example-input` | `--report-name` |
+| `report available-columns` | `--report-name` |
+| `report run` | `--report-name` · `--input` `--input-file` `--input-column` · `--param` `--params-json` `--params-file` `--params-template` · `--output` |
+| `report refresh` | — rebuild the report index after adding one |
+
+`--report-name` also accepts the shorter `--name`. Everything except `run`
+works without a bundle.
+
+```bash
+biofilter --bundle <path> report run --report-name annotate_gene \
+  --input TP53 --output genes.csv
+```
+
+See [Reports](reports.md) and the [Report Catalog](report_catalog.md).
+
+## bundle
+
+Builds a bundle from a plan.
+
+| Command | Options |
+|---|---|
+| `bundle plan` | `--out` · `--all-sources` · `--force` |
+| `bundle build` | `--plan` `--out` `--data-root` · `--restart` · `--keep-raw` `--keep-processed` · `--min-free-gb` · `--into` `--no-assemble` |
+| `bundle info` | takes the bundle directory as an argument |
+
+See [Building Bundles](technical/building_bundles.md).
+
+## etl
+
+Runs one data source at a time. Useful when developing a DTP or re-running
+a single source; a full build goes through `bundle build`.
+
+| Command | Options |
+|---|---|
+| `etl update` | `--data-source` `--source-system` · `--run-step` `--force-step` |
+| `etl update-all` | `--data-source` `--source-system` · `--only-active/--all` · `--drop-files/--keep-files` · `--stop-on-error` |
+| `etl status` | `--data-source` `--source-system` · `--only-active/--all` |
+| `etl explain` | `--data-source` `--source-system` `--dtp-script` |
+| `etl restart` | `--data-source` `--source-system` · `--delete-files` |
+| `etl rollback` | `--data-source` `--source-system` · `--package-id` · `--delete-files` |
+| `etl index` | `--group` · `--drop-only` `--no-drop-first` · `--no-read-mode` `--no-write-mode` |
+
+`--data-source` and `--source-system` are repeatable. `--run-step` and
+`--force-step` are too, so a full explicit run is `--run-step extract
+--run-step transform --run-step load`.
+
+**`restart` and `rollback` destroy work.** Neither should be run
+automatically or without knowing what it will remove.
+
+See [ETL Operations](technical/etl.md).
+
+## db
+
+| Command | Options |
+|---|---|
+| `db create-db` | `--db-uri` (required) · `--overwrite` |
+| `db ping` | — reachability and latency only |
+| `db upgrade` | `--seed-dir` · `--force` — re-applies seeds, idempotent |
+| `db verify` | `--in` (required) · `--no-hashes` · `--schema` |
+| `db export` | `--out` · `--format` · `--table` `--exclude-table` · `--chunksize` · `--schema-version` · `--no-checksums` · `--include-partition-children` |
+| `db import` | `--in` · `--format` · `--allow-missing-tables` · `--no-rebuild-indexes` · `--no-reset-sequences` |
+| `db backup` | `--out` |
+| `db restore` | `--in` |
+
+`db verify` needs no database — it validates a bundle against its own
+manifest, and `--schema` makes it exit non-zero on drift, for CI.
+
+**`restore` overwrites.** Confirm the target before running it.
+
+See [Database Operations](technical/database.md).
+
+## config
+
+| Command | Options |
+|---|---|
+| `config show` | — prints what actually resolved, and from where |
+| `config get SECTION.KEY` | `--path` |
+| `config set SECTION.KEY VALUE` | `--path` |
+| `config init` | `--path` · `--force` · `--db-uri` `--data-root` |
+
+```bash
+biofilter config show
+biofilter config get database.bundle
+```
+
+See [Configuration](technical/configuration.md).
+
+
+
+<!-- ===== SOURCE FILE: docs/source/entity_and_omics.md ===== -->
+
+# The Entity Model
+
+What Biofilter means by a gene, and why you can call it whatever you like.
+
+## One concept, many names
+
+Every biological object Biofilter knows is an **entity** — a single row that
+stands for one concept. Around it sit the names it goes by and the things it
+connects to:
+
+| | |
+|---|---|
+| `entities` | The concept itself. One row per gene, protein, pathway, disease, GO term, chemical. |
+| `entity_aliases` | Every name, symbol, synonym and external code that points at it. |
+| `entity_relationships` | A typed, directed link between two entities. |
+| `entity_relationship_types` | What a link means: `interacts_with`, `in_pathway`, `encodes`, `is_a`. |
+| `entity_groups` | Which domain an entity belongs to. |
+
+The practical effect is the one that matters to you: **you do not have to
+know which name a source used.** `TP53`, `ENSG00000141510`, `HGNC:11998` and
+`7157` all resolve to the same entity, so a gene list assembled from three
+different papers works without being harmonized first.
+
+In one full core build, that looked like this:
+
+| | |
+|---|---:|
+| Entities | 203,393 |
+| Aliases pointing at them | 912,316 |
+| Relationships between them | 4,210,591 |
+
+Roughly 4.5 names per concept. That ratio is the integration work the
+platform is doing on your behalf.
+
+Where the names come from, by source:
+
+| Source | Aliases |
+|---|---:|
+| HGNC | 250,301 |
+| MONDO | 155,752 |
+| UniProt | 111,490 |
+| ENTREZ | 70,220 |
+| ENSEMBL | 45,863 |
+| GO | 41,378 |
+| NCBI | 26,224 |
+| UCSC | 24,337 |
+| MEDGEN | 21,660 |
+
+One practical caution: `xref_source` is recorded as each source spelled it,
+and the spellings are not normalized — `UniProt` and `Uniprot` both appear,
+as separate values. Match case-insensitively if you filter on it.
+
+## Following the links
+
+Relationships are what make a cross-domain question answerable in one query:
+gene → pathway → disease is a traversal, not a join you have to hand-write
+per domain. The types actually present in a full build:
+
+| Type | Links |
+|---|---:|
+| `interacts_with` | 3,950,396 |
+| `in_pathway` | 180,646 |
+| `is_a` | 46,580 |
+| `encodes` | 20,255 |
+| `part_of` | 6,511 |
+| `Disease_has_disruption` | 6,203 |
+
+`expand_entity_relationship` returns these rows directly;
+`expand_entity_neighborhood` summarises them as degree per entity; and
+`pair_variants` uses them to decide whether two genes share enough biology
+to be worth reporting.
+
+## Domain detail
+
+The entity layer carries identity and connection. The specifics live in
+master tables beside it — `gene_masters`, `protein_masters`,
+`pathway_masters`, `disease_masters`, `go_masters`, `chemical_masters` —
+each linked back to its entity. That is where you find a gene's locus type,
+a protein's Pfam domains, a disease's cross-references.
+
+The `annotate_*` reports are the read interface over this layer: give them
+names, get back the master detail plus relationship counts.
+
+## Variants are deliberately outside this
+
+This is the exception worth knowing, because the rest of the model does not
+predict it.
+
+**Variants are not entities.** They carry no `entity_id`, appear in no
+relationship, and the `Variants` entity group is empty in every bundle. A
+variant is identified by `chromosome:position:ref:alt` and nothing else.
+
+They reach genes through the symbol and HGNC id that VEP emitted — a string
+match, not a link through the entity graph. So when `expand_gene_to_variant`
+asks you to choose between `mapping=position` and `mapping=annotation`, that
+is the reason: there is no stored edge saying a variant belongs to a gene,
+so you have to say which question you mean.
+
+This is a design decision, not a gap. Variants outnumber every other domain
+by three orders of magnitude, and keeping them out of the entity graph is
+what lets them be built, stored and queried independently of it.
+
+## Which domains a bundle actually holds
+
+Fourteen entity groups are defined. Far fewer are populated, because a group
+is only filled by a source that was built. From the same build:
+
+| Group | Entities |
+|---|---:|
+| Genes | 72,660 |
+| Proteins | 53,296 |
+| Gene Ontology | 38,092 |
+| Diseases | 36,090 |
+| Pathways | 3,255 |
+| Chemicals | 0 — ChEBI was not included in this build |
+| Variants | 0 — by design, see above |
+
+Epigenomics, Transcriptomics, Metabolomics, Clinical Trials, Microbiome,
+Phenotypes and Cell Types are defined and empty. They mark room the model
+leaves for domains that have no source behind them yet, and no report will
+return anything for them.
+
+**Check before you assume.** The bundle you were given may not carry the
+domain your question needs:
+
+```bash
+biofilter --bundle <path> report run --report-name platform_data_statistics
+```
+
+That reports entity counts by domain for the bundle in front of you, which
+is the only authority on what it can answer. The numbers on this page come
+from one build and are there to show the shape, not to be quoted.
+
+## See also
+
+- [Report Catalog](report_catalog.md) — which report reads which layer
+- [Database Schema](technical/schema.md) — every table and column
+
+
+
+<!-- ===== SOURCE FILE: docs/source/getting_started/finding_reports.md ===== -->
+
+# Finding a Report
+
+## What a report is
+
+A **report** is a prepared question you can ask the data.
+
+You give it an input — a list of gene symbols, an rsID, a disease name,
+sometimes nothing at all — and it gives you back a table. Under the
+covers it knows which files to open, how to resolve the names you typed
+against the ones the sources use, and how to follow the links between
+genes, proteins, pathways, diseases and variants. You do not write
+queries and you do not need to know how the data is laid out.
+
+```bash
+biofilter --bundle /shared/bundles/bf4_20260912 \
+  report run --report-name resolve_entity --input APOE --input TP53
+```
+
+Repeat `--input` for each value — it is not a comma-separated list.
+
+Every report takes the same shape: a name, an input, optional parameters,
+and a table out — to your screen, to a file, or straight into pandas if
+you are working in Python.
+
+Biofilter ships 16 of them: resolving names, annotating what you have,
+expanding it to what is connected, and checking what the bundle actually
+holds. Three ways to find the one you want.
+
+## 1. Browse the catalog
+
+The [Report Catalog](../report_catalog.md) is the full index, grouped by
+purpose. Each entry gives you:
+
+- A one-line description of what it does.
+- A link to its **Explain Guide** — parameters, output columns, examples.
+- A link to a **notebook tutorial** that runs end-to-end.
+
+Use the catalog when you want to see everything available.
+
+## 2. Ask the assistant
+
+For questions in plain language — *"I have a list of genes from a GWAS,
+which report shows what pathways they touch?"* — there is a GPT assistant
+trained on BF4's reports and terminology:
+
+**[BF4 Assistant](https://chatgpt.com/g/g-6887cf80355c8191ab3f88bbd8955e0d-biofilter-4-assistant)**
+
+Its source — system prompt, FAQ, and a manifest of every report with its
+inputs and use cases — lives in the repository's `assistent/` folder.
+
+## 3. Ask Biofilter itself
+
+If you already have it installed:
+
+```bash
+biofilter report list
+```
+
+And for any one of them:
+
+```bash
+biofilter report explain --report-name resolve_entity
+```
+
+That prints the full guide in your terminal — what it expects, what it
+returns, and how to call it.
+
+## Good places to start
+
+**Start from names you have** — genes, variants, diseases, proteins.
+
+| Report | Use it when |
+| ------ | ----------- |
+| `resolve_entity` | You have a list of names and want to know which ones Biofilter recognises |
+| `annotate_gene` | You want everything known about a set of genes |
+| `annotate_variant` | You have rsIDs or positions and want the full annotation |
+
+**Expand to what is connected.**
+
+| Report | Use it when |
+| ------ | ----------- |
+| `expand_gene_to_variant` | You have genes and want the variants in them, filtered by predicted damage |
+| `expand_entity_neighborhood` | You have entities and want everything one hop away |
+| `expand_variant_regulatory` | You want to know which genes a variant regulates, and in which tissue |
+
+**Work with a cohort or a set.**
+
+| Report | Use it when |
+| ------ | ----------- |
+| `aggregate_cohort_variants` | You have a cohort's variants and want them matched and binned |
+| `pair_variants` | You need candidate variant pairs whose genes share biology |
+
+And one worth running once on any bundle you have just been handed:
+
+| Report | Use it when |
+| ------ | ----------- |
+| `platform_data_statistics` | You want to know what is actually in this bundle |
+
+It reports entity counts by domain, variant counts by chromosome, and what
+each data source contributed — which is what decides whether your question
+is answerable at all before you spend time on it.
+
+## Next step
+
+Picked one? [Run your first report](running_reports.md).
+
+
+
+<!-- ===== SOURCE FILE: docs/source/getting_started/index.md ===== -->
+
+# Getting Started
+
+Biofilter 4 (BF4) resolves biological entities — genes, proteins,
+pathways, diseases, variants — tracks the relationships between them, and
+exposes all of it through ready-to-use reports.
+
+What you read is a **bundle**: a directory of parquet files with a
+manifest describing them. No database server, no import step. Point
+Biofilter at a bundle and run reports.
+
+## Choose your path
+
+### Someone gave me a bundle
+
+This is the common case, and it takes minutes.
+
+1. [Install Biofilter](installing.md) — pip or Docker.
+2. [Point at the bundle](reading_a_bundle.md) — one URI, no setup.
+3. [Find a report](finding_reports.md) that fits your question.
+4. [Run it](running_reports.md) — CLI or Python.
+
+### I need to build a bundle
+
+Only if no one has one for the data you need. The full human genome
+means 1.5 TB of downloads, processed and discarded as the build goes, so
+plan for **150 GB of working space**.
+
+1. [Install Biofilter](installing.md) — from source if you will change DTPs.
+2. [Build a bundle](../technical/building_bundles.md) — `bundle plan`, then `bundle build`.
+3. [Run a report](running_reports.md) against what you built.
+
+[What it costs](../technical/bundle_requirements.md) has the measured figures for
+disk, memory and runtime before you start.
+
+## What you'll need
+
+- **Python 3.10+**, or **Docker** if you prefer containers.
+- **A bundle** — a path you can read, local or on a shared filesystem.
+
+## One thing to carry with you
+
+Ids inside a bundle — `entities.id`, `variant_id` — are internal to that
+bundle. They are not stable across bundles, and a stale one still
+resolves: to a different gene, without an error. Pin the bundle, not the
+id. [Reading a bundle](reading_a_bundle.md) explains how results carry
+their origin.
+
+## Where this guide stops
+
+Once you can run a report, the rest goes deeper:
+
+- [Report catalog](../report_catalog.md) — every report, with tutorials.
+- [Building bundles](../technical/building_bundles.md) — the plan/build/inspect flow.
+- [What a build costs](../technical/bundle_requirements.md) — measured disk, time, memory.
+- [The Read Path](../technical/read_path.md) — how views are registered, and what a query costs.
+- [Data sources and ingestion](../technical/etl.md) — where the data comes from, and how it gets in.
+- [Configuration](../technical/configuration.md) — `.biofilter.toml` options.
+- [Troubleshooting](../troubleshooting.md) — common errors.
+
+Running on the Penn LPC? The cluster-specific quickstart and the
+maintainer's deployment guide live in the repository at
+`notebooks/lpc__quickstart.md` and `notebooks/lpc__deploy.md`.
+
+
+
+<!-- ===== SOURCE FILE: docs/source/getting_started/installing.md ===== -->
+
+# Installing Biofilter
+
+Three installation methods, in order of simplicity. Pick **one**.
+
+## Which one should I use?
+
+| Method     | Best for                                           | Requires                |
+| ---------- | -------------------------------------------------- | ----------------------- |
+| **pip**    | Most users — running reports, notebooks, scripting | Python 3.10+            |
+| **Docker** | Avoiding any Python setup, reproducible CI runs    | Docker                  |
+| **Source** | Contributors, debugging, modifying BF4 itself      | Python 3.10+ and Poetry |
+
+## pip (recommended)
+
+```bash
+pip install biofilter
+biofilter --help
+```
+
+That's it — `biofilter` is now available as a CLI command and the `biofilter` Python package is importable.
+
+To verify:
+
+```bash
+biofilter --help
+python -c "from biofilter import Biofilter; print('OK')"
+```
+
+## Docker
+
+One image, published to two registries. Pull it rather than building:
+
+```bash
+docker pull ricoandre/biofilter:latest
+```
+
+The image carries no data. It expects two mounts:
+
+| Mount | Mode | Holds |
+|---|---|---|
+| `/bundle` | read-only | the bundle directory, the one with `manifest.json` |
+| `/workspace` | writable | where `--output` writes |
+
+`BIOFILTER_BUNDLE` already defaults to `/bundle` inside the image, so a
+normal run names no paths beyond the mounts:
+
+```bash
+docker run --rm \
+  -v /shared/bundles/20260914:/bundle:ro \
+  -v "$(pwd)/out:/workspace" \
+  --user "$(id -u):$(id -g)" \
+  ricoandre/biofilter:latest \
+  report run --report-name annotate_gene --input TP53 --output /workspace/genes.csv
+```
+
+Three things worth knowing:
+
+- **Mount the bundle root**, not its `tables/` subdirectory.
+- **`--output` writes inside the container.** Point it at the mounted
+  `/workspace` or the file leaves with the container.
+- **`--user "$(id -u):$(id -g)"`** makes the output yours. Without it the
+  files belong to the image's own user.
+
+An interactive shell:
+
+```bash
+docker run --rm -it \
+  -v /shared/bundles/20260914:/bundle:ro \
+  -v "$(pwd):/workspace" \
+  --entrypoint /bin/bash \
+  ricoandre/biofilter:latest
+```
+
+To build it yourself from a checkout:
+
+```bash
+docker build -t biofilter:latest -f docker/Dockerfile .
+```
+
+### On a cluster (Apptainer/Singularity)
+
+The same image. `--bind` replaces `-v`, and output ownership takes care of
+itself because the container runs as you:
+
+```bash
+apptainer pull bf4.sif docker://ghcr.io/ritchielab/biofilter-hpc:latest
+
+apptainer run \
+  --bind /shared/bundles/20260914:/bundle:ro \
+  --bind ~/bf4_output:/workspace \
+  bf4.sif \
+  report run --report-name annotate_gene --input APOE --output /workspace/apoe.csv
+```
+
+The GHCR name `biofilter-hpc` predates the merge of what used to be two
+images; it is the same image as Docker Hub's.
+
+## From source
+
+For contributors or anyone modifying BF4 itself.
+
+```bash
+git clone https://github.com/RitchieLab/biofilter.git
+cd biofilter
+poetry install
+poetry run biofilter --help
+```
+
+## Next step
+
+Once installed, [point Biofilter at a bundle](reading_a_bundle.md) — one URI, no server to set up.
+
+
+
+<!-- ===== SOURCE FILE: docs/source/getting_started/reading_a_bundle.md ===== -->
+
+# Pointing Biofilter at a Bundle
+
+## What a bundle is
+
+A **bundle** is a folder. Inside it are the knowledge base's data —
+genes, proteins, pathways, diseases, variants and the relationships
+between them — already gathered from their original sources, cleaned up
+and written as parquet files. A `manifest.json` sits alongside them as
+the dictionary: what each file holds, how many rows, and which version of
+the data this is.
+
+Biofilter both writes bundles and reads them. The data lives in the
+folder, not in a server, so there is nothing to install, start or
+connect to. To run a query you give Biofilter the path and it does the
+rest.
+
+A bundle is a **photograph**: it captures the sources exactly as they
+were on the day it was built. Nothing inside it changes afterwards. When
+the sources move on — a new Ensembl release, a new gnomAD callset — you
+build a new bundle rather than update this one, and the old one stays
+readable for anyone who needs to reproduce work done against it.
+
+A full human-genome bundle is around **21 GB** and holds roughly three
+billion rows across 114 files. You can keep it on a laptop, a shared
+drive, or an HPC filesystem — anywhere you can read a folder.
+
+If someone has given you one, this page is the whole setup. If you need
+to build one yourself, see [Building Bundles](../technical/building_bundles.md) —
+borrow one first if you can.
+
+## Point at it
+
+Give Biofilter the bundle folder. It finds the data and the manifest
+inside:
+
+```bash
+biofilter --bundle /shared/bundles/bf4_20260912 report list
+```
+
+If you use the same bundle every day, set it once:
+
+```bash
+export BIOFILTER_BUNDLE="/shared/bundles/bf4_20260912"
+
+biofilter report list
+biofilter report run --report-name platform_data_statistics
+```
+
+Or in `.biofilter.toml`:
+
+```toml
+[database]
+bundle = "/shared/bundles/bf4_20260912"
+```
+
+A relative path there is resolved against the file itself, not your
+working directory, so it means the same thing from the project root and
+from a notebook two levels down.
+
+`--db-uri` exists for the cases that really are a database — a staging
+SQLite during a build, or a development PostgreSQL. Reading a bundle is
+not one of them. Passing both is an error rather than a guess about which
+you meant.
+
+## Check it worked
+
+```bash
+biofilter bundle info /shared/bundles/bf4_20260912
+```
+
+```
+Bundle id:      e29a11604a326d2e
+Biofilter:      4.3.0
+Built:          2026-09-12T11:46:28+00:00
+Tables:         114
+  core        41 table(s)       5,869,266 rows       71.9 MB
+  variant     73 table(s)   3,130,016,386 rows   21,226.3 MB
+```
+
+Biofilter opens the folder, reads `manifest.json` to learn which files
+make up each table, and queries them with DuckDB in the same process.
+There is no server to start and nothing to import.
+
+## The one thing to watch
+
+**Ids belong to one bundle.** `entities.id`, `variant_id` and the rest
+are internal row identifiers, valid only inside the bundle that produced
+them. They are not stable across bundles, and the drift is small enough
+to be dangerous: id 11450 is APOE in one bundle and APOF — a different
+gene in the same family — in another. Nothing errors; the answer is
+simply about the wrong gene.
+
+So pin the bundle, not the id. Every report result carries the bundle it
+came from:
+
+```python
+result = bf.report.run("annotate_gene", input_data=["APOE"])
+result.provenance["bundle_id"]     # 'e29a11604a326d2e'
+```
+
+Saving a result keeps that record: `result.write("genes.csv")` also
+writes `genes.csv.provenance.json` beside it. Writing `.parquet` instead
+stores the provenance inside the file's own metadata, so it travels even
+if the sidecar is lost.
+
+## If something is wrong with the bundle
+
+```bash
+biofilter db verify --in /shared/bundles/bf4_20260912 --no-hashes --schema
+```
+
+`--schema` also checks that the tables present carry the columns this
+version of Biofilter expects. Opening a bundle only warns about that, so
+a partial bundle stays usable; this turns it into an error you can gate
+on.
+
+## Next step
+
+[Find a report](finding_reports.md), then [run it](running_reports.md).
+
+
+
+<!-- ===== SOURCE FILE: docs/source/getting_started/running_reports.md ===== -->
+
+# Running Your First Report
+
+Two ways to run any report: from the command line or from Python. Both
+produce the same result. Pick whichever fits your workflow.
+
+## CLI — quickest path
+
+List what's available:
+
+```bash
+biofilter report list
+```
+
+Run a report and print the result to the terminal:
+
+```bash
+biofilter report run --report-name annotate_gene --input TP53
+```
+
+Save it to a file. The format follows the extension — `.csv` or
+`.parquet`:
+
+```bash
+biofilter report run --report-name annotate_gene \
+  --input TP53 --input BRCA1 \
+  --output genes.csv
+```
+
+Repeat `--input` for each value. For lists too long for a command line,
+put one value per line in a file:
+
+```bash
+biofilter report run \
+  --report-name annotate_gene \
+  --input-file ./genes.txt
+```
+
+Options are separate from input, and go through `--param KEY=VALUE`:
+
+```bash
+biofilter report run \
+  --report-name resolve_entity \
+  --input BRCA1 --input TP53 \
+  --param match_mode=exact
+```
+
+To see what a report accepts:
+
+```bash
+biofilter report explain --report-name resolve_entity
+biofilter report run --report-name resolve_entity --params-template
+```
+
+## Python — best for notebooks and scripts
+
+```python
+from biofilter import Biofilter
+
+bf = Biofilter(bundle="/shared/bundles/bf4_20260912")
+
+result = bf.report.run(
+    "resolve_entity",
+    input_data=["BRCA1", "TP53", "APOE"],
+    match_mode="exact",
+)
+
+df = result.to_pandas()
+print(f"{result.num_rows} rows")
+df.head()
+```
+
+`bf.report.run()` returns a **result**, not a bare DataFrame. Call
+`.to_pandas()` when you want to continue in pandas; the extra layer is
+what carries the record of where the rows came from:
+
+```python
+result.provenance["bundle_id"]   # which build produced these rows
+result.provenance["coverage"]    # what this bundle did not have
+result.write("entities.csv")     # also writes entities.csv.provenance.json
+```
+
+`Biofilter()` with no argument falls back to `BIOFILTER_BUNDLE` or to
+`.biofilter.toml`, so in a configured environment the constructor can stay
+empty.
+
+## A complete first example
+
+Install, point, run:
+
+```bash
+# Install
+pip install biofilter
+
+# Point at a bundle
+export BIOFILTER_BUNDLE="/shared/bundles/bf4_20260912"
+
+# See what is in it
+biofilter report run --report-name platform_data_statistics \
+  --output bundle_contents.csv
+
+# Ask it something
+biofilter report run --report-name annotate_gene \
+  --input APOE --input TP53 \
+  --output genes.csv
+```
+
+Open `bundle_contents.csv` first. It tells you which domains and which
+chromosomes this bundle actually carries — worth knowing before you
+conclude that an empty result means an empty answer.
+
+## Before you trust a result
+
+An empty or partial table has more than one cause, and they are not
+interchangeable:
+
+- **A row with a `not_found` status** means the name did not resolve in
+  this bundle. `resolve_entity` will tell you what it did match.
+- **A `no_variants` status** means the input resolved and nothing met your
+  criteria — a real negative.
+- **A column that is entirely null** may mean the source was never built.
+  `result.provenance["coverage"]` lists what the bundle was missing.
+
+## Next steps
+
+- Browse the [Report Catalog](../report_catalog.md) for what else you can ask.
+- Each report has a worked notebook at `notebooks/templates/reports__<name>.ipynb` — copy one and adapt it.
+- For every CLI option, see the [CLI Reference](../cli_reference.md).
+- For how reports work in general, see [Reports](../reports.md).
+
+
+
+<!-- ===== SOURCE FILE: docs/source/index.md ===== -->
+
+# Biofilter Documentation
+
+Biofilter 4 brings genes, variants, proteins, pathways, diseases, ontology
+terms and chemicals from many public sources into one model, and lets you
+query that model through ready-to-use reports.
+
+What you read is a **bundle**: a directory of parquet files with a manifest
+describing them. No database server, no import step. Point Biofilter at a
+bundle and run reports.
+
+## Where to start
+
+**You were given a bundle and want answers from it.**
+Go to [Getting Started](getting_started/index.md). It takes minutes, and
+you will not need the technical section at all.
+
+**You want to know which analyses exist.**
+The [Report Catalog](report_catalog.md) lists every report and the question
+it answers.
+
+**You build bundles, or extend Biofilter.**
+Go to [Technical Reference](technical/index.md).
+
+```{toctree}
+:maxdepth: 2
+:caption: Getting Started
+
+getting_started/index
+getting_started/installing
+getting_started/reading_a_bundle
+getting_started/finding_reports
+getting_started/running_reports
+```
+
+```{toctree}
+:maxdepth: 2
+:caption: Running Analyses
+
+report_catalog
+reports
+entity_and_omics
+cli_reference
+troubleshooting
+```
+
+```{toctree}
+:maxdepth: 2
+:caption: Technical Reference
+
+technical/index
+```
+
+
+
+<!-- ===== SOURCE FILE: docs/source/report_catalog.md ===== -->
+
+# Report Catalog
+
+Every analysis Biofilter can run, organized by the question it answers.
+There are 16 reports. Each one takes a list of things you already have —
+gene symbols, rsIDs, disease names, a cohort's variants — and returns a
+table.
+
+For how reports work in general (parameters, input channels, output
+formats), see [Reports](reports.md).
+
+## Find your question
+
+| You have | You want | Report |
+|---|---|---|
+| Gene symbols or ids | Everything the bundle knows about them | [`annotate_gene`](#annotate-what-you-already-have) |
+| Gene symbols | The variants in those genes, filtered by predicted damage | [`expand_gene_to_variant`](#from-genes-to-variants) |
+| rsIDs or `chr:pos:ref:alt` | Full annotation, one row per transcript | [`annotate_variant`](#annotate-what-you-already-have) |
+| Variants | Which genes they regulate, in which tissue | [`expand_variant_regulatory`](#from-variants-outward) |
+| Variants | Plausible interacting pairs, with the biology that links them | [`pair_variants`](#from-variants-outward) |
+| A cohort's variants | Which ones the bundle knows, binned by biology | [`aggregate_cohort_variants`](#a-whole-cohort) |
+| Names that are not matching | What they actually resolve to, and where they conflict | [`resolve_entity`](#annotate-what-you-already-have) |
+| Any entity list | Its one-hop neighbourhood, or the relationship rows themselves | [`expand_entity_*`](#follow-the-entity-network) |
+| Disease, pathway, GO or protein names | Annotation for that domain | [`annotate_*`](#annotate-what-you-already-have) |
+| A bundle | What is in it, and how it was built | [`platform_*`](#about-the-bundle-itself) |
+
+## Running a report
+
+```bash
+biofilter --bundle /path/to/bundle report run \
+  --report-name annotate_gene \
+  --input TP53 --input BRCA1 \
+  --output genes.csv
+```
+
+```python
+from biofilter import Biofilter
+
+bf = Biofilter(bundle="/path/to/bundle")
+result = bf.report.run("annotate_gene", input_data=["TP53", "BRCA1"])
+df = result.to_pandas()
+```
+
+Three things worth knowing before you start:
+
+- **`biofilter report explain --report-name <name>`** prints the report's
+  full guide — every parameter, every column, and how to read the result.
+  It is the authoritative reference; this page is the index.
+- **A worked notebook** ships for each report at
+  `notebooks/templates/reports__<name>.ipynb`.
+- **Options go through `--param KEY=VALUE`**, separately from `--input`.
+  Values are coerced: `true`/`false`, numbers, and JSON. A list is written
+  as JSON — `--param impact_filter='["HIGH","MODERATE"]'`. Use
+  `--params-template` to print every option a report accepts.
+
+## Annotate what you already have
+
+You have identifiers. You want what is known about them.
+
+| Report | Takes | Returns |
+|---|---|---|
+| `annotate_gene` | Gene symbols, HGNC or Ensembl ids, aliases | Canonical ids, gene metadata, build-38 coordinates, relationship counts by related domain, and optionally how many variants fall in the gene's range |
+| `annotate_variant` | rsIDs, `chr:pos`, or `chr:pos:ref:alt` | Identity, gnomAD joint frequencies, in-silico predictions, and one row per transcript the variant was annotated against |
+| `annotate_protein` | Accessions, names, aliases | Canonical accession, function, location, tissue expression, isoform resolution, Pfam domains by type |
+| `annotate_disease` | Disease names or aliases | Canonical ids, label and description, disease groups, cross-references by source, and the genes ClinGen links to the disease |
+| `annotate_pathway` | Pathway names or ids | Canonical id and description, which source contributed it, relationship counts by domain |
+| `annotate_go` | GO terms or aliases | GO id, name and namespace, parent and child counts by relation type, relationship counts by domain |
+| `resolve_entity` | Any list of names | What each name resolves to, with conflict and status flags |
+
+`resolve_entity` is the one to reach for when another report returns
+`not_found` and you want to know why. It supports `match_mode=exact`
+(default), `like` for substrings, and `fuzzy` for Jaro-Winkler similarity
+above a threshold.
+
+## From genes to variants
+
+**`expand_gene_to_variant`** — the variants that belong to a list of genes.
+
+This is the report for the common screening question: *given these genes,
+which variants in them are plausibly damaging and rare enough to matter?*
+
+First you choose what "belongs to" means, because the two answers differ:
+
+| `mapping` | A variant belongs to a gene when… |
+|---|---|
+| `position` | Its coordinate falls inside the gene's build-38 range |
+| `annotation` | VEP associated it with that gene |
+
+Then you filter. Every filter below is optional and they compose:
+
+| Filter | Options |
+|---|---|
+| `impact_filter` | `HIGH`, `MODERATE`, `LOW`, `MODIFIER` |
+| `consequence_type_filter` | VEP consequence names |
+| `lof_confidence_filter` | LOFTEE `HC`, `LC` |
+| `af_min`, `af_max` | gnomAD joint allele frequency bounds |
+| `cadd_phred_min`, `sift_score_max`, `polyphen_score_min` | In-silico predictor thresholds |
+| `alphamissense_score_min` | AlphaMissense score |
+| `alphamissense_classification` | `likely_pathogenic`, `likely_benign`, `ambiguous` |
+
+A rare, high-impact, likely-pathogenic screen over two genes:
+
+```bash
+biofilter --bundle /path/to/bundle report run \
+  --report-name expand_gene_to_variant \
+  --input BRCA1 --input CHEK2 \
+  --param mapping=annotation \
+  --param impact_filter=HIGH \
+  --param af_max=0.01 \
+  --param alphamissense_classification=likely_pathogenic \
+  --output candidates.csv
+```
+
+Two defaults to be aware of. `most_severe_only` is `true`, so you get one
+row per gene and variant keeping the worst consequence — set it to `false`
+when you want every transcript. And `max_variants_per_gene` is `5000`; when
+a gene is capped, the `variants_available` column reports its pre-cap total,
+so a truncated row admits that it is truncated.
+
+## From variants outward
+
+| Report | Answers |
+|---|---|
+| `expand_variant_regulatory` | Which genes does this variant regulate, and in which tissue? One row per variant × tissue × regulated gene, with effect size and p-value. Takes gene symbols, rsIDs or positions. |
+| `pair_variants` | Which of these variants plausibly interact? Places each input on its genes, connects those genes through shared pathways, diseases or proteins, and returns the pairs with the evidence that supports them. |
+
+`pair_variants` is a hypothesis generator, not a test: the pairs it returns
+are candidates whose genes share biology, and the supporting columns are
+there so you can judge each one.
+
+## Follow the entity network
+
+| Report | Answers |
+|---|---|
+| `expand_entity_neighborhood` | What is one hop away from these entities? Takes a mixed list — genes, diseases, proteins — with optional `gene:` style hints, and reports degree overall and by neighbour type. |
+| `expand_entity_relationship` | The relationship rows themselves: every link where an input appears on either side, with the related entity named. `scope` controls whether the other side must also be in your input list. |
+
+Use the first to explore, the second to extract.
+
+## A whole cohort
+
+**`aggregate_cohort_variants`** — your cohort's variants, matched against
+the bundle and optionally rolled up into biological bins.
+
+It answers three things at once: which of your variants Biofilter knows,
+where they sit, and what each sample carries per bin. Binning is optional —
+without it you get the match and the placement.
+
+## About the bundle itself
+
+| Report | Answers |
+|---|---|
+| `platform_data_statistics` | What does this bundle hold? Identity, table sizes on disk, entity counts by domain, variant counts by chromosome, relationship counts by group pair, and what each source contributed. |
+| `platform_etl_status` | One row per data source: the latest good extract, transform and load, whether each stage ran on the previous one's output, and whether anything is known to be wrong. |
+| `platform_etl_packages` | The raw record behind the status: one row per ETL package, with stage, timing, row counts and the hash it carried forward. |
+
+Run `platform_data_statistics` first on any bundle you did not build
+yourself. It tells you which chromosomes and which sources are actually in
+there, which is what decides whether your question is answerable at all.
+
+## Reading a result honestly
+
+An empty or partial result has more than one cause, and they are not
+interchangeable.
+
+**Per-row status.** Reports that resolve input keep the inputs that
+produced nothing, with a status saying why — `not_found` (the name did not
+resolve in this bundle), `no_location` (it resolved, but there are no
+coordinates for it), `no_variants` (it resolved and nothing met your
+criteria). A shorter table is not the same as a negative answer.
+
+**Coverage.** Every result carries a `coverage` block in its provenance
+recording which optional tables the bundle did not have and which
+chromosomes it spans. If a bundle was built without AlphaMissense, an
+AlphaMissense filter silently matches nothing — coverage is where that is
+written down.
+
+```python
+result.provenance["coverage"]
+result.provenance["bundle_id"]
+```
+
+**Bundle identity.** Entity and variant ids are valid only inside the
+bundle that produced them. `result.write("out.csv")` saves
+`out.csv.provenance.json` beside the file so the result stays traceable to
+its build. Pin the bundle, not the id.
+
+
+
+<!-- ===== SOURCE FILE: docs/source/reports.md ===== -->
+
+# Reports
+
+A report takes a list of things you have and returns a table. This page is
+how to find one, run it, and read what comes back. For which report answers
+which question, see the [Report Catalog](report_catalog.md).
+
+## Every report needs a bundle
+
+Reports read a bundle and nothing else. Point at one in any of these ways —
+the first that is set wins:
+
+```bash
+biofilter --bundle /path/to/bundles/20260914 report run ...   # flag
+export BIOFILTER_BUNDLE=/path/to/bundles/20260914             # environment
+```
+
+```toml
+# .biofilter.toml — relative to this file, not your working directory
+[database]
+bundle = "./biofilter_data/bundles/20260914"
+```
+
+Discovery is the exception. `report list`, `explain`, `example-input` and
+`available-columns` ask about the installed package, not about data, so they
+work with no bundle at all.
+
+## Find a report
+
+```bash
+biofilter report list
+biofilter report list --verbose          # descriptions and module names
+```
+
+Then ask a specific report what it does:
+
+```bash
+biofilter report explain --report-name expand_gene_to_variant
+biofilter report example-input --report-name expand_gene_to_variant
+biofilter report available-columns --report-name expand_gene_to_variant
+```
+
+`explain` prints the report's full guide — parameters, columns, and how to
+read the result. It is the authoritative reference for any single report.
+
+`report refresh` rebuilds the index after you add a report. You will not
+need it otherwise.
+
+## Run one
+
+```bash
+biofilter --bundle <path> report run --report-name annotate_gene \
+  --input TP53 --input BRCA1
+```
+
+Write the result to a file with `--output`. The format follows the
+extension — `.csv`, or `.parquet` / `.pq`:
+
+```bash
+biofilter --bundle <path> report run --report-name annotate_gene \
+  --input-file ./my_genes.txt \
+  --output genes.parquet
+```
+
+From Python:
+
+```python
+from biofilter import Biofilter
+
+bf = Biofilter(bundle="/path/to/bundles/20260914")
+result = bf.report.run("annotate_gene", input_data=["TP53", "BRCA1"])
+
+df = result.to_pandas()
+result.write("genes.csv")
+```
+
+## Two channels: input and options
+
+They are separate on purpose, and mixing them is an error rather than a
+guess.
+
+**Input** — the records you are asking about. One channel at a time:
+
+```bash
+--input TP53 --input BRCA1                      # repeatable
+--input-file ./genes.txt                        # one value per line
+--input-file ./cohort.csv --input-column symbol # a column of a CSV
+```
+
+**Options** — everything that changes behaviour: filters, modes, thresholds.
+
+```bash
+biofilter --bundle <path> report run --report-name expand_gene_to_variant \
+  --input BRCA1 \
+  --param mapping=annotation \
+  --param impact_filter=HIGH \
+  --param af_max=0.01
+```
+
+Values are coerced: `true` / `false`, numbers, and JSON. A list is JSON —
+`--param impact_filter='["HIGH","MODERATE"]'`. A leading `@` reads the value
+from a file, and `@@` escapes a literal `@`:
+
+```bash
+--param consequence_type_filter=@./consequences.txt
+```
+
+For anything longer, pass the whole option set at once:
+
+```bash
+--params-json '{"mapping":"annotation","af_max":0.01}'
+--params-file ./params.yaml          # .json, .yml or .yaml
+```
+
+`--params-template` prints the options a report accepts, filled with its own
+example values, which is the fastest way to see what is available:
+
+```bash
+biofilter report run --report-name expand_gene_to_variant --params-template
+```
+
+## What comes back
+
+A result is a table plus a record of how it was produced.
+
+```python
+result.num_rows
+result.columns
+result.to_pandas()
+
+result.provenance["bundle_id"]   # which build these rows came from
+result.provenance["params"]      # what was asked
+result.provenance["coverage"]    # what the bundle did not have
+```
+
+`result.write("out.csv")` saves `out.csv.provenance.json` beside it. Writing
+parquet instead keeps the provenance inside the file's own metadata, so it
+travels even if the sidecar is lost.
+
+Two habits worth forming:
+
+- **Check `coverage` before trusting a null.** It lists the optional tables
+  the bundle lacked and the chromosomes it spans. A column that is null
+  because a source was never built looks exactly like one that is null
+  because the answer is null.
+- **Keep the `bundle_id` with the result.** Entity and variant ids are valid
+  only inside the bundle that produced them, so an id without its build is
+  not a fact.
+
+## Guides and notebooks
+
+Each report ships two pieces of documentation besides this page:
+
+| | |
+|---|---|
+| The guide | `biofilter/modules/report/reports_explain/report_<name>.md`, printed by `report explain` |
+| A notebook | `notebooks/templates/reports__<name>.ipynb`, a worked example against a real bundle |
+
+
+
+<!-- ===== SOURCE FILE: docs/source/technical/building_bundles.md ===== -->
 
 # Building Bundles
 
-A bundle is what Biofilter 4.3 produces and what it reads. It is a
-directory of parquet files plus a manifest, built once and never changed.
+A bundle is what Biofilter produces and what it reads: a directory of
+parquet files plus a manifest, built once and never changed. This page is
+how one gets made.
 
-This replaces the older model, where a PostgreSQL database was the
-canonical store and a bundle was an export of it. There is no persistent
-database any more: the build creates a throwaway SQLite, uses it, and
-leaves the bundle behind.
+## Why the build has two branches
 
-## Why it is shaped this way
+Two facts about the data decide the shape of the build.
 
-Two measurements drove it.
+**The relational core is small and needs transactions.** Entities, aliases,
+relationships, genes, proteins, pathways, diseases, GO and chemicals come to
+about 7 million rows and 105 MB. They also resolve against each other —
+creating an entity means asking what earlier sources already created — so
+they need a transactional store while they are being assembled.
 
-Variant data is the wrong shape for a relational store.
-`variant_molecular_effects` costs about 255 bytes per row in PostgreSQL
-and 4 in parquet — 64x. The full genome would be roughly 426 GB in that
-one table, against 6.65 GB as parquet.
+**Variant data is large and needs none of that.** It runs to roughly
+2 billion rows. `variant_masters` carries no `entity_id` and no foreign
+keys; variants link to genes through natural keys that VEP emitted, so
+there is nothing to resolve. At about 4 bytes per row in parquet the whole
+variant set is 15.6 GB — the same table in a row store costs about 255 bytes
+per row, which puts it in the hundreds of gigabytes.
 
-Everything else is small. The entire non-variant model — entities,
-aliases, relationships, genes, proteins, pathways, diseases — is about
-7 million rows and 105 MB. It was being hosted on a database server sized
-for the 2 billion variant rows sitting next to it.
+So the build splits. The **core branch** stages through a throwaway SQLite,
+written through the ORM models. The **variant branch** writes its final
+parquet directly, one file per chromosome, with no relational hop and no
+load step. The branches do not depend on each other.
 
-So the build splits in two. The **core branch** stages through SQLite,
-because those sources resolve entities against each other and need a
-transactional store. The **variant branch** writes parquet directly, with
-no relational hop. They do not depend on each other.
+## Before the first build
+
+`bundle plan` reads the list of data sources from a database, so you need
+one before you can write a plan:
+
+```bash
+biofilter db create-db --db-uri sqlite:///biofilter_data/registry.sqlite
+```
+
+This creates the schema and applies the JSON seeds, including the data
+source registry the plan is generated from. It is a registry, not a data
+store — the build creates its own staging database and never writes here.
 
 ## The three commands
 
 ```bash
-biofilter bundle plan --out bundle_plan.json
+biofilter bundle plan  --out bundle_plan.json --db-uri sqlite:///biofilter_data/registry.sqlite
 biofilter bundle build --plan bundle_plan.json
-biofilter bundle info ./biofilter_data/bundles/20260909
+biofilter bundle info  ./biofilter_data/bundles/20260914
 ```
 
 ### plan
@@ -47,17 +1280,19 @@ Writes the recipe. Every data source appears with an `include` flag, its
 DTP and version, and the path of that DTP's field or tissue config, split
 into the two branches.
 
-Edit the flags to choose what the build covers.
+Edit the flags to choose what the build covers. `--all-sources` enables
+every source rather than only the ones currently flagged active — note that
+this covers the whole genome, and the gnomAD download alone is about 1.5 TB.
 
 **Order matters.** Sources run in the order they appear, and that order is
-the dependency declaration — the core branch resolves entities against
-what earlier sources created, so `hgnc` precedes `gene_ncbi`, which
-precedes `ensembl`. Reordering the list reorders the build.
+the dependency declaration — the core branch resolves entities against what
+earlier sources created, so `hgnc` precedes `gene_ncbi`, which precedes
+`ensembl`. Reordering the list reorders the build.
 
-The plan is authoritative for one build. The `active` flag in the
-database only seeds a new plan's defaults, and each DTP's own JSON config
-still governs what is selected *within* a source — which INFO fields,
-which GTEx tissues.
+The plan is authoritative for one build. The `active` flag in the registry
+only seeds a new plan's defaults, and each DTP's own JSON config still
+governs what is selected *within* a source — which INFO fields, which GTEx
+tissues.
 
 Writing over an existing plan needs `--force`, because a plan may be the
 only record of how a published bundle was made.
@@ -68,29 +1303,40 @@ only record of how a published bundle was made.
 biofilter bundle build \
   --plan bundle_plan.json \
   --data-root biofilter_data \
-  --out ./bundles/20260909
+  --out ./bundles/20260914
 ```
 
 Creates `<data-root>/staging/bundle_staging.sqlite`, runs every included
-source against it, reclaims disk as it goes, and assembles only once all
-of them have succeeded.
+source against it, reclaims disk as it goes, and assembles only once all of
+them have succeeded.
 
-`--out` defaults to `<data-root>/bundles/<YYYYMMDD>`. The build refuses to
-overwrite a directory that already holds a bundle.
+| Option | Default | Does |
+|---|---|---|
+| `--plan` | `bundle_plan.json` | The plan to build from |
+| `--data-root` | `biofilter_data` | Where raw, processed and staging live |
+| `--out` | `<data-root>/bundles/<YYYYMMDD>` | Where to write the bundle |
+| `--restart` | off | Discard the staging database and start over |
+| `--keep-raw` | off | Keep downloads after their output exists |
+| `--min-free-gb` | `100` | Refuse to start a source below this much free space |
+| `--into` | — | Fold this run's variant output into an existing bundle |
+| `--keep-processed` | off | Copy the variant parquet in rather than moving it |
+| `--no-assemble` | off | Run the sources but do not publish |
 
 **Resume is the default.** An interrupted build re-runs only what is
-pending: finished sources are skipped, both because their steps are
-recorded and because the output they left is still there. `--restart`
-discards the staging database and starts over — needed when a source that
-loaded partially has to be excluded, since resuming would leave its rows
-in place.
+pending: finished sources are skipped, both because their steps are recorded
+in the staging ledger and because the output they left is still there.
+`--restart` discards the staging database and starts over — needed when a
+source that loaded partially has to be excluded, since resuming would leave
+its rows in place.
 
-**Disk is the binding constraint.** A full gnomAD download is about
-1.53 TB while the largest single chromosome is about 126 GB, which only
-fits because raw files are dropped as soon as their parquet exists. What
-gets dropped differs per branch: the variant branch keeps its parquet —
-it is the artifact — and drops the raw VCFs; the core branch drops both
-once its rows are in the staging database. `--keep-raw` disables this.
+**Disk is the binding constraint.** A full gnomAD download is about 1.53 TB
+while the largest single chromosome is about 126 GB, which only fits because
+raw files are dropped as soon as their parquet exists. What gets dropped
+differs per branch: the variant branch keeps its parquet — it is the
+artifact — and drops the raw VCFs; the core branch drops both once its rows
+are in the staging database. `--keep-raw` disables this. `--min-free-gb`
+stops a source from starting into a disk that cannot hold it; one gnomAD
+chromosome needs up to 67 GB of raw before its parquet exists.
 
 Sources run one at a time. That is a requirement, not a simplification:
 running chromosomes concurrently multiplies the peak disk footprint, and
@@ -99,46 +1345,94 @@ measured 66.6 MB/s against 64.2 MB/s for one, because the local link
 saturates.
 
 **Nothing is published unless every source succeeded.** A bundle missing a
-table is indistinguishable from a complete one to whoever reads it. A
-failed build stays resumable with its finished work intact.
+table is indistinguishable from a complete one to whoever reads it. A failed
+build stays resumable with its finished work intact.
+
+### Building a genome in stages
+
+A full variant branch is days of work and more raw input than most machines
+hold at once. `--into` lets it be done in stages, each one folding its
+chromosomes into a bundle that already exists:
+
+```bash
+# first stage publishes the bundle, core branch included
+biofilter bundle build --plan plan_chr1_4.json --out ./bundles/20260914
+
+# later stages fold their variant output in
+biofilter bundle build --plan plan_chr5_8.json --into ./bundles/20260914
+```
+
+The core is not touched after the first assembly — it came out of the
+staging database then and has not changed. Only the variant branch is
+folded in.
+
+Three things to know about a staged build:
+
+- **The bundle id changes every time.** It is derived from content, and the
+  content grew. That is the honest outcome and also the cost: a result
+  already stamped with the old id now names a bundle that no longer exists.
+  `build_record.json` gains a `merges` entry per fold, recording
+  `bundle_id_before` and `bundle_id_after`, so the sequence can be read
+  back.
+- **It refuses to replace a file the bundle already has.** Re-folding the
+  same chromosome would silently double its rows, and deciding which copy is
+  right is not something the build can know.
+- **The guards still apply.** A planned source that produced nothing stops
+  the merge, and nothing is moved until that check passes — a collision
+  found halfway would leave the bundle holding part of a run.
+
+Two options exist for the same workflow. `--no-assemble` runs the sources
+without publishing, for when assembling early would produce a bundle holding
+only what has run so far. `--keep-processed` copies the variant parquet into
+the bundle instead of moving it, so `processed/` still holds it afterwards —
+useful for building a chromosome-subset bundle to develop against without
+consuming the files the eventual full bundle needs.
 
 ### info
 
-Prints what a bundle declares about itself: its id, the versions that
-built it, when, and its tables broken down by branch.
+Prints what a bundle declares about itself, which after its sources have
+moved on is the only surviving account of what it holds:
 
-## Reading a bundle
-
-Point `--db-uri` at the bundle folder. No import, no database:
-
-```bash
-biofilter --bundle /path/to/bundle report list
-biofilter --bundle /path/to/bundle \
-  report run --report-name etl_status
+```
+Bundle id:      39c56b50adeb1dc5
+Biofilter:      4.3.0
+Schema:         4.3.0
+Built:          2026-09-14T21:28:42+00:00
+Built from:     sqlite
+Tables:         103
+  core        30 table(s)       5,869,254 rows       71.9 MB
+  variant     73 table(s)   1,313,355,486 rows   10,057.3 MB
+Plan:           bundle_plan.json
+Build record:   build_record.json
 ```
 
-From Python:
+## Reading what you built
+
+```bash
+biofilter --bundle ./bundles/20260914 report list
+```
 
 ```python
 from biofilter import Biofilter
 
-bf = Biofilter(bundle="/path/to/bundle")
-bf.db.connect()
+bf = Biofilter(bundle="./bundles/20260914")
+result = bf.report.run("annotate_gene", input_data=["TP53"])
 
-print(bf.db.bundle_id())          # which data this is
-df = bf.report.run("etl_status")
-print(df.attrs["bundle_id"])      # which data the result came from
+result.provenance["bundle_id"]   # which build these rows came from
+result.write("genes.csv")        # writes genes.csv.provenance.json beside it
 ```
 
-Opening a bundle warns if a table it carries is missing columns this
-build expects, naming them. It does not refuse: a bundle built from a
-subset of the sources legitimately has fewer tables, and refusing would
-make it unusable for the ones it does have. For a strict check suitable
-for gating:
+Opening a bundle warns if a table it carries is missing columns this build
+expects, naming them. It does not refuse: a bundle built from a subset of
+the sources legitimately has fewer tables, and refusing would make it
+unusable for the ones it does have. For a strict check suitable for gating:
 
 ```bash
-biofilter db verify --in ./bundles/20260909 --schema
+biofilter db verify --in ./bundles/20260914 --schema
 ```
+
+See [The Read Path](read_path.md) for what happens between opening a
+directory and getting rows back.
 
 ## Two properties to know about
 
@@ -148,34 +1442,34 @@ biofilter db verify --in ./bundles/20260909 --schema
 row identifiers **valid only inside the bundle that produced them**. They
 are not stable across builds and no attempt is made to make them so.
 
-This matters because the drift is small. Comparing two environments,
-`APOE` was 11448 in one and 11450 in the other — and 11450 in the first is
-`APOF`, a different gene in the same family. Nothing errors; the answer is
-simply wrong.
+This matters because the drift is small. Comparing two environments, `APOE`
+was 11448 in one and 11450 in the other — and 11450 in the first is `APOF`,
+a different gene in the same family. Nothing errors; the answer is simply
+wrong.
 
-Pin the bundle, not the id. Report results carry `bundle_id` in
-`DataFrame.attrs` so an orphaned id can be recognised as one; note that
-this attribute does not survive a CSV export.
+Pin the bundle, not the id. Every report result carries `bundle_id` in its
+provenance, and writing a result saves that provenance beside the file, so
+an orphaned id can be recognised as one.
 
 Cross-domain links use natural keys instead — `chromosome:position:ref:alt`
 for variants, `HGNC_ID` and gene symbols for genes.
 
 ### A bundle cannot be rebuilt
 
-Sources move on. Ensembl publishes a new release and the previous file
-stops being served; gnomAD versions its callsets independently. Building
-the same plan a year later produces different data.
+Sources move on. Ensembl publishes a new release and the previous file stops
+being served; gnomAD versions its callsets independently. Building the same
+plan a year later produces different data.
 
 That is expected rather than a defect. When a source changes you build a
 **new** bundle, and the old one remains a snapshot of a moment that can no
-longer be recreated. Reproducibility lives in the retained artifact, not
-in the ability to rebuild it — which is why bundles are archived, and why
-the manifest, the plan and the build record travel inside the bundle.
-They are the only account of it that survives.
+longer be recreated. Reproducibility lives in the retained artifact, not in
+the ability to rebuild it — which is why bundles are archived, and why the
+manifest, the plan and the build record travel inside the bundle. They are
+the only account of it that survives.
 
 
 
-<!-- ===== SOURCE FILE: docs/source/bundle_requirements.md ===== -->
+<!-- ===== SOURCE FILE: docs/source/technical/bundle_requirements.md ===== -->
 
 # What Building a Bundle Costs
 
@@ -322,9 +1616,12 @@ biofilter --bundle /path/to/bundle report list
 ```
 
 ```python
+from biofilter import Biofilter
+
 bf = Biofilter(bundle="/path/to/bundle")
-bf.db.connect()
-print(bf.db.bundle_id())
+result = bf.report.run("platform_data_statistics")
+
+print(result.provenance["bundle_id"])
 ```
 
 ## One number worth keeping in mind
@@ -337,71 +1634,7 @@ laptop.
 
 
 
-<!-- ===== SOURCE FILE: docs/source/cli_reference.md ===== -->
-
-# CLI Reference
-
-## Global
-
-```bash
-biofilter [--db-uri URI] [--debug] COMMAND ...
-```
-
-Groups:
-
-- `config`
-- `db`
-- `etl`
-- `report`
-
-## Config
-
-- `biofilter config show`
-- `biofilter config get SECTION.KEY`
-- `biofilter config set SECTION.KEY VALUE`
-- `biofilter config init --path .`
-
-## DB
-
-- `biofilter db ping`
-- `biofilter bundle plan`
-- `biofilter bundle build`
-- `biofilter bundle info`
-- `biofilter db create-db`
-- `biofilter db upgrade`
-- `biofilter db backup`
-- `biofilter db restore`
-- `biofilter db export`
-- `biofilter db import`
-
-## ETL
-
-- `biofilter etl update`
-- `biofilter etl update-all`
-- `biofilter etl explain`
-- `biofilter etl status`
-- `biofilter etl restart`
-- `biofilter etl rollback`
-- `biofilter etl index`
-
-## Report
-
-- `biofilter report list`
-- `biofilter report explain --report-name <name>`
-- `biofilter report example-input --report-name <name>`
-- `biofilter report available-columns --report-name <name>`
-- `biofilter report run --report-name <name> [options]`
-
-Key `report run` options:
-
-- `--input`, `--input-file`, `--input-column`
-- `--param`, `--params-json`, `--params-file`
-- `--params-template`
-- `--output`
-
-
-
-<!-- ===== SOURCE FILE: docs/source/configuration.md ===== -->
+<!-- ===== SOURCE FILE: docs/source/technical/configuration.md ===== -->
 
 # Configuration
 
@@ -463,21 +1696,29 @@ Initialize template:
 biofilter config init --path .
 ```
 
-## Typical Keys
+`config init` accepts `--db-uri` and `--data-root` to pre-fill the
+template.
 
-- `database.db_uri`
-- `etl.data_root`
+## Typical keys
+
+| Key | For |
+|---|---|
+| `database.bundle` | Where reports read from. A directory. |
+| `database.db_uri` | Where the ETL and `bundle plan` write. A SQLAlchemy URI. |
+| `etl.data_root` | Where raw, processed and staging live during a build. |
 
 ## Accepted `database.db_uri` values
 
 | Scheme | Example | Writes |
 |---|---|---|
-| PostgreSQL | `postgresql+psycopg2://user:pass@host:5432/biofilter_prod` | yes |
 | SQLite | `sqlite:///biofilter_dev.db` | yes |
-| Parquet bundle | `parquet:///path/to/bundle` | no (read-only) |
+| PostgreSQL | `postgresql+psycopg2://user:pass@host:5432/biofilter_dev` | yes |
+| Parquet bundle | `parquet:///path/to/bundle` | no |
 
-The `parquet://` scheme reads a Parquet bundle directly via DuckDB, for
-environments without a database server. See [Parquet Backend](parquet_backend.md).
+The `parquet://` scheme is a shorthand the database layer understands for
+"read this bundle". Prefer `database.bundle` for reading: it is the same
+target expressed as a directory, it resolves relative to this file, and it
+is what `--bundle` sets. See [The Read Path](read_path.md).
 
 ## Tips
 
@@ -487,1300 +1728,277 @@ environments without a database server. See [Parquet Backend](parquet_backend.md
 
 
 
-<!-- ===== SOURCE FILE: docs/source/database.md ===== -->
+<!-- ===== SOURCE FILE: docs/source/technical/index.md ===== -->
 
-# Database Operations
+# Technical Reference
 
-Biofilter 4.3 has no persistent database. A build creates a throwaway
-SQLite, stages the core sources through it, and leaves a parquet bundle
-behind — see [Building Bundles](building_bundles.md).
+How Biofilter is built and how it works internally. You need this section
+if you **build bundles**, **add a data source or a report**, or need to
+know exactly what the data means at the table level.
 
-The commands here remain for working with a database directly: creating
-one for development, inspecting it, and moving data in and out.
-
-## Creating and checking
-
-```bash
-biofilter db create-db --db-uri "sqlite:///biofilter_dev.db"
-biofilter db ping --db-uri "sqlite:///biofilter_dev.db"
-```
-
-`create-db` builds the schema with `create_all` and applies the master
-seeds. There is no migration step: 4.3 removed Alembic, because a
-database is built once and a schema change produces a new bundle rather
-than an in-place migration.
-
-Applying seed updates to an existing database:
-
-```bash
-biofilter db upgrade
-```
-
-This is idempotent and seed-only. In earlier versions it also ran an
-Alembic upgrade first.
-
-## Backup and restore
-
-Physical snapshot of a database, engine-specific:
-
-```bash
-biofilter db backup --out ./backups/dev.snapshot
-biofilter db restore --in ./backups/dev.snapshot
-```
-
-## Bundles
-
-A bundle is normally produced by `bundle build`. `db export` writes one
-from an existing database, which is how bundles were made before 4.3:
-
-```bash
-biofilter db export --out ./exports/biofilter_bundle --format parquet
-biofilter db import --in ./exports/biofilter_bundle --format parquet
-```
-
-Validate one without a database:
-
-```bash
-biofilter db verify --in ./exports/biofilter_bundle
-biofilter db verify --in ./exports/biofilter_bundle --no-hashes
-biofilter db verify --in ./exports/biofilter_bundle --schema
-```
-
-`--no-hashes` checks presence and size only. `--schema` also checks that
-the tables present carry the columns this build expects, and exits 1 on
-any problem, so CI can gate on it.
-
-A bundle can be read directly, without importing it:
-
-```bash
-biofilter --bundle ./exports/biofilter_bundle report list
-```
-
-See [Parquet Backend](parquet_backend.md) and
-[Building Bundles](building_bundles.md).
-
-
-
-<!-- ===== SOURCE FILE: docs/source/entity_and_omics.md ===== -->
-
-# Entity Model and Omics Domains
-
-## Why `Entity` Exists
-
-Biofilter 4 uses an entity-centric model so different biological domains can share identity and relationships.
-
-Instead of keeping each source isolated, BF4 stores a common entity layer and links domain records to it. This enables cross-domain queries and reusable knowledge.
-
-## Core Entity Objects
-
-At the center of the schema:
-
-- `EntityGroup`
-  - semantic type bucket (for example: Variants, Genes, Proteins, Diseases)
-- `Entity`
-  - persistent concept record with activity/conflict flags and ETL provenance
-- `EntityAlias`
-  - names/codes/synonyms from multiple systems (`alias_type`, `xref_source`)
-- `EntityRelationshipType`
-  - relationship semantics (typed edge meaning)
-- `EntityRelationship`
-  - directed link between two entities with provenance
-
-Practical effect:
-
-- you can resolve aliases from many sources to one entity identity
-- you can traverse relationships across domains without hardcoded paths
-
-## Domain-Specific Master Data
-
-The entity core is complemented by domain tables (master data), such as:
-
-- genes (`GeneMaster` and gene-related tables)
-- variants (variant master/effects/GWAS tables)
-- proteins (`ProteinMaster`, Pfam links)
-- pathways (`PathwayMaster`)
-- gene ontology (`GOMaster`, `GORelation`)
-- diseases (`DiseaseMaster`)
-- chemicals (`ChemicalMaster`)
-
-These domain tables provide rich attributes, while entities/aliases/relationships provide integration.
-
-## Omics Domains in BF4
-
-### Operational Domains (current)
-
-Domains with active schema + ETL/report usage today:
-
-- Variants
-- Genes
-- Proteins
-- Pathways
-- Gene Ontology
-- Diseases
-- Chemicals
-
-These groups define semantic space and allow gradual expansion without redesigning the core model.
-
-## How This Appears in ETL and Reports
-
-- ETL loads source-specific master/relationship data and writes provenance (`ETLPackage`).
-- Reports such as `entity_filter` and `entity_relationship_model` operate directly on this entity layer.
-- Because identities are persistent, updates can be incremental and still query-consistent across domains.
-
-
-
-<!-- ===== SOURCE FILE: docs/source/etl.md ===== -->
-
-# ETL Operations
-
-ETL is how Biofilter ingests, normalizes and versions knowledge from
-external sources. Each source is a **data source**, driven by a **DTP**
-(Data Transformation Package) through three steps: `extract`,
-`transform`, `load`.
-
-In 4.3 the ETL is a step inside a bundle build rather than an end in
-itself. `bundle build` runs it for every source in a plan; the commands
-here drive it directly, which is what you want when developing a DTP or
-re-running one source. See [Building Bundles](building_bundles.md).
-
-## Two branches
-
-Sources fall into two groups, and they behave differently:
-
-**Core** — genes, proteins, pathways, diseases, GO, chemicals and the
-relationships between them. These DTPs resolve entities against each
-other, so they run in order and load into a relational store: the
-throwaway SQLite during a build, or whatever database you point them at
-directly.
-
-**Variant** — gnomAD, AlphaMissense, GTEx, GWAS. These write parquet
-directly and never load into a database. Their `load()` raises
-`NotImplementedError` by design, so run them with explicit steps:
-
-```bash
-biofilter etl update --data-source gnomad_joint_chr21 --run-step extract
-biofilter etl update --data-source gnomad_joint_chr21 --run-step transform
-```
-
-Variant tables link to genes by natural key — `HGNC_ID`, gene symbols —
-never by an entity id, which is what lets the two branches be built
-independently.
-
-## Commands
-
-```bash
-biofilter etl update --data-source hgnc
-biofilter etl update --source-system KEGG
-biofilter etl update-all
-biofilter etl status
-biofilter etl explain --data-source hgnc
-```
-
-Restrict or force individual steps:
-
-```bash
-biofilter etl update --data-source hgnc --run-step transform
-biofilter etl update --data-source hgnc --force-step transform
-```
-
-A step is skipped when its input hash is unchanged **and** the output it
-produced still exists. Deleting a processed file causes it to be rebuilt.
-
-`etl update` exits non-zero when a source fails.
-
-## Field and tissue selection
-
-The variant DTPs read a JSON config next to them in
-`biofilter/modules/etl/dtps/config/`, listing every field a source
-publishes with a `load` flag. They are include-lists: gnomAD's joint
-callset alone carries 664 INFO fields, so an exclude-list would silently
-adopt whatever a future release adds.
-
-The same mechanism selects GTEx tissues — all 50 are listed, 13 enabled
-by default. Note that GTEx ships every tissue in one tarball and does not
-expose them individually, so the selection narrows the transform and the
-output, not the download.
-
-Frequency filters live in the same files. The gnomAD joint config
-defaults to `min_ac: 5`; setting it lower keeps rarer variants at
-proportionally larger output.
-
-## Adding a DTP
-
-1. `biofilter/modules/etl/dtps/dtp_<name>.py` with `extract()`,
-   `transform()` and, for a core source, `load()`
-2. `biofilter/modules/etl/dtps_explain/dtp_<name>.md` — source, behaviour,
-   caveats
-3. Register the data source in the seed
-4. Test with `biofilter etl update --data-source <name>`
-
-See [Developer Extensions](developer_extensions.md).
-
-
-
-<!-- ===== SOURCE FILE: docs/source/getting_started/finding_reports.md ===== -->
-
-# Finding a Report
-
-## What a report is
-
-A **report** is a prepared question you can ask the data.
-
-You give it an input — a list of gene symbols, an rsID, a disease name,
-sometimes nothing at all — and it gives you back a table. Under the
-covers it knows which files to open, how to resolve the names you typed
-against the ones the sources use, and how to follow the links between
-genes, proteins, pathways, diseases and variants. You do not write
-queries and you do not need to know how the data is laid out.
-
-```bash
-biofilter --bundle /shared/bundles/bf4_20260912 \
-  report run --report-name entity_filter --input APOE,TP53
-```
-
-Every report takes the same shape: a name, an input, optional parameters,
-and a table out — to your screen, or to a CSV, or straight into a
-DataFrame if you are working in Python.
-
-BF4 ships around thirty of them: looking entities up, summarising what is
-connected to what, annotating variants, and checking what data the bundle
-actually holds. Three ways to find the one you want.
-
-## 1. Browse the catalog
-
-The [Report Catalog](../report_catalog.md) is the full index, grouped by
-purpose. Each entry gives you:
-
-- A one-line description of what it does.
-- A link to its **Explain Guide** — parameters, output columns, examples.
-- A link to a **notebook tutorial** that runs end-to-end.
-
-Use the catalog when you want to see everything available.
-
-## 2. Ask the assistant
-
-For questions in plain language — *"I have a list of genes from a GWAS,
-which report shows what pathways they touch?"* — there is a GPT assistant
-trained on BF4's reports and terminology:
-
-**[BF4 Assistant](https://chatgpt.com/g/g-6887cf80355c8191ab3f88bbd8955e0d-biofilter-4-assistant)**
-
-Its source — system prompt, FAQ, and a manifest of every report with its
-inputs and use cases — lives in the repository's `assistent/` folder.
-
-## 3. Ask Biofilter itself
-
-If you already have it installed:
-
-```bash
-biofilter report list
-```
-
-And for any one of them:
-
-```bash
-biofilter report explain --report-name entity_filter
-```
-
-That prints the full guide in your terminal — what it expects, what it
-returns, and how to call it.
-
-## Good places to start
-
-Most reports fall into three kinds of work.
-
-**Filtering** — narrowing a list down to what the data recognises or
-supports.
-
-| Report | Use it when |
-| ------ | ----------- |
-| `entity_filter` | You have a list of names and want to know which ones BF4 recognises |
-| `gene_to_variant_filtering` | You have genes and want the variants inside them |
-| `variant_list_intersect` | You have two variant lists and want what they share |
-
-**Annotation** — attaching what is known to something you already have.
-
-| Report | Use it when |
-| ------ | ----------- |
-| `annotate_gene` | You want to browse the gene catalog |
-| `variant_single_gene_annotation` | You have variants and want their effect on one gene |
-| `entity_neighborhood_summary` | You have one entity and want everything connected to it |
-
-**Modeling** — building the sets and pairs an analysis consumes.
-
-| Report | Use it when |
-| ------ | ----------- |
-| `variant_binning` | You want variants grouped into bins for burden testing |
-| `snp_snp_pair_generator` | You need SNP pairs for an interaction scan |
-| `entity_relationship_model` | You want the relationship graph around a set of entities |
-
-And one worth running once on any bundle you have just been handed:
-
-| Report | Use it when |
-| ------ | ----------- |
-| `etl_status` | You want to see which data sources went into this bundle, and when |
-
-It answers "what is actually in here?" — which version of each source,
-and whether it loaded.
-
-## Next step
-
-Picked one? [Run your first report](running_reports.md).
-
-
-
-<!-- ===== SOURCE FILE: docs/source/getting_started/index.md ===== -->
-
-# Getting Started
-
-Biofilter 4 (BF4) resolves biological entities — genes, proteins,
-pathways, diseases, variants — tracks the relationships between them, and
-exposes all of it through ready-to-use reports.
-
-What you read is a **bundle**: a directory of parquet files with a
-manifest describing them. No database server, no import step. Point
-Biofilter at a bundle and run reports.
-
-## Choose your path
-
-### Someone gave me a bundle
-
-This is the common case, and it takes minutes.
-
-1. [Install Biofilter](installing.md) — pip or Docker.
-2. [Point at the bundle](reading_a_bundle.md) — one URI, no setup.
-3. [Find a report](finding_reports.md) that fits your question.
-4. [Run it](running_reports.md) — CLI or Python.
-
-### I need to build a bundle
-
-Only if no one has one for the data you need. The full human genome
-means 1.5 TB of downloads, processed and discarded as the build goes, so
-plan for **150 GB of working space**.
-
-1. [Install Biofilter](installing.md) — from source if you will change DTPs.
-2. [Build a bundle](../building_bundles.md) — `bundle plan`, then `bundle build`.
-3. [Run a report](running_reports.md) against what you built.
-
-[What it costs](../bundle_requirements.md) has the measured figures for
-disk, memory and runtime before you start.
-
-## What you'll need
-
-- **Python 3.10+**, or **Docker** if you prefer containers.
-- **A bundle** — a path you can read, local or on a shared filesystem.
-
-## One thing to carry with you
-
-Ids inside a bundle — `entities.id`, `variant_id` — are internal to that
-bundle. They are not stable across bundles, and a stale one still
-resolves: to a different gene, without an error. Pin the bundle, not the
-id. [Reading a bundle](reading_a_bundle.md) explains how results carry
-their origin.
-
-## Where this guide stops
-
-Once you can run a report, the rest goes deeper:
-
-- [Report catalog](../report_catalog.md) — every report, with tutorials.
-- [Building bundles](../building_bundles.md) — the plan/build/inspect flow.
-- [What a build costs](../bundle_requirements.md) — measured disk, time, memory.
-- [Parquet backend](../parquet_backend.md) — how views are registered, performance.
-- [Data sources and ingestion](../etl.md) — where the data comes from, and how it gets in.
-- [Configuration](../configuration.md) — `.biofilter.toml` options.
-- [Troubleshooting](../troubleshooting.md) — common errors.
-
-
-
-<!-- ===== SOURCE FILE: docs/source/getting_started/installing.md ===== -->
-
-# Installing Biofilter
-
-Three installation methods, in order of simplicity. Pick **one**.
-
-## Which one should I use?
-
-| Method     | Best for                                           | Requires                |
-| ---------- | -------------------------------------------------- | ----------------------- |
-| **pip**    | Most users — running reports, notebooks, scripting | Python 3.10+            |
-| **Docker** | Avoiding any Python setup, reproducible CI runs    | Docker                  |
-| **Source** | Contributors, debugging, modifying BF4 itself      | Python 3.10+ and Poetry |
-
-## pip (recommended)
-
-```bash
-pip install biofilter
-biofilter --help
-```
-
-That's it — `biofilter` is now available as a CLI command and the `biofilter` Python package is importable.
-
-To verify:
-
-```bash
-biofilter --help
-python -c "from biofilter import Biofilter; print('OK')"
-```
-
-## Docker
-
-Build the application-only image:
-
-```bash
-docker build -t biofilter:bf4 -f docker/Dockerfile "https://github.com/RitchieLab/biofilter.git#biofilter3r"
-```
-
-Mount the bundle and point at it. The container needs read access to the
-bundle directory and somewhere to write results:
-
-```bash
-docker run --rm -it \
-  -v /shared/bundles/bf4_20260912:/bundle:ro \
-  -v "$(pwd):/workspace" \
-  -e BIOFILTER_BUNDLE="/bundle" \
-  --entrypoint /bin/bash \
-  biofilter:bf4
-```
-
-To run one report and keep the output:
-
-```bash
-docker run --rm \
-  -v /shared/bundles/bf4_20260912:/bundle:ro \
-  -v "$(pwd)/outputs:/workspace/outputs" \
-  -e BIOFILTER_BUNDLE="/bundle" \
-  biofilter:bf4 \
-  biofilter report run --report-name etl_status --output /workspace/outputs/etl_status.csv
-```
-
-The bundle is mounted read-only because nothing writes to it — refreshing
-data means a newer bundle, not an update to this one.
-
-## From source
-
-For contributors or anyone modifying BF4 itself.
-
-```bash
-git clone https://github.com/RitchieLab/biofilter.git
-cd biofilter
-poetry install
-poetry run biofilter --help
-```
-
-## Next step
-
-Once installed, [point Biofilter at a bundle](reading_a_bundle.md) — one URI, no server to set up.
-
-
-
-<!-- ===== SOURCE FILE: docs/source/getting_started/reading_a_bundle.md ===== -->
-
-# Pointing Biofilter at a Bundle
-
-## What a bundle is
-
-A **bundle** is a folder. Inside it are the knowledge base's data —
-genes, proteins, pathways, diseases, variants and the relationships
-between them — already gathered from their original sources, cleaned up
-and written as parquet files. A `manifest.json` sits alongside them as
-the dictionary: what each file holds, how many rows, and which version of
-the data this is.
-
-Biofilter both writes bundles and reads them. The data lives in the
-folder, not in a server, so there is nothing to install, start or
-connect to. To run a query you give Biofilter the path and it does the
-rest.
-
-A bundle is a **photograph**: it captures the sources exactly as they
-were on the day it was built. Nothing inside it changes afterwards. When
-the sources move on — a new Ensembl release, a new gnomAD callset — you
-build a new bundle rather than update this one, and the old one stays
-readable for anyone who needs to reproduce work done against it.
-
-A full human-genome bundle is around **21 GB** and holds roughly three
-billion rows across 114 files. You can keep it on a laptop, a shared
-drive, or an HPC filesystem — anywhere you can read a folder.
-
-If someone has given you one, this page is the whole setup. If you need
-to build one yourself, see [Building Bundles](../building_bundles.md) —
-borrow one first if you can.
-
-## Point at it
-
-Give Biofilter the bundle folder. It finds the data and the manifest
-inside:
-
-```bash
-biofilter --bundle /shared/bundles/bf4_20260912 report list
-```
-
-If you use the same bundle every day, set it once:
-
-```bash
-export BIOFILTER_BUNDLE="/shared/bundles/bf4_20260912"
-
-biofilter report list
-biofilter report run --report-name etl_status
-```
-
-Or in `.biofilter.toml`:
-
-```toml
-[database]
-db_uri = "parquet:///shared/bundles/bf4_20260912"
-```
-
-Relative paths work; Biofilter resolves them.
-
-### The older form
-
-`--db-uri "parquet:///shared/bundles/bf4_20260912"` does the same thing.
-The `parquet://` scheme dates from when Biofilter spoke to several
-database backends and you had to say which one. With bundles it carries
-no information, so `--bundle` is the plainer way to say it. `--db-uri`
-remains for the cases that really are a database: a staging SQLite during
-a build, or an existing PostgreSQL.
-
-Passing both is an error rather than a guess about which you meant.
-
-## Check it worked
-
-```bash
-biofilter bundle info /shared/bundles/bf4_20260912
-```
-
-```
-Bundle id:      e29a11604a326d2e
-Biofilter:      4.3.0
-Built:          2026-09-12T11:46:28+00:00
-Tables:         114
-  core        41 table(s)       5,869,266 rows       71.9 MB
-  variant     73 table(s)   3,130,016,386 rows   21,226.3 MB
-```
-
-Reports work unchanged — the same code runs over parquet as over a
-database, with DuckDB underneath.
-
-## The one thing to watch
-
-**Ids belong to one bundle.** `entities.id`, `variant_id` and the rest
-are internal row identifiers, valid only inside the bundle that produced
-them. They are not stable across bundles, and the drift is small enough
-to be dangerous: id 11450 is APOE in one bundle and APOF — a different
-gene in the same family — in another. Nothing errors; the answer is
-simply about the wrong gene.
-
-So pin the bundle, not the id. Every report result carries the bundle it
-came from:
-
-```python
-df = bf.report.run("annotate_gene", input_data=["APOE"])
-df.attrs["bundle_id"]     # 'e29a11604a326d2e'
-```
-
-Note that this does not survive a CSV export. If you are writing ids to a
-file that will be read back later, write the bundle id beside them.
-
-## If something is wrong with the bundle
-
-```bash
-biofilter db verify --in /shared/bundles/bf4_20260912 --no-hashes --schema
-```
-
-`--schema` also checks that the tables present carry the columns this
-version of Biofilter expects. Opening a bundle only warns about that, so
-a partial bundle stays usable; this turns it into an error you can gate
-on.
-
-## Next step
-
-[Find a report](finding_reports.md), then [run it](running_reports.md).
-
-
-
-<!-- ===== SOURCE FILE: docs/source/getting_started/running_reports.md ===== -->
-
-# Running Your First Report
-
-Two ways to run any report: from the command line (CLI) or from Python (notebook or script). Both produce the same output. Pick whichever fits your workflow.
-
-## CLI — quickest path
-
-List what's available:
-
-```bash
-biofilter report list
-```
-
-Run a report and print the result to the terminal:
-
-```bash
-biofilter report run --report-name etl_status
-```
-
-Save the output to a CSV file:
-
-```bash
-biofilter report run --report-name etl_status --output etl_status.csv
-```
-
-Pass parameters with `--param KEY=VALUE`:
-
-```bash
-biofilter report run \
-  --report-name entity_filter \
-  --input "BRCA1" \
-  --input "TP53" \
-  --param match_mode=exact
-```
-
-For input lists too long for the command line, use `--input-file`:
-
-```bash
-biofilter report run \
-  --report-name entity_filter \
-  --input-file ./genes.txt
-```
-
-To see what parameters a report accepts:
-
-```bash
-biofilter report explain --report-name entity_filter
-```
-
-## Python API — best for notebooks and scripts
-
-```python
-from biofilter import Biofilter
-
-bf = Biofilter()  # picks up DB from .biofilter.toml or DATABASE_URL
-
-df = bf.report.run(
-    "entity_filter",
-    input_data=["BRCA1", "TP53", "APOE"],
-    match_mode="exact",
-)
-
-print(f"{len(df)} rows")
-df.head()
-```
-
-Every report returns a pandas `DataFrame`, so you can chain it with the rest of your analysis without saving to disk first.
-
-## A complete first example
-
-Here's a full session — install, point, run:
-
-```bash
-# Install
-pip install biofilter
-
-# Point at a bundle
-export BIOFILTER_BUNDLE="/shared/bundles/bf4_20260912"
-
-# Run
-biofilter report list
-biofilter report run --report-name etl_status --output etl_status.csv
-```
-
-Open `etl_status.csv` and you'll see every data source that went into the
-bundle, with the version and timestamp of the run that produced it.
-
-## Next steps
-
-- Browse the [Report Catalog](../report_catalog.md) for what else you can do.
-- Each report has a notebook tutorial in [`biofilter_legacy/bf4_420/notebooks/Templates/`](https://github.com/RitchieLab/biofilter/tree/biofilter3r/biofilter_legacy/bf4_420/notebooks/Templates) — copy one and adapt it.
-- For deeper CLI options, see the [CLI Reference](../cli_reference.md).
-- For Python API patterns, see [Reports](../reports.md).
-
-
-
-<!-- ===== SOURCE FILE: docs/source/index.md ===== -->
-
-# Biofilter Documentation
-
-Lightweight, user-focused documentation for running Biofilter today.
-
-This documentation is intentionally practical:
-- install/configure quickly (PyPI, source, or Docker)
-- build a parquet bundle and read it
-- run reports via CLI/API
-- troubleshoot common operational issues
+If you were given a bundle and want to run analyses on it, you do not need
+anything here — start at [Getting Started](../getting_started/index.md).
 
 ```{toctree}
-:maxdepth: 2
-:caption: Getting Started
-
-getting_started/index
-getting_started/installing
-getting_started/reading_a_bundle
-getting_started/finding_reports
-getting_started/running_reports
-```
-
-```{toctree}
-:maxdepth: 2
-:caption: Reference
+:maxdepth: 1
 
 system_overview
-entity_and_omics
-developer_extensions
-configuration
 building_bundles
 bundle_requirements
-database
-parquet_backend
-schema
 etl
-reports
-report_catalog
-cli_reference
-troubleshooting
+database
+schema
+read_path
+developer_extensions
+configuration
 ```
 
+## What is where
+
+| Page | Answers |
+|---|---|
+| [System Overview](system_overview.md) | How the whole system fits together, in one diagram |
+| [Building Bundles](building_bundles.md) | `plan` → `build` → `info`, and what each step guarantees |
+| [Bundle Requirements](bundle_requirements.md) | Disk, time and network before you start a build |
+| [ETL Operations](etl.md) | Running one source: update, status, restart, rollback |
+| [Database Operations](database.md) | Create, verify, export, import, backup |
+| [Database Schema](schema.md) | Every table and column, with the ER diagram |
+| [The Read Path](read_path.md) | How a bundle becomes queryable, and what is checked on the way |
+| [Developer Extensions](developer_extensions.md) | Adding a DTP or a report |
+| [Configuration](configuration.md) | Settings, precedence, environment variables |
 
 
-<!-- ===== SOURCE FILE: docs/source/parquet_backend.md ===== -->
 
-# Parquet Backend (read-only)
+<!-- ===== SOURCE FILE: docs/source/technical/read_path.md ===== -->
 
-Since **4.2.0**, Biofilter can read the knowledge base directly from a
-**Parquet bundle** using DuckDB as the query engine — no database server, no
-container, no per-user copy of the data.
+# The Read Path
 
-This exists for environments where running PostgreSQL is not an option. The
-motivating case is HPC: on a shared cluster users typically have no privileges
-to run a database daemon, no persistent service host, and no reasonable way to
-maintain a multi-hundred-gigabyte data directory per user.
+Reports do not connect to a database. They open a directory.
 
----
+This page is the mechanism between `Bundle.open()` and a result row: how a
+bundle becomes queryable, what is checked on the way, and what the read
+layer deliberately cannot do. For the practical setup — pointing Biofilter
+at a bundle and running something — see
+[Pointing Biofilter at a bundle](../getting_started/reading_a_bundle.md).
 
-## When to use it
+## Opening a bundle
 
-| Backend | Use for | Writes |
-|---|---|---|
-| PostgreSQL | Production, ETL, multi-user with writes | yes |
-| SQLite | Local development, small datasets | yes |
-| **Parquet bundle** | **HPC, shared read-only snapshots, air-gapped analysis** | **no** |
+```python
+from biofilter.modules.report.bundle import Bundle
 
-Choose the Parquet backend when all of the following hold:
+bundle = Bundle.open("/path/to/bundles/20260914")
 
-- you only need to **read** — run reports, no ETL and no migrations;
-- the data can be distributed as a point-in-time snapshot;
-- you want many users querying the same files concurrently without copies.
-
-If you need to ingest data or apply migrations, use PostgreSQL or SQLite.
-
----
-
-## Connecting
-
-Point Biofilter at the bundle's `tables/` directory with the `parquet://` URI
-scheme:
-
-```bash
-export BIOFILTER_DB_URI="parquet:///shared/bundles/bf4_2026_06"
-
-biofilter report run \
-  --report-name annotate_gene \
-  --input APOE \
-  --output apoe.csv
+bundle.bundle_id                      # which build this is
+bundle.tables["variant_masters"].rows # what it declares
+bundle.has("variant_gtex")            # whether a source made it in
 ```
 
-`DATABASE_URL` works too, as does the `--db-uri` option for a single command:
+Six things happen, in this order:
 
-```bash
-biofilter --db-uri "parquet:///shared/bundles/bf4_2026_06" \
-  report run --report-name annotate_variant --input rs429358 --output out.csv
-```
+1. **Read `manifest.json`.** If it is not there, this is not a bundle and
+   the error says so — including the most common cause, which is pointing at
+   the `tables/` subdirectory instead of the bundle root.
+2. **Check the manifest version.** This release reads `manifest_version: 2`.
+   A bundle declaring anything else is refused rather than guessed at.
+3. **Resolve logical tables** from the manifest entries.
+4. **Verify the files** — every one the manifest declares is present, at the
+   size it recorded.
+5. **`duckdb.connect()`** — in the same process. No server, no port, no
+   daemon.
+6. **Register one view per logical table.**
 
-From Python:
+What is *not* created is as much the point: no `Engine`, no `sessionmaker`,
+no connection pool, no `Session`, no ORM. The read layer has none of that
+machinery because it needs none of it.
+
+Most code reaches this through the facade rather than directly:
 
 ```python
 from biofilter import Biofilter
 
-bf = Biofilter(bundle="/shared/bundles/bf4_2026_06")
-df = bf.report.run("annotate_variant", input_data=["rs429358"])
+bf = Biofilter(bundle="/path/to/bundles/20260914")
+result = bf.report.run("annotate_gene", input_data=["TP53"])
 ```
 
-Both `parquet://relative/path` and `parquet:///absolute/path` are accepted;
-the path is expanded and resolved to an absolute path either way.
+## The manifest is the catalogue
 
----
+Views are built from what the manifest declares, not from what is on disk.
 
-## How it works
+Each manifest entry names a file. A single-file table names only itself; a
+partitioned table declares one entry per file, each carrying a `table` field
+naming the parent it belongs to. Entries are grouped by that field, and each
+group becomes one view:
 
-1. The `parquet://` URI is translated internally to an in-memory DuckDB engine
-   (`duckdb:///:memory:`).
-2. On connect, Biofilter scans the directory and registers one SQL `VIEW` per
-   `*.parquet` file, backed by DuckDB's `read_parquet()`.
-3. A SQLAlchemy `StaticPool` keeps every session on the same connection, so all
-   sessions share the in-memory catalog where those views live.
-4. From that point on the ORM resolves normally.
+```sql
+CREATE OR REPLACE VIEW variant_masters AS
+SELECT * FROM read_parquet([ ...the files the manifest names... ],
+                           union_by_name = true);
+```
 
-**Reports require no changes.** They run through the same ORM layer used by
-PostgreSQL and SQLite, so every report in the catalog works unmodified against
-a bundle.
+So `variant_masters` is one queryable name whether it is one file or
+twenty-five, and no filename convention has to be interpreted to work that
+out.
 
-### Partitioned tables
+This matters more than it looks. Inferring table membership from filenames
+is what once let an empty parent file shadow 177 million rows of real data —
+the same defect, independently, in two code paths. Reading the manifest
+removes that whole class of error rather than patching its symptoms.
 
-Files whose name contains `_chr_` are **skipped** during view registration.
+## Verification is tiered
 
-On PostgreSQL, `variant_masters` and `variant_molecular_effects` are
-partitioned by chromosome, and an export writes both the consolidated parent
-(`variant_molecular_effects.parquet`) and its 25 children
-(`variant_molecular_effects_chr_1.parquet`, …). Registering both would make
-every row appear twice, so only the consolidated parent is queried.
+Hashing 21 GB on every `report run` is not an option, so the checks are
+split by cost:
 
-This means the consolidated file is **required**. A bundle containing only the
-`_chr_*` children will connect successfully but the corresponding table will
-not exist, and variant reports will fail.
-
----
-
-(read-only-enforcement)=
-## Read-only enforcement
-
-The backend is read-only at two levels:
-
-- **Storage** — DuckDB rejects any write against a `read_parquet` view.
-- **Application** — the `Database.read_only` flag exposes the same information
-  to Biofilter code.
-
-Deployments typically add a third level by making the bundle directory
-non-writable on disk (`chmod -R a-w`).
-
-Consequences:
-
-- `biofilter etl update` / `update-all` — **not supported**; run the ETL
-  against PostgreSQL and export a new bundle.
-- `db upgrade` / `db create-db` — **not supported** against a bundle.
-- Refreshing the data means producing a **new bundle**, not modifying the
-  current one.
-
----
-
-## Producing a bundle
-
-Export from any existing PostgreSQL or SQLite instance:
+| Tier | Checks | Cost | When |
+|---|---|---|---|
+| Open | Every declared file is present, at the declared size | ~100 `stat()` calls | Every `Bundle.open()`, by default |
+| `db verify` | Adds SHA-256 re-computation | Reads every byte | On demand |
+| `db verify --schema` | Adds column-level comparison against the models | A metadata read | Gating, CI |
 
 ```bash
-biofilter db export \
-  --db-uri "postgresql+psycopg2://user:password@host:5432/biofilter_prod" \
-  --out /shared/bundles/bf4_2026_06 \
-  --format parquet
+biofilter db verify --in ./bundles/20260914
+biofilter db verify --in ./bundles/20260914 --schema
 ```
 
-This writes:
+Two notes on the middle tier. `--no-hashes` skips the re-computation. And
+the check only runs where the manifest actually recorded a digest — bundles
+produced by `bundle build` currently record size but not SHA-256, so for
+those the hash tier is a no-op and `verify` is checking presence and size.
 
+The `--schema` tier exists because opening a bundle only *warns* when a
+table is missing columns this build expects. That is deliberate: a bundle
+built from a subset of sources legitimately has fewer tables, and refusing
+to open it would make it useless for the sources it does have. `--schema`
+turns the warning into an error, for when you need a gate.
+
+## One cursor per report
+
+Each report execution gets `bundle.cursor()` — its own connection over the
+same database.
+
+Views are catalog objects, so every cursor sees them. Temp tables and
+registered relations are connection-scoped, so they do not leak between
+cursors. That is what gives one report execution a private scratch space,
+and it is why two reports running in the same process cannot collide on a
+temp table name.
+
+Report input arrives the same way: registered as a relation on the cursor
+and joined, never interpolated into the SQL. That is both what keeps
+injection out and what turns a ten-thousand-value filter into a hash join
+instead of a literal list.
+
+## Tuning
+
+```python
+bundle = Bundle.open(path, threads=6, memory_limit="12GB")
 ```
-bf4_2026_06/
-├── manifest.json
-└── tables/
-    ├── entities.parquet
-    ├── gene_masters.parquet
-    └── ...
+
+`memory_limit` is a declared ceiling, and DuckDB respects it by spilling
+rather than by failing. The read path also sets
+`preserve_insertion_order = false`: results are assembled by joins and
+ordered explicitly when order matters, so letting DuckDB drop that guarantee
+is a straight memory saving on large scans.
+
+## What to expect
+
+A production-scale question, measured on a 21 GB bundle with 114 declared
+tables (macOS, 6 threads, `memory_limit = 12GB`):
+
+> Which of a cohort's 711,836 variants map to a protein-coding gene?
+> Against `variant_masters` (177,520,333 rows) and
+> `variant_molecular_effects` (2,238,929,441 rows).
+
+| Step | Time |
+|---|---:|
+| Parse input | 0.2 s |
+| Coding genes | 0.0 s |
+| Match `variant_masters` (177 M) | 2.5 s |
+| Join `variant_molecular_effects` (2.2 B) | 8.9 s |
+| Coding filter and aggregate | 0.1 s |
+| **Total** | **11.9 s** |
+
+Peak resident memory was 1.87 GB against the declared 12 GB ceiling. Queries
+stream from disk with column pruning and predicate pushdown, so memory
+tracks the shape of the result rather than the size of the table.
+
+Shared network storage costs roughly an order of magnitude in wall clock
+against local NVMe and still lands inside interactive range.
+
+## Writing is not possible
+
+Not "blocked" — absent. The read layer opens parquet and has no write path
+to disrespect, so there is no flag to set and no mode to get wrong.
+
+Refreshing data means producing a **new** bundle; see
+[Building Bundles](building_bundles.md). Deployments that want the guarantee
+visible on disk as well typically make the bundle directory non-writable
+(`chmod -R a-w`).
+
+## Querying a bundle without Biofilter
+
+A bundle is parquet files and a JSON catalogue, so anything that reads
+parquet can read it:
+
+```sql
+-- single-file table
+SELECT * FROM read_parquet('/path/to/bundle/tables/gene_masters.parquet')
+LIMIT 5;
+
+-- partitioned table: pass the files together
+SELECT chromosome, count(*)
+FROM read_parquet('/path/to/bundle/tables/variant_masters/*.parquet',
+                  union_by_name = true)
+GROUP BY 1 ORDER BY 1;
 ```
 
-The `tables/` subdirectory is what `parquet://` points at.
+One caution: read `manifest.json` to learn which files make up a table
+rather than trusting a glob. The manifest is the only authority on that, and
+the bugs that come from guessing are silent ones.
 
-> **Production-scale caveat.** On a full production database the partitioned
-> variant tables make the single-command export impractical: exporting the
-> consolidated parent forces PostgreSQL to UNION all 25 partitions on every
-> chunk. The bundle has to be assembled in stages instead — export the
-> partition children individually, then concatenate them outside the database.
-> The full procedure is documented in the
-> [LPC deployment guide](https://github.com/RitchieLab/biofilter/blob/main/biofilter_legacy/bf4_420/notebooks/Templates/lpc__deploy.md).
+## Two parquet readers, and which is which
 
----
+There are two in the codebase, and they are not interchangeable:
 
-## Performance
+| | `Bundle` | `Database` with a `parquet://` URI |
+|---|---|---|
+| Where | `modules/report/bundle.py` | `modules/db/database.py` |
+| Builds views from | `manifest.json` | A directory scan |
+| Stack | DuckDB directly | SQLAlchemy over an in-memory DuckDB |
+| Used by | Every report | `db verify --schema`, `bf.db` helpers |
 
-Queries stream from disk with column pruning and predicate pushdown, so memory
-stays low even against billion-row tables. Measured on the production snapshot:
-
-| Workload | Storage | Wall clock | Peak memory |
-|---|---|---|---|
-| 10,000 rsIDs against `variant_molecular_effects` (1.79 B rows) | local NVMe | 1.18 s | 89 MB |
-| Same workload | shared GPFS | 15.52 s | 89 MB |
-| End-to-end CLI report (`annotate_variant`, 3 rsIDs) | local NVMe | 1.22 s | — |
-
-Shared network storage costs roughly an order of magnitude in wall clock and
-still lands well inside interactive range.
-
----
+Reports never touch the second one. `Biofilter(bundle=...)` stores the path
+as a `parquet://` URI internally, but the report component resolves it back
+to a directory and calls `Bundle.open()` on it.
 
 ## Troubleshooting
 
-**`No *.parquet files found in <dir>`**
-The URI points at the wrong directory. It must point at `tables/`, not at the
-bundle root that holds `manifest.json`.
+**`No manifest.json in <path>`**
+The path is not a bundle root. Point at the directory that holds
+`manifest.json`, not at its `tables/` subdirectory.
 
-**`parquet:// directory not found: <dir>`**
-The path does not exist or is not readable. Check the mount, and remember the
-path is resolved relative to the process working directory when given without
-a leading slash.
+**`<name> declares manifest_version N; this Biofilter reads [2]`**
+The bundle was written by a newer Biofilter. Update the package — the bundle
+is fine and needs no migration.
 
-**A table is missing or a variant report fails**
-The bundle is likely missing a consolidated parent for a partitioned table.
-Check that `variant_molecular_effects.parquet` exists alongside the
-`_chr_*` files — the children alone are not enough.
+**`<name> does not match its manifest`**
+A declared file is missing or the wrong size. The message names the files.
+An incomplete copy is the usual cause; re-sync the directory.
 
-**A write command fails**
-Expected. The backend is read-only; see [Read-only enforcement](#read-only-enforcement).
+**`<name> does not carry: <tables>`**
+The bundle was built without the sources that report needs. Run
+`platform_data_statistics` to see what it does have.
 
----
+**A column is all null**
+Check `result.provenance["coverage"]`. It records which optional tables the
+bundle did not have — a column that is null because a source was never built
+looks exactly like one that is null because the answer is null.
 
 ## See also
 
-- [Pointing Biofilter at a bundle](getting_started/reading_a_bundle.md) — the quick setup
-- [Database Operations](database.md) — export/import commands
-- [Configuration](configuration.md) — how `db_uri` is resolved
-
-
-
-<!-- ===== SOURCE FILE: docs/source/report_catalog.md ===== -->
-
-# Report Catalog
-
-Complete index of all reports available in Biofilter 4.
-Each report has a **name** (used in CLI and Python API), a brief description,
-and links to its explain guide and interactive notebook tutorial where available.
-
-For general usage — how to run, list, and introspect reports — see [Reports](reports.md).
-
----
-
-## Running any report
-
-```bash
-# CLI
-biofilter report run --report-name <name> [--param KEY=VALUE ...] [--output file.csv]
-biofilter report explain --report-name <name>
-biofilter report run --report-name <name> --params-template
-```
-
-```python
-# Python API
-df = bf.report.run("<name>", param1=value1, param2=value2)
-```
-
----
-
-## ETL & Platform Monitoring
-
-Reports for inspecting the state of the ETL pipeline and the knowledge base.
-
-| Report | Description | Explain | Notebook |
-|---|---|---|---|
-| `etl_status` | Current status of all ETL packages (active, last run, row counts) | [Guide](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter/modules/report/reports_explain/report_etl_status.md) | [Tutorial](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter_legacy/bf4_420/notebooks/Templates/reports__etl_status.ipynb) |
-| `etl_packages` | Full provenance log of all ETL executions with timestamps and file hashes | [Guide](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter/modules/report/reports_explain/report_etl_packages.md) | [Tutorial](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter_legacy/bf4_420/notebooks/Templates/reports__etl_packages.ipynb) |
-| `platform_data_statistics` | Row counts and coverage metrics across all master tables | [Guide](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter/modules/report/reports_explain/report_platform_data_statistics.md) | [Tutorial](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter_legacy/bf4_420/notebooks/Templates/reports__platform_data_statistics.ipynb) |
-| `db_pg_table_stats` | PostgreSQL table sizes, row estimates, and bloat metrics *(PostgreSQL only)* | [Guide](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter/modules/report/reports_explain/report_db_pg_table_stats.md) | [Tutorial](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter_legacy/bf4_420/notebooks/Templates/reports__db_pg_table_stats.ipynb) |
-| `db_pg_index_stats` | PostgreSQL index usage, size, and scan counts *(PostgreSQL only)* | [Guide](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter/modules/report/reports_explain/report_db_pg_index_stats.md) | [Tutorial](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter_legacy/bf4_420/notebooks/Templates/reports__db_pg_index_stats.ipynb) |
-
----
-
-## Entity & Relationship
-
-Reports for exploring the biological entity graph.
-
-| Report | Description | Explain | Notebook |
-|---|---|---|---|
-| `entity_filter` | Filter and list entities (genes, pathways, diseases, …) by type, source, or name pattern | [Guide](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter/modules/report/reports_explain/report_entity_filter.md) | [Tutorial](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter_legacy/bf4_420/notebooks/Templates/reports__entity_filter.ipynb) |
-| `entity_relationship_model` | Retrieve all entities related to an input list through shared biological groups (pathways, diseases, GO, PPI) | — | [Tutorial](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter_legacy/bf4_420/notebooks/Templates/reports__entity_relationship_model.ipynb) |
-| `entity_neighborhood_summary` | Resolve heterogeneous inputs (gene:, disease:, pathway:, …) and return a 1-hop neighborhood summary grouped by neighbor type | [Guide](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter/modules/report/reports_explain/report_entity_neighborhood_summary.md) | [Tutorial](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter_legacy/bf4_420/notebooks/Templates/reports__entity_neighborhood_summary.ipynb) |
-
----
-
-## Annotation Masters
-
-Reference tables exposing the full content of each biological domain in the knowledge base.
-Useful for exploring available terms before using them as filters in other reports.
-
-| Report | Description | Explain | Notebook |
-|---|---|---|---|
-| `annotate_gene` | All genes with HGNC symbol, Ensembl ID, locus, and source provenance | [Guide](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter/modules/report/reports_explain/report_annotate_gene.md) | [Tutorial](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter_legacy/bf4_420/notebooks/Templates/reports__annotations_master_gene.ipynb) |
-| `annotate_pathway` | All pathways across all source systems (Reactome, KEGG, …) | [Guide](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter/modules/report/reports_explain/report_annotate_pathway.md) | [Tutorial](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter_legacy/bf4_420/notebooks/Templates/reports__annotations_master_pathway.ipynb) |
-| `annotate_protein` | All proteins with UniProt IDs and gene mappings | [Guide](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter/modules/report/reports_explain/report_annotate_protein.md) | [Tutorial](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter_legacy/bf4_420/notebooks/Templates/reports__annotations_master_protein.ipynb) |
-| `annotate_disease` | All diseases with MONDO/ClinGen IDs and gene associations | [Guide](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter/modules/report/reports_explain/report_annotate_disease.md) | [Tutorial](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter_legacy/bf4_420/notebooks/Templates/reports__annotations_master_disease.ipynb) |
-| `annotate_go` | All Gene Ontology terms (BP, MF, CC) with gene memberships | [Guide](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter/modules/report/reports_explain/report_annotate_go.md) | [Tutorial](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter_legacy/bf4_420/notebooks/Templates/reports__annotations_master_go.ipynb) |
-| `annotate_chemical` | All chemical compounds (ChEBI) with gene and pathway associations | [Guide](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter/modules/report/reports_explain/report_annotate_chemical.md) | [Tutorial](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter_legacy/bf4_420/notebooks/Templates/reports__annotations_master_chemical.ipynb) |
-| `annotate_variant` | Full annotation for input variants: frequencies, pathogenicity scores, VEP consequences per transcript, AlphaMissense | [Guide](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter/modules/report/reports_explain/report_annotate_variant.md) | [Tutorial](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter_legacy/bf4_420/notebooks/Templates/reports__annotations_master_variant.ipynb) |
-
----
-
-## Variant Analysis
-
-Reports for annotating and filtering genomic variants.
-
-| Report | Description | Explain | Notebook |
-|---|---|---|---|
-| `variant_binning` | Assign variants to genomic bins; useful for burden-test preparation | [Guide](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter/modules/report/reports_explain/report_variant_binning.md) | [Tutorial](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter_legacy/bf4_420/notebooks/Templates/reports__variant_binning.ipynb) |
-| `variant_gene_location_model` | Map variants to overlapping gene loci with distance and region annotations | — | [Tutorial](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter_legacy/bf4_420/notebooks/Templates/reports__variant_gene_location_model.ipynb) |
-| `variant_annotation_expanded` | Full annotation expansion for a variant list (consequence, AF, predictions) | — | — |
-| `variant_single_gene_annotation` | **Phase 1** — Given a seed variant, returns the seed gene and all partner genes sharing biological context | [Guide](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter/modules/report/reports_explain/report_variant_single_gene_annotation.md) | [Tutorial](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter_legacy/bf4_420/notebooks/Templates/reports__variant_single_gene_annotation.ipynb) |
-| `gene_to_variant_filtering` | **Phase 2** — Collect and filter variants across a gene list with SQL-level pathogenicity filters | [Guide](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter/modules/report/reports_explain/report_gene_to_variant_filtering.md) | [Tutorial](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter_legacy/bf4_420/notebooks/Templates/reports__gene_to_variant_filtering.ipynb) |
-| `annotation_variant_regulatory_evidence` | Variant ↔ gene regulatory evidence (eQTL / sQTL). Accepts gene symbols, rsids, or chr:pos as input; returns one row per (variant × tissue × regulated gene) with effect size and p-value | [Guide](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter/modules/report/reports_explain/report_annotation_variant_regulatory_evidence.md) | [Tutorial](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter_legacy/bf4_420/notebooks/Templates/reports__annotation_variant_regulatory_evidence.ipynb) |
-
----
-
-## Variant Interaction Modeling
-
-Direct variant-to-variant interaction modeling from a pre-genotyped input list.
-Both variants in every pair come from the input — no DB expansion.
-
-| Report | Description | Explain | Notebook |
-|---|---|---|---|
-| `variant_modeling` | Input variants → gene overlap → group co-membership → Variant×Variant pairs with group_support_count weight | [Guide](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter/modules/report/reports_explain/report_variant_modeling.md) | [Tutorial](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter_legacy/bf4_420/notebooks/Templates/reports__variant_modeling.ipynb) |
-
----
-
-## SNP×SNP Interaction Pipeline
-
-Reports implementing the biologically-informed SNP×SNP interaction workflow.
-See the full pipeline tutorial and methods document for end-to-end guidance.
-
-| Resource | Link |
-|---|---|
-| Pipeline notebook | [pipeline__from_single_variant_to_interactions.ipynb](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter_legacy/bf4_420/notebooks/Templates/pipeline__from_single_variant_to_interactions.ipynb) |
-| Pipeline methods doc | [pipeline__from_single_variant_to_interactions.md](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter_legacy/bf4_420/notebooks/Templates/pipeline__from_single_variant_to_interactions.md) |
-
-| Report | Phase | Description | Explain | Notebook |
-|---|---|---|---|---|
-| `variant_single_gene_annotation` | Phase 1 | Seed variant → partner gene list via biological network | [Guide](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter/modules/report/reports_explain/report_variant_single_gene_annotation.md) | [Tutorial](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter_legacy/bf4_420/notebooks/Templates/reports__variant_single_gene_annotation.ipynb) |
-| `gene_to_variant_filtering` | Phase 2 | Gene list → filtered, annotated variant set (Lista A) | [Guide](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter/modules/report/reports_explain/report_gene_to_variant_filtering.md) | [Tutorial](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter_legacy/bf4_420/notebooks/Templates/reports__gene_to_variant_filtering.ipynb) |
-| `variant_list_intersect` | Phase 2.5 | Lista A ∩ Lista B → Lista C (genotyped subset, PLINK-ready) | [Guide](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter/modules/report/reports_explain/report_variant_list_intersect.md) | [Pipeline notebook](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter_legacy/bf4_420/notebooks/Templates/pipeline__from_single_variant_to_interactions.ipynb) |
-| `snp_snp_pair_generator` | Phase 3 | Lista D → annotated interaction pairs with configurable pairing strategy | [Guide](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter/modules/report/reports_explain/report_snp_snp_pair_generator.md) | [Pipeline notebook](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter_legacy/bf4_420/notebooks/Templates/pipeline__from_single_variant_to_interactions.ipynb) |
-| `snp_snp_model` | Legacy | Earlier SNP×SNP pair model — expands variants from gene loci (superseded by `variant_modeling`) | [Guide](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter/modules/report/reports_explain/report_snp_snp_model.md) | [Tutorial](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter_legacy/bf4_420/notebooks/Templates/reports__snp_snp_model.ipynb) |
-
----
-
-## Pathway Burden Pipeline
-
-Pipeline for prioritising pathways given a list of significant genes (e.g., ExWAS hits) and a target pathway list, using cross-source convergence scoring.
-
-| Resource | Link |
-|---|---|
-| Pipeline notebook | [pipeline__pathway_burden_score.ipynb](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter_legacy/bf4_420/notebooks/Templates/pipeline__pathway_burden_score.ipynb) |
-| Pipeline methods doc | [pipeline__pathway_burden_score.md](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter_legacy/bf4_420/notebooks/Templates/pipeline__pathway_burden_score.md) |
-
----
-
-## Utilities
-
-| Report | Description | Explain | Notebook |
-|---|---|---|---|
-| `template` | Blank report template for development and testing | [Guide](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter/modules/report/reports_explain/report_template.md) | [Tutorial](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter_legacy/bf4_420/notebooks/Templates/reports__qry_template.ipynb) |
-
----
-
-## Coverage summary
-
-| Status | Count |
-|---|---|
-| Reports with explain guide + notebook | 20 |
-| Reports with explain guide only | 2 (`variant_list_intersect`, `snp_snp_pair_generator` — covered by pipeline notebook) |
-| Reports with notebook only | 2 (`entity_relationship_model`, `variant_gene_location_model`) |
-| Reports with neither | 1 (`variant_annotation_expanded`) |
-| **Total** | **25** |
-
-
-
-<!-- ===== SOURCE FILE: docs/source/reports.md ===== -->
-
-# Reports
-
-Reports are the main read interface over Biofilter knowledge and ETL provenance.
-
-For the complete index of all available reports with links to explain guides and notebook tutorials, see the **[Report Catalog](report_catalog.md)**.
-
-## Discover and Inspect
-
-List reports:
-
-```bash
-biofilter report list
-biofilter report list --verbose
-```
-
-Explain report:
-
-```bash
-biofilter report explain --report-name etl_status
-```
-
-Show example input:
-
-```bash
-biofilter report example-input --report-name entity_relationship_model
-```
-
-Show output columns:
-
-```bash
-biofilter report available-columns --report-name etl_packages
-```
-
-## Run Reports
-
-Basic run:
-
-```bash
-biofilter report run --report-name etl_status
-```
-
-Export CSV:
-
-```bash
-biofilter report run --report-name etl_packages --output ./etl_packages.csv
-```
-
-Template-driven params:
-
-```bash
-biofilter report run --report-name entity_relationship_model --params-template
-```
-
-## Dynamic Parameter Injection
-
-Inputs:
-
-```bash
-biofilter report run --report-name entity_filter --input BRCA1 --input TP53
-biofilter report run --report-name entity_filter --input-file ./entities.csv --input-column symbol
-```
-
-Options:
-
-```bash
-biofilter report run --report-name entity_relationship_model \
-  --input TP53 --input BRCA1 \
-  --param relationship_scope=input_to_any \
-  --param deduplicate_pairs=true
-```
-
-JSON/YAML params:
-
-```bash
-biofilter report run --report-name entity_relationship_model --params-json '{"relationship_scope":"input_to_any"}'
-biofilter report run --report-name entity_relationship_model --params-file ./params.yaml
-```
-
-Load one param from file:
-
-```bash
-biofilter report run --report-name entity_relationship_model --input TP53 --param relationship_types=@./relationship_types.txt
-```
-
-## Explain Guides
-
-`report explain` prefers markdown guides stored in:
-
-- `biofilter/modules/report/reports_explain/report_<module>.md`
-
-If a guide file is missing, Biofilter falls back to the report class `explain()` method.
-
-This model keeps report documentation maintainable:
-- update the report module when behavior changes
-- update the paired explain markdown for user-facing guidance
-
-## Practical Examples
-
-Repository-level example guides:
-
-- `docs/reports/snp_snp_model.md`
-
-
-
-<!-- ===== SOURCE FILE: docs/source/system_overview.md ===== -->
-
-# System Overview
-
-## What Is Biofilter 4 (BF4)?
-
-Biofilter 4 is a persistent, entity-centric biological knowledge platform.
-
-In practice, BF4 is designed to:
-- ingest biological data sources through ETL
-- normalize and store knowledge in a local or shared database
-- expose this knowledge through CLI, Python API, SQL, and reports
-
-The key idea is persistence: build once, reuse across many analyses.
-
-## High-Level Architecture
-
-BF4 has four practical layers:
-
-1. Knowledge Storage (Database)
-- relational schema for entities, aliases, relationships, and ETL metadata
-
-2. ETL Orchestration
-- `extract -> transform -> load` pipelines per data source
-- package-level tracking and status history
-
-3. Data Access and Report Layer
-- generic report manager
-- dynamic report execution with shared CLI/API contracts
-
-4. User Interfaces
-- CLI (`biofilter ...`)
-- Python API (`bf = Biofilter(...)`)
-- notebooks and SQL workflows
-
-## Deployment Modes
-
-BF4 supports these modes:
-
-- Local managed database (for development, isolated workflows)
-- Shared database (team/centralized operations)
-- Containerized app-only runtime with external database (portable execution)
-- Read-only Parquet bundle via DuckDB (HPC and other environments where no
-  database server is available) — see [Parquet Backend](parquet_backend.md)
-
-All modes use the same CLI/API patterns. The Parquet mode is read-only:
-reports work unchanged, but ETL and migrations require a writable backend.
-
-## ETL Data Lifecycle
-
-For each data source, BF4 follows a staged lifecycle:
-
-1. Extract
-- source files are downloaded to a raw staging area
-
-2. Transform
-- raw files are normalized into curated intermediate outputs (typically parquet)
-
-3. Load
-- curated outputs are loaded into the database
-
-Operationally, this enables:
-- resumable updates
-- selective rollback/restart
-- optional cleanup of raw/processed files after successful loads
-
-## Provenance and Reproducibility
-
-Each ETL step execution is tracked via ETL packages, including:
-- data source identity
-- operation type (`extract`, `transform`, `load`, `rollback`)
-- status and timestamps
-- hash linkage across steps
-- error notes/stats when failures occur
-
-This metadata is used by:
-- `biofilter etl status`
-- `etl_status` and `etl_packages` reports
-
-## Report Explain Guides
-
-Report tutorials/explains are stored as markdown files in:
-
-- `biofilter/modules/report/reports_explain/report_<module>.md`
-
-`biofilter report explain --report-name <name>` prefers these guides. If not found, BF4 falls back to the report class `explain()` method.
-
-For a focused explanation of the entity-centric model and current omics domains, see [Entity Model and Omics Domains](entity_and_omics.md).
+- [Pointing Biofilter at a bundle](../getting_started/reading_a_bundle.md) — practical setup
+- [Building Bundles](building_bundles.md) — where bundles come from
+- [Database Operations](database.md) — `verify`, `export`, `import`
+- [Configuration](configuration.md) — how the bundle path is resolved
 
 
 
@@ -1802,32 +2020,51 @@ If you pass `--input`/`--input-file`, do not also pass input keys through params
 - Check if guide exists at `biofilter/modules/report/reports_explain/report_<module>.md`.
 - If missing, Biofilter will fall back to class `explain()`.
 
-## PostgreSQL-only Reports
+## Bundle Will Not Open
 
-`db_pg_table_stats` and `db_pg_index_stats` require PostgreSQL.
+`No manifest.json in <path>` — the path is not a bundle root. Point at the
+directory that holds `manifest.json`, not at its `tables/` subdirectory.
 
-## Parquet Backend Errors
+`<name> declares manifest_version N; this Biofilter reads [2]` — the bundle
+was written by a newer Biofilter. Update the package; the bundle needs no
+migration.
 
-`No *.parquet files found in <dir>` — the `parquet://` URI must point at the
-bundle's `tables/` directory, not at the bundle root holding `manifest.json`.
+`<name> does not match its manifest` — a declared file is missing or is the
+wrong size, and the message names which. An incomplete copy is the usual
+cause; re-sync the directory and check with:
 
-`parquet:// directory not found: <dir>` — the path does not exist or is not
-readable; check the mount.
+```bash
+biofilter db verify --in ./bundles/<YYYYMMDD>
+```
 
-A write command failing (`etl update`, `db upgrade`) is expected:
-the Parquet backend is read-only. Run those against PostgreSQL or SQLite.
+## A Report Says the Bundle Does Not Carry Something
 
-A missing table or a failing variant report usually means the bundle lacks the
-consolidated parent for a partitioned table — the `_chr_*` files alone are
-skipped by design. See [Parquet Backend](parquet_backend.md).
+`<name> does not carry: <tables>` — the bundle was built without the sources
+that report needs. See what it does have:
 
-## Migration/Upgrade Issues
+```bash
+biofilter --bundle ./bundles/<YYYYMMDD> report run \
+  --report-name platform_data_statistics
+```
 
-Use:
+## A Column Is All Null
+
+Check `result.provenance["coverage"]`. It records which optional tables the
+bundle lacked. A column that is null because the source was never built looks
+exactly like one that is null because the answer is null, and only coverage
+tells them apart.
+
+## A Write Command Fails Against a Bundle
+
+Expected. A bundle is read-only and the read layer has no write path at all.
+Producing new data means building a new bundle — see
+[Building Bundles](technical/building_bundles.md). There are no in-place
+migrations: a schema change produces a new bundle, not an upgraded one.
+
+To check an existing bundle against the schema this build expects:
 
 ```bash
 biofilter db verify --in ./bundles/<YYYYMMDD> --schema
-biofilter db upgrade
 ```
 
 ## ETL Batch Resume
@@ -1836,14 +2073,36 @@ If `etl update-all` was interrupted, run it again. Successful data sources are s
 
 ## Report Output Not Found (Docker)
 
-If you run BF4 in a container and export with `--output`, mount a host volume and write to that mounted path.
-
-Example:
+`--output` writes inside the container. Mount a host directory and write
+to that path, or the file leaves with the container:
 
 ```bash
 docker run --rm \
-  -e DATABASE_URL="postgresql+psycopg2://user:pass@host:5432/db" \
-  -v "$(pwd)/outputs:/workspace/outputs" \
-  biofilter:bf4 \
-  biofilter report run --report-name etl_status --output /workspace/outputs/etl_status.csv
+  -v /shared/bundles/20260914:/bundle:ro \
+  -v "$(pwd)/out:/workspace" \
+  ricoandre/biofilter:latest \
+  report run --report-name platform_etl_status --output /workspace/etl_status.csv
 ```
+
+## Output Files Owned by the Wrong User (Docker)
+
+The image runs as its own user, so files it writes belong to that uid. Add
+`--user "$(id -u):$(id -g)"` to get your own. Under Apptainer this does not
+arise — the container runs as the invoking user.
+
+## Warning: Bundle Built by a Different Biofilter
+
+```
+UserWarning: <bundle> was built by Biofilter 4.2.0; this is 4.3.0.
+```
+
+The bundle opens and most reports behave. The warning exists because a
+column that changed meaning between releases will not announce itself.
+Check the bundle against this install:
+
+```bash
+biofilter db verify --in /path/to/bundle --schema
+```
+
+Every result records this under `provenance["version_mismatch"]`, so a
+result produced across a version boundary can be recognised later.

@@ -8,24 +8,67 @@ from pathlib import Path
 from zipfile import ZIP_DEFLATED, ZipFile
 
 
-# User-facing assistant: knowledge base is docs + operational guides +
-# per-report explain docs + runnable notebook examples. No Python source code.
-# Keep this list in sync with assistant_context_manifest.yaml.
-def _default_sources() -> list[dict]:
-    return [
-        {"id": "docs", "path": "docs/source", "ext": {".md"}},
-        {"id": "agents", "path": "biofilter_agents", "ext": {".md"}},
-        {
-            "id": "reports_explain",
-            "path": "biofilter/modules/report/reports_explain",
-            "ext": {".md"},
-        },
-        {"id": "notebooks", "path": "notebooks/templates", "ext": {".ipynb", ".md"}},
-    ]
+MANIFEST_PATH = "assistent/assistant_context_manifest.yaml"
+
+#: Only used when the manifest cannot be read. Deliberately minimal: a
+#: fallback that tries to guess the curated selection would drift from it
+#: silently, which is the failure this whole function exists to remove.
+_FALLBACK_SOURCES = [
+    {"id": "docs", "path": "docs/source", "include": ["*.md", "getting_started/**/*.md"]},
+    {"id": "agents", "path": "biofilter_agents", "include": ["ag_start.md", "ag_report_en.md"]},
+    {
+        "id": "reports_explain",
+        "path": "biofilter/modules/report/reports_explain",
+        "include": ["**/*.md"],
+    },
+    {"id": "notebooks", "path": "notebooks", "include": ["templates/*.ipynb"]},
+]
+
+
+def _load_manifest_sources(repo_root: Path) -> tuple[list[dict], list[str]]:
+    """
+    Read the source selection from the manifest.
+
+    The manifest is the single source of truth for what the assistant knows.
+    This script used to carry its own copy of the list with a comment asking
+    whoever edited one to remember the other — and the two had already
+    diverged: the manifest excluded `technical/schema.md` and the maintainer
+    guides, this did not, so the GPT Builder bundle and the vector store were
+    two different knowledge bases.
+    """
+    manifest_file = repo_root / MANIFEST_PATH
+    try:
+        import yaml  # type: ignore
+
+        manifest = yaml.safe_load(manifest_file.read_text(encoding="utf-8")) or {}
+    except Exception as exc:  # noqa: BLE001 — missing PyYAML or a bad file
+        print(
+            f"warning: could not read {MANIFEST_PATH} ({exc}); "
+            f"falling back to a minimal built-in selection. "
+            f"Install PyYAML for the curated one."
+        )
+        return _FALLBACK_SOURCES, []
+
+    sources = []
+    for item in manifest.get("source_priority", []):
+        path = item.get("path")
+        if not path:
+            continue
+        sources.append(
+            {
+                "id": item.get("id", path),
+                "path": path,
+                "include": item.get("include_globs") or ["**/*"],
+                "exclude": item.get("exclude_globs") or [],
+            }
+        )
+    return sources, list(manifest.get("global_exclusions", []))
 
 
 def _collect_files(repo_root: Path) -> list[Path]:
-    exclusions = [
+    sources, global_exclusions = _load_manifest_sources(repo_root)
+
+    exclusions = global_exclusions + [
         "**/.git/**",
         "**/.venv/**",
         "**/__pycache__/**",
@@ -33,42 +76,43 @@ def _collect_files(repo_root: Path) -> list[Path]:
         "**/*.py",  # user-facing assistant: never bundle source code
         "**/docs/build/**",
         "**/AGENTS.md",
-        "**/reports_bkp/**",
         "**/.ipynb_checkpoints/**",
         "**/.DS_Store",
-        # Developer-only material excluded from the end-user knowledge base.
-        # NOTE: fnmatch treats "*" as matching "/" too, so a "**/name.md"
-        # pattern requires at least one leading path segment. All targets
-        # below live under a parent dir, so this matches them correctly.
-        "**/developer_extensions.md",
-        "**/schema.md",
-        "**/biobin_technical_reference.md",
-        "**/report_template.md",
     ]
 
     files: list[Path] = []
     seen: set[Path] = set()
-    for src in _default_sources():
+    for src in sources:
         base = repo_root / src["path"]
         if not base.exists():
+            print(f"warning: source '{src['id']}' path does not exist: {src['path']}")
             continue
-        for p in base.rglob("*"):
-            if not p.is_file():
-                continue
-            if p.suffix.lower() not in src["ext"]:
-                continue
-            rel = p.resolve().relative_to(repo_root.resolve()).as_posix()
-            if any(fnmatch.fnmatch(rel, pat) for pat in exclusions):
-                continue
-            if p in seen:
-                continue
-            seen.add(p)
-            files.append(p)
 
-    # Include FAQ seed as a compact high-signal support source.
-    faq = repo_root / "assistent/assistant_faq_seed.md"
-    if faq.exists() and faq not in seen:
-        files.append(faq)
+        matched = 0
+        for pattern in src["include"]:
+            for p in sorted(base.glob(pattern)):
+                if not p.is_file():
+                    continue
+                rel = p.resolve().relative_to(repo_root.resolve()).as_posix()
+                rel_to_base = p.resolve().relative_to(base.resolve()).as_posix()
+                if any(
+                    fnmatch.fnmatch(rel, pat) or fnmatch.fnmatch(rel_to_base, pat)
+                    for pat in src.get("exclude", [])
+                ):
+                    continue
+                if any(fnmatch.fnmatch(rel, pat) for pat in exclusions):
+                    continue
+                if p in seen:
+                    continue
+                seen.add(p)
+                files.append(p)
+                matched += 1
+
+        # A source that contributes nothing is almost always a path that
+        # moved, and it fails silently otherwise — which is how the LPC
+        # quickstart left the knowledge base once already.
+        if matched == 0:
+            print(f"warning: source '{src['id']}' matched no files under {src['path']}")
 
     return sorted(files)
 

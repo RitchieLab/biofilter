@@ -1,75 +1,90 @@
 # BF4 Assistant Kit
 
-A ready-to-use knowledge and instruction kit for a **ChatGPT (GPT Builder)**
-assistant focused on Biofilter 4 (BF4).
+Knowledge and instruction kit for a ChatGPT assistant that helps people use
+Biofilter 4.
 
 ## Audience
 
-This assistant is for **end users** — researchers and analysts who use BF4 to:
+The assistant serves **someone who was given a bundle and wants an answer out
+of it**: a gene list annotated, variants filtered, a cohort matched. That is
+the whole job.
 
-1. **run reports** and get results (CSV),
-2. **update the database** (ETL),
-3. **install / create a new database** — either by pointing at a shared
-   **Parquet bundle** (`parquet://`, read-only, no server) or by building their
-   own PostgreSQL/SQLite database with migrations + ETL.
+Building a bundle and running the ETL are **out of scope** by design. Both are
+maintainer tasks — a full build needs about 150 GB of working space and two
+days — and an assistant that walks a scientist through a two-day pipeline they
+did not ask for has failed, however accurate the steps. The correct behaviour
+there is to name the guide, state the cost, and defer.
 
-It is **not** a developer assistant. The knowledge base intentionally excludes
-Python source code; grounding comes from user docs, operational guides,
-per-report explain docs, and runnable notebook examples.
+Source code is excluded for a related reason: the audience is not developers.
 
 ## Folder contents
 
-- `assistant_system_prompt.md` — system prompt (assistant behavior + personas).
-- `assistant_response_contract.md` — output style and answer-quality rules.
-- `assistant_context_manifest.yaml` — source selection and retrieval policy.
-- `assistant_faq_seed.md` — curated, high-signal support Q&A.
-- `assistant_eval_set.md` — acceptance prompts to validate quality before release.
-- `sync_to_openai_vector_store.py` — upload manifest-selected files to an
-  OpenAI vector store (File Search).
-- `OPENAI_SYNC.md` — how to run the sync script.
-- `gpt_builder/` — GPT Builder setup:
-  - `build_gpt_builder_bundle.py` — generate a knowledge bundle zip + manifest.
-  - `GPT_BUILDER_INSTRUCTIONS.md` — step-by-step ChatGPT GPT Builder setup.
-  - `gpt_builder_knowledge_bundle.zip` / `gpt_builder_knowledge_manifest.json` —
-    generated artifacts (do not edit by hand; regenerate with the script).
+| File | What it is |
+|---|---|
+| `assistant_system_prompt.md` | the assistant's instructions |
+| `assistant_response_contract.md` | answer-quality policy, layered on top |
+| `assistant_context_manifest.yaml` | **the single source of truth** for what goes into the knowledge base |
+| `assistant_faq_seed.md` | curated, high-signal answers |
+| `assistant_eval_set.md` | acceptance prompts — run before publishing |
+| `sync_to_openai_vector_store.py` | upload to an OpenAI vector store (File Search) |
+| `OPENAI_SYNC.md` | how to run that script |
+| `gpt_builder/` | GPT Builder path: bundle script, instructions, generated artifacts |
+
+Both delivery paths — the vector store and the GPT Builder bundle — read
+`assistant_context_manifest.yaml`. Change the selection there and nowhere
+else.
 
 ## What goes into the knowledge base
 
-Selected by `assistant_context_manifest.yaml` (and mirrored by the GPT Builder
-bundle script), **highest to lowest priority**:
+Selected by the manifest, highest to lowest priority:
 
-1. `docs/source/` — official user docs (dev-only pages excluded).
-2. `biofilter_agents/` — operational task guides.
-3. `biofilter/modules/report/reports_explain/` — per-report usage docs.
-4. `notebooks/Templates/` — runnable examples (incl. the LPC quickstart).
-5. `assistant_faq_seed.md` — curated support answers.
+1. `docs/source/` — the user-facing pages. Most of `technical/` is excluded;
+   the exceptions are the pages the assistant needs in order to *defer*
+   accurately rather than vaguely.
+2. `biofilter_agents/ag_start.md`, `ag_report_en.md` — the two operational
+   guides written for bundle readers. `ag_db_en.md` and `ag_etl_en.md` are
+   maintainer material and stay out.
+3. `biofilter/modules/report/reports_explain/` — per-report truth: parameters,
+   accepted inputs, output columns. Prefer these over anything else when they
+   disagree about a specific report.
+4. `notebooks/templates/*.ipynb` and `notebooks/lpc__quickstart.md` — runnable
+   examples.
+5. `assistant_faq_seed.md` — curated answers.
 
-Python source files (`**/*.py`) are excluded on purpose.
-
-## Recommended usage
-
-1. Review sources in `assistant_context_manifest.yaml`.
-2. Use `assistant_system_prompt.md` as the assistant's system instructions.
-3. Append `assistant_response_contract.md` as additional behavior constraints.
-4. Load the knowledge files (via GPT Builder bundle or the OpenAI sync script).
-5. Run `assistant_eval_set.md` as acceptance checks before publishing.
+Excluded everywhere: `**/*.py`, and `biofilter_legacy/**` — the 4.2.x snapshot
+is correct for its own release and wrong for this one, which makes it the
+likeliest source of a confidently outdated answer.
 
 ## Update workflow
 
-When BF4 changes (new report, new data source, CLI flag change, DB backend
-change such as `parquet://`, or docs updates):
-
-1. Update the underlying docs first (`docs/source`, `biofilter_agents`,
-   `reports_explain`).
-2. Refresh `assistant_faq_seed.md` and `assistant_eval_set.md` if behavior
+1. **Fix the underlying docs first.** The manifest points at them; most
+   staleness is fixed there, not here.
+2. Refresh `assistant_faq_seed.md` and `assistant_eval_set.md` if behaviour
    changed.
-3. Regenerate the knowledge base:
+3. Regenerate:
    - GPT Builder: `python assistent/gpt_builder/build_gpt_builder_bundle.py`
-   - OpenAI vector store: see `OPENAI_SYNC.md`
-4. Re-run the eval prompts and compare results.
+   - Vector store: see `OPENAI_SYNC.md`
+4. **Run `assistant_eval_set.md` and compare answers before publishing.**
 
-## Scope
+Step 4 is the one that catches regressions. The eval set is written against
+the current CLI and names the failure modes this assistant has actually
+produced — recommending a report that no longer exists, presenting
+`parquet://` as the way to point at data, inventing migrations.
 
-This kit is deliberately practical and user-facing. It does not answer
-implementation/source-code questions — those defer to the maintainer or the
-project repository.
+## A note on renamed reports
+
+Several reports were renamed in 4.3.0, and the explain guides say so — for
+example `report_resolve_entity.md` opens with *"Called `entity_filter` before
+4.3.0"*. Those redirects are deliberate: someone following an older note has
+to land somewhere.
+
+They are also a retrieval hazard. A chunk containing the old name can be
+retrieved without the sentence that retires it, so the instructions carry an
+explicit rule — verify any report name against `biofilter report list` before
+recommending it — and the eval set lists the dead names as failure signals.
+Do not remove the redirects; keep the guardrail.
+
+## Scope boundary
+
+This kit does not answer implementation questions. Those defer to the
+maintainer or the repository.
