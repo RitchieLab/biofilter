@@ -143,9 +143,12 @@ biofilter --bundle /path/to/bundle report list
 ```
 
 ```python
+from biofilter import Biofilter
+
 bf = Biofilter(bundle="/path/to/bundle")
-bf.db.connect()
-print(bf.db.bundle_id())
+result = bf.report.run("platform_data_statistics")
+
+print(result.provenance["bundle_id"])
 ```
 
 ## One number worth keeping in mind

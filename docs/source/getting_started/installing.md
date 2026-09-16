@@ -28,37 +28,72 @@ python -c "from biofilter import Biofilter; print('OK')"
 
 ## Docker
 
-Build the application-only image:
+One image, published to two registries. Pull it rather than building:
 
 ```bash
-docker build -t biofilter:bf4 -f docker/Dockerfile "https://github.com/RitchieLab/biofilter.git#biofilter3r"
+docker pull ricoandre/biofilter:latest
 ```
 
-Mount the bundle and point at it. The container needs read access to the
-bundle directory and somewhere to write results:
+The image carries no data. It expects two mounts:
 
-```bash
-docker run --rm -it \
-  -v /shared/bundles/bf4_20260912:/bundle:ro \
-  -v "$(pwd):/workspace" \
-  -e BIOFILTER_BUNDLE="/bundle" \
-  --entrypoint /bin/bash \
-  biofilter:bf4
-```
+| Mount | Mode | Holds |
+|---|---|---|
+| `/bundle` | read-only | the bundle directory, the one with `manifest.json` |
+| `/workspace` | writable | where `--output` writes |
 
-To run one report and keep the output:
+`BIOFILTER_BUNDLE` already defaults to `/bundle` inside the image, so a
+normal run names no paths beyond the mounts:
 
 ```bash
 docker run --rm \
-  -v /shared/bundles/bf4_20260912:/bundle:ro \
-  -v "$(pwd)/outputs:/workspace/outputs" \
-  -e BIOFILTER_BUNDLE="/bundle" \
-  biofilter:bf4 \
-  biofilter report run --report-name etl_status --output /workspace/outputs/etl_status.csv
+  -v /shared/bundles/20260914:/bundle:ro \
+  -v "$(pwd)/out:/workspace" \
+  --user "$(id -u):$(id -g)" \
+  ricoandre/biofilter:latest \
+  report run --report-name annotate_gene --input TP53 --output /workspace/genes.csv
 ```
 
-The bundle is mounted read-only because nothing writes to it — refreshing
-data means a newer bundle, not an update to this one.
+Three things worth knowing:
+
+- **Mount the bundle root**, not its `tables/` subdirectory.
+- **`--output` writes inside the container.** Point it at the mounted
+  `/workspace` or the file leaves with the container.
+- **`--user "$(id -u):$(id -g)"`** makes the output yours. Without it the
+  files belong to the image's own user.
+
+An interactive shell:
+
+```bash
+docker run --rm -it \
+  -v /shared/bundles/20260914:/bundle:ro \
+  -v "$(pwd):/workspace" \
+  --entrypoint /bin/bash \
+  ricoandre/biofilter:latest
+```
+
+To build it yourself from a checkout:
+
+```bash
+docker build -t biofilter:latest -f docker/Dockerfile .
+```
+
+### On a cluster (Apptainer/Singularity)
+
+The same image. `--bind` replaces `-v`, and output ownership takes care of
+itself because the container runs as you:
+
+```bash
+apptainer pull bf4.sif docker://ghcr.io/ritchielab/biofilter-hpc:latest
+
+apptainer run \
+  --bind /shared/bundles/20260914:/bundle:ro \
+  --bind ~/bf4_output:/workspace \
+  bf4.sif \
+  report run --report-name annotate_gene --input APOE --output /workspace/apoe.csv
+```
+
+The GHCR name `biofilter-hpc` predates the merge of what used to be two
+images; it is the same image as Docker Hub's.
 
 ## From source
 

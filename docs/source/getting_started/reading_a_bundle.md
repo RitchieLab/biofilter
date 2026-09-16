@@ -25,7 +25,7 @@ billion rows across 114 files. You can keep it on a laptop, a shared
 drive, or an HPC filesystem — anywhere you can read a folder.
 
 If someone has given you one, this page is the whole setup. If you need
-to build one yourself, see [Building Bundles](../building_bundles.md) —
+to build one yourself, see [Building Bundles](../technical/building_bundles.md) —
 borrow one first if you can.
 
 ## Point at it
@@ -43,28 +43,24 @@ If you use the same bundle every day, set it once:
 export BIOFILTER_BUNDLE="/shared/bundles/bf4_20260912"
 
 biofilter report list
-biofilter report run --report-name etl_status
+biofilter report run --report-name platform_data_statistics
 ```
 
 Or in `.biofilter.toml`:
 
 ```toml
 [database]
-db_uri = "parquet:///shared/bundles/bf4_20260912"
+bundle = "/shared/bundles/bf4_20260912"
 ```
 
-Relative paths work; Biofilter resolves them.
+A relative path there is resolved against the file itself, not your
+working directory, so it means the same thing from the project root and
+from a notebook two levels down.
 
-### The older form
-
-`--db-uri "parquet:///shared/bundles/bf4_20260912"` does the same thing.
-The `parquet://` scheme dates from when Biofilter spoke to several
-database backends and you had to say which one. With bundles it carries
-no information, so `--bundle` is the plainer way to say it. `--db-uri`
-remains for the cases that really are a database: a staging SQLite during
-a build, or an existing PostgreSQL.
-
-Passing both is an error rather than a guess about which you meant.
+`--db-uri` exists for the cases that really are a database — a staging
+SQLite during a build, or a development PostgreSQL. Reading a bundle is
+not one of them. Passing both is an error rather than a guess about which
+you meant.
 
 ## Check it worked
 
@@ -81,8 +77,9 @@ Tables:         114
   variant     73 table(s)   3,130,016,386 rows   21,226.3 MB
 ```
 
-Reports work unchanged — the same code runs over parquet as over a
-database, with DuckDB underneath.
+Biofilter opens the folder, reads `manifest.json` to learn which files
+make up each table, and queries them with DuckDB in the same process.
+There is no server to start and nothing to import.
 
 ## The one thing to watch
 
@@ -97,12 +94,14 @@ So pin the bundle, not the id. Every report result carries the bundle it
 came from:
 
 ```python
-df = bf.report.run("annotate_gene", input_data=["APOE"])
-df.attrs["bundle_id"]     # 'e29a11604a326d2e'
+result = bf.report.run("annotate_gene", input_data=["APOE"])
+result.provenance["bundle_id"]     # 'e29a11604a326d2e'
 ```
 
-Note that this does not survive a CSV export. If you are writing ids to a
-file that will be read back later, write the bundle id beside them.
+Saving a result keeps that record: `result.write("genes.csv")` also
+writes `genes.csv.provenance.json` beside it. Writing `.parquet` instead
+stores the provenance inside the file's own metadata, so it travels even
+if the sidecar is lost.
 
 ## If something is wrong with the bundle
 

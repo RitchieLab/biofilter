@@ -13,16 +13,18 @@ queries and you do not need to know how the data is laid out.
 
 ```bash
 biofilter --bundle /shared/bundles/bf4_20260912 \
-  report run --report-name entity_filter --input APOE,TP53
+  report run --report-name resolve_entity --input APOE --input TP53
 ```
 
-Every report takes the same shape: a name, an input, optional parameters,
-and a table out — to your screen, or to a CSV, or straight into a
-DataFrame if you are working in Python.
+Repeat `--input` for each value — it is not a comma-separated list.
 
-BF4 ships around thirty of them: looking entities up, summarising what is
-connected to what, annotating variants, and checking what data the bundle
-actually holds. Three ways to find the one you want.
+Every report takes the same shape: a name, an input, optional parameters,
+and a table out — to your screen, to a file, or straight into pandas if
+you are working in Python.
+
+Biofilter ships 16 of them: resolving names, annotating what you have,
+expanding it to what is connected, and checking what the bundle actually
+holds. Three ways to find the one you want.
 
 ## 1. Browse the catalog
 
@@ -57,7 +59,7 @@ biofilter report list
 And for any one of them:
 
 ```bash
-biofilter report explain --report-name entity_filter
+biofilter report explain --report-name resolve_entity
 ```
 
 That prints the full guide in your terminal — what it expects, what it
@@ -65,41 +67,38 @@ returns, and how to call it.
 
 ## Good places to start
 
-Most reports fall into three kinds of work.
-
-**Filtering** — narrowing a list down to what the data recognises or
-supports.
+**Start from names you have** — genes, variants, diseases, proteins.
 
 | Report | Use it when |
 | ------ | ----------- |
-| `entity_filter` | You have a list of names and want to know which ones BF4 recognises |
-| `gene_to_variant_filtering` | You have genes and want the variants inside them |
-| `variant_list_intersect` | You have two variant lists and want what they share |
+| `resolve_entity` | You have a list of names and want to know which ones Biofilter recognises |
+| `annotate_gene` | You want everything known about a set of genes |
+| `annotate_variant` | You have rsIDs or positions and want the full annotation |
 
-**Annotation** — attaching what is known to something you already have.
-
-| Report | Use it when |
-| ------ | ----------- |
-| `annotate_gene` | You want to browse the gene catalog |
-| `variant_single_gene_annotation` | You have variants and want their effect on one gene |
-| `entity_neighborhood_summary` | You have one entity and want everything connected to it |
-
-**Modeling** — building the sets and pairs an analysis consumes.
+**Expand to what is connected.**
 
 | Report | Use it when |
 | ------ | ----------- |
-| `variant_binning` | You want variants grouped into bins for burden testing |
-| `snp_snp_pair_generator` | You need SNP pairs for an interaction scan |
-| `entity_relationship_model` | You want the relationship graph around a set of entities |
+| `expand_gene_to_variant` | You have genes and want the variants in them, filtered by predicted damage |
+| `expand_entity_neighborhood` | You have entities and want everything one hop away |
+| `expand_variant_regulatory` | You want to know which genes a variant regulates, and in which tissue |
+
+**Work with a cohort or a set.**
+
+| Report | Use it when |
+| ------ | ----------- |
+| `aggregate_cohort_variants` | You have a cohort's variants and want them matched and binned |
+| `pair_variants` | You need candidate variant pairs whose genes share biology |
 
 And one worth running once on any bundle you have just been handed:
 
 | Report | Use it when |
 | ------ | ----------- |
-| `etl_status` | You want to see which data sources went into this bundle, and when |
+| `platform_data_statistics` | You want to know what is actually in this bundle |
 
-It answers "what is actually in here?" — which version of each source,
-and whether it loaded.
+It reports entity counts by domain, variant counts by chromosome, and what
+each data source contributed — which is what decides whether your question
+is answerable at all before you spend time on it.
 
 ## Next step
 

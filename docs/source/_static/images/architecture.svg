@@ -1,0 +1,199 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 720" width="1200" height="720" role="img" aria-label="Biofilter 4.3 architecture: a plan selects sources, two branches run, the build assembles an immutable parquet bundle, and the read side opens that bundle with DuckDB to run reports.">
+  <title>Biofilter 4.3 — build side, bundle, read side</title>
+
+  <rect x="0" y="0" width="1200" height="720" fill="#ffffff"/>
+
+  <!-- ============ BUILD ============ -->
+  <text x="20" y="34" font-family="Archivo, 'Segoe UI', Arial, sans-serif" font-size="17" font-weight="700" letter-spacing="1.8" fill="#9a4a28">BUILD</text>
+  <text x="96" y="34" font-family="'IBM Plex Mono', Consolas, monospace" font-size="11" fill="#5e7276">runs a few times a year — the only code that writes anything</text>
+
+  <!-- C1 plan -->
+  <rect x="20" y="76" width="196" height="272" rx="2" fill="#f8efe9" stroke="#9a4a28"/>
+  <text x="36" y="99" font-family="Archivo, 'Segoe UI', Arial, sans-serif" font-size="12" font-weight="700" letter-spacing="1" fill="#9a4a28">① PLAN</text>
+  <text x="36" y="119" font-family="'IBM Plex Mono', Consolas, monospace" font-size="11" fill="#16272b">bundle_plan.json</text>
+  <text x="36" y="142" font-family="'IBM Plex Mono', Consolas, monospace" font-size="10" fill="#5e7276">Every data source with</text>
+  <text x="36" y="156" font-family="'IBM Plex Mono', Consolas, monospace" font-size="10" fill="#5e7276">an include flag, its</text>
+  <text x="36" y="170" font-family="'IBM Plex Mono', Consolas, monospace" font-size="10" fill="#5e7276">DTP and its version.</text>
+  <text x="36" y="196" font-family="'IBM Plex Mono', Consolas, monospace" font-size="10" fill="#5e7276">List order is the</text>
+  <text x="36" y="210" font-family="'IBM Plex Mono', Consolas, monospace" font-size="10" fill="#5e7276">dependency order: the</text>
+  <text x="36" y="224" font-family="'IBM Plex Mono', Consolas, monospace" font-size="10" fill="#5e7276">core branch resolves</text>
+  <text x="36" y="238" font-family="'IBM Plex Mono', Consolas, monospace" font-size="10" fill="#5e7276">entities against what</text>
+  <text x="36" y="252" font-family="'IBM Plex Mono', Consolas, monospace" font-size="10" fill="#5e7276">ran before it.</text>
+  <text x="36" y="278" font-family="'IBM Plex Mono', Consolas, monospace" font-size="10" fill="#5e7276">Authoritative for one</text>
+  <text x="36" y="292" font-family="'IBM Plex Mono', Consolas, monospace" font-size="10" fill="#5e7276">build, and archived</text>
+  <text x="36" y="306" font-family="'IBM Plex Mono', Consolas, monospace" font-size="10" fill="#5e7276">inside the bundle it</text>
+  <text x="36" y="320" font-family="'IBM Plex Mono', Consolas, monospace" font-size="10" fill="#5e7276">produced.</text>
+
+  <!-- C2 sources -->
+  <rect x="262" y="76" width="196" height="96" rx="2" fill="#ffffff" stroke="#cfd9d7"/>
+  <text x="278" y="99" font-family="Archivo, 'Segoe UI', Arial, sans-serif" font-size="11" font-weight="700" letter-spacing="1" fill="#16272b">17 CORE SOURCES</text>
+  <text x="278" y="120" font-family="'IBM Plex Mono', Consolas, monospace" font-size="10" fill="#16272b">HGNC · NCBI · Ensembl</text>
+  <text x="278" y="134" font-family="'IBM Plex Mono', Consolas, monospace" font-size="10" fill="#16272b">UniProt · Reactome · KEGG</text>
+  <text x="278" y="148" font-family="'IBM Plex Mono', Consolas, monospace" font-size="10" fill="#16272b">GO · Pfam · MONDO · ChEBI</text>
+  <text x="278" y="162" font-family="'IBM Plex Mono', Consolas, monospace" font-size="10" fill="#16272b">BioGRID · ClinGen · GWAS</text>
+
+  <rect x="262" y="252" width="196" height="96" rx="2" fill="#ffffff" stroke="#cfd9d7"/>
+  <text x="278" y="275" font-family="Archivo, 'Segoe UI', Arial, sans-serif" font-size="11" font-weight="700" letter-spacing="1" fill="#16272b">4 VARIANT SOURCES</text>
+  <text x="278" y="296" font-family="'IBM Plex Mono', Consolas, monospace" font-size="10" fill="#16272b">gnomAD joint · gnomAD VEP</text>
+  <text x="278" y="310" font-family="'IBM Plex Mono', Consolas, monospace" font-size="10" fill="#16272b">AlphaMissense · GTEx eQTL</text>
+  <text x="278" y="331" font-family="'IBM Plex Mono', Consolas, monospace" font-size="10" fill="#5e7276">one data source per chr</text>
+
+  <!-- C3 branches -->
+  <rect x="504" y="76" width="196" height="96" rx="2" fill="#f8efe9" stroke="#9a4a28"/>
+  <text x="520" y="99" font-family="Archivo, 'Segoe UI', Arial, sans-serif" font-size="11" font-weight="700" letter-spacing="1" fill="#9a4a28">② CORE BRANCH</text>
+  <text x="520" y="120" font-family="'IBM Plex Mono', Consolas, monospace" font-size="10" fill="#16272b">extract → transform → load</text>
+  <text x="520" y="141" font-family="'IBM Plex Mono', Consolas, monospace" font-size="10" fill="#5e7276">writes through the ORM</text>
+  <text x="520" y="155" font-family="'IBM Plex Mono', Consolas, monospace" font-size="10" fill="#5e7276">models; needs transactions</text>
+
+  <rect x="504" y="252" width="196" height="96" rx="2" fill="#f8efe9" stroke="#9a4a28"/>
+  <text x="520" y="275" font-family="Archivo, 'Segoe UI', Arial, sans-serif" font-size="11" font-weight="700" letter-spacing="1" fill="#9a4a28">② VARIANT BRANCH</text>
+  <text x="520" y="296" font-family="'IBM Plex Mono', Consolas, monospace" font-size="10" fill="#16272b">extract → transform</text>
+  <text x="520" y="317" font-family="'IBM Plex Mono', Consolas, monospace" font-size="10" fill="#5e7276">no load step; nothing to</text>
+  <text x="520" y="331" font-family="'IBM Plex Mono', Consolas, monospace" font-size="10" fill="#5e7276">resolve, so natural keys</text>
+
+  <!-- C4 destinations -->
+  <rect x="746" y="76" width="196" height="96" rx="2" fill="#eef2f1" stroke="#cfd9d7"/>
+  <text x="762" y="99" font-family="Archivo, 'Segoe UI', Arial, sans-serif" font-size="11" font-weight="700" letter-spacing="1" fill="#16272b">STAGING SQLITE</text>
+  <text x="762" y="120" font-family="'IBM Plex Mono', Consolas, monospace" font-size="10" fill="#5e7276">throwaway; deleted once</text>
+  <text x="762" y="134" font-family="'IBM Plex Mono', Consolas, monospace" font-size="10" fill="#5e7276">the bundle is assembled</text>
+  <text x="762" y="155" font-family="'IBM Plex Mono', Consolas, monospace" font-size="10" fill="#16272b">holds the ETL ledger for</text>
+  <text x="762" y="167" font-family="'IBM Plex Mono', Consolas, monospace" font-size="10" fill="#16272b">both branches → resume</text>
+
+  <rect x="746" y="252" width="196" height="96" rx="2" fill="#ffffff" stroke="#cfd9d7"/>
+  <text x="762" y="275" font-family="Archivo, 'Segoe UI', Arial, sans-serif" font-size="11" font-weight="700" letter-spacing="1" fill="#16272b">PARQUET, DIRECTLY</text>
+  <text x="762" y="296" font-family="'IBM Plex Mono', Consolas, monospace" font-size="10" fill="#16272b">processed/…/*.parquet</text>
+  <text x="762" y="317" font-family="'IBM Plex Mono', Consolas, monospace" font-size="10" fill="#5e7276">one file per chromosome,</text>
+  <text x="762" y="331" font-family="'IBM Plex Mono', Consolas, monospace" font-size="10" fill="#5e7276">already the final format</text>
+
+  <!-- C5 assemble -->
+  <rect x="988" y="76" width="196" height="272" rx="2" fill="#f8efe9" stroke="#9a4a28"/>
+  <text x="1004" y="99" font-family="Archivo, 'Segoe UI', Arial, sans-serif" font-size="12" font-weight="700" letter-spacing="1" fill="#9a4a28">③ ASSEMBLE</text>
+  <text x="1004" y="119" font-family="'IBM Plex Mono', Consolas, monospace" font-size="11" fill="#16272b">all or nothing</text>
+  <text x="1004" y="142" font-family="'IBM Plex Mono', Consolas, monospace" font-size="10" fill="#5e7276">Core tables dumped from</text>
+  <text x="1004" y="156" font-family="'IBM Plex Mono', Consolas, monospace" font-size="10" fill="#5e7276">SQLite to parquet.</text>
+  <text x="1004" y="170" font-family="'IBM Plex Mono', Consolas, monospace" font-size="10" fill="#5e7276">Variant files moved in.</text>
+  <text x="1004" y="196" font-family="'IBM Plex Mono', Consolas, monospace" font-size="10" fill="#5e7276">Every planned source must</text>
+  <text x="1004" y="210" font-family="'IBM Plex Mono', Consolas, monospace" font-size="10" fill="#5e7276">have produced a table, or</text>
+  <text x="1004" y="224" font-family="'IBM Plex Mono', Consolas, monospace" font-size="10" fill="#5e7276">nothing is published.</text>
+  <text x="1004" y="250" font-family="'IBM Plex Mono', Consolas, monospace" font-size="10" fill="#5e7276">A bundle missing a table</text>
+  <text x="1004" y="264" font-family="'IBM Plex Mono', Consolas, monospace" font-size="10" fill="#5e7276">looks exactly like a</text>
+  <text x="1004" y="278" font-family="'IBM Plex Mono', Consolas, monospace" font-size="10" fill="#5e7276">complete one to whoever</text>
+  <text x="1004" y="292" font-family="'IBM Plex Mono', Consolas, monospace" font-size="10" fill="#5e7276">reads it next.</text>
+
+  <!-- build arrows -->
+  <g stroke="#5e7276" stroke-width="1.2" fill="none">
+    <path d="M222,124 H250"/><path d="M222,300 H250"/>
+  </g>
+  <polygon points="250,119.5 258,124 250,128.5" fill="#5e7276"/>
+  <polygon points="250,295.5 258,300 250,304.5" fill="#5e7276"/>
+  <text x="239" y="115" text-anchor="middle" font-family="'IBM Plex Mono', Consolas, monospace" font-size="9" fill="#5e7276">selects</text>
+  <text x="239" y="291" text-anchor="middle" font-family="'IBM Plex Mono', Consolas, monospace" font-size="9" fill="#5e7276">selects</text>
+
+  <g stroke="#5e7276" stroke-width="1.2" fill="none">
+    <path d="M464,124 H492"/><path d="M464,300 H492"/>
+  </g>
+  <polygon points="492,119.5 500,124 492,128.5" fill="#5e7276"/>
+  <polygon points="492,295.5 500,300 492,304.5" fill="#5e7276"/>
+  <text x="481" y="115" text-anchor="middle" font-family="'IBM Plex Mono', Consolas, monospace" font-size="9" fill="#5e7276">download</text>
+  <text x="481" y="291" text-anchor="middle" font-family="'IBM Plex Mono', Consolas, monospace" font-size="9" fill="#5e7276">download</text>
+
+  <g stroke="#9a4a28" stroke-width="1.2" fill="none">
+    <path d="M706,124 H734"/><path d="M706,300 H734"/>
+  </g>
+  <polygon points="734,119.5 742,124 734,128.5" fill="#9a4a28"/>
+  <polygon points="734,295.5 742,300 734,304.5" fill="#9a4a28"/>
+  <text x="720" y="115" text-anchor="middle" font-family="'IBM Plex Mono', Consolas, monospace" font-size="9.5" fill="#5e7276">rows</text>
+  <text x="720" y="291" text-anchor="middle" font-family="'IBM Plex Mono', Consolas, monospace" font-size="9.5" fill="#5e7276">files</text>
+
+  <path d="M700,268 H722 V152 H734" stroke="#5e7276" stroke-width="1.2" fill="none" stroke-dasharray="4 3"/>
+  <polygon points="734,147.5 742,152 734,156.5" fill="#5e7276"/>
+  <text x="730" y="206" font-family="'IBM Plex Mono', Consolas, monospace" font-size="9.5" fill="#5e7276">ledger</text>
+  <text x="730" y="218" font-family="'IBM Plex Mono', Consolas, monospace" font-size="9.5" fill="#5e7276">only</text>
+
+  <g stroke="#9a4a28" stroke-width="1.2" fill="none">
+    <path d="M948,124 H976"/><path d="M948,300 H976"/>
+  </g>
+  <polygon points="976,119.5 984,124 976,128.5" fill="#9a4a28"/>
+  <polygon points="976,295.5 984,300 976,304.5" fill="#9a4a28"/>
+
+  <path d="M1086,354 V378" stroke="#9a4a28" stroke-width="1.2" fill="none"/>
+  <polygon points="1081.5,378 1086,386 1090.5,378" fill="#9a4a28"/>
+  <text x="1096" y="372" font-family="'IBM Plex Mono', Consolas, monospace" font-size="9.5" fill="#5e7276">publish</text>
+
+  <!-- ============ THE BUNDLE ============ -->
+  <rect x="20" y="392" width="1164" height="124" rx="2" fill="#16272b"/>
+  <text x="44" y="422" font-family="Archivo, 'Segoe UI', Arial, sans-serif" font-size="14" font-weight="700" letter-spacing="1.4" fill="#eaf0ee">THE BUNDLE</text>
+  <text x="44" y="443" font-family="'IBM Plex Mono', Consolas, monospace" font-size="10" fill="#9cb2b0">biofilter_data/bundles/20260914/</text>
+  <text x="44" y="463" font-family="'IBM Plex Mono', Consolas, monospace" font-size="11" fill="#eaf0ee">bundle_id  f47a1c47f3ac95f3</text>
+  <text x="44" y="487" font-family="'IBM Plex Mono', Consolas, monospace" font-size="10" fill="#9cb2b0">read-only · a new build makes a new bundle</text>
+  <path d="M352,410 V500" stroke="#9cb2b0" stroke-width="1" opacity="0.45"/>
+
+  <text x="380" y="428" font-family="'IBM Plex Mono', Consolas, monospace" font-size="11" fill="#eaf0ee">tables/</text>
+  <text x="380" y="448" font-family="'IBM Plex Mono', Consolas, monospace" font-size="9.5" fill="#9cb2b0">one parquet file per table;</text>
+  <text x="380" y="461" font-family="'IBM Plex Mono', Consolas, monospace" font-size="9.5" fill="#9cb2b0">variant tables split by chr</text>
+
+  <text x="600" y="428" font-family="'IBM Plex Mono', Consolas, monospace" font-size="11" fill="#eaf0ee">manifest.json</text>
+  <text x="600" y="448" font-family="'IBM Plex Mono', Consolas, monospace" font-size="9.5" fill="#9cb2b0">every file with its rows,</text>
+  <text x="600" y="461" font-family="'IBM Plex Mono', Consolas, monospace" font-size="9.5" fill="#9cb2b0">bytes and branch</text>
+
+  <text x="820" y="428" font-family="'IBM Plex Mono', Consolas, monospace" font-size="11" fill="#eaf0ee">build_record.json</text>
+  <text x="820" y="448" font-family="'IBM Plex Mono', Consolas, monospace" font-size="9.5" fill="#9cb2b0">what each run did, in the</text>
+  <text x="820" y="461" font-family="'IBM Plex Mono', Consolas, monospace" font-size="9.5" fill="#9cb2b0">order it happened</text>
+
+  <text x="1010" y="428" font-family="'IBM Plex Mono', Consolas, monospace" font-size="11" fill="#eaf0ee">bundle_plan.json</text>
+  <text x="1010" y="448" font-family="'IBM Plex Mono', Consolas, monospace" font-size="9.5" fill="#9cb2b0">what the build was</text>
+  <text x="1010" y="461" font-family="'IBM Plex Mono', Consolas, monospace" font-size="9.5" fill="#9cb2b0">asked to cover</text>
+
+  <!-- ============ READ ============ -->
+  <path d="M118,522 V548" stroke="#1d6b74" stroke-width="1.2" fill="none"/>
+  <polygon points="113.5,548 118,556 122.5,548" fill="#1d6b74"/>
+  <text x="128" y="542" font-family="'IBM Plex Mono', Consolas, monospace" font-size="9.5" fill="#5e7276">open</text>
+
+  <text x="20" y="542" font-family="Archivo, 'Segoe UI', Arial, sans-serif" font-size="17" font-weight="700" letter-spacing="1.8" fill="#1d6b74">READ</text>
+  <text x="200" y="542" font-family="'IBM Plex Mono', Consolas, monospace" font-size="11" fill="#5e7276">runs constantly — and cannot write anything</text>
+
+  <rect x="20" y="560" width="196" height="120" rx="2" fill="#e8f1f1" stroke="#1d6b74"/>
+  <text x="36" y="583" font-family="Archivo, 'Segoe UI', Arial, sans-serif" font-size="11" font-weight="700" letter-spacing="1" fill="#1d6b74">Bundle.open(path)</text>
+  <text x="36" y="604" font-family="'IBM Plex Mono', Consolas, monospace" font-size="10" fill="#16272b">reads manifest.json</text>
+  <text x="36" y="625" font-family="'IBM Plex Mono', Consolas, monospace" font-size="10" fill="#5e7276">checks every file it</text>
+  <text x="36" y="639" font-family="'IBM Plex Mono', Consolas, monospace" font-size="10" fill="#5e7276">names is there, at the</text>
+  <text x="36" y="653" font-family="'IBM Plex Mono', Consolas, monospace" font-size="10" fill="#5e7276">size it claims</text>
+
+  <rect x="262" y="560" width="196" height="120" rx="2" fill="#e8f1f1" stroke="#1d6b74"/>
+  <text x="278" y="583" font-family="Archivo, 'Segoe UI', Arial, sans-serif" font-size="11" font-weight="700" letter-spacing="1" fill="#1d6b74">DUCKDB, IN PROCESS</text>
+  <text x="278" y="604" font-family="'IBM Plex Mono', Consolas, monospace" font-size="10" fill="#16272b">one view per table</text>
+  <text x="278" y="625" font-family="'IBM Plex Mono', Consolas, monospace" font-size="10" fill="#5e7276">built from the manifest,</text>
+  <text x="278" y="639" font-family="'IBM Plex Mono', Consolas, monospace" font-size="10" fill="#5e7276">not a directory scan</text>
+  <text x="278" y="660" font-family="'IBM Plex Mono', Consolas, monospace" font-size="10" fill="#5e7276">one cursor per report</text>
+
+  <rect x="504" y="560" width="196" height="120" rx="2" fill="#e8f1f1" stroke="#1d6b74"/>
+  <text x="520" y="583" font-family="Archivo, 'Segoe UI', Arial, sans-serif" font-size="11" font-weight="700" letter-spacing="1" fill="#1d6b74">16 REPORTS</text>
+  <text x="520" y="604" font-family="'IBM Plex Mono', Consolas, monospace" font-size="10" fill="#16272b">annotate · expand · pair</text>
+  <text x="520" y="618" font-family="'IBM Plex Mono', Consolas, monospace" font-size="10" fill="#16272b">resolve · aggregate</text>
+  <text x="520" y="632" font-family="'IBM Plex Mono', Consolas, monospace" font-size="10" fill="#16272b">platform</text>
+  <text x="520" y="653" font-family="'IBM Plex Mono', Consolas, monospace" font-size="10" fill="#5e7276">SQL only; input joined as</text>
+  <text x="520" y="667" font-family="'IBM Plex Mono', Consolas, monospace" font-size="10" fill="#5e7276">a relation, not pasted in</text>
+
+  <rect x="746" y="560" width="196" height="120" rx="2" fill="#ffffff" stroke="#cfd9d7"/>
+  <text x="762" y="583" font-family="Archivo, 'Segoe UI', Arial, sans-serif" font-size="11" font-weight="700" letter-spacing="1" fill="#16272b">ReportResult</text>
+  <text x="762" y="604" font-family="'IBM Plex Mono', Consolas, monospace" font-size="10" fill="#16272b">an arrow table</text>
+  <text x="762" y="618" font-family="'IBM Plex Mono', Consolas, monospace" font-size="10" fill="#16272b">.to_pandas() · .write()</text>
+  <text x="762" y="639" font-family="'IBM Plex Mono', Consolas, monospace" font-size="10" fill="#5e7276">provenance: bundle_id,</text>
+  <text x="762" y="653" font-family="'IBM Plex Mono', Consolas, monospace" font-size="10" fill="#5e7276">params, coverage — saved</text>
+  <text x="762" y="667" font-family="'IBM Plex Mono', Consolas, monospace" font-size="10" fill="#5e7276">beside the output file</text>
+
+  <rect x="988" y="560" width="196" height="120" rx="2" fill="#eef2f1" stroke="none"/>
+  <text x="1004" y="583" font-family="Archivo, 'Segoe UI', Arial, sans-serif" font-size="11" font-weight="700" letter-spacing="1" fill="#5e7276">NO SERVER</text>
+  <text x="1004" y="604" font-family="'IBM Plex Mono', Consolas, monospace" font-size="10" fill="#5e7276">A bundle is copied, not</text>
+  <text x="1004" y="618" font-family="'IBM Plex Mono', Consolas, monospace" font-size="10" fill="#5e7276">served. No daemon, no</text>
+  <text x="1004" y="632" font-family="'IBM Plex Mono', Consolas, monospace" font-size="10" fill="#5e7276">port, no per-user copy.</text>
+  <text x="1004" y="653" font-family="'IBM Plex Mono', Consolas, monospace" font-size="10" fill="#5e7276">Many readers, the same</text>
+  <text x="1004" y="667" font-family="'IBM Plex Mono', Consolas, monospace" font-size="10" fill="#5e7276">files, no coordination.</text>
+
+  <g stroke="#1d6b74" stroke-width="1.2" fill="none">
+    <path d="M222,620 H250"/><path d="M464,620 H492"/><path d="M706,620 H734"/>
+  </g>
+  <polygon points="250,615.5 258,620 250,624.5" fill="#1d6b74"/>
+  <polygon points="492,615.5 500,620 492,624.5" fill="#1d6b74"/>
+  <polygon points="734,615.5 742,620 734,624.5" fill="#1d6b74"/>
+</svg>

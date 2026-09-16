@@ -1,13 +1,27 @@
 # Database Schema
 
-Entity-relationship diagram of the Biofilter 4 database, derived directly from the SQLAlchemy ORM models.
+The schema Biofilter writes through and validates against, derived from the
+SQLAlchemy models. It comes in two halves that are shaped very differently,
+and the difference is the most important thing on this page.
 
-The schema is organized into four logical zones:
+**The entity graph** is relational and connected. Everything is anchored to
+`entities`, joined through surrogate keys and real foreign keys. This is the
+half the ER diagram below describes:
 
-- **ETL infrastructure** — source systems, data sources, and execution packages
-- **Core entity layer** — canonical entities, aliases, relationships, and genomic locations
-- **Domain master tables** — gene, protein, pathway, disease, chemical, GO
-- **Variant tables** — partitioned tables for large-scale variant data (gnomAD, VEP, GWAS)
+- **ETL infrastructure** — source systems, data sources, execution packages
+- **Core entity layer** — entities, aliases, relationships, genomic locations
+- **Domain masters** — gene, protein, pathway, disease, chemical, GO
+
+**The variant tables** are none of those things. They carry no `entity_id`
+and no foreign keys, they are keyed by `chromosome:position:ref:alt`, and
+there is one table per source with no cross-source joins. They are declared
+imperatively rather than as ORM classes (`map_variant_*` in
+`models/model_variants.py`, registered through `utils/db_loader.py`), and
+each definition describes the parquet its DTP writes, column for column.
+
+Because they participate in no relationships, an ER diagram says nothing
+useful about them — they are listed with their columns
+[further down](#variant-tables) instead.
 
 ---
 
@@ -204,68 +218,22 @@ erDiagram
         string relation_type
     }
 
-    %% ── VARIANT DOMAIN (partitioned by chromosome) ──────────────────────────
+    %% ── VARIANT DIMENSIONS (the only variant tables in the entity zone) ────
 
-    variant_masters {
-        bigint variant_id PK
-        int chromosome PK
-        bigint position_start
-        bigint position_end
-        string reference_allele
-        string alternate_allele
-        string rsid
-        float af
-    }
-    variant_molecular_effects {
-        bigint variant_id FK
-        int chromosome
-        string transcript_id
-        int consequence_id FK
-        int impact_id FK
-        bool is_most_severe_for_variant
-        string hgvsc
-        string hgvsp
-    }
-    variant_effect_predictions {
-        bigint variant_id FK
-        int chromosome
-        string predictor_key
-        string predictor_name
-        float score
-        string classification
-    }
-    variant_consequence_groups {
-        int id PK
-        string name
-    }
-    variant_consequence_categories {
-        int id PK
-        string name
-    }
     variant_consequences {
-        int id PK
-        string name
-        int consequence_group_id FK
-        int consequence_category_id FK
+        string name PK
         int severity_rank
+        string consequence_group
+        string consequence_category
+        string description
+        bool is_active
     }
     variant_impacts {
-        int id PK
-        string name
+        string name PK
         int severity_rank
+        string description
     }
-    variant_gwas {
-        bigint id PK
-        string snp_id
-        string raw_trait
-        string mapped_trait
-        float p_value
-    }
-    variant_gwas_snp {
-        bigint id PK
-        bigint variant_gwas_id FK
-        bigint snp_id
-    }
+
     %% ── RELATIONSHIPS ───────────────────────────────────────────────────────
 
     %% ETL
@@ -307,14 +275,86 @@ erDiagram
     entities ||--o{ go_masters : "GO term"
     go_masters ||--o{ go_relations : "parent"
     go_masters ||--o{ go_relations : "child"
-
-    %% Variants
-    variant_masters ||--o{ variant_molecular_effects : "effects"
-    variant_consequence_groups ||--o{ variant_consequences : "group"
-    variant_consequence_categories ||--o{ variant_consequences : "category"
-    variant_masters ||--o{ variant_effect_predictions : "predictions"
-    variant_gwas ||--o{ variant_gwas_snp : "indexed SNP"
 ```
+
+
+---
+
+(variant-tables)=
+## Variant tables
+
+Keyed by `chromosome`, `position`, `reference_allele`, `alternate_allele` —
+the natural key, written as `variant_key` where a single column is needed.
+No surrogate ids, no foreign keys, one table per source.
+
+### `variant_masters`
+
+One row per ALT allele of the gnomAD joint callset. Identity and frequency:
+
+`chromosome`, `position`, `reference_allele`, `alternate_allele`,
+`variant_key`, `rsid`, `quality_filter`, `exomes_filters`, `genomes_filters`,
+`ac_exomes`, `ac_genomes`, `ac_joint`, `af_exomes`, `af_genomes`, `af_joint`,
+`an_exomes`, `an_genomes`, `an_joint`, `nhomalt_exomes`, `nhomalt_genomes`,
+`nhomalt_joint`, `faf95_joint`, `faf99_joint`, `fafmax_faf95_max_joint`,
+`fafmax_faf95_max_gen_anc_joint`, `af_grpmax_joint`, `grpmax_joint`
+
+### `variant_molecular_effects`
+
+One row per variant × transcript, as VEP annotated it. This is the largest
+table in a bundle by a wide margin:
+
+`chromosome`, `position`, `reference_allele`, `alternate_allele`,
+`variant_key`, `allele`, `consequence`, `impact`, `symbol`, `gene`,
+`hgnc_id`, `symbol_source`, `feature_type`, `feature`, `biotype`, `exon`,
+`intron`, `hgvsc`, `hgvsp`, `amino_acids`, `codons`, `strand`,
+`variant_class`, `canonical`, `mane_select`, `mane_plus_clinical`, `ensp`,
+`lof`, `lof_filter`, `lof_flags`, `lof_info`
+
+`symbol` and `gene` are the strings VEP emitted — this is where variants
+meet genes, and the join is on the name, never on an entity id.
+
+### `variant_rsid`
+
+The rsID index, separate so a lookup by rsID does not scan the annotation:
+
+`chromosome`, `position`, `reference_allele`, `alternate_allele`, `rsid`
+
+### `variant_predictions`
+
+In-silico predictors carried in the gnomAD VEP release:
+
+`chromosome`, `position`, `reference_allele`, `alternate_allele`,
+`cadd_raw_score`, `cadd_phred`, `revel_max`, `sift_max`, `polyphen_max`,
+`spliceai_ds_max`, `pangolin_largest_ds`, `phylop`
+
+### `variant_alphamissense`
+
+AlphaMissense pathogenicity, one row per variant × transcript:
+
+`chromosome`, `position`, `reference_allele`, `alternate_allele`,
+`predictor_key`, `transcript_id`, `predictor_name`, `predictor_version`,
+`score`, `classification`, `details`, `data_source_id`, `etl_package_id`
+
+### `variant_gtex`
+
+GTEx eQTL evidence, one row per variant × tissue × gene:
+
+`chromosome`, `position`, `reference_allele`, `alternate_allele`,
+`evidence_key`, `gene_id`, `bio_context`, `qtl_type`, `beta`, `se`,
+`p_value`, `n`, `effect_allele`, `details`, `data_source_id`,
+`etl_package_id`
+
+### `variant_gwas`
+
+GWAS Catalog associations. Note this one keeps the catalogue's own spelling
+(`chr_id`, `chr_pos`) rather than the natural key the others use:
+
+`pubmed_id`, `raw_trait`, `mapped_trait`, `mapped_trait_id`, `parent_trait`,
+`parent_trait_id`, `chr_id`, `chr_pos`, `reported_gene`, `mapped_gene`,
+`snp_id`, `snp_rank`, `snp_risk_allele`, `risk_allele_frequency`, `context`,
+`intergenic`, `p_value`, `pvalue_mlog`, `odds_ratio_beta`, `ci_text`,
+`initial_sample_size`, `replication_sample_size`, `platform`,
+`data_source_id`, `etl_package_id`
 
 ---
 
@@ -326,7 +366,9 @@ erDiagram
 
 - **`entity_relationships` as the graph surface** — connects any two entities with a typed, directed edge. Supports multi-hop traversal (e.g., gene → pathway → disease) entirely within SQL.
 
-- **Variant tables are partitioned** — `variant_masters`, `variant_molecular_effects`, `variant_effect_predictions`, `variant_regulatory_elements`, and `variant_gene_regulatory_evidence` are partitioned by `chromosome` on PostgreSQL (plain tables on SQLite). No physical FK constraints — integrity is ETL-enforced for performance at scale.
+- **Variant tables are split by chromosome** — in a bundle each one is a directory of parquet files, one per chromosome, presented as a single view. They have no physical FK constraints, by design rather than for performance: they link to genes through the symbols and HGNC ids VEP emitted, which is what lets the variant branch be built without the entity graph existing yet.
+
+- **Severity ordering lives in two small tables** — `variant_consequences` and `variant_impacts` are keyed by name, not by a surrogate id, and exist for one reason: `variant_molecular_effects` carries the VEP term and the impact class as strings, and nothing in `missense_variant` or `MODIFIER` says how bad it is. Join on the name to get `severity_rank`.
 
 - **Provenance on every row** — `data_source_id` and `etl_package_id` are present on virtually every table, enabling full traceability back to the source system and the exact ETL execution that produced each record.
 

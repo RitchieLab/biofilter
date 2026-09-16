@@ -1,100 +1,156 @@
 # Reports
 
-Reports are the main read interface over Biofilter knowledge and ETL provenance.
+A report takes a list of things you have and returns a table. This page is
+how to find one, run it, and read what comes back. For which report answers
+which question, see the [Report Catalog](report_catalog.md).
 
-For the complete index of all available reports with links to explain guides and notebook tutorials, see the **[Report Catalog](report_catalog.md)**.
+## Every report needs a bundle
 
-## Discover and Inspect
+Reports read a bundle and nothing else. Point at one in any of these ways —
+the first that is set wins:
 
-List reports:
+```bash
+biofilter --bundle /path/to/bundles/20260914 report run ...   # flag
+export BIOFILTER_BUNDLE=/path/to/bundles/20260914             # environment
+```
+
+```toml
+# .biofilter.toml — relative to this file, not your working directory
+[database]
+bundle = "./biofilter_data/bundles/20260914"
+```
+
+Discovery is the exception. `report list`, `explain`, `example-input` and
+`available-columns` ask about the installed package, not about data, so they
+work with no bundle at all.
+
+## Find a report
 
 ```bash
 biofilter report list
-biofilter report list --verbose
+biofilter report list --verbose          # descriptions and module names
 ```
 
-Explain report:
+Then ask a specific report what it does:
 
 ```bash
-biofilter report explain --report-name etl_status
+biofilter report explain --report-name expand_gene_to_variant
+biofilter report example-input --report-name expand_gene_to_variant
+biofilter report available-columns --report-name expand_gene_to_variant
 ```
 
-Show example input:
+`explain` prints the report's full guide — parameters, columns, and how to
+read the result. It is the authoritative reference for any single report.
+
+`report refresh` rebuilds the index after you add a report. You will not
+need it otherwise.
+
+## Run one
 
 ```bash
-biofilter report example-input --report-name entity_relationship_model
+biofilter --bundle <path> report run --report-name annotate_gene \
+  --input TP53 --input BRCA1
 ```
 
-Show output columns:
+Write the result to a file with `--output`. The format follows the
+extension — `.csv`, or `.parquet` / `.pq`:
 
 ```bash
-biofilter report available-columns --report-name etl_packages
+biofilter --bundle <path> report run --report-name annotate_gene \
+  --input-file ./my_genes.txt \
+  --output genes.parquet
 ```
 
-## Run Reports
+From Python:
 
-Basic run:
+```python
+from biofilter import Biofilter
+
+bf = Biofilter(bundle="/path/to/bundles/20260914")
+result = bf.report.run("annotate_gene", input_data=["TP53", "BRCA1"])
+
+df = result.to_pandas()
+result.write("genes.csv")
+```
+
+## Two channels: input and options
+
+They are separate on purpose, and mixing them is an error rather than a
+guess.
+
+**Input** — the records you are asking about. One channel at a time:
 
 ```bash
-biofilter report run --report-name etl_status
+--input TP53 --input BRCA1                      # repeatable
+--input-file ./genes.txt                        # one value per line
+--input-file ./cohort.csv --input-column symbol # a column of a CSV
 ```
 
-Export CSV:
+**Options** — everything that changes behaviour: filters, modes, thresholds.
 
 ```bash
-biofilter report run --report-name etl_packages --output ./etl_packages.csv
+biofilter --bundle <path> report run --report-name expand_gene_to_variant \
+  --input BRCA1 \
+  --param mapping=annotation \
+  --param impact_filter=HIGH \
+  --param af_max=0.01
 ```
 
-Template-driven params:
+Values are coerced: `true` / `false`, numbers, and JSON. A list is JSON —
+`--param impact_filter='["HIGH","MODERATE"]'`. A leading `@` reads the value
+from a file, and `@@` escapes a literal `@`:
 
 ```bash
-biofilter report run --report-name entity_relationship_model --params-template
+--param consequence_type_filter=@./consequences.txt
 ```
 
-## Dynamic Parameter Injection
-
-Inputs:
+For anything longer, pass the whole option set at once:
 
 ```bash
-biofilter report run --report-name entity_filter --input BRCA1 --input TP53
-biofilter report run --report-name entity_filter --input-file ./entities.csv --input-column symbol
+--params-json '{"mapping":"annotation","af_max":0.01}'
+--params-file ./params.yaml          # .json, .yml or .yaml
 ```
 
-Options:
+`--params-template` prints the options a report accepts, filled with its own
+example values, which is the fastest way to see what is available:
 
 ```bash
-biofilter report run --report-name entity_relationship_model \
-  --input TP53 --input BRCA1 \
-  --param relationship_scope=input_to_any \
-  --param deduplicate_pairs=true
+biofilter report run --report-name expand_gene_to_variant --params-template
 ```
 
-JSON/YAML params:
+## What comes back
 
-```bash
-biofilter report run --report-name entity_relationship_model --params-json '{"relationship_scope":"input_to_any"}'
-biofilter report run --report-name entity_relationship_model --params-file ./params.yaml
+A result is a table plus a record of how it was produced.
+
+```python
+result.num_rows
+result.columns
+result.to_pandas()
+
+result.provenance["bundle_id"]   # which build these rows came from
+result.provenance["params"]      # what was asked
+result.provenance["coverage"]    # what the bundle did not have
 ```
 
-Load one param from file:
+`result.write("out.csv")` saves `out.csv.provenance.json` beside it. Writing
+parquet instead keeps the provenance inside the file's own metadata, so it
+travels even if the sidecar is lost.
 
-```bash
-biofilter report run --report-name entity_relationship_model --input TP53 --param relationship_types=@./relationship_types.txt
-```
+Two habits worth forming:
 
-## Explain Guides
+- **Check `coverage` before trusting a null.** It lists the optional tables
+  the bundle lacked and the chromosomes it spans. A column that is null
+  because a source was never built looks exactly like one that is null
+  because the answer is null.
+- **Keep the `bundle_id` with the result.** Entity and variant ids are valid
+  only inside the bundle that produced them, so an id without its build is
+  not a fact.
 
-`report explain` prefers markdown guides stored in:
+## Guides and notebooks
 
-- `biofilter/modules/report/reports_explain/report_<module>.md`
+Each report ships two pieces of documentation besides this page:
 
-If a guide file is missing, Biofilter falls back to the report class `explain()` method.
-
-This model keeps report documentation maintainable:
-- update the report module when behavior changes
-- update the paired explain markdown for user-facing guidance
-
-## Practical Examples
-
-Each report ships a worked notebook at
-`notebooks/templates/reports__<name>.ipynb`, runnable against a bundle.
+| | |
+|---|---|
+| The guide | `biofilter/modules/report/reports_explain/report_<name>.md`, printed by `report explain` |
+| A notebook | `notebooks/templates/reports__<name>.ipynb`, a worked example against a real bundle |

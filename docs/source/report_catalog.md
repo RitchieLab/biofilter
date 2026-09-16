@@ -1,143 +1,185 @@
 # Report Catalog
 
-Complete index of all reports available in Biofilter 4.
-Each report has a **name** (used in CLI and Python API), a brief description,
-and links to its explain guide and interactive notebook tutorial where available.
+Every analysis Biofilter can run, organized by the question it answers.
+There are 16 reports. Each one takes a list of things you already have —
+gene symbols, rsIDs, disease names, a cohort's variants — and returns a
+table.
 
-For general usage — how to run, list, and introspect reports — see [Reports](reports.md).
+For how reports work in general (parameters, input channels, output
+formats), see [Reports](reports.md).
 
----
+## Find your question
 
-## Running any report
+| You have | You want | Report |
+|---|---|---|
+| Gene symbols or ids | Everything the bundle knows about them | [`annotate_gene`](#annotate-what-you-already-have) |
+| Gene symbols | The variants in those genes, filtered by predicted damage | [`expand_gene_to_variant`](#from-genes-to-variants) |
+| rsIDs or `chr:pos:ref:alt` | Full annotation, one row per transcript | [`annotate_variant`](#annotate-what-you-already-have) |
+| Variants | Which genes they regulate, in which tissue | [`expand_variant_regulatory`](#from-variants-outward) |
+| Variants | Plausible interacting pairs, with the biology that links them | [`pair_variants`](#from-variants-outward) |
+| A cohort's variants | Which ones the bundle knows, binned by biology | [`aggregate_cohort_variants`](#a-whole-cohort) |
+| Names that are not matching | What they actually resolve to, and where they conflict | [`resolve_entity`](#annotate-what-you-already-have) |
+| Any entity list | Its one-hop neighbourhood, or the relationship rows themselves | [`expand_entity_*`](#follow-the-entity-network) |
+| Disease, pathway, GO or protein names | Annotation for that domain | [`annotate_*`](#annotate-what-you-already-have) |
+| A bundle | What is in it, and how it was built | [`platform_*`](#about-the-bundle-itself) |
+
+## Running a report
 
 ```bash
-# CLI
-biofilter report run --report-name <name> [--param KEY=VALUE ...] [--output file.csv]
-biofilter report explain --report-name <name>
-biofilter report run --report-name <name> --params-template
+biofilter --bundle /path/to/bundle report run \
+  --report-name annotate_gene \
+  --input TP53 --input BRCA1 \
+  --output genes.csv
 ```
 
 ```python
-# Python API
-df = bf.report.run("<name>", param1=value1, param2=value2)
+from biofilter import Biofilter
+
+bf = Biofilter(bundle="/path/to/bundle")
+result = bf.report.run("annotate_gene", input_data=["TP53", "BRCA1"])
+df = result.to_pandas()
 ```
 
----
+Three things worth knowing before you start:
 
-## ETL & Platform Monitoring
+- **`biofilter report explain --report-name <name>`** prints the report's
+  full guide — every parameter, every column, and how to read the result.
+  It is the authoritative reference; this page is the index.
+- **A worked notebook** ships for each report at
+  `notebooks/templates/reports__<name>.ipynb`.
+- **Options go through `--param KEY=VALUE`**, separately from `--input`.
+  Values are coerced: `true`/`false`, numbers, and JSON. A list is written
+  as JSON — `--param impact_filter='["HIGH","MODERATE"]'`. Use
+  `--params-template` to print every option a report accepts.
 
-Reports for inspecting the state of the ETL pipeline and the knowledge base.
+## Annotate what you already have
 
-| Report | Description | Explain | Notebook |
-|---|---|---|---|
-| `etl_status` | Current status of all ETL packages (active, last run, row counts) | [Guide](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter/modules/report/reports_explain/report_etl_status.md) | [Tutorial](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter_legacy/bf4_420/notebooks/Templates/reports__etl_status.ipynb) |
-| `etl_packages` | Full provenance log of all ETL executions with timestamps and file hashes | [Guide](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter/modules/report/reports_explain/report_etl_packages.md) | [Tutorial](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter_legacy/bf4_420/notebooks/Templates/reports__etl_packages.ipynb) |
-| `platform_data_statistics` | Row counts and coverage metrics across all master tables | [Guide](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter/modules/report/reports_explain/report_platform_data_statistics.md) | [Tutorial](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter_legacy/bf4_420/notebooks/Templates/reports__platform_data_statistics.ipynb) |
-| `db_pg_table_stats` | PostgreSQL table sizes, row estimates, and bloat metrics *(PostgreSQL only)* | [Guide](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter/modules/report/reports_explain/report_db_pg_table_stats.md) | [Tutorial](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter_legacy/bf4_420/notebooks/Templates/reports__db_pg_table_stats.ipynb) |
-| `db_pg_index_stats` | PostgreSQL index usage, size, and scan counts *(PostgreSQL only)* | [Guide](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter/modules/report/reports_explain/report_db_pg_index_stats.md) | [Tutorial](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter_legacy/bf4_420/notebooks/Templates/reports__db_pg_index_stats.ipynb) |
+You have identifiers. You want what is known about them.
 
----
+| Report | Takes | Returns |
+|---|---|---|
+| `annotate_gene` | Gene symbols, HGNC or Ensembl ids, aliases | Canonical ids, gene metadata, build-38 coordinates, relationship counts by related domain, and optionally how many variants fall in the gene's range |
+| `annotate_variant` | rsIDs, `chr:pos`, or `chr:pos:ref:alt` | Identity, gnomAD joint frequencies, in-silico predictions, and one row per transcript the variant was annotated against |
+| `annotate_protein` | Accessions, names, aliases | Canonical accession, function, location, tissue expression, isoform resolution, Pfam domains by type |
+| `annotate_disease` | Disease names or aliases | Canonical ids, label and description, disease groups, cross-references by source, and the genes ClinGen links to the disease |
+| `annotate_pathway` | Pathway names or ids | Canonical id and description, which source contributed it, relationship counts by domain |
+| `annotate_go` | GO terms or aliases | GO id, name and namespace, parent and child counts by relation type, relationship counts by domain |
+| `resolve_entity` | Any list of names | What each name resolves to, with conflict and status flags |
 
-## Entity & Relationship
+`resolve_entity` is the one to reach for when another report returns
+`not_found` and you want to know why. It supports `match_mode=exact`
+(default), `like` for substrings, and `fuzzy` for Jaro-Winkler similarity
+above a threshold.
 
-Reports for exploring the biological entity graph.
+## From genes to variants
 
-| Report | Description | Explain | Notebook |
-|---|---|---|---|
-| `entity_filter` | Filter and list entities (genes, pathways, diseases, …) by type, source, or name pattern | [Guide](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter/modules/report/reports_explain/report_entity_filter.md) | [Tutorial](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter_legacy/bf4_420/notebooks/Templates/reports__entity_filter.ipynb) |
-| `entity_relationship_model` | Retrieve all entities related to an input list through shared biological groups (pathways, diseases, GO, PPI) | — | [Tutorial](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter_legacy/bf4_420/notebooks/Templates/reports__entity_relationship_model.ipynb) |
-| `entity_neighborhood_summary` | Resolve heterogeneous inputs (gene:, disease:, pathway:, …) and return a 1-hop neighborhood summary grouped by neighbor type | [Guide](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter/modules/report/reports_explain/report_entity_neighborhood_summary.md) | [Tutorial](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter_legacy/bf4_420/notebooks/Templates/reports__entity_neighborhood_summary.ipynb) |
+**`expand_gene_to_variant`** — the variants that belong to a list of genes.
 
----
+This is the report for the common screening question: *given these genes,
+which variants in them are plausibly damaging and rare enough to matter?*
 
-## Annotation Masters
+First you choose what "belongs to" means, because the two answers differ:
 
-Reference tables exposing the full content of each biological domain in the knowledge base.
-Useful for exploring available terms before using them as filters in other reports.
-
-| Report | Description | Explain | Notebook |
-|---|---|---|---|
-| `annotate_gene` | All genes with HGNC symbol, Ensembl ID, locus, and source provenance | [Guide](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter/modules/report/reports_explain/report_annotate_gene.md) | [Tutorial](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter_legacy/bf4_420/notebooks/Templates/reports__annotations_master_gene.ipynb) |
-| `annotate_pathway` | All pathways across all source systems (Reactome, KEGG, …) | [Guide](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter/modules/report/reports_explain/report_annotate_pathway.md) | [Tutorial](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter_legacy/bf4_420/notebooks/Templates/reports__annotations_master_pathway.ipynb) |
-| `annotate_protein` | All proteins with UniProt IDs and gene mappings | [Guide](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter/modules/report/reports_explain/report_annotate_protein.md) | [Tutorial](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter_legacy/bf4_420/notebooks/Templates/reports__annotations_master_protein.ipynb) |
-| `annotate_disease` | All diseases with MONDO/ClinGen IDs and gene associations | [Guide](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter/modules/report/reports_explain/report_annotate_disease.md) | [Tutorial](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter_legacy/bf4_420/notebooks/Templates/reports__annotations_master_disease.ipynb) |
-| `annotate_go` | All Gene Ontology terms (BP, MF, CC) with gene memberships | [Guide](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter/modules/report/reports_explain/report_annotate_go.md) | [Tutorial](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter_legacy/bf4_420/notebooks/Templates/reports__annotations_master_go.ipynb) |
-| `annotate_chemical` | All chemical compounds (ChEBI) with gene and pathway associations | [Guide](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter/modules/report/reports_explain/report_annotate_chemical.md) | [Tutorial](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter_legacy/bf4_420/notebooks/Templates/reports__annotations_master_chemical.ipynb) |
-| `annotate_variant` | Full annotation for input variants: frequencies, pathogenicity scores, VEP consequences per transcript, AlphaMissense | [Guide](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter/modules/report/reports_explain/report_annotate_variant.md) | [Tutorial](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter_legacy/bf4_420/notebooks/Templates/reports__annotations_master_variant.ipynb) |
-
----
-
-## Variant Analysis
-
-Reports for annotating and filtering genomic variants.
-
-| Report | Description | Explain | Notebook |
-|---|---|---|---|
-| `variant_binning` | Assign variants to genomic bins; useful for burden-test preparation | [Guide](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter/modules/report/reports_explain/report_variant_binning.md) | [Tutorial](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter_legacy/bf4_420/notebooks/Templates/reports__variant_binning.ipynb) |
-| `variant_gene_location_model` | Map variants to overlapping gene loci with distance and region annotations | — | [Tutorial](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter_legacy/bf4_420/notebooks/Templates/reports__variant_gene_location_model.ipynb) |
-| `variant_annotation_expanded` | Full annotation expansion for a variant list (consequence, AF, predictions) | — | — |
-| `variant_single_gene_annotation` | **Phase 1** — Given a seed variant, returns the seed gene and all partner genes sharing biological context | [Guide](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter/modules/report/reports_explain/report_variant_single_gene_annotation.md) | [Tutorial](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter_legacy/bf4_420/notebooks/Templates/reports__variant_single_gene_annotation.ipynb) |
-| `gene_to_variant_filtering` | **Phase 2** — Collect and filter variants across a gene list with SQL-level pathogenicity filters | [Guide](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter/modules/report/reports_explain/report_gene_to_variant_filtering.md) | [Tutorial](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter_legacy/bf4_420/notebooks/Templates/reports__gene_to_variant_filtering.ipynb) |
-| `annotation_variant_regulatory_evidence` | Variant ↔ gene regulatory evidence (eQTL / sQTL). Accepts gene symbols, rsids, or chr:pos as input; returns one row per (variant × tissue × regulated gene) with effect size and p-value | [Guide](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter/modules/report/reports_explain/report_annotation_variant_regulatory_evidence.md) | [Tutorial](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter_legacy/bf4_420/notebooks/Templates/reports__annotation_variant_regulatory_evidence.ipynb) |
-
----
-
-## Variant Interaction Modeling
-
-Direct variant-to-variant interaction modeling from a pre-genotyped input list.
-Both variants in every pair come from the input — no DB expansion.
-
-| Report | Description | Explain | Notebook |
-|---|---|---|---|
-| `variant_modeling` | Input variants → gene overlap → group co-membership → Variant×Variant pairs with group_support_count weight | [Guide](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter/modules/report/reports_explain/report_variant_modeling.md) | [Tutorial](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter_legacy/bf4_420/notebooks/Templates/reports__variant_modeling.ipynb) |
-
----
-
-## SNP×SNP Interaction Pipeline
-
-Reports implementing the biologically-informed SNP×SNP interaction workflow.
-See the full pipeline tutorial and methods document for end-to-end guidance.
-
-| Resource | Link |
+| `mapping` | A variant belongs to a gene when… |
 |---|---|
-| Pipeline notebook | [pipeline__from_single_variant_to_interactions.ipynb](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter_legacy/bf4_420/notebooks/Templates/pipeline__from_single_variant_to_interactions.ipynb) |
-| Pipeline methods doc | [pipeline__from_single_variant_to_interactions.md](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter_legacy/bf4_420/notebooks/Templates/pipeline__from_single_variant_to_interactions.md) |
+| `position` | Its coordinate falls inside the gene's build-38 range |
+| `annotation` | VEP associated it with that gene |
 
-| Report | Phase | Description | Explain | Notebook |
-|---|---|---|---|---|
-| `variant_single_gene_annotation` | Phase 1 | Seed variant → partner gene list via biological network | [Guide](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter/modules/report/reports_explain/report_variant_single_gene_annotation.md) | [Tutorial](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter_legacy/bf4_420/notebooks/Templates/reports__variant_single_gene_annotation.ipynb) |
-| `gene_to_variant_filtering` | Phase 2 | Gene list → filtered, annotated variant set (Lista A) | [Guide](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter/modules/report/reports_explain/report_gene_to_variant_filtering.md) | [Tutorial](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter_legacy/bf4_420/notebooks/Templates/reports__gene_to_variant_filtering.ipynb) |
-| `variant_list_intersect` | Phase 2.5 | Lista A ∩ Lista B → Lista C (genotyped subset, PLINK-ready) | [Guide](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter/modules/report/reports_explain/report_variant_list_intersect.md) | [Pipeline notebook](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter_legacy/bf4_420/notebooks/Templates/pipeline__from_single_variant_to_interactions.ipynb) |
-| `snp_snp_pair_generator` | Phase 3 | Lista D → annotated interaction pairs with configurable pairing strategy | [Guide](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter/modules/report/reports_explain/report_snp_snp_pair_generator.md) | [Pipeline notebook](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter_legacy/bf4_420/notebooks/Templates/pipeline__from_single_variant_to_interactions.ipynb) |
-| `snp_snp_model` | Legacy | Earlier SNP×SNP pair model — expands variants from gene loci (superseded by `variant_modeling`) | [Guide](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter/modules/report/reports_explain/report_snp_snp_model.md) | [Tutorial](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter_legacy/bf4_420/notebooks/Templates/reports__snp_snp_model.ipynb) |
+Then you filter. Every filter below is optional and they compose:
 
----
-
-## Pathway Burden Pipeline
-
-Pipeline for prioritising pathways given a list of significant genes (e.g., ExWAS hits) and a target pathway list, using cross-source convergence scoring.
-
-| Resource | Link |
+| Filter | Options |
 |---|---|
-| Pipeline notebook | [pipeline__pathway_burden_score.ipynb](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter_legacy/bf4_420/notebooks/Templates/pipeline__pathway_burden_score.ipynb) |
-| Pipeline methods doc | [pipeline__pathway_burden_score.md](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter_legacy/bf4_420/notebooks/Templates/pipeline__pathway_burden_score.md) |
+| `impact_filter` | `HIGH`, `MODERATE`, `LOW`, `MODIFIER` |
+| `consequence_type_filter` | VEP consequence names |
+| `lof_confidence_filter` | LOFTEE `HC`, `LC` |
+| `af_min`, `af_max` | gnomAD joint allele frequency bounds |
+| `cadd_phred_min`, `sift_score_max`, `polyphen_score_min` | In-silico predictor thresholds |
+| `alphamissense_score_min` | AlphaMissense score |
+| `alphamissense_classification` | `likely_pathogenic`, `likely_benign`, `ambiguous` |
 
----
+A rare, high-impact, likely-pathogenic screen over two genes:
 
-## Utilities
+```bash
+biofilter --bundle /path/to/bundle report run \
+  --report-name expand_gene_to_variant \
+  --input BRCA1 --input CHEK2 \
+  --param mapping=annotation \
+  --param impact_filter=HIGH \
+  --param af_max=0.01 \
+  --param alphamissense_classification=likely_pathogenic \
+  --output candidates.csv
+```
 
-| Report | Description | Explain | Notebook |
-|---|---|---|---|
-| `template` | Blank report template for development and testing | [Guide](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter/modules/report/reports_explain/report_template.md) | [Tutorial](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter_legacy/bf4_420/notebooks/Templates/reports__qry_template.ipynb) |
+Two defaults to be aware of. `most_severe_only` is `true`, so you get one
+row per gene and variant keeping the worst consequence — set it to `false`
+when you want every transcript. And `max_variants_per_gene` is `5000`; when
+a gene is capped, the `variants_available` column reports its pre-cap total,
+so a truncated row admits that it is truncated.
 
----
+## From variants outward
 
-## Coverage summary
-
-| Status | Count |
+| Report | Answers |
 |---|---|
-| Reports with explain guide + notebook | 20 |
-| Reports with explain guide only | 2 (`variant_list_intersect`, `snp_snp_pair_generator` — covered by pipeline notebook) |
-| Reports with notebook only | 2 (`entity_relationship_model`, `variant_gene_location_model`) |
-| Reports with neither | 1 (`variant_annotation_expanded`) |
-| **Total** | **25** |
+| `expand_variant_regulatory` | Which genes does this variant regulate, and in which tissue? One row per variant × tissue × regulated gene, with effect size and p-value. Takes gene symbols, rsIDs or positions. |
+| `pair_variants` | Which of these variants plausibly interact? Places each input on its genes, connects those genes through shared pathways, diseases or proteins, and returns the pairs with the evidence that supports them. |
+
+`pair_variants` is a hypothesis generator, not a test: the pairs it returns
+are candidates whose genes share biology, and the supporting columns are
+there so you can judge each one.
+
+## Follow the entity network
+
+| Report | Answers |
+|---|---|
+| `expand_entity_neighborhood` | What is one hop away from these entities? Takes a mixed list — genes, diseases, proteins — with optional `gene:` style hints, and reports degree overall and by neighbour type. |
+| `expand_entity_relationship` | The relationship rows themselves: every link where an input appears on either side, with the related entity named. `scope` controls whether the other side must also be in your input list. |
+
+Use the first to explore, the second to extract.
+
+## A whole cohort
+
+**`aggregate_cohort_variants`** — your cohort's variants, matched against
+the bundle and optionally rolled up into biological bins.
+
+It answers three things at once: which of your variants Biofilter knows,
+where they sit, and what each sample carries per bin. Binning is optional —
+without it you get the match and the placement.
+
+## About the bundle itself
+
+| Report | Answers |
+|---|---|
+| `platform_data_statistics` | What does this bundle hold? Identity, table sizes on disk, entity counts by domain, variant counts by chromosome, relationship counts by group pair, and what each source contributed. |
+| `platform_etl_status` | One row per data source: the latest good extract, transform and load, whether each stage ran on the previous one's output, and whether anything is known to be wrong. |
+| `platform_etl_packages` | The raw record behind the status: one row per ETL package, with stage, timing, row counts and the hash it carried forward. |
+
+Run `platform_data_statistics` first on any bundle you did not build
+yourself. It tells you which chromosomes and which sources are actually in
+there, which is what decides whether your question is answerable at all.
+
+## Reading a result honestly
+
+An empty or partial result has more than one cause, and they are not
+interchangeable.
+
+**Per-row status.** Reports that resolve input keep the inputs that
+produced nothing, with a status saying why — `not_found` (the name did not
+resolve in this bundle), `no_location` (it resolved, but there are no
+coordinates for it), `no_variants` (it resolved and nothing met your
+criteria). A shorter table is not the same as a negative answer.
+
+**Coverage.** Every result carries a `coverage` block in its provenance
+recording which optional tables the bundle did not have and which
+chromosomes it spans. If a bundle was built without AlphaMissense, an
+AlphaMissense filter silently matches nothing — coverage is where that is
+written down.
+
+```python
+result.provenance["coverage"]
+result.provenance["bundle_id"]
+```
+
+**Bundle identity.** Entity and variant ids are valid only inside the
+bundle that produced them. `result.write("out.csv")` saves
+`out.csv.provenance.json` beside the file so the result stays traceable to
+its build. Pin the bundle, not the id.

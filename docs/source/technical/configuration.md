@@ -58,21 +58,29 @@ Initialize template:
 biofilter config init --path .
 ```
 
-## Typical Keys
+`config init` accepts `--db-uri` and `--data-root` to pre-fill the
+template.
 
-- `database.db_uri`
-- `etl.data_root`
+## Typical keys
+
+| Key | For |
+|---|---|
+| `database.bundle` | Where reports read from. A directory. |
+| `database.db_uri` | Where the ETL and `bundle plan` write. A SQLAlchemy URI. |
+| `etl.data_root` | Where raw, processed and staging live during a build. |
 
 ## Accepted `database.db_uri` values
 
 | Scheme | Example | Writes |
 |---|---|---|
-| PostgreSQL | `postgresql+psycopg2://user:pass@host:5432/biofilter_prod` | yes |
 | SQLite | `sqlite:///biofilter_dev.db` | yes |
-| Parquet bundle | `parquet:///path/to/bundle` | no (read-only) |
+| PostgreSQL | `postgresql+psycopg2://user:pass@host:5432/biofilter_dev` | yes |
+| Parquet bundle | `parquet:///path/to/bundle` | no |
 
-The `parquet://` scheme reads a Parquet bundle directly via DuckDB, for
-environments without a database server. See [Parquet Backend](parquet_backend.md).
+The `parquet://` scheme is a shorthand the database layer understands for
+"read this bundle". Prefer `database.bundle` for reading: it is the same
+target expressed as a directory, it resolves relative to this file, and it
+is what `--bundle` sets. See [The Read Path](read_path.md).
 
 ## Tips
 

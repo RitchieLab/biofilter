@@ -50,18 +50,22 @@ biofilter etl update --data-source hgnc --run-step transform
 biofilter etl update --data-source hgnc --force-step transform
 ```
 
+Both accept the flag more than once, so a full explicit run is
+`--run-step extract --run-step transform --run-step load`.
+
 A step is skipped when its input hash is unchanged **and** the output it
 produced still exists. Deleting a processed file causes it to be rebuilt.
 
-`etl update` exits non-zero when a source fails.
+`etl update` exits non-zero when a source fails. `--stop-on-error` makes a
+multi-source run halt on the first failure instead of continuing.
 
 ## Field and tissue selection
 
 The variant DTPs read a JSON config next to them in
 `biofilter/modules/etl/dtps/config/`, listing every field a source
 publishes with a `load` flag. They are include-lists: gnomAD's joint
-callset alone carries 664 INFO fields, so an exclude-list would silently
-adopt whatever a future release adds.
+callset carries 664 INFO fields and the build keeps 20 of them, so an
+exclude-list would silently adopt whatever a future release adds.
 
 The same mechanism selects GTEx tissues — all 50 are listed, 13 enabled
 by default. Note that GTEx ships every tissue in one tarball and does not
@@ -69,8 +73,13 @@ expose them individually, so the selection narrows the transform and the
 output, not the download.
 
 Frequency filters live in the same files. The gnomAD joint config
-defaults to `min_ac: 5`; setting it lower keeps rarer variants at
-proportionally larger output.
+defaults to `min_ac: 5`, which on chromosome 21 keeps 14.3% of records —
+`AC_joint = 0` alone accounts for 49.5% and singletons for a further
+22.2%. Setting it lower keeps rarer variants at proportionally larger
+output.
+
+These filters apply at build time and bundles are immutable, so a variant
+dropped here is absent from that bundle for good.
 
 ## Adding a DTP
 

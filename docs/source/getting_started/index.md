@@ -26,10 +26,10 @@ means 1.5 TB of downloads, processed and discarded as the build goes, so
 plan for **150 GB of working space**.
 
 1. [Install Biofilter](installing.md) — from source if you will change DTPs.
-2. [Build a bundle](../building_bundles.md) — `bundle plan`, then `bundle build`.
+2. [Build a bundle](../technical/building_bundles.md) — `bundle plan`, then `bundle build`.
 3. [Run a report](running_reports.md) against what you built.
 
-[What it costs](../bundle_requirements.md) has the measured figures for
+[What it costs](../technical/bundle_requirements.md) has the measured figures for
 disk, memory and runtime before you start.
 
 ## What you'll need
@@ -50,9 +50,13 @@ their origin.
 Once you can run a report, the rest goes deeper:
 
 - [Report catalog](../report_catalog.md) — every report, with tutorials.
-- [Building bundles](../building_bundles.md) — the plan/build/inspect flow.
-- [What a build costs](../bundle_requirements.md) — measured disk, time, memory.
-- [Parquet backend](../parquet_backend.md) — how views are registered, performance.
-- [Data sources and ingestion](../etl.md) — where the data comes from, and how it gets in.
-- [Configuration](../configuration.md) — `.biofilter.toml` options.
+- [Building bundles](../technical/building_bundles.md) — the plan/build/inspect flow.
+- [What a build costs](../technical/bundle_requirements.md) — measured disk, time, memory.
+- [The Read Path](../technical/read_path.md) — how views are registered, and what a query costs.
+- [Data sources and ingestion](../technical/etl.md) — where the data comes from, and how it gets in.
+- [Configuration](../technical/configuration.md) — `.biofilter.toml` options.
 - [Troubleshooting](../troubleshooting.md) — common errors.
+
+Running on the Penn LPC? The cluster-specific quickstart and the
+maintainer's deployment guide live in the repository at
+`notebooks/lpc__quickstart.md` and `notebooks/lpc__deploy.md`.

@@ -15,9 +15,9 @@ biofilter db ping --db-uri "sqlite:///biofilter_dev.db"
 ```
 
 `create-db` builds the schema with `create_all` and applies the master
-seeds. There is no migration step: 4.3 removed Alembic, because a
-database is built once and a schema change produces a new bundle rather
-than an in-place migration.
+seeds, including the data source registry that `bundle plan` reads. There
+is no migration step and no migration chain: a database is built once, and
+a schema change produces a new bundle rather than an in-place upgrade.
 
 Applying seed updates to an existing database:
 
@@ -25,8 +25,7 @@ Applying seed updates to an existing database:
 biofilter db upgrade
 ```
 
-This is idempotent and seed-only. In earlier versions it also ran an
-Alembic upgrade first.
+This is idempotent and seed-only.
 
 ## Backup and restore
 
@@ -40,7 +39,8 @@ biofilter db restore --in ./backups/dev.snapshot
 ## Bundles
 
 A bundle is normally produced by `bundle build`. `db export` writes one
-from an existing database, which is how bundles were made before 4.3:
+from a database you already have, which is useful for a development
+snapshot:
 
 ```bash
 biofilter db export --out ./exports/biofilter_bundle --format parquet
@@ -59,11 +59,16 @@ biofilter db verify --in ./exports/biofilter_bundle --schema
 the tables present carry the columns this build expects, and exits 1 on
 any problem, so CI can gate on it.
 
+Note that the hash tier only runs where the manifest recorded a digest.
+Bundles produced by `bundle build` record size but not SHA-256, so for
+those `verify` is checking presence and size whether or not you pass
+`--no-hashes`.
+
 A bundle can be read directly, without importing it:
 
 ```bash
 biofilter --bundle ./exports/biofilter_bundle report list
 ```
 
-See [Parquet Backend](parquet_backend.md) and
+See [The Read Path](read_path.md) and
 [Building Bundles](building_bundles.md).
