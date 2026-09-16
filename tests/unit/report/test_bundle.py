@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import warnings
 from pathlib import Path
 
 import pyarrow as pa
@@ -110,3 +111,69 @@ class TestIsolation:
             assert first.execute("SELECT count(*) FROM scratch").fetchone()[0] == 2
             with pytest.raises(Exception):
                 second.execute("SELECT count(*) FROM scratch").fetchone()
+
+
+class TestReleaseMismatch:
+    """
+    A bundle built by another release opens, and says so.
+
+    The hard refusal belongs to `manifest_version` — a layout this
+    release cannot read. A *release* difference is different: it usually
+    works, and refusing would make an archived bundle unreadable by the
+    only install at hand. So it warns and records, and the record is what
+    makes a result recognisable later as one produced across a boundary.
+    """
+
+    @staticmethod
+    def _restamp(bundle_root: Path, version: str) -> None:
+        path = bundle_root / "manifest.json"
+        manifest = json.loads(path.read_text())
+        manifest["biofilter_version"] = version
+        path.write_text(json.dumps(manifest))
+
+    def test_same_release_is_silent(self, fixture_bundle):
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            with Bundle.open(fixture_bundle) as bundle:
+                assert bundle.version_mismatch is None
+        assert not [
+            w for w in caught if "was built by Biofilter" in str(w.message)
+        ]
+
+    def test_older_bundle_warns_and_records(self, fixture_bundle):
+        self._restamp(fixture_bundle, "4.2.0")
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            with Bundle.open(fixture_bundle) as bundle:
+                assert bundle.version_mismatch is not None
+                assert "4.2.0" in bundle.version_mismatch
+                # It names the way out, not just the problem.
+                assert "--schema" in bundle.version_mismatch
+        assert [
+            w for w in caught if "was built by Biofilter" in str(w.message)
+        ]
+
+    def test_patch_release_is_not_a_mismatch(self, fixture_bundle):
+        """Only major.minor is compared; a patch fixes code, not schema."""
+        self._restamp(fixture_bundle, "4.3.99")
+        with Bundle.open(fixture_bundle) as bundle:
+            assert bundle.version_mismatch is None
+
+    def test_unparseable_version_is_not_a_mismatch(self, fixture_bundle):
+        """An unreadable stamp is not evidence of disagreement."""
+        self._restamp(fixture_bundle, "unknown")
+        with Bundle.open(fixture_bundle) as bundle:
+            assert bundle.version_mismatch is None
+
+    def test_mismatch_reaches_the_result(self, fixture_bundle):
+        from biofilter.modules.report.report_manager import ReportManager
+
+        self._restamp(fixture_bundle, "4.2.0")
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            with Bundle.open(fixture_bundle) as bundle:
+                manager = ReportManager(bundle=bundle)
+                result = manager.run("resolve_entity", input_data=["TP53"])
+
+        assert result.provenance["version_mismatch"] is not None
+        assert "4.2.0" in result.provenance["version_mismatch"]

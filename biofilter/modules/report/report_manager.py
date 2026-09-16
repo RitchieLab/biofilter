@@ -200,6 +200,7 @@ class ReportManager:
             biofilter_version=bundle.biofilter_version,
             rows=result.num_rows,
             coverage=self._coverage(cls, bundle),
+            version_mismatch=bundle.version_mismatch,
         )
         # What the report decided, not only what it was told.
         result.provenance.update(extra)

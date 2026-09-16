@@ -45,6 +45,7 @@ def make_provenance(
     biofilter_version: Optional[str] = None,
     rows: Optional[int] = None,
     coverage: Optional[dict[str, Any]] = None,
+    version_mismatch: Optional[str] = None,
 ) -> dict[str, Any]:
     """
     Build the provenance record that travels with a result.
@@ -58,6 +59,11 @@ def make_provenance(
     `coverage` records what the bundle was missing: optional tables the
     report would have used, and which chromosomes its variants span. Both
     show up in the result as nulls and absences that look like answers.
+
+    `version_mismatch` is set when the bundle was built by a different
+    Biofilter release than the one that read it. The read is allowed; the
+    record is what lets the result be recognised later as one produced
+    across a version boundary.
     """
     return {
         "report": report,
@@ -71,6 +77,8 @@ def make_provenance(
         # source was never built looks exactly like one that is null
         # because the answer is null, and only this tells them apart.
         "coverage": coverage or {},
+        # None when the bundle and this install are the same release.
+        "version_mismatch": version_mismatch,
     }
 
 

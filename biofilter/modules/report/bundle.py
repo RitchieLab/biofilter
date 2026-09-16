@@ -16,11 +16,14 @@ two independently written code paths.
 from __future__ import annotations
 
 import json
+import warnings
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Iterable, Optional
 
 import duckdb
+
+from biofilter.utils.version import __version__ as INSTALLED_VERSION
 
 #: Manifest layouts this release can read. A bundle declaring anything
 #: else is refused rather than guessed at (ADR-004 §2.9).
@@ -81,6 +84,9 @@ class Bundle:
     _chromosomes: dict[str, Optional[list[int]]] = field(
         default_factory=dict, repr=False
     )
+    #: Set when the bundle was built by a different Biofilter release.
+    #: Advisory — it does not stop the read, it travels with the result.
+    version_mismatch: Optional[str] = None
 
     # ------------------------------------------------------------------
     # Opening
@@ -107,6 +113,7 @@ class Bundle:
         root = Path(path).expanduser().resolve()
         manifest = cls._read_manifest(root)
         cls._check_version(root, manifest)
+        mismatch = cls._check_biofilter_version(root, manifest)
 
         tables = cls._resolve_tables(root, manifest)
         if verify:
@@ -122,7 +129,13 @@ class Bundle:
         # large scans.
         con.execute("SET preserve_insertion_order = false")
 
-        bundle = cls(root=root, manifest=manifest, tables=tables, con=con)
+        bundle = cls(
+            root=root,
+            manifest=manifest,
+            tables=tables,
+            con=con,
+            version_mismatch=mismatch,
+        )
         bundle._register_views()
         return bundle
 
@@ -153,6 +166,58 @@ class Bundle:
             f"Update Biofilter to read this bundle — the bundle itself is "
             f"fine and needs no migration."
         )
+
+    @staticmethod
+    def _parse_release(value: Any) -> Optional[tuple]:
+        """`"4.3.0"` -> `(4, 3)`. None for anything unparseable."""
+        if not isinstance(value, str):
+            return None
+        parts = value.strip().split(".")
+        if len(parts) < 2:
+            return None
+        try:
+            return (int(parts[0]), int(parts[1]))
+        except ValueError:
+            return None
+
+    @classmethod
+    def _check_biofilter_version(
+        cls, root: Path, manifest: dict[str, Any]
+    ) -> Optional[str]:
+        """
+        Warn when the bundle was built by a different release.
+
+        This is advisory on purpose. `_check_version` already refuses a
+        manifest layout this release cannot read, which is the direction
+        that corrupts answers. The other direction — an older bundle in a
+        newer Biofilter — usually works, and refusing it would make an
+        archived bundle unreadable by the only install available.
+
+        What it prevents is the silent case. A report asking for a column
+        an older bundle never carried fails clearly (BundleSchemaMismatch),
+        but a report that merely *means* something different against an
+        older schema fails nowhere. Recording the mismatch is what lets a
+        result be recognised as one produced across a version boundary,
+        and the warning is what puts it in an HPC job's stderr rather than
+        nowhere.
+
+        Returns the message, or None when the releases agree.
+        """
+        built_with = manifest.get("biofilter_version")
+        built = cls._parse_release(built_with)
+        running = cls._parse_release(INSTALLED_VERSION)
+        if built is None or running is None or built == running:
+            return None
+
+        message = (
+            f"{root.name} was built by Biofilter {built_with}; this is "
+            f"{INSTALLED_VERSION}. The bundle opens and most reports will "
+            f"behave, but a column that changed meaning between releases "
+            f"will not announce itself. Run `biofilter db verify --in "
+            f"{root} --schema` to check this bundle against this install."
+        )
+        warnings.warn(message, UserWarning, stacklevel=3)
+        return message
 
     @staticmethod
     def _resolve_tables(
