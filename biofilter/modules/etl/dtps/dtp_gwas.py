@@ -9,7 +9,6 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import requests
-from sqlalchemy import text
 
 from biofilter.modules.etl.mixins.base_dtp import DTPBase
 from biofilter.modules.etl.mixins.entity_query_mixin import EntityQueryMixin
