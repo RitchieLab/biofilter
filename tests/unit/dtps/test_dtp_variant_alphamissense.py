@@ -9,10 +9,7 @@ from sqlalchemy import MetaData, create_engine, select
 from sqlalchemy.orm import sessionmaker
 
 import biofilter.modules.etl.dtps.dtp_variant_alphamissense as mod
-from biofilter.modules.db.models.model_variants import (
-    map_variant_effect_predictions,
-    map_variant_masters,
-)
+from biofilter.modules.db.models.model_variants import map_variant_masters
 
 
 class DummyLogger:

@@ -27,10 +27,7 @@ from .model_proteins import (  # noqa: E501
     ProteinPfamLink,
 )
 from .model_variants import (
-    VariantBiotype,
     VariantConsequence,
-    VariantConsequenceCategory,
-    VariantConsequenceGroup,
     VariantGWAS,
     VariantImpact,
 )
@@ -66,11 +63,8 @@ __all__ = [
 
     # VARIANTS MODELS
     "VariantGWAS",
-    "VariantConsequenceGroup",
-    "VariantConsequenceCategory",
     "VariantConsequence",
     "VariantImpact",
-    "VariantBiotype",
 
     # PATHWAY MODELS
     "PathwayMaster",

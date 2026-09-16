@@ -34,50 +34,6 @@ CORE_BRANCH = "core"
 # sources move on, so what it says about itself is the only account left.
 CONTROL_TABLES: tuple = ()
 
-# Declared by the models, never written by 4.3.0, and therefore never
-# exported. Each was part of the relational model a bundle replaced:
-#
-#   variant_consequence_categories, variant_consequence_groups,
-#   variant_biotypes
-#       Dimensions of `variant_molecular_effects`, which used to carry
-#       `consequence_id`, `impact_id` and `biotype_id`. The parquet the
-#       VEP DTP writes carries the strings, so nothing points here.
-#
-#       `variant_consequences` and `variant_impacts` were on this list
-#       and came back off it. They were removed for the same reason, and
-#       the reason was wrong about them: their join key went away, but
-#       they also carry `severity_rank`, which the annotation does not
-#       have and which cannot be derived from it. Dropping them took the
-#       only ordering out of the bundle.
-#
-#   variant_effect_predictions, variant_gene_regulatory_evidence
-#       Superseded by the per-source tables the DTPs write straight to
-#       parquet — `variant_alphamissense` and `variant_gtex`, the same
-#       shapes keyed by `chrom:pos:ref:alt` instead of `variant_id`.
-#
-#   variant_regulatory_elements
-#       Never had a producer.
-#
-#   variant_gwas_snp
-#       An rsID index built during `load`; the variant branch has no
-#       load step, and the GWAS DTP now explodes `SNPS` into
-#       `variant_gwas` itself.
-#
-# They shipped as empty tables in every bundle, which is worse than
-# absent: `db verify` counted them present, and a report joining one got
-# zero rows instead of an error. The models outlive them only because
-# `modules/report_legacy/` still imports them; they go when its last
-# report is replaced.
-RETIRED_TABLES: tuple = (
-    "variant_biotypes",
-    "variant_consequence_categories",
-    "variant_consequence_groups",
-    "variant_effect_predictions",
-    "variant_gene_regulatory_evidence",
-    "variant_gwas_snp",
-    "variant_regulatory_elements",
-)
-
 
 @dataclass
 class SourceOutcome:
@@ -615,9 +571,7 @@ class BundleBuilder:
             biofilter_version=__version__,
             schema_version=__version__,
             fmt="parquet",
-            exclude_tables=[
-                t for t in CONTROL_TABLES + RETIRED_TABLES if t in present
-            ],
+            exclude_tables=[t for t in CONTROL_TABLES if t in present],
             checksums=False,
         )
 

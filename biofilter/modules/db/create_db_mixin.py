@@ -14,20 +14,17 @@ from biofilter.utils.version import __version__
 
 from biofilter.modules.db.core_ddl import (
     ddl_list_partitions,
-    ddl_variant_effect_predictions,
-    ddl_variant_gene_regulatory_evidence,
     ddl_variant_masters,
     ddl_variant_molecular_effect,
-    ddl_variant_regulatory_elements,
 )
 from biofilter.utils.db_loader import bootstrap_models
 
+#: Partitioned by chromosome on PostgreSQL. Every name here must also be
+#: in `Base.metadata`: the SQLite path asserts it, and three 4.2.x tables
+#: outlived their models here long enough to break `create_db` outright.
 CORE_PARTITIONED = {
     "variant_masters",
     "variant_molecular_effects",
-    "variant_effect_predictions",
-    "variant_regulatory_elements",
-    "variant_gene_regulatory_evidence",
 }
 
 # ---------------------------------------------------------------------
@@ -219,11 +216,6 @@ class CreateDBMixin:
             conn.execute(
                 text(ddl_variant_molecular_effect())
             )  # renomeie para plural se quiser
-            conn.execute(text(ddl_variant_effect_predictions()))
-            conn.execute(
-                text(ddl_variant_regulatory_elements())
-            )  # corrigir typo no import/func
-            conn.execute(text(ddl_variant_gene_regulatory_evidence()))  # idem
 
     def _ensure_partitions_by_chromosome(self, core_partitioned) -> None:
         with self.engine.begin() as conn:

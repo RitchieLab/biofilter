@@ -431,23 +431,42 @@ def test_the_models_declare_only_what_a_plan_can_fill():
     """
     `Base.metadata` is what `db verify --schema` compares a bundle
     against, so a table declared there is a promise some plan fills it.
-    Three 4.2.x lookups were still declared and could not be filled by
-    anything, which made a clean "0 drift" mean less than it read.
 
-    They still exist as classes — two report modules import them at
-    module level — but on their own metadata.
+    Seven 4.2.x tables outlived the schema that needed them. Three were
+    parked on a second metadata and four were named in an exclusion list;
+    all seven are now deleted, which is why this asserts absence rather
+    than separation.
     """
-    from biofilter.modules.db.base import Base, RetiredBase
+    from biofilter.modules.db.base import Base
     import biofilter.modules.db.models  # noqa: F401
 
-    retired = set(RetiredBase.metadata.tables)
-
-    assert retired == {
+    assert not hasattr(
+        __import__("biofilter.modules.db.base", fromlist=["base"]), "RetiredBase"
+    )
+    assert not ({
         "variant_biotypes",
         "variant_consequence_categories",
         "variant_consequence_groups",
-    }
-    assert not (retired & set(Base.metadata.tables))
+        "variant_effect_predictions",
+        "variant_gene_regulatory_evidence",
+        "variant_gwas_snp",
+        "variant_regulatory_elements",
+    } & set(Base.metadata.tables))
+
+
+def test_create_db_builds_every_table_it_promises():
+    """
+    Regression: `CORE_PARTITIONED` listed three tables whose models had
+    been retired, and the SQLite path asserts every name there is in
+    `Base.metadata`. Creating a staging database raised outright, so a
+    `bundle build` from scratch could not start — only one resuming an
+    existing staging file worked.
+    """
+    from biofilter.modules.db.base import Base
+    from biofilter.modules.db.create_db_mixin import CORE_PARTITIONED
+    import biofilter.modules.db.models  # noqa: F401
+
+    assert CORE_PARTITIONED <= set(Base.metadata.tables)
 
 
 def test_every_variant_table_a_bundle_carries_is_declared(tmp_path):
