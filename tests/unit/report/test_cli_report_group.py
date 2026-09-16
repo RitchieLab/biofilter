@@ -31,10 +31,6 @@ class FakeReportFacade:
         self.available_columns_result = ["col_a", "col_b"]
         self.run_result = FakeDataFrame()
         self.run_error = None
-        self.pending_result = []
-
-    def pending_migration(self):
-        return self.pending_result
 
     def list(self, verbose=False):
         self.calls.append(("list", {"verbose": verbose}))
@@ -567,34 +563,3 @@ def test_report_run_invalid_name_prints_friendly_error_without_traceback(monkeyp
     assert "biofilter report list" in result.output
     assert "Traceback" not in result.output
 
-
-def test_report_list_reports_what_is_still_pending(monkeypatch):
-    """
-    The count of reports awaiting rewrite is the migration's progress
-    bar; it has to reach the user, not just the tree.
-    """
-    runner = CliRunner()
-    facade = FakeReportFacade()
-    facade.list_result = [{"name": "annotate_gene", "module": "x"}]
-    facade.pending_result = ["snp_snp_model", "variant_binning"]
-    _patch_biofilter(monkeypatch, facade, {})
-
-    result = runner.invoke(
-        report_cli_mod.report, ["list", "--db-uri", "sqlite:///t.db", "--verbose"]
-    )
-
-    assert result.exit_code == 0, result.output
-    assert "2 more await rewriting" in result.output
-    assert "- snp_snp_model" in result.output
-
-
-def test_report_list_says_nothing_when_nothing_is_pending(monkeypatch):
-    runner = CliRunner()
-    facade = FakeReportFacade()
-    facade.list_result = [{"name": "annotate_gene", "module": "x"}]
-    _patch_biofilter(monkeypatch, facade, {})
-
-    result = runner.invoke(report_cli_mod.report, ["list", "--db-uri", "sqlite:///t.db"])
-
-    assert result.exit_code == 0, result.output
-    assert "await rewriting" not in result.output

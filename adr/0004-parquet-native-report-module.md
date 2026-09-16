@@ -514,6 +514,24 @@ No version deadline. The module is deleted when it is empty, and
 `report list` keeps the remaining count visible (§2.9) so the debt does
 not go quiet.
 
+**Done, 2026-09-16.** `biofilter/modules/report_legacy/` is deleted, and
+with it `tests/unit/report_legacy/` — whose own conftest said it would
+go the same day — plus `ReportComponent.pending_migration()` and the
+`report list` footer that counted what was left. A progress bar at zero
+is not information, and keeping it invites someone to add a row.
+
+The deletion is safe because git holds the module: every retired report
+is one `git show` away, which is what "reference material" was ever
+worth (§2.2).
+
+It also settles a question three other files were waiting on.
+`db/base.py`, `db/models/model_variants.py` and `bundle/builder.py` each
+keep retired model classes alive with a comment saying they exist *only*
+because `report_legacy` imports them. Nothing imports them now, so that
+comment is false and `RetiredBase` can go. Not done here: those files
+belong to the bundle-build work in flight, and the class deletion is
+theirs to make.
+
 ### 2.12 Reports fall into six classes, and the class predicts the work
 
 Migrating seven reports made the shape of the remaining nineteen legible.

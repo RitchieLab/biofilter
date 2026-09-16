@@ -327,18 +327,6 @@ def list_(ctx, db_uri, verbose, debug):
                 click.echo(f"   module: {module}")
         click.echo("")
 
-    # What is left to rewrite, counted from the directory rather than by
-    # importing anything. It disappears when that directory empties.
-    pending = bf.report.pending_migration()
-    if pending:
-        click.echo(
-            f"{len(pending)} more await rewriting for the bundle and cannot be "
-            f"run yet — see biofilter/modules/report_legacy/reports/."
-        )
-        if verbose:
-            for name in pending:
-                click.echo(f"   - {name}")
-
 
 # TESTADO
 @report.command("explain")

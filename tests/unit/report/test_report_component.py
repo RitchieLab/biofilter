@@ -94,31 +94,3 @@ class TestWithABundle:
             component.run("no_such_report")
 
 
-class TestPendingMigration:
-    def test_counts_reports_awaiting_rewrite_without_importing_them(self):
-        """
-        Several of them no longer import — they select columns the
-        bundles stopped carrying — so the count comes from the directory
-        listing. It is the migration's progress bar, and it reaches zero
-        when the directory empties.
-        """
-        pending = rcmod.ReportComponent.pending_migration()
-
-        # Deliberately not naming one: every name here is a moving
-        # target, and a test that has to be edited each time a report is
-        # migrated tests the migration schedule rather than the code.
-        assert all(isinstance(name, str) and name for name in pending)
-        assert not any(name.startswith("report_") for name in pending)
-        assert pending == sorted(pending)
-
-    def test_a_migrated_report_is_no_longer_pending(self):
-        assert "annotate_gene" not in (
-            rcmod.ReportComponent.pending_migration()
-        )
-
-    def test_the_scaffold_is_not_counted(self):
-        assert "template" not in rcmod.ReportComponent.pending_migration()
-
-    def test_an_empty_directory_means_nothing_pending(self, monkeypatch, tmp_path):
-        monkeypatch.setattr(rcmod, "_PENDING_DIR", tmp_path / "gone")
-        assert rcmod.ReportComponent.pending_migration() == []

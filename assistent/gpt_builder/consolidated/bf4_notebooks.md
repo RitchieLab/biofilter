@@ -122,20 +122,13 @@ import pandas as pd
 reports = bf.report.list()
 df = pd.DataFrame(reports)
 
-pending = bf.report.pending_migration()
-print(f"{len(df)} reports available; {len(pending)} still awaiting rewrite")
+print(f"{len(df)} reports available")
 df[["name", "description"]]
 ```
 
-Reports are being rewritten for the bundle one at a time.
-`bf.report.pending_migration()` lists the ones that have not moved yet —
-they live in `biofilter/modules/report_legacy/reports/` as reference for
-whoever rewrites them, and **cannot be run**. Most could not run against
-a 4.3.0 bundle anyway: they select columns the bundles stopped carrying.
-
-```python
-bf.report.pending_migration()[:5]
-```
+Every report now reads the bundle. The rewrite finished in 4.3.0 and the
+frozen relational layer was deleted with it, so `bf.report.list()` is the
+whole catalogue — there is no second set of reports waiting elsewhere.
 
 ### 3. Ask a report about itself
 

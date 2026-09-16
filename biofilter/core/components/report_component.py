@@ -1,12 +1,9 @@
 """
 Facade over the report module.
 
-Reports read a bundle. There is no relational path: `biofilter.modules
-.report_legacy` is reference material for the reports still to be
-rewritten, not code that runs, so nothing here imports it.
-
-What remains of it here is a count — how many reports are still waiting
-— read from the directory listing rather than by importing anything.
+Reports read a bundle. There is no relational path at all: the frozen
+`report_legacy` module was deleted once its last report was rewritten
+(ADR-004 §2.11), and with it the count of what was still waiting.
 """
 
 from __future__ import annotations
@@ -17,13 +14,6 @@ from typing import Any, Optional
 from biofilter.core.components.base_component import BaseComponent
 from biofilter.modules.report.report_manager import ReportManager
 from biofilter.utils.bundle_path import PARQUET_URI_SCHEME
-
-#: Where the reports still to be rewritten live. Read as filenames, never
-#: imported: several no longer run at all, since they select columns the
-#: bundles stopped carrying.
-_PENDING_DIR = (
-    Path(__file__).resolve().parents[2] / "modules" / "report_legacy" / "reports"
-)
 
 _NO_BUNDLE = (
     "Reports read a bundle. Pass --bundle <path> on the CLI, or "
@@ -77,25 +67,6 @@ class ReportComponent(BaseComponent):
 
         self._bundle = Bundle.open(root)
         return self._bundle
-
-    # ------------------------------------------------------------------
-    # Migration status
-    # ------------------------------------------------------------------
-    @staticmethod
-    def pending_migration() -> list[str]:
-        """
-        Reports not yet rewritten, by name, from the directory listing.
-
-        No import: the point of keeping them is to read them, and some
-        would not import anyway.
-        """
-        if not _PENDING_DIR.is_dir():
-            return []
-        return sorted(
-            path.stem[len("report_"):]
-            for path in _PENDING_DIR.glob("report_*.py")
-            if path.stem != "report_template"
-        )
 
     # ------------------------------------------------------------------
     # Public API

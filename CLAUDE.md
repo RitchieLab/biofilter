@@ -190,11 +190,13 @@ A report is three artifacts, and all three ship together:
 5. Validate: `biofilter --bundle <path> report list` + `report explain --report-name <name>`
 
 Reports are discovered by being in the package — nothing to register.
-Migrating one means writing it here and deleting the file under
-`biofilter/modules/report_legacy/reports/`, which is reference material
-that nothing imports. Shared SQL for the annotation family lives in
-`reports/_annotation.py`; a module there that does not start with
-`report_` is not discovered as a report.
+The frozen `report_legacy` module is gone: every report was rewritten
+against the bundle (ADR-004 §2.11), so there is no relational path and
+no second place to look. Shared helpers live in modules that do not
+start with `report_`, which is what keeps them from being discovered as
+reports: `_annotation.py` (the annotate family's SQL), `_resolution.py`
+(turning a typed name into entities), `_variants.py` (reading rsIDs and
+positions) and `_cohort.py` (reading VCF / PLINK files).
 
 ---
 

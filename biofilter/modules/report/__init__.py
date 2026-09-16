@@ -2,8 +2,8 @@
 Parquet-native report layer (ADR-004).
 
 Reports read a bundle through DuckDB and return Arrow. There is no
-relational path: `biofilter.modules.report_legacy` holds the reports
-still to be rewritten, as reference material that nothing imports.
+relational path: every report was rewritten here, and the frozen
+`report_legacy` module was deleted once the last one moved (§2.11).
 """
 
 from biofilter.modules.report.bundle import (
