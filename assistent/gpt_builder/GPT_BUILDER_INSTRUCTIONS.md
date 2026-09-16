@@ -1,7 +1,24 @@
 # GPT Builder Setup (BF4 Assistant)
 
-This guide configures a ChatGPT GPT (Builder) using the BF4 assistant kit.
-The assistant targets **end users** (researchers/analysts), not developers.
+Configuring the ChatGPT GPT from this kit.
+
+The assistant serves people who were **given a bundle** and want an answer out
+of it. Building a bundle and running the ETL are deliberate deferrals — see
+`../README.md` for why.
+
+## What goes where
+
+Two different things, and mixing them up is the common mistake:
+
+| Kit file | Goes into |
+|---|---|
+| `assistant_system_prompt.md` | GPT **Instructions** box |
+| `assistant_response_contract.md` | GPT **Instructions** box, appended after the prompt |
+| `consolidated/*.md` (5 files) | GPT **Knowledge** (uploaded files) |
+| everything else in `assistent/` | **nowhere** — manifest, eval set and scripts are tooling, not content |
+
+The knowledge base is not the `assistent/` folder. It is the five merged files
+the build script produces from across the repository.
 
 ## 1) Build the knowledge files
 
@@ -11,36 +28,44 @@ From the project root:
 python assistent/gpt_builder/build_gpt_builder_bundle.py
 ```
 
-This generates (inside `assistent/gpt_builder/`):
+This reads `assistent/assistant_context_manifest.yaml` — the single source of
+truth for what the assistant knows — and writes into `assistent/gpt_builder/`:
 
-- `consolidated/` — **5 merged Markdown files** (`bf4_docs.md`, `bf4_agents.md`,
-  `bf4_reports_explain.md`, `bf4_notebooks.md`, `bf4_faq.md`). **Upload these
-  to the GPT.** ChatGPT custom GPTs cap Knowledge at 20 files, so the 72 source
-  files are merged into 5 (each embedded file keeps a `SOURCE FILE:` provenance
-  header so the assistant can still cite where a passage came from).
-- `gpt_builder_knowledge_bundle.zip` / `gpt_builder_knowledge_manifest.json` —
-  the full 72-file set (useful for the API vector-store path; not for GPT
-  Builder because of the 20-file cap).
+- `consolidated/` — **the 5 files you upload**: `bf4_docs.md`,
+  `bf4_agents.md`, `bf4_reports_explain.md`, `bf4_notebooks.md`, `bf4_faq.md`.
+  ChatGPT caps Knowledge at 20 files, so the source files are merged into
+  five; each embedded file keeps a `SOURCE FILE:` header so the assistant can
+  still say where a passage came from.
+- `gpt_builder_knowledge_bundle.zip` and its manifest — the full unmerged set,
+  for the API vector-store path. Not for GPT Builder.
 
-All content is user docs, operational guides, per-report explain docs, notebook
-examples (converted to Markdown), and the FAQ seed — **no Python source code**.
+Watch the output for `warning: source '<id>' matched no files`. That means a
+path moved, and a silently empty source is how the LPC quickstart once left
+the knowledge base without anyone noticing.
 
-## 2) Open GPT Builder
+## 2) Set Instructions
 
-1. Open your GPT in Builder mode.
-2. Go to **Configure**.
+In **Configure → Instructions**, paste in this order:
 
-## 3) Set Instructions
+1. the whole of `assistent/assistant_system_prompt.md`
+2. then the whole of `assistent/assistant_response_contract.md`
 
-Use this content in GPT **Instructions**, in this order:
+Replace what is there; do not append to the previous version. These are
+instructions, and an old line contradicting a new one does not get resolved by
+the knowledge base — the model just follows whichever it reads as more
+specific.
 
-1. `assistent/assistant_system_prompt.md`
-2. `assistent/assistant_response_contract.md`
+## 3) Replace the Knowledge files
 
-## 4) Upload Knowledge Files
+**Delete every existing Knowledge file first, then upload the five.**
 
-In Builder **Knowledge**, upload the 5 files from
-`assistent/gpt_builder/consolidated/`:
+This matters more than it looks. ChatGPT does not reliably replace an uploaded
+file by name, so re-uploading over an old set can leave both copies in
+retrieval. And any file from an older kit whose name is no longer produced
+would stay forever — still retrievable, still describing 4.2.x, with nothing
+to indicate it is stale.
+
+Then upload, from `assistent/gpt_builder/consolidated/`:
 
 - `bf4_docs.md`
 - `bf4_agents.md`
@@ -48,41 +73,43 @@ In Builder **Knowledge**, upload the 5 files from
 - `bf4_notebooks.md`
 - `bf4_faq.md`
 
-That is the whole knowledge base (72 source files merged into 5), comfortably
-under ChatGPT's 20-file Knowledge limit.
+## 4) GPT metadata
 
-## 5) Suggested GPT Metadata
-
-- Name: `Biofilter 4 Assistant`
-- Description: `Run BF4 reports, connect to data, and set up a database — no coding needed.`
-- Conversation starters:
+- **Name:** `Biofilter 4 Assistant`
+- **Description:** `Run Biofilter reports against a bundle and read the
+  results — no coding needed.`
+- **Conversation starters:**
   - `I have a list of genes — how do I annotate them into a CSV?`
-  - `I just want to run reports against a shared snapshot, no install.`
-  - `How do I create a new BF4 database and load data?`
-  - `Which reports are available and what inputs do they take?`
+  - `Someone gave me a bundle. How do I point Biofilter at it?`
+  - `Which variants in these genes are likely damaging?`
+  - `My report came back empty — what does that mean?`
 
-## 6) Validation Before Publishing
+The last starter is deliberate. Telling `not_found` from `no_variants` from a
+source that was never built is the question users most need answered and least
+think to ask.
 
-Run these prompts against the GPT:
+## 5) Validate before publishing
 
-- `How do I annotate a list of genes and save a CSV?`
-- `How do I point BF4 at a Parquet bundle to run reports?`
-- `What is the difference between etl update and etl update-all?`
-- `How do I bootstrap a new database from scratch?`
+Run `assistent/assistant_eval_set.md` — twenty prompts written against the
+current CLI, with a failure-signal list naming the mistakes this assistant has
+actually made.
 
-Expected behavior:
+A fast subset if you only have a minute:
 
-- clear copy-paste commands
-- no invented reports, commands, or flags
-- safe guidance for rollback/delete operations (with a caution note)
-- defers implementation/source-code questions to the maintainer/repo
+| Prompt | Must not |
+|---|---|
+| `How do I point Biofilter at a bundle?` | suggest a `parquet://` URI, or point at `tables/` |
+| `Which reports can I run?` | name `entity_filter`, `etl_status`, `annotation_master_*` or any other 4.2.x name |
+| `How do I create a database and load data?` | walk through it — it should defer, with the cost |
+| `I have genes and want the damaging variants in them` | miss the `mapping` choice in `expand_gene_to_variant` |
+| `Can I use these entity ids with another bundle?` | say yes |
 
-You can also run the full `assistent/assistant_eval_set.md` prompts.
+## 6) Update routine
 
-## 7) Update Routine
+When reports, the CLI or the docs change:
 
-When BF4 docs/CLI/data change:
-
-1. Re-run the bundle script.
-2. Re-upload changed files in GPT Builder Knowledge.
-3. Re-run validation prompts.
+1. Fix the underlying docs first — the manifest points at them.
+2. Re-run the build script.
+3. **Delete the Knowledge files and re-upload**, per §3.
+4. Re-paste Instructions if the prompt or contract changed.
+5. Re-run the eval set.
