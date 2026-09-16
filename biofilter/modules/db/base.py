@@ -7,8 +7,8 @@ from sqlalchemy.orm import declarative_base
 Base = declarative_base()
 
 #: Tables no plan can fill any more, kept only because
-#: `biofilter/modules/report/` still imports their classes and is frozen
-#: until ADR-004 §2.2 replaces it.
+#: `biofilter/modules/report_legacy/` still imports their classes and
+#: is frozen until its reports are replaced.
 #:
 #: They live on their own metadata so `Base.metadata` stops listing
 #: tables nothing writes. Declaring them beside the live schema made

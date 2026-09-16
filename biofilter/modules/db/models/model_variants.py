@@ -75,8 +75,8 @@ class VariantImpact(Base):
 #
 # They gave `group` and `category` an id for a foreign key that is gone;
 # `VariantConsequence` carries both as strings now. The classes remain
-# only because `modules/report/` imports them and is frozen until
-# ADR-004 §2.2 replaces it — they hold no data a bundle needs.
+# only because `modules/report_legacy/` imports them and is frozen
+# until its reports are replaced — they hold no data a bundle needs.
 
 
 class VariantConsequenceGroup(RetiredBase):

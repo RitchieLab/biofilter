@@ -276,6 +276,18 @@ def plan_cmd(ctx, db_uri, out_path: Path, all_sources: bool, force: bool, debug:
     ),
 )
 @click.option(
+    "--into",
+    "merge_into",
+    type=click.Path(file_okay=False, path_type=Path),
+    help=(
+        "Fold this run's variant output into a bundle that already "
+        "exists, instead of writing a new one. For a staged build: each "
+        "stage folds its chromosomes in, and the bundle grows. The "
+        "bundle id changes each time, because it is derived from "
+        "content. Refuses to replace a file the bundle already has."
+    ),
+)
+@click.option(
     "--keep-processed",
     is_flag=True,
     help=(
@@ -305,7 +317,7 @@ def plan_cmd(ctx, db_uri, out_path: Path, all_sources: bool, force: bool, debug:
     ),
 )
 @click.option("--debug", is_flag=True, help="Enable debug logging.")
-def build_cmd(plan_path: Path, data_root: Path, bundle_dir, restart: bool, keep_raw: bool, keep_processed: bool, no_assemble: bool, min_free_gb: float, debug: bool):  # noqa: E501
+def build_cmd(plan_path: Path, data_root: Path, bundle_dir, restart: bool, keep_raw: bool, keep_processed: bool, merge_into, no_assemble: bool, min_free_gb: float, debug: bool):  # noqa: E501
     """
     Build a bundle from a plan.
 
@@ -330,6 +342,7 @@ def build_cmd(plan_path: Path, data_root: Path, bundle_dir, restart: bool, keep_
         logger=bf.core.logger,
         keep_raw=keep_raw,
         keep_processed=keep_processed,
+        merge_into=merge_into,
         bundle_dir=bundle_dir,
         assemble=not no_assemble,
         min_free_gb=min_free_gb,

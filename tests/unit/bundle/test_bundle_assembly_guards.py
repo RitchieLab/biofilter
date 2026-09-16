@@ -290,3 +290,136 @@ def test_the_default_still_moves(tmp_path):
     assert len(moved) == 1
     assert (tables / "variant_masters" / "variant_masters_gnomad_chr22.parquet").is_file()
     assert not src.exists()
+
+
+# ---------------------------------------------------------------------------
+# Folding a later run into an existing bundle
+# ---------------------------------------------------------------------------
+
+
+def _bundle(tmp_path, entries):
+    """A bundle with a manifest and the files it declares."""
+    out = tmp_path / "bundle"
+    (out / "tables").mkdir(parents=True)
+    tables = []
+    for name, table in entries:
+        directory = out / "tables" / table
+        directory.mkdir(exist_ok=True)
+        path = directory / f"{name}.parquet"
+        _stamped(path, table, "gnomad")
+        tables.append({
+            "name": name, "table": table, "branch": "variant",
+            "rows": 1, "file": str(path.relative_to(out)),
+            "bytes": path.stat().st_size,
+        })
+    (out / "manifest.json").write_text(json.dumps({
+        "bundle_id": "0000000000000000", "tables": tables,
+    }))
+    return out
+
+
+def _merging_builder(tmp_path, out, sources):
+    builder = BundleBuilder.__new__(BundleBuilder)
+    builder.logger = _Logger()
+    builder.keep_processed = False
+    builder.merge_into = out
+    builder.processed_path = tmp_path / "processed"
+    builder.plan = {"branches": {"variant": {"sources": [
+        {"name": n, "source_system": "gnomAD", "include": True} for n in sources
+    ]}}}
+    for name in sources:
+        (builder.processed_path / "gnomAD" / name).mkdir(parents=True)
+    return builder
+
+
+def test_a_stage_is_folded_into_the_bundle_it_targets(tmp_path, monkeypatch):
+    """
+    A genome runs in stages. Without this each stage either publishes a
+    partial bundle or waits for all of them, which is the same as having
+    no stages.
+    """
+    out = _bundle(tmp_path, [("variant_masters_gnomad_chr22", "variant_masters")])
+    builder = _merging_builder(tmp_path, out, ["gnomad_joint_chr1"])
+    _stamped(
+        builder.processed_path / "gnomAD" / "gnomad_joint_chr1"
+        / "variant_masters_gnomad_chr1.parquet",
+        "variant_masters", "gnomad",
+    )
+    monkeypatch.setattr(builder, "_stamp_metadata", lambda *a: None)
+    monkeypatch.setattr(builder, "_resync_manifest_entry", lambda *a: None)
+
+    assert builder._merge() is True
+
+    manifest = json.loads((out / "manifest.json").read_text())
+    names = sorted(t["name"] for t in manifest["tables"])
+    assert names == [
+        "variant_masters_gnomad_chr1", "variant_masters_gnomad_chr22",
+    ]
+    # Derived from content, and the content grew.
+    assert manifest["bundle_id"] != "0000000000000000"
+    assert (out / "tables" / "variant_masters"
+            / "variant_masters_gnomad_chr1.parquet").is_file()
+
+
+def test_folding_the_same_chromosome_twice_is_refused(tmp_path):
+    """
+    Re-folding would double its rows, and nothing here can know which
+    copy is the right one.
+    """
+    out = _bundle(tmp_path, [("variant_masters_gnomad_chr1", "variant_masters")])
+    builder = _merging_builder(tmp_path, out, ["gnomad_joint_chr1"])
+    source = (
+        builder.processed_path / "gnomAD" / "gnomad_joint_chr1"
+        / "variant_masters_gnomad_chr1.parquet"
+    )
+    _stamped(source, "variant_masters", "gnomad")
+
+    assert builder._merge() is False
+    # Checked before anything moves: a collision found halfway would
+    # leave the bundle holding part of a run.
+    assert source.is_file()
+    manifest = json.loads((out / "manifest.json").read_text())
+    assert len(manifest["tables"]) == 1
+    assert manifest["bundle_id"] == "0000000000000000"
+
+
+def test_a_directory_that_is_not_a_bundle_is_refused(tmp_path):
+    empty = tmp_path / "somewhere"
+    empty.mkdir()
+    builder = _merging_builder(tmp_path, empty, ["gnomad_joint_chr1"])
+
+    assert builder._merge() is False
+
+
+def test_the_merge_is_recorded_beside_the_original_build(tmp_path, monkeypatch):
+    """The id changes on every merge; the record is how the sequence is
+    read back afterwards."""
+    out = _bundle(tmp_path, [])
+    (out / "build_record.json").write_text(json.dumps({"started_at": "x"}))
+    builder = _merging_builder(tmp_path, out, ["gnomad_joint_chr1"])
+    _stamped(
+        builder.processed_path / "gnomAD" / "gnomad_joint_chr1"
+        / "variant_masters_gnomad_chr1.parquet",
+        "variant_masters", "gnomad",
+    )
+    monkeypatch.setattr(builder, "_stamp_metadata", lambda *a: None)
+    monkeypatch.setattr(builder, "_resync_manifest_entry", lambda *a: None)
+
+    builder._merge()
+
+    record = json.loads((out / "build_record.json").read_text())
+    assert record["started_at"] == "x"
+    merge = record["merges"][0]
+    assert merge["sources"] == ["gnomad_joint_chr1"]
+    assert merge["tables"] == ["variant_masters"]
+    assert merge["bundle_id_before"] == "0000000000000000"
+    assert merge["bundle_id_after"] != merge["bundle_id_before"]
+
+
+def test_a_source_that_produced_nothing_stops_the_merge(tmp_path):
+    """The same guard the normal assembly has: a planned source that
+    contributed no table means the run is not what was asked for."""
+    out = _bundle(tmp_path, [])
+    builder = _merging_builder(tmp_path, out, ["gnomad_joint_chr1"])
+
+    assert builder._merge() is False

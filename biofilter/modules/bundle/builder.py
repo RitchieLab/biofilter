@@ -66,8 +66,8 @@ CONTROL_TABLES: tuple = ()
 # They shipped as empty tables in every bundle, which is worse than
 # absent: `db verify` counted them present, and a report joining one got
 # zero rows instead of an error. The models outlive them only because
-# `modules/report/` still imports them; they go when ADR-004 §2.2
-# retires that module.
+# `modules/report_legacy/` still imports them; they go when its last
+# report is replaced.
 RETIRED_TABLES: tuple = (
     "variant_biotypes",
     "variant_consequence_categories",
@@ -130,6 +130,7 @@ class BundleBuilder:
         keep_raw: bool = False,
         keep_processed: bool = False,
         bundle_dir: Optional[Path] = None,
+        merge_into: Optional[Path] = None,
         assemble: bool = True,
         min_free_gb: float = 0.0,
     ):
@@ -146,6 +147,12 @@ class BundleBuilder:
         # otherwise consume the very files the eventual full bundle
         # needs, forcing that chromosome to be downloaded again.
         self.keep_processed = keep_processed
+        # Fold this run's variant output into a bundle that already
+        # exists, instead of writing a new one. The staged build needs
+        # it: a genome runs in three or four passes, and without this
+        # each pass either publishes a partial bundle or waits for all
+        # of them, which is the same as having no stages.
+        self.merge_into = Path(merge_into) if merge_into else None
         self.assemble = assemble
         self.min_free_gb = min_free_gb
 
@@ -573,6 +580,9 @@ class BundleBuilder:
         from biofilter.modules.db.transfer import export_full_clone
         from biofilter.utils.version import __version__
 
+        if self.merge_into is not None:
+            return self._merge()
+
         out = self.bundle_dir
         if out.exists() and any(out.iterdir()):
             self.logger.log(
@@ -640,6 +650,133 @@ class BundleBuilder:
             "INFO",
         )
         return True
+
+    def _merge(self) -> bool:
+        """
+        Fold this run's variant output into a bundle that already exists.
+
+        The core is not touched: it came from the staging database on the
+        first assembly and has not changed, so only the variant branch is
+        folded in. Everything the normal path guards is still guarded —
+        a planned source that produced nothing stops the merge, and
+        nothing is moved until that check passes.
+
+        The bundle id changes, because it is derived from content and the
+        content grew. That is the honest outcome and also the cost: a
+        result already stamped with the old id now names a bundle that no
+        longer exists. `build_record.json` carries an entry for every
+        merge so the sequence can be read back.
+
+        Refuses to replace a file already in the bundle. Re-folding the
+        same chromosome would otherwise silently double its rows, and
+        deciding *which* copy is right is not something this can know.
+        """
+        out = self.merge_into
+        manifest_path = out / "manifest.json"
+        if not manifest_path.is_file():
+            self.logger.log(
+                f"❌ {out} is not a bundle: no manifest.json. --into takes "
+                f"a bundle to fold this run's output into.",
+                "ERROR",
+            )
+            return False
+
+        tables_dir = out / "tables"
+        self.logger.log(f"📦 Merging into {out}", "INFO")
+
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        before_id = manifest.get("bundle_id")
+        known = {t.get("name") for t in manifest.get("tables", [])}
+
+        # Check before moving anything: a collision found halfway leaves
+        # the bundle holding part of a run.
+        planned: List[tuple] = []
+        for entry in self.included_sources(VARIANT_BRANCH):
+            src_dir = self.processed_path / entry["source_system"] / entry["name"]  # noqa: E501
+            if not src_dir.is_dir():
+                continue
+            for parquet in sorted(src_dir.rglob("*.parquet")):
+                if parquet.stem in known:
+                    self.logger.log(
+                        f"❌ {parquet.stem} is already in {out}. Folding it "
+                        f"again would double its rows. Remove it from the "
+                        f"bundle first, or fold a run that does not repeat "
+                        f"it.",
+                        "ERROR",
+                    )
+                    return False
+                planned.append((entry, parquet))
+
+        moved = self._move_variant_tables(tables_dir)
+
+        missing = self._sources_without_output(moved)
+        if missing:
+            self.logger.log(
+                f"❌ {', '.join(missing)} contributed no table. Nothing was "
+                f"folded in.",
+                "ERROR",
+            )
+            return False
+
+        import pyarrow.parquet as pq
+
+        for path in moved:
+            manifest["tables"].append({
+                "name": path.stem,
+                "table": self._table_for(path),
+                "branch": VARIANT_BRANCH,
+                "rows": pq.ParquetFile(path).metadata.num_rows,
+                "file": str(path.relative_to(out)),
+                "bytes": path.stat().st_size,
+            })
+
+        fingerprint = json.dumps(
+            sorted(
+                (t.get("name"), t.get("rows"), t.get("bytes"))
+                for t in manifest["tables"]
+                if t.get("name") != "biofilter_metadata"
+            ),
+            sort_keys=True,
+        )
+        bundle_id = hashlib.sha256(fingerprint.encode("utf-8")).hexdigest()[:16]  # noqa: E501
+        manifest["bundle_id"] = bundle_id
+        manifest_path.write_text(
+            json.dumps(manifest, indent=2) + "\n", encoding="utf-8"
+        )
+
+        self._stamp_metadata(tables_dir, bundle_id)
+        self._resync_manifest_entry(out, "biofilter_metadata")
+        self._append_merge_record(out, moved, before_id, bundle_id)
+
+        self.logger.log(
+            f"✅ Merged {len(moved)} file(s) into {out}", "INFO"
+        )
+        self.logger.log(f"   bundle_id: {before_id} -> {bundle_id}", "INFO")
+        return True
+
+    def _append_merge_record(
+        self,
+        out: Path,
+        moved: List[Path],
+        before_id: Optional[str],
+        after_id: str,
+    ) -> None:
+        """Record what this merge added, beside the original build."""
+        path = out / "build_record.json"
+        record = (
+            json.loads(path.read_text(encoding="utf-8"))
+            if path.is_file() else {}
+        )
+        tables = sorted({self._table_for(p) for p in moved})
+        record.setdefault("merges", []).append({
+            "at": datetime.now(timezone.utc).isoformat(),
+            "sources": [e["name"] for e in self.included_sources(VARIANT_BRANCH)],  # noqa: E501
+            "files": len(moved),
+            "tables": tables,
+            "bundle_id_before": before_id,
+            "bundle_id_after": after_id,
+        })
+        path.write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")
 
     def _move_variant_tables(self, tables_dir: Path) -> List[Path]:
         """
