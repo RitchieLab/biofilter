@@ -96,6 +96,5 @@ This model keeps report documentation maintainable:
 
 ## Practical Examples
 
-Repository-level example guides:
-
-- `docs/reports/snp_snp_model.md`
+Each report ships a worked notebook at
+`notebooks/templates/reports__<name>.ipynb`, runnable against a bundle.
