@@ -1,12 +1,20 @@
 """
 What a report returns.
 
-A report hands back a table plus the provenance needed to know which
-bundle produced it, and — when it has any — the extra files it wrote
-along the way. `artifacts` is empty for every report today; it is
-declared now so the day a report needs to emit rejected rows or an
-inconsistency log, the contract does not have to change under the
-reports already migrated (ADR-004 §2.6).
+A report hands back its main table, any further tables it produced, the
+provenance needed to know which bundle made them, and the extra files it
+wrote along the way.
+
+Two verbs, because they answer different questions:
+
+- `write()` **exports**. CSV for reading elsewhere, parquet for size.
+  It flattens nested columns so a spreadsheet can hold them, which is
+  lossy on purpose.
+- `save()` / `load()` **round-trip**. A directory holding every table as
+  parquet plus a manifest, losing nothing. It is written in the same
+  shape as a bundle, so a saved result can also be opened with
+  `Bundle.open` and queried in DuckDB — which is most of what reusing
+  one means.
 """
 
 from __future__ import annotations
@@ -24,6 +32,17 @@ import pyarrow.parquet as pq
 #: Suffix of the file written next to a CSV export. CSV has nowhere
 #: honest to put metadata, so provenance travels beside it.
 PROVENANCE_SUFFIX = ".provenance.json"
+
+#: What the main table is called inside a saved result. Named rather than
+#: positional so the directory reads the same whether a report produced
+#: one table or five.
+PRIMARY_TABLE = "result"
+
+#: The manifest a saved result declares. Deliberately the same version a
+#: bundle declares: a saved result is shaped like one, and `Bundle.open`
+#: reads it without knowing the difference.
+RESULT_MANIFEST_VERSION = 2
+RESULT_MANIFEST = "manifest.json"
 
 
 @dataclass(frozen=True)
@@ -89,6 +108,15 @@ class ReportResult:
     table: pa.Table
     provenance: dict[str, Any] = field(default_factory=dict)
     artifacts: list[Artifact] = field(default_factory=list)
+    #: Further tables, by name. A report whose answer is genuinely two
+    #: shapes says so here rather than flattening them into one wide
+    #: table or writing the second one out as a file.
+    extra_tables: dict[str, pa.Table] = field(default_factory=dict)
+
+    @property
+    def tables(self) -> dict[str, pa.Table]:
+        """Every table this result carries, main one first."""
+        return {PRIMARY_TABLE: self.table, **self.extra_tables}
 
     @property
     def num_rows(self) -> int:
@@ -164,6 +192,154 @@ class ReportResult:
             ]
         side.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
         return side
+
+    # ------------------------------------------------------------------
+    # Round-trip
+    # ------------------------------------------------------------------
+    def save(self, directory: str | Path, *, overwrite: bool = False) -> Path:
+        """
+        Write every table and the provenance, losing nothing.
+
+        A directory, not a file, because a result can carry more than one
+        table and because its artifacts are files that belong beside it.
+        The layout is a bundle's — `manifest.json` and `tables/` — so the
+        same reader opens both and a saved result can be queried rather
+        than only reloaded.
+        """
+        root = Path(directory).expanduser()
+        if root.exists() and any(root.iterdir()) and not overwrite:
+            raise FileExistsError(
+                f"{root} already holds something. Pass overwrite=True to "
+                f"replace it, or choose a directory of its own — a result "
+                f"written over another leaves the manifest describing files "
+                f"that are no longer all there."
+            )
+        tables_dir = root / "tables"
+        tables_dir.mkdir(parents=True, exist_ok=True)
+
+        entries = []
+        for name, table in self.tables.items():
+            target = tables_dir / f"{name}.parquet"
+            pq.write_table(table, target)
+            entries.append(
+                {
+                    "name": name,
+                    "table": name,
+                    "file": str(target.relative_to(root)),
+                    "rows": table.num_rows,
+                    "bytes": target.stat().st_size,
+                    "branch": "result",
+                }
+            )
+
+        manifest = {
+            "manifest_version": RESULT_MANIFEST_VERSION,
+            "kind": "report_result",
+            "biofilter_version": self.provenance.get("biofilter_version"),
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            # The bundle this came from, not an identity of its own: the
+            # ids in these rows mean nothing except next to that build.
+            "bundle_id": self.provenance.get("bundle_id"),
+            "primary_table": PRIMARY_TABLE,
+            "provenance": _jsonable(self.provenance),
+            "tables": entries,
+            "artifacts": [
+                {
+                    "name": a.name,
+                    "file": a.path.name,
+                    "kind": a.kind,
+                    "description": a.description,
+                }
+                for a in self.artifacts
+            ],
+        }
+        (root / RESULT_MANIFEST).write_text(
+            json.dumps(manifest, indent=2) + "\n", encoding="utf-8"
+        )
+        return root
+
+    @classmethod
+    def load(cls, directory: str | Path) -> "ReportResult":
+        """
+        Read back a result `save()` wrote.
+
+        The result is self-contained: it does not need the bundle that
+        produced it, and does not go looking. Whether that bundle is
+        still on disk is recorded under `provenance["source_bundle"]`,
+        because a result outliving its bundle is the normal case and the
+        reason for saving one at all.
+        """
+        root = Path(directory).expanduser()
+        manifest_path = root / RESULT_MANIFEST
+        if not manifest_path.is_file():
+            raise FileNotFoundError(
+                f"{root} is not a saved result: no {RESULT_MANIFEST}. "
+                f"`ReportResult.save()` writes a directory, not a file."
+            )
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+
+        primary_name = manifest.get("primary_table", PRIMARY_TABLE)
+        tables: dict[str, pa.Table] = {}
+        for entry in manifest.get("tables") or []:
+            path = root / entry["file"]
+            if not path.is_file():
+                raise FileNotFoundError(
+                    f"{manifest_path} declares {entry['file']}, which is not "
+                    f"there. A saved result is the directory, not the "
+                    f"manifest alone."
+                )
+            tables[entry.get("table") or entry["name"]] = pq.read_table(path)
+
+        if primary_name not in tables:
+            raise ValueError(
+                f"{manifest_path} names {primary_name!r} as the main table "
+                f"and does not declare it. Tables present: {sorted(tables)}."
+            )
+
+        provenance = dict(manifest.get("provenance") or {})
+        provenance["source_bundle"] = cls._source_bundle_status(provenance)
+
+        return cls(
+            table=tables.pop(primary_name),
+            provenance=provenance,
+            artifacts=[
+                Artifact(
+                    name=a["name"],
+                    path=root / a["file"],
+                    kind=a.get("kind", "log"),
+                    description=a.get("description", ""),
+                )
+                for a in (manifest.get("artifacts") or [])
+            ],
+            extra_tables=tables,
+        )
+
+    @staticmethod
+    def _source_bundle_status(provenance: dict[str, Any]) -> dict[str, Any]:
+        """
+        Whether the bundle behind these rows is still where it was.
+
+        Not a check that has to pass — the rows are valid either way, and
+        `bundle_id` names the build whether or not it is still on disk.
+        It is here so a reader asking "can I go back to the source" gets
+        an answer instead of finding out by opening a missing path.
+        """
+        root = provenance.get("bundle_root")
+        present = bool(root) and (Path(root) / "manifest.json").is_file()
+        return {
+            "bundle_id": provenance.get("bundle_id"),
+            "bundle_root": root,
+            "still_present": present,
+            "means": (
+                "The bundle that produced this is where it was, so the ids "
+                "in these rows can be looked up again."
+                if present
+                else "The bundle that produced this is not at that path any "
+                "more. The rows are unchanged and still belong to the build "
+                "`bundle_id` names; what cannot be done without it is "
+                "resolving those ids to anything else."
+            ),
+        }
 
     def _table_with_metadata(self) -> pa.Table:
         """Provenance as parquet key-value metadata, one JSON blob."""

@@ -245,9 +245,9 @@ class AggregateCohortVariantsReport(ReportBase):
                     overall_major_allele, group_by,
                 )
             )
-            self._write_variant_to_bin(build, window, maf_cutoff,
-                                       rare_case_control, overall_major_allele,
-                                       group_by)
+            self._emit_variant_to_bin(build, window, maf_cutoff,
+                                      rare_case_control, overall_major_allele,
+                                      group_by)
 
         return ReportResult(table=table, provenance={}, artifacts=list(self.artifacts))
 
@@ -273,6 +273,14 @@ class AggregateCohortVariantsReport(ReportBase):
         )
         in_file = set(samples)
         in_phenotype = set(classes)
+        unmatched = len(in_file - in_phenotype)
+        if unmatched:
+            self.warn(
+                f"{unmatched} of {len(in_file)} cohort samples have no "
+                f"phenotype and take no part in the case/control counts.",
+                samples_without_phenotype=unmatched,
+            )
+
         self.note_provenance(
             "phenotype",
             {
@@ -345,6 +353,15 @@ class AggregateCohortVariantsReport(ReportBase):
             ),
         }
         self.note_provenance("chromosome_coverage", coverage)
+
+        if missing and not require_full:
+            self.warn(
+                f"{unplaceable:,} of {total:,} cohort variants "
+                f"({unplaceable / total:.1%}) sit on chromosomes this bundle "
+                f"does not carry and take no part in the result.",
+                chromosomes=missing,
+                variants=unplaceable,
+            )
 
         if missing and require_full:
             raise ValueError(
@@ -443,6 +460,21 @@ class AggregateCohortVariantsReport(ReportBase):
             means = (
                 f"{carried:,} of {rare:,} rare variants are carried by at "
                 f"least one sample, and only those can reach a bin."
+            )
+
+        if floor is not None and maf_cutoff < floor:
+            self.warn(
+                f"maf_cutoff {maf_cutoff} is below {floor:.4f}, the smallest "
+                f"frequency {sample_count} samples can observe. Every bin "
+                f"will be empty.",
+                samples=sample_count,
+                smallest_observable_maf=round(floor, 6),
+            )
+        elif rare and not carried:
+            self.warn(
+                f"None of the {rare:,} rare variants is carried by any "
+                f"sample, so there is nothing to aggregate.",
+                rare=rare,
             )
 
         self.note_provenance(
@@ -767,23 +799,22 @@ class AggregateCohortVariantsReport(ReportBase):
             ),
         )
 
-    def _write_variant_to_bin(
+    def _emit_variant_to_bin(
         self, build: int, window: int, maf_cutoff: float,
         rare_case_control: bool, overall_major_allele: bool, group_by: str,
     ) -> None:
         """
         Which variants went into which bin.
 
-        A bin count is not auditable without it: two runs differing only
-        in `maf_cutoff` produce different bins and the result table does
-        not say which variants moved.
-        """
-        path = self.param("variant_to_bin_path")
-        if not path:
-            return
-        target = Path(str(path)).expanduser()
-        target.parent.mkdir(parents=True, exist_ok=True)
+        A second table, not a file. A bin count is not auditable without
+        it — two runs differing only in `maf_cutoff` produce different
+        bins and the result table does not say which variants moved — so
+        it travels *with* the result rather than beside it, where it
+        could be lost or go stale without anything noticing.
 
+        `variant_to_bin_path` still writes the CSV, for feeding something
+        that reads files.
+        """
         mapping = self.sql(f"""
             WITH {self._frequencies_cte(maf_cutoff, rare_case_control,
                                         overall_major_allele)},
@@ -799,6 +830,13 @@ class AggregateCohortVariantsReport(ReportBase):
             WHERE m.is_rare
             ORDER BY b.bin_name, m.chromosome, m.position
         """)
+        self.emit("variant_to_bin", mapping)
+
+        path = self.param("variant_to_bin_path")
+        if not path:
+            return
+        target = Path(str(path)).expanduser()
+        target.parent.mkdir(parents=True, exist_ok=True)
 
         with target.open("w", encoding="utf-8", newline="") as handle:
             writer = csv.writer(handle)

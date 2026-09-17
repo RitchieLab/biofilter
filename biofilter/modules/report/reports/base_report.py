@@ -43,6 +43,19 @@ class BundleSchemaMismatch(RuntimeError):
         return [f"BundleSchemaMismatch: {self}"]
 
 
+def _jsonable_context(context: dict[str, Any]) -> dict[str, Any]:
+    """Keep a warning's context printable: it ends up in JSON."""
+    out: dict[str, Any] = {}
+    for key, value in context.items():
+        if isinstance(value, (str, int, float, bool, type(None))):
+            out[key] = value
+        elif isinstance(value, (list, tuple, set)):
+            out[key] = [str(v) for v in value]
+        else:
+            out[key] = str(value)
+    return out
+
+
 class ReportBase:
     #: Friendly name; how the report is asked for on the CLI.
     name: str = "unnamed_report"
@@ -77,6 +90,13 @@ class ReportBase:
         #: the result's provenance, because "which of two mechanisms
         #: produced this" is not recoverable from the rows.
         self.provenance_extra: dict[str, Any] = {}
+        #: Things that went wrong or nearly did, in order. A report that
+        #: silently copes with a problem leaves nothing behind; this is
+        #: where coping gets written down, and it travels in the result's
+        #: provenance rather than only into a log file nobody kept.
+        self.run_warnings: list[dict[str, Any]] = []
+        #: Tables beyond the main one, by name (ADR-004 §2.6).
+        self.extra_tables: dict[str, pa.Table] = {}
         # One cursor per execution. Views are shared; temp tables and
         # registered relations are not, so two reports in one process
         # cannot collide.
@@ -229,6 +249,34 @@ class ReportBase:
         raise ValueError(
             f"{param_name} must be a list of values or a path to a text file."
         )
+
+    def warn(self, message: str, **context: Any) -> None:
+        """
+        Record something the reader needs to know, and say it out loud.
+
+        Both, deliberately. The log reaches whoever is watching the run;
+        the provenance reaches whoever opens the result next month, who
+        is usually a different person and never has the log.
+        """
+        entry = {"message": message, **_jsonable_context(context)}
+        self.run_warnings.append(entry)
+        self.logger.log(f"⚠️  {self.name}: {message}", "WARNING")
+
+    def emit(self, name: str, table: pa.Table) -> None:
+        """
+        Attach a second table to the result.
+
+        For an answer that is genuinely two shapes — the rows, and what
+        was rejected; the bins, and what went into them. Writing the
+        second one out as a CSV instead makes it a file the result only
+        names, which is how it stops being checked.
+        """
+        if name == "result":
+            raise ValueError(
+                "'result' is the main table's name. Return the main table "
+                "from run(); emit() is for the ones beside it."
+            )
+        self.extra_tables[name] = table
 
     def note_provenance(self, key: str, value: Any) -> None:
         """

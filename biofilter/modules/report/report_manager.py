@@ -179,6 +179,8 @@ class ReportManager:
         try:
             produced = report.run()
             extra = dict(report.provenance_extra)
+            warned = list(report.run_warnings)
+            emitted = dict(report.extra_tables)
         finally:
             report.close()
 
@@ -186,6 +188,7 @@ class ReportManager:
             result = produced
         elif isinstance(produced, pa.Table):
             result = ReportResult(table=produced, artifacts=list(report.artifacts))
+
         else:
             raise TypeError(
                 f"Report '{report_name}' returned {type(produced).__name__}; "
@@ -204,6 +207,11 @@ class ReportManager:
         )
         # What the report decided, not only what it was told.
         result.provenance.update(extra)
+        # Always present, so its absence never has to be distinguished
+        # from "nothing went wrong".
+        result.provenance["warnings"] = warned
+        for name, table in emitted.items():
+            result.extra_tables.setdefault(name, table)
 
         elapsed = time.perf_counter() - started
         self.logger.log(
