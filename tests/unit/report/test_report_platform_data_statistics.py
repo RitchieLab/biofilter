@@ -8,6 +8,7 @@ sections are actually cheap.
 
 from __future__ import annotations
 
+import pyarrow as pa
 import pytest
 
 from biofilter.modules.report import Bundle, ReportManager
@@ -185,3 +186,75 @@ class TestContract:
     def test_it_needs_no_input(self, run):
         _, result = run()
         assert result.num_rows > 0
+
+
+class TestTheTablesBesideTheLongOne:
+    """
+    Two sections carry a number the long shape can only hold as text.
+    They get a table of their own; the other four do not, because the
+    long form is faithful for them and `relationships` alone carries two
+    metrics of different shapes.
+    """
+
+    def test_storage_reports_bytes_as_a_number(self, run):
+        _, result = run(sections=["storage"])
+        storage = result.extra_tables["storage"]
+
+        assert storage.column("bytes").type == pa.int64()
+        assert storage.column("rows").type == pa.int64()
+
+    def test_the_long_row_only_had_it_as_prose(self, run):
+        """`note` reads "1 file(s), 3416028 bytes" — not something to sort by."""
+        rows, _ = run(sections=["storage"])
+        note = next(r["note"] for r in rows if r["note"])
+
+        assert "byte" in note
+
+    def test_storage_names_every_table_the_bundle_has(self, run):
+        _, result = run(sections=["storage"])
+        storage = result.extra_tables["storage"].to_pylist()
+
+        assert {r["table"] for r in storage} >= {"entities", "gene_masters"}
+        assert all(r["files"] >= 1 for r in storage)
+
+    def test_variants_reports_the_chromosome_as_an_integer(self, run):
+        """
+        In the long shape it is a string, so sorting gives 1, 10, 11, 2.
+        The bundle now carries enough chromosomes for that to be the
+        usual outcome rather than a curiosity.
+        """
+        _, result = run(sections=["variants"])
+        variants = result.extra_tables["variants"]
+
+        assert variants.column("chromosome").type in (pa.int32(), pa.int64())
+
+    def test_variants_covers_each_variant_table(self, run):
+        _, result = run(sections=["variants"])
+        variants = result.extra_tables["variants"].to_pylist()
+
+        assert "variant_masters" in {r["table"] for r in variants}
+        assert all(r["rows"] > 0 for r in variants)
+
+    def test_a_section_not_asked_for_emits_nothing(self, run):
+        _, result = run(sections=["entities"])
+
+        assert result.extra_tables == {}
+
+    def test_the_main_table_is_unchanged_by_any_of_this(self, run):
+        from biofilter.modules.report.reports.report_platform_data_statistics import (
+            PlatformDataStatisticsReport,
+        )
+
+        _, result = run(sections=["storage", "variants"])
+
+        assert result.columns == list(PlatformDataStatisticsReport.COLUMNS)
+
+    def test_the_whole_result_round_trips(self, run, tmp_path):
+        from biofilter.modules.report.result import ReportResult
+
+        _, result = run(sections=["storage", "variants"])
+        result.save(tmp_path / "stats")
+        back = ReportResult.load(tmp_path / "stats")
+
+        assert set(back.tables) == {"result", "storage", "variants"}
+        assert back.extra_tables["storage"].equals(result.extra_tables["storage"])

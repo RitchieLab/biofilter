@@ -146,10 +146,12 @@ class PlatformDataStatisticsReport(ReportBase):
             rows += self._bundle_section()
         if "storage" in sections:
             rows += self._storage_section()
+            self._emit_storage()
         if "entities" in sections:
             rows += self._entities_section()
         if "variants" in sections:
             rows += self._variants_section()
+            self._emit_variants()
         if "relationships" in sections:
             rows += self._relationships_section()
         if "sources" in sections:
@@ -164,6 +166,77 @@ class PlatformDataStatisticsReport(ReportBase):
                 }
             ]
         return self._rows_to_table(rows)
+
+    # ------------------------------------------------------------------
+    # The two sections the long shape cannot hold faithfully
+    # ------------------------------------------------------------------
+    #
+    # The long shape is right for the rest: heterogeneous measurements
+    # share one set of columns, and `relationships` alone carries two
+    # metrics of different shapes, so "one table per section" is not even
+    # well defined. These two are different — the long form loses
+    # something in each, and what it loses is the part you would sort by.
+
+    def _emit_storage(self) -> None:
+        """
+        Per table: rows, bytes, files — with bytes as a number.
+
+        In the long shape a table's size survives twice and neither is
+        usable: `value_text` rounds it to "3.4 MB" and `note` buries the
+        exact figure in "1 file(s), 3416028 bytes". Ordering a bundle's
+        tables by size means parsing a sentence.
+        """
+        by_file: dict[str, tuple[int, int]] = {}
+        for entry in self.bundle.manifest.get("tables") or []:
+            logical = entry.get("table") or entry.get("name")
+            if not logical:
+                continue
+            size, count = by_file.get(logical, (0, 0))
+            by_file[logical] = (size + int(entry.get("bytes") or 0), count + 1)
+
+        names, branches, rows_n, bytes_n, files_n = [], [], [], [], []
+        for name, table in sorted(self.bundle.tables.items()):
+            size, files = by_file.get(name, (0, len(table.files)))
+            names.append(name)
+            branches.append(table.branch)
+            rows_n.append(int(table.rows))
+            bytes_n.append(int(size))
+            files_n.append(int(files))
+
+        self.emit(
+            "storage",
+            pa.table(
+                {
+                    "table": pa.array(names, pa.string()),
+                    "branch": pa.array(branches, pa.string()),
+                    "rows": pa.array(rows_n, pa.int64()),
+                    "bytes": pa.array(bytes_n, pa.int64()),
+                    "files": pa.array(files_n, pa.int32()),
+                }
+            ),
+        )
+
+    def _emit_variants(self) -> None:
+        """
+        Rows per chromosome, with the chromosome as a number.
+
+        `dimension_2` is a string, so a reader sorting it gets 1, 10, 11,
+        2 — and the bundle now carries enough chromosomes for that to be
+        the usual outcome rather than a curiosity.
+        """
+        present = [name for name in VARIANT_TABLES if self.bundle.has(name)]
+        if not present:
+            return
+
+        union = "\nUNION ALL\n".join(
+            f"""SELECT '{name}' AS "table", chromosome, count(*) AS rows
+                FROM "{name}" GROUP BY chromosome"""
+            for name in present
+        )
+        self.emit(
+            "variants",
+            self.sql(f'SELECT * FROM ({union}) ORDER BY "table", chromosome'),
+        )
 
     # ------------------------------------------------------------------
     # Sections read from the manifest — no scan
