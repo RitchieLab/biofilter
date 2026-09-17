@@ -68,3 +68,28 @@ where to go for why.
 
 **`as_of` is about the data, not the report.** When a source was last
 loaded, for instance. When the *report* ran is in the provenance sidecar.
+
+## The two tables beside the long one
+
+The long shape holds most of this report faithfully. Two sections it
+cannot, and in both cases what it loses is the part you would sort by —
+so those travel as tables of their own:
+
+```python
+stats = bf.report.run("platform_data_statistics")
+
+stats.table                        # the long measurements, unchanged
+stats.extra_tables["storage"]      # table, branch, rows, bytes, files
+stats.extra_tables["variants"]     # table, chromosome, rows
+```
+
+`storage.bytes` is an integer. In the long shape a table's size survives
+twice and neither is usable: `value_text` rounds it to `"3.4 MB"` and
+`note` buries the figure in `"1 file(s), 3416028 bytes"`.
+
+`variants.chromosome` is an integer. In the long shape it is a string in
+`dimension_2`, so sorting gives 1, 10, 11, 2.
+
+The other four sections keep the long shape and lose nothing by it.
+`relationships` alone carries two metrics of different shapes, which is
+why "one table per section" is not a thing this report could have.

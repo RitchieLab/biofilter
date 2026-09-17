@@ -189,6 +189,18 @@ A report is three artifacts, and all three ship together:
 4. `tests/unit/report/test_report_<name>.py` — against the fixture bundle in `tests/unit/report/conftest.py`
 5. Validate: `biofilter --bundle <path> report list` + `report explain --report-name <name>`
 
+A report returns one table. When its answer is genuinely two shapes,
+`self.emit("<name>", table)` attaches another instead of flattening them
+into one or writing the second out as a file. When it copes with
+something the reader should know about, `self.warn(msg, **context)` logs
+it and records it in the result's provenance.
+
+`result.save(dir)` / `ReportResult.load(dir)` round-trip the whole thing
+— every table as parquet, provenance in a manifest, in a bundle's own
+layout so `Bundle.open` reads a saved result and DuckDB queries it.
+`result.write(path)` is the other job: exporting CSV or parquet for
+something else to read, flattening nested columns, lossy on purpose.
+
 Reports are discovered by being in the package — nothing to register.
 The frozen `report_legacy` module is gone: every report was rewritten
 against the bundle (ADR-004 §2.11), so there is no relational path and

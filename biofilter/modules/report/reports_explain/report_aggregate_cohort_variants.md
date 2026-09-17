@@ -129,7 +129,7 @@ cannot reach is reported as unbinned, not dropped.
 | `max_variants` | none | stop after this many, for a quick look |
 | `require_full_coverage` | `false` | refuse if the bundle cannot place a chromosome |
 | `plink_extract_path` | none | write a `--extract` list |
-| `variant_to_bin_path` | none | write the (variant, bin) mapping |
+| `variant_to_bin_path` | none | also write the (variant, bin) mapping as a CSV |
 
 ## The PLINK `--extract` file
 
@@ -188,5 +188,23 @@ outside this report.
 
 **Rebinning changes the bins.** Two runs differing only in `maf_cutoff`
 produce different bins and the result table does not say which variants
-moved. `variant_to_bin_path` writes that mapping; keep it next to the
-result whenever the bins matter.
+moved. So the mapping is a **second table** on the result, not a file
+you have to remember to ask for:
+
+```python
+bins = bf.report.run("aggregate_cohort_variants", cohort_file="...",
+                     output_grain="bins")
+
+bins.table                            # one row per (bin, sample)
+bins.extra_tables["variant_to_bin"]   # what each bin is made of
+bins.save("runs/2026-09-17")          # both, plus the provenance
+```
+
+`variant_to_bin_path` still writes it as a CSV, for feeding something
+that reads files.
+
+**Check `provenance["warnings"]`.** This report proceeds through three
+situations that can make its answer misleading — chromosomes the bundle
+cannot place, a `maf_cutoff` below what the cohort can observe, and
+samples with no phenotype. Each is logged when it happens and recorded
+there, because whoever opens the result later does not have the log.

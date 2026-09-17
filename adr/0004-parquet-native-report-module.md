@@ -508,6 +508,39 @@ The fixture bundle also carries the column-name check that §2.4 gives
 up: a report referencing a column the bundle does not have fails in
 tests rather than in production. §1.4 is what happens without it.
 
+### 2.10b A result is a thing you can put down and pick up
+
+*Added 2026-09-17.*
+
+§2.6 declared `artifacts` so a report could emit a rejected-row log
+without changing the contract under the migrated reports. Two years of
+one table showed the declaration was aimed slightly wrong: what reports
+actually needed was not files beside the result but **more tables in
+it**. Both workarounds in the tree confirmed it — `platform_data_statistics`
+flattening heterogeneous sections into one long table, and
+`aggregate_cohort_variants` writing `variant_to_bin` out as a CSV.
+
+So `ReportResult` carries `extra_tables`, and `ReportBase.emit()` fills
+it. `artifacts` stays for what is genuinely a file — a PLINK `--extract`
+list is not a table anyone will query.
+
+`save()` / `load()` round-trip a result whole, and deliberately in a
+bundle's layout: `manifest.json` plus `tables/*.parquet`. Reusing a
+result mostly means querying it rather than reloading it into Python, and
+Biofilter already has a reader for that shape, so `Bundle.open` opens a
+saved result with no new code. `write()` keeps the other job — exporting
+for something else to read, flattening nested columns, lossy on purpose.
+
+Loading never requires the bundle that produced the rows. A result
+outliving its bundle is the normal case and the reason to save one;
+`provenance["source_bundle"]` records whether that build is still on
+disk, and `bundle_id` names it either way (ADR-003 §2.5).
+
+`provenance["warnings"]` is always present, so an empty list never has to
+be told apart from "nothing was collected". A report that copes with a
+problem in silence leaves nothing behind, and the log reaches whoever is
+watching the run, never whoever opens the result next month.
+
 ### 2.11 `report_legacy` ends when the last report leaves
 
 No version deadline. The module is deleted when it is empty, and
