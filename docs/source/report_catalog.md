@@ -145,6 +145,22 @@ It answers three things at once: which of your variants Biofilter knows,
 where they sit, and what each sample carries per bin. Binning is optional —
 without it you get the match and the placement.
 
+It returns **two tables**: the bins, and the `(variant, bin)` mapping that
+says what each bin is made of.
+
+```python
+bins = bf.report.run("aggregate_cohort_variants",
+                     cohort_file="cohort.vcf.gz", output_grain="bins")
+
+bins.table                            # one row per (bin, sample)
+bins.extra_tables["variant_to_bin"]   # what each bin is made of
+```
+
+It also writes a `plink --extract` list as an artifact. And it is the report
+whose `provenance["warnings"]` most often has something in it — chromosomes
+the bundle cannot place, a `maf_cutoff` below what the cohort can observe,
+samples with no phenotype. Read them.
+
 ## About the bundle itself
 
 | Report | Answers |
@@ -156,6 +172,21 @@ without it you get the match and the placement.
 Run `platform_data_statistics` first on any bundle you did not build
 yourself. It tells you which chromosomes and which sources are actually in
 there, which is what decides whether your question is answerable at all.
+
+It returns **three tables**. The long list of measurements holds most of the
+report, but two sections lose the part you would sort by, so they travel as
+tables of their own:
+
+```python
+stats = bf.report.run("platform_data_statistics")
+
+stats.table                       # the long measurements
+stats.extra_tables["storage"]     # table, branch, rows, bytes, files
+stats.extra_tables["variants"]    # table, chromosome, rows
+```
+
+In the long shape a size is `"3.4 MB"` and a chromosome is a string, so
+sorting gives 1, 10, 11, 2. In these two they are integers.
 
 ## Reading a result honestly
 
@@ -179,7 +210,26 @@ result.provenance["coverage"]
 result.provenance["bundle_id"]
 ```
 
+**Warnings.** A report that copes with a problem rather than failing records
+it, and `provenance["warnings"]` is always present — so an empty list means
+nothing went wrong, not that nobody checked.
+
+```python
+result.provenance["warnings"]
+```
+
 **Bundle identity.** Entity and variant ids are valid only inside the
 bundle that produced them. `result.write("out.csv")` saves
 `out.csv.provenance.json` beside the file so the result stays traceable to
 its build. Pin the bundle, not the id.
+
+**Keeping the whole thing.** `write()` exports one table and flattens what a
+spreadsheet cannot hold. For a result you mean to come back to — especially
+one of the multi-table reports above — `save()` writes a directory that loses
+nothing, and `load()` reads it back:
+
+```python
+result.save("./results/cohort_2026_09")
+```
+
+See [Reports](reports.md#saving-a-result) for both.
