@@ -211,7 +211,86 @@ saving one writes a `.provenance.json` beside it. Across bundles, use natural
 keys: `chromosome:position:ref:alt` for variants, symbols and HGNC ids for
 genes.
 
-### C4) It warns the bundle was built by a different Biofilter
+### C4) Did anything go wrong that the table does not show?
+
+```python
+result.provenance["warnings"]
+```
+
+Always present. A report that copes with a problem rather than failing writes
+it here — a chromosome it could not place, a `maf_cutoff` below what the
+cohort can observe, samples with no phenotype. An empty list means nothing
+went wrong; it never means nobody checked.
+
+`aggregate_cohort_variants` is the one most likely to have something there.
+
+### C5) I ran a report and think I am missing part of the answer
+
+Some reports return more than one table. The result object holds them:
+
+```python
+result.table                      # the main one
+result.extra_tables               # the rest, by name
+result.tables.keys()              # everything, main one first
+```
+
+| Report | Main table | Beside it |
+|---|---|---|
+| `platform_data_statistics` | the long list of measurements | `storage`, `variants` |
+| `aggregate_cohort_variants` | one row per bin and sample | `variant_to_bin` |
+
+For `platform_data_statistics` the extras are not a detail: in the long shape
+a table's size is the string `"3.4 MB"` and a chromosome sorts 1, 10, 11, 2.
+In `storage` and `variants` they are integers.
+
+```python
+stats = bf.report.run("platform_data_statistics")
+stats.extra_tables["storage"]     # table, branch, rows, bytes, files
+stats.extra_tables["variants"]    # table, chromosome, rows
+```
+
+### C6) How do I save a result so I can come back to it?
+
+Two verbs, and the difference matters:
+
+```python
+result.write("genes.csv")         # export: one table, flattened for a spreadsheet
+result.save("./results/run_01")   # keep: every table, nothing lost
+```
+
+`write()` takes the main table only. Nested columns become JSON strings so a
+spreadsheet can hold them, and extra tables and artifacts are not included —
+which is fine for handing numbers to someone, and wrong for a multi-table
+report.
+
+`save()` writes a directory: each table as parquet, plus a manifest. Read it
+back with:
+
+```python
+from biofilter.modules.report.result import ReportResult
+
+later = ReportResult.load("./results/run_01")
+later.extra_tables
+later.provenance["source_bundle"]   # is the source bundle still on disk?
+```
+
+A saved result is written in a bundle's shape, so `Bundle.open()` can query it
+too.
+
+### C7) I loaded an old result and the bundle is gone
+
+`load()` reports it:
+
+```python
+later.provenance["source_bundle"]["still_present"]   # False
+```
+
+The rows are unchanged and still belong to the build `bundle_id` names. What
+you cannot do without that bundle is resolve the ids in them to anything else.
+A result outliving its bundle is the normal case, and the reason for saving
+one.
+
+### C8) It warns the bundle was built by a different Biofilter
 
 ```
 UserWarning: <bundle> was built by Biofilter 4.2.0; this is 4.3.0.

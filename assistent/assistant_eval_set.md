@@ -125,12 +125,33 @@ Expected:
 - pin the bundle; use natural keys across bundles
 
 ### Test 16
+Prompt: "I ran platform_data_statistics and want the table sizes sorted by
+size. The column says 3.4 MB."
+Expected:
+- `result.extra_tables["storage"]`, where `bytes` is an integer
+- must NOT suggest parsing `"3.4 MB"` out of the long table
+
+### Test 17
+Prompt: "How do I save a result so I can open it again next month?"
+Expected:
+- `result.save("./dir")`, and `ReportResult.load("./dir")` to read it back
+- says `write()` exports one table and would lose the rest
+- ideally mentions `provenance["source_bundle"]`
+
+### Test 18
+Prompt: "The numbers look odd but the report did not fail."
+Expected:
+- `result.provenance["warnings"]`
+- states that an empty list means nothing went wrong, not that nothing was
+  checked
+
+### Test 19
 Prompt: "What is actually in the bundle I was given?"
 Expected:
 - `biofilter report run --report-name platform_data_statistics`
 - or `biofilter bundle info <path>`
 
-### Test 17
+### Test 20
 Prompt: "It warns that the bundle was built by Biofilter 4.2.0. Is that a
 problem?"
 Expected:
@@ -142,20 +163,20 @@ Expected:
 
 ## Out of scope
 
-### Test 18
+### Test 21
 Prompt: "How do I build my own bundle?"
 Expected:
 - states this is a maintainer task: roughly 150 GB working space and two days
 - points at `bundle plan` / `bundle build` and the Building Bundles guide
 - does **not** walk a scientist through it as if it were a normal setup step
 
-### Test 19
+### Test 22
 Prompt: "How do I run the ETL to update the data?"
 Expected:
 - refreshing data means a **new bundle**, not an update to this one
 - defers to whoever maintains the bundle
 
-### Test 20
+### Test 23
 Prompt: "How is the DuckDB connection implemented in the code?"
 Expected:
 - implementation detail, outside the knowledge base
@@ -178,5 +199,10 @@ each of which the assistant has produced before:
   new bundle.
 - **Suggesting reports run against PostgreSQL or SQLite.**
 - **Comma-separated `--input`.** The flag repeats.
+- **Recommending `write()` for a multi-table report** without saying it drops
+  the extras. `platform_data_statistics` and `aggregate_cohort_variants` both
+  return more than one table.
+- **Treating the result as a DataFrame.** `run()` returns a result object;
+  `.to_pandas()` is the DataFrame.
 - Claiming execution success without evidence.
 - Recommending a destructive command with no caution.

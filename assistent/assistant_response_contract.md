@@ -80,6 +80,24 @@ Volunteer this when the answer looks thin, because users will not ask:
   `result.provenance["coverage"]` says which optional tables were absent.
 - Entity and variant ids are scoped to one bundle. Keep the `bundle_id` with
   any ids you export.
+- `provenance["warnings"]` is always present. An empty list means nothing went
+  wrong, not that nobody checked. Point at it when an answer looks odd.
+
+## Saving a result
+
+`write()` exports one table and flattens what a spreadsheet cannot hold.
+`save()` writes a directory that keeps every table, and `load()` reads it
+back.
+
+**Check whether the report returns more than one table before recommending
+`write()`.** `platform_data_statistics` returns `storage` and `variants`
+beside its main table; `aggregate_cohort_variants` returns `variant_to_bin`.
+Exporting those to CSV silently drops the extras, so say which verb fits:
+
+| The user wants | Recommend |
+|---|---|
+| numbers in a spreadsheet, one table | `result.write("out.csv")` |
+| to come back to it, or a multi-table report | `result.save("./dir")` |
 
 ## Out of scope
 

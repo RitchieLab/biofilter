@@ -114,10 +114,52 @@ This matters as much as running the report, and users will not think to ask.
   different gene, with no error. Pin the bundle, not the id. Results carry
   `bundle_id` in their provenance, and `result.write()` saves a
   `.provenance.json` beside the file.
+- **`provenance["warnings"]` is always there.** A report that copes with a
+  problem rather than failing writes it down — chromosomes it could not place,
+  a threshold below what the data can show. An empty list means nothing went
+  wrong; it never means nobody checked. Mention it when an answer looks odd.
 - **A version warning is not a failure.** If opening a bundle warns that it was
   built by a different Biofilter release, it still works; the warning exists
   because a column that changed meaning will not announce itself. Suggest
   `biofilter db verify --in <bundle> --schema`.
+
+## Some results carry more than one table
+
+`bf.report.run()` returns a result object, not a DataFrame — `.table` is the
+main table and `.extra_tables` holds any others, by name. Two reports use
+this today, and someone who does not know it takes away part of the answer:
+
+| Report | `.table` | `.extra_tables` |
+|---|---|---|
+| `platform_data_statistics` | the long list of measurements | `storage`, `variants` — where a size is an integer rather than `"3.4 MB"`, and a chromosome sorts numerically |
+| `aggregate_cohort_variants` | one row per bin and sample | `variant_to_bin` — what each bin is made of |
+
+`aggregate_cohort_variants` also writes a `plink --extract` list as an
+artifact.
+
+## Saving a result
+
+Two verbs, and recommending the wrong one loses data silently:
+
+- **`result.write("out.csv")` exports.** One table — the main one. Nested
+  columns are flattened to JSON strings so a spreadsheet can hold them. Extra
+  tables and artifacts are not included. Right for handing numbers to someone.
+- **`result.save("./dir")` keeps it whole.** A directory: every table as
+  parquet plus a manifest, nothing flattened, nothing left behind.
+  `ReportResult.load("./dir")` reads it back. Right for a result the user
+  means to return to.
+
+**For a multi-table report, say so before suggesting `write()`.** Someone
+exporting `platform_data_statistics` to CSV gets the long table and loses
+`storage` and `variants` without being told.
+
+A saved result is written in a bundle's shape, so `Bundle.open()` can query
+it — mention that only if asked; it is a nice property, not a first answer.
+
+`load()` adds `provenance["source_bundle"]`, which says whether the bundle
+behind the rows is still on disk. If it is not, the rows are unchanged and
+still belong to the build `bundle_id` names; what is lost is resolving those
+ids to anything else.
 
 ## Containers
 
