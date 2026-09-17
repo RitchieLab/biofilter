@@ -548,6 +548,24 @@ class AggregateCohortVariantsReport(ReportBase):
             )
         """
 
+    def _cohort_chromosome_filter(self, column: str = "chromosome") -> str:
+        """
+        Restrict a bundle table to the chromosomes the cohort touches.
+
+        The variant tables are partitioned by chromosome, so naming them
+        lets the scan skip whole files. Without it a three-rsID cohort
+        reads every chromosome in the bundle to annotate three rows, and
+        that cost grows with the bundle rather than with the question.
+        """
+        rows = self.con.execute(
+            "SELECT DISTINCT chromosome FROM cohort_variants "
+            "WHERE chromosome IS NOT NULL ORDER BY 1"
+        ).fetchall()
+        present = [int(r[0]) for r in rows]
+        if not present:
+            return ""
+        return f"WHERE {column} IN ({', '.join(str(c) for c in present)})"
+
     def _placement_cte(self, build: int, window: int, needs_rsid: bool) -> str:
         """Cohort variant to the genes whose range holds it, and to the bundle."""
         has_rsid = self.bundle.has("variant_rsid")
@@ -566,17 +584,17 @@ class AggregateCohortVariantsReport(ReportBase):
             """
                 SELECT
                     c.row_id,
-                    coalesce(c.chromosome, r.chromosome) AS chromosome,
-                    coalesce(c.position, r.position) AS position,
-                    coalesce(c.reference_allele, r.reference_allele) AS reference_allele,
-                    coalesce(c.alternate_allele, r.alternate_allele) AS alternate_allele,
+                    coalesce(c.chromosome, u.chromosome) AS chromosome,
+                    coalesce(c.position, u.position) AS position,
+                    coalesce(c.reference_allele, u.reference_allele)
+                        AS reference_allele,
+                    coalesce(c.alternate_allele, u.alternate_allele)
+                        AS alternate_allele,
                     c.variant_id, c.is_rare,
                     c.maf_overall, c.maf_case, c.maf_control,
                     c.ac_overall, c.an_overall
                 FROM classified c
-                LEFT JOIN rsids r
-                       ON c.chromosome IS NULL
-                      AND lower(c.variant_id) = lower(r.rsid)
+                LEFT JOIN looked_up u ON u.row_id = c.row_id
             """
             if needs_rsid
             else """
@@ -589,8 +607,22 @@ class AggregateCohortVariantsReport(ReportBase):
                 FROM classified c
             """
         )
+        # The lookup needs every chromosome — finding one is the point.
+        # Everything after it only ever touches the cohort's own, and
+        # says so, because the variant tables are partitioned by
+        # chromosome and a named set lets the scan skip whole files.
+        #
+        # Which chromosomes those are is known up front for a cohort that
+        # gave coordinates, and only after the lookup for one that gave
+        # rsIDs — so the filter is a literal list when we have one and a
+        # semi-join against the resolved rows when we do not.
+        narrow = self._cohort_chromosome_filter()
+        if not narrow:
+            narrow = (
+                "WHERE chromosome IN (SELECT DISTINCT chromosome FROM looked_up)"
+            )
         return f"""
-            rsids AS ({rsids}),
+            rsids_all AS ({rsids}),
             -- An rsID-only entry has no coordinates of its own; the
             -- bundle supplies them.
             --
@@ -600,6 +632,33 @@ class AggregateCohortVariantsReport(ReportBase):
             -- rows on a whole-genome bundle, spilling tens of gigabytes
             -- to do nothing at all for a cohort that gave coordinates,
             -- which every VCF and every .bim does.
+            -- Which inputs need a lookup is a filter on the cohort, and
+            -- it belongs here rather than inside the join condition.
+            -- `ON c.chromosome IS NULL AND <equality>` reads the same and
+            -- is not: mixing a non-equality into the condition costs the
+            -- hash join, and DuckDB falls back to a nested loop over all
+            -- 264 million rsIDs. Separated, the same lookup is a hash
+            -- join that finishes in about a second.
+            --
+            -- `lower()` goes on the cohort's side only. The bundle's
+            -- rsids are already lowercase, and wrapping a column in a
+            -- function is what throws away its row-group statistics.
+            needs_lookup AS (
+                SELECT row_id, lower(variant_id) AS rsid
+                FROM classified WHERE chromosome IS NULL AND variant_id IS NOT NULL
+            ),
+            looked_up AS (
+                SELECT
+                    n.row_id, r.chromosome, r.position,
+                    r.reference_allele, r.alternate_allele
+                FROM needs_lookup n
+                JOIN rsids_all r ON r.rsid = n.rsid
+                QUALIFY row_number() OVER (
+                    PARTITION BY n.row_id ORDER BY r.chromosome, r.position
+                ) = 1
+            ),
+            masters AS (SELECT * FROM variant_masters {narrow}),
+            rsids AS (SELECT * FROM rsids_all {narrow}),
             located AS ({located}),
             matched AS (
                 SELECT
@@ -607,7 +666,7 @@ class AggregateCohortVariantsReport(ReportBase):
                     v.variant_key,
                     rs.rsid AS bundle_rsid
                 FROM located l
-                LEFT JOIN variant_masters v
+                LEFT JOIN masters v
                        ON v.chromosome = l.chromosome AND v.position = l.position
                       AND (l.reference_allele IS NULL
                            OR v.reference_allele = l.reference_allele)
