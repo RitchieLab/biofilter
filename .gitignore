@@ -170,6 +170,11 @@ adsp/
 # Where the template notebooks write their results.
 notebooks/templates/outputs/
 
+# DuckDB spills here when a query outgrows memory_limit. On a
+# whole-genome bundle that is tens of gigabytes, and it is disposable.
+notebooks/templates/.tmp/
+**/duckdb_temp_storage_*.tmp
+
 # Safety net: report output landing at the repository root, which is what
 # happens when something writes a bare filename from the wrong directory.
 /*.csv

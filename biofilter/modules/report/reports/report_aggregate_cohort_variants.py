@@ -548,7 +548,7 @@ class AggregateCohortVariantsReport(ReportBase):
             )
         """
 
-    def _placement_cte(self, build: int, window: int) -> str:
+    def _placement_cte(self, build: int, window: int, needs_rsid: bool) -> str:
         """Cohort variant to the genes whose range holds it, and to the bundle."""
         has_rsid = self.bundle.has("variant_rsid")
         rsids = (
@@ -562,11 +562,8 @@ class AggregateCohortVariantsReport(ReportBase):
             WHERE false
             """
         )
-        return f"""
-            rsids AS ({rsids}),
-            -- An rsID-only entry has no coordinates of its own; the
-            -- bundle supplies them.
-            located AS (
+        located = (
+            """
                 SELECT
                     c.row_id,
                     coalesce(c.chromosome, r.chromosome) AS chromosome,
@@ -580,7 +577,30 @@ class AggregateCohortVariantsReport(ReportBase):
                 LEFT JOIN rsids r
                        ON c.chromosome IS NULL
                       AND lower(c.variant_id) = lower(r.rsid)
-            ),
+            """
+            if needs_rsid
+            else """
+                SELECT
+                    c.row_id, c.chromosome, c.position,
+                    c.reference_allele, c.alternate_allele,
+                    c.variant_id, c.is_rare,
+                    c.maf_overall, c.maf_case, c.maf_control,
+                    c.ac_overall, c.an_overall
+                FROM classified c
+            """
+        )
+        return f"""
+            rsids AS ({rsids}),
+            -- An rsID-only entry has no coordinates of its own; the
+            -- bundle supplies them.
+            --
+            -- Only when one is actually present. `c.chromosome IS NULL`
+            -- beside an equality stops DuckDB using a hash join, so this
+            -- becomes a nested loop over `variant_rsid` — 264 million
+            -- rows on a whole-genome bundle, spilling tens of gigabytes
+            -- to do nothing at all for a cohort that gave coordinates,
+            -- which every VCF and every .bim does.
+            located AS ({located}),
             matched AS (
                 SELECT
                     l.*,
@@ -612,6 +632,14 @@ class AggregateCohortVariantsReport(ReportBase):
             )
         """
 
+    def _needs_rsid_lookup(self) -> bool:
+        """Whether any input arrived without coordinates of its own."""
+        return bool(
+            self.con.execute(
+                "SELECT count(*) FROM cohort_variants WHERE chromosome IS NULL"
+            ).fetchone()[0]
+        )
+
     # ------------------------------------------------------------------
     def _variants_query(
         self, build: int, window: int, maf_cutoff: float,
@@ -623,7 +651,7 @@ class AggregateCohortVariantsReport(ReportBase):
         )
         return f"""
             WITH {self._frequencies_cte(maf_cutoff, rare_case_control, overall_major_allele)},
-            {self._placement_cte(build, window)},
+            {self._placement_cte(build, window, self._needs_rsid_lookup())},
             genes AS (
                 SELECT
                     row_id,
@@ -687,7 +715,7 @@ class AggregateCohortVariantsReport(ReportBase):
     ) -> str:
         return f"""
             WITH {self._frequencies_cte(maf_cutoff, rare_case_control, overall_major_allele)},
-            {self._placement_cte(build, window)},
+            {self._placement_cte(build, window, self._needs_rsid_lookup())},
             {self._bins_cte(group_by, build)},
             rare_bins AS (
                 SELECT DISTINCT b.row_id, b.bin_name, b.bin_type, b.gene_entity_id
@@ -818,7 +846,7 @@ class AggregateCohortVariantsReport(ReportBase):
         mapping = self.sql(f"""
             WITH {self._frequencies_cte(maf_cutoff, rare_case_control,
                                         overall_major_allele)},
-            {self._placement_cte(build, window)},
+            {self._placement_cte(build, window, self._needs_rsid_lookup())},
             {self._bins_cte(group_by, build)}
             SELECT
                 m.chromosome, m.position, m.reference_allele, m.alternate_allele,
