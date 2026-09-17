@@ -120,23 +120,130 @@ biofilter report run --report-name expand_gene_to_variant --params-template
 
 ## What comes back
 
-A result is a table plus a record of how it was produced.
+`bf.report.run()` returns a **result**, not a bare DataFrame. The extra layer
+is what carries everything the rows alone cannot say.
 
 ```python
-result.num_rows
-result.columns
-result.to_pandas()
+result = bf.report.run("annotate_gene", input_data=["TP53", "BRCA1"])
 
-result.provenance["bundle_id"]   # which build these rows came from
-result.provenance["params"]      # what was asked
-result.provenance["coverage"]    # what the bundle did not have
+result.num_rows          # rows in the main table
+result.columns           # its column names
+result.to_pandas()       # a DataFrame, provenance on .attrs
 ```
 
-`result.write("out.csv")` saves `out.csv.provenance.json` beside it. Writing
-parquet instead keeps the provenance inside the file's own metadata, so it
-travels even if the sidecar is lost.
+### What it holds
 
-Two habits worth forming:
+| | |
+|---|---|
+| `result.table` | the main table, as Arrow |
+| `result.extra_tables` | further tables, by name — see below |
+| `result.tables` | all of them, main one first |
+| `result.provenance` | where the rows came from and what happened |
+| `result.artifacts` | extra files the report wrote, if any |
+
+### The provenance
+
+```python
+result.provenance["report"]             # which report
+result.provenance["bundle_id"]          # which build these rows came from
+result.provenance["bundle_root"]        # and where it was
+result.provenance["params"]             # what was asked
+result.provenance["rows"]               # how many came back
+result.provenance["generated_at"]       # when
+result.provenance["coverage"]           # what the bundle did not have
+result.provenance["version_mismatch"]   # None unless built by another release
+result.provenance["warnings"]           # what the report coped with, in order
+```
+
+`warnings` is always present, so an empty list means "nothing went wrong"
+rather than "nobody recorded whether anything did". A report that quietly
+works around a problem writes it here, where it reaches whoever opens the
+result next month — who never has the log.
+
+### More than one table
+
+Some answers are genuinely two shapes. `platform_data_statistics` returns one
+long list of metrics and, beside it, the storage and variant breakdowns that
+list cannot hold. `aggregate_cohort_variants` returns the bins and, beside
+them, what went into each.
+
+```python
+result.tables.keys()              # 'result', then the rest
+result.extra_tables["variants"]
+```
+
+They are tables rather than files on purpose: a second table stays part of
+the result and gets checked with it, where a CSV written off to the side
+becomes something the result only names.
+
+## Saving a result
+
+Two verbs, because they answer different questions.
+
+### `write()` — export it
+
+For getting the numbers somewhere else: a spreadsheet, a collaborator, a
+plotting script.
+
+```python
+result.write("genes.csv")        # also writes genes.csv.provenance.json
+result.write("genes.parquet")    # provenance inside the file's metadata too
+```
+
+One table — the main one. Nested columns are flattened to JSON strings so a
+spreadsheet can hold them, which is **lossy on purpose**. Extra tables and
+artifacts are not included.
+
+### `save()` / `load()` — keep it whole
+
+For coming back to it later, or handing the whole answer to someone else.
+
+```python
+from biofilter.modules.report.result import ReportResult
+
+result.save("./results/apoe_screen")
+
+later = ReportResult.load("./results/apoe_screen")
+later.provenance["bundle_id"]
+later.extra_tables
+```
+
+`save()` writes a **directory**, not a file: every table as parquet, plus a
+`manifest.json`. Nothing is flattened and nothing is left behind. It refuses
+to write over a directory that already holds something unless you pass
+`overwrite=True`.
+
+The layout is deliberately a bundle's, which means a saved result is not only
+reloadable — it is **queryable**:
+
+```python
+from biofilter.modules.report.bundle import Bundle
+
+with Bundle.open("./results/apoe_screen") as saved:
+    saved.con.execute("SELECT count(*) FROM result").fetchone()
+```
+
+### Does the source bundle still exist?
+
+`load()` adds one field the original result did not have:
+
+```python
+later.provenance["source_bundle"]
+# {'bundle_id': '39c56b50adeb1dc5',
+#  'bundle_root': '/path/to/bundles/20260914',
+#  'still_present': True,
+#  'means': 'The bundle that produced this is where it was, ...'}
+```
+
+A saved result is self-contained and does not go looking for its bundle. This
+field is there so that "can I go back to the source?" has an answer, rather
+than being discovered by opening a path that is gone.
+
+If `still_present` is `False`, the rows are unchanged and still belong to the
+build `bundle_id` names. What you lose is the ability to resolve the ids in
+them to anything else.
+
+## Two habits worth forming
 
 - **Check `coverage` before trusting a null.** It lists the optional tables
   the bundle lacked and the chromosomes it spans. A column that is null
@@ -144,7 +251,9 @@ Two habits worth forming:
   because the answer is null.
 - **Keep the `bundle_id` with the result.** Entity and variant ids are valid
   only inside the bundle that produced them, so an id without its build is
-  not a fact.
+  not a fact. `write()` puts it in the sidecar and `save()` puts it in the
+  manifest — what neither can do is follow a column of ids you pasted into a
+  spreadsheet.
 
 ## Guides and notebooks
 
