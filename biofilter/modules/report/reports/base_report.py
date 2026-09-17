@@ -278,6 +278,36 @@ class ReportBase:
             )
         self.extra_tables[name] = table
 
+    def chromosome_filter(
+        self, source: str, column: str = "chromosome", *, alias: str = ""
+    ) -> str:
+        """
+        A WHERE clause restricting a bundle table to the chromosomes
+        `source` actually touches, or empty when it touches none.
+
+        The variant tables are partitioned by chromosome, so naming them
+        lets a scan skip whole files. Without it a two-variant question
+        reads every chromosome the bundle has, and what that costs grows
+        with the bundle rather than with the question — which is how a
+        report that was instant on one chromosome takes a minute on six.
+
+        `source` is a registered relation or a table already narrowed to
+        the input; the chromosomes are read from it now and written into
+        the SQL as literals, so the optimiser can prune on them.
+        """
+        try:
+            rows = self.con.execute(
+                f"SELECT DISTINCT {column} FROM {source} "
+                f"WHERE {column} IS NOT NULL ORDER BY 1"
+            ).fetchall()
+        except duckdb.Error:
+            return ""
+        present = [int(r[0]) for r in rows if r[0] is not None]
+        if not present:
+            return ""
+        prefix = f"{alias}." if alias else ""
+        return f"WHERE {prefix}{column} IN ({', '.join(str(c) for c in present)})"
+
     def note_provenance(self, key: str, value: Any) -> None:
         """
         Record something about how this result was produced.

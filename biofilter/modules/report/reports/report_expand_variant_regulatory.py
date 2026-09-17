@@ -227,7 +227,7 @@ class ExpandVariantRegulatoryReport(ReportBase):
 
         rsid_cte = (
             "SELECT chromosome, position, reference_allele, alternate_allele, rsid "
-            "FROM variant_rsid"
+            f"FROM variant_rsid {self.chromosome_filter('reg_input')}"
             if has_rsid
             else """
             SELECT CAST(NULL AS INTEGER) AS chromosome, CAST(NULL AS BIGINT) AS position,

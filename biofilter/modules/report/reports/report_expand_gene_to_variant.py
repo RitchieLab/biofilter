@@ -161,6 +161,42 @@ class ExpandGeneToVariantReport(ReportBase):
             )
         return value
 
+    def _narrow_to_gene_chromosomes(self, build: int) -> str:
+        """
+        The chromosomes the input genes sit on, as a WHERE clause.
+
+        Empty unless *every* resolved gene has coordinates. Almost half
+        the bundle's genes have none, and under `annotation` mapping VEP
+        associates variants by symbol rather than by position — so
+        narrowing on a partial set would drop a gene's variants for no
+        reason the caller could see. All or nothing is the only version
+        of this that cannot lose rows.
+        """
+        row = self.sql(
+            f"""
+            WITH genes AS (
+                SELECT DISTINCT gm.entity_id
+                FROM gene_input i
+                JOIN entity_aliases a ON {ALIAS_KEY} = i.input_gene_norm
+                JOIN gene_masters gm ON gm.entity_id = a.entity_id
+            )
+            SELECT
+                count(*) AS genes,
+                count(l.entity_id) AS placed,
+                list_sort(list_distinct(list(l.chromosome))) AS chromosomes
+            FROM genes g
+            LEFT JOIN (
+                SELECT DISTINCT entity_id, chromosome
+                FROM entity_locations WHERE build = {build}
+            ) l ON l.entity_id = g.entity_id
+            """
+        ).to_pylist()
+        stats = row[0] if row else {}
+        chromosomes = stats.get("chromosomes") or []
+        if not chromosomes or stats.get("placed") != stats.get("genes"):
+            return ""
+        return f"WHERE chromosome IN ({', '.join(str(int(c)) for c in chromosomes)})"
+
     # ------------------------------------------------------------------
     def run(self) -> pa.Table:
         genes = self.resolve_input_list(
@@ -214,6 +250,7 @@ class ExpandGeneToVariantReport(ReportBase):
         has_alphamissense = self.bundle.has("variant_alphamissense")
         has_consequences = self.bundle.has("variant_consequences")
         has_rsid = self.bundle.has("variant_rsid")
+        narrow = self._narrow_to_gene_chromosomes(build)
 
         if mapping == "position" and not self.bundle.has("entity_locations"):
             raise ValueError(
@@ -225,7 +262,7 @@ class ExpandGeneToVariantReport(ReportBase):
         effect_filters = self._effect_filters()
 
         predictions = (
-            "SELECT * FROM variant_predictions"
+            f"SELECT * FROM variant_predictions {narrow}"
             if has_predictions
             else """
             SELECT CAST(NULL AS INTEGER) AS chromosome, CAST(NULL AS BIGINT) AS position,
@@ -255,7 +292,7 @@ class ExpandGeneToVariantReport(ReportBase):
             SELECT chromosome, position, reference_allele, alternate_allele,
                    split_part(transcript_id, '.', 1) AS transcript_id,
                    score, classification
-            FROM variant_alphamissense
+            FROM variant_alphamissense {narrow}
             QUALIFY row_number() OVER (
                 PARTITION BY {am_partition}
                 ORDER BY score DESC, transcript_id
@@ -307,7 +344,7 @@ class ExpandGeneToVariantReport(ReportBase):
         )
         rsids = (
             "SELECT chromosome, position, reference_allele, alternate_allele, rsid "
-            "FROM variant_rsid"
+            f"FROM variant_rsid {narrow}"
             if has_rsid
             else """
             SELECT CAST(NULL AS INTEGER) AS chromosome, CAST(NULL AS BIGINT) AS position,
@@ -326,7 +363,7 @@ class ExpandGeneToVariantReport(ReportBase):
                 e.variant_key, e.feature AS transcript_id, e.consequence, e.impact,
                 e.canonical, e.mane_select, e.lof
             FROM gene_ranges g
-            JOIN variant_molecular_effects e
+            JOIN effects e
               ON e.chromosome = g.chromosome
              AND e.position BETWEEN g.start_pos - {window} AND g.end_pos + {window}
             """
@@ -338,7 +375,7 @@ class ExpandGeneToVariantReport(ReportBase):
                 e.variant_key, e.feature AS transcript_id, e.consequence, e.impact,
                 e.canonical, e.mane_select, e.lof
             FROM gene_ids g
-            JOIN variant_molecular_effects e
+            JOIN effects e
               ON e.symbol = g.gene_symbol
             """
 
@@ -423,6 +460,8 @@ class ExpandGeneToVariantReport(ReportBase):
             alphamissense AS ({alphamissense}),
             consequences AS ({consequences}),
             rsids AS ({rsids}),
+            effects AS (SELECT * FROM variant_molecular_effects {narrow}),
+            masters AS (SELECT * FROM variant_masters {narrow}),
             pairs AS ({pairs}),
             enriched AS (
                 SELECT
@@ -434,7 +473,7 @@ class ExpandGeneToVariantReport(ReportBase):
                     am.score AS alphamissense_score,
                     am.classification AS alphamissense_classification
                 FROM pairs p
-                JOIN variant_masters v
+                JOIN masters v
                   ON v.chromosome = p.chromosome AND v.position = p.position
                  AND v.reference_allele = p.reference_allele
                  AND v.alternate_allele = p.alternate_allele

@@ -244,6 +244,32 @@ class AnnotateVariantReport(ReportBase):
             ),
         )
 
+    def _narrow_to_input_chromosomes(self) -> str:
+        """
+        The chromosomes this run can possibly touch, as a WHERE clause.
+
+        A position says its own chromosome. An rsID does not — but
+        finding out is a hash join against `variant_rsid` that takes
+        about a second, and paying it once turns every scan afterwards
+        into a single partition file instead of the whole bundle. The
+        alternative is doing the genome-wide read three more times.
+        """
+        rows = self.con.execute(
+            """
+            SELECT DISTINCT chromosome FROM variant_input
+             WHERE chromosome IS NOT NULL
+            UNION
+            SELECT DISTINCT r.chromosome
+              FROM variant_input i
+              JOIN variant_rsid r ON r.rsid = i.rsid
+             WHERE i.input_kind = 'rsid'
+            """
+        ).fetchall()
+        present = sorted({int(r[0]) for r in rows if r[0] is not None})
+        if not present:
+            return ""
+        return f"WHERE chromosome IN ({', '.join(str(c) for c in present)})"
+
     # ------------------------------------------------------------------
     def run(self) -> pa.Table:
         values = self.resolve_input_list(
@@ -266,8 +292,10 @@ class AnnotateVariantReport(ReportBase):
         # Every optional table becomes a CTE either way, so the SELECT
         # below does not branch — a bundle without AlphaMissense returns
         # the columns as null rather than a different shape.
+        narrow = self._narrow_to_input_chromosomes()
+
         predictions = (
-            "SELECT * FROM variant_predictions"
+            f"SELECT * FROM variant_predictions {narrow}"
             if has_predictions
             else """
             SELECT
@@ -282,14 +310,14 @@ class AnnotateVariantReport(ReportBase):
             """
         )
         alphamissense = (
-            """
+            f"""
             -- AlphaMissense names transcripts with their version
             -- (ENST00000327374.9); VEP does not (ENST00000327374).
             -- Joining them raw matches nothing, silently.
             SELECT chromosome, position, reference_allele, alternate_allele,
                    split_part(transcript_id, '.', 1) AS transcript_id,
                    score, classification
-            FROM variant_alphamissense
+            FROM variant_alphamissense {narrow}
             QUALIFY row_number() OVER (
                 PARTITION BY chromosome, position, reference_allele,
                              alternate_allele, split_part(transcript_id, '.', 1)
@@ -346,6 +374,22 @@ class AnnotateVariantReport(ReportBase):
             alphamissense AS ({alphamissense}),
             consequences AS ({consequences}),
             impacts AS ({impacts}),
+            -- The three big tables, narrowed to the chromosomes the
+            -- input actually names. They are partitioned by chromosome,
+            -- so this is the difference between reading one file and
+            -- reading the bundle: `variant_molecular_effects` alone is
+            -- 827 million rows.
+            --
+            -- An rsID input names no chromosome, so `narrow` is empty
+            -- for it and these stay whole — finding where an rsID lives
+            -- is the one question that has to look everywhere.
+            masters AS (SELECT * FROM variant_masters {narrow}),
+            effects AS (SELECT * FROM variant_molecular_effects {narrow}),
+            rsids AS (
+                SELECT chromosome, position, reference_allele,
+                       alternate_allele, rsid
+                FROM variant_rsid {narrow}
+            ),
             -- rsID lookup goes through variant_rsid: variant_masters
             -- carries an `rsid` column and it is entirely null in 4.3.0
             -- bundles, so joining on it would silently match nothing.
@@ -353,7 +397,7 @@ class AnnotateVariantReport(ReportBase):
                 SELECT i.input_value, i.input_kind, m.*
                 FROM variant_input i
                 JOIN variant_rsid r ON lower(r.rsid) = i.rsid
-                JOIN variant_masters m
+                JOIN masters m
                   ON m.chromosome = r.chromosome AND m.position = r.position
                  AND m.reference_allele = r.reference_allele
                  AND m.alternate_allele = r.alternate_allele
@@ -362,14 +406,14 @@ class AnnotateVariantReport(ReportBase):
             by_position AS (
                 SELECT i.input_value, i.input_kind, m.*
                 FROM variant_input i
-                JOIN variant_masters m
+                JOIN masters m
                   ON m.chromosome = i.chromosome AND m.position = i.position
                 WHERE i.input_kind = 'chr_pos'
             ),
             by_allele AS (
                 SELECT i.input_value, i.input_kind, m.*
                 FROM variant_input i
-                JOIN variant_masters m
+                JOIN masters m
                   ON m.chromosome = i.chromosome AND m.position = i.position
                  AND m.reference_allele = i.reference_allele
                  AND m.alternate_allele = i.alternate_allele
@@ -414,11 +458,11 @@ class AnnotateVariantReport(ReportBase):
                     am.score          AS alphamissense_score,
                     am.classification AS alphamissense_classification
                 FROM matched v
-                LEFT JOIN variant_molecular_effects e
+                LEFT JOIN effects e
                        ON e.chromosome = v.chromosome AND e.position = v.position
                       AND e.reference_allele = v.reference_allele
                       AND e.alternate_allele = v.alternate_allele
-                LEFT JOIN variant_rsid rs
+                LEFT JOIN rsids rs
                        ON rs.chromosome = v.chromosome AND rs.position = v.position
                       AND rs.reference_allele = v.reference_allele
                       AND rs.alternate_allele = v.alternate_allele
