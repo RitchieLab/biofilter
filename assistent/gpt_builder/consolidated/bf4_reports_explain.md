@@ -135,7 +135,7 @@ cannot reach is reported as unbinned, not dropped.
 | `max_variants` | none | stop after this many, for a quick look |
 | `require_full_coverage` | `false` | refuse if the bundle cannot place a chromosome |
 | `plink_extract_path` | none | write a `--extract` list |
-| `variant_to_bin_path` | none | write the (variant, bin) mapping |
+| `variant_to_bin_path` | none | also write the (variant, bin) mapping as a CSV |
 
 ## The PLINK `--extract` file
 
@@ -194,8 +194,26 @@ outside this report.
 
 **Rebinning changes the bins.** Two runs differing only in `maf_cutoff`
 produce different bins and the result table does not say which variants
-moved. `variant_to_bin_path` writes that mapping; keep it next to the
-result whenever the bins matter.
+moved. So the mapping is a **second table** on the result, not a file
+you have to remember to ask for:
+
+```python
+bins = bf.report.run("aggregate_cohort_variants", cohort_file="...",
+                     output_grain="bins")
+
+bins.table                            # one row per (bin, sample)
+bins.extra_tables["variant_to_bin"]   # what each bin is made of
+bins.save("runs/2026-09-17")          # both, plus the provenance
+```
+
+`variant_to_bin_path` still writes it as a CSV, for feeding something
+that reads files.
+
+**Check `provenance["warnings"]`.** This report proceeds through three
+situations that can make its answer misleading — chromosomes the bundle
+cannot place, a `maf_cutoff` below what the cohort can observe, and
+samples with no phenotype. Each is logged when it happens and recorded
+there, because whoever opens the result later does not have the log.
 
 
 
@@ -1366,6 +1384,31 @@ where to go for why.
 
 **`as_of` is about the data, not the report.** When a source was last
 loaded, for instance. When the *report* ran is in the provenance sidecar.
+
+## The two tables beside the long one
+
+The long shape holds most of this report faithfully. Two sections it
+cannot, and in both cases what it loses is the part you would sort by —
+so those travel as tables of their own:
+
+```python
+stats = bf.report.run("platform_data_statistics")
+
+stats.table                        # the long measurements, unchanged
+stats.extra_tables["storage"]      # table, branch, rows, bytes, files
+stats.extra_tables["variants"]     # table, chromosome, rows
+```
+
+`storage.bytes` is an integer. In the long shape a table's size survives
+twice and neither is usable: `value_text` rounds it to `"3.4 MB"` and
+`note` buries the figure in `"1 file(s), 3416028 bytes"`.
+
+`variants.chromosome` is an integer. In the long shape it is a string in
+`dimension_2`, so sorting gives 1, 10, 11, 2.
+
+The other four sections keep the long shape and lose nothing by it.
+`relationships` alone carries two metrics of different shapes, which is
+why "one table per section" is not a thing this report could have.
 
 
 

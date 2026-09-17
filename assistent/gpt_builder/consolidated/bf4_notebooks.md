@@ -377,6 +377,78 @@ with open(OUTPUT_DIR / "genes.csv.provenance.json") as fh:
     print(json.dumps(json.load(fh), indent=2))
 ```
 
+### 8. Putting a result down and picking it up
+
+`write()` **exports**: CSV to open elsewhere, parquet for size. It
+flattens nested columns so a spreadsheet can hold them, which is lossy on
+purpose — a list of aliases becomes a JSON string.
+
+`save()` / `load()` is the other job: lose nothing, and stay usable
+later. It writes a **directory**, not a file, because a result can carry
+more than one table:
+
+```
+runs/genes/
+├── manifest.json          provenance, and what tables are here
+└── tables/
+    └── result.parquet
+```
+
+```python
+from biofilter.modules.report.result import ReportResult
+
+saved = result.save(OUTPUT_DIR / "runs" / "genes", overwrite=True)
+back = ReportResult.load(saved)
+
+print("identical:", back.table.equals(result.table))
+print("report   :", back.provenance["report"])
+print("params   :", back.provenance["params"])
+```
+
+A result does not need the bundle that produced it, and does not go
+looking. Whether that bundle is still on disk is recorded, because a
+result outliving its bundle is the normal case and the reason to save
+one — the rows are unchanged either way, and `bundle_id` names the build
+whether or not the path still resolves.
+
+```python
+back.provenance["source_bundle"]
+```
+
+**Some reports return more than one table.** When a report's answer is
+genuinely two shapes it says so, rather than flattening them into one or
+writing the second out as a file:
+
+```python
+bins = bf.report.run("aggregate_cohort_variants", cohort_file="...",
+                     output_grain="bins")
+bins.table                            # one row per (bin, sample)
+bins.extra_tables["variant_to_bin"]   # what each bin is made of
+```
+
+And because a saved result is laid out like a bundle, the reader
+Biofilter already has opens it — so reusing one usually means querying
+it, not loading it back into Python.
+
+```python
+from biofilter.modules.report import Bundle
+
+with Bundle.open(saved) as opened:
+    print("tables:", sorted(opened.tables))
+    display(opened.con.execute(
+        "SELECT * FROM result LIMIT 3"
+    ).to_arrow_table().to_pandas())
+```
+
+**`provenance["warnings"]` is always there.** An empty list means
+nothing went wrong, never "nothing was collected" — a report that copes
+with a problem in silence leaves nothing behind, so coping gets written
+down.
+
+```python
+result.provenance["warnings"]
+```
+
 ---
 
 ## Working directly, without the facade
@@ -538,7 +610,36 @@ everything = bf.report.run(REPORT, input_data="__ALL__")
 print(f"{everything.num_rows:,} rows in {time.perf_counter() - started:.1f}s")
 ```
 
-### 7. Export
+### 7. If your report needs more than one table
+
+A report returns one table. When its answer is genuinely two shapes —
+the rows and what was rejected; the bins and what went into them — call
+`self.emit("<name>", table)` in `run()` instead of flattening them
+together or writing the second one out as a file. A file is something
+the result only names, which is how it stops being checked.
+
+When the report copes with something the reader should know about, call
+`self.warn(message, **context)`. It logs at WARNING *and* records the
+same thing in `provenance["warnings"]`, which is what reaches whoever
+opens the result months later without the log.
+
+```python
+def run(self):
+    ...
+    if dropped:
+        self.warn(f"{dropped:,} rows had no coordinates.", rows=dropped)
+        self.emit("dropped", dropped_table)
+    return main_table
+```
+
+```python
+# What this run produced, beyond the main table.
+print("tables :", {n: t.num_rows for n, t in result.tables.items()})
+print("warnings:", result.provenance["warnings"])
+print("files  :", [a.name for a in result.artifacts])
+```
+
+### 8. Export
 
 Always show both, and say what the provenance sidecar is for: ids in a
 result are scoped to the bundle that produced them.
@@ -548,7 +649,7 @@ for path in result.write(OUTPUT_DIR / "<report_name>.csv"):
     print(path)
 ```
 
-### 8. The same thing on the command line
+### 9. The same thing on the command line
 
 ```bash
 biofilter --bundle /path/to/bundles/20260914 report run \
@@ -557,7 +658,7 @@ biofilter --bundle /path/to/bundles/20260914 report run \
     --output out.csv
 ```
 
-### 9. Quick QA
+### 10. Quick QA
 
 ```python
 expected = list(bf.report.available_columns(REPORT))
@@ -805,41 +906,66 @@ for label, params in [
           f"{rare['rare_with_carriers']:>4} with carriers")
 ```
 
-### 9. Two files worth keeping
+### 9. One table that travels, one file that does not
 
-`plink_extract_path` writes the `--extract` list. PLINK matches on the id
-in your `.bim`, not on coordinates, so the id your own file used is
-preferred — a file of `chr:pos` strings extracts nothing from a dataset
-keyed by rsIDs.
+`variant_to_bin` — what each bin is made of — is a **second table on the
+result**, always there when you ask for bins. Two runs differing only in
+`maf_cutoff` produce different bins and the main table does not say which
+variants moved; this is how you find out. Being a table rather than a
+file, it cannot be lost or go stale without anything noticing.
 
-`variant_to_bin_path` writes what each bin is made of. Two runs differing
-only in `maf_cutoff` produce different bins and the result table does not
-say which variants moved.
+`plink_extract_path` writes a real file, because PLINK reads files. It
+matches on the id in your `.bim`, not on coordinates, so the id your own
+file used is preferred — a list of `chr:pos` strings extracts nothing
+from a dataset keyed by rsIDs.
 
 ```python
 audited = bf.report.run(
     REPORT, cohort_file=str(COHORT), phenotype_file=str(PHENOTYPE),
     output_grain="bins", maf_cutoff=0.01,
-    variant_to_bin_path=str(OUTPUT_DIR / "variant_to_bin.csv"),
 )
+
+print("tables on the result:")
+for name, table in audited.tables.items():
+    print(f"  {name:<16} {table.num_rows:>6,} rows")
+
+display(audited.extra_tables["variant_to_bin"].to_pandas().head(5))
+
 keep = bf.report.run(
     REPORT, cohort_file=str(COHORT),
     plink_extract_path=str(OUTPUT_DIR / "keep.txt"),
 )
-
-for result in (audited, keep):
-    for artifact in result.artifacts:
-        print(f"  {artifact.name}: {artifact.description}")
+for artifact in keep.artifacts:
+    print(f"\nfile: {artifact.name} — {artifact.description}")
 ```
 
-### 10. Export
+### 10. What the run wants you to know
+
+This report proceeds through three situations that can make its answer
+misleading rather than refusing outright. Each is logged when it happens
+**and** recorded in the provenance, because whoever opens the result next
+month does not have the log.
+
+```python
+small = bf.report.run(REPORT, cohort_file=str(COHORT),
+                     output_grain="bins", maf_cutoff=0.0001)
+
+for warning in small.provenance["warnings"]:
+    print("⚠️ ", warning["message"])
+
+print("\nno warnings on a clean run:",
+      bf.report.run(REPORT, cohort_file=str(COHORT),
+                    output_grain="variants").provenance["warnings"])
+```
+
+### 11. Export
 
 ```python
 for path in bins.write(OUTPUT_DIR / "aggregate_cohort_variants.csv"):
     print(path)
 ```
 
-### 11. The same thing on the command line
+### 12. The same thing on the command line
 
 ```bash
 biofilter report run --report-name aggregate_cohort_variants \\
@@ -2930,6 +3056,9 @@ Heterogeneous statistics do not fit a wide table, so this one is long:
 `section` and `metric` name the measurement, `dimension_1` and
 `dimension_2` say what it is measured by.
 
+Two sections cannot be held faithfully that way, and come back as tables
+of their own as well — sections 4 and 6 below.
+
 ```python
 result = bf.report.run(REPORT)
 stats = result.to_pandas()
@@ -2956,15 +3085,19 @@ measurement of its own rather than hiding in the per-table list.
 ### 4. How big, per table
 
 Rows, bytes and file count come from `manifest.json`, so this section
-costs **no I/O at all** — the sizes of a 21 GB bundle are read from a few
-hundred lines of JSON.
+costs **no I/O at all** — the sizes of a multi-gigabyte bundle are read
+from a few hundred lines of JSON.
+
+In the long table a size survives twice and neither is usable:
+`value_text` rounds it to `"3.4 MB"` and `note` buries the figure in
+`"6 file(s), 3249124626 bytes"`. So `storage` also comes back as its own
+table, where `bytes` is an integer you can sort by.
 
 ```python
-storage = stats[stats["section"] == "storage"].sort_values(
-    "value_number", ascending=False
-)
+storage = result.extra_tables["storage"].to_pandas()
 
-storage[["dimension_1", "dimension_2", "value_number", "value_text", "note"]].head(12)
+print(f'{len(storage)} tables, {storage["bytes"].sum() / 1e9:.1f} GB in total')
+storage.nlargest(12, "bytes")[["table", "branch", "rows", "bytes", "files"]]
 ```
 
 ```python
@@ -2993,25 +3126,29 @@ rows per *file*, and a file happening to be one chromosome is a
 convention of the current build rather than a guarantee.
 
 It is affordable because `chromosome` is a real column with row-group
-statistics — 2.2 billion rows group in about a second.
+statistics — hundreds of millions of rows group in about a second.
+
+Here too the long shape loses something: `dimension_2` is a string, so
+sorting it gives 1, 10, 11, 2. The `variants` table has the chromosome
+as an integer.
 
 ```python
-variants = stats[stats["section"] == "variants"]
+variants = result.extra_tables.get("variants")
 
-if len(variants):
-    wide = variants.pivot_table(
-        index="dimension_2", columns="dimension_1",
-        values="value_number", aggfunc="sum",
-    )
-    wide.index.name = "chromosome"
-    display(wide.head(25))
+if variants is not None:
+    frame = variants.to_pandas()
+    wide = frame.pivot_table(
+        index="chromosome", columns="table", values="rows", aggfunc="sum"
+    ).sort_index()
+    display(wide)
 else:
     print("this bundle carries no variant tables")
 ```
 
 ⚠️ **A bundle built for a subset of chromosomes shows exactly that.**
-If only one chromosome appears here, every variant count elsewhere is
-about that chromosome — true of the bundle, not of the genome.
+The chromosomes listed here are the ones the bundle has; every variant
+count elsewhere in Biofilter is about those and silent about the rest.
+Worth reading before concluding anything about the genome.
 
 ### 7. How things are connected
 
