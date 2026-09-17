@@ -293,7 +293,15 @@ class AnnotateGeneReport(ReportBase):
             variant_counts AS (
                 SELECT l.entity_id, CAST(count(*) AS BIGINT) AS n
                 FROM loc l
-                JOIN variant_masters v
+                -- Naming the chromosomes lets the scan skip whole
+                -- partition files. Without it the range join reads every
+                -- chromosome in the bundle to count inside one gene, and
+                -- what that costs grows with the bundle rather than with
+                -- the question.
+                JOIN (
+                    SELECT chromosome, position FROM variant_masters
+                    WHERE chromosome IN (SELECT DISTINCT chromosome FROM loc)
+                ) v
                   ON v.chromosome = l.chromosome
                  AND v.position BETWEEN l.start_pos AND l.end_pos
                 GROUP BY l.entity_id
@@ -322,9 +330,15 @@ class AnnotateGeneReport(ReportBase):
         return self.sql(
             f"""
             WITH loc AS (
+                -- Only the genes in the answer. `resolved` is a temp
+                -- table, so every CTE here can narrow to it, and most
+                -- already do — this one did not, and the range join
+                -- below then measured all 39,306 placed genes to report
+                -- on the one that was asked about.
                 SELECT entity_id, build, chromosome, start_pos, end_pos
                 FROM entity_locations
                 WHERE build = 38
+                  AND entity_id IN (SELECT entity_id FROM resolved)
                 QUALIFY row_number() OVER (
                     PARTITION BY entity_id ORDER BY start_pos
                 ) = 1
