@@ -423,3 +423,30 @@ def test_a_source_that_produced_nothing_stops_the_merge(tmp_path):
     builder = _merging_builder(tmp_path, out, ["gnomad_joint_chr1"])
 
     assert builder._merge() is False
+
+
+def test_a_merge_dates_the_content_it_added(tmp_path, monkeypatch):
+    """
+    `created_at` says when the bundle began; a genome assembled over
+    three days would otherwise report the moment its first chromosome
+    landed, and read as older than it is.
+    """
+    out = _bundle(tmp_path, [])
+    manifest = json.loads((out / "manifest.json").read_text())
+    manifest["created_at"] = "2026-09-14T21:28:42+00:00"
+    (out / "manifest.json").write_text(json.dumps(manifest))
+
+    builder = _merging_builder(tmp_path, out, ["gnomad_joint_chr1"])
+    _stamped(
+        builder.processed_path / "gnomAD" / "gnomad_joint_chr1"
+        / "variant_masters_gnomad_chr1.parquet",
+        "variant_masters", "gnomad",
+    )
+    monkeypatch.setattr(builder, "_stamp_metadata", lambda *a: None)
+    monkeypatch.setattr(builder, "_resync_manifest_entry", lambda *a: None)
+
+    builder._merge()
+
+    after = json.loads((out / "manifest.json").read_text())
+    assert after["created_at"] == "2026-09-14T21:28:42+00:00"
+    assert after["updated_at"] > after["created_at"]

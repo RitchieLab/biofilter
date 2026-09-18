@@ -394,6 +394,11 @@ def info_cmd(bundle_path: Path):
     click.echo(f"Biofilter:      {manifest.get('biofilter_version')}")
     click.echo(f"Schema:         {manifest.get('schema_version')}")
     click.echo(f"Built:          {manifest.get('created_at')}")
+    updated = manifest.get("updated_at")
+    if updated and updated != manifest.get("created_at"):
+        # Only when they differ: a bundle assembled in one pass would
+        # otherwise print the same date twice.
+        click.echo(f"Last merged:    {updated}")
     click.echo(f"Built from:     {manifest.get('engine')}")
     click.echo(f"Tables:         {len(tables)}")
 

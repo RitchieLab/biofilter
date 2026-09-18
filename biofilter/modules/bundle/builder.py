@@ -694,6 +694,12 @@ class BundleBuilder:
         )
         bundle_id = hashlib.sha256(fingerprint.encode("utf-8")).hexdigest()[:16]  # noqa: E501
         manifest["bundle_id"] = bundle_id
+        # `created_at` stays what it was: it says when this bundle began.
+        # A merge changes the content, so it needs its own date — without
+        # one, a genome assembled over three days reports the moment its
+        # first chromosome landed, and `bundle info` reads as if the data
+        # were older than it is.
+        manifest["updated_at"] = datetime.now(timezone.utc).isoformat()
         manifest_path.write_text(
             json.dumps(manifest, indent=2) + "\n", encoding="utf-8"
         )
