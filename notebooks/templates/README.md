@@ -21,6 +21,7 @@ user actually has.
 | `reports__expand_variant_regulatory.ipynb` | which genes a variant regulates, and in which tissue |
 | `reports__expand_gene_to_variant.ipynb` | the variants in a gene — by coordinate or by VEP, and you pick which |
 | `reports__pair_variants.ipynb` | candidate variant pairs whose genes share a pathway, disease or protein |
+| `reports__pair_genes.ipynb` | which genes are related and by what — and, given your own list, what that implies |
 | `reports__aggregate_cohort_variants.ipynb` | your own VCF or .bim against the bundle, and rare-variant bins |
 | `reports__annotate_gene.ipynb` | genes |
 | `reports__annotate_variant.ipynb` | variants: rsID / position / allele, one row per transcript |

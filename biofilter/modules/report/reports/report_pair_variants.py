@@ -50,7 +50,6 @@ from biofilter.modules.report.reports._resolution import ALIAS_KEY
 from biofilter.modules.report.reports.base_report import ReportBase
 
 MEMBERSHIPS = ("both", "either")
-GRAINS = ("variant_pairs", "gene_pairs")
 
 DEFAULT_BUILD = 38
 DEFAULT_MAX_GROUP_SIZE = 300
@@ -100,20 +99,6 @@ class PairVariantsReport(ReportBase):
         "gene_2_id",
         "gene_2_symbol",
         "variant_2_from_input",
-        "group_support_count",
-        "group_support_types",
-        "group_support_names",
-        "membership",
-    )
-
-    GENE_COLUMNS = (
-        "input_1",
-        "gene_1_id",
-        "gene_1_symbol",
-        "gene_1_from_input",
-        "gene_2_id",
-        "gene_2_symbol",
-        "gene_2_from_input",
         "group_support_count",
         "group_support_types",
         "group_support_names",
@@ -209,7 +194,6 @@ class PairVariantsReport(ReportBase):
             raise ValueError("input_data must contain at least one gene or variant.")
 
         membership = self._choice("membership", MEMBERSHIPS, "both")
-        grain = self._choice("output_grain", GRAINS, "variant_pairs")
         group_types = self._group_types()
         build = self._int_param("build", DEFAULT_BUILD)
         window = self._int_param("window_bp", 0)
@@ -237,7 +221,6 @@ class PairVariantsReport(ReportBase):
             "pairing",
             {
                 "membership": membership,
-                "output_grain": grain,
                 "group_types": group_types,
                 "max_group_size": max_group_size or None,
                 "min_group_support": min_support,
@@ -259,7 +242,6 @@ class PairVariantsReport(ReportBase):
 
         common = self._query(
             membership=membership,
-            grain=grain,
             group_types=group_types,
             build=build,
             window=window,
@@ -273,7 +255,6 @@ class PairVariantsReport(ReportBase):
 
         table = self.sql(self._query(
             membership=membership,
-            grain=grain,
             group_types=group_types,
             build=build,
             window=window,
@@ -290,7 +271,6 @@ class PairVariantsReport(ReportBase):
         self,
         *,
         membership: str,
-        grain: str,
         group_types: list[str],
         build: int,
         window: int,
@@ -495,20 +475,6 @@ class PairVariantsReport(ReportBase):
                 SELECT group_id, count(DISTINCT gene_id) AS n
                 FROM links_distinct GROUP BY 1
             ) sz ON sz.group_id = l.group_id
-            """
-
-        if grain == "gene_pairs":
-            return common + f"""
-            SELECT
-                (SELECT min(input_value) FROM seed_genes s
-                  WHERE s.gene_id = p.gene_1_id) AS input_1,
-                p.gene_1_id, p.gene_1_symbol, p.gene_1_from_input,
-                p.gene_2_id, p.gene_2_symbol, p.gene_2_from_input,
-                p.group_support_count, p.group_support_types, p.group_support_names,
-                '{membership}' AS membership
-            FROM named_pairs p
-            ORDER BY p.group_support_count DESC, p.gene_1_symbol, p.gene_2_symbol
-            LIMIT {max_pairs if max_pairs > 0 else 9223372036854775807}
             """
 
         # Stage 3: gene pairs become variant pairs. A gene's variants are

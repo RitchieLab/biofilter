@@ -30,7 +30,14 @@ biofilter report run --report-name pair_variants \
    many distinct groups link a pair is the pair's `group_support_count`.
 3. **Pair.** Gene pairs become variant pairs.
 
-Stop after stage 2 with `output_grain=gene_pairs`.
+Gene pairs alone are a question of their own, and have a report of their
+own: **`pair_genes`**. It also expands a gene pair by a list you supply,
+which is what to use when the variant to gene attachment comes from
+outside the bundle — a colocalization, a fine-mapping, a curated list.
+
+`output_grain` is gone from here. Two ways to reach one answer is what
+the six-report consolidation removed, and keeping it would repeat the
+mistake at a smaller scale.
 
 ## `max_group_size` is the parameter that matters
 
@@ -94,7 +101,6 @@ and `variant_2_from_input` report which is which.
 | --- | --- | --- |
 | `input_data` | required | gene names and/or variants, mixed |
 | `membership` | `both` | see above |
-| `output_grain` | `variant_pairs` | or `gene_pairs` to stop after stage 2 |
 | `group_types` | `["Pathways"]` | `Pathways`, `Diseases`, `Proteins`, `Genes` |
 | `max_group_size` | `300` | drop groups reaching more genes than this; `0` for no limit |
 | `min_group_support` | `1` | require this many distinct groups behind a pair |

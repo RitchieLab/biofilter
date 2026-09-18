@@ -719,6 +719,13 @@ def pairing_bundle(tmp_path: Path) -> Path:
     tables["entity_relationships"] = pa.concat_tables(
         [tables["entity_relationships"], _pair_links()]
     )
+    # DGENE has an alias and relationships but no `gene_masters` row, so
+    # it resolves to an entity and never to a gene. A third *pairable*
+    # gene is what makes global deduplication testable: with only two,
+    # every item pair arrives by one path and the rule is vacuous.
+    tables["gene_masters"] = pa.concat_tables(
+        [tables["gene_masters"], _dgene_master()]
+    )
     partitions = _variant_partitions()
     partitions[17] = pa.concat_tables([partitions[17], _brca1_variants()])
     return _write_bundle(
@@ -741,6 +748,20 @@ def _pair_links() -> pa.Table:
         relationship_type_id=pa.array([2, 1, 1], pa.int64()),
         data_source_id=pa.array([DS_REACTOME, DS_CLINGEN, DS_CLINGEN], pa.int64()),
         etl_package_id=pa.array([81] * 3, pa.int64()),
+    )
+
+
+def _dgene_master() -> pa.Table:
+    """DGENE as a gene, so three genes can pair with each other."""
+    return _t(
+        id=pa.array([104], pa.int64()),
+        entity_id=pa.array([DGENE], pa.int64()),
+        symbol=pa.array(["DGENE1"]),
+        hgnc_status=pa.array(["Approved"]),
+        omic_status_id=pa.array([1], pa.int64()),
+        locus_group_id=pa.array([1], pa.int64()),
+        locus_type_id=pa.array([1], pa.int64()),
+        chromosome=pa.array([17], pa.int32()),
     )
 
 

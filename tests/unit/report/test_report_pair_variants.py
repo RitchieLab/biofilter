@@ -296,32 +296,6 @@ class TestPairIdentity:
         assert all(r["variant_1_key"] != r["variant_2_key"] for r in rows)
 
 
-class TestGenePairGrain:
-    """The grain that absorbs `variant_single_gene_annotation`."""
-
-    def test_it_stops_at_the_genes(self, run):
-        rows, _ = run(
-            input_data=["TP53"], membership="either", output_grain="gene_pairs"
-        )
-
-        assert rows
-        assert "variant_1_key" not in rows[0]
-        assert rows[0]["gene_1_symbol"] == "TP53"
-        assert rows[0]["gene_2_symbol"] == "BRCA1"
-
-    def test_it_says_which_side_came_from_the_input(self, run):
-        rows, _ = run(
-            input_data=["TP53"], membership="either", output_grain="gene_pairs"
-        )
-
-        assert rows[0]["gene_1_from_input"] is True
-        assert rows[0]["gene_2_from_input"] is False
-
-    def test_an_unknown_grain_is_refused(self, run):
-        with pytest.raises(ValueError, match="output_grain must be one of"):
-            run(input_data=["TP53"], output_grain="gene_list")
-
-
 class TestTheWindow:
     def test_it_widens_which_genes_a_variant_belongs_to(self, run):
         """17:9000 lies outside every gene; a wide window reaches BRCA1."""
@@ -353,5 +327,4 @@ class TestTheContract:
         pairing = result.provenance["pairing"]
 
         assert pairing["group_types"] == ["Pathways"]
-        assert pairing["output_grain"] == "variant_pairs"
         assert "Both members come from the input." in pairing["means"]
