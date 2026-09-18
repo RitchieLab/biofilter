@@ -1,5 +1,5 @@
 {
-  "count": 53,
+  "count": 55,
   "files": [
     "assistent/assistant_faq_seed.md",
     "biofilter/modules/report/reports_explain/report_aggregate_cohort_variants.md",
@@ -13,6 +13,7 @@
     "biofilter/modules/report/reports_explain/report_expand_entity_relationship.md",
     "biofilter/modules/report/reports_explain/report_expand_gene_to_variant.md",
     "biofilter/modules/report/reports_explain/report_expand_variant_regulatory.md",
+    "biofilter/modules/report/reports_explain/report_pair_genes.md",
     "biofilter/modules/report/reports_explain/report_pair_variants.md",
     "biofilter/modules/report/reports_explain/report_platform_data_statistics.md",
     "biofilter/modules/report/reports_explain/report_platform_etl_packages.md",
@@ -50,6 +51,7 @@
     "notebooks/templates/reports__expand_entity_relationship.ipynb.md",
     "notebooks/templates/reports__expand_gene_to_variant.ipynb.md",
     "notebooks/templates/reports__expand_variant_regulatory.ipynb.md",
+    "notebooks/templates/reports__pair_genes.ipynb.md",
     "notebooks/templates/reports__pair_variants.ipynb.md",
     "notebooks/templates/reports__platform_data_statistics.ipynb.md",
     "notebooks/templates/reports__platform_etl.ipynb.md",

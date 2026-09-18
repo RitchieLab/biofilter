@@ -42,8 +42,29 @@ Sixteen, in six families. By the shape of the question:
 | variants, want what they regulate | `expand_variant_regulatory` |
 | entities, want what connects | `expand_entity_neighborhood`, `expand_entity_relationship` |
 | variants, want candidate pairs | `pair_variants` |
+| genes, want which are related and by what | `pair_genes` |
+| a gene-to-anything list of your own, want the pairs it implies | `pair_genes` |
 | a cohort | `aggregate_cohort_variants` |
 | a bundle you do not know | `platform_data_statistics` |
+
+### A2b) `pair_variants` or `pair_genes`?
+
+Whichever matches **where the link between a variant and a gene comes
+from**.
+
+`pair_variants` derives it from coordinates: a variant belongs to the
+gene it sits inside. That is right for a coding variant.
+
+`pair_genes` does no variant-to-gene mapping at all. Use it when the
+attachment comes from somewhere else — a colocalization, a fine-mapping,
+a curated assignment — and supply it as a two-column mapping, gene then
+item. A regulatory variant usually acts on a gene it does not sit in, so
+`pair_variants` would look for it among that gene's positional variants,
+not find it, and drop it without an error.
+
+The item in the mapping is never read, so it can be a position, an rsID,
+a probe id, an exposure — anything. Biofilter is build 38 and managing
+build is the user's; nothing in this report interprets a coordinate.
 
 ### A3) What does a report accept?
 

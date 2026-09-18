@@ -2790,6 +2790,256 @@ biofilter report run --report-name expand_variant_regulatory \\
 
 
 
+<!-- ===== SOURCE FILE: notebooks/templates/reports__pair_genes.ipynb.md ===== -->
+
+<h1>🎛️ Biofilter — Report: <code>pair_genes</code></h1>
+
+Which of these genes are related, and by what — and optionally, what that
+implies about a list of your own.
+
+Two stages: **connect** genes through a shared pathway, disease or
+protein, then **expand** — only if you ask — by a gene → item mapping you
+supply.
+
+Section 4 is the one to read. It is why this report exists rather than
+being a mode of `pair_variants`.
+
+### 1. Open a bundle
+
+```python
+from pathlib import Path
+
+from biofilter import Biofilter
+
+BUNDLE = None
+REPORT = "pair_genes"
+
+bf = Biofilter(bundle=BUNDLE, debug_mode=False) if BUNDLE else Biofilter(debug_mode=False)
+
+_root = next(
+    (p for p in [Path.cwd(), *Path.cwd().parents] if (p / ".biofilter.toml").is_file()),
+    Path.cwd(),
+)
+OUTPUT_DIR = _root / "notebooks" / "templates" / "outputs"
+OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+
+GENES = ["CHEK2", "SMARCB1", "NF2"]
+print(bf.core.db_uri)
+```
+
+### 2. Gene pairs, on their own
+
+No mapping: the answer is which of your genes are related, and by what.
+That question stands by itself, which is the argument for this being a
+report rather than a parameter of another one.
+
+```python
+pairs = bf.report.run(REPORT, input_data=GENES, group_types=["Proteins"])
+df = pairs.to_pandas()
+
+print(f"{len(df)} gene pairs, tables: {list(pairs.tables)}")
+df[["gene_1_symbol", "gene_2_symbol", "group_support_count",
+    "group_support_source_count", "group_support_sources"]]
+```
+
+`group_support_sources` names the curation from the bundle rather than
+guessing it from an accession prefix. Two curations agreeing is a
+different claim from one curation saying it twice, which is what
+`min_group_sources` filters on — and what `min_group_support` does not.
+
+### 3. `max_group_size` decides the size *and* the meaning
+
+A pathway naming 2,615 genes links its members while saying almost
+nothing about any of them. When a result comes back empty or thin, this
+is usually why — so the provenance says what the cut removed.
+
+```python
+for size in (200, 300, 1000, 0):
+    out = bf.report.run(REPORT, input_data=GENES, group_types=["Proteins"],
+                        max_group_size=size)
+    label = "no limit" if size == 0 else str(size)
+    print(f"  max_group_size={label:<9} {out.num_rows:>3} pairs")
+
+pairs.provenance["group_filter"]
+```
+
+### 4. Why this is not a mode of `pair_variants`
+
+`pair_variants` derives "this variant belongs to this gene" from
+coordinates. That is right for a coding variant and wrong for a
+regulatory one: a variant sits in one gene and acts on another.
+
+Ask the bundle how often those differ.
+
+```python
+from biofilter.modules.report import Bundle
+
+with Bundle.open(bf.core.db_uri.removeprefix("parquet://")) as bundle:
+    disagreement = bundle.con.execute("""
+        WITH linked AS (
+            SELECT DISTINCT
+                g.chromosome, g.position, g.reference_allele, g.alternate_allele,
+                g.gene_id AS regulated, e.gene AS sits_in
+            FROM variant_gtex g
+            JOIN variant_molecular_effects e
+              ON e.chromosome = g.chromosome AND e.position = g.position
+             AND e.reference_allele = g.reference_allele
+             AND e.alternate_allele = g.alternate_allele
+            WHERE e.gene IS NOT NULL AND g.gene_id IS NOT NULL
+        )
+        SELECT count(*) AS pairs,
+               count(*) FILTER (WHERE regulated <> sits_in) AS different_gene
+        FROM linked
+    """).to_arrow_table().to_pandas()
+
+share = disagreement.different_gene[0] / max(disagreement.pairs[0], 1)
+print(f"{disagreement.pairs[0]:,} variant x gene links carrying both kinds of evidence")
+print(f"{share:.1%} name a gene other than the one the variant sits in")
+```
+
+So when your evidence for the attachment comes from outside Biofilter —
+a colocalization, a fine-mapping, a curated list — `pair_variants` cannot
+use it: its stage 3 re-derives membership from coordinates and drops
+anything that disagrees, silently.
+
+`pair_genes` never derives it. It takes the link you supply.
+
+### 5. The mapping: two columns, gene then item
+
+Many-to-many in both directions. The worked example from ADR-005: three
+items on one gene, two on the other, one pair between them.
+
+```python
+MAPPING = {
+    "CHEK2":   ["111", "222", "333"],
+    "SMARCB1": ["444", "555"],
+}
+
+expanded = bf.report.run(REPORT, input_data=["CHEK2", "SMARCB1"],
+                         group_types=["Proteins"], mapping=MAPPING)
+
+print(f"tables: {list(expanded.tables)}")
+print(f"  result     {expanded.num_rows} item pairs   <- what write() exports")
+print(f"  gene_pairs {expanded.extra_tables['gene_pairs'].num_rows} gene pair")
+expanded.to_pandas()[["item_1", "item_2", "gene_1_symbol", "gene_2_symbol"]]
+```
+
+```python
+# The same thing from a file, which is what a real mapping arrives as.
+mapping_file = OUTPUT_DIR / "demo_mapping.tsv"
+mapping_file.write_text("\n".join(
+    f"{gene}\t{item}" for gene, items in MAPPING.items() for item in items) + "\n")
+
+from_file = bf.report.run(REPORT, input_data=["CHEK2", "SMARCB1"],
+                          group_types=["Proteins"], mapping_file=str(mapping_file))
+print("same answer:", from_file.num_rows == expanded.num_rows)
+```
+
+### 6. The item is never read
+
+Which is what makes gene→position, gene→rsID, gene→probe and
+gene→exposure one feature instead of four.
+
+**Biofilter is build 38 and managing build is yours** — but nothing here
+interprets a coordinate, so build-37 positions pass through correctly and
+Biofilter never has to know what one is.
+
+```python
+anything = bf.report.run(
+    REPORT, input_data=["CHEK2", "SMARCB1"], group_types=["Proteins"],
+    mapping={"CHEK2": ["17:7579472", "exposure:smoking"],
+             "SMARCB1": ["probe_0042"]},
+).to_pandas()
+
+anything[["item_1", "item_2"]]
+```
+
+The price of that is real and worth stating: the report cannot filter by
+allele frequency, resolve an rsID, or validate an item — and **two
+spellings of one thing are two things**. `22:100:A:G` and
+`chr22:100:A:G` are different items, and that bounds what the
+deduplication below can promise.
+
+### 7. Three rules the simple example does not show
+
+The cross product is not the work. These are, and they are identical for
+every caller — which is the argument for the platform owning them rather
+than each analysis re-deriving them.
+
+```python
+# An item on both genes would otherwise pair with itself.
+self_pair = bf.report.run(
+    REPORT, input_data=["CHEK2", "SMARCB1"], group_types=["Proteins"],
+    mapping={"CHEK2": ["X", "111"], "SMARCB1": ["X", "444"]},
+).to_pandas()
+
+print("pairs:", sorted(zip(self_pair.item_1, self_pair.item_2)))
+print("X paired with itself:", bool((self_pair.item_1 == self_pair.item_2).any()))
+```
+
+```python
+# Deduplication is global, not per gene pair: the same item pair arrives
+# through every gene pair linking it. On one real run that was 4.3% of
+# the answer — 72,554 against the 75,794 a naive sum(n1 x n2) reports.
+three = bf.report.run(
+    REPORT, input_data=GENES, group_types=["Proteins"],
+    mapping={"CHEK2": ["A"], "SMARCB1": ["B"], "NF2": ["A"]},
+)
+print(f"{three.extra_tables['gene_pairs'].num_rows} gene pairs "
+      f"-> {three.num_rows} item pair(s)")
+three.to_pandas()[["item_1", "item_2"]]
+```
+
+### 8. Both genes must carry an item
+
+Not "both were named". A gene can be in your input and carry nothing, and
+then there is nothing on its side to pair.
+
+For the same reason `membership="either"` is refused with a mapping: the
+partner gene came from the bundle, not from your list.
+
+```python
+partial = bf.report.run(REPORT, input_data=GENES, group_types=["Proteins"],
+                        mapping={"CHEK2": ["A"], "SMARCB1": ["B"]})
+print(f"NF2 is in the input and carries nothing -> {partial.num_rows} pair(s)")
+
+try:
+    bf.report.run(REPORT, input_data=["CHEK2"], membership="either",
+                  mapping={"CHEK2": ["A"]})
+except ValueError as exc:
+    print("\nrefused:", exc)
+```
+
+### 9. Export, and keeping both tables
+
+`write()` exports the primary table, which is the item pairs when you
+asked for them. `save()` keeps everything.
+
+```python
+for path in expanded.write(OUTPUT_DIR / "pair_genes.csv"):
+    print(path)
+
+saved = expanded.save(OUTPUT_DIR / "runs" / "pair_genes", overwrite=True)
+print("\nsaved:", saved)
+
+from biofilter.modules.report.result import ReportResult
+back = ReportResult.load(saved)
+print("tables back:", list(back.tables))
+```
+
+### 10. The same thing on the command line
+
+```bash
+biofilter report run --report-name pair_genes \\
+    --input CHEK2 --input SMARCB1 --input NF2 \\
+    --param group_types=Proteins \\
+    --param max_group_size=300 \\
+    --param mapping_file=./variant_to_gene.tsv \\
+    --output item_pairs.csv
+```
+
+
+
 <!-- ===== SOURCE FILE: notebooks/templates/reports__pair_variants.ipynb.md ===== -->
 
 <h1>🎛️ Biofilter — Report: <code>pair_variants</code></h1>
@@ -2868,7 +3118,7 @@ Run the three genes at the default and watch it return nothing — then
 read why.
 
 ```python
-empty = bf.report.run(REPORT, input_data=GENES, output_grain="gene_pairs")
+empty = bf.report.run("pair_genes", input_data=GENES)
 
 print(f"{len(empty.to_pandas())} rows")
 empty.provenance["group_filter"]
@@ -2882,11 +3132,11 @@ consequence of a parameter.
 ```python
 # Raise the limit, or use a group type whose members are smaller.
 for size in (300, 2000):
-    out = bf.report.run(REPORT, input_data=GENES, output_grain="gene_pairs",
+    out = bf.report.run("pair_genes", input_data=GENES,
                         max_group_size=size).to_pandas()
     print(f"  max_group_size={size:>5}  {len(out):>3} gene pairs")
 
-by_protein = bf.report.run(REPORT, input_data=GENES, output_grain="gene_pairs",
+by_protein = bf.report.run("pair_genes", input_data=GENES,
                            group_types=["Proteins"]).to_pandas()
 print(f"  group_types=Proteins   {len(by_protein):>3} gene pairs")
 by_protein[["gene_1_symbol", "gene_2_symbol", "group_support_count"]]
@@ -2983,18 +3233,24 @@ df.nlargest(5, "group_support_count")[
 ]
 ```
 
-### 8. Stopping at the genes
+### 8. Gene pairs are a different question
 
-`output_grain="gene_pairs"` ends after stage 2 — this is what
-`variant_single_gene_annotation` did.
+Stage 2 on its own — which of these genes are related, and by what — is
+`pair_genes`, a report of its own rather than a mode of this one. It also
+expands a gene pair by a list **you** supply, which is what to reach for
+when the variant to gene attachment comes from outside the bundle: a
+colocalization, a fine-mapping, a curated assignment.
+
+`pair_variants` derives that attachment from coordinates, which is right
+for a coding variant and wrong for a regulatory one.
 
 ```python
-partners = bf.report.run(REPORT, input_data=["CHEK2"], group_types=["Proteins"],
-                         membership="either", output_grain="gene_pairs").to_pandas()
+partners = bf.report.run("pair_genes", input_data=["CHEK2"],
+                         group_types=["Proteins"], membership="either").to_pandas()
 
 print(f"{len(partners):,} partner genes for CHEK2")
 partners[["gene_1_symbol", "gene_2_symbol", "gene_2_from_input",
-          "group_support_count"]].head(8)
+          "group_support_count", "group_support_sources"]].head(8)
 ```
 
 ### 9. Export

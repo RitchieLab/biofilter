@@ -877,7 +877,7 @@ technical/index
 # Report Catalog
 
 Every analysis Biofilter can run, organized by the question it answers.
-There are 16 reports. Each one takes a list of things you already have —
+There are 17 reports. Each one takes a list of things you already have —
 gene symbols, rsIDs, disease names, a cohort's variants — and returns a
 table.
 
@@ -892,7 +892,9 @@ formats), see [Reports](reports.md).
 | Gene symbols | The variants in those genes, filtered by predicted damage | [`expand_gene_to_variant`](#from-genes-to-variants) |
 | rsIDs or `chr:pos:ref:alt` | Full annotation, one row per transcript | [`annotate_variant`](#annotate-what-you-already-have) |
 | Variants | Which genes they regulate, in which tissue | [`expand_variant_regulatory`](#from-variants-outward) |
-| Variants | Plausible interacting pairs, with the biology that links them | [`pair_variants`](#from-variants-outward) |
+| Variants | Plausible interacting pairs, with the biology that links them | [`pair_variants`](#pairs-to-test) |
+| Genes | Which of them are related, and by what | [`pair_genes`](#pairs-to-test) |
+| Genes, and your own gene-to-anything list | The pairs your list implies | [`pair_genes`](#pairs-to-test) |
 | A cohort's variants | Which ones the bundle knows, binned by biology | [`aggregate_cohort_variants`](#a-whole-cohort) |
 | Names that are not matching | What they actually resolve to, and where they conflict | [`resolve_entity`](#annotate-what-you-already-have) |
 | Any entity list | Its one-hop neighbourhood, or the relationship rows themselves | [`expand_entity_*`](#follow-the-entity-network) |
@@ -997,11 +999,54 @@ so a truncated row admits that it is truncated.
 | Report | Answers |
 |---|---|
 | `expand_variant_regulatory` | Which genes does this variant regulate, and in which tissue? One row per variant × tissue × regulated gene, with effect size and p-value. Takes gene symbols, rsIDs or positions. |
-| `pair_variants` | Which of these variants plausibly interact? Places each input on its genes, connects those genes through shared pathways, diseases or proteins, and returns the pairs with the evidence that supports them. |
 
-`pair_variants` is a hypothesis generator, not a test: the pairs it returns
-are candidates whose genes share biology, and the supporting columns are
-there so you can judge each one.
+## Pairs to test
+
+Two reports generate candidate pairs, and choosing between them is
+choosing **where the link between a variant and a gene comes from**.
+
+| Report | Answers |
+|---|---|
+| `pair_variants` | Which of these variants plausibly interact? Places each input on its genes **by coordinate**, connects those genes through shared pathways, diseases or proteins, and returns the variant pairs. |
+| `pair_genes` | Which of these genes are related, and by what — and, given a gene-to-item list of your own, the item pairs those gene pairs imply. Performs **no** variant-to-gene mapping. |
+
+Use `pair_variants` when the variant belongs to the gene it sits inside.
+That is true of a coding variant.
+
+Use `pair_genes` when it does not. A regulatory variant sits in one gene
+and acts on another: of the 11,532,453 variant × gene links in this bundle
+that carry both kinds of evidence, **91.5% name a gene other than the one
+the variant sits in**. If your evidence for the attachment comes from
+outside Biofilter — a colocalization, a fine-mapping, a curated
+assignment — `pair_variants` cannot use it. It re-derives membership from
+coordinates and drops what disagrees, with no error.
+
+`pair_genes` never derives it:
+
+```bash
+biofilter --bundle /path/to/bundle report run \
+  --report-name pair_genes \
+  --input-file my_genes.txt \
+  --param mapping_file=variant_to_gene.tsv \
+  --param max_group_size=300 \
+  --param min_group_sources=2 \
+  --output item_pairs.csv
+```
+
+The mapping is two columns, gene then item, and the item is **never
+read** — which is what lets the same report pair positions, rsIDs, probe
+ids or exposures. Biofilter is build 38 and managing build is yours;
+because nothing interprets the item, build-37 positions pass through
+correctly.
+
+It also owns three rules that are easy to get wrong alone: pairs are
+unordered, deduplication is global rather than per gene pair, and an item
+attached to both genes does not pair with itself. On one real run the
+deduplication alone was 4.3% of the answer.
+
+Both are hypothesis generators, not tests. The pairs are candidates whose
+genes share biology, and the supporting columns are there so you can judge
+each one — `group_support_count` is a weight for ranking, never a p-value.
 
 ## Follow the entity network
 
