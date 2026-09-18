@@ -893,6 +893,7 @@ formats), see [Reports](reports.md).
 | rsIDs or `chr:pos:ref:alt` | Full annotation, one row per transcript | [`annotate_variant`](#annotate-what-you-already-have) |
 | Variants | Which genes they regulate, in which tissue | [`expand_variant_regulatory`](#from-variants-outward) |
 | Variants | Plausible interacting pairs, with the biology that links them | [`pair_variants`](#pairs-to-test) |
+| Genes | Their variants, then the pairs among those | `expand_gene_to_variant` then [`pair_variants`](#pairs-to-test) |
 | Genes | Which of them are related, and by what | [`pair_genes`](#pairs-to-test) |
 | Genes, and your own gene-to-anything list | The pairs your list implies | [`pair_genes`](#pairs-to-test) |
 | A cohort's variants | Which ones the bundle knows, binned by biology | [`aggregate_cohort_variants`](#a-whole-cohort) |
@@ -1007,11 +1008,19 @@ choosing **where the link between a variant and a gene comes from**.
 
 | Report | Answers |
 |---|---|
-| `pair_variants` | Which of these variants plausibly interact? Places each input on its genes **by coordinate**, connects those genes through shared pathways, diseases or proteins, and returns the variant pairs. |
+| `pair_variants` | Which of these variants plausibly interact? Places each input variant on its genes **by coordinate**, connects those genes through shared pathways, diseases or proteins, and returns the pairs among the variants you named. |
 | `pair_genes` | Which of these genes are related, and by what — and, given a gene-to-item list of your own, the item pairs those gene pairs imply. Performs **no** variant-to-gene mapping. |
 
 Use `pair_variants` when the variant belongs to the gene it sits inside.
 That is true of a coding variant.
+
+**`pair_variants` takes variants only.** It used to accept gene names and
+expand each into the variants inside it, keeping 100 of a gene's ~4,000
+by allele frequency without showing you which. Run
+`expand_gene_to_variant` first, look at the list, filter it, and pair
+that — one visible step instead of one invisible one. `membership` and
+`max_variants_per_gene` left with the expansion, and passing either is an
+error rather than a silently different answer.
 
 Use `pair_genes` when it does not. A regulatory variant sits in one gene
 and acts on another: of the 11,532,453 variant × gene links in this bundle

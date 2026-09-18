@@ -1432,13 +1432,20 @@ Candidate variant × variant pairs whose genes share biology.
 
 ```bash
 biofilter report run --report-name pair_variants \
-    --input CHEK2 --input SMARCB1 --input NF2 \
+    --input-file my_variants.txt \
     --param group_types=Pathways \
     --param max_group_size=300 \
-    --param membership=both \
     --output pairs.csv
 ```
 
+**It takes variants, and only the ones you name** — an rsID, `chr:pos`,
+or `chr:pos:ref:alt`. A gene name is refused rather than expanded.
+
+> Gene pairs on their own — and expanding them by a list you supply —
+> are `pair_genes`. Use that one when the link between a variant and a
+> gene comes from outside the bundle, since this report derives it from
+> coordinates.
+>
 > Replaces six reports that were one pipeline written in three eras:
 > `variant_gene_location_model` (stage 1 alone),
 > `variant_single_gene_annotation` (stages 1-2), `snp_snp_model` and
@@ -1449,10 +1456,9 @@ biofilter report run --report-name pair_variants \
 
 ## The three stages
 
-1. **Place.** Each input is read as a gene name or as a variant (rsID,
-   `chr:pos`, `chr:pos:ref:alt`) — mixed freely in one list. A variant is
-   placed on the genes whose build-38 range contains it, widened by
-   `window_bp` if you pass one.
+1. **Place.** Each input variant — an rsID, `chr:pos`, or
+   `chr:pos:ref:alt` — is placed on the genes whose build-38 range
+   contains it, widened by `window_bp` if you pass one.
 2. **Connect.** Seed genes reach partner genes through a shared entity: a
    pathway, a disease, a protein. That entity is the **group**, and how
    many distinct groups link a pair is the pair's `group_support_count`.
@@ -1506,48 +1512,52 @@ at the default. That is correct: the only pathways linking them have
 1,231, 1,321 and 1,543 genes. Without the provenance block it would read
 as "these genes share no biology".
 
-## `membership`: one side from the input, or both
+## Starting from genes
 
-| value | means |
+Run `expand_gene_to_variant`, look at what it returns, filter it, and
+pair that.
+
+This report used to do it for you, and that is why it no longer does. A
+gene on chr22 holds about 4,000 variants; it kept 100 of them ranked by
+allele frequency, and you never saw which 100. Running the expansion
+yourself costs one step and puts that selection where it belongs — in
+front of the person making it.
+
+```python
+variants = bf.report.run("expand_gene_to_variant",
+                         input_data=["CHEK2", "SMARCB1"],
+                         impact_filter=["HIGH"], af_max=0.01)
+keys = variants.to_pandas().query("status == 'ok'").variant_key.tolist()
+
+bf.report.run("pair_variants", input_data=keys)
+```
+
+Three parameters went with it, and passing one is an error rather than a
+silent change of answer:
+
+| gone | instead |
 | --- | --- |
-| `both` (default) | both variants come from the input |
-| `either` | one comes from the input; the other is any variant in a gene the input reaches |
+| gene names in `input_data` | `expand_gene_to_variant`, then pair its output |
+| `max_variants_per_gene` | the same parameter on `expand_gene_to_variant`, where the expansion now happens |
+| `membership="either"` | `pair_genes(membership="either")` → `expand_gene_to_variant` on the partner genes → pair |
 
-This is the only difference there ever was between `variant_modeling`
-(`both`) and `snp_snp_model` (`either`). It is not a cosmetic filter:
-`either` is unbounded in a way `both` is not. Five seed genes reach
-19,393 partner genes through proteins.
-
-**Naming a gene and naming a variant are different requests.** Naming
-`TP53` asks for its variants. Naming `rs1042522` asks for that variant,
-not for the other 4,000 in the gene that contains it. `variant_1_from_input`
-and `variant_2_from_input` report which is which.
+`membership="either"` was the unbounded mode: five seed genes reach
+19,393 partner genes through proteins. Its replacement is three visible
+steps instead of one invisible one.
 
 ## Parameters
 
 | parameter | default | meaning |
 | --- | --- | --- |
-| `input_data` | required | gene names and/or variants, mixed |
-| `membership` | `both` | see above |
+| `input_data` | required | variants: rsIDs, `chr:pos`, `chr:pos:ref:alt` |
 | `group_types` | `["Pathways"]` | `Pathways`, `Diseases`, `Proteins`, `Genes` |
 | `max_group_size` | `300` | drop groups reaching more genes than this; `0` for no limit |
 | `min_group_support` | `1` | require this many distinct groups behind a pair |
-| `max_variants_per_gene` | `100` | how many variants each gene contributes; `0` for all |
+| `min_group_sources` | `1` | require this many distinct curations |
 | `max_pairs` | `1000000` | cap on rows returned |
 | `window_bp` | `0` | widen a gene's range when placing a variant |
 | `build` | `38` | genome build |
 | `af_min`, `af_max` | none | joint allele frequency bounds |
-
-## Why `max_variants_per_gene` exists
-
-Pairs grow with the **square** of the variants per gene. A gene on chr22
-carries about 4,000 variants; three such genes paired in full are 48
-million rows, which is not an answer anybody reads — and the query runs
-out of memory before it gets there.
-
-The variants kept are the **most common**, because a pairwise interaction
-test has no power on a rare variant. A variant you named by hand is never
-dropped. Both facts are recorded in the provenance `pairing` block.
 
 ## Gene Ontology is not offered
 
@@ -1560,15 +1570,18 @@ Here a group type the bundle cannot use is refused by name.
 
 | column | meaning |
 | --- | --- |
-| `input_1`, `input_2` | what you typed, when you typed this variant or its gene |
+| `input_1`, `input_2` | the text you typed for each side |
 | `variant_1_key`, `variant_1_rsid`, `variant_1_chromosome`, `variant_1_position` | side 1 |
 | `gene_1_id`, `gene_1_symbol` | the gene side 1 sits in |
-| `variant_1_from_input` | whether side 1 came from your list |
 | `variant_2_*`, `gene_2_*` | the same for side 2 |
 | `group_support_count` | how many distinct groups link the two genes |
+| `group_support_source_count` | how many distinct curations asserted them |
 | `group_support_types` | `Pathways`, `Diseases`, … |
 | `group_support_names` | the groups themselves |
-| `membership` | which mode produced this row |
+| `group_support_sources` | the curations: `reactome_relationships`, `biogrid`, … |
+
+There is no `from_input` column any more. Every variant in every pair
+came from your list, so a column saying so would be a constant.
 
 ## Reading the result
 

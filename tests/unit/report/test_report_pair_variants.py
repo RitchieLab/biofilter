@@ -5,8 +5,12 @@ Runs against `pairing_bundle` — the shared fixture plus a connector that
 reaches two different genes, since without one there is no pair to make.
 
 The shape to keep in mind: PATHWAY reaches TP53 and BRCA1 (two genes).
-DISEASE reaches TP53, BRCA1 and DGENE (three). TP53 holds variants at
-17:150, 200 and 300; BRCA1 holds 17:5100 and 17:5200.
+DISEASE reaches TP53, BRCA1 and DGENE1. TP53 holds variants at 17:150,
+200 and 300; BRCA1 holds 17:5100 and 17:5200; 17:9000 sits in no gene.
+
+Only variants go in. The gene path, the gene-to-variant expansion and
+`membership` were removed in ADR-005 D13, so a good part of this file is
+about refusing them clearly rather than ignoring them.
 """
 
 from __future__ import annotations
@@ -14,6 +18,9 @@ from __future__ import annotations
 import pytest
 
 from biofilter.modules.report import Bundle, ReportManager
+
+TP53_VARIANTS = ["17:150", "17:200", "17:300"]
+BRCA1_VARIANTS = ["17:5100", "17:5200"]
 
 
 @pytest.fixture
@@ -36,16 +43,9 @@ def _pairs(rows):
 
 
 class TestTheThreeStages:
-    def test_a_gene_input_reaches_the_variants_of_the_gene_it_pairs_with(self, run):
-        rows, _ = run(input_data=["TP53"], membership="either")
-
-        assert rows
-        assert {r["gene_1_symbol"] for r in rows} == {"TP53"}
-        assert {r["gene_2_symbol"] for r in rows} == {"BRCA1"}
-
-    def test_both_genes_named_pairs_their_variants_across(self, run):
+    def test_variants_in_two_linked_genes_pair(self, run):
         """3 variants in TP53 x 2 in BRCA1 = 6 pairs, one gene pair."""
-        rows, _ = run(input_data=["TP53", "BRCA1"])
+        rows, _ = run(input_data=TP53_VARIANTS + BRCA1_VARIANTS)
 
         assert len(rows) == 6
         assert _pairs(rows) == {
@@ -54,75 +54,107 @@ class TestTheThreeStages:
             for b in ("17:5100:A:G", "17:5200:A:G")
         }
 
-    def test_a_variant_input_is_placed_on_its_gene(self, run):
-        """17:150 sits in TP53, so it pairs with BRCA1's variants."""
-        rows, _ = run(input_data=["17:150"], membership="either")
+    def test_variants_in_one_gene_do_not_pair_with_each_other(self, run):
+        """A pair is across two genes; two variants in TP53 are not one."""
+        rows, _ = run(input_data=TP53_VARIANTS)
 
-        assert {r["variant_1_key"] for r in rows} == {"17:150:A:G"}
-        assert {r["gene_1_symbol"] for r in rows} == {"TP53"}
+        assert rows == []
 
-    def test_an_input_that_resolves_to_nothing_makes_no_pair(self, run):
-        rows, _ = run(input_data=["NOT_A_GENE"], membership="either")
+    def test_a_variant_in_no_gene_cannot_pair(self, run):
+        """17:9000 sits outside every gene's range."""
+        rows, _ = run(input_data=["17:9000"] + BRCA1_VARIANTS)
+
+        assert rows == []
+
+    def test_a_variant_the_bundle_does_not_have(self, run):
+        rows, _ = run(input_data=["17:424242"] + BRCA1_VARIANTS)
 
         assert rows == []
 
     def test_an_empty_input_is_refused(self, run):
-        with pytest.raises(ValueError, match="at least one gene or variant"):
+        with pytest.raises(ValueError, match="at least one variant"):
             run(input_data=[])
 
 
-class TestNamingAGeneAndNamingAVariantAreDifferentRequests:
+class TestItTakesOnlyVariants:
     """
-    `from_input` cannot mean the same thing for both. Naming a gene asks
-    for its variants; naming a variant asks for that variant, not for
-    every other one in the gene that happens to contain it.
+    ADR-005 D13. The gene path was an implicit chain and it hid which of
+    a gene's thousands of variants reached the pairing.
     """
 
-    def test_naming_a_gene_makes_all_its_variants_count_as_input(self, run):
-        rows, _ = run(input_data=["TP53", "BRCA1"])
+    def test_a_gene_name_is_refused_by_name(self, run):
+        with pytest.raises(ValueError, match="pair_variants takes variants"):
+            run(input_data=["TP53", "BRCA1"])
 
-        assert all(r["variant_1_from_input"] for r in rows)
-        assert all(r["variant_2_from_input"] for r in rows)
+    def test_the_refusal_names_the_offending_values(self, run):
+        with pytest.raises(ValueError, match="'TP53'"):
+            run(input_data=["TP53", "17:5100"])
 
-    def test_naming_one_variant_does_not_enrol_its_neighbours(self, run):
-        """
-        17:150 and 17:300 are both in TP53. Asking for the first must not
-        silently pair the second.
-        """
+    def test_the_refusal_points_at_the_report_that_does_it(self, run):
+        with pytest.raises(ValueError, match="expand_gene_to_variant"):
+            run(input_data=["TP53"])
+
+    def test_one_bad_value_among_good_ones_still_refuses(self, run):
+        with pytest.raises(ValueError, match="pair_variants takes variants"):
+            run(input_data=TP53_VARIANTS + ["BRCA1"])
+
+
+class TestParametersThatWereRemoved:
+    """
+    Silently ignoring one would hand a caller a different answer to the
+    question they think they asked, which is worse than failing.
+    """
+
+    @pytest.mark.parametrize(
+        "name,value",
+        [
+            ("membership", "either"),
+            ("max_variants_per_gene", 10),
+            ("output_grain", "gene_pairs"),
+        ],
+    )
+    def test_each_is_refused(self, run, name, value):
+        with pytest.raises(ValueError, match="no longer takes"):
+            run(input_data=TP53_VARIANTS + BRCA1_VARIANTS, **{name: value})
+
+    def test_membership_says_what_replaced_it(self, run):
+        with pytest.raises(ValueError, match="pair_genes"):
+            run(input_data=TP53_VARIANTS, membership="either")
+
+    def test_max_variants_per_gene_says_where_it_went(self, run):
+        with pytest.raises(ValueError, match="expand_gene_to_variant"):
+            run(input_data=TP53_VARIANTS, max_variants_per_gene=10)
+
+    def test_several_at_once_are_all_named(self, run):
+        with pytest.raises(ValueError, match="membership, max_variants_per_gene"):
+            run(
+                input_data=TP53_VARIANTS,
+                membership="both",
+                max_variants_per_gene=5,
+            )
+
+
+class TestInputShapes:
+    def test_a_position_without_alleles(self, run):
         rows, _ = run(input_data=["17:150", "17:5100"])
 
         assert _pairs(rows) == {("17:150:A:G", "17:5100:A:G")}
 
-    def test_the_named_variant_carries_the_text_that_named_it(self, run):
-        rows, _ = run(input_data=["17:150", "17:5100"])
+    def test_a_position_with_alleles(self, run):
+        rows, _ = run(input_data=["17:150:A:G", "17:5100:A:G"])
 
-        assert rows[0]["input_1"] == "17:150"
-        assert rows[0]["input_2"] == "17:5100"
+        assert _pairs(rows) == {("17:150:A:G", "17:5100:A:G")}
 
+    def test_an_rsid(self, run):
+        """rs101 is 17:150 in the fixture."""
+        rows, _ = run(input_data=["rs101", "17:5100"])
 
-class TestMembership:
-    def test_both_keeps_only_pairs_the_input_covers_on_each_side(self, run):
-        rows, _ = run(input_data=["TP53"], membership="both")
+        assert _pairs(rows) == {("17:150:A:G", "17:5100:A:G")}
 
-        # BRCA1 was never asked for, so its variants are not input.
-        assert rows == []
+    def test_the_text_that_named_each_side_comes_back(self, run):
+        rows, _ = run(input_data=["rs101", "17:5100"])
 
-    def test_either_admits_a_partner_the_input_never_named(self, run):
-        rows, _ = run(input_data=["TP53"], membership="either")
-
-        assert rows
-        assert all(r["variant_1_from_input"] for r in rows)
-        assert not any(r["variant_2_from_input"] for r in rows)
-
-    def test_the_mode_is_a_column_and_a_provenance_entry(self, run):
-        rows, result = run(input_data=["TP53"], membership="either")
-
-        assert {r["membership"] for r in rows} == {"either"}
-        assert result.provenance["pairing"]["membership"] == "either"
-
-    def test_an_unknown_mode_is_refused_by_name(self, run):
-        with pytest.raises(ValueError, match="membership must be one of"):
-            run(input_data=["TP53"], membership="any")
+        assert {rows[0]["input_1"], rows[0]["input_2"]} == {"rs101", "17:5100"}
 
 
 class TestGroupSize:
@@ -135,7 +167,7 @@ class TestGroupSize:
     def test_a_group_reaching_too_many_genes_is_excluded(self, run):
         """DISEASE reaches three genes; PATHWAY reaches two."""
         rows, _ = run(
-            input_data=["TP53", "BRCA1"],
+            input_data=TP53_VARIANTS + BRCA1_VARIANTS,
             group_types=["Pathways", "Diseases"],
             max_group_size=2,
         )
@@ -144,7 +176,7 @@ class TestGroupSize:
 
     def test_raising_it_lets_the_larger_group_back_in(self, run):
         rows, _ = run(
-            input_data=["TP53", "BRCA1"],
+            input_data=TP53_VARIANTS + BRCA1_VARIANTS,
             group_types=["Pathways", "Diseases"],
             max_group_size=10,
         )
@@ -156,7 +188,7 @@ class TestGroupSize:
 
     def test_zero_means_no_limit_rather_than_the_default(self, run):
         _, result = run(
-            input_data=["TP53", "BRCA1"],
+            input_data=TP53_VARIANTS + BRCA1_VARIANTS,
             group_types=["Diseases"],
             max_group_size=0,
         )
@@ -165,13 +197,8 @@ class TestGroupSize:
         assert result.provenance["group_filter"]["groups_excluded_by_size"] == 0
 
     def test_an_empty_result_says_the_filter_caused_it(self, run):
-        """
-        Otherwise an empty answer reads as "these genes share no
-        biology", when the truth is "the only thing linking them is a
-        group you excluded".
-        """
         rows, result = run(
-            input_data=["TP53", "BRCA1"],
+            input_data=TP53_VARIANTS + BRCA1_VARIANTS,
             group_types=["Diseases"],
             max_group_size=2,
         )
@@ -179,18 +206,17 @@ class TestGroupSize:
 
         assert rows == []
         assert excluded["groups_excluded_by_size"] >= 1
-        assert excluded["smallest_excluded"] == 3
         assert "raising max_group_size" in excluded["means"]
 
     def test_a_negative_size_is_refused(self, run):
         with pytest.raises(ValueError, match="max_group_size must be 0 or positive"):
-            run(input_data=["TP53"], max_group_size=-1)
+            run(input_data=TP53_VARIANTS, max_group_size=-1)
 
 
 class TestSupport:
     def test_the_count_is_the_number_of_distinct_groups(self, run):
         rows, _ = run(
-            input_data=["TP53", "BRCA1"],
+            input_data=TP53_VARIANTS + BRCA1_VARIANTS,
             group_types=["Pathways", "Diseases"],
             max_group_size=10,
         )
@@ -199,67 +225,68 @@ class TestSupport:
 
     def test_min_group_support_filters_on_it(self, run):
         rows, _ = run(
-            input_data=["TP53", "BRCA1"],
+            input_data=TP53_VARIANTS + BRCA1_VARIANTS,
             group_types=["Pathways"],
             min_group_support=2,
         )
 
         assert rows == []
 
+    def test_the_curation_behind_a_pair_is_named(self, run):
+        """Read from the bundle, not guessed from an accession prefix."""
+        rows, _ = run(input_data=TP53_VARIANTS + BRCA1_VARIANTS)
+
+        assert rows[0]["group_support_sources"]
+        assert rows[0]["group_support_source_count"] == len(
+            set(rows[0]["group_support_sources"])
+        )
+
+    def test_min_group_sources_is_a_stronger_claim(self, run):
+        rows, _ = run(
+            input_data=TP53_VARIANTS + BRCA1_VARIANTS,
+            group_types=["Pathways", "Diseases"],
+            max_group_size=10,
+            min_group_sources=3,
+        )
+
+        assert rows == []
+
     def test_support_below_one_is_refused(self, run):
         with pytest.raises(ValueError, match="min_group_support must be at least 1"):
-            run(input_data=["TP53"], min_group_support=0)
+            run(input_data=TP53_VARIANTS, min_group_support=0)
+
+    def test_sources_below_one_is_refused(self, run):
+        with pytest.raises(ValueError, match="min_group_sources must be at least 1"):
+            run(input_data=TP53_VARIANTS, min_group_sources=0)
 
 
 class TestGroupTypes:
-    def test_a_misspelled_group_type_is_refused_rather_than_returning_nothing(
-        self, run
-    ):
+    def test_a_misspelled_group_type_is_refused_rather_than_empty(self, run):
         with pytest.raises(ValueError, match="Unknown group_types"):
-            run(input_data=["TP53"], group_types=["Pathway"])
-
-    def test_the_error_lists_what_the_bundle_has(self, run):
-        with pytest.raises(ValueError, match="Pathways"):
-            run(input_data=["TP53"], group_types=["Nonsense"])
+            run(input_data=TP53_VARIANTS, group_types=["Pathway"])
 
     def test_gene_ontology_is_named_as_unusable(self, run):
-        """It has entities and no relationships, so it cannot link genes."""
         with pytest.raises(ValueError, match="Gene Ontology carries"):
-            run(input_data=["TP53"], group_types=["Nonsense"])
-
-    def test_an_empty_list_is_refused(self, run):
-        with pytest.raises(ValueError, match="at least one entity group"):
-            run(input_data=["TP53"], group_types=[])
+            run(input_data=TP53_VARIANTS, group_types=["Nonsense"])
 
 
-class TestTheVariantsPerGeneCap:
-    def test_it_bounds_the_pairs(self, run):
-        """Pairs grow with the square, so this is the real size control."""
-        rows, _ = run(input_data=["TP53", "BRCA1"], max_variants_per_gene=1)
+class TestTheWindow:
+    def test_it_widens_which_genes_a_variant_belongs_to(self, run):
+        """17:9000 lies outside every gene; a wide window reaches BRCA1."""
+        narrow, _ = run(input_data=["17:9000"] + TP53_VARIANTS)
+        wide, _ = run(input_data=["17:9000"] + TP53_VARIANTS, window_bp=4_000)
 
-        assert len(rows) == 1
+        assert narrow == []
+        assert wide
 
-    def test_a_variant_named_by_hand_is_never_dropped(self, run):
-        """
-        The cap keeps the commonest variants. One the caller asked for by
-        name is not a candidate for being dropped.
-        """
-        rows, _ = run(
-            input_data=["17:300", "17:5200"], max_variants_per_gene=1
-        )
-
-        assert _pairs(rows) == {("17:300:A:G", "17:5200:A:G")}
-
-    def test_zero_means_no_cap(self, run):
-        _, result = run(input_data=["TP53", "BRCA1"], max_variants_per_gene=0)
-
-        assert result.provenance["pairing"]["max_variants_per_gene"] is None
-        assert result.provenance["pairing"]["variants_kept_per_gene"] == "all of them"
+    def test_a_negative_window_is_refused(self, run):
+        with pytest.raises(ValueError, match="window_bp must be 0 or positive"):
+            run(input_data=TP53_VARIANTS, window_bp=-1)
 
 
 class TestThePairCap:
     def test_truncation_is_reported(self, run):
-        _, result = run(input_data=["TP53", "BRCA1"], max_pairs=2)
+        _, result = run(input_data=TP53_VARIANTS + BRCA1_VARIANTS, max_pairs=2)
         cut = result.provenance["truncation"]
 
         assert cut["applied"] is True
@@ -267,7 +294,7 @@ class TestThePairCap:
         assert "not every pair" in cut["means"]
 
     def test_an_untruncated_run_says_so(self, run):
-        _, result = run(input_data=["TP53", "BRCA1"])
+        _, result = run(input_data=TP53_VARIANTS + BRCA1_VARIANTS)
 
         assert result.provenance["truncation"]["applied"] is False
 
@@ -275,7 +302,7 @@ class TestThePairCap:
 class TestPairIdentity:
     def test_a_pair_is_never_returned_in_both_orientations(self, run):
         rows, _ = run(
-            input_data=["TP53", "BRCA1"],
+            input_data=TP53_VARIANTS + BRCA1_VARIANTS,
             group_types=["Pathways", "Diseases"],
             max_group_size=10,
         )
@@ -286,28 +313,21 @@ class TestPairIdentity:
         assert len(unordered) == len(set(unordered))
 
     def test_a_pair_is_always_across_two_distinct_genes(self, run):
-        rows, _ = run(input_data=["TP53", "BRCA1"])
+        rows, _ = run(input_data=TP53_VARIANTS + BRCA1_VARIANTS)
 
         assert all(r["gene_1_id"] != r["gene_2_id"] for r in rows)
 
     def test_no_variant_is_paired_with_itself(self, run):
-        rows, _ = run(input_data=["TP53", "BRCA1"], membership="either")
+        rows, _ = run(input_data=TP53_VARIANTS + BRCA1_VARIANTS)
 
         assert all(r["variant_1_key"] != r["variant_2_key"] for r in rows)
 
 
-class TestTheWindow:
-    def test_it_widens_which_genes_a_variant_belongs_to(self, run):
-        """17:9000 lies outside every gene; a wide window reaches BRCA1."""
-        narrow, _ = run(input_data=["17:9000"], membership="either")
-        wide, _ = run(input_data=["17:9000"], membership="either", window_bp=4_000)
+class TestAlleleFrequency:
+    def test_a_filter_that_excludes_everything_leaves_no_pair(self, run):
+        rows, _ = run(input_data=TP53_VARIANTS + BRCA1_VARIANTS, af_min=0.99)
 
-        assert narrow == []
-        assert wide
-
-    def test_a_negative_window_is_refused(self, run):
-        with pytest.raises(ValueError, match="window_bp must be 0 or positive"):
-            run(input_data=["TP53"], window_bp=-1)
+        assert rows == []
 
 
 class TestTheContract:
@@ -316,15 +336,22 @@ class TestTheContract:
             PairVariantsReport,
         )
 
-        _, result = run(input_data=["TP53", "BRCA1"])
+        _, result = run(input_data=TP53_VARIANTS + BRCA1_VARIANTS)
 
-        assert list(result.table.column_names) == list(
+        assert list(result.columns) == list(
             PairVariantsReport.available_columns()
         )
 
     def test_provenance_records_how_the_pairs_were_made(self, run):
-        _, result = run(input_data=["TP53", "BRCA1"])
+        _, result = run(input_data=TP53_VARIANTS + BRCA1_VARIANTS)
         pairing = result.provenance["pairing"]
 
         assert pairing["group_types"] == ["Pathways"]
-        assert "Both members come from the input." in pairing["means"]
+        assert "variants you named" in pairing["means"]
+        assert "expand_gene_to_variant" in pairing["means"]
+
+    def test_it_declares_no_membership(self):
+        from biofilter.modules.report.reports import report_pair_variants as mod
+
+        assert not hasattr(mod, "MEMBERSHIPS")
+        assert not hasattr(mod, "DEFAULT_MAX_VARIANTS_PER_GENE")

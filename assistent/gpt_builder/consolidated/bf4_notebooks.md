@@ -2804,7 +2804,7 @@ supply.
 Section 4 is the one to read. It is why this report exists rather than
 being a mode of `pair_variants`.
 
-### 5. Open a bundle
+### 1. Open a bundle
 
 ```python
 from pathlib import Path
@@ -2827,7 +2827,7 @@ GENES = ["CHEK2", "SMARCB1", "NF2"]
 print(bf.core.db_uri)
 ```
 
-### 6. Gene pairs, on their own
+### 2. Gene pairs, on their own
 
 No mapping: the answer is which of your genes are related, and by what.
 That question stands by itself, which is the argument for this being a
@@ -2847,7 +2847,7 @@ guessing it from an accession prefix. Two curations agreeing is a
 different claim from one curation saying it twice, which is what
 `min_group_sources` filters on — and what `min_group_support` does not.
 
-### 7. `max_group_size` decides the size *and* the meaning
+### 3. `max_group_size` decides the size *and* the meaning
 
 A pathway naming 2,615 genes links its members while saying almost
 nothing about any of them. When a result comes back empty or thin, this
@@ -2863,7 +2863,7 @@ for size in (200, 300, 1000, 0):
 pairs.provenance["group_filter"]
 ```
 
-### 8. Why this is not a mode of `pair_variants`
+### 4. Why this is not a mode of `pair_variants`
 
 `pair_variants` derives "this variant belongs to this gene" from
 coordinates. That is right for a coding variant and wrong for a
@@ -2904,7 +2904,7 @@ anything that disagrees, silently.
 
 `pair_genes` never derives it. It takes the link you supply.
 
-### 9. How you name a gene
+### 5. How you name a gene
 
 Three mechanisms, and you say which — for `input_data` and the mapping
 alike, since it is one decision about one thing.
@@ -2968,7 +2968,7 @@ because no other column is consulted.
 issued it (ADR-003 §2.5). A list of entity ids belongs with the
 `bundle_id` it came from.
 
-### 10. The mapping: two columns, gene then item
+### 6. The mapping: two columns, gene then item
 
 Many-to-many in both directions. The worked example from ADR-005: three
 items on one gene, two on the other, one pair between them.
@@ -2999,7 +2999,7 @@ from_file = bf.report.run(REPORT, input_data=["CHEK2", "SMARCB1"],
 print("same answer:", from_file.num_rows == expanded.num_rows)
 ```
 
-### 11. The item is never read
+### 7. The item is never read
 
 Which is what makes gene→position, gene→rsID, gene→probe and
 gene→exposure one feature instead of four.
@@ -3024,7 +3024,7 @@ spellings of one thing are two things**. `22:100:A:G` and
 `chr22:100:A:G` are different items, and that bounds what the
 deduplication below can promise.
 
-### 12. Three rules the simple example does not show
+### 8. Three rules the simple example does not show
 
 The cross product is not the work. These are, and they are identical for
 every caller — which is the argument for the platform owning them rather
@@ -3054,7 +3054,7 @@ print(f"{three.extra_tables['gene_pairs'].num_rows} gene pairs "
 three.to_pandas()[["item_1", "item_2"]]
 ```
 
-### 13. Both genes must carry an item
+### 9. Both genes must carry an item
 
 Not "both were named". A gene can be in your input and carry nothing, and
 then there is nothing on its side to pair.
@@ -3074,7 +3074,7 @@ except ValueError as exc:
     print("\nrefused:", exc)
 ```
 
-### 14. Export, and keeping both tables
+### 10. Export, and keeping both tables
 
 `write()` exports the primary table, which is the item pairs when you
 asked for them. `save()` keeps everything.
@@ -3091,7 +3091,7 @@ back = ReportResult.load(saved)
 print("tables back:", list(back.tables))
 ```
 
-### 15. The same thing on the command line
+### 11. The same thing on the command line
 
 ```bash
 biofilter report run --report-name pair_genes \\
@@ -3110,19 +3110,17 @@ biofilter report run --report-name pair_genes \\
 
 Candidate variant × variant pairs whose genes share biology.
 
-Replaces six reports that were one pipeline written in three eras. Three
-stages: **place** the input on genes, **connect** those genes through a
-shared pathway / disease / protein, **pair** the variants.
+**It takes variants** — rsIDs, `chr:pos`, `chr:pos:ref:alt` — and pairs
+the ones you named. Section 5 is about what it deliberately no longer
+does, and how to get it back in one visible step.
 
-Section 3 is the one to read: `max_group_size` decides both the size and
-the meaning of the answer.
-
-### 1. Open a bundle
+### 1. Open a bundle, and get some variants
 
 ```python
 from pathlib import Path
 
 from biofilter import Biofilter
+from biofilter.modules.report import Bundle
 
 BUNDLE = None
 REPORT = "pair_variants"
@@ -3136,20 +3134,27 @@ _root = next(
 OUTPUT_DIR = _root / "notebooks" / "templates" / "outputs"
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
-GENES = ["CHEK2", "SMARCB1", "NF2"]
-print(bf.core.db_uri)
+# A realistic input: common variants in three genes that share biology.
+with Bundle.open(bf.core.db_uri.removeprefix("parquet://")) as bundle:
+    VARIANTS = [r[0] for r in bundle.con.execute("""
+        SELECT v.variant_key
+        FROM variant_masters v
+        JOIN entity_locations l ON l.build = 38 AND l.chromosome = v.chromosome
+         AND v.position BETWEEN l.start_pos AND l.end_pos
+        JOIN gene_masters gm ON gm.entity_id = l.entity_id
+        WHERE gm.symbol IN ('CHEK2', 'SMARCB1', 'NF2') AND v.af_joint > 0.05
+        ORDER BY v.af_joint DESC LIMIT 40
+    """).fetchall()]
+
+print(f"{len(VARIANTS)} variants, e.g. {VARIANTS[:2]}")
 ```
 
 ### 2. What can link two genes in this bundle
 
 A *group* is the entity sitting between two genes: a pathway they share,
-a disease both are implicated in, a protein both interact with. Ask the
-bundle which kinds it actually has edges for — Gene Ontology has 38,092
-entities and no relationships at all, so it cannot link anything.
+a disease both are implicated in, a protein both interact with.
 
 ```python
-from biofilter.modules.report import Bundle
-
 with Bundle.open(bf.core.db_uri.removeprefix("parquet://")) as bundle:
     groups = bundle.con.execute("""
         WITH ge AS (SELECT e.id FROM entities e JOIN entity_groups eg ON eg.id = e.group_id
@@ -3160,153 +3165,129 @@ with Bundle.open(bf.core.db_uri.removeprefix("parquet://")) as bundle:
             UNION ALL
             SELECT r.entity_2_id, r.entity_1_id FROM entity_relationships r
             WHERE r.entity_1_id IN (SELECT id FROM ge) AND r.entity_2_id NOT IN (SELECT id FROM ge))
-        SELECT eg.name AS group_type, count(DISTINCT l.grp) AS groups,
-               max(gene_n) AS largest_group
-        FROM link l
-        JOIN entities e ON e.id = l.grp
+        SELECT eg.name AS group_type, count(DISTINCT l.grp) AS groups
+        FROM link l JOIN entities e ON e.id = l.grp
         JOIN entity_groups eg ON eg.id = e.group_id
-        JOIN (SELECT grp, count(DISTINCT gene) AS gene_n FROM link GROUP BY 1) d
-          ON d.grp = l.grp
         GROUP BY 1 ORDER BY 2 DESC
     """).to_arrow_table().to_pandas()
 
 groups
 ```
 
-### 3. `max_group_size`, and why an empty result is not "no biology"
+### 3. Pair them
 
-A pathway naming 1,500 genes links its members while saying almost
-nothing about any of them. The default drops groups above 300 genes.
-
-Run the three genes at the default and watch it return nothing — then
-read why.
+One row is a pair of your variants whose genes share at least one
+group.
 
 ```python
-empty = bf.report.run("pair_genes", input_data=GENES)
-
-print(f"{len(empty.to_pandas())} rows")
-empty.provenance["group_filter"]
-```
-
-The three pathways linking these genes have 1,231, 1,321 and 1,543
-genes each. Excluding them is correct — and without that provenance block
-the empty frame would read as a finding about biology rather than a
-consequence of a parameter.
-
-```python
-# Raise the limit, or use a group type whose members are smaller.
-for size in (300, 2000):
-    out = bf.report.run("pair_genes", input_data=GENES,
-                        max_group_size=size).to_pandas()
-    print(f"  max_group_size={size:>5}  {len(out):>3} gene pairs")
-
-by_protein = bf.report.run("pair_genes", input_data=GENES,
-                           group_types=["Proteins"]).to_pandas()
-print(f"  group_types=Proteins   {len(by_protein):>3} gene pairs")
-by_protein[["gene_1_symbol", "gene_2_symbol", "group_support_count"]]
-```
-
-### 4. `membership` — one side from the input, or both
-
-The only difference there ever was between `variant_modeling` (`both`)
-and `snp_snp_model` (`either`). Not a cosmetic filter: `either` is
-unbounded in a way `both` is not.
-
-```python
-for membership in ("both", "either"):
-    out = bf.report.run(REPORT, input_data=GENES, group_types=["Proteins"],
-                        membership=membership, max_pairs=50_000)
-    df = out.to_pandas()
-    partners = df["gene_2_symbol"].nunique()
-    print(f"  membership={membership:<7} {len(df):>7,} pairs, "
-          f"{partners:>5,} partner genes, "
-          f"truncated={out.provenance['truncation']['applied']}")
-```
-
-Five seed genes reach 19,393 partner genes through proteins, which
-is why `either` needs its caps and `both` mostly does not.
-
-### 5. Naming a gene and naming a variant are different requests
-
-Naming `CHEK2` asks for its variants. Naming one rsID asks for that
-variant — not for the other 4,000 in the gene that contains it.
-
-```python
-pairs = bf.report.run(REPORT, input_data=GENES, group_types=["Proteins"])
+pairs = bf.report.run(REPORT, input_data=VARIANTS, group_types=["Proteins"])
 df = pairs.to_pandas()
 
-print(f"{len(df):,} pairs from gene names")
-df[["input_1", "variant_1_key", "gene_1_symbol", "variant_1_from_input",
-    "variant_2_key", "gene_2_symbol", "variant_2_from_input",
-    "group_support_count"]].head(5)
+print(f"{len(df):,} pairs from {len(VARIANTS)} variants")
+df[["variant_1_key", "gene_1_symbol", "variant_2_key", "gene_2_symbol",
+    "group_support_count", "group_support_sources"]].head(6)
+```
+
+### 4. `max_group_size`, and why an empty result is not "no biology"
+
+A pathway naming 2,615 genes links its members while saying almost
+nothing about any of them. When a result comes back empty or thin, this
+is usually why — so the provenance says what the cut removed.
+
+```python
+for size in (200, 300, 1000, 0):
+    out = bf.report.run(REPORT, input_data=VARIANTS, group_types=["Proteins"],
+                        max_group_size=size)
+    label = "no limit" if size == 0 else str(size)
+    print(f"  max_group_size={label:<9} {out.num_rows:>7,} pairs")
+
+pairs.provenance["group_filter"]
+```
+
+### 5. Starting from genes
+
+This report used to accept gene names and expand each one into the
+variants inside it. It no longer does, and the reason is not tidiness.
+
+A gene on chr22 holds about 4,000 variants. The report kept **100** of
+them, ranked by allele frequency, and you never saw which 100. Running
+the expansion yourself costs one step and puts that choice in front of
+the person making it.
+
+```python
+try:
+    bf.report.run(REPORT, input_data=["CHEK2", "SMARCB1"])
+except ValueError as exc:
+    print(exc)
 ```
 
 ```python
-# The same report given variants instead: every side is a named variant.
-with Bundle.open(bf.core.db_uri.removeprefix("parquet://")) as bundle:
-    named = [r[0] for r in bundle.con.execute("""
-        SELECT v.variant_key FROM variant_masters v
-        JOIN entity_locations l ON l.build = 38 AND l.chromosome = v.chromosome
-         AND v.position BETWEEN l.start_pos AND l.end_pos
-        JOIN gene_masters gm ON gm.entity_id = l.entity_id
-        WHERE gm.symbol IN ('CHEK2', 'SMARCB1', 'NF2') AND v.af_joint > 0.05
-        ORDER BY v.af_joint DESC LIMIT 40
-    """).fetchall()]
+# One visible step instead of one invisible one — and you can look at
+# and filter the list before anything is paired.
+expanded = bf.report.run("expand_gene_to_variant",
+                         input_data=["CHEK2", "SMARCB1"],
+                         mapping="position", af_max=0.01,
+                         impact_filter=["HIGH", "MODERATE"],
+                         max_variants_per_gene=0).to_pandas()
 
-from_variants = bf.report.run(REPORT, input_data=named,
-                              group_types=["Proteins"]).to_pandas()
+keys = expanded.query("status == 'ok'").variant_key.drop_duplicates().tolist()
+print(f"{len(keys):,} rare, damaging variants — yours to filter further")
 
-print(f"{len(named)} variants in -> {len(from_variants):,} pairs")
-print("every side was named by hand:",
-      bool(from_variants.variant_1_from_input.all()
-           and from_variants.variant_2_from_input.all()))
+from_genes = bf.report.run(REPORT, input_data=keys[:200], group_types=["Proteins"])
+print(f"{from_genes.num_rows:,} pairs")
 ```
 
-### 6. `max_variants_per_gene` — where the size is really decided
+Three parameters left with it. Passing one is an error rather than a
+silent change of answer:
 
-Pairs grow with the **square** of the variants per gene. Three chr22
-genes paired in full are 48 million rows, and the query runs out of
-memory before producing them.
-
-The variants kept are the most common, because a pairwise interaction
-test has no power on a rare one. A variant you named is never dropped.
+| gone | instead |
+| --- | --- |
+| gene names in `input_data` | `expand_gene_to_variant`, then pair its output |
+| `max_variants_per_gene` | the same parameter on `expand_gene_to_variant` |
+| `membership="either"` | `pair_genes(membership="either")` → expand the partners → pair |
 
 ```python
-for cap in (10, 100, 300):
-    out = bf.report.run(REPORT, input_data=GENES, group_types=["Proteins"],
-                        max_variants_per_gene=cap).to_pandas()
-    print(f"  max_variants_per_gene={cap:>4}  {len(out):>7,} pairs")
-
-pairs.provenance["pairing"]
+for name, value in [("membership", "either"),
+                    ("max_variants_per_gene", 10),
+                    ("output_grain", "gene_pairs")]:
+    try:
+        bf.report.run(REPORT, input_data=VARIANTS[:4], **{name: value})
+    except ValueError as exc:
+        print(f"{name}: {str(exc).splitlines()[-1].strip()}\n")
 ```
 
-### 7. Support, and what it is not
+### 6. Support, and what it is not
 
-`group_support_count` counts the distinct groups linking the two genes.
-It is a weight for ranking candidates — not a p-value, and not evidence
-of interaction. Change `max_group_size` and every count changes.
+`group_support_count` counts the groups linking the two genes;
+`group_support_source_count` counts the **curations** that asserted them,
+read from the bundle rather than guessed from an accession prefix. Two
+curations agreeing is not one curation saying it twice.
 
 ```python
-for support in (1, 20, 60):
-    out = bf.report.run(REPORT, input_data=GENES, group_types=["Proteins"],
+for support in (1, 10, 30):
+    out = bf.report.run(REPORT, input_data=VARIANTS, group_types=["Proteins"],
                         min_group_support=support).to_pandas()
     print(f"  min_group_support={support:>3}  {len(out):>7,} pairs")
 
 df.nlargest(5, "group_support_count")[
-    ["gene_1_symbol", "gene_2_symbol", "group_support_count", "group_support_names"]
+    ["gene_1_symbol", "gene_2_symbol", "group_support_count",
+     "group_support_source_count", "group_support_sources"]
 ]
 ```
 
-### 8. Gene pairs are a different question
+It is a weight for ranking candidates — not a p-value, and not evidence
+of interaction. Change `max_group_size` and every count changes.
 
-Stage 2 on its own — which of these genes are related, and by what — is
-`pair_genes`, a report of its own rather than a mode of this one. It also
-expands a gene pair by a list **you** supply, which is what to reach for
-when the variant to gene attachment comes from outside the bundle: a
-colocalization, a fine-mapping, a curated assignment.
+### 7. Gene pairs are a different question
 
-`pair_variants` derives that attachment from coordinates, which is right
-for a coding variant and wrong for a regulatory one.
+Stage 2 on its own — which genes are related, and by what — is
+`pair_genes`. It also expands a gene pair by a list **you** supply, which
+is what to reach for when the variant-to-gene attachment comes from
+outside the bundle: a colocalization, a fine-mapping, a curated
+assignment.
+
+This report derives that attachment from coordinates, which is right for
+a coding variant and wrong for a regulatory one.
 
 ```python
 partners = bf.report.run("pair_genes", input_data=["CHEK2"],
@@ -3314,24 +3295,24 @@ partners = bf.report.run("pair_genes", input_data=["CHEK2"],
 
 print(f"{len(partners):,} partner genes for CHEK2")
 partners[["gene_1_symbol", "gene_2_symbol", "gene_2_from_input",
-          "group_support_count", "group_support_sources"]].head(8)
+          "group_support_count", "group_support_sources"]].head(6)
 ```
 
-### 9. Export
+### 8. Export
 
 ```python
 for path in pairs.write(OUTPUT_DIR / "pair_variants.csv"):
     print(path)
 ```
 
-### 10. The same thing on the command line
+### 9. The same thing on the command line
 
 ```bash
 biofilter report run --report-name pair_variants \\
-    --input CHEK2 --input SMARCB1 --input NF2 \\
+    --input-file my_variants.txt \\
     --param group_types=Proteins \\
     --param max_group_size=300 \\
-    --param membership=both \\
+    --param min_group_sources=2 \\
     --output pairs.csv
 ```
 

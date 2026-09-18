@@ -42,6 +42,7 @@ Sixteen, in six families. By the shape of the question:
 | variants, want what they regulate | `expand_variant_regulatory` |
 | entities, want what connects | `expand_entity_neighborhood`, `expand_entity_relationship` |
 | variants, want candidate pairs | `pair_variants` |
+| genes, want candidate variant pairs | `expand_gene_to_variant`, then `pair_variants` |
 | genes, want which are related and by what | `pair_genes` |
 | a gene-to-anything list of your own, want the pairs it implies | `pair_genes` |
 | a cohort | `aggregate_cohort_variants` |
@@ -87,6 +88,22 @@ under `entrez`, `2` can only be A2M. The accepted values are `alias`,
 asking for one it lacks is refused with the list of what it has.
 
 It governs the mapping too, not just `input_data`.
+
+### A2d) `pair_variants` says my genes are not variants
+
+It takes variants only — an rsID, `chr:pos`, or `chr:pos:ref:alt`. The
+gene path was removed in 4.3.0.
+
+Run `expand_gene_to_variant` on the genes, filter what comes back, and
+feed those variant keys to `pair_variants`. That is one extra step and it
+is the point: the old behaviour kept 100 of a gene's ~4,000 variants,
+ranked by allele frequency, and never said which.
+
+`membership` and `max_variants_per_gene` went with it. Passing either
+raises rather than being ignored, because ignoring one would answer a
+different question without saying so. `membership="either"` is now
+`pair_genes(membership="either")`, then `expand_gene_to_variant` on the
+partner genes, then pair.
 
 ### A3) What does a report accept?
 

@@ -267,13 +267,61 @@ not advertise it.
 scoped to the build that issued them, so a list of them means nothing
 without its `bundle_id`.
 
+### D13 — `pair_variants` takes variants, and nothing else
+
+*Added 2026-09-18.*
+
+Gene input, the gene-to-variant expansion, `max_variants_per_gene` and
+`membership` all leave `pair_variants`. It takes rsIDs and positions, and
+pairs the variants it was given.
+
+D11 left open whether `pair_variants` should be re-expressed on top of
+`pair_genes`. This is not that — the two reports stay independent — but
+it settles the part of the question that mattered: with `pair_genes`
+answering "which genes are related", the gene path here was a second way
+to reach a neighbouring answer.
+
+Three arguments, in the order they carry weight.
+
+**It hid a choice that is the caller's.** A gene on chr22 holds about
+4,000 variants. The report kept 100 of them, ranked by allele frequency,
+and the caller never saw which. `expand_gene_to_variant` puts that list
+in front of the person choosing, who can filter it before anything is
+paired. Deciding for them and not saying so is the defect this project
+keeps finding in its own code.
+
+**It was an implicit chain**, and chaining is the caller's job — the rule
+set when `expand_gene_to_variant` was built and `variant_annotation_expanded`
+was retired for scraping another report's CSV.
+
+**Every parameter now means something in every call.** `max_variants_per_gene`
+existed only to bound the expansion; `membership="either"` was the
+unbounded mode, the one that needed caps and spilled memory (five seed
+genes reach 19,393 partner genes). A parameter that is load-bearing in
+one mode and meaningless in another is exactly what Alternative A was
+rejected for.
+
+What is lost, and what replaces it:
+
+| gone | instead |
+| --- | --- |
+| gene input | `expand_gene_to_variant`, then pair its output |
+| `membership="either"` | `pair_genes(membership="either")` → `expand_gene_to_variant` on the partners → pair |
+
+Both replacements are longer and visible. That is the trade.
+
+A removed parameter is **refused by name** rather than ignored: a caller
+passing `membership="either"` would otherwise get pairs built under a
+different rule and no indication of it. The refusal says what replaced
+it.
+
 ### D11 — Not decided here
 
 - Whether `pair_variants` should eventually be re-expressed on top of
-  `pair_genes` plus a bundle-sourced expansion. The symmetry is suggestive —
-  `pair_variants` expands by the bundle's variants, `pair_genes` by the
-  caller's list — but the existing report works and this ADR does not touch it
-  beyond removing `output_grain`.
+  `pair_genes`. D13 removed the expansion that made the symmetry
+  tempting, so the two are now independent reports that share `_pairing`
+  and answer different questions. Merging them would be a new argument,
+  not a continuation of this one.
 - Whether the mapping may carry its own attributes (a p-value, a tissue) that
   travel to the output alongside the item. The MVP kept evidence columns in its
   own files and joined afterwards.
