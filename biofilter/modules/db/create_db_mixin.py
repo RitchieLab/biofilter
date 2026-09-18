@@ -10,25 +10,21 @@ from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.engine.url import make_url
 
 from biofilter.modules.db.base import Base
+from biofilter.utils.version import __version__
 
-# from biofilter.modules.db.migrate import alembic_upgrade_head
 from biofilter.modules.db.core_ddl import (
     ddl_list_partitions,
-    ddl_variant_effect_predictions,
-    ddl_variant_gene_regulatory_evidence,
     ddl_variant_masters,
     ddl_variant_molecular_effect,
-    ddl_variant_regulatory_elements,
 )
-from biofilter.modules.db.migrate import get_repo_heads, get_script_location
 from biofilter.utils.db_loader import bootstrap_models
 
+#: Partitioned by chromosome on PostgreSQL. Every name here must also be
+#: in `Base.metadata`: the SQLite path asserts it, and three 4.2.x tables
+#: outlived their models here long enough to break `create_db` outright.
 CORE_PARTITIONED = {
     "variant_masters",
     "variant_molecular_effects",
-    "variant_effect_predictions",
-    "variant_regulatory_elements",
-    "variant_gene_regulatory_evidence",
 }
 
 # ---------------------------------------------------------------------
@@ -46,9 +42,10 @@ SEED_UNIQUE_KEYS: Dict[str, List[str]] = {
     "EntityRelationshipType": ["id"],
     "OmicStatus": ["name"],
     # --- variants dims ---
-    "VariantConsequenceGroup": ["name"],
-    "VariantConsequenceCategory": ["name"],
+    # Both are keyed by name in 4.3.0: the parquet carries the term, so
+    # the term is the join key.
     "VariantConsequence": ["name"],
+    "VariantImpact": ["name"],
     # --- genome ---
     "GenomeAssembly": ["accession"],
 }
@@ -219,11 +216,6 @@ class CreateDBMixin:
             conn.execute(
                 text(ddl_variant_molecular_effect())
             )  # renomeie para plural se quiser
-            conn.execute(text(ddl_variant_effect_predictions()))
-            conn.execute(
-                text(ddl_variant_regulatory_elements())
-            )  # corrigir typo no import/func
-            conn.execute(text(ddl_variant_gene_regulatory_evidence()))  # idem
 
     def _ensure_partitions_by_chromosome(self, core_partitioned) -> None:
         with self.engine.begin() as conn:
@@ -278,21 +270,17 @@ class CreateDBMixin:
         )
         self._seed_from_json(
             f"{seed_dir}/initial_omic_status.json",
-            "model_curation",
+            "model_status",
             "OmicStatus",
             key="omic_status",
         )
+        # No groups/categories seeding: VariantConsequence carries both
+        # as strings, which is how the seed always held them.
         self._seed_from_json(
-            f"{seed_dir}/initial_variant_consequence_groups.json",
+            f"{seed_dir}/initial_variant_impacts.json",
             "model_variants",
-            "VariantConsequenceGroup",
-            key="variant_consequence_groups",
-        )
-        self._seed_from_json(
-            f"{seed_dir}/initial_variant_consequence_categories.json",
-            "model_variants",
-            "VariantConsequenceCategory",
-            key="variant_consequence_categories",
+            "VariantImpact",
+            key="variant_impacts",
         )
         self._seed_from_json(
             f"{seed_dir}/initial_variant_consequences.json",
@@ -341,11 +329,14 @@ class CreateDBMixin:
             for item in records:
                 applied += 1
 
-                # --- Special: BiofilterMetadata schema_revision comes from Alembic heads ---  # noqa E501
+                # BiofilterMetadata used to take schema_revision from the
+                # Alembic head. With Alembic gone the schema is whatever
+                # create_all built, so the package version is the only
+                # meaningful revision. ADR-003 Phase 4 replaces this row
+                # wholesale at build time; until then it at least stops
+                # claiming a migration id that no longer exists.
                 if model_name == "BiofilterMetadata":
-                    script_location = get_script_location()
-                    schema_revision = ",".join(get_repo_heads(script_location))
-                    item["schema_revision"] = schema_revision
+                    item["schema_revision"] = __version__
 
                 # --- Parse datetime-like fields (if your seeds contain them) ---  # noqa E501
                 for k, v in list(item.items()):
@@ -393,48 +384,15 @@ class CreateDBMixin:
                     item["data_source_id"] = fk_obj.id
 
                 if model_name == "VariantConsequence":
-                    if "group" in item and "consequence_group" not in item:
+                    # The seed names them `group` and `category`; the
+                    # columns are `consequence_group` and
+                    # `consequence_category`. Both are plain strings —
+                    # the id lookup that used to sit here resolved
+                    # foreign keys that no longer exist.
+                    if "group" in item:
                         item["consequence_group"] = item.pop("group")
-                    if "category" in item and "consequence_category" not in item:
+                    if "category" in item:
                         item["consequence_category"] = item.pop("category")
-
-                    if "consequence_group" in item:
-                        group_name = item.pop("consequence_group")
-                        VariantConsequenceGroup = import_module(
-                            "biofilter.modules.db.models.model_variants"
-                        ).VariantConsequenceGroup
-                        group_obj = (
-                            session.query(VariantConsequenceGroup)
-                            .filter_by(name=group_name)
-                            .first()
-                        )
-                        if not group_obj:
-                            self.logger.log(
-                                f"Variant Consequence Group not found for name: {group_name}",  # noqa E501
-                                "WARNING",
-                            )
-                            skipped += 1
-                            continue
-                        item["consequence_group_id"] = group_obj.id
-
-                    if "consequence_category" in item:
-                        category_name = item.pop("consequence_category")
-                        VariantConsequenceCategory = import_module(
-                            "biofilter.modules.db.models.model_variants"
-                        ).VariantConsequenceCategory
-                        category_obj = (
-                            session.query(VariantConsequenceCategory)
-                            .filter_by(name=category_name)
-                            .first()
-                        )
-                        if not category_obj:
-                            self.logger.log(
-                                f"Variant Consequence Category not found for name: {category_name}",  # noqa E501
-                                "WARNING",
-                            )
-                            skipped += 1
-                            continue
-                        item["consequence_category_id"] = category_obj.id
 
                 # --- Build lookup from natural key(s) ---
                 lookup = {k: item.get(k) for k in unique_keys}

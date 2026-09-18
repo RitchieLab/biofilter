@@ -9,8 +9,8 @@ Context guide for Claude Code to work on the Biofilter 4 project.
 Biofilter 4 (BF4) is a persistent, entity-centric biological knowledge platform developed at the Ritchie Lab (Penn Medicine). It replaces transient file-based annotation workflows with a versioned, reusable, and queryable knowledge base.
 
 **Author:** Andre Rico (`andreluis.rico@pennmedicine.upenn.edu`)  
-**Current version:** 4.2.1  
-**Active branch:** `main` (active development — APIs and schema still evolving)  
+**Current version:** 4.3.0  
+**Active branch:** `release/4.3.0` (active development — APIs and schema still evolving)  
 **Docs (Sphinx / Read the Docs):** https://biofilter.readthedocs.io/en/latest/
 
 ---
@@ -22,19 +22,26 @@ biofilter/               # Main Python package
   api/cli/               # Click CLI (main.py, groups/)
   core/components/       # db_component, etl_component, report_component, settings_component
   modules/
-    db/                  # SQLAlchemy ORM, Alembic migrations, JSON seeds
-    etl/                 # ETLManager + 19 DTPs (Data Transformation Packages)
+    db/                  # SQLAlchemy ORM, JSON seeds
+    etl/                 # ETLManager + 21 DTPs (Data Transformation Packages)
     report/              # ReportManager + 17 reusable reports
   utils/                 # config, logger, version helpers
   biofilter.py           # Main Python API facade
 
-biofilter_agents/        # Operational guides (LLM-ready) for CLI/ETL/DB/Report
-assistent/               # GPT assistant kit (system prompt, FAQ, manifest)
-biofilter_data/          # Downloads and processed files before DB ingestion
-biofilter_legacy/        # Archived legacy code (v2 and v3)
-docs/source/             # Sphinx documentation source
-notebooks/               # Tutorials and examples (Andre/, Templates/)
-scripts/                 # Admin and debug scripts (target of launch.json configs)
+biofilter_agents/        # Operational guides (LLM-ready). ag_start + ag_report
+                         # are for bundle readers; ag_db + ag_etl for maintainers
+assistent/               # GPT assistant kit. The manifest is the single source
+                         # of truth for its knowledge base; both sync paths read it
+biofilter_data/          # downloads/, processed/, staging/, bundles/
+docs/source/             # Sphinx docs, split by audience:
+                         #   root + getting_started/ — the scientist
+                         #   technical/ — building bundles, internals
+notebooks/               # templates/ — one notebook per report
+                         # lpc__quickstart.md, lpc__deploy.md — Penn LPC
+adr/                     # Architecture decisions, not tied to a release
+biofilter_legacy/
+  bf4_420/               # Frozen 4.2.x: notebooks, scripts, docs snapshot
+  bf2x_code/, loki_code/ # Archived v2/v3 code
 tests/                   # unit/, integration/, contract tests
 docker/                  # Dockerfile and container docs
 temp/                    # Created during binning queries — disposable
@@ -45,15 +52,17 @@ temp/                    # Created during binning queries — disposable
 ## 4-layer architecture
 
 ### 1. Database layer (`modules/db/`)
-- SQLAlchemy 2.x ORM + Alembic migrations
+- SQLAlchemy 2.x ORM, schema built with `create_all` (no migrations:
+  a schema change produces a new bundle, not an in-place migration)
 - Entity-centric model: `Entity`, `EntityAlias`, `EntityRelationship`, `EntityRelationshipType`, `EntityGroup`
 - Domain master tables: `GeneMaster`, `VariantMaster`, `ProteinMaster`, `PathwayMaster`, `DiseaseMaster`, `ChemicalMaster`, `GOMaster`
 - Provenance tracking via `ETLPackage`
-- SQLite (dev) and PostgreSQL (production)
+- Throwaway SQLite during a build; read-only parquet bundle in
+  production. PostgreSQL still works but is no longer the target.
 - Seeds in JSON: `biofilter/modules/db/seed/`
 
 ### 2. ETL layer (`modules/etl/`)
-- 20 active DTPs: `hgnc`, `gene_ncbi`, `gene_ensembl`, `uniprot`, `uniprot_relationships`, `reactome`, `reactome_relationships`, `kegg`, `kegg_relationships`, `go`, `pfam`, `mondo`, `mondo_relationships`, `biogrid`, `clingen`, `chebi`, `gwas`, `variant_gnomad`, `variant_alphamissense`, `variant_ncbi`
+- 21 DTPs: `hgnc`, `gene_ncbi`, `gene_ensembl`, `uniprot`, `uniprot_relationships`, `reactome`, `reactome_relationships`, `kegg`, `kegg_relationships`, `go`, `pfam`, `mondo`, `mondo_relationships`, `biogrid`, `clingen`, `chebi`, `gwas`, `variant_gnomad_joint`, `variant_gnomad_vep`, `variant_alphamissense`, `variant_eqtl_gtex`
 - Pipeline: `extract → transform → load` with file-hash-based skip logic
 - Raw files → `<data_root>/downloads/`, processed → `<data_root>/processed/` (parquet)
 - `ETLManager` orchestrates execution, tracking, rollback, and resume
@@ -64,8 +73,8 @@ temp/                    # Created during binning queries — disposable
 - `ReportManager` handles discovery, indexing, and routing
 
 ### 4. Interaction layer (`api/cli/` + `biofilter.py`)
-- Click CLI with 4 command groups: `config`, `db`, `etl`, `report`
-- Python facade: `Biofilter(db_uri=...)` exposing `.db`, `.etl`, `.report`, `.settings`
+- Click CLI with 5 command groups: `bundle`, `config`, `db`, `etl`, `report`
+- Python facade: `Biofilter(bundle=...)` for a bundle, or `Biofilter(db_uri=...)` for any SQLAlchemy URI; exposes `.db`, `.etl`, `.report`, `.settings`
 - Supports `DATABASE_URL` env var (Docker-ready)
 
 ---
@@ -103,21 +112,19 @@ cd docs && make html
 ## Typical operational workflow
 
 ```bash
-# 1) Validate config and database state
-biofilter config show
-biofilter db migrate --status
+# 1) Plan what the bundle covers
+biofilter bundle plan --out bundle_plan.json
 
-# 2) Bootstrap (new environment)
-biofilter db migrate --target head --force
-biofilter db upgrade
+# 2) Build it: staging SQLite, both branches, then assembly
+biofilter bundle build --plan bundle_plan.json
 
-# 3) ETL
-biofilter etl update-all
-biofilter etl status
+# 3) Inspect the result
+biofilter bundle info ./biofilter_data/bundles/<YYYYMMDD>
+biofilter db verify --in ./biofilter_data/bundles/<YYYYMMDD> --schema
 
 # 4) Monitoring reports
-biofilter report run --report-name etl_status
-biofilter report run --report-name etl_packages
+biofilter report run --report-name platform_etl_status
+biofilter report run --report-name platform_etl_packages
 
 # 5) Explore available reports
 biofilter report list --verbose
@@ -131,17 +138,23 @@ biofilter report explain --report-name <name>
 ```python
 from biofilter import Biofilter
 
-bf = Biofilter(db_uri="postgresql+psycopg2://user:pass@localhost:5432/biofilter_dev")
-bf.db.connect()
+# Reading: a bundle is a directory — point at the directory, not at its
+# tables/. A bundle is read-only, so reports work and the ETL does not.
+bf = Biofilter(bundle="./biofilter_data/bundles/20260914")
 
-# ETL
-summary = bf.etl.update_all(only_active=True)
+result = bf.report.run("annotate_gene", input_data=["TP53", "BRCA1"])
+df = result.to_pandas()          # every report returns a ReportResult
+result.provenance["bundle_id"]   # which build these ids belong to
+result.write("genes.csv")        # export: one table, lossy on purpose
+result.save("./runs/apoe")       # keep: every table, nothing lost
 
-# Reports
-df_status = bf.report.run("etl_status", only_active=False)
-df_rel    = bf.report.run("entity_relationship_model",
-                           input_data=["TP53", "BRCA1"],
-                           relationship_scope="input_to_any")
+# Some reports answer in more than one shape.
+stats = bf.report.run("platform_data_statistics")
+stats.extra_tables["storage"]    # beside stats.table
+
+# Writing: the ETL needs a writable URI, never a bundle.
+bf_dev = Biofilter(db_uri="postgresql+psycopg2://user:pass@localhost:5432/biofilter_dev")
+summary = bf_dev.etl.update_all(only_active=True)
 ```
 
 ---
@@ -175,16 +188,42 @@ df_rel    = bf.report.run("entity_relationship_model",
 
 ## Extending: new Report
 
-1. `biofilter/modules/report/reports/report_<name>.py` — `name`, `description`, `run()`, `available_columns()`, `example_input()`
-2. `biofilter/modules/report/reports_explain/report_<name>.md` — tutorial, parameters, column descriptions
-3. Validate: `biofilter report list --verbose` + `biofilter report explain --report-name <name>`
+A report is four artifacts, and all four ship together:
+
+1. `biofilter/modules/report/reports/report_<name>.py` — `name`, `description`, `requires`, `run()`, `available_columns()`, `example_input()`
+2. `biofilter/modules/report/reports_explain/report_<name>.md` — reference: parameters, columns, how to read the result
+3. `notebooks/templates/reports__<name>.ipynb` — worked example; copy `reports__TEMPLATE.ipynb`
+4. `tests/unit/report/test_report_<name>.py` — against the fixture bundle in `tests/unit/conftest.py`
+5. Validate: `biofilter --bundle <path> report list` + `report explain --report-name <name>`
+
+A report returns one table. When its answer is genuinely two shapes,
+`self.emit("<name>", table)` attaches another instead of flattening them
+into one or writing the second out as a file. When it copes with
+something the reader should know about, `self.warn(msg, **context)` logs
+it and records it in the result's provenance.
+
+`result.save(dir)` / `ReportResult.load(dir)` round-trip the whole thing
+— every table as parquet, provenance in a manifest, in a bundle's own
+layout so `Bundle.open` reads a saved result and DuckDB queries it.
+`result.write(path)` is the other job: exporting CSV or parquet for
+something else to read, flattening nested columns, lossy on purpose.
+
+Reports are discovered by being in the package — nothing to register.
+The frozen `report_legacy` module is gone: every report was rewritten
+against the bundle (ADR-004 §2.11), so there is no relational path and
+no second place to look. Shared helpers live in modules that do not
+start with `report_`, which is what keeps them from being discovered as
+reports: `_annotation.py` (the annotate family's SQL), `_resolution.py`
+(turning a typed name into entities), `_variants.py` (reading rsIDs and
+positions) and `_cohort.py` (reading VCF / PLINK files).
 
 ---
 
 ## Safety and operational rules
 
 - **Never run `rollback` or `restore` automatically** — require explicit confirmation
-- **Before destructive migrations:** create a backup (`biofilter db backup --out ...`)
+- **Before overwriting a bundle:** don't. A published bundle cannot be
+  rebuilt once its sources move on; build a new one instead.
 - **`--drop-files` in ETL:** do not use by default in production
 - **`--stamp-head`:** only in controlled environments with clear justification
 - **Bundle `import`:** confirm target environment before executing
@@ -208,19 +247,33 @@ df_rel    = bf.report.run("entity_relationship_model",
 
 ## Infrastructure
 
-- **Production:** read-only Parquet bundle on the Penn LPC (`/project/hall_shared/datasets/biofilter/<YYYYMMDD>/tables`), accessed via `--db-uri parquet:///.../tables`. The VPS was decommissioned; its PostgreSQL deployment procedure is kept for reference in `notebooks/Templates/lpc__deploy.md` (Appendix A).
+- **Production:** read-only Parquet bundle, built by `bundle build`, on the Penn LPC (`/project/hall_shared/datasets/biofilter/<YYYYMMDD>`), accessed via `--db-uri parquet:///...`. The VPS was decommissioned; its PostgreSQL deployment procedure is kept for reference in `biofilter_legacy/bf4_420/notebooks/Templates/lpc__deploy.md` (Appendix A).
 - **Local dev:** PostgreSQL `biofilter_dev`. Note its entity IDs are a different ID space from the bundle — never export from it over the bundle.
-- **Docker:** available to run the CLI without installing BF4 locally (`docker/Dockerfile`)
+- **Docker:** one image (`docker/Dockerfile`), published to Docker Hub and
+  to GHCR as `biofilter-hpc`. It carries no data: bind the bundle at
+  `/bundle` read-only and a writable `/workspace` for output.
 - **Tooling:** Poetry, tox, pytest, sphinx, testcontainers (Postgres in tests)
-- **Local config:** `.biofilter.toml` at project root (do not commit credentials)
+- **Local config:** `.biofilter.toml` at project root — `[database] bundle` for
+  reading (a directory, relative to the file), `db_uri` only for writing;
+  bundle wins. Do not commit credentials.
 
 ---
 
 ## Known documentation gaps
 
-- Some `reports_explain/` files are minimal stubs — to be revisited
-- Notebooks in `notebooks/` have no index — acceptable if used for personal development
+- `docs/source/guides/` does not exist yet. It is the agreed home for
+  task-shaped pages written as questions ("which variants in these genes
+  are plausibly damaging"), as opposed to the current organization by
+  system component. The model for one is
+  `biofilter_legacy/bf4_420/notebooks/Andre/adsp/step_01/README.md`.
+- Only the current release's notebooks live at the root (`notebooks/`),
+  unversioned on purpose: the directory carried a `_430` suffix while the
+  4.2.x set sat beside it, and that set has moved under
+  `biofilter_legacy/`. Versioning the path again would mean renaming it,
+  and every reference to it, each release.
+  Everything from 4.2.x — notebooks, scripts and a snapshot of its docs —
+  is frozen under `biofilter_legacy/bf4_420/`, so `docs/` can be rewritten
+  for 4.3.0 without stranding anyone still reading a 4.2.0 bundle.
 
 ## Notes
 
-- `dtp_variant_ncbi.py` is kept as a backup DTP (replaced by gnomAD as primary variant source); no explain doc required for now

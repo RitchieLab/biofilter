@@ -1,0 +1,421 @@
+# biofilter/api/cli/groups/bundle.py
+"""
+Build a parquet bundle from a declared plan.
+
+Under ADR-003 a bundle is an immutable, versioned release rather than an
+export of a live database, which makes the plan that produced it part of
+its identity: the same plan rebuilds the same bundle. `bundle plan`
+writes that plan; `bundle build` consumes it.
+
+The plan is the authority for a single build. The `active` flag on
+`etl_data_sources` only seeds a new plan's defaults, and each DTP's own
+JSON config still answers "what within a source" (which INFO fields,
+which tissues) — the plan answers "which sources".
+"""
+
+from __future__ import annotations
+
+import json
+from datetime import datetime, timezone
+from pathlib import Path
+
+import click
+
+from biofilter.api.cli.common import local_db_uri_option, require_db_uri
+from biofilter.biofilter import NO_DATABASE, Biofilter
+from biofilter.modules.db.models import ETLDataSource, ETLSourceSystem
+from biofilter.utils.version import __version__
+
+PLAN_VERSION = 1
+
+# Data sources whose output is written straight to parquet, never staged
+# through the relational database (ADR-003 §2.2). Everything else needs
+# the SQLite staging pass, because those DTPs resolve entities against
+# each other while they load.
+VARIANT_DATA_TYPE = "Variant"
+
+# Execution order for the core branch. This is the dependency
+# declaration: sources run in the order the plan lists them, and the core
+# DTPs resolve entities against what earlier ones created.
+#
+# The database's own id order is *not* usable here — it is seed insertion
+# order, which has gene_ncbi at 1 and hgnc at 2, the reverse of what the
+# gene load needs. HGNC is the authoritative nomenclature and seeds the
+# gene entities; NCBI and Ensembl enrich what it created.
+#
+# Only the gene ordering is firm. `dtp_gene_ensembl` states its
+# requirement ("requires prior gene load (HGNC/NCBI)"); the rest follows
+# the rule that a master must precede the relationships drawn over it,
+# which is derivable but not declared anywhere. Anything not listed keeps
+# its database order, after everything that is.
+CORE_ORDER = [
+    # Genes first: everything downstream resolves against them.
+    "hgnc",
+    "gene_ncbi",
+    "ensembl",
+    # Domain masters. Pfam before UniProt: the protein load attaches
+    # domain families to the proteins it creates, so the families have to
+    # exist first.
+    "pfam",
+    "uniprot",
+    "reactome",
+    "kegg_pathways",
+    "gene_ontology",
+    "mondo",
+    "chebi",
+    # Relationships, each after the master it draws over.
+    "uniprot_relationships",
+    "reactome_relationships",
+    "kegg_relationships",
+    "mondo_relationships",
+    "biogrid",
+    "clingen",
+]
+
+
+def _core_sort_key(name: str) -> tuple:
+    """Position in CORE_ORDER; unlisted sources sort after, by name."""
+    try:
+        return (0, CORE_ORDER.index(name))
+    except ValueError:
+        return (1, name)
+
+
+@click.group()
+def bundle():
+    """Plan and build parquet bundles."""
+    pass
+
+
+def _config_override_for(dtp_script: str) -> str | None:
+    """
+    Path of the DTP's packaged field/tissue config, when it has one.
+
+    Recorded in the plan so a build states which selection it used, and
+    so a rebuild can point at an archived copy instead of whatever the
+    installed package currently ships.
+    """
+    candidate = (
+        Path("biofilter/modules/etl/dtps/config") / f"{dtp_script}.json"
+    )
+    return str(candidate) if candidate.is_file() else None
+
+
+@bundle.command("plan")
+@local_db_uri_option
+@click.option(
+    "--out",
+    "out_path",
+    type=click.Path(dir_okay=False, path_type=Path),
+    default=Path("bundle_plan.json"),
+    show_default=True,
+    help="Where to write the plan.",
+)
+@click.option(
+    "--all-sources",
+    is_flag=True,
+    help=(
+        "Enable every source in the plan, not only the ones currently "
+        "flagged active. Note the variant sources cover the whole genome: "
+        "the gnomAD download alone is about 1.5 TB."
+    ),
+)
+@click.option(
+    "--force",
+    is_flag=True,
+    help="Overwrite an existing plan file.",
+)
+@click.option("--debug", is_flag=True, help="Enable debug logging.")
+@click.pass_context
+def plan_cmd(ctx, db_uri, out_path: Path, all_sources: bool, force: bool, debug: bool):  # noqa: E501
+    """
+    Write a build plan listing every data source, flagged for inclusion.
+
+    Edit the file to choose what the build covers, then pass it to
+    `bundle build`. Sources are split into the two branches the build
+    runs independently: `core`, staged through SQLite, and `variant`,
+    written straight to parquet.
+    """
+    db_uri = require_db_uri(ctx, local_db_uri=db_uri)
+
+    if out_path.exists() and not force:
+        raise click.ClickException(
+            f"{out_path} already exists. Pass --force to overwrite it, or "
+            f"--out to write elsewhere. Refusing to discard a plan that "
+            f"may have produced a published bundle."
+        )
+
+    bf = Biofilter(db_uri=db_uri, debug_mode=debug)
+    bf.db.connect()
+
+    with bf.core.require_db().get_session() as session:
+        rows = (
+            session.query(ETLDataSource, ETLSourceSystem.name)
+            .join(ETLSourceSystem, ETLSourceSystem.id == ETLDataSource.source_system_id)  # noqa: E501
+            .order_by(ETLDataSource.id)
+            .all()
+        )
+
+        core, variant = [], []
+        for ds, system_name in rows:
+            entry = {
+                "name": ds.name,
+                "include": bool(all_sources or ds.active),
+                "source_system": system_name,
+                "data_type": ds.data_type,
+                "dtp_script": ds.dtp_script,
+                "dtp_version": ds.dtp_version,
+                "config_override": _config_override_for(ds.dtp_script),
+            }
+            (variant if ds.data_type == VARIANT_DATA_TYPE else core).append(entry)  # noqa: E501
+
+        core.sort(key=lambda e: _core_sort_key(e["name"]))
+
+    plan = {
+        "plan_version": PLAN_VERSION,
+        "biofilter_version": __version__,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "_comment": [
+            "Build plan for a parquet bundle (ADR-003).",
+            "Set 'include' to choose what the build covers. This file is",
+            "the authority for one build: the 'active' flag in the",
+            "database only seeded these defaults, and each DTP's own JSON",
+            "config still governs what is selected *within* a source.",
+            "The plan is recorded in the bundle manifest, so an archived",
+            "plan identifies how a published bundle was produced.",
+            "",
+            "ORDER MATTERS. Sources run in the order they appear here,",
+            "and that order is the dependency declaration: the core branch",
+            "resolves entities against what earlier sources created, so",
+            "hgnc has to precede ensembl. Reordering this list reorders",
+            "the build. The generated order is the one the ETL has always",
+            "used (seed insertion order).",
+            "",
+            "Branches run independently:",
+            "  core    - staged through a throwaway SQLite, then dumped to",
+            "            parquet. These DTPs resolve entities against each",
+            "            other, so they need a transactional store.",
+            "  variant - written straight to parquet, one file per",
+            "            chromosome. No relational hop.",
+            "",
+            "Disk, not CPU, is the binding constraint on the variant",
+            "branch: the full gnomAD download is ~1.53 TB while the",
+            "largest single chromosome is ~126 GB. The build processes and",
+            "discards raw files per chromosome rather than downloading",
+            "everything first.",
+        ],
+        "branches": {
+            "core": {
+                "staging": "sqlite",
+                "sources": core,
+            },
+            "variant": {
+                "staging": "none",
+                "sources": variant,
+            },
+        },
+    }
+
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text(json.dumps(plan, indent=2) + "\n", encoding="utf-8")
+
+    n_core = sum(1 for s in core if s["include"])
+    n_var = sum(1 for s in variant if s["include"])
+    click.echo(f"📝 Plan written to {out_path}")
+    click.echo(
+        f"   core:    {n_core} of {len(core)} sources included"
+    )
+    click.echo(
+        f"   variant: {n_var} of {len(variant)} sources included"
+    )
+    click.echo("   Edit 'include' flags, then run: biofilter bundle build")
+
+
+@bundle.command("build")
+@click.option(
+    "--plan",
+    "plan_path",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    default=Path("bundle_plan.json"),
+    show_default=True,
+    help="Plan to build from (see `bundle plan`).",
+)
+@click.option(
+    "--data-root",
+    type=click.Path(file_okay=False, path_type=Path),
+    default=Path("biofilter_data"),
+    show_default=True,
+    help="Where raw, processed and staging live.",
+)
+@click.option(
+    "--out",
+    "bundle_dir",
+    type=click.Path(file_okay=False, path_type=Path),
+    default=None,
+    help=(
+        "Where to write the bundle. Defaults to "
+        "<data-root>/bundles/<YYYYMMDD>. Refuses to overwrite a "
+        "directory that already holds one."
+    ),
+)
+@click.option(
+    "--restart",
+    is_flag=True,
+    help=(
+        "Discard the staging database and start over. The default is to "
+        "resume: an interrupted build re-runs only what is still pending."
+    ),
+)
+@click.option(
+    "--keep-raw",
+    is_flag=True,
+    help=(
+        "Keep downloaded files after their output exists. Off by default "
+        "because a full genome is ~1.53 TB of raw input against ~126 GB "
+        "for the largest single chromosome."
+    ),
+)
+@click.option(
+    "--into",
+    "merge_into",
+    type=click.Path(file_okay=False, path_type=Path),
+    help=(
+        "Fold this run's variant output into a bundle that already "
+        "exists, instead of writing a new one. For a staged build: each "
+        "stage folds its chromosomes in, and the bundle grows. The "
+        "bundle id changes each time, because it is derived from "
+        "content. Refuses to replace a file the bundle already has."
+    ),
+)
+@click.option(
+    "--keep-processed",
+    is_flag=True,
+    help=(
+        "Copy the variant parquet into the bundle instead of moving it, "
+        "so processed/ still holds it afterwards. For building a "
+        "chromosome-subset bundle to develop against without consuming "
+        "the files the eventual full bundle needs."
+    ),
+)
+@click.option(
+    "--no-assemble",
+    is_flag=True,
+    help=(
+        "Run the sources but do not assemble. For a staged build, where "
+        "assembling early would publish a bundle holding only what has "
+        "run so far."
+    ),
+)
+@click.option(
+    "--min-free-gb",
+    type=float,
+    default=100.0,
+    show_default=True,
+    help=(
+        "Refuse to start a source below this much free space. One gnomAD "
+        "chromosome needs up to 67 GB of raw before its parquet exists."
+    ),
+)
+@click.option("--debug", is_flag=True, help="Enable debug logging.")
+def build_cmd(plan_path: Path, data_root: Path, bundle_dir, restart: bool, keep_raw: bool, keep_processed: bool, merge_into, no_assemble: bool, min_free_gb: float, debug: bool):  # noqa: E501
+    """
+    Build a bundle from a plan.
+
+    Creates a throwaway SQLite under <data-root>/staging, runs every
+    included source against it, and assembles the bundle only once all of
+    them have succeeded. Re-running resumes: finished sources are skipped.
+    """
+    from biofilter.modules.bundle import BundleBuilder
+
+    plan = json.loads(plan_path.read_text(encoding="utf-8"))
+
+    # Start with no database at all. `Biofilter()` falls back to the URI
+    # in .biofilter.toml when none is given, so the command used to fail
+    # before it started whenever that database was absent — which is the
+    # normal state, since 4.3 has no persistent database to point at. The
+    # build creates and connects its own staging database moments later.
+    bf = Biofilter(db_uri=NO_DATABASE, debug_mode=debug)
+    builder = BundleBuilder(
+        plan,
+        biofilter=bf,
+        data_root=data_root,
+        logger=bf.core.logger,
+        keep_raw=keep_raw,
+        keep_processed=keep_processed,
+        merge_into=merge_into,
+        bundle_dir=bundle_dir,
+        assemble=not no_assemble,
+        min_free_gb=min_free_gb,
+    )
+    result = builder.run(restart=restart)
+
+    click.echo("")
+    for outcome in result.outcomes:
+        mark = {"done": "✅", "failed": "❌", "skipped": "⏭️"}.get(outcome.status, "•")  # noqa: E501
+        freed = f"  (freed {outcome.raw_freed_mb:,.0f} MB)" if outcome.raw_freed_mb else ""  # noqa: E501
+        click.echo(f"  {mark} {outcome.name} [{outcome.branch}]{freed}")
+        if outcome.detail:
+            click.echo(f"      {outcome.detail}")
+
+    if not result.ok:
+        raise click.ClickException(
+            f"{len(result.failed)} source(s) failed; the bundle was not "
+            f"assembled. Run again to resume from where this stopped."
+        )
+
+    click.echo("")
+    click.echo(f"Staging database: {result.staging_db}")
+    if result.assembled:
+        click.echo(f"Bundle:           {builder.bundle_dir}")
+
+
+@bundle.command("info")
+@click.argument(
+    "bundle_path",
+    type=click.Path(exists=True, file_okay=False, path_type=Path),
+)
+def info_cmd(bundle_path: Path):
+    """
+    Show what a bundle says about itself.
+
+    A bundle cannot be rebuilt once its sources move on, so its manifest
+    is the only surviving account of what it holds — this prints it.
+    """
+    manifest_path = bundle_path / "manifest.json"
+    if not manifest_path.is_file():
+        manifest_path = bundle_path.parent / "manifest.json"
+    if not manifest_path.is_file():
+        raise click.ClickException(f"No manifest.json under {bundle_path}")
+
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    tables = manifest.get("tables", [])
+
+    click.echo(f"Bundle id:      {manifest.get('bundle_id', '(none)')}")
+    click.echo(f"Biofilter:      {manifest.get('biofilter_version')}")
+    click.echo(f"Schema:         {manifest.get('schema_version')}")
+    click.echo(f"Built:          {manifest.get('created_at')}")
+    updated = manifest.get("updated_at")
+    if updated and updated != manifest.get("created_at"):
+        # Only when they differ: a bundle assembled in one pass would
+        # otherwise print the same date twice.
+        click.echo(f"Last merged:    {updated}")
+    click.echo(f"Built from:     {manifest.get('engine')}")
+    click.echo(f"Tables:         {len(tables)}")
+
+    by_branch: dict = {}
+    for table in tables:
+        branch = table.get("branch", "unknown")
+        entry = by_branch.setdefault(branch, [0, 0, 0])
+        entry[0] += 1
+        entry[1] += table.get("rows") or 0
+        entry[2] += table.get("bytes") or 0
+    for branch, (n, rows, size) in sorted(by_branch.items()):
+        click.echo(
+            f"  {branch:<10} {n:>3} table(s)  {rows:>14,} rows  "
+            f"{size / 1024 ** 2:>9,.1f} MB"
+        )
+
+    for extra, label in (("plan", "Plan"), ("build_record", "Build record")):
+        name = manifest.get(extra)
+        if name and (bundle_path / name).is_file():
+            click.echo(f"{label + ':':<16}{name}")

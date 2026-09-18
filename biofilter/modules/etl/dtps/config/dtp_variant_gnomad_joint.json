@@ -1,0 +1,4676 @@
+{
+  "_comment": [
+    "Field selection for the gnomAD joint callset (variants parquet).",
+    "This is an INCLUDE-list: 'load': true is what reaches the parquet.",
+    "Generated from the v4.1 chr21 VCF header; 664 INFO fields.",
+    "A future gnomAD release adding fields will surface them here as",
+    "load:false rather than silently widening the schema."
+  ],
+  "release": "4.1",
+  "source": "gnomad.joint.v4.1.sites.chr{chrom}.vcf.bgz",
+  "filters": {
+    "_comment": [
+      "Applied at build time. ADR-003 bundles are immutable, so a variant",
+      "dropped here is absent from that bundle for good.",
+      "Measured on chr21: AC_joint=0 is 49.5% of records, singletons are",
+      "22.2%, AC>5 keeps only 14.3%.",
+      "null disables a bound. Bounds are inclusive."
+    ],
+    "min_ac": 5,
+    "max_ac": null,
+    "min_af": null,
+    "max_af": null,
+    "ac_field": "AC_joint",
+    "af_field": "AF_joint"
+  },
+  "info_fields": [
+    {
+      "name": "AC_exomes",
+      "load": true,
+      "type": "Integer",
+      "number": "A",
+      "description": "Alternate allele count in exomes dataset"
+    },
+    {
+      "name": "AC_genomes",
+      "load": true,
+      "type": "Integer",
+      "number": "A",
+      "description": "Alternate allele count in genomes dataset"
+    },
+    {
+      "name": "AC_joint",
+      "load": true,
+      "type": "Integer",
+      "number": "A",
+      "description": "Alternate allele count in joint dataset"
+    },
+    {
+      "name": "AF_exomes",
+      "load": true,
+      "type": "Float",
+      "number": "A",
+      "description": "Alternate allele frequency in exomes dataset"
+    },
+    {
+      "name": "AF_genomes",
+      "load": true,
+      "type": "Float",
+      "number": "A",
+      "description": "Alternate allele frequency in genomes dataset"
+    },
+    {
+      "name": "AF_joint",
+      "load": true,
+      "type": "Float",
+      "number": "A",
+      "description": "Alternate allele frequency in joint dataset"
+    },
+    {
+      "name": "AN_exomes",
+      "load": true,
+      "type": "Integer",
+      "number": "1",
+      "description": "Total number of alleles in exomes dataset"
+    },
+    {
+      "name": "AN_genomes",
+      "load": true,
+      "type": "Integer",
+      "number": "1",
+      "description": "Total number of alleles in genomes dataset"
+    },
+    {
+      "name": "AN_joint",
+      "load": true,
+      "type": "Integer",
+      "number": "1",
+      "description": "Total number of alleles in joint dataset"
+    },
+    {
+      "name": "exomes_filters",
+      "load": true,
+      "type": "String",
+      "number": ".",
+      "description": "Filters' values from the exomes dataset."
+    },
+    {
+      "name": "faf95_joint",
+      "load": true,
+      "type": "Float",
+      "number": "A",
+      "description": "Filtering allele frequency (using Poisson 95% CI) in joint dataset"
+    },
+    {
+      "name": "faf99_joint",
+      "load": true,
+      "type": "Float",
+      "number": "A",
+      "description": "Filtering allele frequency (using Poisson 99% CI) in joint dataset"
+    },
+    {
+      "name": "fafmax_faf95_max_gen_anc_joint",
+      "load": true,
+      "type": "String",
+      "number": "A",
+      "description": "Genetic ancestry group with maximum filtering allele frequency (using Poisson 95% CI) in joint dataset"
+    },
+    {
+      "name": "fafmax_faf95_max_joint",
+      "load": true,
+      "type": "Float",
+      "number": "A",
+      "description": "Maximum filtering allele frequency (using Poisson 95% CI) across genetic ancestry groups in joint dataset"
+    },
+    {
+      "name": "genomes_filters",
+      "load": true,
+      "type": "String",
+      "number": ".",
+      "description": "Filters' values from the genomes dataset."
+    },
+    {
+      "name": "nhomalt_exomes",
+      "load": true,
+      "type": "Integer",
+      "number": "A",
+      "description": "Count of homozygous individuals in exomes dataset"
+    },
+    {
+      "name": "nhomalt_genomes",
+      "load": true,
+      "type": "Integer",
+      "number": "A",
+      "description": "Count of homozygous individuals in genomes dataset"
+    },
+    {
+      "name": "nhomalt_joint",
+      "load": true,
+      "type": "Integer",
+      "number": "A",
+      "description": "Count of homozygous individuals in joint dataset"
+    },
+    {
+      "name": "AC_exomes_XX",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Alternate allele count for XX samples in exomes dataset"
+    },
+    {
+      "name": "AC_exomes_XY",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Alternate allele count for XY samples in exomes dataset"
+    },
+    {
+      "name": "AC_exomes_afr",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Alternate allele count for samples in the African/African-American genetic ancestry group in exomes dataset"
+    },
+    {
+      "name": "AC_exomes_afr_XX",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Alternate allele count for XX samples in the African/African-American genetic ancestry group in exomes dataset"
+    },
+    {
+      "name": "AC_exomes_afr_XY",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Alternate allele count for XY samples in the African/African-American genetic ancestry group in exomes dataset"
+    },
+    {
+      "name": "AC_exomes_amr",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Alternate allele count for samples in the Admixed American genetic ancestry group in exomes dataset"
+    },
+    {
+      "name": "AC_exomes_amr_XX",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Alternate allele count for XX samples in the Admixed American genetic ancestry group in exomes dataset"
+    },
+    {
+      "name": "AC_exomes_amr_XY",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Alternate allele count for XY samples in the Admixed American genetic ancestry group in exomes dataset"
+    },
+    {
+      "name": "AC_exomes_asj",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Alternate allele count for samples in the Ashkenazi Jewish genetic ancestry group in exomes dataset"
+    },
+    {
+      "name": "AC_exomes_asj_XX",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Alternate allele count for XX samples in the Ashkenazi Jewish genetic ancestry group in exomes dataset"
+    },
+    {
+      "name": "AC_exomes_asj_XY",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Alternate allele count for XY samples in the Ashkenazi Jewish genetic ancestry group in exomes dataset"
+    },
+    {
+      "name": "AC_exomes_eas",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Alternate allele count for samples in the East Asian genetic ancestry group in exomes dataset"
+    },
+    {
+      "name": "AC_exomes_eas_XX",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Alternate allele count for XX samples in the East Asian genetic ancestry group in exomes dataset"
+    },
+    {
+      "name": "AC_exomes_eas_XY",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Alternate allele count for XY samples in the East Asian genetic ancestry group in exomes dataset"
+    },
+    {
+      "name": "AC_exomes_fin",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Alternate allele count for samples in the Finnish genetic ancestry group in exomes dataset"
+    },
+    {
+      "name": "AC_exomes_fin_XX",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Alternate allele count for XX samples in the Finnish genetic ancestry group in exomes dataset"
+    },
+    {
+      "name": "AC_exomes_fin_XY",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Alternate allele count for XY samples in the Finnish genetic ancestry group in exomes dataset"
+    },
+    {
+      "name": "AC_exomes_mid",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Alternate allele count for samples in the Middle Eastern genetic ancestry group in exomes dataset"
+    },
+    {
+      "name": "AC_exomes_mid_XX",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Alternate allele count for XX samples in the Middle Eastern genetic ancestry group in exomes dataset"
+    },
+    {
+      "name": "AC_exomes_mid_XY",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Alternate allele count for XY samples in the Middle Eastern genetic ancestry group in exomes dataset"
+    },
+    {
+      "name": "AC_exomes_nfe",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Alternate allele count for samples in the Non-Finnish European genetic ancestry group in exomes dataset"
+    },
+    {
+      "name": "AC_exomes_nfe_XX",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Alternate allele count for XX samples in the Non-Finnish European genetic ancestry group in exomes dataset"
+    },
+    {
+      "name": "AC_exomes_nfe_XY",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Alternate allele count for XY samples in the Non-Finnish European genetic ancestry group in exomes dataset"
+    },
+    {
+      "name": "AC_exomes_raw",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Alternate allele count for samples, before removing low-confidence genotypes in exomes dataset"
+    },
+    {
+      "name": "AC_exomes_remaining",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Alternate allele count for samples in the Remaining individuals genetic ancestry group in exomes dataset"
+    },
+    {
+      "name": "AC_exomes_remaining_XX",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Alternate allele count for XX samples in the Remaining individuals genetic ancestry group in exomes dataset"
+    },
+    {
+      "name": "AC_exomes_remaining_XY",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Alternate allele count for XY samples in the Remaining individuals genetic ancestry group in exomes dataset"
+    },
+    {
+      "name": "AC_exomes_sas",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Alternate allele count for samples in the South Asian genetic ancestry group in exomes dataset"
+    },
+    {
+      "name": "AC_exomes_sas_XX",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Alternate allele count for XX samples in the South Asian genetic ancestry group in exomes dataset"
+    },
+    {
+      "name": "AC_exomes_sas_XY",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Alternate allele count for XY samples in the South Asian genetic ancestry group in exomes dataset"
+    },
+    {
+      "name": "AC_genomes_XX",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Alternate allele count for XX samples in genomes dataset"
+    },
+    {
+      "name": "AC_genomes_XY",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Alternate allele count for XY samples in genomes dataset"
+    },
+    {
+      "name": "AC_genomes_afr",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Alternate allele count for samples in the African/African-American genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "AC_genomes_afr_XX",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Alternate allele count for XX samples in the African/African-American genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "AC_genomes_afr_XY",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Alternate allele count for XY samples in the African/African-American genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "AC_genomes_ami",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Alternate allele count for samples in the Amish genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "AC_genomes_ami_XX",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Alternate allele count for XX samples in the Amish genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "AC_genomes_ami_XY",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Alternate allele count for XY samples in the Amish genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "AC_genomes_amr",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Alternate allele count for samples in the Admixed American genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "AC_genomes_amr_XX",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Alternate allele count for XX samples in the Admixed American genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "AC_genomes_amr_XY",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Alternate allele count for XY samples in the Admixed American genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "AC_genomes_asj",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Alternate allele count for samples in the Ashkenazi Jewish genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "AC_genomes_asj_XX",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Alternate allele count for XX samples in the Ashkenazi Jewish genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "AC_genomes_asj_XY",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Alternate allele count for XY samples in the Ashkenazi Jewish genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "AC_genomes_eas",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Alternate allele count for samples in the East Asian genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "AC_genomes_eas_XX",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Alternate allele count for XX samples in the East Asian genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "AC_genomes_eas_XY",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Alternate allele count for XY samples in the East Asian genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "AC_genomes_fin",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Alternate allele count for samples in the Finnish genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "AC_genomes_fin_XX",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Alternate allele count for XX samples in the Finnish genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "AC_genomes_fin_XY",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Alternate allele count for XY samples in the Finnish genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "AC_genomes_mid",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Alternate allele count for samples in the Middle Eastern genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "AC_genomes_mid_XX",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Alternate allele count for XX samples in the Middle Eastern genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "AC_genomes_mid_XY",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Alternate allele count for XY samples in the Middle Eastern genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "AC_genomes_nfe",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Alternate allele count for samples in the Non-Finnish European genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "AC_genomes_nfe_XX",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Alternate allele count for XX samples in the Non-Finnish European genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "AC_genomes_nfe_XY",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Alternate allele count for XY samples in the Non-Finnish European genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "AC_genomes_raw",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Alternate allele count for samples, before removing low-confidence genotypes in genomes dataset"
+    },
+    {
+      "name": "AC_genomes_remaining",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Alternate allele count for samples in the Remaining individuals genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "AC_genomes_remaining_XX",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Alternate allele count for XX samples in the Remaining individuals genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "AC_genomes_remaining_XY",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Alternate allele count for XY samples in the Remaining individuals genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "AC_genomes_sas",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Alternate allele count for samples in the South Asian genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "AC_genomes_sas_XX",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Alternate allele count for XX samples in the South Asian genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "AC_genomes_sas_XY",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Alternate allele count for XY samples in the South Asian genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "AC_grpmax_exomes",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Allele count in the genetic ancestry group with the maximum allele frequency in exomes dataset"
+    },
+    {
+      "name": "AC_grpmax_genomes",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Allele count in the genetic ancestry group with the maximum allele frequency in genomes dataset"
+    },
+    {
+      "name": "AC_grpmax_joint",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Allele count in the genetic ancestry group with the maximum allele frequency in joint dataset"
+    },
+    {
+      "name": "AC_joint_XX",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Alternate allele count for XX samples in joint dataset"
+    },
+    {
+      "name": "AC_joint_XY",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Alternate allele count for XY samples in joint dataset"
+    },
+    {
+      "name": "AC_joint_afr",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Alternate allele count for samples in the African/African-American genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "AC_joint_afr_XX",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Alternate allele count for XX samples in the African/African-American genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "AC_joint_afr_XY",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Alternate allele count for XY samples in the African/African-American genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "AC_joint_ami",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Alternate allele count for samples in the Amish genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "AC_joint_ami_XX",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Alternate allele count for XX samples in the Amish genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "AC_joint_ami_XY",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Alternate allele count for XY samples in the Amish genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "AC_joint_amr",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Alternate allele count for samples in the Admixed American genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "AC_joint_amr_XX",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Alternate allele count for XX samples in the Admixed American genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "AC_joint_amr_XY",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Alternate allele count for XY samples in the Admixed American genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "AC_joint_asj",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Alternate allele count for samples in the Ashkenazi Jewish genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "AC_joint_asj_XX",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Alternate allele count for XX samples in the Ashkenazi Jewish genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "AC_joint_asj_XY",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Alternate allele count for XY samples in the Ashkenazi Jewish genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "AC_joint_eas",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Alternate allele count for samples in the East Asian genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "AC_joint_eas_XX",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Alternate allele count for XX samples in the East Asian genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "AC_joint_eas_XY",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Alternate allele count for XY samples in the East Asian genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "AC_joint_fin",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Alternate allele count for samples in the Finnish genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "AC_joint_fin_XX",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Alternate allele count for XX samples in the Finnish genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "AC_joint_fin_XY",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Alternate allele count for XY samples in the Finnish genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "AC_joint_mid",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Alternate allele count for samples in the Middle Eastern genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "AC_joint_mid_XX",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Alternate allele count for XX samples in the Middle Eastern genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "AC_joint_mid_XY",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Alternate allele count for XY samples in the Middle Eastern genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "AC_joint_nfe",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Alternate allele count for samples in the Non-Finnish European genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "AC_joint_nfe_XX",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Alternate allele count for XX samples in the Non-Finnish European genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "AC_joint_nfe_XY",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Alternate allele count for XY samples in the Non-Finnish European genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "AC_joint_raw",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Alternate allele count for samples, before removing low-confidence genotypes in joint dataset"
+    },
+    {
+      "name": "AC_joint_remaining",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Alternate allele count for samples in the Remaining individuals genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "AC_joint_remaining_XX",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Alternate allele count for XX samples in the Remaining individuals genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "AC_joint_remaining_XY",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Alternate allele count for XY samples in the Remaining individuals genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "AC_joint_sas",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Alternate allele count for samples in the South Asian genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "AC_joint_sas_XX",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Alternate allele count for XX samples in the South Asian genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "AC_joint_sas_XY",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Alternate allele count for XY samples in the South Asian genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "AF_exomes_XX",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Alternate allele frequency in XX samples in exomes dataset"
+    },
+    {
+      "name": "AF_exomes_XY",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Alternate allele frequency in XY samples in exomes dataset"
+    },
+    {
+      "name": "AF_exomes_afr",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Alternate allele frequency in samples in the African/African-American genetic ancestry group in exomes dataset"
+    },
+    {
+      "name": "AF_exomes_afr_XX",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Alternate allele frequency in XX samples in the African/African-American genetic ancestry group in exomes dataset"
+    },
+    {
+      "name": "AF_exomes_afr_XY",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Alternate allele frequency in XY samples in the African/African-American genetic ancestry group in exomes dataset"
+    },
+    {
+      "name": "AF_exomes_amr",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Alternate allele frequency in samples in the Admixed American genetic ancestry group in exomes dataset"
+    },
+    {
+      "name": "AF_exomes_amr_XX",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Alternate allele frequency in XX samples in the Admixed American genetic ancestry group in exomes dataset"
+    },
+    {
+      "name": "AF_exomes_amr_XY",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Alternate allele frequency in XY samples in the Admixed American genetic ancestry group in exomes dataset"
+    },
+    {
+      "name": "AF_exomes_asj",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Alternate allele frequency in samples in the Ashkenazi Jewish genetic ancestry group in exomes dataset"
+    },
+    {
+      "name": "AF_exomes_asj_XX",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Alternate allele frequency in XX samples in the Ashkenazi Jewish genetic ancestry group in exomes dataset"
+    },
+    {
+      "name": "AF_exomes_asj_XY",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Alternate allele frequency in XY samples in the Ashkenazi Jewish genetic ancestry group in exomes dataset"
+    },
+    {
+      "name": "AF_exomes_eas",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Alternate allele frequency in samples in the East Asian genetic ancestry group in exomes dataset"
+    },
+    {
+      "name": "AF_exomes_eas_XX",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Alternate allele frequency in XX samples in the East Asian genetic ancestry group in exomes dataset"
+    },
+    {
+      "name": "AF_exomes_eas_XY",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Alternate allele frequency in XY samples in the East Asian genetic ancestry group in exomes dataset"
+    },
+    {
+      "name": "AF_exomes_fin",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Alternate allele frequency in samples in the Finnish genetic ancestry group in exomes dataset"
+    },
+    {
+      "name": "AF_exomes_fin_XX",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Alternate allele frequency in XX samples in the Finnish genetic ancestry group in exomes dataset"
+    },
+    {
+      "name": "AF_exomes_fin_XY",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Alternate allele frequency in XY samples in the Finnish genetic ancestry group in exomes dataset"
+    },
+    {
+      "name": "AF_exomes_mid",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Alternate allele frequency in samples in the Middle Eastern genetic ancestry group in exomes dataset"
+    },
+    {
+      "name": "AF_exomes_mid_XX",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Alternate allele frequency in XX samples in the Middle Eastern genetic ancestry group in exomes dataset"
+    },
+    {
+      "name": "AF_exomes_mid_XY",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Alternate allele frequency in XY samples in the Middle Eastern genetic ancestry group in exomes dataset"
+    },
+    {
+      "name": "AF_exomes_nfe",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Alternate allele frequency in samples in the Non-Finnish European genetic ancestry group in exomes dataset"
+    },
+    {
+      "name": "AF_exomes_nfe_XX",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Alternate allele frequency in XX samples in the Non-Finnish European genetic ancestry group in exomes dataset"
+    },
+    {
+      "name": "AF_exomes_nfe_XY",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Alternate allele frequency in XY samples in the Non-Finnish European genetic ancestry group in exomes dataset"
+    },
+    {
+      "name": "AF_exomes_raw",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Alternate allele frequency in samples, before removing low-confidence genotypes in exomes dataset"
+    },
+    {
+      "name": "AF_exomes_remaining",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Alternate allele frequency in samples in the Remaining individuals genetic ancestry group in exomes dataset"
+    },
+    {
+      "name": "AF_exomes_remaining_XX",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Alternate allele frequency in XX samples in the Remaining individuals genetic ancestry group in exomes dataset"
+    },
+    {
+      "name": "AF_exomes_remaining_XY",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Alternate allele frequency in XY samples in the Remaining individuals genetic ancestry group in exomes dataset"
+    },
+    {
+      "name": "AF_exomes_sas",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Alternate allele frequency in samples in the South Asian genetic ancestry group in exomes dataset"
+    },
+    {
+      "name": "AF_exomes_sas_XX",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Alternate allele frequency in XX samples in the South Asian genetic ancestry group in exomes dataset"
+    },
+    {
+      "name": "AF_exomes_sas_XY",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Alternate allele frequency in XY samples in the South Asian genetic ancestry group in exomes dataset"
+    },
+    {
+      "name": "AF_genomes_XX",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Alternate allele frequency in XX samples in genomes dataset"
+    },
+    {
+      "name": "AF_genomes_XY",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Alternate allele frequency in XY samples in genomes dataset"
+    },
+    {
+      "name": "AF_genomes_afr",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Alternate allele frequency in samples in the African/African-American genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "AF_genomes_afr_XX",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Alternate allele frequency in XX samples in the African/African-American genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "AF_genomes_afr_XY",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Alternate allele frequency in XY samples in the African/African-American genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "AF_genomes_ami",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Alternate allele frequency in samples in the Amish genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "AF_genomes_ami_XX",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Alternate allele frequency in XX samples in the Amish genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "AF_genomes_ami_XY",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Alternate allele frequency in XY samples in the Amish genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "AF_genomes_amr",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Alternate allele frequency in samples in the Admixed American genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "AF_genomes_amr_XX",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Alternate allele frequency in XX samples in the Admixed American genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "AF_genomes_amr_XY",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Alternate allele frequency in XY samples in the Admixed American genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "AF_genomes_asj",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Alternate allele frequency in samples in the Ashkenazi Jewish genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "AF_genomes_asj_XX",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Alternate allele frequency in XX samples in the Ashkenazi Jewish genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "AF_genomes_asj_XY",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Alternate allele frequency in XY samples in the Ashkenazi Jewish genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "AF_genomes_eas",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Alternate allele frequency in samples in the East Asian genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "AF_genomes_eas_XX",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Alternate allele frequency in XX samples in the East Asian genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "AF_genomes_eas_XY",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Alternate allele frequency in XY samples in the East Asian genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "AF_genomes_fin",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Alternate allele frequency in samples in the Finnish genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "AF_genomes_fin_XX",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Alternate allele frequency in XX samples in the Finnish genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "AF_genomes_fin_XY",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Alternate allele frequency in XY samples in the Finnish genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "AF_genomes_mid",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Alternate allele frequency in samples in the Middle Eastern genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "AF_genomes_mid_XX",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Alternate allele frequency in XX samples in the Middle Eastern genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "AF_genomes_mid_XY",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Alternate allele frequency in XY samples in the Middle Eastern genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "AF_genomes_nfe",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Alternate allele frequency in samples in the Non-Finnish European genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "AF_genomes_nfe_XX",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Alternate allele frequency in XX samples in the Non-Finnish European genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "AF_genomes_nfe_XY",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Alternate allele frequency in XY samples in the Non-Finnish European genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "AF_genomes_raw",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Alternate allele frequency in samples, before removing low-confidence genotypes in genomes dataset"
+    },
+    {
+      "name": "AF_genomes_remaining",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Alternate allele frequency in samples in the Remaining individuals genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "AF_genomes_remaining_XX",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Alternate allele frequency in XX samples in the Remaining individuals genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "AF_genomes_remaining_XY",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Alternate allele frequency in XY samples in the Remaining individuals genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "AF_genomes_sas",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Alternate allele frequency in samples in the South Asian genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "AF_genomes_sas_XX",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Alternate allele frequency in XX samples in the South Asian genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "AF_genomes_sas_XY",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Alternate allele frequency in XY samples in the South Asian genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "AF_grpmax_exomes",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Maximum allele frequency across genetic ancestry groups in exomes dataset"
+    },
+    {
+      "name": "AF_grpmax_genomes",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Maximum allele frequency across genetic ancestry groups in genomes dataset"
+    },
+    {
+      "name": "AF_grpmax_joint",
+      "load": true,
+      "type": "Float",
+      "number": "A",
+      "description": "Maximum allele frequency across genetic ancestry groups in joint dataset"
+    },
+    {
+      "name": "AF_joint_XX",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Alternate allele frequency in XX samples in joint dataset"
+    },
+    {
+      "name": "AF_joint_XY",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Alternate allele frequency in XY samples in joint dataset"
+    },
+    {
+      "name": "AF_joint_afr",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Alternate allele frequency in samples in the African/African-American genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "AF_joint_afr_XX",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Alternate allele frequency in XX samples in the African/African-American genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "AF_joint_afr_XY",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Alternate allele frequency in XY samples in the African/African-American genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "AF_joint_ami",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Alternate allele frequency in samples in the Amish genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "AF_joint_ami_XX",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Alternate allele frequency in XX samples in the Amish genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "AF_joint_ami_XY",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Alternate allele frequency in XY samples in the Amish genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "AF_joint_amr",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Alternate allele frequency in samples in the Admixed American genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "AF_joint_amr_XX",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Alternate allele frequency in XX samples in the Admixed American genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "AF_joint_amr_XY",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Alternate allele frequency in XY samples in the Admixed American genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "AF_joint_asj",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Alternate allele frequency in samples in the Ashkenazi Jewish genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "AF_joint_asj_XX",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Alternate allele frequency in XX samples in the Ashkenazi Jewish genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "AF_joint_asj_XY",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Alternate allele frequency in XY samples in the Ashkenazi Jewish genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "AF_joint_eas",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Alternate allele frequency in samples in the East Asian genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "AF_joint_eas_XX",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Alternate allele frequency in XX samples in the East Asian genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "AF_joint_eas_XY",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Alternate allele frequency in XY samples in the East Asian genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "AF_joint_fin",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Alternate allele frequency in samples in the Finnish genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "AF_joint_fin_XX",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Alternate allele frequency in XX samples in the Finnish genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "AF_joint_fin_XY",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Alternate allele frequency in XY samples in the Finnish genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "AF_joint_mid",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Alternate allele frequency in samples in the Middle Eastern genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "AF_joint_mid_XX",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Alternate allele frequency in XX samples in the Middle Eastern genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "AF_joint_mid_XY",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Alternate allele frequency in XY samples in the Middle Eastern genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "AF_joint_nfe",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Alternate allele frequency in samples in the Non-Finnish European genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "AF_joint_nfe_XX",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Alternate allele frequency in XX samples in the Non-Finnish European genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "AF_joint_nfe_XY",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Alternate allele frequency in XY samples in the Non-Finnish European genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "AF_joint_raw",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Alternate allele frequency in samples, before removing low-confidence genotypes in joint dataset"
+    },
+    {
+      "name": "AF_joint_remaining",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Alternate allele frequency in samples in the Remaining individuals genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "AF_joint_remaining_XX",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Alternate allele frequency in XX samples in the Remaining individuals genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "AF_joint_remaining_XY",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Alternate allele frequency in XY samples in the Remaining individuals genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "AF_joint_sas",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Alternate allele frequency in samples in the South Asian genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "AF_joint_sas_XX",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Alternate allele frequency in XX samples in the South Asian genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "AF_joint_sas_XY",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Alternate allele frequency in XY samples in the South Asian genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "AN_exomes_XX",
+      "load": false,
+      "type": "Integer",
+      "number": "1",
+      "description": "Total number of alleles in XX samples in exomes dataset"
+    },
+    {
+      "name": "AN_exomes_XY",
+      "load": false,
+      "type": "Integer",
+      "number": "1",
+      "description": "Total number of alleles in XY samples in exomes dataset"
+    },
+    {
+      "name": "AN_exomes_afr",
+      "load": false,
+      "type": "Integer",
+      "number": "1",
+      "description": "Total number of alleles in samples in the African/African-American genetic ancestry group in exomes dataset"
+    },
+    {
+      "name": "AN_exomes_afr_XX",
+      "load": false,
+      "type": "Integer",
+      "number": "1",
+      "description": "Total number of alleles in XX samples in the African/African-American genetic ancestry group in exomes dataset"
+    },
+    {
+      "name": "AN_exomes_afr_XY",
+      "load": false,
+      "type": "Integer",
+      "number": "1",
+      "description": "Total number of alleles in XY samples in the African/African-American genetic ancestry group in exomes dataset"
+    },
+    {
+      "name": "AN_exomes_amr",
+      "load": false,
+      "type": "Integer",
+      "number": "1",
+      "description": "Total number of alleles in samples in the Admixed American genetic ancestry group in exomes dataset"
+    },
+    {
+      "name": "AN_exomes_amr_XX",
+      "load": false,
+      "type": "Integer",
+      "number": "1",
+      "description": "Total number of alleles in XX samples in the Admixed American genetic ancestry group in exomes dataset"
+    },
+    {
+      "name": "AN_exomes_amr_XY",
+      "load": false,
+      "type": "Integer",
+      "number": "1",
+      "description": "Total number of alleles in XY samples in the Admixed American genetic ancestry group in exomes dataset"
+    },
+    {
+      "name": "AN_exomes_asj",
+      "load": false,
+      "type": "Integer",
+      "number": "1",
+      "description": "Total number of alleles in samples in the Ashkenazi Jewish genetic ancestry group in exomes dataset"
+    },
+    {
+      "name": "AN_exomes_asj_XX",
+      "load": false,
+      "type": "Integer",
+      "number": "1",
+      "description": "Total number of alleles in XX samples in the Ashkenazi Jewish genetic ancestry group in exomes dataset"
+    },
+    {
+      "name": "AN_exomes_asj_XY",
+      "load": false,
+      "type": "Integer",
+      "number": "1",
+      "description": "Total number of alleles in XY samples in the Ashkenazi Jewish genetic ancestry group in exomes dataset"
+    },
+    {
+      "name": "AN_exomes_eas",
+      "load": false,
+      "type": "Integer",
+      "number": "1",
+      "description": "Total number of alleles in samples in the East Asian genetic ancestry group in exomes dataset"
+    },
+    {
+      "name": "AN_exomes_eas_XX",
+      "load": false,
+      "type": "Integer",
+      "number": "1",
+      "description": "Total number of alleles in XX samples in the East Asian genetic ancestry group in exomes dataset"
+    },
+    {
+      "name": "AN_exomes_eas_XY",
+      "load": false,
+      "type": "Integer",
+      "number": "1",
+      "description": "Total number of alleles in XY samples in the East Asian genetic ancestry group in exomes dataset"
+    },
+    {
+      "name": "AN_exomes_fin",
+      "load": false,
+      "type": "Integer",
+      "number": "1",
+      "description": "Total number of alleles in samples in the Finnish genetic ancestry group in exomes dataset"
+    },
+    {
+      "name": "AN_exomes_fin_XX",
+      "load": false,
+      "type": "Integer",
+      "number": "1",
+      "description": "Total number of alleles in XX samples in the Finnish genetic ancestry group in exomes dataset"
+    },
+    {
+      "name": "AN_exomes_fin_XY",
+      "load": false,
+      "type": "Integer",
+      "number": "1",
+      "description": "Total number of alleles in XY samples in the Finnish genetic ancestry group in exomes dataset"
+    },
+    {
+      "name": "AN_exomes_mid",
+      "load": false,
+      "type": "Integer",
+      "number": "1",
+      "description": "Total number of alleles in samples in the Middle Eastern genetic ancestry group in exomes dataset"
+    },
+    {
+      "name": "AN_exomes_mid_XX",
+      "load": false,
+      "type": "Integer",
+      "number": "1",
+      "description": "Total number of alleles in XX samples in the Middle Eastern genetic ancestry group in exomes dataset"
+    },
+    {
+      "name": "AN_exomes_mid_XY",
+      "load": false,
+      "type": "Integer",
+      "number": "1",
+      "description": "Total number of alleles in XY samples in the Middle Eastern genetic ancestry group in exomes dataset"
+    },
+    {
+      "name": "AN_exomes_nfe",
+      "load": false,
+      "type": "Integer",
+      "number": "1",
+      "description": "Total number of alleles in samples in the Non-Finnish European genetic ancestry group in exomes dataset"
+    },
+    {
+      "name": "AN_exomes_nfe_XX",
+      "load": false,
+      "type": "Integer",
+      "number": "1",
+      "description": "Total number of alleles in XX samples in the Non-Finnish European genetic ancestry group in exomes dataset"
+    },
+    {
+      "name": "AN_exomes_nfe_XY",
+      "load": false,
+      "type": "Integer",
+      "number": "1",
+      "description": "Total number of alleles in XY samples in the Non-Finnish European genetic ancestry group in exomes dataset"
+    },
+    {
+      "name": "AN_exomes_raw",
+      "load": false,
+      "type": "Integer",
+      "number": "1",
+      "description": "Total number of alleles in samples, before removing low-confidence genotypes in exomes dataset"
+    },
+    {
+      "name": "AN_exomes_remaining",
+      "load": false,
+      "type": "Integer",
+      "number": "1",
+      "description": "Total number of alleles in samples in the Remaining individuals genetic ancestry group in exomes dataset"
+    },
+    {
+      "name": "AN_exomes_remaining_XX",
+      "load": false,
+      "type": "Integer",
+      "number": "1",
+      "description": "Total number of alleles in XX samples in the Remaining individuals genetic ancestry group in exomes dataset"
+    },
+    {
+      "name": "AN_exomes_remaining_XY",
+      "load": false,
+      "type": "Integer",
+      "number": "1",
+      "description": "Total number of alleles in XY samples in the Remaining individuals genetic ancestry group in exomes dataset"
+    },
+    {
+      "name": "AN_exomes_sas",
+      "load": false,
+      "type": "Integer",
+      "number": "1",
+      "description": "Total number of alleles in samples in the South Asian genetic ancestry group in exomes dataset"
+    },
+    {
+      "name": "AN_exomes_sas_XX",
+      "load": false,
+      "type": "Integer",
+      "number": "1",
+      "description": "Total number of alleles in XX samples in the South Asian genetic ancestry group in exomes dataset"
+    },
+    {
+      "name": "AN_exomes_sas_XY",
+      "load": false,
+      "type": "Integer",
+      "number": "1",
+      "description": "Total number of alleles in XY samples in the South Asian genetic ancestry group in exomes dataset"
+    },
+    {
+      "name": "AN_genomes_XX",
+      "load": false,
+      "type": "Integer",
+      "number": "1",
+      "description": "Total number of alleles in XX samples in genomes dataset"
+    },
+    {
+      "name": "AN_genomes_XY",
+      "load": false,
+      "type": "Integer",
+      "number": "1",
+      "description": "Total number of alleles in XY samples in genomes dataset"
+    },
+    {
+      "name": "AN_genomes_afr",
+      "load": false,
+      "type": "Integer",
+      "number": "1",
+      "description": "Total number of alleles in samples in the African/African-American genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "AN_genomes_afr_XX",
+      "load": false,
+      "type": "Integer",
+      "number": "1",
+      "description": "Total number of alleles in XX samples in the African/African-American genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "AN_genomes_afr_XY",
+      "load": false,
+      "type": "Integer",
+      "number": "1",
+      "description": "Total number of alleles in XY samples in the African/African-American genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "AN_genomes_ami",
+      "load": false,
+      "type": "Integer",
+      "number": "1",
+      "description": "Total number of alleles in samples in the Amish genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "AN_genomes_ami_XX",
+      "load": false,
+      "type": "Integer",
+      "number": "1",
+      "description": "Total number of alleles in XX samples in the Amish genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "AN_genomes_ami_XY",
+      "load": false,
+      "type": "Integer",
+      "number": "1",
+      "description": "Total number of alleles in XY samples in the Amish genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "AN_genomes_amr",
+      "load": false,
+      "type": "Integer",
+      "number": "1",
+      "description": "Total number of alleles in samples in the Admixed American genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "AN_genomes_amr_XX",
+      "load": false,
+      "type": "Integer",
+      "number": "1",
+      "description": "Total number of alleles in XX samples in the Admixed American genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "AN_genomes_amr_XY",
+      "load": false,
+      "type": "Integer",
+      "number": "1",
+      "description": "Total number of alleles in XY samples in the Admixed American genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "AN_genomes_asj",
+      "load": false,
+      "type": "Integer",
+      "number": "1",
+      "description": "Total number of alleles in samples in the Ashkenazi Jewish genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "AN_genomes_asj_XX",
+      "load": false,
+      "type": "Integer",
+      "number": "1",
+      "description": "Total number of alleles in XX samples in the Ashkenazi Jewish genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "AN_genomes_asj_XY",
+      "load": false,
+      "type": "Integer",
+      "number": "1",
+      "description": "Total number of alleles in XY samples in the Ashkenazi Jewish genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "AN_genomes_eas",
+      "load": false,
+      "type": "Integer",
+      "number": "1",
+      "description": "Total number of alleles in samples in the East Asian genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "AN_genomes_eas_XX",
+      "load": false,
+      "type": "Integer",
+      "number": "1",
+      "description": "Total number of alleles in XX samples in the East Asian genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "AN_genomes_eas_XY",
+      "load": false,
+      "type": "Integer",
+      "number": "1",
+      "description": "Total number of alleles in XY samples in the East Asian genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "AN_genomes_fin",
+      "load": false,
+      "type": "Integer",
+      "number": "1",
+      "description": "Total number of alleles in samples in the Finnish genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "AN_genomes_fin_XX",
+      "load": false,
+      "type": "Integer",
+      "number": "1",
+      "description": "Total number of alleles in XX samples in the Finnish genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "AN_genomes_fin_XY",
+      "load": false,
+      "type": "Integer",
+      "number": "1",
+      "description": "Total number of alleles in XY samples in the Finnish genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "AN_genomes_mid",
+      "load": false,
+      "type": "Integer",
+      "number": "1",
+      "description": "Total number of alleles in samples in the Middle Eastern genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "AN_genomes_mid_XX",
+      "load": false,
+      "type": "Integer",
+      "number": "1",
+      "description": "Total number of alleles in XX samples in the Middle Eastern genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "AN_genomes_mid_XY",
+      "load": false,
+      "type": "Integer",
+      "number": "1",
+      "description": "Total number of alleles in XY samples in the Middle Eastern genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "AN_genomes_nfe",
+      "load": false,
+      "type": "Integer",
+      "number": "1",
+      "description": "Total number of alleles in samples in the Non-Finnish European genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "AN_genomes_nfe_XX",
+      "load": false,
+      "type": "Integer",
+      "number": "1",
+      "description": "Total number of alleles in XX samples in the Non-Finnish European genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "AN_genomes_nfe_XY",
+      "load": false,
+      "type": "Integer",
+      "number": "1",
+      "description": "Total number of alleles in XY samples in the Non-Finnish European genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "AN_genomes_raw",
+      "load": false,
+      "type": "Integer",
+      "number": "1",
+      "description": "Total number of alleles in samples, before removing low-confidence genotypes in genomes dataset"
+    },
+    {
+      "name": "AN_genomes_remaining",
+      "load": false,
+      "type": "Integer",
+      "number": "1",
+      "description": "Total number of alleles in samples in the Remaining individuals genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "AN_genomes_remaining_XX",
+      "load": false,
+      "type": "Integer",
+      "number": "1",
+      "description": "Total number of alleles in XX samples in the Remaining individuals genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "AN_genomes_remaining_XY",
+      "load": false,
+      "type": "Integer",
+      "number": "1",
+      "description": "Total number of alleles in XY samples in the Remaining individuals genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "AN_genomes_sas",
+      "load": false,
+      "type": "Integer",
+      "number": "1",
+      "description": "Total number of alleles in samples in the South Asian genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "AN_genomes_sas_XX",
+      "load": false,
+      "type": "Integer",
+      "number": "1",
+      "description": "Total number of alleles in XX samples in the South Asian genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "AN_genomes_sas_XY",
+      "load": false,
+      "type": "Integer",
+      "number": "1",
+      "description": "Total number of alleles in XY samples in the South Asian genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "AN_grpmax_exomes",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Total number of alleles in the genetic ancestry group with the maximum allele frequency in exomes dataset"
+    },
+    {
+      "name": "AN_grpmax_genomes",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Total number of alleles in the genetic ancestry group with the maximum allele frequency in genomes dataset"
+    },
+    {
+      "name": "AN_grpmax_joint",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Total number of alleles in the genetic ancestry group with the maximum allele frequency in joint dataset"
+    },
+    {
+      "name": "AN_joint_XX",
+      "load": false,
+      "type": "Integer",
+      "number": "1",
+      "description": "Total number of alleles in XX samples in joint dataset"
+    },
+    {
+      "name": "AN_joint_XY",
+      "load": false,
+      "type": "Integer",
+      "number": "1",
+      "description": "Total number of alleles in XY samples in joint dataset"
+    },
+    {
+      "name": "AN_joint_afr",
+      "load": false,
+      "type": "Integer",
+      "number": "1",
+      "description": "Total number of alleles in samples in the African/African-American genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "AN_joint_afr_XX",
+      "load": false,
+      "type": "Integer",
+      "number": "1",
+      "description": "Total number of alleles in XX samples in the African/African-American genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "AN_joint_afr_XY",
+      "load": false,
+      "type": "Integer",
+      "number": "1",
+      "description": "Total number of alleles in XY samples in the African/African-American genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "AN_joint_ami",
+      "load": false,
+      "type": "Integer",
+      "number": "1",
+      "description": "Total number of alleles in samples in the Amish genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "AN_joint_ami_XX",
+      "load": false,
+      "type": "Integer",
+      "number": "1",
+      "description": "Total number of alleles in XX samples in the Amish genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "AN_joint_ami_XY",
+      "load": false,
+      "type": "Integer",
+      "number": "1",
+      "description": "Total number of alleles in XY samples in the Amish genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "AN_joint_amr",
+      "load": false,
+      "type": "Integer",
+      "number": "1",
+      "description": "Total number of alleles in samples in the Admixed American genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "AN_joint_amr_XX",
+      "load": false,
+      "type": "Integer",
+      "number": "1",
+      "description": "Total number of alleles in XX samples in the Admixed American genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "AN_joint_amr_XY",
+      "load": false,
+      "type": "Integer",
+      "number": "1",
+      "description": "Total number of alleles in XY samples in the Admixed American genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "AN_joint_asj",
+      "load": false,
+      "type": "Integer",
+      "number": "1",
+      "description": "Total number of alleles in samples in the Ashkenazi Jewish genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "AN_joint_asj_XX",
+      "load": false,
+      "type": "Integer",
+      "number": "1",
+      "description": "Total number of alleles in XX samples in the Ashkenazi Jewish genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "AN_joint_asj_XY",
+      "load": false,
+      "type": "Integer",
+      "number": "1",
+      "description": "Total number of alleles in XY samples in the Ashkenazi Jewish genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "AN_joint_eas",
+      "load": false,
+      "type": "Integer",
+      "number": "1",
+      "description": "Total number of alleles in samples in the East Asian genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "AN_joint_eas_XX",
+      "load": false,
+      "type": "Integer",
+      "number": "1",
+      "description": "Total number of alleles in XX samples in the East Asian genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "AN_joint_eas_XY",
+      "load": false,
+      "type": "Integer",
+      "number": "1",
+      "description": "Total number of alleles in XY samples in the East Asian genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "AN_joint_fin",
+      "load": false,
+      "type": "Integer",
+      "number": "1",
+      "description": "Total number of alleles in samples in the Finnish genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "AN_joint_fin_XX",
+      "load": false,
+      "type": "Integer",
+      "number": "1",
+      "description": "Total number of alleles in XX samples in the Finnish genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "AN_joint_fin_XY",
+      "load": false,
+      "type": "Integer",
+      "number": "1",
+      "description": "Total number of alleles in XY samples in the Finnish genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "AN_joint_mid",
+      "load": false,
+      "type": "Integer",
+      "number": "1",
+      "description": "Total number of alleles in samples in the Middle Eastern genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "AN_joint_mid_XX",
+      "load": false,
+      "type": "Integer",
+      "number": "1",
+      "description": "Total number of alleles in XX samples in the Middle Eastern genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "AN_joint_mid_XY",
+      "load": false,
+      "type": "Integer",
+      "number": "1",
+      "description": "Total number of alleles in XY samples in the Middle Eastern genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "AN_joint_nfe",
+      "load": false,
+      "type": "Integer",
+      "number": "1",
+      "description": "Total number of alleles in samples in the Non-Finnish European genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "AN_joint_nfe_XX",
+      "load": false,
+      "type": "Integer",
+      "number": "1",
+      "description": "Total number of alleles in XX samples in the Non-Finnish European genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "AN_joint_nfe_XY",
+      "load": false,
+      "type": "Integer",
+      "number": "1",
+      "description": "Total number of alleles in XY samples in the Non-Finnish European genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "AN_joint_raw",
+      "load": false,
+      "type": "Integer",
+      "number": "1",
+      "description": "Total number of alleles in samples, before removing low-confidence genotypes in joint dataset"
+    },
+    {
+      "name": "AN_joint_remaining",
+      "load": false,
+      "type": "Integer",
+      "number": "1",
+      "description": "Total number of alleles in samples in the Remaining individuals genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "AN_joint_remaining_XX",
+      "load": false,
+      "type": "Integer",
+      "number": "1",
+      "description": "Total number of alleles in XX samples in the Remaining individuals genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "AN_joint_remaining_XY",
+      "load": false,
+      "type": "Integer",
+      "number": "1",
+      "description": "Total number of alleles in XY samples in the Remaining individuals genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "AN_joint_sas",
+      "load": false,
+      "type": "Integer",
+      "number": "1",
+      "description": "Total number of alleles in samples in the South Asian genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "AN_joint_sas_XX",
+      "load": false,
+      "type": "Integer",
+      "number": "1",
+      "description": "Total number of alleles in XX samples in the South Asian genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "AN_joint_sas_XY",
+      "load": false,
+      "type": "Integer",
+      "number": "1",
+      "description": "Total number of alleles in XY samples in the South Asian genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "CMH_chisq",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Chi-squared test statistic from the Cochran-Mantel-Haenszel test comparing allele frequencies between exomes and genomes stratified by genetic ancestry group"
+    },
+    {
+      "name": "CMH_p_value",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Odds ratio from Cochran-Mantel-Haenszel test comparing allele frequencies between exomes and genomes stratified by genetic ancestry group"
+    },
+    {
+      "name": "CTT_odds_ratio",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Odds ratio from from Hail's contingency_table_test with `min_cell_count=100` comparing allele frequencies between exomes and genomes"
+    },
+    {
+      "name": "CTT_odds_ratio_XX",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Odds ratio from from Hail's contingency_table_test with `min_cell_count=100` comparing allele frequencies between exomes and genomes for XX samples"
+    },
+    {
+      "name": "CTT_odds_ratio_XY",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Odds ratio from from Hail's contingency_table_test with `min_cell_count=100` comparing allele frequencies between exomes and genomes for XY samples"
+    },
+    {
+      "name": "CTT_odds_ratio_afr",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Odds ratio from from Hail's contingency_table_test with `min_cell_count=100` comparing allele frequencies between exomes and genomes for samples in the African/"
+    },
+    {
+      "name": "CTT_odds_ratio_afr_XX",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Odds ratio from from Hail's contingency_table_test with `min_cell_count=100` comparing allele frequencies between exomes and genomes for XX samples in the Afric"
+    },
+    {
+      "name": "CTT_odds_ratio_afr_XY",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Odds ratio from from Hail's contingency_table_test with `min_cell_count=100` comparing allele frequencies between exomes and genomes for XY samples in the Afric"
+    },
+    {
+      "name": "CTT_odds_ratio_ami",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Odds ratio from from Hail's contingency_table_test with `min_cell_count=100` comparing allele frequencies between exomes and genomes for samples in the Amish ge"
+    },
+    {
+      "name": "CTT_odds_ratio_ami_XX",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Odds ratio from from Hail's contingency_table_test with `min_cell_count=100` comparing allele frequencies between exomes and genomes for XX samples in the Amish"
+    },
+    {
+      "name": "CTT_odds_ratio_ami_XY",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Odds ratio from from Hail's contingency_table_test with `min_cell_count=100` comparing allele frequencies between exomes and genomes for XY samples in the Amish"
+    },
+    {
+      "name": "CTT_odds_ratio_amr",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Odds ratio from from Hail's contingency_table_test with `min_cell_count=100` comparing allele frequencies between exomes and genomes for samples in the Admixed "
+    },
+    {
+      "name": "CTT_odds_ratio_amr_XX",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Odds ratio from from Hail's contingency_table_test with `min_cell_count=100` comparing allele frequencies between exomes and genomes for XX samples in the Admix"
+    },
+    {
+      "name": "CTT_odds_ratio_amr_XY",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Odds ratio from from Hail's contingency_table_test with `min_cell_count=100` comparing allele frequencies between exomes and genomes for XY samples in the Admix"
+    },
+    {
+      "name": "CTT_odds_ratio_asj",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Odds ratio from from Hail's contingency_table_test with `min_cell_count=100` comparing allele frequencies between exomes and genomes for samples in the Ashkenaz"
+    },
+    {
+      "name": "CTT_odds_ratio_asj_XX",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Odds ratio from from Hail's contingency_table_test with `min_cell_count=100` comparing allele frequencies between exomes and genomes for XX samples in the Ashke"
+    },
+    {
+      "name": "CTT_odds_ratio_asj_XY",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Odds ratio from from Hail's contingency_table_test with `min_cell_count=100` comparing allele frequencies between exomes and genomes for XY samples in the Ashke"
+    },
+    {
+      "name": "CTT_odds_ratio_eas",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Odds ratio from from Hail's contingency_table_test with `min_cell_count=100` comparing allele frequencies between exomes and genomes for samples in the East Asi"
+    },
+    {
+      "name": "CTT_odds_ratio_eas_XX",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Odds ratio from from Hail's contingency_table_test with `min_cell_count=100` comparing allele frequencies between exomes and genomes for XX samples in the East "
+    },
+    {
+      "name": "CTT_odds_ratio_eas_XY",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Odds ratio from from Hail's contingency_table_test with `min_cell_count=100` comparing allele frequencies between exomes and genomes for XY samples in the East "
+    },
+    {
+      "name": "CTT_odds_ratio_fin",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Odds ratio from from Hail's contingency_table_test with `min_cell_count=100` comparing allele frequencies between exomes and genomes for samples in the Finnish "
+    },
+    {
+      "name": "CTT_odds_ratio_fin_XX",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Odds ratio from from Hail's contingency_table_test with `min_cell_count=100` comparing allele frequencies between exomes and genomes for XX samples in the Finni"
+    },
+    {
+      "name": "CTT_odds_ratio_fin_XY",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Odds ratio from from Hail's contingency_table_test with `min_cell_count=100` comparing allele frequencies between exomes and genomes for XY samples in the Finni"
+    },
+    {
+      "name": "CTT_odds_ratio_mid",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Odds ratio from from Hail's contingency_table_test with `min_cell_count=100` comparing allele frequencies between exomes and genomes for samples in the Middle E"
+    },
+    {
+      "name": "CTT_odds_ratio_mid_XX",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Odds ratio from from Hail's contingency_table_test with `min_cell_count=100` comparing allele frequencies between exomes and genomes for XX samples in the Middl"
+    },
+    {
+      "name": "CTT_odds_ratio_mid_XY",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Odds ratio from from Hail's contingency_table_test with `min_cell_count=100` comparing allele frequencies between exomes and genomes for XY samples in the Middl"
+    },
+    {
+      "name": "CTT_odds_ratio_nfe",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Odds ratio from from Hail's contingency_table_test with `min_cell_count=100` comparing allele frequencies between exomes and genomes for samples in the Non-Finn"
+    },
+    {
+      "name": "CTT_odds_ratio_nfe_XX",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Odds ratio from from Hail's contingency_table_test with `min_cell_count=100` comparing allele frequencies between exomes and genomes for XX samples in the Non-F"
+    },
+    {
+      "name": "CTT_odds_ratio_nfe_XY",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Odds ratio from from Hail's contingency_table_test with `min_cell_count=100` comparing allele frequencies between exomes and genomes for XY samples in the Non-F"
+    },
+    {
+      "name": "CTT_odds_ratio_raw",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Odds ratio from from Hail's contingency_table_test with `min_cell_count=100` comparing allele frequencies between exomes and genomes for samples, before removin"
+    },
+    {
+      "name": "CTT_odds_ratio_remaining",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Odds ratio from from Hail's contingency_table_test with `min_cell_count=100` comparing allele frequencies between exomes and genomes for samples in the Remainin"
+    },
+    {
+      "name": "CTT_odds_ratio_remaining_XX",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Odds ratio from from Hail's contingency_table_test with `min_cell_count=100` comparing allele frequencies between exomes and genomes for XX samples in the Remai"
+    },
+    {
+      "name": "CTT_odds_ratio_remaining_XY",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Odds ratio from from Hail's contingency_table_test with `min_cell_count=100` comparing allele frequencies between exomes and genomes for XY samples in the Remai"
+    },
+    {
+      "name": "CTT_odds_ratio_sas",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Odds ratio from from Hail's contingency_table_test with `min_cell_count=100` comparing allele frequencies between exomes and genomes for samples in the South As"
+    },
+    {
+      "name": "CTT_odds_ratio_sas_XX",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Odds ratio from from Hail's contingency_table_test with `min_cell_count=100` comparing allele frequencies between exomes and genomes for XX samples in the South"
+    },
+    {
+      "name": "CTT_odds_ratio_sas_XY",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Odds ratio from from Hail's contingency_table_test with `min_cell_count=100` comparing allele frequencies between exomes and genomes for XY samples in the South"
+    },
+    {
+      "name": "CTT_p_value",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "P-value from Hail's contingency_table_test with `min_cell_count=100` comparing allele frequencies between exomes and genomes"
+    },
+    {
+      "name": "CTT_p_value_XX",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "P-value from Hail's contingency_table_test with `min_cell_count=100` comparing allele frequencies between exomes and genomes for XX samples"
+    },
+    {
+      "name": "CTT_p_value_XY",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "P-value from Hail's contingency_table_test with `min_cell_count=100` comparing allele frequencies between exomes and genomes for XY samples"
+    },
+    {
+      "name": "CTT_p_value_afr",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "P-value from Hail's contingency_table_test with `min_cell_count=100` comparing allele frequencies between exomes and genomes for samples in the African/African-"
+    },
+    {
+      "name": "CTT_p_value_afr_XX",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "P-value from Hail's contingency_table_test with `min_cell_count=100` comparing allele frequencies between exomes and genomes for XX samples in the African/Afric"
+    },
+    {
+      "name": "CTT_p_value_afr_XY",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "P-value from Hail's contingency_table_test with `min_cell_count=100` comparing allele frequencies between exomes and genomes for XY samples in the African/Afric"
+    },
+    {
+      "name": "CTT_p_value_ami",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "P-value from Hail's contingency_table_test with `min_cell_count=100` comparing allele frequencies between exomes and genomes for samples in the Amish genetic an"
+    },
+    {
+      "name": "CTT_p_value_ami_XX",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "P-value from Hail's contingency_table_test with `min_cell_count=100` comparing allele frequencies between exomes and genomes for XX samples in the Amish genetic"
+    },
+    {
+      "name": "CTT_p_value_ami_XY",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "P-value from Hail's contingency_table_test with `min_cell_count=100` comparing allele frequencies between exomes and genomes for XY samples in the Amish genetic"
+    },
+    {
+      "name": "CTT_p_value_amr",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "P-value from Hail's contingency_table_test with `min_cell_count=100` comparing allele frequencies between exomes and genomes for samples in the Admixed American"
+    },
+    {
+      "name": "CTT_p_value_amr_XX",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "P-value from Hail's contingency_table_test with `min_cell_count=100` comparing allele frequencies between exomes and genomes for XX samples in the Admixed Ameri"
+    },
+    {
+      "name": "CTT_p_value_amr_XY",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "P-value from Hail's contingency_table_test with `min_cell_count=100` comparing allele frequencies between exomes and genomes for XY samples in the Admixed Ameri"
+    },
+    {
+      "name": "CTT_p_value_asj",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "P-value from Hail's contingency_table_test with `min_cell_count=100` comparing allele frequencies between exomes and genomes for samples in the Ashkenazi Jewish"
+    },
+    {
+      "name": "CTT_p_value_asj_XX",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "P-value from Hail's contingency_table_test with `min_cell_count=100` comparing allele frequencies between exomes and genomes for XX samples in the Ashkenazi Jew"
+    },
+    {
+      "name": "CTT_p_value_asj_XY",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "P-value from Hail's contingency_table_test with `min_cell_count=100` comparing allele frequencies between exomes and genomes for XY samples in the Ashkenazi Jew"
+    },
+    {
+      "name": "CTT_p_value_eas",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "P-value from Hail's contingency_table_test with `min_cell_count=100` comparing allele frequencies between exomes and genomes for samples in the East Asian genet"
+    },
+    {
+      "name": "CTT_p_value_eas_XX",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "P-value from Hail's contingency_table_test with `min_cell_count=100` comparing allele frequencies between exomes and genomes for XX samples in the East Asian ge"
+    },
+    {
+      "name": "CTT_p_value_eas_XY",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "P-value from Hail's contingency_table_test with `min_cell_count=100` comparing allele frequencies between exomes and genomes for XY samples in the East Asian ge"
+    },
+    {
+      "name": "CTT_p_value_fin",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "P-value from Hail's contingency_table_test with `min_cell_count=100` comparing allele frequencies between exomes and genomes for samples in the Finnish genetic "
+    },
+    {
+      "name": "CTT_p_value_fin_XX",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "P-value from Hail's contingency_table_test with `min_cell_count=100` comparing allele frequencies between exomes and genomes for XX samples in the Finnish genet"
+    },
+    {
+      "name": "CTT_p_value_fin_XY",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "P-value from Hail's contingency_table_test with `min_cell_count=100` comparing allele frequencies between exomes and genomes for XY samples in the Finnish genet"
+    },
+    {
+      "name": "CTT_p_value_mid",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "P-value from Hail's contingency_table_test with `min_cell_count=100` comparing allele frequencies between exomes and genomes for samples in the Middle Eastern g"
+    },
+    {
+      "name": "CTT_p_value_mid_XX",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "P-value from Hail's contingency_table_test with `min_cell_count=100` comparing allele frequencies between exomes and genomes for XX samples in the Middle Easter"
+    },
+    {
+      "name": "CTT_p_value_mid_XY",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "P-value from Hail's contingency_table_test with `min_cell_count=100` comparing allele frequencies between exomes and genomes for XY samples in the Middle Easter"
+    },
+    {
+      "name": "CTT_p_value_nfe",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "P-value from Hail's contingency_table_test with `min_cell_count=100` comparing allele frequencies between exomes and genomes for samples in the Non-Finnish Euro"
+    },
+    {
+      "name": "CTT_p_value_nfe_XX",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "P-value from Hail's contingency_table_test with `min_cell_count=100` comparing allele frequencies between exomes and genomes for XX samples in the Non-Finnish E"
+    },
+    {
+      "name": "CTT_p_value_nfe_XY",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "P-value from Hail's contingency_table_test with `min_cell_count=100` comparing allele frequencies between exomes and genomes for XY samples in the Non-Finnish E"
+    },
+    {
+      "name": "CTT_p_value_raw",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "P-value from Hail's contingency_table_test with `min_cell_count=100` comparing allele frequencies between exomes and genomes for samples, before removing low-co"
+    },
+    {
+      "name": "CTT_p_value_remaining",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "P-value from Hail's contingency_table_test with `min_cell_count=100` comparing allele frequencies between exomes and genomes for samples in the Remaining indivi"
+    },
+    {
+      "name": "CTT_p_value_remaining_XX",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "P-value from Hail's contingency_table_test with `min_cell_count=100` comparing allele frequencies between exomes and genomes for XX samples in the Remaining ind"
+    },
+    {
+      "name": "CTT_p_value_remaining_XY",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "P-value from Hail's contingency_table_test with `min_cell_count=100` comparing allele frequencies between exomes and genomes for XY samples in the Remaining ind"
+    },
+    {
+      "name": "CTT_p_value_sas",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "P-value from Hail's contingency_table_test with `min_cell_count=100` comparing allele frequencies between exomes and genomes for samples in the South Asian gene"
+    },
+    {
+      "name": "CTT_p_value_sas_XX",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "P-value from Hail's contingency_table_test with `min_cell_count=100` comparing allele frequencies between exomes and genomes for XX samples in the South Asian g"
+    },
+    {
+      "name": "CTT_p_value_sas_XY",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "P-value from Hail's contingency_table_test with `min_cell_count=100` comparing allele frequencies between exomes and genomes for XY samples in the South Asian g"
+    },
+    {
+      "name": "ab_hist_alt_bin_freq_exomes",
+      "load": false,
+      "type": "String",
+      "number": "A",
+      "description": "Histogram for AB in heterozygous individuals calculated on high quality genotypes in exomes dataset; bin edges are: 0.00|0.05|0.10|0.15|0.20|0.25|0.30|0.35|0.40"
+    },
+    {
+      "name": "ab_hist_alt_bin_freq_genomes",
+      "load": false,
+      "type": "String",
+      "number": "A",
+      "description": "Histogram for AB in heterozygous individuals calculated on high quality genotypes in genomes dataset; bin edges are: 0.00|0.05|0.10|0.15|0.20|0.25|0.30|0.35|0.4"
+    },
+    {
+      "name": "ab_hist_alt_bin_freq_joint",
+      "load": false,
+      "type": "String",
+      "number": "A",
+      "description": "Histogram for AB in heterozygous individuals calculated on high quality genotypes in joint dataset; bin edges are: 0.00|0.05|0.10|0.15|0.20|0.25|0.30|0.35|0.40|"
+    },
+    {
+      "name": "age_hist_het_bin_freq_exomes",
+      "load": false,
+      "type": "String",
+      "number": "A",
+      "description": "Histogram of ages of heterozygous individuals in exomes dataset; bin edges are: 30.0|35.0|40.0|45.0|50.0|55.0|60.0|65.0|70.0|75.0|80.0; total number of individu"
+    },
+    {
+      "name": "age_hist_het_bin_freq_genomes",
+      "load": false,
+      "type": "String",
+      "number": "A",
+      "description": "Histogram of ages of heterozygous individuals in genomes dataset; bin edges are: 30.0|35.0|40.0|45.0|50.0|55.0|60.0|65.0|70.0|75.0|80.0; total number of individ"
+    },
+    {
+      "name": "age_hist_het_bin_freq_joint",
+      "load": false,
+      "type": "String",
+      "number": "A",
+      "description": "Histogram of ages of heterozygous individuals in joint dataset; bin edges are: 30.0|35.0|40.0|45.0|50.0|55.0|60.0|65.0|70.0|75.0|80.0; total number of individua"
+    },
+    {
+      "name": "age_hist_het_n_larger_exomes",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Count of age values falling above highest histogram bin edge for heterozygous individuals in exomes dataset"
+    },
+    {
+      "name": "age_hist_het_n_larger_genomes",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Count of age values falling above highest histogram bin edge for heterozygous individuals in genomes dataset"
+    },
+    {
+      "name": "age_hist_het_n_larger_joint",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Count of age values falling above highest histogram bin edge for heterozygous individuals in joint dataset"
+    },
+    {
+      "name": "age_hist_het_n_smaller_exomes",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Count of age values falling below lowest histogram bin edge for heterozygous individuals in exomes dataset"
+    },
+    {
+      "name": "age_hist_het_n_smaller_genomes",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Count of age values falling below lowest histogram bin edge for heterozygous individuals in genomes dataset"
+    },
+    {
+      "name": "age_hist_het_n_smaller_joint",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Count of age values falling below lowest histogram bin edge for heterozygous individuals in joint dataset"
+    },
+    {
+      "name": "age_hist_hom_bin_freq_exomes",
+      "load": false,
+      "type": "String",
+      "number": "A",
+      "description": "Histogram of ages of homozygous alternate individuals in exomes dataset; bin edges are: 30.0|35.0|40.0|45.0|50.0|55.0|60.0|65.0|70.0|75.0|80.0; total number of "
+    },
+    {
+      "name": "age_hist_hom_bin_freq_genomes",
+      "load": false,
+      "type": "String",
+      "number": "A",
+      "description": "Histogram of ages of homozygous alternate individuals in genomes dataset; bin edges are: 30.0|35.0|40.0|45.0|50.0|55.0|60.0|65.0|70.0|75.0|80.0; total number of"
+    },
+    {
+      "name": "age_hist_hom_bin_freq_joint",
+      "load": false,
+      "type": "String",
+      "number": "A",
+      "description": "Histogram of ages of homozygous alternate individuals in joint dataset; bin edges are: 30.0|35.0|40.0|45.0|50.0|55.0|60.0|65.0|70.0|75.0|80.0; total number of i"
+    },
+    {
+      "name": "age_hist_hom_n_larger_exomes",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Count of age values falling above highest histogram bin edge for homozygous alternate individuals in exomes dataset"
+    },
+    {
+      "name": "age_hist_hom_n_larger_genomes",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Count of age values falling above highest histogram bin edge for homozygous alternate individuals in genomes dataset"
+    },
+    {
+      "name": "age_hist_hom_n_larger_joint",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Count of age values falling above highest histogram bin edge for homozygous alternate individuals in joint dataset"
+    },
+    {
+      "name": "age_hist_hom_n_smaller_exomes",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Count of age values falling below lowest histogram bin edge for homozygous alternate individuals in exomes dataset"
+    },
+    {
+      "name": "age_hist_hom_n_smaller_genomes",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Count of age values falling below lowest histogram bin edge for homozygous alternate individuals in genomes dataset"
+    },
+    {
+      "name": "age_hist_hom_n_smaller_joint",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Count of age values falling below lowest histogram bin edge for homozygous alternate individuals in joint dataset"
+    },
+    {
+      "name": "dp_hist_all_bin_freq_exomes",
+      "load": false,
+      "type": "String",
+      "number": "A",
+      "description": "Histogram for DP calculated on high quality genotypes in exomes dataset; bin edges are: 0|5|10|15|20|25|30|35|40|45|50|55|60|65|70|75|80|85|90|95|100"
+    },
+    {
+      "name": "dp_hist_all_bin_freq_genomes",
+      "load": false,
+      "type": "String",
+      "number": "A",
+      "description": "Histogram for DP calculated on high quality genotypes in genomes dataset; bin edges are: 0|5|10|15|20|25|30|35|40|45|50|55|60|65|70|75|80|85|90|95|100"
+    },
+    {
+      "name": "dp_hist_all_bin_freq_joint",
+      "load": false,
+      "type": "String",
+      "number": "A",
+      "description": "Histogram for DP calculated on high quality genotypes in joint dataset; bin edges are: 0|5|10|15|20|25|30|35|40|45|50|55|60|65|70|75|80|85|90|95|100"
+    },
+    {
+      "name": "dp_hist_all_n_larger_exomes",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Count of DP values falling above highest histogram bin edge DP calculated on high quality genotypes in exomes dataset"
+    },
+    {
+      "name": "dp_hist_all_n_larger_genomes",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Count of DP values falling above highest histogram bin edge DP calculated on high quality genotypes in genomes dataset"
+    },
+    {
+      "name": "dp_hist_all_n_larger_joint",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Count of DP values falling above highest histogram bin edge DP calculated on high quality genotypes in joint dataset"
+    },
+    {
+      "name": "dp_hist_alt_bin_freq_exomes",
+      "load": false,
+      "type": "String",
+      "number": "A",
+      "description": "Histogram for DP in heterozygous individuals calculated on high quality genotypes in exomes dataset; bin edges are: 0|5|10|15|20|25|30|35|40|45|50|55|60|65|70|7"
+    },
+    {
+      "name": "dp_hist_alt_bin_freq_genomes",
+      "load": false,
+      "type": "String",
+      "number": "A",
+      "description": "Histogram for DP in heterozygous individuals calculated on high quality genotypes in genomes dataset; bin edges are: 0|5|10|15|20|25|30|35|40|45|50|55|60|65|70|"
+    },
+    {
+      "name": "dp_hist_alt_bin_freq_joint",
+      "load": false,
+      "type": "String",
+      "number": "A",
+      "description": "Histogram for DP in heterozygous individuals calculated on high quality genotypes in joint dataset; bin edges are: 0|5|10|15|20|25|30|35|40|45|50|55|60|65|70|75"
+    },
+    {
+      "name": "dp_hist_alt_n_larger_exomes",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Count of DP values falling above highest histogram bin edge DP in heterozygous individuals calculated on high quality genotypes in exomes dataset"
+    },
+    {
+      "name": "dp_hist_alt_n_larger_genomes",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Count of DP values falling above highest histogram bin edge DP in heterozygous individuals calculated on high quality genotypes in genomes dataset"
+    },
+    {
+      "name": "dp_hist_alt_n_larger_joint",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Count of DP values falling above highest histogram bin edge DP in heterozygous individuals calculated on high quality genotypes in joint dataset"
+    },
+    {
+      "name": "faf95_exomes",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Filtering allele frequency (using Poisson 95% CI) in exomes dataset"
+    },
+    {
+      "name": "faf95_exomes_XX",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Filtering allele frequency (using Poisson 95% CI) for XX samples in exomes dataset in non-PAR regions of sex chromosomes only"
+    },
+    {
+      "name": "faf95_exomes_XY",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Filtering allele frequency (using Poisson 95% CI) for XY samples in exomes dataset in non-PAR regions of sex chromosomes only"
+    },
+    {
+      "name": "faf95_exomes_afr",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Filtering allele frequency (using Poisson 95% CI) for samples in the African/African-American genetic ancestry group in exomes dataset"
+    },
+    {
+      "name": "faf95_exomes_afr_XX",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Filtering allele frequency (using Poisson 95% CI) for XX samples in the African/African-American genetic ancestry group in exomes dataset in non-PAR regions of "
+    },
+    {
+      "name": "faf95_exomes_afr_XY",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Filtering allele frequency (using Poisson 95% CI) for XY samples in the African/African-American genetic ancestry group in exomes dataset in non-PAR regions of "
+    },
+    {
+      "name": "faf95_exomes_amr",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Filtering allele frequency (using Poisson 95% CI) for samples in the Admixed American genetic ancestry group in exomes dataset"
+    },
+    {
+      "name": "faf95_exomes_amr_XX",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Filtering allele frequency (using Poisson 95% CI) for XX samples in the Admixed American genetic ancestry group in exomes dataset in non-PAR regions of sex chro"
+    },
+    {
+      "name": "faf95_exomes_amr_XY",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Filtering allele frequency (using Poisson 95% CI) for XY samples in the Admixed American genetic ancestry group in exomes dataset in non-PAR regions of sex chro"
+    },
+    {
+      "name": "faf95_exomes_eas",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Filtering allele frequency (using Poisson 95% CI) for samples in the East Asian genetic ancestry group in exomes dataset"
+    },
+    {
+      "name": "faf95_exomes_eas_XX",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Filtering allele frequency (using Poisson 95% CI) for XX samples in the East Asian genetic ancestry group in exomes dataset in non-PAR regions of sex chromosome"
+    },
+    {
+      "name": "faf95_exomes_eas_XY",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Filtering allele frequency (using Poisson 95% CI) for XY samples in the East Asian genetic ancestry group in exomes dataset in non-PAR regions of sex chromosome"
+    },
+    {
+      "name": "faf95_exomes_mid",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Filtering allele frequency (using Poisson 95% CI) for samples in the Middle Eastern genetic ancestry group in exomes dataset"
+    },
+    {
+      "name": "faf95_exomes_mid_XX",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Filtering allele frequency (using Poisson 95% CI) for XX samples in the Middle Eastern genetic ancestry group in exomes dataset in non-PAR regions of sex chromo"
+    },
+    {
+      "name": "faf95_exomes_mid_XY",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Filtering allele frequency (using Poisson 95% CI) for XY samples in the Middle Eastern genetic ancestry group in exomes dataset in non-PAR regions of sex chromo"
+    },
+    {
+      "name": "faf95_exomes_nfe",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Filtering allele frequency (using Poisson 95% CI) for samples in the Non-Finnish European genetic ancestry group in exomes dataset"
+    },
+    {
+      "name": "faf95_exomes_nfe_XX",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Filtering allele frequency (using Poisson 95% CI) for XX samples in the Non-Finnish European genetic ancestry group in exomes dataset in non-PAR regions of sex "
+    },
+    {
+      "name": "faf95_exomes_nfe_XY",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Filtering allele frequency (using Poisson 95% CI) for XY samples in the Non-Finnish European genetic ancestry group in exomes dataset in non-PAR regions of sex "
+    },
+    {
+      "name": "faf95_exomes_sas",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Filtering allele frequency (using Poisson 95% CI) for samples in the South Asian genetic ancestry group in exomes dataset"
+    },
+    {
+      "name": "faf95_exomes_sas_XX",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Filtering allele frequency (using Poisson 95% CI) for XX samples in the South Asian genetic ancestry group in exomes dataset in non-PAR regions of sex chromosom"
+    },
+    {
+      "name": "faf95_exomes_sas_XY",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Filtering allele frequency (using Poisson 95% CI) for XY samples in the South Asian genetic ancestry group in exomes dataset in non-PAR regions of sex chromosom"
+    },
+    {
+      "name": "faf95_genomes",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Filtering allele frequency (using Poisson 95% CI) in genomes dataset"
+    },
+    {
+      "name": "faf95_genomes_XX",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Filtering allele frequency (using Poisson 95% CI) for XX samples in genomes dataset in non-PAR regions of sex chromosomes only"
+    },
+    {
+      "name": "faf95_genomes_XY",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Filtering allele frequency (using Poisson 95% CI) for XY samples in genomes dataset in non-PAR regions of sex chromosomes only"
+    },
+    {
+      "name": "faf95_genomes_afr",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Filtering allele frequency (using Poisson 95% CI) for samples in the African/African-American genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "faf95_genomes_afr_XX",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Filtering allele frequency (using Poisson 95% CI) for XX samples in the African/African-American genetic ancestry group in genomes dataset in non-PAR regions of"
+    },
+    {
+      "name": "faf95_genomes_afr_XY",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Filtering allele frequency (using Poisson 95% CI) for XY samples in the African/African-American genetic ancestry group in genomes dataset in non-PAR regions of"
+    },
+    {
+      "name": "faf95_genomes_amr",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Filtering allele frequency (using Poisson 95% CI) for samples in the Admixed American genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "faf95_genomes_amr_XX",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Filtering allele frequency (using Poisson 95% CI) for XX samples in the Admixed American genetic ancestry group in genomes dataset in non-PAR regions of sex chr"
+    },
+    {
+      "name": "faf95_genomes_amr_XY",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Filtering allele frequency (using Poisson 95% CI) for XY samples in the Admixed American genetic ancestry group in genomes dataset in non-PAR regions of sex chr"
+    },
+    {
+      "name": "faf95_genomes_eas",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Filtering allele frequency (using Poisson 95% CI) for samples in the East Asian genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "faf95_genomes_eas_XX",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Filtering allele frequency (using Poisson 95% CI) for XX samples in the East Asian genetic ancestry group in genomes dataset in non-PAR regions of sex chromosom"
+    },
+    {
+      "name": "faf95_genomes_eas_XY",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Filtering allele frequency (using Poisson 95% CI) for XY samples in the East Asian genetic ancestry group in genomes dataset in non-PAR regions of sex chromosom"
+    },
+    {
+      "name": "faf95_genomes_nfe",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Filtering allele frequency (using Poisson 95% CI) for samples in the Non-Finnish European genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "faf95_genomes_nfe_XX",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Filtering allele frequency (using Poisson 95% CI) for XX samples in the Non-Finnish European genetic ancestry group in genomes dataset in non-PAR regions of sex"
+    },
+    {
+      "name": "faf95_genomes_nfe_XY",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Filtering allele frequency (using Poisson 95% CI) for XY samples in the Non-Finnish European genetic ancestry group in genomes dataset in non-PAR regions of sex"
+    },
+    {
+      "name": "faf95_genomes_sas",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Filtering allele frequency (using Poisson 95% CI) for samples in the South Asian genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "faf95_genomes_sas_XX",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Filtering allele frequency (using Poisson 95% CI) for XX samples in the South Asian genetic ancestry group in genomes dataset in non-PAR regions of sex chromoso"
+    },
+    {
+      "name": "faf95_genomes_sas_XY",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Filtering allele frequency (using Poisson 95% CI) for XY samples in the South Asian genetic ancestry group in genomes dataset in non-PAR regions of sex chromoso"
+    },
+    {
+      "name": "faf95_joint_XX",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Filtering allele frequency (using Poisson 95% CI) for XX samples in joint dataset in non-PAR regions of sex chromosomes only"
+    },
+    {
+      "name": "faf95_joint_XY",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Filtering allele frequency (using Poisson 95% CI) for XY samples in joint dataset in non-PAR regions of sex chromosomes only"
+    },
+    {
+      "name": "faf95_joint_afr",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Filtering allele frequency (using Poisson 95% CI) for samples in the African/African-American genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "faf95_joint_afr_XX",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Filtering allele frequency (using Poisson 95% CI) for XX samples in the African/African-American genetic ancestry group in joint dataset in non-PAR regions of s"
+    },
+    {
+      "name": "faf95_joint_afr_XY",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Filtering allele frequency (using Poisson 95% CI) for XY samples in the African/African-American genetic ancestry group in joint dataset in non-PAR regions of s"
+    },
+    {
+      "name": "faf95_joint_amr",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Filtering allele frequency (using Poisson 95% CI) for samples in the Admixed American genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "faf95_joint_amr_XX",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Filtering allele frequency (using Poisson 95% CI) for XX samples in the Admixed American genetic ancestry group in joint dataset in non-PAR regions of sex chrom"
+    },
+    {
+      "name": "faf95_joint_amr_XY",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Filtering allele frequency (using Poisson 95% CI) for XY samples in the Admixed American genetic ancestry group in joint dataset in non-PAR regions of sex chrom"
+    },
+    {
+      "name": "faf95_joint_eas",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Filtering allele frequency (using Poisson 95% CI) for samples in the East Asian genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "faf95_joint_eas_XX",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Filtering allele frequency (using Poisson 95% CI) for XX samples in the East Asian genetic ancestry group in joint dataset in non-PAR regions of sex chromosomes"
+    },
+    {
+      "name": "faf95_joint_eas_XY",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Filtering allele frequency (using Poisson 95% CI) for XY samples in the East Asian genetic ancestry group in joint dataset in non-PAR regions of sex chromosomes"
+    },
+    {
+      "name": "faf95_joint_mid",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Filtering allele frequency (using Poisson 95% CI) for samples in the Middle Eastern genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "faf95_joint_mid_XX",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Filtering allele frequency (using Poisson 95% CI) for XX samples in the Middle Eastern genetic ancestry group in joint dataset in non-PAR regions of sex chromos"
+    },
+    {
+      "name": "faf95_joint_mid_XY",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Filtering allele frequency (using Poisson 95% CI) for XY samples in the Middle Eastern genetic ancestry group in joint dataset in non-PAR regions of sex chromos"
+    },
+    {
+      "name": "faf95_joint_nfe",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Filtering allele frequency (using Poisson 95% CI) for samples in the Non-Finnish European genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "faf95_joint_nfe_XX",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Filtering allele frequency (using Poisson 95% CI) for XX samples in the Non-Finnish European genetic ancestry group in joint dataset in non-PAR regions of sex c"
+    },
+    {
+      "name": "faf95_joint_nfe_XY",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Filtering allele frequency (using Poisson 95% CI) for XY samples in the Non-Finnish European genetic ancestry group in joint dataset in non-PAR regions of sex c"
+    },
+    {
+      "name": "faf95_joint_sas",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Filtering allele frequency (using Poisson 95% CI) for samples in the South Asian genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "faf95_joint_sas_XX",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Filtering allele frequency (using Poisson 95% CI) for XX samples in the South Asian genetic ancestry group in joint dataset in non-PAR regions of sex chromosome"
+    },
+    {
+      "name": "faf95_joint_sas_XY",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Filtering allele frequency (using Poisson 95% CI) for XY samples in the South Asian genetic ancestry group in joint dataset in non-PAR regions of sex chromosome"
+    },
+    {
+      "name": "faf99_exomes",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Filtering allele frequency (using Poisson 99% CI) in exomes dataset"
+    },
+    {
+      "name": "faf99_exomes_XX",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Filtering allele frequency (using Poisson 99% CI) for XX samples in exomes dataset in non-PAR regions of sex chromosomes only"
+    },
+    {
+      "name": "faf99_exomes_XY",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Filtering allele frequency (using Poisson 99% CI) for XY samples in exomes dataset in non-PAR regions of sex chromosomes only"
+    },
+    {
+      "name": "faf99_exomes_afr",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Filtering allele frequency (using Poisson 99% CI) for samples in the African/African-American genetic ancestry group in exomes dataset"
+    },
+    {
+      "name": "faf99_exomes_afr_XX",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Filtering allele frequency (using Poisson 99% CI) for XX samples in the African/African-American genetic ancestry group in exomes dataset in non-PAR regions of "
+    },
+    {
+      "name": "faf99_exomes_afr_XY",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Filtering allele frequency (using Poisson 99% CI) for XY samples in the African/African-American genetic ancestry group in exomes dataset in non-PAR regions of "
+    },
+    {
+      "name": "faf99_exomes_amr",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Filtering allele frequency (using Poisson 99% CI) for samples in the Admixed American genetic ancestry group in exomes dataset"
+    },
+    {
+      "name": "faf99_exomes_amr_XX",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Filtering allele frequency (using Poisson 99% CI) for XX samples in the Admixed American genetic ancestry group in exomes dataset in non-PAR regions of sex chro"
+    },
+    {
+      "name": "faf99_exomes_amr_XY",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Filtering allele frequency (using Poisson 99% CI) for XY samples in the Admixed American genetic ancestry group in exomes dataset in non-PAR regions of sex chro"
+    },
+    {
+      "name": "faf99_exomes_eas",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Filtering allele frequency (using Poisson 99% CI) for samples in the East Asian genetic ancestry group in exomes dataset"
+    },
+    {
+      "name": "faf99_exomes_eas_XX",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Filtering allele frequency (using Poisson 99% CI) for XX samples in the East Asian genetic ancestry group in exomes dataset in non-PAR regions of sex chromosome"
+    },
+    {
+      "name": "faf99_exomes_eas_XY",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Filtering allele frequency (using Poisson 99% CI) for XY samples in the East Asian genetic ancestry group in exomes dataset in non-PAR regions of sex chromosome"
+    },
+    {
+      "name": "faf99_exomes_mid",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Filtering allele frequency (using Poisson 99% CI) for samples in the Middle Eastern genetic ancestry group in exomes dataset"
+    },
+    {
+      "name": "faf99_exomes_mid_XX",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Filtering allele frequency (using Poisson 99% CI) for XX samples in the Middle Eastern genetic ancestry group in exomes dataset in non-PAR regions of sex chromo"
+    },
+    {
+      "name": "faf99_exomes_mid_XY",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Filtering allele frequency (using Poisson 99% CI) for XY samples in the Middle Eastern genetic ancestry group in exomes dataset in non-PAR regions of sex chromo"
+    },
+    {
+      "name": "faf99_exomes_nfe",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Filtering allele frequency (using Poisson 99% CI) for samples in the Non-Finnish European genetic ancestry group in exomes dataset"
+    },
+    {
+      "name": "faf99_exomes_nfe_XX",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Filtering allele frequency (using Poisson 99% CI) for XX samples in the Non-Finnish European genetic ancestry group in exomes dataset in non-PAR regions of sex "
+    },
+    {
+      "name": "faf99_exomes_nfe_XY",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Filtering allele frequency (using Poisson 99% CI) for XY samples in the Non-Finnish European genetic ancestry group in exomes dataset in non-PAR regions of sex "
+    },
+    {
+      "name": "faf99_exomes_sas",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Filtering allele frequency (using Poisson 99% CI) for samples in the South Asian genetic ancestry group in exomes dataset"
+    },
+    {
+      "name": "faf99_exomes_sas_XX",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Filtering allele frequency (using Poisson 99% CI) for XX samples in the South Asian genetic ancestry group in exomes dataset in non-PAR regions of sex chromosom"
+    },
+    {
+      "name": "faf99_exomes_sas_XY",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Filtering allele frequency (using Poisson 99% CI) for XY samples in the South Asian genetic ancestry group in exomes dataset in non-PAR regions of sex chromosom"
+    },
+    {
+      "name": "faf99_genomes",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Filtering allele frequency (using Poisson 99% CI) in genomes dataset"
+    },
+    {
+      "name": "faf99_genomes_XX",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Filtering allele frequency (using Poisson 99% CI) for XX samples in genomes dataset in non-PAR regions of sex chromosomes only"
+    },
+    {
+      "name": "faf99_genomes_XY",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Filtering allele frequency (using Poisson 99% CI) for XY samples in genomes dataset in non-PAR regions of sex chromosomes only"
+    },
+    {
+      "name": "faf99_genomes_afr",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Filtering allele frequency (using Poisson 99% CI) for samples in the African/African-American genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "faf99_genomes_afr_XX",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Filtering allele frequency (using Poisson 99% CI) for XX samples in the African/African-American genetic ancestry group in genomes dataset in non-PAR regions of"
+    },
+    {
+      "name": "faf99_genomes_afr_XY",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Filtering allele frequency (using Poisson 99% CI) for XY samples in the African/African-American genetic ancestry group in genomes dataset in non-PAR regions of"
+    },
+    {
+      "name": "faf99_genomes_amr",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Filtering allele frequency (using Poisson 99% CI) for samples in the Admixed American genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "faf99_genomes_amr_XX",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Filtering allele frequency (using Poisson 99% CI) for XX samples in the Admixed American genetic ancestry group in genomes dataset in non-PAR regions of sex chr"
+    },
+    {
+      "name": "faf99_genomes_amr_XY",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Filtering allele frequency (using Poisson 99% CI) for XY samples in the Admixed American genetic ancestry group in genomes dataset in non-PAR regions of sex chr"
+    },
+    {
+      "name": "faf99_genomes_eas",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Filtering allele frequency (using Poisson 99% CI) for samples in the East Asian genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "faf99_genomes_eas_XX",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Filtering allele frequency (using Poisson 99% CI) for XX samples in the East Asian genetic ancestry group in genomes dataset in non-PAR regions of sex chromosom"
+    },
+    {
+      "name": "faf99_genomes_eas_XY",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Filtering allele frequency (using Poisson 99% CI) for XY samples in the East Asian genetic ancestry group in genomes dataset in non-PAR regions of sex chromosom"
+    },
+    {
+      "name": "faf99_genomes_nfe",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Filtering allele frequency (using Poisson 99% CI) for samples in the Non-Finnish European genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "faf99_genomes_nfe_XX",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Filtering allele frequency (using Poisson 99% CI) for XX samples in the Non-Finnish European genetic ancestry group in genomes dataset in non-PAR regions of sex"
+    },
+    {
+      "name": "faf99_genomes_nfe_XY",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Filtering allele frequency (using Poisson 99% CI) for XY samples in the Non-Finnish European genetic ancestry group in genomes dataset in non-PAR regions of sex"
+    },
+    {
+      "name": "faf99_genomes_sas",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Filtering allele frequency (using Poisson 99% CI) for samples in the South Asian genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "faf99_genomes_sas_XX",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Filtering allele frequency (using Poisson 99% CI) for XX samples in the South Asian genetic ancestry group in genomes dataset in non-PAR regions of sex chromoso"
+    },
+    {
+      "name": "faf99_genomes_sas_XY",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Filtering allele frequency (using Poisson 99% CI) for XY samples in the South Asian genetic ancestry group in genomes dataset in non-PAR regions of sex chromoso"
+    },
+    {
+      "name": "faf99_joint_XX",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Filtering allele frequency (using Poisson 99% CI) for XX samples in joint dataset in non-PAR regions of sex chromosomes only"
+    },
+    {
+      "name": "faf99_joint_XY",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Filtering allele frequency (using Poisson 99% CI) for XY samples in joint dataset in non-PAR regions of sex chromosomes only"
+    },
+    {
+      "name": "faf99_joint_afr",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Filtering allele frequency (using Poisson 99% CI) for samples in the African/African-American genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "faf99_joint_afr_XX",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Filtering allele frequency (using Poisson 99% CI) for XX samples in the African/African-American genetic ancestry group in joint dataset in non-PAR regions of s"
+    },
+    {
+      "name": "faf99_joint_afr_XY",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Filtering allele frequency (using Poisson 99% CI) for XY samples in the African/African-American genetic ancestry group in joint dataset in non-PAR regions of s"
+    },
+    {
+      "name": "faf99_joint_amr",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Filtering allele frequency (using Poisson 99% CI) for samples in the Admixed American genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "faf99_joint_amr_XX",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Filtering allele frequency (using Poisson 99% CI) for XX samples in the Admixed American genetic ancestry group in joint dataset in non-PAR regions of sex chrom"
+    },
+    {
+      "name": "faf99_joint_amr_XY",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Filtering allele frequency (using Poisson 99% CI) for XY samples in the Admixed American genetic ancestry group in joint dataset in non-PAR regions of sex chrom"
+    },
+    {
+      "name": "faf99_joint_eas",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Filtering allele frequency (using Poisson 99% CI) for samples in the East Asian genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "faf99_joint_eas_XX",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Filtering allele frequency (using Poisson 99% CI) for XX samples in the East Asian genetic ancestry group in joint dataset in non-PAR regions of sex chromosomes"
+    },
+    {
+      "name": "faf99_joint_eas_XY",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Filtering allele frequency (using Poisson 99% CI) for XY samples in the East Asian genetic ancestry group in joint dataset in non-PAR regions of sex chromosomes"
+    },
+    {
+      "name": "faf99_joint_mid",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Filtering allele frequency (using Poisson 99% CI) for samples in the Middle Eastern genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "faf99_joint_mid_XX",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Filtering allele frequency (using Poisson 99% CI) for XX samples in the Middle Eastern genetic ancestry group in joint dataset in non-PAR regions of sex chromos"
+    },
+    {
+      "name": "faf99_joint_mid_XY",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Filtering allele frequency (using Poisson 99% CI) for XY samples in the Middle Eastern genetic ancestry group in joint dataset in non-PAR regions of sex chromos"
+    },
+    {
+      "name": "faf99_joint_nfe",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Filtering allele frequency (using Poisson 99% CI) for samples in the Non-Finnish European genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "faf99_joint_nfe_XX",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Filtering allele frequency (using Poisson 99% CI) for XX samples in the Non-Finnish European genetic ancestry group in joint dataset in non-PAR regions of sex c"
+    },
+    {
+      "name": "faf99_joint_nfe_XY",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Filtering allele frequency (using Poisson 99% CI) for XY samples in the Non-Finnish European genetic ancestry group in joint dataset in non-PAR regions of sex c"
+    },
+    {
+      "name": "faf99_joint_sas",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Filtering allele frequency (using Poisson 99% CI) for samples in the South Asian genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "faf99_joint_sas_XX",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Filtering allele frequency (using Poisson 99% CI) for XX samples in the South Asian genetic ancestry group in joint dataset in non-PAR regions of sex chromosome"
+    },
+    {
+      "name": "faf99_joint_sas_XY",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Filtering allele frequency (using Poisson 99% CI) for XY samples in the South Asian genetic ancestry group in joint dataset in non-PAR regions of sex chromosome"
+    },
+    {
+      "name": "fafmax_faf95_max_exomes",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Maximum filtering allele frequency (using Poisson 95% CI) across genetic ancestry groups in exomes dataset"
+    },
+    {
+      "name": "fafmax_faf95_max_gen_anc_exomes",
+      "load": false,
+      "type": "String",
+      "number": "A",
+      "description": "Genetic ancestry group with maximum filtering allele frequency (using Poisson 95% CI) in exomes dataset"
+    },
+    {
+      "name": "fafmax_faf95_max_gen_anc_genomes",
+      "load": false,
+      "type": "String",
+      "number": "A",
+      "description": "Genetic ancestry group with maximum filtering allele frequency (using Poisson 95% CI) in genomes dataset"
+    },
+    {
+      "name": "fafmax_faf95_max_genomes",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Maximum filtering allele frequency (using Poisson 95% CI) across genetic ancestry groups in genomes dataset"
+    },
+    {
+      "name": "fafmax_faf99_max_exomes",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Maximum filtering allele frequency (using Poisson 99% CI) across genetic ancestry groups in exomes dataset"
+    },
+    {
+      "name": "fafmax_faf99_max_gen_anc_exomes",
+      "load": false,
+      "type": "String",
+      "number": "A",
+      "description": "Genetic ancestry group with maximum filtering allele frequency (using Poisson 99% CI) in exomes dataset"
+    },
+    {
+      "name": "fafmax_faf99_max_gen_anc_genomes",
+      "load": false,
+      "type": "String",
+      "number": "A",
+      "description": "Genetic ancestry group with maximum filtering allele frequency (using Poisson 99% CI) in genomes dataset"
+    },
+    {
+      "name": "fafmax_faf99_max_gen_anc_joint",
+      "load": false,
+      "type": "String",
+      "number": "A",
+      "description": "Genetic ancestry group with maximum filtering allele frequency (using Poisson 99% CI) in joint dataset"
+    },
+    {
+      "name": "fafmax_faf99_max_genomes",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Maximum filtering allele frequency (using Poisson 99% CI) across genetic ancestry groups in genomes dataset"
+    },
+    {
+      "name": "fafmax_faf99_max_joint",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "Maximum filtering allele frequency (using Poisson 99% CI) across genetic ancestry groups in joint dataset"
+    },
+    {
+      "name": "fail_interval_qc",
+      "load": false,
+      "type": "Flag",
+      "number": "0",
+      "description": "Less than 85 percent of samples meet 20X coverage if variant is in autosomal or PAR regions or 10X coverage for non-PAR regions of chromosomes X and Y."
+    },
+    {
+      "name": "gq_hist_all_bin_freq_exomes",
+      "load": false,
+      "type": "String",
+      "number": "A",
+      "description": "Histogram for GQ calculated on high quality genotypes in exomes dataset; bin edges are: 0|5|10|15|20|25|30|35|40|45|50|55|60|65|70|75|80|85|90|95|100"
+    },
+    {
+      "name": "gq_hist_all_bin_freq_genomes",
+      "load": false,
+      "type": "String",
+      "number": "A",
+      "description": "Histogram for GQ calculated on high quality genotypes in genomes dataset; bin edges are: 0|5|10|15|20|25|30|35|40|45|50|55|60|65|70|75|80|85|90|95|100"
+    },
+    {
+      "name": "gq_hist_all_bin_freq_joint",
+      "load": false,
+      "type": "String",
+      "number": "A",
+      "description": "Histogram for GQ calculated on high quality genotypes in joint dataset; bin edges are: 0|5|10|15|20|25|30|35|40|45|50|55|60|65|70|75|80|85|90|95|100"
+    },
+    {
+      "name": "gq_hist_alt_bin_freq_exomes",
+      "load": false,
+      "type": "String",
+      "number": "A",
+      "description": "Histogram for GQ in heterozygous individuals calculated on high quality genotypes in exomes dataset; bin edges are: 0|5|10|15|20|25|30|35|40|45|50|55|60|65|70|7"
+    },
+    {
+      "name": "gq_hist_alt_bin_freq_genomes",
+      "load": false,
+      "type": "String",
+      "number": "A",
+      "description": "Histogram for GQ in heterozygous individuals calculated on high quality genotypes in genomes dataset; bin edges are: 0|5|10|15|20|25|30|35|40|45|50|55|60|65|70|"
+    },
+    {
+      "name": "gq_hist_alt_bin_freq_joint",
+      "load": false,
+      "type": "String",
+      "number": "A",
+      "description": "Histogram for GQ in heterozygous individuals calculated on high quality genotypes in joint dataset; bin edges are: 0|5|10|15|20|25|30|35|40|45|50|55|60|65|70|75"
+    },
+    {
+      "name": "grpmax_exomes",
+      "load": false,
+      "type": "String",
+      "number": "A",
+      "description": "Genetic ancestry group with the maximum allele frequency in exomes dataset"
+    },
+    {
+      "name": "grpmax_genomes",
+      "load": false,
+      "type": "String",
+      "number": "A",
+      "description": "Genetic ancestry group with the maximum allele frequency in genomes dataset"
+    },
+    {
+      "name": "grpmax_joint",
+      "load": true,
+      "type": "String",
+      "number": "A",
+      "description": "Genetic ancestry group with the maximum allele frequency in joint dataset"
+    },
+    {
+      "name": "nhomalt_exomes_XX",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Count of homozygous individuals in XX samples in exomes dataset"
+    },
+    {
+      "name": "nhomalt_exomes_XY",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Count of homozygous individuals in XY samples in exomes dataset"
+    },
+    {
+      "name": "nhomalt_exomes_afr",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Count of homozygous individuals in samples in the African/African-American genetic ancestry group in exomes dataset"
+    },
+    {
+      "name": "nhomalt_exomes_afr_XX",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Count of homozygous individuals in XX samples in the African/African-American genetic ancestry group in exomes dataset"
+    },
+    {
+      "name": "nhomalt_exomes_afr_XY",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Count of homozygous individuals in XY samples in the African/African-American genetic ancestry group in exomes dataset"
+    },
+    {
+      "name": "nhomalt_exomes_amr",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Count of homozygous individuals in samples in the Admixed American genetic ancestry group in exomes dataset"
+    },
+    {
+      "name": "nhomalt_exomes_amr_XX",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Count of homozygous individuals in XX samples in the Admixed American genetic ancestry group in exomes dataset"
+    },
+    {
+      "name": "nhomalt_exomes_amr_XY",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Count of homozygous individuals in XY samples in the Admixed American genetic ancestry group in exomes dataset"
+    },
+    {
+      "name": "nhomalt_exomes_asj",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Count of homozygous individuals in samples in the Ashkenazi Jewish genetic ancestry group in exomes dataset"
+    },
+    {
+      "name": "nhomalt_exomes_asj_XX",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Count of homozygous individuals in XX samples in the Ashkenazi Jewish genetic ancestry group in exomes dataset"
+    },
+    {
+      "name": "nhomalt_exomes_asj_XY",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Count of homozygous individuals in XY samples in the Ashkenazi Jewish genetic ancestry group in exomes dataset"
+    },
+    {
+      "name": "nhomalt_exomes_eas",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Count of homozygous individuals in samples in the East Asian genetic ancestry group in exomes dataset"
+    },
+    {
+      "name": "nhomalt_exomes_eas_XX",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Count of homozygous individuals in XX samples in the East Asian genetic ancestry group in exomes dataset"
+    },
+    {
+      "name": "nhomalt_exomes_eas_XY",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Count of homozygous individuals in XY samples in the East Asian genetic ancestry group in exomes dataset"
+    },
+    {
+      "name": "nhomalt_exomes_fin",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Count of homozygous individuals in samples in the Finnish genetic ancestry group in exomes dataset"
+    },
+    {
+      "name": "nhomalt_exomes_fin_XX",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Count of homozygous individuals in XX samples in the Finnish genetic ancestry group in exomes dataset"
+    },
+    {
+      "name": "nhomalt_exomes_fin_XY",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Count of homozygous individuals in XY samples in the Finnish genetic ancestry group in exomes dataset"
+    },
+    {
+      "name": "nhomalt_exomes_mid",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Count of homozygous individuals in samples in the Middle Eastern genetic ancestry group in exomes dataset"
+    },
+    {
+      "name": "nhomalt_exomes_mid_XX",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Count of homozygous individuals in XX samples in the Middle Eastern genetic ancestry group in exomes dataset"
+    },
+    {
+      "name": "nhomalt_exomes_mid_XY",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Count of homozygous individuals in XY samples in the Middle Eastern genetic ancestry group in exomes dataset"
+    },
+    {
+      "name": "nhomalt_exomes_nfe",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Count of homozygous individuals in samples in the Non-Finnish European genetic ancestry group in exomes dataset"
+    },
+    {
+      "name": "nhomalt_exomes_nfe_XX",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Count of homozygous individuals in XX samples in the Non-Finnish European genetic ancestry group in exomes dataset"
+    },
+    {
+      "name": "nhomalt_exomes_nfe_XY",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Count of homozygous individuals in XY samples in the Non-Finnish European genetic ancestry group in exomes dataset"
+    },
+    {
+      "name": "nhomalt_exomes_raw",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Count of homozygous individuals in samples, before removing low-confidence genotypes in exomes dataset"
+    },
+    {
+      "name": "nhomalt_exomes_remaining",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Count of homozygous individuals in samples in the Remaining individuals genetic ancestry group in exomes dataset"
+    },
+    {
+      "name": "nhomalt_exomes_remaining_XX",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Count of homozygous individuals in XX samples in the Remaining individuals genetic ancestry group in exomes dataset"
+    },
+    {
+      "name": "nhomalt_exomes_remaining_XY",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Count of homozygous individuals in XY samples in the Remaining individuals genetic ancestry group in exomes dataset"
+    },
+    {
+      "name": "nhomalt_exomes_sas",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Count of homozygous individuals in samples in the South Asian genetic ancestry group in exomes dataset"
+    },
+    {
+      "name": "nhomalt_exomes_sas_XX",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Count of homozygous individuals in XX samples in the South Asian genetic ancestry group in exomes dataset"
+    },
+    {
+      "name": "nhomalt_exomes_sas_XY",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Count of homozygous individuals in XY samples in the South Asian genetic ancestry group in exomes dataset"
+    },
+    {
+      "name": "nhomalt_genomes_XX",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Count of homozygous individuals in XX samples in genomes dataset"
+    },
+    {
+      "name": "nhomalt_genomes_XY",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Count of homozygous individuals in XY samples in genomes dataset"
+    },
+    {
+      "name": "nhomalt_genomes_afr",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Count of homozygous individuals in samples in the African/African-American genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "nhomalt_genomes_afr_XX",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Count of homozygous individuals in XX samples in the African/African-American genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "nhomalt_genomes_afr_XY",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Count of homozygous individuals in XY samples in the African/African-American genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "nhomalt_genomes_ami",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Count of homozygous individuals in samples in the Amish genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "nhomalt_genomes_ami_XX",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Count of homozygous individuals in XX samples in the Amish genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "nhomalt_genomes_ami_XY",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Count of homozygous individuals in XY samples in the Amish genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "nhomalt_genomes_amr",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Count of homozygous individuals in samples in the Admixed American genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "nhomalt_genomes_amr_XX",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Count of homozygous individuals in XX samples in the Admixed American genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "nhomalt_genomes_amr_XY",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Count of homozygous individuals in XY samples in the Admixed American genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "nhomalt_genomes_asj",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Count of homozygous individuals in samples in the Ashkenazi Jewish genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "nhomalt_genomes_asj_XX",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Count of homozygous individuals in XX samples in the Ashkenazi Jewish genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "nhomalt_genomes_asj_XY",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Count of homozygous individuals in XY samples in the Ashkenazi Jewish genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "nhomalt_genomes_eas",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Count of homozygous individuals in samples in the East Asian genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "nhomalt_genomes_eas_XX",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Count of homozygous individuals in XX samples in the East Asian genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "nhomalt_genomes_eas_XY",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Count of homozygous individuals in XY samples in the East Asian genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "nhomalt_genomes_fin",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Count of homozygous individuals in samples in the Finnish genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "nhomalt_genomes_fin_XX",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Count of homozygous individuals in XX samples in the Finnish genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "nhomalt_genomes_fin_XY",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Count of homozygous individuals in XY samples in the Finnish genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "nhomalt_genomes_mid",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Count of homozygous individuals in samples in the Middle Eastern genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "nhomalt_genomes_mid_XX",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Count of homozygous individuals in XX samples in the Middle Eastern genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "nhomalt_genomes_mid_XY",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Count of homozygous individuals in XY samples in the Middle Eastern genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "nhomalt_genomes_nfe",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Count of homozygous individuals in samples in the Non-Finnish European genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "nhomalt_genomes_nfe_XX",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Count of homozygous individuals in XX samples in the Non-Finnish European genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "nhomalt_genomes_nfe_XY",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Count of homozygous individuals in XY samples in the Non-Finnish European genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "nhomalt_genomes_raw",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Count of homozygous individuals in samples, before removing low-confidence genotypes in genomes dataset"
+    },
+    {
+      "name": "nhomalt_genomes_remaining",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Count of homozygous individuals in samples in the Remaining individuals genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "nhomalt_genomes_remaining_XX",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Count of homozygous individuals in XX samples in the Remaining individuals genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "nhomalt_genomes_remaining_XY",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Count of homozygous individuals in XY samples in the Remaining individuals genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "nhomalt_genomes_sas",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Count of homozygous individuals in samples in the South Asian genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "nhomalt_genomes_sas_XX",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Count of homozygous individuals in XX samples in the South Asian genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "nhomalt_genomes_sas_XY",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Count of homozygous individuals in XY samples in the South Asian genetic ancestry group in genomes dataset"
+    },
+    {
+      "name": "nhomalt_grpmax_exomes",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Count of homozygous individuals in the genetic ancestry group with the maximum allele frequency in exomes dataset"
+    },
+    {
+      "name": "nhomalt_grpmax_genomes",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Count of homozygous individuals in the genetic ancestry group with the maximum allele frequency in genomes dataset"
+    },
+    {
+      "name": "nhomalt_grpmax_joint",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Count of homozygous individuals in the genetic ancestry group with the maximum allele frequency in joint dataset"
+    },
+    {
+      "name": "nhomalt_joint_XX",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Count of homozygous individuals in XX samples in joint dataset"
+    },
+    {
+      "name": "nhomalt_joint_XY",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Count of homozygous individuals in XY samples in joint dataset"
+    },
+    {
+      "name": "nhomalt_joint_afr",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Count of homozygous individuals in samples in the African/African-American genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "nhomalt_joint_afr_XX",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Count of homozygous individuals in XX samples in the African/African-American genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "nhomalt_joint_afr_XY",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Count of homozygous individuals in XY samples in the African/African-American genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "nhomalt_joint_ami",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Count of homozygous individuals in samples in the Amish genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "nhomalt_joint_ami_XX",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Count of homozygous individuals in XX samples in the Amish genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "nhomalt_joint_ami_XY",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Count of homozygous individuals in XY samples in the Amish genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "nhomalt_joint_amr",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Count of homozygous individuals in samples in the Admixed American genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "nhomalt_joint_amr_XX",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Count of homozygous individuals in XX samples in the Admixed American genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "nhomalt_joint_amr_XY",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Count of homozygous individuals in XY samples in the Admixed American genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "nhomalt_joint_asj",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Count of homozygous individuals in samples in the Ashkenazi Jewish genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "nhomalt_joint_asj_XX",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Count of homozygous individuals in XX samples in the Ashkenazi Jewish genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "nhomalt_joint_asj_XY",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Count of homozygous individuals in XY samples in the Ashkenazi Jewish genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "nhomalt_joint_eas",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Count of homozygous individuals in samples in the East Asian genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "nhomalt_joint_eas_XX",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Count of homozygous individuals in XX samples in the East Asian genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "nhomalt_joint_eas_XY",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Count of homozygous individuals in XY samples in the East Asian genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "nhomalt_joint_fin",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Count of homozygous individuals in samples in the Finnish genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "nhomalt_joint_fin_XX",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Count of homozygous individuals in XX samples in the Finnish genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "nhomalt_joint_fin_XY",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Count of homozygous individuals in XY samples in the Finnish genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "nhomalt_joint_mid",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Count of homozygous individuals in samples in the Middle Eastern genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "nhomalt_joint_mid_XX",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Count of homozygous individuals in XX samples in the Middle Eastern genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "nhomalt_joint_mid_XY",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Count of homozygous individuals in XY samples in the Middle Eastern genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "nhomalt_joint_nfe",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Count of homozygous individuals in samples in the Non-Finnish European genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "nhomalt_joint_nfe_XX",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Count of homozygous individuals in XX samples in the Non-Finnish European genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "nhomalt_joint_nfe_XY",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Count of homozygous individuals in XY samples in the Non-Finnish European genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "nhomalt_joint_raw",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Count of homozygous individuals in samples, before removing low-confidence genotypes in joint dataset"
+    },
+    {
+      "name": "nhomalt_joint_remaining",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Count of homozygous individuals in samples in the Remaining individuals genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "nhomalt_joint_remaining_XX",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Count of homozygous individuals in XX samples in the Remaining individuals genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "nhomalt_joint_remaining_XY",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Count of homozygous individuals in XY samples in the Remaining individuals genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "nhomalt_joint_sas",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Count of homozygous individuals in samples in the South Asian genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "nhomalt_joint_sas_XX",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Count of homozygous individuals in XX samples in the South Asian genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "nhomalt_joint_sas_XY",
+      "load": false,
+      "type": "Integer",
+      "number": "A",
+      "description": "Count of homozygous individuals in XY samples in the South Asian genetic ancestry group in joint dataset"
+    },
+    {
+      "name": "not_called_in_exomes",
+      "load": false,
+      "type": "Flag",
+      "number": "0",
+      "description": "Variant was not called in the gnomAD exomes."
+    },
+    {
+      "name": "not_called_in_genomes",
+      "load": false,
+      "type": "Flag",
+      "number": "0",
+      "description": "Variant was not called in the gnomAD genomes."
+    },
+    {
+      "name": "outside_broad_calling_region",
+      "load": false,
+      "type": "Flag",
+      "number": "0",
+      "description": "Variant falls outside of the Broad exome capture regions plus 150 bp padding."
+    },
+    {
+      "name": "outside_broad_capture_region",
+      "load": false,
+      "type": "Flag",
+      "number": "0",
+      "description": "Variant falls outside of the Broad exome capture regions."
+    },
+    {
+      "name": "outside_ukb_calling_region",
+      "load": false,
+      "type": "Flag",
+      "number": "0",
+      "description": "Variant falls outside of the UK Biobank exome capture regions plus 150 bp padding."
+    },
+    {
+      "name": "outside_ukb_capture_region",
+      "load": false,
+      "type": "Flag",
+      "number": "0",
+      "description": "Variant falls outside of the UK Biobank exome capture regions."
+    },
+    {
+      "name": "stat_union_gen_ancs",
+      "load": false,
+      "type": "String",
+      "number": ".",
+      "description": "List of genetic ancestry groups included in the test. If stat_union_test_name is contingency_table_test, the length of gen_ancs is one and if stat_union_test_na"
+    },
+    {
+      "name": "stat_union_p_value",
+      "load": false,
+      "type": "Float",
+      "number": "A",
+      "description": "p-value from the contingency table or Cochran-Mantel-Haenszel tests"
+    },
+    {
+      "name": "stat_union_test_name",
+      "load": false,
+      "type": "String",
+      "number": "A",
+      "description": "Name of the test, either contingency_table_test or cochran_mantel_haenszel_test, used to compare allele frequencies between exomes and genomes"
+    }
+  ]
+}

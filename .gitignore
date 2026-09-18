@@ -160,8 +160,34 @@ tests/test_data/kdc/
 
 # Notebook job files (large data files, outputs, scripts)
 notebooks/Andre/jobs/
-notebooks/Andre/adsp/
+
+# The ADSP analysis is tracked — notebooks, scripts and the write-up — because
+# it is the worked example the 4.3 report layer was designed against. What it
+# reads and writes is not: the variant list and the pQTL lookup are other
+# people's data, the outputs are hundreds of megabytes, and burrao/ and
+# meetings/ are working notes.
+notebooks/Andre/adsp/data/
+notebooks/Andre/adsp/outputs/
+notebooks/Andre/adsp/burrao/
+notebooks/Andre/adsp/meetings/
+notebooks/Andre/adsp/.tmp/
+
+# The frozen 4.2.0 version of the same analysis, data files and all.
+biofilter_legacy/bf4_420/notebooks/Andre/adsp/
 
 # Claude Code settings
 .claude/
 
+# Where the template notebooks write their results.
+notebooks/templates/outputs/
+
+# DuckDB spills here when a query outgrows memory_limit. On a
+# whole-genome bundle that is tens of gigabytes, and it is disposable.
+notebooks/templates/.tmp/
+**/duckdb_temp_storage_*.tmp
+
+# Safety net: report output landing at the repository root, which is what
+# happens when something writes a bare filename from the wrong directory.
+/*.csv
+/*.parquet
+/*.provenance.json

@@ -1,4 +1,6 @@
 from sqlalchemy.exc import IntegrityError
+
+from biofilter.modules.etl.mixins.batched_commit import BatchedCommitMixin
 from biofilter.modules.db.models.model_entities import (
     Entity,
     EntityAlias,
@@ -7,7 +9,7 @@ from biofilter.modules.db.models.model_entities import (
 from biofilter.utils.utilities import string_normalization, as_list
 
 
-class EntityQueryMixin:
+class EntityQueryMixin(BatchedCommitMixin):
 
     def get_or_create_entity(
         self,
@@ -91,7 +93,7 @@ class EntityQueryMixin:
             self.session.add(primary_alias)
 
             if auto_commit:
-                self.session.commit()
+                self._commit_batched()
             msg = f"✅ Entity '{clean_name}' created with ID {new_entity.id}"
             # self.logger.log(msg, "DEBUG")
             return new_entity.id, True
@@ -184,7 +186,7 @@ class EntityQueryMixin:
             return count_added
 
         try:
-            self.session.commit()
+            self._commit_batched()
             self.logger.log(
                 f"✅  {count_added} aliases added to Entity {entity_id}",
                 "DEBUG",  # noqa E501

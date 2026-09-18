@@ -119,7 +119,7 @@ def _friendly_missing_dtp_doc_message(
 @click.option(
     "--data-source",
     multiple=True,
-    help="Data source name (repeatable). Example: --data-source dbsnp_sample",
+    help="Data source name (repeatable). Example: --data-source gnomad_joint_chr21",
 )
 @click.option(
     "--run-step",
@@ -140,12 +140,17 @@ def update(ctx, db_uri, source_system, data_source, run_step, force_step, debug)
     bf = Biofilter(db_uri=db_uri, debug_mode=debug)
     bf.db.connect()
 
-    bf.etl.update(
+    ok = bf.etl.update(
         source_system=_to_list_or_none(source_system),
         data_sources=_to_list_or_none(data_source),
         run_steps=_to_list_or_none(run_step),
         force_steps=_to_list_or_none(force_step),
     )
+    # Exit non-zero on failure so a script or a scheduler can tell. The
+    # command used to exit 0 whatever happened, which is only survivable
+    # when a human is reading the log.
+    if not ok:
+        raise SystemExit(1)
 
 
 @etl.command("update-all")

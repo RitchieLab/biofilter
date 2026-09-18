@@ -6,7 +6,8 @@ import os
 import shutil
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Iterable, Optional, Sequence
+from pathlib import Path
+from typing import Any, Iterable, List, Optional, Sequence
 
 from sqlalchemy import MetaData, func, or_, select
 from sqlalchemy.exc import SQLAlchemyError
@@ -204,7 +205,7 @@ class ETLManager:
         processed_path: Optional[str] = None,
         run_steps: Optional[Sequence[str]] = None,
         force_steps: Optional[Sequence[str]] = None,
-    ) -> None:
+    ) -> bool:
         if run_steps is None:
             run_steps = ["extract", "transform", "load"]
         if force_steps is None:
@@ -222,7 +223,7 @@ class ETLManager:
         if not source_system and not data_sources:
             msg = "❌ No source_system or data_sources provided. Aborting."
             self.logger.log(msg, "ERROR")
-            return
+            return False
 
         # Query DataSources in a short-lived session
         with self.db.get_session() as session:
@@ -231,21 +232,69 @@ class ETLManager:
         if not ds_ids:
             msg = "⚠️ No matching active DataSources found."
             self.logger.log(msg, "WARNING")
-            return
+            return False
 
         # Run each datasource with its OWN session
         # (keeps package updates consistent per ds)
+        failed: List[str] = []
         for ds_id in ds_ids:
             with self.db.get_session() as session:
                 ds = self._load_datasource(session, ds_id)
-                self._run_one_datasource(
-                    session=session,
-                    ds=ds,
-                    download_path=download_path,
-                    processed_path=processed_path,
-                    run_steps=run_steps,
-                    force_steps=force_steps,
+                name = ds.name
+                try:
+                    self._run_one_datasource(
+                        session=session,
+                        ds=ds,
+                        download_path=download_path,
+                        processed_path=processed_path,
+                        run_steps=run_steps,
+                        force_steps=force_steps,
+                    )
+                except Exception:  # noqa: BLE001
+                    failed.append(name)
+                    continue
+                if not self._datasource_steps_ok(session, ds_id, run_steps):
+                    failed.append(name)
+
+        if failed:
+            self.logger.log(
+                f"❌ {len(failed)} data source(s) did not complete: "
+                f"{', '.join(failed)}",
+                "ERROR",
+            )
+        return not failed
+
+    def _datasource_steps_ok(
+        self,
+        session: Session,
+        ds_id: int,
+        run_steps: Sequence[str],
+    ) -> bool:
+        """
+        Whether every step this run asked for reached a terminal success.
+
+        Checked against the package ledger rather than inferred from the
+        call returning: a DTP that returns `(False, msg)` marks its package
+        failed without raising, so a caller watching only for exceptions
+        sees a clean run. That is how a failed step used to end with
+        "ETL update process finished" as the last line on screen.
+        """
+        ok_states = {"completed", "up-to-date", "not-applicable"}
+        for step in run_steps:
+            pkg = (
+                session.query(ETLPackage)
+                .filter(
+                    ETLPackage.data_source_id == ds_id,
+                    ETLPackage.operation_type == step,
                 )
+                .order_by(ETLPackage.id.desc())
+                .first()
+            )
+            if pkg is None:
+                return False
+            if str(getattr(pkg, f"{step}_status", "")) not in ok_states:
+                return False
+        return True
 
     def start_process_all(
         self,
@@ -1062,6 +1111,68 @@ class ETLManager:
     # ---------------------------------------------------------------------
     # STEP: EXTRACT
     # ---------------------------------------------------------------------
+    def _mark_package_failed(
+        self,
+        session: Session,
+        pkg: ETLPackage,
+        step: str,
+        exc: BaseException,
+    ) -> None:
+        """
+        Record a raising step on its package before the exception leaves.
+
+        Without this the package keeps the `running` it was committed with
+        while the caller rolls the session back and logs, so the database
+        shows a step still in flight that will never finish — and a
+        resumed build cannot tell it apart from one genuinely in progress.
+        """
+        pkg.status = "failed"
+        setattr(pkg, f"{step}_status", "failed")
+        setattr(pkg, f"{step}_end", datetime.now())
+        pkg.stats = {
+            "error": f"{type(exc).__name__}: {exc}",
+            "step": step,
+        }
+        try:
+            session.commit()
+        except Exception:  # noqa: BLE001
+            session.rollback()
+
+    def _step_output_exists(
+        self,
+        base_path: Optional[str],
+        ds: ETLDataSource,
+    ) -> bool:
+        """
+        Whether this data source left any file under `base_path`.
+
+        The skip logic matched on hashes alone, so a step whose output had
+        been deleted still reported up-to-date and wrote nothing. That was
+        survivable when the relational database held the truth and the
+        files were scratch; under ADR-003 the parquet *is* the product,
+        and the bundle build deliberately deletes raw files once their
+        parquet exists — so a resumed build would skip straight past the
+        gap it was meant to fill.
+
+        Returns True when the path is unknown, so a missing setting
+        cannot silently force every step to re-run.
+
+        A *file* has to be there, at any depth. Checking for directory
+        entries was not enough: the bundle build moves the parquet out
+        of `processed/<system>/<source>/<subdir>/` and leaves `<subdir>/`
+        behind, so a source whose output had already been folded into a
+        previous bundle still looked present, its transform was skipped
+        as not-applicable, and the next bundle silently lost the table.
+        """
+        if not base_path:
+            return True
+        directory = (
+            Path(base_path) / ds.source_system.name / ds.name
+        )
+        if not directory.is_dir():
+            return False
+        return any(entry.is_file() for entry in directory.rglob("*"))
+
     def _run_extract(
         self,
         session: Session,
@@ -1092,7 +1203,12 @@ class ETLManager:
             db=self.db,
         )
 
-        ok, message, file_hash = dtp.extract(raw_dir=download_path)
+        try:
+            ok, message, file_hash = dtp.extract(raw_dir=download_path)
+        except Exception as exc:  # noqa: BLE001
+            self._mark_package_failed(session, pkg, "extract", exc)
+            raise
+
 
         pkg.extract_end = datetime.now()
         pkg.extract_hash = file_hash
@@ -1107,7 +1223,27 @@ class ETLManager:
                 extra_filters=[ETLPackage.extract_hash == file_hash],
             )
 
-            if last_same_hash and "extract" not in force_steps:
+            # Skipping is only safe while the raw file is still there, or
+            # while a transform has already consumed it for this same
+            # hash — which is the normal state after the bundle build
+            # discards raw files it no longer needs.
+            raw_present = self._step_output_exists(download_path, ds)
+            transform_done = bool(
+                self._find_last_package(
+                    session=session,
+                    ds_id=ds.id,
+                    operation_type="transform",
+                    ok_statuses=["completed", "up-to-date", "not-applicable"],
+                    order_field=ETLPackage.transform_end,
+                    extra_filters=[ETLPackage.transform_hash == file_hash],
+                )
+            )
+
+            if (
+                last_same_hash
+                and "extract" not in force_steps
+                and (raw_present or transform_done)
+            ):
                 pkg.status = "up-to-date"
                 pkg.extract_status = "up-to-date"
                 pkg.stats = {
@@ -1186,7 +1322,16 @@ class ETLManager:
             extra_filters=[ETLPackage.transform_hash == last_extract.extract_hash],  # noqa E501
         )
 
-        if last_transform and "transform" not in force_steps:
+        processed_present = self._step_output_exists(processed_path, ds)
+        if not processed_present and last_transform:
+            self.logger.log(
+                f"♻️  Transform for '{ds.name}' is recorded as done for this "
+                f"hash, but no output remains under {processed_path}. "
+                f"Re-running it.",
+                "WARNING",
+            )
+
+        if last_transform and processed_present and "transform" not in force_steps:  # noqa: E501
             pkg = self._create_package(session, ds)
             if not pkg:
                 return
@@ -1236,7 +1381,12 @@ class ETLManager:
             db=self.db,
         )
 
-        ok, message = dtp.transform(download_path, processed_path)
+        try:
+            ok, message = dtp.transform(download_path, processed_path)
+        except Exception as exc:  # noqa: BLE001
+            self._mark_package_failed(session, pkg, "transform", exc)
+            raise
+
 
         pkg.transform_end = datetime.now()
 
@@ -1349,7 +1499,23 @@ class ETLManager:
             db=self.db,
         )
 
-        ok, message = dtp.load(processed_path)
+        try:
+            ok, message = dtp.load(processed_path)
+        except Exception as exc:  # noqa: BLE001
+            self._mark_package_failed(session, pkg, "load", exc)
+            raise
+        finally:
+            # get_or_create_* commits every COMMIT_BATCH_SIZE rows rather
+            # than every row, so a run can end with a partial batch
+            # pending. The package update below commits anyway, but that
+            # is a coincidence of ordering rather than a guarantee.
+            flush = getattr(dtp, "flush_pending_writes", None)
+            if callable(flush):
+                try:
+                    flush()
+                except Exception:  # noqa: BLE001
+                    session.rollback()
+
 
         pkg.load_end = datetime.now()
 

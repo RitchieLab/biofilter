@@ -2,491 +2,39 @@
 
 
 
-<!-- ===== SOURCE FILE: notebooks/Templates/lpc__deploy.md ===== -->
+<!-- ===== SOURCE FILE: notebooks/lpc__quickstart.md ===== -->
 
-# Deploying Biofilter 4 on the Penn LPC
+# Biofilter 4.3 on the LPC — Quickstart
 
-Operational guide for the **maintainer** who installs or updates BF4 on the
-LPC cluster: building the Parquet bundle from a production snapshot,
-publishing it on shared storage, and managing future updates.
+Paste, run, get a CSV.
 
-> **Audience:** the person who owns the BF4 environment on the cluster.
-> If you just want to _run reports_, see [lpc\_\_quickstart.md](lpc__quickstart.md)
-> instead.
-
----
-
-## 0. What changed in 4.2.0
-
-Up to 4.1.x, the LPC deployment restored a full PostgreSQL database on the
-cluster: a ~480 GB `pgdata/` directory bind-mounted into a container that
-embedded PG 16. That model is retired.
-
-Since **4.2.0**, BF4 reads the knowledge base directly from a **Parquet
-bundle** via DuckDB — see [ADR-001](../Andre/ADR/0001-duckdb-parquet-strategy.md)
-for the rationale and benchmarks. The practical consequences for deployment:
-
-| | 4.1.x (retired) | 4.2.0+ (current) |
-|---|---|---|
-| Storage on cluster | ~480 GB `pgdata/` | Parquet bundle (much smaller, columnar) |
-| Database server | PG 16 inside the container | none |
-| Concurrency | one postmaster → per-user copies | native, read-only, multi-user |
-| First run | `initdb` + `pg_restore` (3–8 h) | none — read files in place |
-| Image size | ~1.5 GB | ~400 MB |
-| Write operations | possible on cluster | **not possible** — bundle is read-only |
-
-The legacy flow is preserved in [Appendix A](#appendix-a--legacy-postgresql-deployment-41x)
-for reference; do not use it for new deployments.
-
----
-
-## 1. Directory layout
-
-```
-/project/hall_shared/biofilter/
-├── images/
-│   └── bf4-hpc-<version>.sif           ← Apptainer image (optional; see §5)
-├── venv/
-│   └── bf4-<version>/                  ← native venv used by the build jobs
-├── jobs/                               ← the .bsub scripts and helper scripts
-│   ├── fase1.bsub
-│   ├── fase1_resume.bsub
-│   ├── fase1_merge.bsub
-│   ├── merge_variant_molecular_effects.py
-│   └── regen_manifest.py
-└── databases/
-    └── <snapshot-date>/
-        ├── bundle/
-        │   ├── manifest.json
-        │   └── tables/                 ← *.parquet — this is what users read
-        ├── logs/                       ← LSF job output
-        └── pgdata/                     ← only if building the bundle on the LPC (§3)
-```
-
-Reference copies of the build scripts live in this repo at
-[`notebooks/Andre/`](../Andre/) — copy them to `jobs/` on the cluster.
-
-Dating the snapshot folders lets you keep multiple generations side by side.
-Treat each snapshot as **immutable** once published.
-
----
-
-## 2. Prerequisites
-
-- LPC account with write access to `/project/hall_shared/biofilter/`
-- `apptainer` and `python/3.12` modules available on the cluster
-- A native venv with BF4 installed (used by the merge/manifest steps, which
-  run outside the container and need only `pyarrow`)
-- Free space: budget for the Parquet bundle **plus** the `pgdata/` if you
-  build on the cluster (§3). The build jobs warn below 250 GB free.
-
----
-
-## 3. Building the Parquet bundle
-
-The bundle is produced by `biofilter db export --format parquet`, which needs
-a live PostgreSQL to read from. Two options:
-
-- **On a dedicated PostgreSQL server** — export against it, then `rsync` only
-  the bundle to the cluster. Avoids restoring a ~480 GB `pgdata/` on the LPC
-  entirely. This was the VPS path; the VPS has since been decommissioned, so
-  it applies only if such a server is provisioned again.
-- **On the LPC** (what was done for the `20260514` snapshot) — restore the
-  dump into a cluster-side `pgdata/` first (Appendix A, §A.2), then export
-  using the legacy PG-bundled image. Documented below because it is the path
-  that was actually exercised.
-
-Either way, the bundle contents and the partition caveat in §3.2 are the same.
-
-### 3.1 Why this is three jobs, not one
-
-`variant_masters` and `variant_molecular_effects` are **partitioned by
-chromosome** in PostgreSQL, with child tables named `<parent>_chr_<N>`
-(1–22, X, Y, MT → 23, 24, 25).
-
-`db export` discovers tables via SQLAlchemy's inspector, which on PostgreSQL
-returns **both the partitioned parent and every child** as independent tables.
-So a full export writes 25 `variant_molecular_effects_chr_N.parquet` files
-_and_ a consolidated `variant_molecular_effects.parquet`.
-
-The problem is the parent. Exporting it runs
-`SELECT * FROM variant_molecular_effects`, forcing PostgreSQL to UNION all 25
-partitions on every chunk. On the 1.79-billion-row table this is slow enough
-to be impractical — the first attempt was killed after the job wall clock ran
-out.
-
-The consolidated file is **not optional**: DuckDB registers one view per
-`*.parquet` but explicitly skips any file whose name contains `_chr_`
-(otherwise the same rows would appear twice — once via the parent, once via
-the children). Without `variant_molecular_effects.parquet`, that table simply
-does not exist for the reports.
-
-The workaround is to build the parent outside the database: export the 25
-children (each a fast direct scan), then concatenate them with
-`pyarrow.ParquetWriter` in streaming append mode.
-
-### 3.2 The three phases
-
-| Phase | Script | What it does |
-|---|---|---|
-| 1 | [`fase1.bsub`](../Andre/fase1.bsub) | Full `db export`. Completes every table except the giant partitioned parent. |
-| 1-resume | [`fase1_resume.bsub`](../Andre/fase1_resume.bsub) | `db export --table variant_molecular_effects_chr_1 … _chr_25` — the 25 children only. |
-| 1-merge | [`fase1_merge.bsub`](../Andre/fase1_merge.bsub) | Concatenates the children into the consolidated parent, then regenerates `manifest.json`. |
-
-Each script has a configuration block at the top (`ROOT`, `SNAPSHOT`,
-`VERSION`). Edit those, then submit:
-
-```bash
-cd /project/hall_shared/biofilter/jobs
-
-bsub < fase1.bsub          # wait for completion, check logs/export-<jobid>.out
-bsub < fase1_resume.bsub   # wait for completion
-bsub < fase1_merge.bsub    # wait for completion
-```
-
-Phase 1 is expected to end with `variant_molecular_effects.parquet` missing or
-truncated — that is normal and is exactly what phases 1-resume and 1-merge
-exist to repair.
-
-**Phase 1-merge runs in the native venv, not the container.** It needs only
-`pyarrow`; no PostgreSQL, no Apptainer:
-
-```bash
-module load python/3.12
-source /project/hall_shared/biofilter/venv/bf4-<version>/bin/activate
-
-python jobs/merge_variant_molecular_effects.py \
-    --in  databases/<snapshot>/bundle/tables \
-    --out databases/<snapshot>/bundle/tables/variant_molecular_effects.parquet
-
-python jobs/regen_manifest.py \
-    --bundle databases/<snapshot>/bundle \
-    --biofilter-version <version>
-```
-
-`regen_manifest.py` is required because the bundle was assembled by several
-partial exports, so the `manifest.json` left by phase 1 covers only a subset
-of the files. It rescans `tables/*.parquet`, rewrites the manifest in place,
-and backs up the previous one as `manifest.json.bak`.
-
-### 3.3 Schema note on null columns
-
-`merge_variant_molecular_effects.py` promotes `null`-typed columns to nullable
-`string` before writing. Without this, a first chunk coming from an all-null
-partition fixes the schema as `null` and every later chunk fails to cast.
-
-The same fix exists in
-[`transfer.py`](../../biofilter/modules/db/transfer.py) for the in-database
-export path, and has been upstream **since 4.2.0**. The `.bsub` scripts from
-the `20260514` build bind-mount a patched `transfer.py` over the one inside
-the container:
-
-```bash
---bind "${ROOT}/images/patches/transfer.py:/opt/biofilter/venv/lib/python3.11/site-packages/biofilter/modules/db/transfer.py:ro"
-```
-
-**Drop that bind when using a 4.2.0 or newer image** — the patch is already in
-the installed package.
-
-### 3.4 Verifying the bundle
-
-```bash
-BUNDLE=/project/hall_shared/biofilter/databases/<snapshot>/bundle
-
-# every table present, and the consolidated parent among them
-ls -1 "${BUNDLE}/tables"/*.parquet | wc -l
-ls -lh "${BUNDLE}/tables/variant_molecular_effects.parquet"
-
-# manifest covers all files and row counts look sane
-python -c "import json,sys; m=json.load(open('${BUNDLE}/manifest.json')); \
-print(len(m['tables']),'tables'); \
-[print(f\"{t['name']:45s} {t['rows']}\") for t in m['tables'][:10]]"
-```
-
-Expected row counts for the current production data:
-
-```
-variant_masters                     152,084,680
-variant_molecular_effects         1,793,092,126
-variant_gene_regulatory_evidence     18,231,184
-```
-
----
-
-## 4. Publishing the bundle
-
-Once verified, make the snapshot read-only so no user can corrupt it:
-
-```bash
-chmod -R a-w /project/hall_shared/biofilter/databases/<snapshot>/bundle
-```
-
-Read-only is enforced at three levels — filesystem permissions here, DuckDB
-rejecting writes against `read_parquet` views, and the `Database.read_only`
-flag at the application layer. A single copy safely serves the whole group;
-no per-user duplication.
-
----
-
-## 5. User access
-
-Users reach the bundle through the lab's module tree
-(see [lpc\_\_quickstart.md](lpc__quickstart.md)):
-
-```bash
-source /project/hall_shared/hall_shared.sh
-module load biofilter/<version>
-```
-
-The modulefile must do two things:
-
-1. put the `biofilter` CLI on `PATH` (from the native venv, or via a wrapper
-   around the Apptainer image);
-2. export `BIOFILTER_DB_URI` pointing at the current snapshot's `tables/`
-   directory:
-
-```
-parquet:///project/hall_shared/biofilter/databases/<snapshot>/bundle/tables
-```
-
-With that set, users never pass `--db-uri`. The modulefile itself lives in the
-lab's shared module tree, outside this repository.
-
-**Container alternative** — for users who prefer Apptainer over the module,
-the read-only HPC image works with a bind mount:
-
-```bash
-apptainer run \
-  --bind /project/hall_shared/biofilter/databases/<snapshot>/bundle/tables:/bundle:ro \
-  --bind ~/bf4_output:/workspace \
-  --env BIOFILTER_DB_URI=parquet:///bundle \
-  bf4-hpc.sif \
-  biofilter report run --name annotation_master_gene --input APOE --output /workspace/apoe.csv
-```
-
-See [docker/hpc/README.md](../../docker/hpc/README.md) for image details and
-publishing.
-
----
-
-## 6. Smoke test after install
-
-```bash
-source /project/hall_shared/hall_shared.sh
-module load biofilter/<version>
-
-biofilter --version
-biofilter report list | head
-
-# gene path
-biofilter report run --name annotation_master_gene --input APOE --output /tmp/smoke_gene.csv
-
-# variant path — exercises the merged parent table specifically
-biofilter report run --name annotation_master_variant --input rs429358 --output /tmp/smoke_variant.csv
-
-head -3 /tmp/smoke_gene.csv /tmp/smoke_variant.csv
-```
-
-Both should complete in about a second. **The variant report is the one that
-matters** — it is the only check that the consolidated
-`variant_molecular_effects.parquet` was merged correctly. A gene report passing
-tells you nothing about the merge.
-
-Expected performance (from the ADR-001 POC): 10,000 rsIDs annotated against
-the 1.79-billion-row table in ~1.2 s on local NVMe, ~15.5 s over GPFS, peak
-memory ~89 MB.
-
----
-
-## 7. Updates
-
-### 7.1 New BF4 version
-
-Publish a new venv and/or image, add the new modulefile version, smoke-test it
-against the current snapshot, then point `latest` at it. Users can pin a
-version explicitly with `module load biofilter/<version>`.
-
-Because the bundle is data-only, a BF4 upgrade does **not** require rebuilding
-it — unless the release changes the schema. In that case export a new bundle
-from a migrated PostgreSQL (§3) rather than trying to migrate the bundle;
-there is no write path against Parquet.
-
-### 7.2 New data snapshot
-
-```bash
-# 1) Produce a new dated bundle following §3
-# 2) Verify it (§3.4) and freeze it (§4)
-# 3) Smoke-test with an explicit --db-uri before switching anyone over:
-biofilter --db-uri "parquet:///project/hall_shared/biofilter/databases/<new>/bundle/tables" \
-  report run --name annotation_master_variant --input rs429358 --output /tmp/check.csv
-# 4) Update the modulefile's BIOFILTER_DB_URI to the new snapshot
-# 5) Announce the new date to users
-```
-
-Old snapshots can stay as long as disk allows — they are reference data for
-reproducibility, and users can still target them with `--db-uri`.
-
----
-
-## 8. Backup
-
-The bundle is plain files on shared storage, so it backs up like any other
-research data. The canonical recovery source remains the PostgreSQL dump the
-bundle was exported from — keep those alongside the snapshot they produced.
-
-Rebuilding a bundle from a dump is the §3 flow again, so the dump plus this
-guide is a complete recovery path.
-
----
-
-## 9. References
-
-- End-user usage: [lpc\_\_quickstart.md](lpc__quickstart.md)
-- Design rationale and benchmarks: [ADR-001](../Andre/ADR/0001-duckdb-parquet-strategy.md)
-- Build scripts: [`notebooks/Andre/`](../Andre/)
-- HPC image: [docker/hpc/README.md](../../docker/hpc/README.md)
-- GHCR publish workflow: [.github/workflows/docker-publish-hpc.yml](../../.github/workflows/docker-publish-hpc.yml)
-
----
-
-## Appendix A — Legacy PostgreSQL deployment (4.1.x)
-
-> **Deprecated.** Kept for reference and for the one case where it is still
-> needed: building a Parquet bundle on the cluster (§3) requires a live
-> PostgreSQL to export from. The 4.2.0 HPC image no longer embeds PG — use a
-> 4.1.4 image for this. Do not use this flow for regular user-facing
-> deployments.
-
-### A.1 Layout
-
-```
-/project/${PROJECT}/
-├── env/modules/biofilter/<version>/bf4-hpc.sif
-└── datasets/bf4/
-    ├── <snapshot-date>/pgdata/
-    └── dumps/biofilter-<date>.dump
-```
-
-Budget ~500 GB for `pgdata/` and ~20 GB for the compressed dump.
-
-### A.2 Restore from a production dump
-
-On the VPS:
-
-```bash
-pg_dump -Fc -d biofilter -f /tmp/biofilter-$(date +%Y%m%d).dump
-```
-
-Transfer (~20 GB, 1–4 h depending on bandwidth):
-
-```bash
-rsync --partial --progress \
-  /tmp/biofilter-20260514.dump \
-  user@lpc:/project/${PROJECT}/datasets/bf4/dumps/biofilter-20260514.dump
-```
-
-Restore inside the legacy PG-bundled container:
-
-```bash
-SNAPSHOT_DATE=20260514
-VERSION=4.1.4
-
-DB_DIR=/project/${PROJECT}/datasets/bf4/${SNAPSHOT_DATE}
-DUMP=/project/${PROJECT}/datasets/bf4/dumps/biofilter-${SNAPSHOT_DATE}.dump
-SIF=/project/${PROJECT}/env/modules/biofilter/${VERSION}/bf4-hpc.sif
-
-mkdir -p "${DB_DIR}/pgdata"
-TMP_DIR=$(mktemp -d -t bf4-restore-XXXXXX)
-mkdir -p "${TMP_DIR}/tmp" "${TMP_DIR}/pg-run"
-
-apptainer run \
-  --writable-tmpfs \
-  --pwd /tmp \
-  --bind "${DB_DIR}/pgdata:/var/lib/postgresql/data" \
-  --bind "${DUMP}:/restore.dump:ro" \
-  --bind "${TMP_DIR}/tmp:/tmp" \
-  --bind "${TMP_DIR}/pg-run:/var/run/postgresql" \
-  --env BIOFILTER_RESTORE_DUMP=/restore.dump \
-  --env BIOFILTER_RESTORE_JOBS=8 \
-  "${SIF}" \
-  biofilter db migrate --status
-
-rm -rf "${TMP_DIR}"
-```
-
-On first run with an empty `pgdata/` and `BIOFILTER_RESTORE_DUMP` set, the
-entrypoint runs `initdb`, creates the application database, then `pg_restore`
-with the specified parallelism before starting PG normally. Expect **3–8 hours**
-on GPFS-class storage; run it as an LSF job.
-
-### A.3 Fresh empty database
-
-Only for isolated test environments:
-
-```bash
-apptainer run --writable-tmpfs --pwd /tmp \
-  --bind "${DB_DIR}/pgdata:/var/lib/postgresql/data" \
-  --bind "${TMP_DIR}/tmp:/tmp" \
-  --bind "${TMP_DIR}/pg-run:/var/run/postgresql" \
-  "${SIF}" \
-  sh -c 'biofilter db create-db --db-uri "$DATABASE_URL"'
-
-apptainer run --writable-tmpfs --pwd /tmp \
-  --bind "${DB_DIR}/pgdata:/var/lib/postgresql/data" \
-  --bind "${TMP_DIR}/tmp:/tmp" \
-  --bind "${TMP_DIR}/pg-run:/var/run/postgresql" \
-  "${SIF}" \
-  biofilter db migrate --stamp-head
-```
-
-### A.4 Why it was retired
-
-Beyond the cost of a ~480 GB per-snapshot `pgdata/`, the blocking issue was
-concurrency: PostgreSQL allows a single postmaster per data directory, which
-under Apptainer meant either serialized access or a per-user copy of the whole
-database. The `PGDATA` mode `0700` requirement also conflicted with GPFS
-`chown` semantics under fakeroot.
-
-A SQLite migration was attempted first (2026-06-17 → 06-22) and abandoned: after
-~70 h of cumulative LSF runtime the import never finished
-`variant_molecular_effects` and never reached the smaller tables. That failure
-is what motivated ADR-001 — see §6 of the ADR for the full history.
-
-
-
-<!-- ===== SOURCE FILE: notebooks/Templates/lpc__quickstart.md ===== -->
-
-# Biofilter 4 on the LPC — Quickstart
-
-Paste, run, get a CSV. That's it.
-
-> **Audience:** LPC users who want to query the BF4 knowledge base. You
-> don't need to know anything about containers, databases, or Python.
-> If you're administering the BF4 environment on the cluster, see
+> **Audience:** LPC users who want to query the Biofilter knowledge base.
+> You do not need to know anything about containers, databases or Python.
+> If you maintain the Biofilter install on the cluster, see
 > [lpc__deploy.md](lpc__deploy.md) instead.
 
 ---
 
-## Activate BF4
+## Activate Biofilter
 
-BF4 lives inside the lab's shared module tree. Two steps:
+It lives in the lab's shared module tree. Two lines:
 
 ```bash
-source /project/hall_shared/hall_shared.sh          # makes lab modules visible
-module load biofilter/4.2.0                # activates BF4 4.2.0 + bundle
+source /project/hall_shared/hall_shared.sh      # makes lab modules visible
+module load biofilter/4.3.0                     # CLI on PATH, bundle configured
 ```
 
-The `biofilter/4.2.0` module puts the CLI on your PATH and points it at
-the current Parquet snapshot — no `--db-uri` needed on every command.
+The module puts the `biofilter` CLI on your `PATH` and sets
+`BIOFILTER_BUNDLE` to the current bundle, so you never pass a path.
 
-> _Optional:_ add the two lines above to your `~/.bashrc` so every shell
-> starts ready.
+> _Optional:_ add both lines to your `~/.bashrc` so every shell starts
+> ready.
 
-Confirm it worked:
+Check it took:
 
 ```bash
 biofilter --version
-# Expected: biofilter 4.2.0
+biofilter config show      # prints which bundle is in effect
 ```
 
 ---
@@ -495,104 +43,118 @@ biofilter --version
 
 ```bash
 biofilter report run \
-  --name annotation_master_gene \
+  --report-name annotate_gene \
   --input APOE \
   --output apoe.csv
 ```
 
-Result: `apoe.csv` in the current directory.
-
-That's the whole thing — no container, no PostgreSQL, no bind mounts.
-Memory peak typically under 100 MB; runs in under a second.
+That is the whole thing — no container, no database, no bind mounts. The
+result lands in the current directory, typically in about a second.
 
 ---
 
 ## Change the query
 
-Edit the report flags:
+| Flag | Does |
+|---|---|
+| `--report-name <name>` | which report to run |
+| `--input APOE` | one value — **repeat the flag** for more, it is not a comma-separated list |
+| `--input-file genes.txt` | one value per line; use this for long lists |
+| `--param KEY=VALUE` | options and filters, separate from input |
+| `--output <name>.csv` | where to write; `.parquet` also works |
 
-- `--name <report>` — which report to run (see list below)
-- `--input APOE` — one value; repeat the flag for more
-  (`--input APOE --input TP53 --input BRCA1`)
-- *or* `--input-file genes.txt` — one item per line (best for long lists)
-- `--output <name>.csv` — your output filename
+```bash
+biofilter report run \
+  --report-name annotate_gene \
+  --input APOE --input TP53 --input BRCA1 \
+  --output genes.csv
+```
 
 ---
 
-## Available reports
+## Which report?
 
 ```bash
 biofilter report list
+biofilter report explain --report-name <name>    # the full guide
 ```
 
-Most common:
+The ones people reach for first:
 
-| Report | Input |
-|---|---|
-| `annotation_master_gene` | Gene symbols (e.g. `APOE`) |
-| `annotation_master_variant` | rsIDs (e.g. `rs429358`) or `chr:pos` or `chr:pos:ref:alt` |
-| `annotation_master_disease` | Disease names or MONDO IDs |
-| `annotation_master_pathway` | Pathway names or Reactome/KEGG IDs |
-| `annotation_master_chemical` | Chemical names or ChEBI IDs |
-| `annotation_master_protein` | UniProt accessions |
-| `annotation_master_go` | GO terms |
-| `variant_modeling` | rsIDs — produces SNP×SNP pairs via shared biological groups |
+| Report | Input | Answers |
+|---|---|---|
+| `platform_data_statistics` | none | **run this first on a bundle you have not used** — what is actually in it |
+| `resolve_entity` | any names | which of my names does Biofilter recognise |
+| `annotate_gene` | gene symbols or ids | everything known about these genes |
+| `annotate_variant` | rsIDs, `chr:pos`, `chr:pos:ref:alt` | full annotation, one row per transcript |
+| `expand_gene_to_variant` | gene symbols | the variants in them, filtered by predicted damage |
+| `expand_variant_regulatory` | variants | which genes they regulate, in which tissue |
+| `pair_variants` | variants | candidate pairs whose genes share biology |
+| `aggregate_cohort_variants` | a cohort's variants | matched, placed, and binned |
+
+The full index is in the
+[Report Catalog](https://biofilter.readthedocs.io/en/latest/report_catalog.html).
 
 ---
 
-## Get help on a specific report
+## Before you trust a result
 
-```bash
-biofilter report explain --report-name annotation_master_gene
-```
+Three things that look like answers but are not:
 
-Shows the parameters, accepted input formats, and output columns.
+- **`not_found` in a status column** — the name did not resolve in this
+  bundle. Run `resolve_entity` on it to see what it did match.
+- **`no_variants`** — it resolved and nothing met your criteria. That one
+  is a real negative.
+- **A column that is entirely null** — the source may never have been
+  built into this bundle. `platform_data_statistics` says what is there.
+
+Writing a result keeps this record. `--output genes.csv` also writes
+`genes.csv.provenance.json` beside it, naming the bundle the rows came
+from. Keep them together: entity and variant ids are valid only inside
+the bundle that produced them.
 
 ---
 
-## Switching versions or snapshots (advanced)
+## Using a different bundle
 
-**Different BF4 version** — if the lab publishes multiple versions,
-`module avail biofilter` lists them and you pick with `module load`:
-
-```bash
-module avail biofilter
-module load biofilter/4.3.0                # example, if available
-```
-
-**Different data snapshot** — the module sets `BIOFILTER_DB_URI` to the
-current snapshot. To use another one for a single command:
+The module points at the current one. For a single command:
 
 ```bash
-biofilter --db-uri "parquet:///project/hall_shared/biofilter/databases/<other-date>/bundle/tables" \
-  report run --name annotation_master_gene --input APOE --output out.csv
+biofilter --bundle /project/hall_shared/datasets/biofilter/<other-date> \
+  report run --report-name annotate_gene --input APOE --output out.csv
 ```
 
-Or override the env for the whole session:
+Or for the whole session:
 
 ```bash
-export BIOFILTER_DB_URI="parquet:///project/hall_shared/biofilter/databases/<other-date>/bundle/tables"
-biofilter report list                       # now reads from the other snapshot
+export BIOFILTER_BUNDLE=/project/hall_shared/datasets/biofilter/<other-date>
+biofilter report list
 ```
+
+Point at the bundle **directory** — the one holding `manifest.json` — not
+at its `tables/` subdirectory.
+
+If that bundle was built by a different Biofilter release, opening it
+prints a warning saying so. It still works; the warning is there because
+a column that changed meaning between releases will not announce itself.
 
 ---
 
 ## Heavy workloads (LSF)
 
-For very large input sets or many reports back-to-back, submit as an
-LSF job. BF4 is memory-light (typically < 1 GB even for 10k variants),
-so resource requests can be modest:
+Biofilter is memory-light — a cohort-scale question over two billion
+annotation rows peaked at 1.87 GB — so resource requests can be modest.
 
 ```bash
 #!/bin/bash
 #BSUB -J bf4-batch
 #BSUB -o bf4-%J.log
 #BSUB -W 1:00
-#BSUB -M 4000
+#BSUB -M 8000
 #BSUB -n 4
 
 # Do NOT use `#BSUB -L /bin/bash` on this cluster — some compute nodes
-# have a `/etc/profile` guard ("no direct access allowed") that aborts
+# have an /etc/profile guard ("no direct access allowed") that aborts
 # login shells silently. Initialise modules manually instead.
 if ! type module >/dev/null 2>&1; then
     for init in \
@@ -605,30 +167,52 @@ if ! type module >/dev/null 2>&1; then
 fi
 
 source /project/hall_shared/hall_shared.sh
-module load biofilter/4.2.0
+module load biofilter/4.3.0
 
 biofilter report run \
-  --name annotation_master_variant \
+  --report-name annotate_variant \
   --input-file my_rsids.txt \
   --output results.csv
 ```
 
+Check the `.log` afterwards even when the job exits 0 — warnings about a
+missing source or a version mismatch are printed, not raised.
+
 ---
 
-## What is BF4?
+## Container alternative
 
-Biofilter 4 is an entity-centric biological knowledge platform: it lets
-you query and annotate **genes, variants, pathways, diseases,
-chemicals**, and the relationships among them, across many curated
-source databases (HGNC, Ensembl, UniProt, Reactome, KEGG, GO, MONDO,
-ClinGen, GWAS Catalog, gnomAD, AlphaMissense, …).
+If you prefer a container to the module:
 
-On the LPC, BF4 reads a Parquet bundle directly through DuckDB — no
-database server, no import phase, multi-user safe by design. The same
-bundle serves any number of concurrent users from shared storage.
+```bash
+apptainer pull bf4.sif docker://ghcr.io/ritchielab/biofilter-hpc:latest
 
-- Full documentation: <https://biofilter.readthedocs.io/>
-- Project repo: <https://github.com/RitchieLab/biofilter>
+apptainer run \
+  --bind /project/hall_shared/datasets/biofilter/<snapshot>:/bundle:ro \
+  --bind ~/bf4_output:/workspace \
+  bf4.sif \
+  report run --report-name annotate_gene --input APOE --output /workspace/apoe.csv
+```
+
+`--output` writes inside the container, so it has to point at the bound
+`/workspace` or the file goes away with the container.
+
+---
+
+## What is Biofilter?
+
+An entity-centric biological knowledge platform: it lets you query and
+annotate genes, variants, proteins, pathways, diseases, GO terms and the
+relationships among them, across many curated sources (HGNC, Ensembl,
+UniProt, Reactome, KEGG, GO, MONDO, ClinGen, GWAS Catalog, gnomAD,
+AlphaMissense, GTEx).
+
+On the LPC it reads a parquet bundle directly through DuckDB — no
+database server, no import step, multi-user by design. One copy on shared
+storage serves any number of concurrent readers.
+
+- Documentation: <https://biofilter.readthedocs.io/>
+- Repository: <https://github.com/RitchieLab/biofilter>
 
 ---
 
@@ -638,6478 +222,3622 @@ Andre Rico — <andreluis.rico@pennmedicine.upenn.edu>
 
 
 
-<!-- ===== SOURCE FILE: notebooks/Templates/pipeline__from_single_variant_to_interactions.ipynb.md ===== -->
+<!-- ===== SOURCE FILE: notebooks/templates/reports__101.ipynb.md ===== -->
 
-# Biofilter — SNP×SNP Interaction Pipeline
+<h1>📘 Biofilter — Reports 101 (4.3.0)</h1>
 
-End-to-end tutorial for building a biologically-informed SNP×SNP interaction analysis.
+How reports work now that they read a **bundle** instead of a database.
 
----
+A bundle is a folder: parquet files plus a `manifest.json` that says what
+is in them. It is immutable — the build that produced it is the version
+of the data — and reports only ever read it.
 
-## Pipeline overview
+This notebook covers the whole report API. Each individual report has
+its own notebook in this folder.
 
-```
-╔══════════════════════════════════════════════════════════════════════╗
-║  [Biofilter]  Phase 1 — Gene Discovery                               ║
-║  Report: variant_single_gene_annotation                              ║
-║    Input : one seed variant (rsID or chr:pos)                        ║
-║    Output: seed gene + partner-gene list (pathway/disease context)   ║
-║    Scale : ~8 k genes                                                ║
-╚══════════════════════╦═══════════════════════════════════════════════╝
-                       ║  partner gene symbol list
-                       ▼
-╔══════════════════════════════════════════════════════════════════════╗
-║  [Biofilter]  Phase 2 — Filtered Variant Collection                  ║
-║  Report: gene_to_variant_filtering                                   ║
-║    Input : gene symbols + SQL filters (impact, AF, LoF, …)           ║
-║    Output: Lista A — biologically annotated variants                 ║
-║    Scale : ~15 k–100 k variants (controlled by filters)              ║
-║    Export: lista_A.csv                                               ║
-╚══════════════════════╦═══════════════════════════════════════════════╝
-                       ║  lista_A.csv
-       ╔════════════════╩══════════════════════════╗
-       ║  [External]  Extract Lista B from PLINK   ║
-       ║  plink --bfile dataset --write-snplist    ║
-       ║    Output: lista_B.txt (~500 k–10 M vars) ║
-       ╚════════════════╦══════════════════════════╝
-                        ║  lista_A.csv + lista_B.txt
-                        ▼
-╔══════════════════════════════════════════════════════════════════════╗
-║  [Biofilter]  Phase 2.5 — Genotype Intersection                      ║
-║  Report: variant_list_intersect                                      ║
-║    Input : Lista A (Biofilter) + Lista B (VCF/PLINK)                 ║
-║    Output: Lista C — variants present in BOTH                        ║
-║    Export: lista_C.txt  (PLINK --extract ready)                      ║
-╚══════════════════════╦═══════════════════════════════════════════════╝
-                        ║  lista_C.txt
-       ╔════════════════╩═══════════════════════════════════╗
-       ║  [External — PLINK 1.9]  LD Pruning on Lista C     ║
-       ║  plink --bfile dataset                             ║
-       ║        --extract lista_C.txt                       ║
-       ║        --indep-pairwise 50 5 0.2                   ║
-       ║    Output: lista_D.prune.in                        ║
-       ╚════════════════╦═══════════════════════════════════╝
-                        ║  lista_D.prune.in
-                        ▼
-╔══════════════════════════════════════════════════════════════════════╗
-║  [Biofilter]  Phase 3 — SNP×SNP Pair Generation                      ║
-║  Report: snp_snp_pair_generator                                      ║
-║    Input : Lista D + Lista A annotations                             ║
-║    Output: annotated interaction pairs (one row per pair)            ║
-╚══════════════════════════════════════════════════════════════════════╝
-```
+## What changed from 4.2.0
 
----
+| | 4.2.0 | 4.3.0 |
+| --- | --- | --- |
+| data | PostgreSQL, or a parquet bundle through an ORM bridge | the bundle, read natively |
+| `bf.report.run()` returns | a DataFrame | a `ReportResult` |
+| provenance | lost on export | written beside the file |
 
-### Why this separation matters
+There is no relational path any more: a report reads a bundle or it does
+not run.
 
-| Naive approach | This pipeline |
-|---|---|
-| APOE × 8 k partners × all variants = ~260 M pairs | Phase 1 + Phase 2 filters → ~300 genes × ~50 variants = **~15 k rows** |
-| Uncontrolled LD inflation | LD Pruning runs **only on Lista C** — focused, fast pruning step |
-| No biological annotation on pairs | Every pair carries full gene + consequence + prediction annotation |
-
----
-
-### 1. Start Biofilter
+### 1. Open a bundle
 
 ```python
+from pathlib import Path
+
 from biofilter import Biofilter
 
-bf = Biofilter(debug_mode=False)
+# A bundle is a directory. Point at the directory, not at its tables/.
+# Leave as None to use `[database] bundle` from .biofilter.toml.
+BUNDLE = None
+
+bf = Biofilter(bundle=BUNDLE, debug_mode=False) if BUNDLE else Biofilter(debug_mode=False)
+
+# Results land here whatever directory the kernel was started in — VS Code
+# and Jupyter disagree about that, and a bare filename ends up wherever
+# they landed. The project root is the folder holding .biofilter.toml.
+_root = next(
+    (p for p in [Path.cwd(), *Path.cwd().parents] if (p / ".biofilter.toml").is_file()),
+    Path.cwd(),
+)
+OUTPUT_DIR = _root / "notebooks" / "templates" / "outputs"
+OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+
+bf
+```
+
+On the command line the same thing is `--bundle`:
+
+```bash
+biofilter --bundle /path/to/bundles/20260914 report list
+```
+
+Or put the path in `.biofilter.toml` once and drop the argument:
+
+```toml
+[database]
+bundle = "./biofilter_data/bundles/20260914"
+```
+
+A relative path there is relative to the config file, not to where you
+are, so it works from a notebook in a subdirectory. With that set,
+`Biofilter()` and `biofilter report run ...` both find it, and
+`biofilter config show` prints which bundle is in effect.
+
+### 2. What reports exist
+
+```python
+import pandas as pd
+
+reports = bf.report.list()
+df = pd.DataFrame(reports)
+
+print(f"{len(df)} reports")
+df[["name", "description"]]
+```
+
+Every report reads the bundle. The rewrite finished in 4.3.0 and the
+frozen relational layer was deleted with it, so this list is the whole
+catalogue — there is no second set waiting somewhere else.
+
+The names start with what the report does: `resolve_`, `annotate_`,
+`expand_`, `pair_`, `aggregate_`, `platform_`.
+
+### 3. Ask a report about itself
+
+```python
+report_name = "annotate_gene"
+
+print("columns:")
+print(bf.report.available_columns(report_name))
+
+print("\nexample input:")
+print(bf.report.example_input(report_name))
+```
+
+```python
+print(bf.report.explain(report_name))
+```
+
+### 4. Run one
+
+```python
+result = bf.report.run(report_name, input_data=["TP53", "BRCA1"])
+
+# Native reports return a ReportResult, not a DataFrame.
+print(type(result).__name__)
+print(f"{result.num_rows} rows")
+
+df = result.to_pandas()
+df[["input_value", "gene_symbol", "hgnc_id", "chromosome", "status"]]
+```
+
+### 5. Provenance — which bundle produced this
+
+`entity_id` and `variant_id` are **scoped to one bundle**. The same
+integer means a different gene in the next build, and a stale id still
+resolves — to the wrong row. Carrying the bundle id alongside the data is
+what makes that detectable.
+
+```python
+result.provenance
+```
+
+### 6. Export
+
+```python
+# CSV, with a genes.csv.provenance.json written beside it.
+written = result.write(OUTPUT_DIR / "genes.csv")
+for path in written:
+    print(path)
+```
+
+```python
+# Parquet instead: the provenance travels inside the file's metadata,
+# and list columns stay real lists rather than JSON strings.
+result.write(OUTPUT_DIR / "genes.parquet")
+```
+
+### 7. Reading a result someone else produced
+
+The sidecar is what lets you answer "where did this come from" months
+later, and `build_record.json` in the bundle has the per-source detail
+behind that id — which DTP, which version, which source URL.
+
+```python
+import json
+
+with open(OUTPUT_DIR / "genes.csv.provenance.json") as fh:
+    print(json.dumps(json.load(fh), indent=2))
+```
+
+### 8. Putting a result down and picking it up
+
+`write()` **exports**: CSV to open elsewhere, parquet for size. It
+flattens nested columns so a spreadsheet can hold them, which is lossy on
+purpose — a list of aliases becomes a JSON string.
+
+`save()` / `load()` is the other job: lose nothing, and stay usable
+later. It writes a **directory**, not a file, because a result can carry
+more than one table:
+
+```
+runs/genes/
+├── manifest.json          provenance, and what tables are here
+└── tables/
+    └── result.parquet
+```
+
+```python
+from biofilter.modules.report.result import ReportResult
+
+saved = result.save(OUTPUT_DIR / "runs" / "genes", overwrite=True)
+back = ReportResult.load(saved)
+
+print("identical:", back.table.equals(result.table))
+print("report   :", back.provenance["report"])
+print("params   :", back.provenance["params"])
+```
+
+A result does not need the bundle that produced it, and does not go
+looking. Whether that bundle is still on disk is recorded, because a
+result outliving its bundle is the normal case and the reason to save
+one — the rows are unchanged either way, and `bundle_id` names the build
+whether or not the path still resolves.
+
+```python
+back.provenance["source_bundle"]
+```
+
+**Some reports return more than one table.** When a report's answer is
+genuinely two shapes it says so, rather than flattening them into one or
+writing the second out as a file:
+
+```python
+bins = bf.report.run("aggregate_cohort_variants", cohort_file="...",
+                     output_grain="bins")
+bins.table                            # one row per (bin, sample)
+bins.extra_tables["variant_to_bin"]   # what each bin is made of
+```
+
+And because a saved result is laid out like a bundle, the reader
+Biofilter already has opens it — so reusing one usually means querying
+it, not loading it back into Python.
+
+```python
+from biofilter.modules.report import Bundle
+
+with Bundle.open(saved) as opened:
+    print("tables:", sorted(opened.tables))
+    display(opened.con.execute(
+        "SELECT * FROM result LIMIT 3"
+    ).to_arrow_table().to_pandas())
+```
+
+**`provenance["warnings"]` is always there.** An empty list means
+nothing went wrong, never "nothing was collected" — a report that copes
+with a problem in silence leaves nothing behind, so coping gets written
+down.
+
+```python
+result.provenance["warnings"]
 ```
 
 ---
 
-### 2. Phase 1 — Gene Discovery
+## Working directly, without the facade
 
-Start from a seed variant and discover all genes that share biological context
-(pathways, diseases, GO terms) with the seed gene.
+Reports are the packaged questions. For an ad-hoc one, open the bundle
+and write SQL — it is the same engine the reports use.
 
-Here we use `rs429358` (APOE ε4 allele) as the seed variant, restricting to
-**Reactome pathways** to keep the partner list biologically coherent.
+```python
+from biofilter.modules.report import Bundle
+
+with Bundle.open(BUNDLE or bf.core.db_uri.removeprefix('parquet://')) as bundle:
+    print(f"bundle {bundle.bundle_id}, {len(bundle.tables)} tables")
+
+    # Every table is a view; query it as SQL and get Arrow back.
+    out = bundle.con.execute("""
+        SELECT g.name AS gene_group, count(*) AS genes
+        FROM gene_masters gm
+        JOIN gene_group_memberships m ON m.gene_id = gm.id
+        JOIN gene_groups g ON g.id = m.group_id
+        GROUP BY 1 ORDER BY genes DESC LIMIT 10
+    """).to_arrow_table()
+
+display(out.to_pandas())
+```
+
+### What is in this bundle
+
+`bundle.tables` is the manifest, resolved: one entry per logical table,
+with the files behind it. A partitioned table is many files and one view.
+
+```python
+with Bundle.open(BUNDLE or bf.core.db_uri.removeprefix('parquet://')) as bundle:
+    inventory = pd.DataFrame(
+        [
+            {
+                "table": t.name,
+                "rows": t.rows,
+                "files": len(t.files),
+                "branch": t.branch,
+            }
+            for t in bundle.tables.values()
+        ]
+    ).sort_values("rows", ascending=False)
+
+inventory.head(15)
+```
+
+
+
+<!-- ===== SOURCE FILE: notebooks/templates/reports__TEMPLATE.ipynb.md ===== -->
+
+<h1>📄 Biofilter — Report notebook template</h1>
+
+Copy this file to `reports__<report_name>.ipynb` and fill it in. Every
+report gets one, and it ships with the report — the code lives in
+`biofilter/modules/report/reports/report_<name>.py`, the reference in
+`reports_explain/report_<name>.md`, and the worked example here.
+
+Keep the section numbering: people move between these notebooks and the
+sections should mean the same thing in each.
+
+Delete this cell when you copy.
+
+<h1>🧬 Biofilter — Report: <code>&lt;report_name&gt;</code></h1>
+
+One paragraph: what question this answers, for whom, and what one row of
+the output represents.
+
+### 1. Open a bundle
+
+```python
+from pathlib import Path
+
+from biofilter import Biofilter
+
+BUNDLE = "/path/to/biofilter_data/bundles/20260914"
+REPORT = "<report_name>"
+
+bf = Biofilter(bundle=BUNDLE, debug_mode=False)
+
+# Results land here whatever directory the kernel was started in — VS Code
+# and Jupyter disagree about that, and a bare filename ends up wherever
+# they landed. The project root is the folder holding .biofilter.toml.
+_root = next(
+    (p for p in [Path.cwd(), *Path.cwd().parents] if (p / ".biofilter.toml").is_file()),
+    Path.cwd(),
+)
+OUTPUT_DIR = _root / "notebooks" / "templates" / "outputs"
+OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+
+bf
+```
+
+### 2. What the report offers
+
+```python
+print("columns:")
+for column in bf.report.available_columns(REPORT):
+    print(" ", column)
+
+print("\nexample input:")
+print(bf.report.example_input(REPORT))
+```
+
+```python
+print(bf.report.explain(REPORT))
+```
+
+### 3. Run it
+
+Show the smallest input that demonstrates the report, and include one
+input you expect to **fail** to resolve — how a report reports absence
+is part of what a reader needs to know.
+
+```python
+result = bf.report.run(REPORT, input_data=[...])
+
+df = result.to_pandas()
+print(f"{result.num_rows} rows from bundle {result.provenance['bundle_id']}")
+df.head()
+```
+
+### 4. Reading the result
+
+Explain the columns a reader could misread. Two that come up in every
+report:
+
+- **What `status` values mean**, and whether unresolved inputs are kept.
+- **Where null differs from zero.** Null usually means "not computed" or
+  "not applicable"; zero means "computed, and none". Say which is which.
+
+If the report has list-valued columns, note that CSV writes them as JSON
+while parquet and DataFrames keep them as lists.
+
+```python
+df[["...", "status", "note"]]
+```
+
+### 5. Parameters worth knowing
+
+One cell per parameter that changes the answer rather than the shape —
+especially any that trade completeness for speed.
+
+```python
+alternative = bf.report.run(REPORT, input_data=[...], some_param=False)
+alternative.to_pandas().head()
+```
+
+### 6. At scale
+
+If the report supports `__ALL__` or accepts large inputs, show it with a
+timing, and say what the expensive part is.
 
 ```python
 import time
 
-start = time.time()
-df_phase1 = bf.report.run(
-    "variant_single_gene_annotation",
-    input_variant="rs429358",
-    group_entity_type="Pathways",
-    source_system_filter=["Reactome"],
-)
-elapsed = time.time() - start
+started = time.perf_counter()
+everything = bf.report.run(REPORT, input_data="__ALL__")
+print(f"{everything.num_rows:,} rows in {time.perf_counter() - started:.1f}s")
+```
 
-seed_gene     = df_phase1["seed_gene_symbol"].iloc[0]
-partner_genes = df_phase1["partner_gene_symbol"].dropna().unique().tolist()
-all_genes     = [seed_gene] + partner_genes
+### 7. If your report needs more than one table
 
-print(f"Phase 1 completed in {elapsed:.1f}s")
-print(f"  Seed gene : {seed_gene}")
-print(f"  Partners  : {len(partner_genes):,}")
-print(f"  Total     : {len(all_genes):,} genes → input for Phase 2")
+A report returns one table. When its answer is genuinely two shapes —
+the rows and what was rejected; the bins and what went into them — call
+`self.emit("<name>", table)` in `run()` instead of flattening them
+together or writing the second one out as a file. A file is something
+the result only names, which is how it stops being checked.
+
+When the report copes with something the reader should know about, call
+`self.warn(message, **context)`. It logs at WARNING *and* records the
+same thing in `provenance["warnings"]`, which is what reaches whoever
+opens the result months later without the log.
+
+```python
+def run(self):
+    ...
+    if dropped:
+        self.warn(f"{dropped:,} rows had no coordinates.", rows=dropped)
+        self.emit("dropped", dropped_table)
+    return main_table
 ```
 
 ```python
-# Top shared pathways
-(
-    df_phase1
-    .dropna(subset=["shared_group_names"])
-    .groupby("shared_group_names")["partner_gene_symbol"]
-    .nunique()
-    .sort_values(ascending=False)
-    .head(10)
-    .rename("genes")
-    .reset_index()
-)
+# What this run produced, beyond the main table.
+print("tables :", {n: t.num_rows for n, t in result.tables.items()})
+print("warnings:", result.provenance["warnings"])
+print("files  :", [a.name for a in result.artifacts])
 ```
 
----
+### 8. Export
 
-### 3. Phase 2 — Filtered Variant Collection
-
-Collect variants from all Phase 1 genes. Apply SQL-level filters to keep
-only biologically relevant variants before generating pairs.
-
-**Filters applied here:**
-- `impact_filter=["HIGH", "MODERATE"]` — coding variants only
-- `af_max=0.05` — exclude rare variants (MAF < 5%)
-- `most_severe_only=True` — one row per variant (no transcript expansion)
-
-> Adjust filters to your study design: rare-variant studies may use `af_max=0.01`;
-> LoF studies may add `lof_confidence_filter=["HC"]`.
+Always show both, and say what the provenance sidecar is for: ids in a
+result are scoped to the bundle that produced them.
 
 ```python
-start = time.time()
-df_phase2 = bf.report.run(
-    "gene_to_variant_filtering",
-    gene_symbols=all_genes,
-    impact_filter=["HIGH", "MODERATE"],
-    af_max=0.05,
-    most_severe_only=True,
-)
-elapsed = time.time() - start
-
-print(f"Phase 2 completed in {elapsed:.1f}s")
-print(f"  Rows            : {len(df_phase2):,}")
-print(f"  Genes with vars : {df_phase2['gene_entity_id'].nunique():,}")
-print(f"  Unique variants : {df_phase2['variant_id'].nunique():,}  ← Lista A")
+for path in result.write(OUTPUT_DIR / "<report_name>.csv"):
+    print(path)
 ```
 
-```python
-# Variant summary by gene (top 20)
-(
-    df_phase2
-    .groupby("gene_symbol")
-    .agg(
-        variant_count    = ("variant_id",      "nunique"),
-        high_impact      = ("impact_name",      lambda x: (x == "HIGH").sum()),
-        moderate_impact  = ("impact_name",      lambda x: (x == "MODERATE").sum()),
-        with_alphamiss   = ("alphamissense_score", lambda x: x.notna().sum()),
-    )
-    .sort_values("variant_count", ascending=False)
-    .reset_index()
-    .head(20)
-)
-```
-
-#### Export Lista A
-
-Save the Phase 2 output to CSV — this is the input for the genotype intersection step.
-
-```python
-import os
-
-OUTPUT_DIR = "pipeline_output"
-os.makedirs(OUTPUT_DIR, exist_ok=True)
-
-lista_a_path = f"{OUTPUT_DIR}/lista_A.csv"
-df_phase2.to_csv(lista_a_path, index=False)
-
-print(f"Lista A saved → {lista_a_path}")
-print(f"  {len(df_phase2):,} rows | {df_phase2['variant_id'].nunique():,} unique variants")
-print(f"  Columns: {list(df_phase2.columns)}")
-```
-
----
-
-### 4. Extract Lista B from your genotype data  *(external step)*
-
-Before running the intersection, extract the list of all variant IDs present in
-your VCF or PLINK dataset. This step happens **outside Biofilter** using standard
-genomics tools.
-
-#### PLINK 1.9
+### 9. The same thing on the command line
 
 ```bash
-# Write all SNP IDs from a PLINK binary dataset
-plink --bfile my_cohort \
-      --write-snplist \
-      --out pipeline_output/lista_B
-# → pipeline_output/lista_B.snplist  (one rsID or chr:pos per line)
+biofilter --bundle /path/to/bundles/20260914 report run \
+    --report-name <report_name> \
+    --input ... \
+    --output out.csv
 ```
 
-The `.bim` file itself can also be used directly as `variant_list_b` — Biofilter
-reads it natively.
-
-#### VCF
-
-```bash
-# Extract ID column from a VCF (rsIDs in column 3)
-bcftools query -f '%ID\n' my_cohort.vcf.gz > pipeline_output/lista_B.txt
-
-# Or chr:pos format if IDs are missing
-bcftools query -f '%CHROM:%POS\n' my_cohort.vcf.gz > pipeline_output/lista_B.txt
-```
-
-> **Tip:** the `.bim` file is the most convenient Lista B source when working with
-> PLINK binary datasets — pass its path directly to `variant_list_b`.
-
----
-
-### 5. Phase 2.5 — Genotype Intersection
-
-Intersect Lista A (biologically annotated) with Lista B (genotyped variants).
-
-**Why this step?**
-Not all variants in Lista A will be present in your genotype data — they may have
-been filtered during QC, not genotyped on the array, or not imputed. Running LD
-Pruning on the full Lista A would waste time and lose information.
-
-Lista C = Lista A ∩ Lista B — variants that are **both biologically relevant and
-genotyped in your dataset**. The LD Pruning step works only on this focused list.
-
-**Match strategy (`match_by="auto"`):**
-1. Tries rsID matching first (faster, unambiguous)
-2. Falls back to chr:pos matching (robust when rsIDs differ between builds/sources)
+### 10. Quick QA
 
 ```python
-# Adjust lista_b_path to your actual genotype file
-lista_b_path = "path/to/my_cohort.bim"   # .bim | .vcf | .vcf.gz | .txt
-lista_c_path = f"{OUTPUT_DIR}/lista_C.txt"
+expected = list(bf.report.available_columns(REPORT))
+missing = [c for c in expected if c not in df.columns]
 
-df_intersect = bf.report.run(
-    "variant_list_intersect",
-    variant_list_a=lista_a_path,
-    variant_list_b=lista_b_path,
-    match_by="auto",
-    plink_extract_path=lista_c_path,
-)
-
-n_matched = (df_intersect["match_status"].str.startswith("matched")).sum()
-n_only_a  = (df_intersect["match_status"] == "only_in_a").sum()
-
-print(f"Lista A total    : {len(df_intersect):,} variants")
-print(f"  matched_rsid   : {(df_intersect['match_status'] == 'matched_rsid').sum():,}")
-print(f"  matched_chr_pos: {(df_intersect['match_status'] == 'matched_chr_pos').sum():,}")
-print(f"  only_in_a      : {n_only_a:,}  (not in genotype data)")
-print(f"Lista C          : {n_matched:,} variants → {lista_c_path}")
+print("missing columns:", missing or "none")
+print("bundle:", result.provenance["bundle_id"])
+display(df.dtypes.to_frame("dtype"))
 ```
+
+
+
+<!-- ===== SOURCE FILE: notebooks/templates/reports__aggregate_cohort_variants.ipynb.md ===== -->
+
+<h1>🎛️ Biofilter — Report: <code>aggregate_cohort_variants</code></h1>
+
+Your cohort's variants, matched against the bundle and aggregated into
+biological bins.
+
+Three stages: **read** your file, **match** it to the bundle, **aggregate**
+the rare variants into bins. `output_grain` decides where you stop.
+
+Sections 4 and 6 are the ones to read — they are the two ways this report
+can hand you an empty answer that means something.
+
+### 1. Open a bundle
 
 ```python
-# Match status breakdown
-df_intersect["match_status"].value_counts()
-```
+from pathlib import Path
 
-```python
-# Variants not found in genotype data — inspect before pruning
-df_missing = df_intersect[df_intersect["match_status"] == "only_in_a"]
-print(f"{len(df_missing):,} variants in Lista A have no genotype data")
-df_missing[["variant_a_id", "gene_symbol", "consequence_name", "impact_name", "af"]].head(10)
-```
-
----
-
-### 6. LD Pruning on Lista C  *(external — PLINK 1.9)*
-
-Run LD Pruning **only on Lista C** — the small, focused intersection subset.
-This is much faster than pruning the full dataset and produces Lista D:
-variants that are biologically relevant, genotyped, AND statistically independent.
-
-```bash
-# Standard LD pruning on Lista C only
-plink --bfile my_cohort \
-      --extract pipeline_output/lista_C.txt \
-      --indep-pairwise 50 5 0.2 \
-      --out pipeline_output/lista_D
-
-# Output:
-#   lista_D.prune.in  ← Lista D (LD-independent variants)
-#   lista_D.prune.out ← pruned out (in high LD with a retained variant)
-```
-
-**Pruning parameters:**
-- `50` — window size (variants)
-- `5` — step size (variants)
-- `0.2` — r² threshold
-
-> Adjust thresholds to your study design. For rare-variant interaction studies,
-> a less stringent threshold (e.g., r²=0.5) may be appropriate to preserve
-> functional variants that happen to share some LD.
-
----
-
-### 7. Phase 3 — SNP×SNP Pair Generation
-
-Generate all variant pairs from Lista D, enriched with full annotations from Lista A.
-Every pair carries annotation on both sides (`_a` / `_b` suffix).
-
-**Pairing strategies:**
-
-| Strategy | Formula | Best for |
-|---|---|---|
-| `seed_vs_all` | n_seed × n_other | Gene-centric (e.g., APOE × all partners) |
-| `cross_gene` | pairs between different genes | Pathway-wide scan, no fixed seed |
-| `all_vs_all` | n × (n−1) / 2 | Small Lista D only (< 2k variants) |
-
-**Safety check:** if estimated pairs exceed `max_pairs`, the report aborts before
-generating any data and returns a `pair_limit_exceeded` row with a suggestion.
-
-```python
-# ── Paths (carried from earlier cells; override here if running standalone) ──
-OUTPUT_DIR   = "pipeline_output"
-lista_a_path = f"{OUTPUT_DIR}/lista_A.csv"
-lista_d_path = f"{OUTPUT_DIR}/lista_D.prune.in"
-# seed_gene is set in Phase 1; uncomment to override:
-# seed_gene = "APOE"
-
-start = time.time()
-df_pairs = bf.report.run(
-    "snp_snp_pair_generator",
-    variant_list      = lista_d_path,
-    annotation_source = lista_a_path,
-    pairing_strategy  = "seed_vs_all",
-    seed_gene         = seed_gene,
-    max_pairs         = 1_000_000,
-    exclude_same_gene = True,
-)
-elapsed = time.time() - start
-
-if "resolution_status" in df_pairs.columns:
-    status = df_pairs["resolution_status"].iloc[0]
-    print(f"Status  : {status}")
-    if status == "pair_limit_exceeded":
-        print(df_pairs["suggestion"].iloc[0])
-else:
-    print(f"Phase 3 completed in {elapsed:.1f}s")
-    print(f"  Pairs           : {len(df_pairs):,}")
-    print(f"  Seed variants   : {df_pairs['rsid_a'].nunique():,}  ({seed_gene})")
-    print(f"  Partner variants: {df_pairs['rsid_b'].nunique():,}")
-```
-
-#### Inspect pairs
-
-```python
-# Preview — key annotation columns from both sides of each pair
-preview_cols = [
-    "rsid_a", "gene_symbol_a", "consequence_name_a", "impact_name_a", "af_a",
-    "rsid_b", "gene_symbol_b", "consequence_name_b", "impact_name_b", "af_b",
-    "same_gene",
-]
-df_pairs[[c for c in preview_cols if c in df_pairs.columns]].head(10)
-```
-
-#### Analyze pair distribution
-
-```python
-# Pair distribution: impact_a × impact_b
-(
-    df_pairs
-    .groupby(["impact_name_a", "impact_name_b"])
-    .size()
-    .rename("pair_count")
-    .reset_index()
-    .sort_values("pair_count", ascending=False)
-)
-```
-
-```python
-# Top gene pairs by number of variant interactions
-(
-    df_pairs[~df_pairs["same_gene"]]
-    .groupby(["gene_symbol_a", "gene_symbol_b"])
-    .size()
-    .rename("pair_count")
-    .reset_index()
-    .sort_values("pair_count", ascending=False)
-    .head(20)
-)
-```
-
-#### Export for statistical testing
-
-```python
-# Export pairs for statistical testing
-pairs_path = f"{OUTPUT_DIR}/phase3_pairs.csv"
-df_pairs.to_csv(pairs_path, index=False)
-print(f"Pairs saved → {pairs_path}  ({len(df_pairs):,} rows)")
-```
-
----
-
-### 8. Pipeline summary
-
-```
-Phase 1    variant_single_gene_annotation  →  gene list (~8k genes)
-Phase 2    gene_to_variant_filtering       →  Lista A (annotated variants, CSV)
-Phase 2.5  variant_list_intersect          →  Lista C (genotyped subset, PLINK-ready)
-[PLINK]    --indep-pairwise                →  Lista D (LD-independent)
-Phase 3    snp_snp_pair_generator          →  annotated interaction pairs
-```
-
-#### Quick-reference CLI commands
-
-```bash
-# Phase 1 — gene discovery from seed variant
-biofilter report run \
-  --report-name variant_single_gene_annotation \
-  --param input_variant=rs429358 \
-  --param group_entity_type=Pathways \
-  --param source_system_filter=Reactome \
-  --output pipeline_output/phase1.csv
-
-# Phase 2 — variant collection (gene list from file)
-biofilter report run \
-  --report-name gene_to_variant_filtering \
-  --param gene_symbols=pipeline_output/partner_genes.txt \
-  --param impact_filter="HIGH,MODERATE" \
-  --param af_max=0.05 \
-  --output pipeline_output/lista_A.csv
-
-# Phase 2.5 — genotype intersection
-biofilter report run \
-  --report-name variant_list_intersect \
-  --param variant_list_a=pipeline_output/lista_A.csv \
-  --param variant_list_b=my_cohort.bim \
-  --param plink_extract_path=pipeline_output/lista_C.txt \
-  --output pipeline_output/intersect_report.csv
-
-# LD Pruning (external — PLINK 1.9)
-plink --bfile my_cohort \
-      --extract pipeline_output/lista_C.txt \
-      --indep-pairwise 50 5 0.2 \
-      --out pipeline_output/lista_D
-
-# Phase 3 — pair generation
-biofilter report run \
-  --report-name snp_snp_pair_generator \
-  --param variant_list=pipeline_output/lista_D.prune.in \
-  --param annotation_source=pipeline_output/lista_A.csv \
-  --param pairing_strategy=seed_vs_all \
-  --param seed_gene=APOE \
-  --output pipeline_output/phase3_pairs.csv
-```
-
-
-
-<!-- ===== SOURCE FILE: notebooks/Templates/pipeline__from_single_variant_to_interactions.md ===== -->
-
-# SNP×SNP Interaction Pipeline: From a Single Variant to Biologically-Informed Interaction Pairs
-
-**Biofilter 4
-**Pipeline version:** 1.0  
-**Biofilter version:\*\* 4.1.x
-
----
-
-## Abstract
-
-_This document describes the theoretical design and methodological rationale of the pipeline. Each step is demonstrated in practice in the companion notebook:  
-[`pipeline__from_single_variant_to_interactions.ipynb`](https://github.com/RitchieLab/biofilter/blob/biofilter3r/notebooks/Templates/pipeline__from_single_variant_to_interactions.ipynb)_
-
-We describe a computational pipeline for generating biologically-informed variant interaction pairs for SNP×SNP epistasis analysis. Starting from a single seed variant of interest, the pipeline (1) identifies functionally related genes by querying a multi-source biological knowledge base across user-selectable relationship contexts — including curated pathways (Reactome, KEGG), Gene Ontology terms, protein–protein interactions, and disease associations — allowing the analyst to define biological relevance according to the specific hypothesis under investigation; (2) collects and annotates all variants within those gene loci, applying configurable pathogenicity filters (VEP consequence class, LoF confidence, allele frequency, CADD, AlphaMissense, and other) to retain only variants relevant to the biological context of the analysis; (3) intersects the annotated variant set with the study's genotyped variants; (4) applies linkage disequilibrium (LD) pruning to produce a statistically independent variant set; and (5) generates all pairwise interaction candidates with full annotation on both sides. The pipeline is implemented in Biofilter 4 and is designed to dramatically reduce the interaction search space relative to naive all-pairs approaches while preserving — and making explicit — the biological rationale for every pair tested.
-
----
-
-## 1. Motivation
-
-Genome-wide association studies (GWAS) test each variant independently, ignoring epistatic interactions that may contribute substantially to complex trait heritability. Testing all possible SNP pairs in a typical GWAS dataset (500k–10M variants) is computationally intractable and statistically underpowered after multiple testing correction. Biologically-guided pre-selection of variant pairs addresses both problems, but existing approaches typically rely on a single biological context (e.g., a fixed pathway database) and apply uniform variant selection criteria, limiting their adaptability to different study designs.
-
-This pipeline introduces two key differentiators:
-
-**1. Flexible biological grouping.** The gene discovery step (Phase 1) is not bound to a single relationship type. The analyst selects the biological context most appropriate to the study hypothesis:
-
-| Context                      | Source         | Use case                             |
-| ---------------------------- | -------------- | ------------------------------------ |
-| Biological pathways          | Reactome, KEGG | Functional pathway interactions      |
-| Gene Ontology                | GO             | Shared molecular function or process |
-| Protein–protein interactions | BioGRID, Pfam  | Direct physical interactions         |
-| Disease associations         | ClinGen, MONDO | Disease-relevant gene sets           |
-
-The same seed variant can be analysed under multiple contexts in parallel, enabling hypothesis-driven comparison of interaction landscapes.
-
-**2. Context-aware pathogenicity filtering.** Phase 2 applies a configurable stack of functional filters directly in SQL before any data is transferred, ensuring that only variants relevant to the biological question enter the analysis. Filters span multiple prediction frameworks:
-
-| Filter tier            | Tools / annotations                              | Purpose                                     |
-| ---------------------- | ------------------------------------------------ | ------------------------------------------- |
-| Functional consequence | VEP impact (HIGH/MODERATE/LOW), consequence type | Remove synonymous and intergenic noise      |
-| Loss-of-function       | LOFTEE LoF confidence (HC/LC)                    | Isolate high-confidence truncating variants |
-| Allele frequency       | gnomAD AF (af_min, af_max)                       | Control common vs. rare variant analysis    |
-| Deleteriousness        | CADD Phred score                                 | Combined multi-annotation score             |
-| Missense pathogenicity | AlphaMissense classification                     | Deep learning structural pathogenicity      |
-| Splicing impact        | SpliceAI delta score                             | Splice-altering variant identification      |
-
-Any combination of filters can be applied independently, making the pipeline adaptable from rare high-impact LoF studies to common missense burden analyses without changes to the codebase.
-
----
-
-## 2. Pipeline Architecture
-
-The pipeline alternates between Biofilter (biological annotation) and external tools (genotyping and LD computation):
-
-```
-╔══════════════════════════════════════════════════════════════════════╗
-║  [Biofilter]  Phase 1 — Biological Network Construction              ║
-║  Report: variant_single_gene_annotation                              ║
-║    Input : one seed variant (rsID or chr:pos)                        ║
-║    Output: seed gene + partner-gene list (pathway/disease context)   ║
-╚══════════════════════╦═══════════════════════════════════════════════╝
-                       ║  partner gene symbol list
-                       ▼
-╔══════════════════════════════════════════════════════════════════════╗
-║  [Biofilter]  Phase 2 — Variant Annotation and Filtering             ║
-║  Report: gene_to_variant_filtering                                   ║
-║    Input : gene symbols + pathogenicity filters                      ║
-║    Output: Lista A — biologically annotated variants (CSV)           ║
-╚══════════════════════╦═══════════════════════════════════════════════╝
-                       ║  lista_A.csv
-       ╔═══════════════╩═══════════════════════════╗
-       ║  [External]  Extract Lista B from PLINK   ║
-       ║  plink --bfile dataset --write-snplist    ║
-       ║    Output: lista_B (.bim / .txt / .vcf)   ║
-       ╚════════════════╦══════════════════════════╝
-                        ║  lista_A.csv + lista_B
-                        ▼
-╔══════════════════════════════════════════════════════════════════════╗
-║  [Biofilter]  Phase 2.5 — Genotype–Annotation Integration            ║
-║  Report: variant_list_intersect                                      ║
-║    Input : Lista A + Lista B                                         ║
-║    Output: Lista C — variants present in BOTH (PLINK --extract)      ║
-╚══════════════════════╦═══════════════════════════════════════════════╝
-                       ║  lista_C.txt
-       ╔═══════════════╩════════════════════════════════════╗
-       ║  [External — PLINK 1.9]  LD Pruning on Lista C     ║
-       ║  plink --extract lista_C.txt                       ║
-       ║        --indep-pairwise 50 5 0.2                   ║
-       ║    Output: Lista D — LD-independent variants       ║
-       ╚════════════════╦═══════════════════════════════════╝
-                        ║  lista_D.prune.in
-                        ▼
-╔══════════════════════════════════════════════════════════════════════╗
-║  [Biofilter]  Phase 3 — Interaction Pair Generation                  ║
-║  Report: snp_snp_pair_generator                                      ║
-║    Input : Lista D + Lista A annotations                             ║
-║    Output: annotated interaction pairs (one row per pair)            ║
-╚══════════════════════════════════════════════════════════════════════╝
-```
-
-**Scale reduction example** (APOE seed, Reactome pathways):
-
-| Stage                                          | N                        |
-| ---------------------------------------------- | ------------------------ |
-| All possible variant pairs (gnomAD/no filter)  | ~260 M                   |
-| After Phase 2 filters (HIGH/MODERATE, AF < 5%) | ~N k variants            |
-| After genotype intersection (Phase 2.5)        | ~N k variants (estimate) |
-| After LD pruning (r² < 0.2)                    | ~N k variants            |
-| Final interaction pairs (seed × partners)      | ~N k pairs               |
-
----
-
-## 3. Data Sources
-
-| Source                     | Content                                                       | Version / Build         |
-| -------------------------- | ------------------------------------------------------------- | ----------------------- |
-| Biofilter 4 knowledge base | Gene loci, pathway membership, disease associations, GO terms | 4.1.2, GRCh38           |
-| Reactome                   | Curated biological pathways                                   | Current at DB ingestion |
-| KEGG                       | Curated biological pathways                                   | Current at DB ingestion |
-| gnomAD v4                  | Variant allele frequencies, functional annotations            | GRCh38                  |
-| Ensembl VEP (by gnomAD)    | Consequence annotations, LOFTEE LoF confidence                | GRCh38                  |
-| AlphaMissense (by VEP)     | Deep learning pathogenicity scores for missense variants      | v1                      |
-| CADD (by gnomAD)           | Combined annotation-dependent depletion scores                | v1.7                    |
-| NCBI / HGNC                | Gene symbol resolution, canonical loci                        | Current at DB ingestion |
-
----
-
-## 4. Phase 1 — Biological Network Construction
-
-**Report:** `variant_single_gene_annotation`
-
-- [Report Tutorial link](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter/modules/report/reports_explain/report_variant_single_gene_annotation.md).
-- [Report Example link](https://github.com/RitchieLab/biofilter/blob/biofilter3r/notebooks/Templates/reports__variant_single_gene_annotation.ipynb).
-
-### Input
-
-A single seed variant specified as rsID (e.g., `rs429358`) or genomic coordinate (`chr19:44908684`).
-
-### Method
-
-1. The seed variant is mapped to its host gene via genomic position overlap with gene loci (GRCh38 coordinates from NCBI/HGNC).
-2. The host (seed) gene is queried against the Biofilter 4 entity relationship graph to retrieve all partner genes connected through shared biological groups (pathways, diseases, GO terms, protein families).
-3. Relationships are filtered by `group_entity_type` (e.g., `Pathways`) and optionally by source system (e.g., `Reactome`).
-
-### Key parameters
-
-| Parameter              | Value used | Rationale                                                                   |
-| ---------------------- | ---------- | --------------------------------------------------------------------------- |
-| `group_entity_type`    | `Pathways` | Restricts to curated functional pathways; reduces non-specific associations |
-| `source_system_filter` | `Reactome` | Reactome provides manually curated, hierarchical pathway annotations        |
-
-### Output
-
-A DataFrame with one row per (seed_gene × partner_gene × shared_groups) relationship. The partner gene symbol list is extracted and passed to Phase 2.
-
-### Scale
-
-~8,000 partner genes for APOE via Reactome pathways.
-
----
-
-## 5. Phase 2 — Variant Annotation and Filtering
-
-**Report:** `gene_to_variant_filtering`
-
-- [Report Tutorial link](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter/modules/report/reports_explain/report_gene_to_variant_filtering.md).
-- Report Example link](https://github.com/RitchieLab/biofilter/blob/biofilter3r/notebooks/Templates/reports__gene_to_variant_filtering.ipynb).
-
-### Input
-
-The gene symbol list from Phase 1.
-
-### Method
-
-1. Gene symbols are resolved to internal entity IDs via alias tables (supports HGNC approved symbols, Ensembl IDs, synonyms).
-2. Genomic loci (chromosome, start, end) are retrieved for each gene at the specified genome build.
-3. A temporary range table is constructed in the database and joined against the variant master table to retrieve all variants within gene loci using partition-aware per-chromosome queries.
-4. Variants are joined to functional annotation tables (`variant_molecular_effects`, `variant_effect_predictions`) to retrieve consequence, impact, prediction scores, and LoF confidence.
-5. All filters are applied at the SQL level before data transfer to minimize memory footprint.
-
-### Filters
-
-All filters are optional and combinable. Filters marked **SQL** are applied server-side before data transfer; **Python** filters are applied post-query.
-
-| Filter                  | Parameter                      | Example value                         | Engine       | Rationale                                                                                                                 |
-| ----------------------- | ------------------------------ | ------------------------------------- | ------------ | ------------------------------------------------------------------------------------------------------------------------- |
-| VEP impact              | `impact_filter`                | `["HIGH", "MODERATE"]`                | SQL          | Retains coding variants with functional potential; excludes synonymous and intergenic variants                            |
-| Consequence type        | `consequence_type_filter`      | `["missense_variant", "stop_gained"]` | SQL          | Fine-grained control over consequence class; accepts group, category, or individual consequence names                     |
-| Most severe per variant | `most_severe_only`             | `True`                                | SQL + Python | One row per variant (no transcript expansion); avoids redundancy in downstream pair generation                            |
-| Allele frequency max    | `af_max`                       | `0.05`                                | SQL          | Excludes common variants above MAF threshold                                                                              |
-| Allele frequency min    | `af_min`                       | `0.001`                               | SQL          | Excludes ultra-rare variants below MAF threshold                                                                          |
-| LoF confidence          | `lof_confidence_filter`        | `["HC", "LC"]`                        | SQL          | LOFTEE annotation: `HC` = high-confidence LoF; `LC` = low-confidence LoF; non-LoF variants excluded when filter is active |
-| AlphaMissense class     | `alphamissense_classification` | `["likely_pathogenic"]`               | Python       | Deep learning missense classification (`likely_pathogenic`, `ambiguous`, `likely_benign`)                                 |
-| AlphaMissense score     | `alphamissense_score_min`      | `0.564`                               | Python       | Continuous score threshold (0–1); 0.564 is the `likely_pathogenic` boundary                                               |
-| CADD Phred              | `cadd_phred_min`               | `20`                                  | SQL          | Combined multi-annotation deleteriousness score; Phred-scaled (20 = top 1% most deleterious)                              |
-| SIFT                    | `sift_score_max`               | `0.05`                                | SQL          | Evolutionary constraint score; lower = more damaging (≤ 0.05 is standard "deleterious" threshold)                         |
-| PolyPhen-2              | `polyphen_score_min`           | `0.85`                                | SQL          | Structural pathogenicity score; higher = more damaging (≥ 0.85 = "probably damaging")                                     |
-| Gene window             | `gene_window_bp`               | `2000`                                | SQL          | Extends gene boundaries on each side; captures upstream regulatory and splice-region variants                             |
-
-### Output (Lista A)
-
-A CSV file (`lista_A.csv`) with one row per (gene × variant), carrying all annotation columns. Exported for use in Phase 2.5.
-
----
-
-## 6. Phase 2.5 — Genotype–Annotation Integration
-
-Not all variants in Lista A will be present in the study's genotype data. Variants may be absent because they were not included on the genotyping array, failed quality control, or fall below the imputation threshold. Running LD pruning on the full Lista A would therefore be inefficient and potentially misleading — pruning variants that cannot be tested in the first place.
-
-This phase resolves that gap by intersecting Lista A with Lista B (the complete variant list from the study's genotype dataset), producing **Lista C**: the subset of biologically annotated variants that are actually available for statistical testing. Only Lista C proceeds to LD pruning and pair generation, ensuring that every variant in the final interaction pairs has both biological annotation and genotype data.
-
-**Report:** `variant_list_intersect`
-
-- [Report Tutorial link](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter/modules/report/reports_explain/report_variant_list_intersect.md).
-- [Report Example link]
-
-### Input
-
-- **Lista A:** Phase 2 output CSV (biologically annotated variants)
-- **Lista B:** Variant list from the study's genotype data (PLINK `.bim` file or VCF)
-
-### Method
-
-Lista A variants are matched against Lista B using a dual-key strategy:
-
-1. **rsID match** (primary): variant IDs matching the pattern `rs\d+` are compared directly.
-2. **chr:pos match** (fallback): variants not matched by rsID are matched by (chromosome, position) after normalising chromosome encoding across formats (PLINK integers, VCF `chr`-prefixed strings, Biofilter internal integer encoding).
-
-### Output (Lista C)
-
-- **DataFrame:** all Lista A variants with match status (`matched_rsid`, `matched_chr_pos`, `only_in_a`). Variants with `only_in_a` status are not genotyped in the study dataset and are excluded from downstream analysis.
-- **Extract file** (`lista_C.txt`): PLINK-format variant ID list for `--extract`, containing only matched variants.
-
-### Considerations
-
-Variants present in Lista A but absent from Lista B (`only_in_a`) may reflect variants in gnomAD that were not genotyped on the study array, failed genotyping QC, or are absent from the imputation reference panel. These variants are logged for review but do not cause pipeline failure.
-
----
-
-## 7. LD Pruning
-
-**Tool:** PLINK 1.9
-
-### Input
-
-Lista C (`lista_C.txt`) and the study's PLINK binary dataset.
-
-### Method
-
-```bash
-plink --bfile <cohort> \
-      --extract lista_C.txt \
-      --indep-pairwise 50 5 0.2 \
-      --out lista_D
-```
-
-LD pruning is performed **exclusively on Lista C** — the biologically relevant, genotyped subset. This is intentional: pruning only the pre-filtered set is computationally faster than pruning the full dataset and avoids the risk of retaining LD proxy variants that have no biological annotation in Lista A.
-
-### Parameters
-
-| Parameter    | Value       | Description                                               |
-| ------------ | ----------- | --------------------------------------------------------- |
-| Window size  | 50 variants | Sliding window for pairwise LD computation                |
-| Step size    | 5 variants  | Window advance step                                       |
-| r² threshold | 0.2         | Variants with r² > 0.2 to any retained variant are pruned |
-
-### Output (Lista D)
-
-`lista_D.prune.in` — LD-independent subset of Lista C. These are variants that are biologically annotated, present in the study dataset, and statistically independent.
-
-### Considerations
-
-The r² threshold of 0.2 is a commonly used conservative threshold for interaction analyses. Studies focused on rare coding variants may relax this threshold (e.g., r² < 0.5), as rare functional variants may share partial LD with nearby common variants without being captured by a strict pruning step.
-
----
-
-## 8. Phase 3 — Interaction Pair Generation
-
-**Report:** `snp_snp_pair_generator`
-
-- [Report Tutorial link](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter/modules/report/reports_explain/report_variant_list_intersect.md).
-- [Report Example link]
-
-### Input
-
-- **Lista D** (`lista_D.prune.in`): LD-independent, genotyped, annotated variants
-- **Annotation source** (`lista_A.csv`): Phase 2 output — provides annotation for enrichment
-
-### Method
-
-Lista D variant IDs are matched back to Lista A annotations using the same dual-key strategy as Phase 2.5. All annotation columns from Lista A are carried to the output, duplicated with `_a` and `_b` suffixes for each side of the pair.
-
-Pairs are generated according to the specified pairing strategy:
-
-| Strategy      | Description                                                 | Formula          |
-| ------------- | ----------------------------------------------------------- | ---------------- |
-| `seed_vs_all` | Seed gene variants paired against all partner-gene variants | n_seed × n_other |
-| `cross_gene`  | All pairs between variants from different genes             | ≤ n × (n−1) / 2  |
-| `all_vs_all`  | All unique pairs                                            | n × (n−1) / 2    |
-
-A safety check estimates the pair count before materialisation; if the estimate exceeds `max_pairs` (default: 1,000,000), the report aborts and returns a descriptive error with a suggestion for reducing scope.
-
-### Default configuration (current study)
-
-| Parameter           | Value         |
-| ------------------- | ------------- |
-| `pairing_strategy`  | `seed_vs_all` |
-| `seed_gene`         | APOE          |
-| `exclude_same_gene` | `True`        |
-| `max_pairs`         | 1,000,000     |
-
-### Output
-
-A CSV file (`phase3_pairs.csv`) with one row per variant pair. Each row contains full annotation from Lista A for both the seed-side variant (`_a` columns) and the partner-side variant (`_b` columns), plus:
-
-- `same_gene` — boolean flag indicating whether both variants belong to the same gene
-- `pairing_strategy` — the strategy used to generate the pair
-
----
-
-## 9. Implementation Notes
-
-### Software versions
-
-| Tool       | Version          | Reference                                                                     |
-| ---------- | ---------------- | ----------------------------------------------------------------------------- |
-| Biofilter  | 4.1.2            | [biofilter.readthedocs.io](https://biofilter.readthedocs.io)                  |
-| Python     | 3.10+            |                                                                               |
-| SQLAlchemy | 2.x              |                                                                               |
-| PostgreSQL | 15+ (production) | Ritchie Lab VPS server (decommissioned since)                                 |
-| DB         | `biofilter_prod` | PostgreSQL on the VPS, reached over `postgresql+psycopg2://`                  |
-| PLINK      | 1.9              | Purcell et al., 2007; Chang et al., 2015                                      |
-| pandas     | ≥ 2.0            |                                                                               |
-| NumPy      | ≥ 1.24           |                                                                               |
-
-> **Environment note.** This study ran against the Ritchie Lab VPS PostgreSQL
-> instance, which has since been decommissioned. Production is now a read-only
-> Parquet bundle on the Penn LPC, reached with
-> `--db-uri parquet:///project/hall_shared/datasets/biofilter/<YYYYMMDD>/tables`.
-> The table above records the environment as it was, for reproducibility.
-
-### Reproducibility
-
-- All Biofilter report parameters are logged at runtime and recoverable from the output DataFrame column `resolution_status`.
-- The exact gene list, variant list, and pair list at each phase are exported as CSV/TXT files, enabling replication of any downstream step independently.
-- The Biofilter database version and ETL package provenance are queryable via `bf.report.run("etl_packages")`.
-
----
-
-## 10. Limitations and Considerations
-
-**Pathway annotation completeness.** The gene-gene relationships used in Phase 1 are limited to the biological databases ingested into Biofilter 4 (Reactome, KEGG, GO, etc.). Genes with poor pathway annotation coverage may have fewer or no partner genes identified, even if biologically relevant interactions exist.
-
-**Variant annotation coverage.** Functional annotations (consequence, AlphaMissense, CADD) are available for gnomAD variants only. Variants present in the study cohort but absent from gnomAD will not appear in Lista A and therefore cannot be included in interaction pairs.
-
-> **Production database note.** The current Biofilter 4 instance running on the Ritchie Lab VPS server was loaded with a gnomAD filter of **allele count AC ≥ 5**, applied during the ETL process to reduce storage requirements. This excludes ultra-rare singletons and doubletons from the knowledge base. Studies requiring complete variant coverage (AC = 1–4) should provision a dedicated PostgreSQL instance with at least **3 TB of storage** and re-run the gnomAD ETL without the AC filter (`biofilter etl update --data-source variant_gnomad`).
-
-**LD pruning and rare variants.** LD pruning can remove rare functional variants when a common proxy variant is retained in the same LD block. For rare-variant studies (MAF < 1%), consider relaxing the r² threshold or performing burden-test aggregation before pair generation.
-
-**Genome build consistency.** All coordinates in Biofilter 4 are aligned to GRCh38. Study cohorts aligned to GRCh37 must be lifted over before Phase 2.5.
-
-**Pair generation scale.** The `seed_vs_all` strategy assumes a single biologically meaningful seed gene. For studies without a clear seed, `cross_gene` pairs may number in the hundreds of millions; aggressive Phase 2 filtering is required to keep the analysis tractable.
-
----
-
-## 11. References
-
-- Purcell S, et al. PLINK: [a tool set for whole-genome association and population-based linkage analyses.](https://pubmed.ncbi.nlm.nih.gov/17701901/) _Am J Hum Genet._ 2007;81(3):559–575.
-- Chang CC, et al. [Second-generation PLINK: rising to the challenge of larger and richer datasets](https://pubmed.ncbi.nlm.nih.gov/25722852/) _Gigascience._ 2015;4:7.
-- Cheng J, et al. [Accurate proteome-wide missense variant effect prediction with AlphaMissense.](https://pubmed.ncbi.nlm.nih.gov/37733863/) _Science._ 2023;381(6664):eadg7492.
-- Rentzsch P, et al. [CADD: predicting the deleteriousness of variants throughout the human genome.](https://pubmed.ncbi.nlm.nih.gov/30371827/) _Nucleic Acids Res._ 2019;47(D1):D886–D894.
-- Karczewski KJ, et al. [The mutational constraint spectrum quantified from variation in 141,456 humans.](https://pubmed.ncbi.nlm.nih.gov/32461654/) _Nature._ 2020;581(7809):434–443. _(gnomAD v3)_
-- Jassal B, et al. [The reactome pathway knowledgebase.](https://pubmed.ncbi.nlm.nih.gov/37941124/) _Nucleic Acids Res._ 2020;48(D1):D498–D503.
-- McLaren W, et al. [The Ensembl Variant Effect Predictor.](https://pubmed.ncbi.nlm.nih.gov/27268795/) _Genome Biol._ 2016;17(1):122.
-
----
-
-_Document generated from pipeline implementation in Biofilter 4._  
-_Companion notebook:_ `notebooks/Templates/pipeline__from_single_variant_to_interactions.ipynb`
-
-
-
-<!-- ===== SOURCE FILE: notebooks/Templates/pipeline__pathway_burden_score.ipynb.md ===== -->
-
-# Biofilter — Pathway Burden Pipeline
-
-**From a list of significant genes (e.g., ExWAS hits) to a prioritised set of biological pathways, weighted by cross-source evidence convergence.**
-
-Companion to [`pipeline__pathway_burden_score.md`](https://github.com/RitchieLab/biofilter/blob/biofilter3r/notebooks/Templates/pipeline__pathway_burden_score.md).
-
-Pipeline overview:
-
-1. **Phase 1** — Resolve informal pathway names to canonical entities
-2. **Phase 2** — Retrieve gene membership for each pathway
-3. **Phase 3** — Build per-pathway and per-gene burden tables
-4. **Phase 4** — Compute per-gene convergence score across knowledge bases
-5. **Phase 5** — Roll convergence into the burden tables and rank pathways
-
----
-### 0. Start Biofilter and define inputs
-
-```python
 from biofilter import Biofilter
 
-bf = Biofilter()
-db = bf.db.connect()  # idempotent — returns the connected Database
+BUNDLE = None
+REPORT = "aggregate_cohort_variants"
+
+bf = Biofilter(bundle=BUNDLE, debug_mode=False) if BUNDLE else Biofilter(debug_mode=False)
+
+_root = next(
+    (p for p in [Path.cwd(), *Path.cwd().parents] if (p / ".biofilter.toml").is_file()),
+    Path.cwd(),
+)
+OUTPUT_DIR = _root / "notebooks" / "templates" / "outputs"
+OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+
+print(bf.core.db_uri)
+```
+
+### 2. A cohort to work with
+
+This notebook has to be runnable, so it writes a small synthetic cohort
+from variants the bundle actually carries. Point `COHORT` at your own VCF
+and everything below works unchanged.
+
+Two things are deliberate: 200 samples, and two variants on a chromosome
+the bundle does not carry.
+
+```python
+import random
+
+from biofilter.modules.report import Bundle
+
+COHORT = OUTPUT_DIR / "demo_cohort.vcf"
+PHENOTYPE = OUTPUT_DIR / "demo_phenotype.csv"
+N_SAMPLES = 200
+
+with Bundle.open(bf.core.db_uri.removeprefix("parquet://")) as bundle:
+    rows = bundle.con.execute("""
+        SELECT v.chromosome, v.position, v.reference_allele, v.alternate_allele
+        FROM variant_masters v
+        JOIN entity_locations l ON l.build = 38 AND l.chromosome = v.chromosome
+         AND v.position BETWEEN l.start_pos AND l.end_pos
+        JOIN gene_masters gm ON gm.entity_id = l.entity_id
+        WHERE gm.symbol IN ('CHEK2', 'SMARCB1', 'NF2')
+          AND length(v.reference_allele) = 1 AND length(v.alternate_allele) = 1
+        ORDER BY v.position LIMIT 600
+    """).fetchall()
+
+random.seed(11)
+samples = [f"S{i + 1}" for i in range(N_SAMPLES)]
+lines = ["##fileformat=VCFv4.2", "##contig=<ID=chr22>"]
+lines.append("\t".join(
+    ["#CHROM", "POS", "ID", "REF", "ALT", "QUAL", "FILTER", "INFO", "FORMAT"] + samples))
+
+for i, (chrom, pos, ref, alt) in enumerate(rows):
+    genotypes = ["0/0"] * N_SAMPLES
+    if i % 3 == 0:                       # rare: one to three carriers
+        for j in random.sample(range(N_SAMPLES), random.choice([1, 2, 3])):
+            genotypes[j] = "0/1"
+    elif i % 3 == 1:                     # common: about 15%
+        genotypes = [f"{int(random.random() < 0.15)}/{int(random.random() < 0.15)}"
+                     for _ in samples]
+    lines.append("\t".join(
+        [f"chr{chrom}", str(pos), f"v{i}", ref, alt, ".", "PASS", ".", "GT"] + genotypes))
+
+# On a chromosome this bundle does not carry — section 4 is about these.
+lines.append("\t".join(
+    ["chr1", "12010", "offtarget", "A", "C", ".", "PASS", ".", "GT"] + ["0/1"] * N_SAMPLES))
+
+COHORT.write_text("\n".join(lines) + "\n")
+PHENOTYPE.write_text("\n".join(
+    ["SampleID,Phenotype"]
+    + [f"{s},{1 if i < N_SAMPLES // 2 else 0}" for i, s in enumerate(samples)]) + "\n")
+
+print(f"{len(rows)} variants, {N_SAMPLES} samples")
+print(f"smallest frequency this cohort can observe: {1 / (2 * N_SAMPLES):.4f}")
+```
+
+### 3. Stage 2 — which of your variants does Biofilter know?
+
+`output_grain="variants"` is what `variant_list_intersect` did. Five
+statuses, and the differences between them are the point.
+
+```python
+matched = bf.report.run(REPORT, cohort_file=str(COHORT),
+                        phenotype_file=str(PHENOTYPE))
+df = matched.to_pandas()
+
+print(f"{len(df):,} cohort variants")
+df.groupby("match_status").size().to_frame("variants")
 ```
 
 ```python
-# Analyst inputs — replace with your study values
-
-pathway_list = [
-    "estrogen signaling",
-    "progesterone response",
-    "inflammation",
-    "immune pathways",
-    "fibrosis",
-    "ECM remodeling",
-    "angiogenesis",
-    "nociception",
-    "pain signaling",
+df[df.match_status == "matched"].head(5)[
+    ["cohort_variant_id", "chromosome", "position", "variant_key", "plink_id",
+     "gene_symbols", "maf_overall", "maf_case", "maf_control", "is_rare"]
 ]
-
-# Significant genes from upstream analysis (ExWAS, GWAS, …)
-exwas_genes = [
-    "APOE",
-    "BRCA1",
-    "TP53",
-    # add your full list here
-]
 ```
 
----
-### 1. Phase 1 — Pathway Resolution
+`in_bundle_no_gene` and `not_in_bundle` look alike in a spreadsheet
+and mean opposite things: the first is a variant Biofilter knows that no
+gene contains, the second one it has never heard of. The `note` column
+spells out which happened.
 
-Resolve informal pathway names into canonical entities using the `entity_filter` report. Fuzzy matching is permissive enough to catch substring-style queries (`"alzheimer"` → `"Alzheimer disease"`), and `group_filter="Pathways"` ensures we never bleed into Genes or Diseases that happen to share an alias.
+### 4. The guard: can the bundle place what you brought?
 
-```python
-result_fuzzy = bf.report.run(
-    "entity_filter",
-    input_data=pathway_list,
-    match_mode="fuzzy",
-    group_filter="Pathways",
-    similarity_threshold=75,
-)
+A cohort file spans the genome. A bundle need not. **Binning a
+whole-genome VCF against a single-chromosome bundle does not fail** — it
+returns bins for that chromosome and stays silent about the rest.
 
-found_pathways = (
-    result_fuzzy[result_fuzzy["observation"] != "not found"]["primary_name"]
-    .dropna()
-    .unique()
-    .tolist()
-)
-
-print(f"{len(found_pathways)} canonical pathway(s) resolved:")
-for p in found_pathways:
-    print(f"  • {p}")
-```
-
----
-### 2. Phase 2 — Pathway → Gene Membership
-
-For each resolved pathway, pull every gene member from `entity_relationships`. The output `pathway_gene_map` is many-to-many — the same gene can appear in multiple pathways.
+That is the single most dangerous thing this report could do, so every
+run measures it.
 
 ```python
-genes_by_pathway = bf.report.run(
-    "entity_relationship_model",
-    input_data=found_pathways,
-    input_entity_groups=["Pathway"],
-    output_entity_groups=["Gene"],
-    relationship_scope="input_to_any",
-)
-
-pathway_gene_map = (
-    genes_by_pathway[genes_by_pathway["observation"] != "not found"]
-    [["input_entity_id", "input_primary_name", "related_primary_name"]]
-    .drop_duplicates()
-)
-
-print(
-    f"{len(pathway_gene_map):,} pathway-gene links for "
-    f"{pathway_gene_map['related_primary_name'].nunique():,} unique genes"
-)
-```
-
----
-### 3. Phase 3 — Burden Tables
-
-Build two summary tables from the pathway-gene map intersected with `exwas_genes`:
-
-- **Pathway table** — one row per pathway with `total_genes`, `exwas_hit_count`, `hit_proportion`, and explicit gene lists.
-- **Gene table** — one row per gene with `pathway_count`, list of pathways, and an `is_exwas_hit` flag.
-
-`hit_proportion` is a crude size-adjusted enrichment — the fraction of the pathway's genes that are ExWAS hits.
-
-```python
-exwas_set = {g.upper() for g in exwas_genes}
-pathway_gene_map = pathway_gene_map.copy()
-pathway_gene_map["is_exwas"] = (
-    pathway_gene_map["related_primary_name"].str.upper().isin(exwas_set)
-)
-
-# Pathway table — one row per pathway
-pathway_table = (
-    pathway_gene_map
-    .groupby(["input_entity_id", "input_primary_name"], as_index=False)
-    .agg(
-        total_genes=("related_primary_name", "nunique"),
-        genes=("related_primary_name", lambda x: sorted(x.dropna().unique())),
-    )
-    .rename(columns={
-        "input_entity_id": "pathway_id",
-        "input_primary_name": "pathway_name",
-    })
-)
-
-exwas_agg = (
-    pathway_gene_map[pathway_gene_map["is_exwas"]]
-    .groupby("input_primary_name", as_index=False)
-    .agg(
-        exwas_hit_count=("related_primary_name", "nunique"),
-        exwas_genes=("related_primary_name", lambda x: sorted(x.dropna().unique())),
-    )
-    .rename(columns={"input_primary_name": "pathway_name"})
-)
-
-pathway_table = pathway_table.merge(exwas_agg, on="pathway_name", how="left")
-pathway_table["exwas_hit_count"] = pathway_table["exwas_hit_count"].fillna(0).astype(int)
-pathway_table["exwas_genes"] = pathway_table["exwas_genes"].apply(
-    lambda x: x if isinstance(x, list) else []
-)
-pathway_table["hit_proportion"] = (
-    pathway_table["exwas_hit_count"] / pathway_table["total_genes"]
-).round(4)
-pathway_table = pathway_table.sort_values("hit_proportion", ascending=False)
-pathway_table
+matched.provenance["chromosome_coverage"]
 ```
 
 ```python
-# Gene table — one row per gene
-gene_table = (
-    pathway_gene_map
-    .groupby("related_primary_name", as_index=False)
-    .agg(
-        pathway_count=("input_primary_name", "nunique"),
-        pathways=("input_primary_name", lambda x: sorted(x.dropna().unique())),
-    )
-    .rename(columns={"related_primary_name": "gene"})
-)
-gene_table["is_exwas_hit"] = gene_table["gene"].str.upper().isin(exwas_set)
-gene_table = gene_table.sort_values(
-    ["is_exwas_hit", "pathway_count"], ascending=[False, False]
-)
-gene_table.head(20)
+# When the result leaves your screen, make it a refusal instead.
+try:
+    bf.report.run(REPORT, cohort_file=str(COHORT), require_full_coverage=True)
+except ValueError as exc:
+    print("refused:", exc)
 ```
 
----
-### 4. Phase 4 — Convergence Scoring
+### 5. Stage 3 — bins
 
-For each ExWAS gene, count distinct knowledge bases that record any relationship for the gene. The score reflects **how well-characterised the gene is across independent sources**, regardless of whether each source links it to a pathway specifically.
-
-Tune `SOURCE_WEIGHTS` to bias toward curated sources (ClinGen, MONDO) over inferred ones (BioGrid PPI) when the use case demands it.
+`output_grain="bins"` is what `variant_binning` did. One row is one
+sample in one bin, and only carriers appear.
 
 ```python
-import pandas as pd
-from sqlalchemy import or_, select, text
-from biofilter.modules.db.models import EntityRelationship
+bins = bf.report.run(REPORT, cohort_file=str(COHORT),
+                     phenotype_file=str(PHENOTYPE),
+                     output_grain="bins", group_by="gene",
+                     maf_cutoff=0.01)
+bdf = bins.to_pandas()
 
-# Load known data sources for the score lookup
-with db.engine.connect() as conn:
-    sources_df = pd.read_sql(
-        text("SELECT id, name FROM etl_data_sources ORDER BY name"),
-        conn,
-    )
-source_map = dict(zip(sources_df["id"], sources_df["name"]))
-print(f"{len(source_map)} data sources available")
-
-# Default: equal weight per relationship-bearing source.
-# Add or remove entries to bias the score; sources not listed contribute 0.
-SOURCE_WEIGHTS = {
-    "biogrid": 1.0,
-    "reactome": 1.0,
-    "reactome_relationships": 1.0,
-    "mondo": 1.0,
-    "mondo_relationships": 1.0,
-    "clingen": 1.0,
-    "uniprot_relationships": 1.0,
-    "gene_ontology": 1.0,
-}
+print(f"{len(bdf):,} (sample, bin) rows across {bdf.bin_name.nunique()} bins")
+bdf.head(5)
 ```
 
 ```python
-# Resolve ExWAS gene symbols to entity_ids
-exwas_resolved = bf.report.run(
-    "entity_filter",
-    input_data=list(exwas_genes),
-    match_mode="exact",
-    group_filter="Genes",
+# The burden, which is what a downstream test consumes.
+bdf.groupby(["bin_name", "sample_class"]).agg(
+    samples=("sample", "nunique"),
+    alt_alleles=("alt_count", "sum"),
+    variants=("variant_count", "sum"),
 )
-resolved_mask = exwas_resolved["observation"] != "not found"
-exwas_id_to_symbol = dict(
-    zip(
-        exwas_resolved.loc[resolved_mask, "entity_id"].astype(int),
-        exwas_resolved.loc[resolved_mask, "primary_name"],
-    )
-)
-exwas_entity_ids = list(exwas_id_to_symbol.keys())
-print(f"Resolved {len(exwas_entity_ids)}/{len(exwas_genes)} ExWAS gene symbols")
+```
+
+### 6. The other empty result, and it is arithmetic
+
+With **N samples the smallest observable minor allele frequency is
+1/(2N)** — one allele copy in one person. A 20-sample cohort cannot see
+anything rarer than 0.025, so asking it for `maf_cutoff=0.01` keeps only
+variants nobody carries and every bin comes back empty.
+
+Correct, and invisible in the rows. So the report says it.
+
+```python
+bins.provenance["rare_variants"]
 ```
 
 ```python
-# Pull every relationship touching any ExWAS gene, then aggregate per gene
-stmt = select(
-    EntityRelationship.entity_1_id,
-    EntityRelationship.entity_2_id,
-    EntityRelationship.data_source_id,
-).where(
-    or_(
-        EntityRelationship.entity_1_id.in_(exwas_entity_ids),
-        EntityRelationship.entity_2_id.in_(exwas_entity_ids),
-    )
-)
+# The same cohort cut down to 10 samples, asking for something it
+# cannot observe.
+small = OUTPUT_DIR / "demo_small.vcf"
+head, *body = COHORT.read_text().splitlines()
+cols = body[0].split("\t")
+small.write_text("\n".join(
+    [head, "\t".join(cols[:9] + cols[9:19])]
+    + ["\t".join(r.split("\t")[:9] + r.split("\t")[9:19]) for r in body[1:]]) + "\n")
 
-with db.engine.connect() as conn:
-    rels_df = pd.read_sql(stmt, conn)
-
-exwas_id_set = set(exwas_entity_ids)
-e1_in = rels_df["entity_1_id"].isin(exwas_id_set)
-rels_df["gene_id"] = rels_df["entity_1_id"].where(e1_in, rels_df["entity_2_id"])
-rels_df["source_name"] = rels_df["data_source_id"].map(source_map)
-
-def _score(sources):
-    return float(sum(SOURCE_WEIGHTS.get(s, 0.0) for s in set(sources) if s))
-
-gene_convergence = (
-    rels_df.dropna(subset=["source_name"])
-    .groupby("gene_id")
-    .agg(
-        evidence_sources=("source_name", lambda s: sorted(set(s))),
-        convergence_count=("source_name", "nunique"),
-        convergence_score=("source_name", _score),
-    )
-    .reset_index()
-)
-gene_convergence["gene"] = gene_convergence["gene_id"].map(exwas_id_to_symbol)
-gene_convergence = gene_convergence.sort_values("convergence_score", ascending=False)
-gene_convergence[["gene", "convergence_count", "convergence_score", "evidence_sources"]]
+tiny = bf.report.run(REPORT, cohort_file=str(small), output_grain="bins",
+                     maf_cutoff=0.01)
+print("rows:", len(tiny.to_pandas()))
+print(tiny.provenance["rare_variants"]["means"])
 ```
 
----
-### 5. Phase 5 — Convergence Roll-up
+### 7. Four kinds of bin, and how far each reaches
 
-Merge per-gene convergence into the burden tables and re-rank pathways. The final `pathway_table` carries:
-
-- `hit_proportion` — size-adjusted hit rate (Phase 3)
-- `mean_convergence` — average evidence per ExWAS hit
-- `total_convergence` — sum of evidence across ExWAS hits
-
-The ranking by `total_convergence` favours pathways whose ExWAS hits are well-supported across multiple knowledge bases.
+Stage 2 is positional, and only 39,306 of the bundle's 72,660 genes carry
+build-38 coordinates — so half the catalogue is out of reach whatever the
+grouping.
 
 ```python
-# Enrich gene_table with convergence columns
-gene_table = gene_table.merge(
-    gene_convergence[["gene", "convergence_count", "convergence_score", "evidence_sources"]],
-    on="gene",
-    how="left",
-)
-gene_table["convergence_score"] = gene_table["convergence_score"].fillna(0.0)
-gene_table["convergence_count"] = gene_table["convergence_count"].fillna(0).astype(int)
-
-# Roll into pathway_table
-gene_score = dict(
-    zip(gene_convergence["gene"].str.upper(), gene_convergence["convergence_score"])
-)
-
-def _avg_score(genes_list):
-    scores = [gene_score.get(g.upper(), 0.0) for g in (genes_list or [])]
-    return round(sum(scores) / len(scores), 2) if scores else 0.0
-
-def _sum_score(genes_list):
-    return round(sum(gene_score.get(g.upper(), 0.0) for g in (genes_list or [])), 2)
-
-pathway_table["mean_convergence"] = pathway_table["exwas_genes"].apply(_avg_score)
-pathway_table["total_convergence"] = pathway_table["exwas_genes"].apply(_sum_score)
-pathway_table = pathway_table.sort_values(
-    ["total_convergence", "exwas_hit_count"], ascending=[False, False]
-)
+for group_by in ("gene", "gene_group", "locus_type", "pathway"):
+    out = bf.report.run(REPORT, cohort_file=str(COHORT),
+                        phenotype_file=str(PHENOTYPE),
+                        output_grain="bins", group_by=group_by, maf_cutoff=0.01)
+    frame = out.to_pandas()
+    reach = out.provenance["bin_coverage"]
+    print(f"  {group_by:<11} {len(frame):>6,} rows, "
+          f"{frame.bin_name.nunique() if len(frame) else 0:>4} bins   "
+          f"reaches {reach['genes_this_bin_type_can_reach']:,} genes "
+          f"({reach['share']:.1%})")
 ```
+
+### 8. Which frequency the rare filter uses
+
+With both arms present the default filters on the **larger** of the case
+and control MAFs — BioBin's rule, so a variant common in cases and absent
+in controls is not swept into a rare bin.
 
 ```python
-# Final pathway ranking
-display_cols = [
-    "pathway_name", "exwas_hit_count", "total_genes", "hit_proportion",
-    "mean_convergence", "total_convergence", "exwas_genes",
-]
-pathway_table[[c for c in display_cols if c in pathway_table.columns]]
+for label, params in [
+    ("case/control (default)", {"rare_case_control": True}),
+    ("control only", {"rare_case_control": False, "overall_major_allele": False}),
+    ("overall", {"rare_case_control": False, "overall_major_allele": True}),
+]:
+    out = bf.report.run(REPORT, cohort_file=str(COHORT),
+                        phenotype_file=str(PHENOTYPE),
+                        output_grain="bins", maf_cutoff=0.01, **params)
+    rare = out.provenance["rare_variants"]
+    print(f"  {label:<24} {rare['rare']:>4} rare, "
+          f"{rare['rare_with_carriers']:>4} with carriers")
 ```
 
+### 9. One table that travels, one file that does not
+
+`variant_to_bin` — what each bin is made of — is a **second table on the
+result**, always there when you ask for bins. Two runs differing only in
+`maf_cutoff` produce different bins and the main table does not say which
+variants moved; this is how you find out. Being a table rather than a
+file, it cannot be lost or go stale without anything noticing.
+
+`plink_extract_path` writes a real file, because PLINK reads files. It
+matches on the id in your `.bim`, not on coordinates, so the id your own
+file used is preferred — a list of `chr:pos` strings extracts nothing
+from a dataset keyed by rsIDs.
+
 ```python
-# ExWAS hits ranked by convergence
-gene_cols = [
-    "gene", "is_exwas_hit", "pathway_count",
-    "convergence_count", "convergence_score", "evidence_sources",
-]
-(
-    gene_table[gene_table["is_exwas_hit"] == True]
-    [[c for c in gene_cols if c in gene_table.columns]]
-    .sort_values("convergence_score", ascending=False)
+audited = bf.report.run(
+    REPORT, cohort_file=str(COHORT), phenotype_file=str(PHENOTYPE),
+    output_grain="bins", maf_cutoff=0.01,
 )
+
+print("tables on the result:")
+for name, table in audited.tables.items():
+    print(f"  {name:<16} {table.num_rows:>6,} rows")
+
+display(audited.extra_tables["variant_to_bin"].to_pandas().head(5))
+
+keep = bf.report.run(
+    REPORT, cohort_file=str(COHORT),
+    plink_extract_path=str(OUTPUT_DIR / "keep.txt"),
+)
+for artifact in keep.artifacts:
+    print(f"\nfile: {artifact.name} — {artifact.description}")
 ```
 
----
-## Interpreting the output
-
-**Pathway table** — pathways at the top combine high `hit_proportion` (size-adjusted enrichment) with high `total_convergence` (well-supported hits). Use both columns together: a pathway with `hit_proportion=0.5` but a single low-evidence gene is less compelling than one with `hit_proportion=0.1` and ten high-evidence genes.
-
-**Gene table** — ExWAS hits ranked by `convergence_score` highlight the most well-characterised hits. Genes with low convergence are candidates for novel biology (or false positives — verify via independent evidence).
-
-**Tuning the score** — the default `SOURCE_WEIGHTS` treats every source equally. For a clinically motivated scope, increase ClinGen and MONDO weights and decrease BioGrid (which contains both curated and large-scale inferred PPIs). Document the chosen weights when reporting results.
-
-**Next steps** — for variant-level prioritisation within these pathways, use the `gene_to_variant_filtering` report on the resolved gene list, or feed the per-pathway hits into the SNP×SNP interaction pipeline.
-
-
-
-<!-- ===== SOURCE FILE: notebooks/Templates/pipeline__pathway_burden_score.md ===== -->
-
-# Pathway Burden Pipeline: From Gene Hit Lists to Cross-Source Convergence Scores
-
-**Biofilter 4**
-**Pipeline version:** 1.0
-**Biofilter version:** 4.1.x
-
----
-
-## Abstract
-
-_This document describes the theoretical design and methodological rationale of the pipeline. Each step is demonstrated in practice in the companion notebook:
-[`pipeline__pathway_burden_score.ipynb`](https://github.com/RitchieLab/biofilter/blob/biofilter3r/notebooks/Templates/pipeline__pathway_burden_score.ipynb)_
-
-We describe a pipeline for prioritising biological pathways given a list of genes flagged as significant by an upstream genetic analysis (e.g., ExWAS, GWAS). Starting from informal pathway names and a list of significant genes, the pipeline (1) resolves user-provided pathway names against the Biofilter 4 knowledge base using fuzzy or substring matching, accommodating legacy and approximate labels; (2) retrieves the full gene membership of each resolved pathway from curated databases (Reactome, KEGG); (3) intersects pathway membership with the analyst's hit gene list to build per-pathway and per-gene burden tables; (4) computes a **convergence score** for each gene, defined as the number (or weighted sum) of independent knowledge bases that record the gene in any biological relationship — BioGrid (PPI), Reactome (pathways), MONDO (disease ontology), ClinGen (clinical curation), UniProt, and others; (5) rolls convergence into the burden tables, producing a per-pathway summary that combines hit count, hit proportion, and average evidence strength of the genes hitting that pathway. The pipeline operates on summary-level inputs (no individual genotypes required) and is engine-agnostic (PostgreSQL or SQLite).
-
----
-
-## 1. Motivation
-
-After a genetic analysis identifies a set of significant genes, a common next question is: **which biological processes are these genes collectively pointing to?** Standard pathway enrichment tools (DAVID, Enrichr, GSEA) answer this with a hypergeometric or rank-based test against a fixed pathway database. Useful, but with two limitations relevant to small or curated hit lists:
-
-1. **Single-source pathway annotation.** Most enrichment tools query one database at a time. A gene linked to a pathway only in BioGrid (PPI inference) and not in Reactome (manually curated) may be invisible.
-2. **No evidence-weighting per gene.** A hit gene mentioned in 5 independent knowledge bases (BioGrid, Reactome, MONDO, ClinGen, UniProt) carries stronger biological priors than a hit gene mentioned in only one. Standard enrichment treats both equally.
-
-This pipeline addresses both:
-
-**Multi-source pathway lookup.** Phase 2 retrieves gene membership from every relationship source loaded into Biofilter 4 (Reactome and KEGG for pathways, plus any future ones), without requiring the analyst to merge them manually.
-
-**Convergence scoring.** Phase 4 is the methodological contribution: for each ExWAS hit, count the distinct knowledge bases that record the gene in any biological relationship. The score is fully tunable via per-source weights, allowing the analyst to bias toward curated sources (ClinGen, MONDO) over inferred ones (BioGrid PPI) when desired.
-
-The two layers combine to produce a pathway burden score that is **size-aware** (hits per pathway gene), **biologically plural** (pulling from all sources), and **evidence-weighted** (per-gene convergence).
-
----
-
-## 2. Pipeline Architecture
-
-The pipeline is fully internal to Biofilter 4 — no external tooling required:
-
-```
-╔══════════════════════════════════════════════════════════════════════╗
-║  [Input]  Analyst inputs                                             ║
-║    - pathway_list   : informal pathway names                         ║
-║    - exwas_genes    : significant gene symbols                       ║
-║    - SOURCE_WEIGHTS : per-source weight overrides (optional)         ║
-╚══════════════════════╦═══════════════════════════════════════════════╝
-                       ║
-                       ▼
-╔══════════════════════════════════════════════════════════════════════╗
-║  [Biofilter]  Phase 1 — Pathway Resolution                           ║
-║  Report: entity_filter (fuzzy / like / exact)                        ║
-║    Input : pathway_list                                              ║
-║    Output: found_pathways (canonical primary_names)                  ║
-╚══════════════════════╦═══════════════════════════════════════════════╝
-                       ║
-                       ▼
-╔══════════════════════════════════════════════════════════════════════╗
-║  [Biofilter]  Phase 2 — Pathway → Gene Membership                    ║
-║  Report: entity_relationship_model (Pathways → Genes)                ║
-║    Input : found_pathways                                            ║
-║    Output: pathway_gene_map (one row per pathway-gene link)          ║
-╚══════════════════════╦═══════════════════════════════════════════════╝
-                       ║
-                       ▼
-╔══════════════════════════════════════════════════════════════════════╗
-║  [Pandas]  Phase 3 — Burden Tables                                   ║
-║  Aggregate hits and proportions                                      ║
-║    Output: pathway_table  (per pathway: hit_count, hit_proportion)   ║
-║            gene_table     (per gene: pathway_count, is_exwas_hit)    ║
-╚══════════════════════╦═══════════════════════════════════════════════╝
-                       ║
-                       ▼
-╔══════════════════════════════════════════════════════════════════════╗
-║  [Biofilter]  Phase 4 — Convergence Scoring                          ║
-║  Direct query on entity_relationships + etl_data_sources             ║
-║    Input : ExWAS entity_ids + SOURCE_WEIGHTS                         ║
-║    Output: gene_convergence (per gene: distinct sources, score)      ║
-╚══════════════════════╦═══════════════════════════════════════════════╝
-                       ║
-                       ▼
-╔══════════════════════════════════════════════════════════════════════╗
-║  [Pandas]  Phase 5 — Convergence Roll-up                             ║
-║  Merge convergence into pathway_table and gene_table                 ║
-║    Output: pathway_table  (+ mean_convergence, total_convergence)    ║
-║            gene_table     (+ convergence_score, evidence_sources)    ║
-╚══════════════════════════════════════════════════════════════════════╝
-```
-
-**Example scale** (9 pathway names + 65 ExWAS genes):
-
-| Stage                          | N                          |
-| ------------------------------ | -------------------------- |
-| Input pathway names            | 9                          |
-| Resolved pathways (Phase 1)    | ~16 (fuzzy expansion)      |
-| Total genes in pathways        | ~3,000 unique              |
-| ExWAS hits in resolved set     | ~10–30                     |
-| Final per-pathway summary rows | 16 (one per pathway)       |
-
----
-
-## 3. Data Sources
-
-| Source                     | Content                                        | Used in Phase   |
-| -------------------------- | ---------------------------------------------- | --------------- |
-| Biofilter 4 knowledge base | Entities, aliases, relationships, data sources | All             |
-| Reactome                   | Curated pathways, gene-pathway membership      | 1, 2            |
-| KEGG                       | Curated pathways                               | 2 (if loaded)   |
-| BioGrid                    | Protein-protein interactions                   | 4 (convergence) |
-| MONDO                      | Disease ontology, gene-disease links           | 4 (convergence) |
-| ClinGen                    | Clinical gene-disease curation                 | 4 (convergence) |
-| UniProt                    | Protein-gene encoding, function                | 4 (convergence) |
-| Gene Ontology              | Functional annotation                          | 4 (convergence) |
-
----
-
-## 4. Phase 1 — Pathway Resolution
-
-**Report:** `entity_filter`
-
-- [Report Tutorial link](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter/modules/report/reports_explain/report_entity_filter.md)
-- [Report Example link](https://github.com/RitchieLab/biofilter/blob/biofilter3r/notebooks/Templates/reports__entity_filter.ipynb)
-
-### Input
-
-A list of informal pathway names. These can be partial labels, common names, or formal database names. Examples: `"estrogen signaling"`, `"inflammation"`, `"DNA repair"`.
-
-### Method
-
-The `entity_filter` report performs case-insensitive matching against the alias table for entities in the `Pathways` group. Three modes:
-
-| Mode    | Behavior                                              | When to use                       |
-| ------- | ----------------------------------------------------- | --------------------------------- |
-| `exact` | Match `alias_norm` literally                          | Inputs are known canonical names  |
-| `like`  | Substring match (`%term%` in either direction)        | Inputs are partial labels         |
-| `fuzzy` | rapidfuzz `token_sort_ratio` against all aliases     | Inputs are informal/misspelled   |
-
-`group_filter="Pathways"` ensures matches are scoped to pathway entities only, avoiding cross-domain bleed (e.g., a gene whose alias coincidentally contains "signaling").
-
-### Key parameters
-
-| Parameter              | Value used | Rationale                                                                |
-| ---------------------- | ---------- | ------------------------------------------------------------------------ |
-| `match_mode`           | `fuzzy`    | Tolerant to informal labels common in study writeups                     |
-| `group_filter`         | `Pathways` | Restricts to pathway entities, eliminates cross-group collisions         |
-| `similarity_threshold` | `75`       | Permissive enough to catch substring-style queries (e.g. "alzheimer")    |
-
-### Output (`found_pathways`)
-
-A list of canonical `primary_name` values (Reactome IDs like `R-HSA-111885`). Pathways with `observation == "not found"` are excluded; they are surfaced separately for manual review.
-
----
-
-## 5. Phase 2 — Pathway → Gene Membership
-
-**Report:** `entity_relationship_model`
-
-- [Report Tutorial link](https://github.com/RitchieLab/biofilter/blob/biofilter3r/biofilter/modules/report/reports_explain/report_entity_relationship_model.md)
-
-### Input
-
-`found_pathways` from Phase 1.
-
-### Method
-
-Resolves each pathway entity and traverses one hop in `entity_relationships` filtered by `relationship_type IN ('in_pathway')`. For each pathway, returns every member gene with the supporting `data_source_id`.
-
-### Key parameters
-
-| Parameter              | Value used        | Rationale                                                |
-| ---------------------- | ----------------- | -------------------------------------------------------- |
-| `input_entity_groups`  | `["Pathway"]`     | Treats inputs as pathways                                |
-| `output_entity_groups` | `["Gene"]`        | Returns only gene neighbours                             |
-| `relationship_scope`   | `input_to_any`    | Returns every gene linked to any input pathway           |
-
-### Output (`pathway_gene_map`)
-
-One row per `(pathway, gene)` link, with `data_source_id` for provenance. The same gene may appear under multiple pathways — that's intentional; pathway membership is many-to-many.
-
----
-
-## 6. Phase 3 — Burden Tables
-
-**Engine:** pandas (no Biofilter call)
-
-### Inputs
-
-- `pathway_gene_map` (Phase 2 output)
-- `exwas_genes` (analyst-provided list of significant gene symbols)
-
-### Method
-
-Two grouped aggregations:
-
-**Pathway table.** For each pathway:
-- `total_genes` = distinct genes in the pathway (full membership)
-- `exwas_hit_count` = distinct genes from `exwas_genes` that fall in this pathway
-- `hit_proportion` = `exwas_hit_count / total_genes`
-- `genes` and `exwas_genes` columns hold the explicit lists
-
-**Gene table.** For each gene:
-- `pathway_count` = number of distinct pathways the gene belongs to
-- `pathways` = the list
-- `is_exwas_hit` = boolean flag
-
-### Why hit_proportion matters
-
-Pathways vary in size by orders of magnitude — a pathway with 5 genes versus one with 500. A raw hit count favours large pathways. The proportion normalises this and acts as a crude size-adjusted enrichment.
-
-### Output
-
-`pathway_table` and `gene_table` — both ready for the convergence enrichment in Phase 5.
-
----
-
-## 7. Phase 4 — Convergence Scoring
-
-**Engine:** direct ORM query (no report call)
-
-### Input
-
-- ExWAS gene list (resolved to `entity_id` via `entity_filter`)
-- `SOURCE_WEIGHTS` dict (per-source float; defaults to 1.0 each)
-
-### Method
-
-For each ExWAS gene, query `entity_relationships` for **all** rows where the gene appears as either `entity_1` or `entity_2`, then count distinct `data_source_id` values. The data source ID is mapped to a human-readable name via `etl_data_sources`. The convergence score is the sum of weights for the distinct sources observed:
-
-```
-convergence_score(gene) = Σ_{s ∈ sources(gene)} SOURCE_WEIGHTS[s]
-```
-
-With all weights = 1.0, the score reduces to "count of distinct knowledge bases that mention this gene". Tuning weights lets the analyst bias the score toward curated evidence over inferred evidence, or toward disease-specific sources for clinically motivated hypotheses.
-
-### Default weights
-
-| Source                   | Default weight | Type                       |
-| ------------------------ | -------------- | -------------------------- |
-| `biogrid`                | 1.0            | PPI (inferred + curated)   |
-| `reactome` / `_relationships`             | 1.0            | Curated pathways           |
-| `mondo` / `_relationships`               | 1.0            | Disease ontology           |
-| `clingen`                | 1.0            | Clinical curation (high)   |
-| `uniprot_relationships`  | 1.0            | Protein function           |
-
-Sources not in `SOURCE_WEIGHTS` contribute 0 (silently excluded). Add `gene_ontology`, `kegg_pathways`, `gtex_v10_brain_eqtl`, etc. as needed for the analysis.
-
-### Output (`gene_convergence`)
-
-| Column              | Meaning                                                   |
-| ------------------- | --------------------------------------------------------- |
-| `gene`              | Gene primary symbol                                       |
-| `evidence_sources`  | Sorted list of distinct sources mentioning the gene       |
-| `convergence_count` | Length of `evidence_sources`                              |
-| `convergence_score` | Weighted sum of `SOURCE_WEIGHTS` over `evidence_sources`  |
-
-### Suggested weight calibrations
-
-| Use case                        | Weight bias                                              |
-| ------------------------------- | -------------------------------------------------------- |
-| High-confidence clinical scope  | `clingen=2.0`, `mondo=1.5`, `biogrid=0.5`                |
-| PPI-driven mechanism            | `biogrid=2.0`, `uniprot_relationships=1.5`               |
-| Pathway-centric (default)       | All curated sources = 1.0; inferred sources = 0.5        |
-
----
-
-## 8. Phase 5 — Convergence Roll-up
-
-**Engine:** pandas
-
-### Method
-
-`gene_convergence` is merged into `gene_table` on the gene symbol. Each pathway in `pathway_table` then receives:
-
-- `mean_convergence` = average `convergence_score` over the pathway's ExWAS hits
-- `total_convergence` = sum of `convergence_score` over the pathway's ExWAS hits
-
-`pathway_table` is re-sorted by `total_convergence` descending — pathways whose hits are well-characterised across knowledge bases rank higher.
-
-### Output
-
-The final `pathway_table` carries:
-
-| Column              | Source        | Meaning                                                |
-| ------------------- | ------------- | ------------------------------------------------------ |
-| `pathway_id`        | Phase 2       | Reactome ID                                            |
-| `pathway_name`      | Phase 2       | Pathway primary alias                                  |
-| `total_genes`       | Phase 3       | Pathway size (gene count)                              |
-| `exwas_hit_count`   | Phase 3       | ExWAS genes that hit this pathway                      |
-| `exwas_genes`       | Phase 3       | List of those genes                                    |
-| `hit_proportion`    | Phase 3       | `exwas_hit_count / total_genes`                        |
-| `mean_convergence`  | Phase 5       | Average evidence per ExWAS hit                         |
-| `total_convergence` | Phase 5       | Sum of evidence across ExWAS hits                      |
-
-The combination of `hit_proportion` (size-adjusted enrichment) and `total_convergence` (evidence-weighted hit count) gives a richer ranking than either alone.
-
----
-
-## 9. Implementation Notes
-
-### Software versions
-
-| Tool       | Version          |
-| ---------- | ---------------- |
-| Biofilter  | 4.1.2            |
-| Python     | 3.10+            |
-| SQLAlchemy | 2.x              |
-| PostgreSQL | 15+ (production) |
-| SQLite     | 3.x (local)      |
-| pandas     | ≥ 2.0            |
-| rapidfuzz  | ≥ 3.0            |
-
-### Reproducibility
-
-- All Biofilter report calls log their parameters and elapsed time.
-- The exact `pathway_list`, `exwas_genes`, and `SOURCE_WEIGHTS` are visible in the notebook cells; saving the notebook itself preserves the analysis.
-- The Biofilter database state (which sources are loaded) is queryable via `bf.report.run("etl_status")`.
-
-### Engine support
-
-The pipeline is **engine-agnostic**: every report and ORM call is portable across PostgreSQL and SQLite. Fuzzy matching uses `rapidfuzz` client-side rather than `pg_trgm`.
-
----
-
-## 10. Limitations and Considerations
-
-**Pathway annotation completeness.** Phase 2 retrieves gene membership only from databases ingested into Biofilter 4. Pathways that exist in the source database but not in BF4 (e.g., KEGG variants not loaded) are invisible.
-
-**Convergence ≠ pathogenicity.** A gene with high convergence is well-characterised, not necessarily disease-relevant. The score reflects research attention, not biological causality. Combine with downstream variant-level annotation (gnomAD, AlphaMissense) for clinical interpretation.
-
-**Source weight choices are subjective.** Default weights treat all sources equally, but ClinGen (clinically curated) and BioGrid (high-throughput PPI) carry very different evidence quality. Weight calibration should reflect the analyst's prior on each source. Document the chosen weights when publishing.
-
-**Pathway resolution false positives.** Fuzzy matching with low thresholds (< 70) can pull unrelated pathways. Always inspect the `result_fuzzy` output and prune false matches before proceeding to Phase 2.
-
-**Single-organism scope.** All knowledge sources currently loaded reflect human (Homo sapiens) annotations. The pipeline does not adapt automatically to other species.
-
-**Independence assumption.** The convergence score treats sources as independent evidence, but BioGrid and UniProt share underlying data; MONDO is partly derived from clinical sources. The score is therefore an **upper bound** on truly independent evidence.
-
----
-
-## 11. References
-
-- Jassal B, et al. [The reactome pathway knowledgebase.](https://pubmed.ncbi.nlm.nih.gov/31691815/) _Nucleic Acids Res._ 2020;48(D1):D498–D503.
-- Oughtred R, et al. [The BioGRID interaction database: 2019 update.](https://pubmed.ncbi.nlm.nih.gov/30476227/) _Nucleic Acids Res._ 2019;47(D1):D529–D541.
-- Vasilevsky NA, et al. [Mondo: Unifying diseases for the world, by the world.](https://www.medrxiv.org/content/10.1101/2022.04.13.22273750v3) _medRxiv_ 2022.
-- Rehm HL, et al. [ClinGen — The Clinical Genome Resource.](https://pubmed.ncbi.nlm.nih.gov/26014595/) _N Engl J Med._ 2015;372(23):2235–2242.
-- The UniProt Consortium. [UniProt: the Universal Protein Knowledgebase in 2023.](https://pubmed.ncbi.nlm.nih.gov/36408920/) _Nucleic Acids Res._ 2023;51(D1):D523–D531.
-
----
-
-_Document generated from pipeline implementation in Biofilter 4._
-_Companion notebook:_ `notebooks/Templates/pipeline__pathway_burden_score.ipynb`
-
-
-
-<!-- ===== SOURCE FILE: notebooks/Templates/reports__101.ipynb.md ===== -->
-
-<h1> 📘 Biofilter — Reports 101 </h1>
-
-This notebook is the landing tutorial for the Reports module.
-It covers the core workflow and points to focused notebooks for each report.
-
-## Core Report API
-
-- `bf.report.list()`
-- `bf.report.explain("<report_name>")`
-- `bf.report.available_columns("<report_name>")`
-- `bf.report.example_input("<report_name>")`
-- `bf.report.run("<report_name>", **params)`
-
---------
-
-### 1. Start Biofilter
+### 10. What the run wants you to know
+
+This report proceeds through three situations that can make its answer
+misleading rather than refusing outright. Each is logged when it happens
+**and** recorded in the provenance, because whoever opens the result next
+month does not have the log.
 
 ```python
+small = bf.report.run(REPORT, cohort_file=str(COHORT),
+                     output_grain="bins", maf_cutoff=0.0001)
+
+for warning in small.provenance["warnings"]:
+    print("⚠️ ", warning["message"])
+
+print("\nno warnings on a clean run:",
+      bf.report.run(REPORT, cohort_file=str(COHORT),
+                    output_grain="variants").provenance["warnings"])
+```
+
+### 11. Export
+
+```python
+for path in bins.write(OUTPUT_DIR / "aggregate_cohort_variants.csv"):
+    print(path)
+```
+
+### 12. The same thing on the command line
+
+```bash
+biofilter report run --report-name aggregate_cohort_variants \\
+    --param cohort_file=./cohort.vcf.gz \\
+    --param phenotype_file=./phenotype.csv \\
+    --param output_grain=bins \\
+    --param group_by=gene \\
+    --param maf_cutoff=0.01 \\
+    --param require_full_coverage=true \\
+    --output bins.csv
+```
+
+
+
+<!-- ===== SOURCE FILE: notebooks/templates/reports__annotate_disease.ipynb.md ===== -->
+
+<h1>🩺 Biofilter — Report: <code>annotate_disease</code></h1>
+
+Everything the bundle knows about a list of diseases: MONDO record, groups, cross-references grouped by the source that issued them, and how many genes ClinGen links to the disease.
+
+### 1. Open a bundle
+
+```python
+from pathlib import Path
+
 from biofilter import Biofilter
 
-# Uses db_uri from .biofilter.toml when available
-bf = Biofilter(debug_mode=False)
-```
+# A bundle is a directory — the one holding manifest.json.
+# Leave as None to use `[database] bundle` from .biofilter.toml.
+BUNDLE = None
+REPORT = "annotate_disease"
 
-------
+bf = Biofilter(bundle=BUNDLE, debug_mode=False) if BUNDLE else Biofilter(debug_mode=False)
 
-### 2. List available reports
-
-```python
-reports = bf.report.list()
-print(f"Total reports: {len(reports)}")
-reports
-```
-
-------
-
-### 3. Inspect a stable report (`etl_status`)
-
-```python
-bf.report.explain("etl_status")
-```
-
-```python
-bf.report.available_columns("etl_status")
-```
-
-------
-
-### 4. Run a report (default)
-
-```python
-df = bf.report.run("etl_status")
-print(f"Rows: {len(df)}")
-df.head()
-```
-
-### 5. Run with filters (API params)
-
-```python
-df_filtered = bf.report.run(
-    "etl_status",
-    source_system=["NCBI"],
-    only_active=True,
+# Results land here whatever directory the kernel was started in — VS Code
+# and Jupyter disagree about that, and a bare filename ends up wherever
+# they landed. The project root is the folder holding .biofilter.toml.
+_root = next(
+    (p for p in [Path.cwd(), *Path.cwd().parents] if (p / ".biofilter.toml").is_file()),
+    Path.cwd(),
 )
-print(f"Rows: {len(df_filtered)}")
-df_filtered.head()
-```
+OUTPUT_DIR = _root / "notebooks" / "templates" / "outputs"
+OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
-------
-
-## Next Tutorials (by report)
-
-- `reports__etl_status.ipynb`
-- `reports__etl_packages.ipynb`
-- `reports__entity_filter.ipynb`
-- `reports__db_pg_table_stats.ipynb` (PostgreSQL-only)
-- `reports__db_pg_index_stats.ipynb` (PostgreSQL-only)
-- `reports__variant_molecular_effects.ipynb`
-- `reports__qry_template.ipynb`
-
-
-
-<!-- ===== SOURCE FILE: notebooks/Templates/reports__annotations_master_chemical.ipynb.md ===== -->
-
-<h1> Biofilter - Report: Chemical Master Annotation </h1>
-
-Compact chemical annotation report based on ChemicalMaster.
-Returns identity/properties, optional xref summary, and optional relationship summary.
-
-### 1. Start Biofilter
-
-```python
-from biofilter import Biofilter
-```
-
-```python
-# Production (LPC, read-only):
-# db_uri = "parquet:///project/hall_shared/datasets/biofilter/<YYYYMMDD>/tables"
-# Legacy PostgreSQL server (decommissioned; see lpc__deploy.md Appendix A):
-# db_uri = "postgresql+psycopg2://<user>:<password>@<SERVER_IP>:5432/biofilter_prod"
-db_uri = "postgresql+psycopg2://admin:admin@localhost/biofilter_dev"
-bf = Biofilter(db_uri=db_uri, debug_mode=False)
 bf
 ```
 
-### 2. Inspect report metadata
+### 2. What the report offers
 
 ```python
-report_name = 'annotation_master_chemical'
+print("columns:")
+for column in bf.report.available_columns(REPORT):
+    print(" ", column)
 
-print('name:', report_name)
-print('available columns:')
-print(bf.report.available_columns(report_name))
-
-print('\nexample_input:')
-print(bf.report.example_input(report_name))
-
-print('\nexplain:')
-print(bf.report.explain(report_name))
+print("\nexample input:")
+print(bf.report.example_input(REPORT))
 ```
 
-### 3. Run default mode
+```python
+print(bf.report.explain(REPORT))
+```
+
+### 3. Run it
+
+Diseases resolve by MONDO id, by label, or by a cross-reference code from
+any source the bundle carries.
 
 ```python
-input_chemicals = [
-    'CHEBI:15377',
-    'CHEBI:17234',
-    'water',
-    'NOT_A_CHEMICAL'
+diseases = [
+    "MONDO:0007254",     # breast cancer, by id
+    "Leigh syndrome",    # by label
+    "NOT_A_DISEASE",     # kept, with status='not_found'
 ]
 
-df = bf.report.run(
-    'annotation_master_chemical',
-    input_data=input_chemicals,
-    include_aliases=True,
-    include_xref_summary=True,
-    include_relationships=False,
-    emit_not_found_rows=True,
-)
-
-print('rows:', len(df))
-df.head(20)
+result = bf.report.run(REPORT, input_data=diseases)
+df = result.to_pandas()
+df[["input_value", "disease_id", "disease_label", "omic_status", "status"]]
 ```
 
-```python
-focus_cols = [
-    'input_value',
-    'entity_id',
-    'chemical_id',
-    'chemical_name',
-    'chemical_formula',
-    'chemical_charge',
-    'chemical_mass',
-    'xref_ids_by_source',
-    'status',
-    'note',
-]
+### 4. The two ClinGen numbers
 
-df[[c for c in focus_cols if c in df.columns]].head(50)
+`clingen_gene_count` counts **distinct genes**; `clingen_relationship_count`
+counts assertions. One gene supported by three lines of evidence is one
+gene and three assertions — when they diverge, that is why.
+
+```python
+df[[
+    "input_value",
+    "clingen_gene_count",
+    "clingen_relationship_count",
+    "total_entity_relationships",
+]]
 ```
 
-### 4. Run with relationship summary
+ClinGen's share is not the total. A disease can have thousands of
+relationships — MONDO's own hierarchy, Reactome, BioGRID — and no ClinGen
+genes at all. That means nobody has curated a gene–disease assertion for
+it, not that it has no genetic basis.
+
+### 5. Cross-references, grouped by who issued them
 
 ```python
-df_rel = bf.report.run(
-    'annotation_master_chemical',
-    input_data=input_chemicals,
-    include_aliases=True,
-    include_xref_summary=True,
-    include_relationships=True,
-    emit_not_found_rows=True,
-)
-
-rel_cols = [
-    'input_value',
-    'chemical_id',
-    'entity_relationships_by_group',
-    'total_entity_relationships',
-    'status',
-]
-
-df_rel[[c for c in rel_cols if c in df_rel.columns]].head(50)
+for _, row in df[df["status"] == "ok"].iterrows():
+    print(row["disease_label"])
+    for entry in row["xref_ids_by_source"]:
+        print(f"  {entry['source']:<12} {list(entry['ids'])[:4]}")
+    print("  groups:", list(row["disease_groups"]))
+    print()
 ```
 
+### 6. Every disease in the bundle
+
 ```python
-df_rel.to_csv('annotation_master_chemical.csv', index=False)
-print('Saved: annotation_master_chemical.csv')
+import time
+
+started = time.perf_counter()
+everything = bf.report.run(REPORT, input_data="__ALL__", include_clingen_summary=False)
+catalog = everything.to_pandas()
+
+print(f"{everything.num_rows:,} diseases in {time.perf_counter() - started:.1f}s")
+catalog["status"].value_counts()
 ```
 
-### 5. Schema Check (quick QA)
+### 7. Export
+
+CSV by default, with a `.provenance.json` beside it naming the bundle the ids came from.
 
 ```python
-df_to_check = df_rel if 'df_rel' in globals() else (df if 'df' in globals() else None)
+for path in result.write(OUTPUT_DIR / "annotate_disease.csv"):
+    print(path)
+```
 
-if df_to_check is None:
-    print('No DataFrame found to validate (expected df or df_rel).')
-else:
-    required_cols = [
-        'input_value',
-        'entity_id',
-        'chemical_id',
-        'chemical_name',
-        'status',
-    ]
+### 8. The same thing on the command line
 
-    print('Dtypes:')
-    display(df_to_check.dtypes.to_frame('dtype'))
+```bash
+biofilter report run --report-name annotate_disease \\
+    --input ... \\
+    --output out.csv
+```
 
-    missing_cols = [c for c in required_cols if c not in df_to_check.columns]
-    print('\nMissing required columns:', missing_cols if missing_cols else 'none')
+### 9. Quick QA
 
-    for c in [
-        'entity_id',
-        'chemical_master_id',
-        'chemical_charge',
-        'chemical_structure_id',
-        'chemical_etl_package_id',
-        'total_entity_relationships',
-    ]:
-        if c in df_to_check.columns:
-            print(f'{c} dtype: {df_to_check[c].dtype}')
+```python
+expected = list(bf.report.available_columns(REPORT))
+missing = [c for c in expected if c not in df.columns]
+
+print("missing columns:", missing or "none")
+print("unresolved inputs:", int((df["status"] == "not_found").sum()))
+print("bundle:", result.provenance["bundle_id"])
+display(df.dtypes.to_frame("dtype"))
 ```
 
 
 
-<!-- ===== SOURCE FILE: notebooks/Templates/reports__annotations_master_disease.ipynb.md ===== -->
+<!-- ===== SOURCE FILE: notebooks/templates/reports__annotate_gene.ipynb.md ===== -->
 
-<h1> Biofilter - Report: Disease Master Annotation </h1>
+<h1>🧬 Biofilter — Report: <code>annotate_gene</code></h1>
 
-Compact disease annotation report based on DiseaseMaster.
-Returns MONDO identity, groups/subsets, optional xref summary, optional ClinGen summary, and optional relationship summary.
+Everything the bundle knows about a list of genes, one row per input:
+canonical IDs, HGNC metadata, build 38 coordinates, relationship counts
+by related entity group, and the number of variants inside the gene's
+range.
 
-### 1. Start Biofilter
+Reads the bundle natively (ADR-004). Accepts symbols, aliases, synonyms
+or cross-reference codes, matched case-insensitively.
+
+### 1. Open a bundle
 
 ```python
+from pathlib import Path
+
 from biofilter import Biofilter
-```
 
-```python
-# Production (LPC, read-only):
-# db_uri = "parquet:///project/hall_shared/datasets/biofilter/<YYYYMMDD>/tables"
-# Legacy PostgreSQL server (decommissioned; see lpc__deploy.md Appendix A):
-# db_uri = "postgresql+psycopg2://<user>:<password>@<SERVER_IP>:5432/biofilter_prod"
-db_uri = "postgresql+psycopg2://admin:admin@localhost/biofilter_dev"
-bf = Biofilter(db_uri=db_uri, debug_mode=False)
+BUNDLE = "/Users/andrerico/Works/Sys/biofilter_430/biofilter_data/bundles/20260914" # change this to the path of your biofilter_data bundle
+REPORT = "annotate_gene"
+
+bf = Biofilter(bundle=BUNDLE, debug_mode=False)
+
+# Results land here whatever directory the kernel was started in — VS Code
+# and Jupyter disagree about that, and a bare filename ends up wherever
+# they landed. The project root is the folder holding .biofilter.toml.
+_root = next(
+    (p for p in [Path.cwd(), *Path.cwd().parents] if (p / ".biofilter.toml").is_file()),
+    Path.cwd(),
+)
+OUTPUT_DIR = _root / "notebooks" / "templates" / "outputs"
+OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+
 bf
 ```
 
-### 2. Inspect report metadata
+### 2. What the report offers
 
 ```python
-report_name = 'annotation_master_disease'
+print("columns:")
+for column in bf.report.available_columns(REPORT):
+    print(" ", column)
 
-print('name:', report_name)
-print('available columns:')
-print(bf.report.available_columns(report_name))
-
-print('\nexample_input:')
-print(bf.report.example_input(report_name))
-
-print('\nexplain:')
-print(bf.report.explain(report_name))
-```
-
-### 3. Run default mode (xref + ClinGen summary, no relationships)
-
-```python
-input_diseases = [
-    'MONDO:0019391',
-    'MONDO:0005737',
-    'cystic fibrosis',
-    'NOT_A_DISEASE'
-]
-
-df = bf.report.run(
-    'annotation_master_disease',
-    input_data=input_diseases,
-    include_aliases=True,
-    include_xref_summary=True,
-    include_clingen_summary=True,
-    include_relationships=False,
-    emit_not_found_rows=True,
-)
-
-print('rows:', len(df))
-df.head(20)
+print("\nexample input:")
+print(bf.report.example_input(REPORT))
 ```
 
 ```python
-df.to_csv('annotation_master_disease.csv', index=False)
+print(bf.report.explain(REPORT))
 ```
 
-```python
-focus_cols = [
-    'input_value',
-    'entity_id',
-    'disease_id',
-    'disease_label',
-    'omic_status',
-    'disease_groups',
-    'disease_source_system',
-    'disease_data_source',
-    'xref_ids_by_source',
-    'clingen_gene_count',
-    'clingen_relationship_count',
-    'status',
-    'note',
-]
+### 3. Run it
 
-df[[c for c in focus_cols if c in df.columns]].head(50)
+Any of these resolve to the same gene — symbol, synonym, or code:
+
 ```
-
-### 4. Run with relationship summary
-
-```python
-df_rel = bf.report.run(
-    'annotation_master_disease',
-    input_data=input_diseases,
-    include_aliases=True,
-    include_xref_summary=True,
-    include_clingen_summary=True,
-    include_relationships=True,
-    emit_not_found_rows=True,
-)
-
-rel_cols = [
-    'input_value',
-    'disease_id',
-    'entity_relationships_by_group',
-    'total_entity_relationships',
-    'status',
-]
-
-df_rel[[c for c in rel_cols if c in df_rel.columns]].head(50)
+TP53   p53   HGNC:11998   ENSG00000141510   7157
 ```
-
-```python
-df_rel.to_csv('annotation_master_disease.csv', index=False)
-print('Saved: annotation_master_disease.csv')
-```
-
-### 5. Schema Check (quick QA)
-
-```python
-df_to_check = df_rel if 'df_rel' in globals() else (df if 'df' in globals() else None)
-
-if df_to_check is None:
-    print('No DataFrame found to validate (expected df or df_rel).')
-else:
-    required_cols = [
-        'input_value',
-        'entity_id',
-        'disease_id',
-        'disease_label',
-        'status',
-    ]
-
-    print('Dtypes:')
-    display(df_to_check.dtypes.to_frame('dtype'))
-
-    missing_cols = [c for c in required_cols if c not in df_to_check.columns]
-    print('\nMissing required columns:', missing_cols if missing_cols else 'none')
-
-    for c in ['entity_id', 'disease_master_id', 'clingen_gene_count', 'clingen_relationship_count', 'total_entity_relationships']:
-        if c in df_to_check.columns:
-            print(f'{c} dtype: {df_to_check[c].dtype}')
-```
-
-
-
-<!-- ===== SOURCE FILE: notebooks/Templates/reports__annotations_master_gene.ipynb.md ===== -->
-
-<h1> Biofilter - Report: Gene Master Annotation </h1>
-
-Compact gene annotation report focused on performance.
-Returns canonical IDs, GeneMaster metadata, build38 location, relationship summary, and optional variant counts.
-
-### 1. Start Biofilter
-
-```python
-from biofilter import Biofilter
-```
-
-```python
-# Production (LPC, read-only):
-# db_uri = "parquet:///project/hall_shared/datasets/biofilter/<YYYYMMDD>/tables"
-# Legacy PostgreSQL server (decommissioned; see lpc__deploy.md Appendix A):
-# db_uri = "postgresql+psycopg2://<user>:<password>@<SERVER_IP>:5432/biofilter_prod"
-db_uri = "postgresql+psycopg2://admin:admin@localhost/biofilter_dev"
-bf = Biofilter(db_uri=db_uri, debug_mode=False)
-bf
-```
-
-### 2. Inspect report metadata
-
-```python
-report_name = 'annotation_master_gene'
-
-print('name:', report_name)
-print('available columns:')
-print(bf.report.available_columns(report_name))
-
-print('\nexample_input:')
-print(bf.report.example_input(report_name))
-
-print('\nexplain:')
-print(bf.report.explain(report_name))
-```
-
-> Tip: use `input_data="__ALL__"` to process all genes in `GeneMaster`.
->
-> For performance in full-scan mode, prefer `include_relationships=False` and `include_variant_summary=False`.
-
-### 3. Run default mode (relationships + variant count)
 
 ```python
 input_genes = [
-    # 'TP53',
-    # 'BRCA1',
-    # 'HGNC:1100',
-    # 'ENSG00000141510',
-    # 'NOT_A_GENE'
-    'A4GALT',
-    'AARS1'
-
+    "TP53",
+    "BRCA1",
+    "ENSG00000146648",   # EGFR, by Ensembl id
+    "NOT_A_GENE",        # kept in the output, with status='not_found'
 ]
 
-df = bf.report.run(
-    'annotation_master_gene',
+result = bf.report.run(
+    REPORT,
     input_data=input_genes,
     include_relationships=True,
     include_variant_summary=True,
     emit_not_found_rows=True,
 )
 
-print('rows:', len(df))
-df.head(20)
+df = result.to_pandas()
+print(f"{result.num_rows} rows from bundle {result.provenance['bundle_id']}")
+df[["input_value", "input_matched_alias", "gene_symbol", "entity_id", "status"]]
 ```
 
+### 4. Reading the result
+
+`status` is the first column to look at.
+
+| value | meaning |
+| --- | --- |
+| `ok` | resolved, with a gene record and build 38 coordinates |
+| `partial` | resolved, but something is missing — `note` says what |
+| `not_found` | the bundle has no gene entity for this input |
+
+Unresolved inputs are **kept on purpose**. Dropping them would leave no
+way to tell "absent from this bundle" from "never asked for".
+
 ```python
-df.to_csv('annotation_master_gene_report.csv', index=False)
+df[["input_value", "status", "note"]]
 ```
 
-```python
-focus_cols = [
-    'input_value',
-    'entity_id',
-    'gene_symbol',
-    'hgnc_id',
-    'ensembl_id',
-    'entrez_id',
-    'gene_locus_group',
-    'gene_locus_type',
-    'gene_groups',
-    'build',
-    'chromosome',
-    'start_position',
-    'end_position',
-    'entity_relationships_by_group',
-    'total_entity_relationships',
-    'variant_count_in_gene_range',
-    'status',
-    'note',
-]
+#### Identity and coordinates
 
-df[[c for c in focus_cols if c in df.columns]].head(50)
+```python
+df[[
+    "input_value",
+    "gene_symbol",
+    "hgnc_id",
+    "ensembl_id",
+    "entrez_id",
+    "hgnc_status",
+    "omic_status",
+    "gene_locus_group",
+    "build",
+    "chromosome",
+    "start_position",
+    "end_position",
+]]
 ```
 
-### 4. Performance mode (disable heavy summaries)
+#### Lists: groups, relationships, other aliases
+
+Three columns hold lists rather than scalars. In a DataFrame and in
+parquet they are real lists; exported to CSV they are written as JSON so
+one cell can hold them.
 
 ```python
-df_fast = bf.report.run(
-    'annotation_master_gene',
+for _, row in df[df["status"] != "not_found"].iterrows():
+    print(row["gene_symbol"])
+    print("  gene groups :", list(row["gene_groups"]))
+    print("  relationships:", row["total_entity_relationships"], "total")
+    for entry in row["entity_relationships_by_group"]:
+        print(f"      {entry['group_name']:<12} {entry['count']:>6}")
+    print("  other aliases:", list(row["other_aliases"])[:6])
+    print()
+```
+
+Relationships are counted **in both directions**: a gene appearing on
+either side of a relationship counts it, grouped by what is on the other
+side.
+
+#### `variant_count_in_gene_range`: null is not zero
+
+| value | meaning |
+| --- | --- |
+| a number | the range was searched, and held that many variants |
+| `0` | the range was searched and held none |
+| `NaN` / null | the count was **not made** |
+
+Null happens when the gene has no build 38 range, or when
+`include_variant_summary=False`.
+
+⚠️ A bundle built for a subset of chromosomes returns `0` for every gene
+outside them. That is true of the bundle, not of the genome — check what
+the bundle covers before reading a zero as biology.
+
+```python
+df[["input_value", "chromosome", "start_position", "end_position",
+    "variant_count_in_gene_range"]]
+```
+
+### 5. Lighter modes
+
+`include_relationships` and `include_variant_summary` are the two
+expensive sections. Turning them off is what makes whole-catalog mode
+comfortable.
+
+```python
+fast = bf.report.run(
+    REPORT,
     input_data=input_genes,
     include_relationships=False,
     include_variant_summary=False,
-    emit_not_found_rows=True,
 )
 
-df_fast.head(20)
+fast.to_pandas()[["input_value", "gene_symbol", "hgnc_id", "chromosome", "status"]]
 ```
 
-### 4b. Full catalog mode (`input_data="__ALL__"`)
+### 6. Every gene in the bundle
 
-```python
-df_all = bf.report.run(
-    'annotation_master_gene',
-    input_data='__ALL__',
-    include_relationships=False,
-    include_variant_summary=False,
-    emit_not_found_rows=False,
-)
-
-print('rows:', len(df_all))
-df_all.head(20)
-```
-
-```python
-df_all.to_csv('annotation_master_gene.csv', index=False)
-print('Saved: annotation_master_gene.csv')
-```
-
-### 5. Schema Check (quick QA)
-
-```python
-df_to_check = df if "df" in globals() else (df_fast if "df_fast" in globals() else (df_all if "df_all" in globals() else None))
-
-if df_to_check is None:
-    print("No DataFrame found to validate (expected df, df_fast, or df_all).")
-else:
-    required_cols = [
-        "input_value",
-        "entity_id",
-        "gene_symbol",
-        "hgnc_id",
-        "build",
-        "chromosome",
-        "start_position",
-        "end_position",
-        "status",
-    ]
-
-    print("Dtypes:")
-    display(df_to_check.dtypes.to_frame("dtype"))
-
-    missing_cols = [c for c in required_cols if c not in df_to_check.columns]
-    print("\nMissing required columns:", missing_cols if missing_cols else "none")
-
-    for c in ["entity_id", "build", "chromosome", "start_position", "end_position"]:
-        if c in df_to_check.columns:
-            print(f"{c} dtype: {df_to_check[c].dtype}")
-```
-
-
-
-<!-- ===== SOURCE FILE: notebooks/Templates/reports__annotations_master_go.ipynb.md ===== -->
-
-<h1> Biofilter - Report: GO Master Annotation </h1>
-
-Compact GO annotation report based on GOMaster.
-Returns GO identity, optional GO DAG summary/details, and optional relationship summary.
-
-### 1. Start Biofilter
-
-```python
-from biofilter import Biofilter
-```
-
-```python
-# Production (LPC, read-only):
-# db_uri = "parquet:///project/hall_shared/datasets/biofilter/<YYYYMMDD>/tables"
-# Legacy PostgreSQL server (decommissioned; see lpc__deploy.md Appendix A):
-# db_uri = "postgresql+psycopg2://<user>:<password>@<SERVER_IP>:5432/biofilter_prod"
-db_uri = "postgresql+psycopg2://admin:admin@localhost/biofilter_dev"
-bf = Biofilter(db_uri=db_uri, debug_mode=False)
-bf
-```
-
-### 2. Inspect report metadata
-
-```python
-report_name = 'annotation_master_go'
-
-print('name:', report_name)
-print('available columns:')
-print(bf.report.available_columns(report_name))
-
-print('\nexample_input:')
-print(bf.report.example_input(report_name))
-
-print('\nexplain:')
-print(bf.report.explain(report_name))
-```
-
-### 3. Run default mode (GO relation summary on, details off)
-
-```python
-input_go = [
-    'GO:0006915',
-    'GO:0008150',
-    'NOT_A_GO_TERM'
-]
-
-df = bf.report.run(
-    'annotation_master_go',
-    input_data=input_go,
-    include_aliases=True,
-    include_go_relation_summary=True,
-    include_go_relation_details=False,
-    include_relationships=False,
-    emit_not_found_rows=True,
-)
-
-print('rows:', len(df))
-```
-
-```python
-focus_cols = [
-    'input_value',
-    'entity_id',
-    'go_id',
-    'go_name',
-    'go_namespace',
-    'go_parent_count',
-    'go_child_count',
-    'go_parent_relation_types',
-    'go_child_relation_types',
-    'status',
-    'note',
-]
-
-df[[c for c in focus_cols if c in df.columns]].head(50)
-```
-
-### 4. GO details mode (parent/child GO IDs)
-
-```python
-df_go_details = bf.report.run(
-    'annotation_master_go',
-    input_data=input_go,
-    include_aliases=True,
-    include_go_relation_summary=True,
-    include_go_relation_details=True,
-    max_go_terms_per_side=20,
-    include_relationships=False,
-    emit_not_found_rows=True,
-)
-
-details_cols = [
-    'input_value',
-    'go_id',
-    'go_parent_count',
-    'go_child_count',
-    'go_parent_ids',
-    'go_child_ids',
-]
-
-df_go_details[[c for c in details_cols if c in df_go_details.columns]].head(50)
-```
-
-### 5. Run with relationship summary
-
-```python
-df_rel = bf.report.run(
-    'annotation_master_go',
-    input_data=input_go,
-    include_aliases=True,
-    include_go_relation_summary=True,
-    include_go_relation_details=False,
-    include_relationships=True,
-    emit_not_found_rows=True,
-)
-
-rel_cols = [
-    'input_value',
-    'go_id',
-    'entity_relationships_by_group',
-    'total_entity_relationships',
-    'status',
-]
-
-df_rel[[c for c in rel_cols if c in df_rel.columns]].head(50)
-```
-
-```python
-df_rel.to_csv('annotation_master_go.csv', index=False)
-print('Saved: annotation_master_go.csv')
-```
-
-### 6. Schema Check (quick QA)
-
-```python
-df_to_check = df_rel if 'df_rel' in globals() else (df if 'df' in globals() else None)
-
-if df_to_check is None:
-    print('No DataFrame found to validate (expected df or df_rel).')
-else:
-    required_cols = [
-        'input_value',
-        'entity_id',
-        'go_id',
-        'go_name',
-        'go_namespace',
-        'status',
-    ]
-
-    print('Dtypes:')
-    display(df_to_check.dtypes.to_frame('dtype'))
-
-    missing_cols = [c for c in required_cols if c not in df_to_check.columns]
-    print('\nMissing required columns:', missing_cols if missing_cols else 'none')
-
-    for c in ['entity_id', 'go_master_id', 'go_parent_count', 'go_child_count', 'total_entity_relationships']:
-        if c in df_to_check.columns:
-            print(f'{c} dtype: {df_to_check[c].dtype}')
-```
-
-
-
-<!-- ===== SOURCE FILE: notebooks/Templates/reports__annotations_master_pathway.ipynb.md ===== -->
-
-<h1> Biofilter - Report: Pathway Master Annotation </h1>
-
-Compact pathway annotation report.
-Returns pathway identity, description, pathway origin (source system/data source), optional relationship summary, and compact alias list.
-
-### 1. Start Biofilter
-
-```python
-from biofilter import Biofilter
-```
-
-```python
-# Production (LPC, read-only):
-# db_uri = "parquet:///project/hall_shared/datasets/biofilter/<YYYYMMDD>/tables"
-# Legacy PostgreSQL server (decommissioned; see lpc__deploy.md Appendix A):
-# db_uri = "postgresql+psycopg2://<user>:<password>@<SERVER_IP>:5432/biofilter_prod"
-db_uri = "postgresql+psycopg2://admin:admin@localhost/biofilter_dev"
-bf = Biofilter(db_uri=db_uri, debug_mode=False)
-```
-
-### 2. Inspect report metadata
-
-```python
-report_name = 'annotation_master_pathway'
-
-print('name:', report_name)
-print('available columns:')
-print(bf.report.available_columns(report_name))
-
-print('\nexample_input:')
-print(bf.report.example_input(report_name))
-
-print('\nexplain:')
-print(bf.report.explain(report_name))
-```
-
-### 3. Run default mode (without relationships)
-
-```python
-input_pathways = [
-    # 'R-HSA-109581',
-    # 'hsa00010',
-    # 'Cell cycle',
-    # 'NOT_A_PATHWAY'
-    '__ALL__'
-]
-
-df = bf.report.run(
-    'annotation_master_pathway',
-    input_data=input_pathways,
-    include_relationships=False,
-    include_aliases=True,
-    emit_not_found_rows=True,
-)
-
-print('rows:', len(df))
-df.head(20)
-```
-
-```python
-df.to_csv('annotation_master_pathway.csv', index=False)
-```
-
-```python
-focus_cols = [
-    'input_value',
-    'entity_id',
-    'pathway_id',
-    'pathway_description',
-    'pathway_source_system',
-    'pathway_data_source',
-    'pathway_etl_package_id',
-    'other_aliases',
-    'status',
-    'note',
-]
-
-df[[c for c in focus_cols if c in df.columns]].head(50)
-```
-
-### 4. Run with relationship summary
-
-```python
-df_rel = bf.report.run(
-    'annotation_master_pathway',
-    input_data=input_pathways,
-    include_relationships=True,
-    include_aliases=True,
-    emit_not_found_rows=True,
-)
-
-rel_cols = [
-    'input_value',
-    'pathway_id',
-    'entity_relationships_by_group',
-    'total_entity_relationships',
-    'status',
-]
-
-df_rel[[c for c in rel_cols if c in df_rel.columns]].head(50)
-```
-
-```python
-df_rel.to_csv('annotation_master_pathway.csv', index=False)
-print('Saved: annotation_master_pathway.csv')
-```
-
-### 5. Schema Check (quick QA)
-
-```python
-df_to_check = df_rel if "df_rel" in globals() else (df if "df" in globals() else None)
-
-if df_to_check is None:
-    print("No DataFrame found to validate (expected df or df_rel).")
-else:
-    required_cols = [
-        "input_value",
-        "entity_id",
-        "pathway_id",
-        "pathway_description",
-        "pathway_source_system",
-        "status",
-    ]
-
-    print("Dtypes:")
-    display(df_to_check.dtypes.to_frame("dtype"))
-
-    missing_cols = [c for c in required_cols if c not in df_to_check.columns]
-    print("\nMissing required columns:", missing_cols if missing_cols else "none")
-
-    for c in ["entity_id", "pathway_etl_package_id", "total_entity_relationships"]:
-        if c in df_to_check.columns:
-            print(f"{c} dtype: {df_to_check[c].dtype}")
-```
-
-
-
-<!-- ===== SOURCE FILE: notebooks/Templates/reports__annotations_master_protein.ipynb.md ===== -->
-
-<h1> Biofilter - Report: Protein Master Annotation </h1>
-
-Compact protein annotation report.
-Returns canonical/isoform context, ProteinMaster metadata, optional Pfam summary/details, and optional relationship summary.
-
-### 1. Start Biofilter
-
-```python
-from biofilter import Biofilter
-```
-
-```python
-# Production (LPC, read-only):
-# db_uri = "parquet:///project/hall_shared/datasets/biofilter/<YYYYMMDD>/tables"
-# Legacy PostgreSQL server (decommissioned; see lpc__deploy.md Appendix A):
-# db_uri = "postgresql+psycopg2://<user>:<password>@<SERVER_IP>:5432/biofilter_prod"
-db_uri = "postgresql+psycopg2://admin:admin@localhost/biofilter_dev"
-bf = Biofilter(db_uri=db_uri, debug_mode=False)
-bf
-```
-
-### 2. Inspect report metadata
-
-```python
-report_name = 'annotation_master_protein'
-
-print('name:', report_name)
-print('available columns:')
-print(bf.report.available_columns(report_name))
-
-print('\nexample_input:')
-print(bf.report.example_input(report_name))
-
-print('\nexplain:')
-print(bf.report.explain(report_name))
-```
-
-### 3. Run default mode (Pfam summary on, no relationships)
-
-```python
-input_proteins = [
-    # 'P04637',
-    # 'P04637-2',
-    # 'TP53_HUMAN',
-    # 'NOT_A_PROTEIN'
-    '__ALL__'
-]
-
-df = bf.report.run(
-    'annotation_master_protein',
-    input_data=input_proteins,
-    include_pfam_summary=True,
-    include_pfam_details=False,
-    include_relationships=False,
-    include_aliases=True,
-    emit_not_found_rows=True,
-)
-
-print('rows:', len(df))
-# df.head(20)
-```
-
-```python
-df.to_csv('annotation_master_protein.csv', index=False)
-```
-
-```python
-focus_cols = [
-    'input_value',
-    'entity_id',
-    'canonical_entity_id',
-    'protein_master_id',
-    'protein_id',
-    'input_is_isoform',
-    'input_isoform_accession',
-    'isoform_count',
-    'protein_source_system',
-    'protein_data_source',
-    'pfam_total_count',
-    'pfam_count_by_type',
-    'status',
-    'note',
-]
-
-df[[c for c in focus_cols if c in df.columns]].head(50)
-```
-
-### 4. Pfam details mode (IDs by type)
-
-```python
-df_pfam_details = bf.report.run(
-    'annotation_master_protein',
-    input_data=input_proteins,
-    include_pfam_summary=True,
-    include_pfam_details=True,
-    max_pfam_ids_per_type=20,
-    include_relationships=False,
-    include_aliases=True,
-    emit_not_found_rows=True,
-)
-
-pfam_cols = [
-    'input_value',
-    'protein_id',
-    'pfam_total_count',
-    'pfam_count_by_type',
-    'pfam_ids_by_type',
-]
-
-df_pfam_details[[c for c in pfam_cols if c in df_pfam_details.columns]].head(50)
-```
-
-### 5. Run with relationship summary
-
-```python
-df_rel = bf.report.run(
-    'annotation_master_protein',
-    input_data=input_proteins,
-    include_pfam_summary=True,
-    include_pfam_details=False,
-    include_relationships=True,
-    include_aliases=True,
-    emit_not_found_rows=True,
-)
-
-rel_cols = [
-    'input_value',
-    'protein_id',
-    'entity_relationships_by_group',
-    'total_entity_relationships',
-    'status',
-]
-
-df_rel[[c for c in rel_cols if c in df_rel.columns]].head(50)
-```
-
-```python
-df_rel.to_csv('annotation_master_protein.csv', index=False)
-print('Saved: annotation_master_protein.csv')
-```
-
-### 6. Schema Check (quick QA)
-
-```python
-required_cols = [
-    "input_value",
-    "entity_id",
-    "protein_master_id",
-    "protein_id",
-    "pfam_total_count",
-    "status",
-]
-
-print("Dtypes:")
-display(df_rel.dtypes.to_frame("dtype"))
-
-missing_cols = [c for c in required_cols if c not in df_rel.columns]
-print("\nMissing required columns:", missing_cols if missing_cols else "none")
-
-if "entity_id" in df_rel.columns:
-    print("entity_id dtype:", df_rel["entity_id"].dtype)
-if "protein_master_id" in df_rel.columns:
-    print("protein_master_id dtype:", df_rel["protein_master_id"].dtype)
-if "pfam_total_count" in df_rel.columns:
-    print("pfam_total_count dtype:", df_rel["pfam_total_count"].dtype)
-```
-
-
-
-<!-- ===== SOURCE FILE: notebooks/Templates/reports__annotations_master_variant.ipynb.md ===== -->
-
-# Biofilter — Report: Annotation Master Variant
-
-Full annotation expansion for an input list of variants.
-Returns **one row per variant × transcript annotation**, joining:
-
-| Source | Content |
-|---|---|
-| `variant_masters` | Identity, population frequencies (gnomAD), pathogenicity scores |
-| `variant_molecular_effects` | VEP consequence per transcript (gene, HGVS, LoF, MANE) |
-| `variant_effect_predictions` | AlphaMissense score + classification |
-
-Complements the annotation master family (`annotation_master_gene`, `annotation_master_pathway`, …)
-with a **variant-centric** view.
-
-See the explain guide: `biofilter/modules/report/reports_explain/report_annotation_master_variant.md`
-
-### 1. Start Biofilter
-
-```python
-from biofilter import Biofilter
-
-bf = Biofilter(debug_mode=False)
-bf
-```
-
-### 2. Inspect report metadata
-
-```python
-report_name = 'annotation_master_variant'
-
-print('name:', report_name)
-print('\navailable columns:')
-print(bf.report.available_columns(report_name))
-
-print('\nexample_input:')
-print(bf.report.example_input(report_name))
-
-print('\nexplain:')
-print(bf.report.explain(report_name))
-```
-
-### 3. Basic run — rsID, chr:pos, and chr:pos:ref:alt inputs
-
-Three input formats can be mixed in the same list:
-
-| Format | Example | Behavior |
-|---|---|---|
-| **rsID** | `rs429358` | dbSNP lookup |
-| **chr:pos** | `chr19:44908684` | All alleles at the position (SNVs only) |
-| **chr:pos:ref:alt** | `chr19:44908684:T:C` | Only the exact ref/alt variant (SNV or indel) |
-
-Use `chr:pos:ref:alt` for credible-set / fine-mapping variants to avoid multiallelic ambiguity.
-
-```python
-input_variants = [
-    'rs429358',                # APOE ε4 allele
-    'rs7412',                  # APOE ε2 allele
-    'rs11591147',              # PCSK9 R46L (loss-of-function)
-    'chr19:44908684',          # chr:pos — returns ALL alleles at this position
-    'chr19:44908684:T:C',      # chr:pos:ref:alt — returns ONLY this exact allele
-]
-
-df = bf.report.run(
-    'annotation_master_variant',
-    input_data=input_variants,
-)
-
-print(f'Total rows (variant × transcript): {len(df):,}')
-print(f'Unique variants: {df["variant_id"].nunique()}')
-df.head(10)
-```
-
-#### 3b. Focus view — key columns
-
-```python
-focus_cols = [
-    'input_value', 'rsid', 'chromosome', 'position_start',
-    'af', 'cadd_phred',
-    'gene_symbol', 'transcript_id',
-    'consequence_name', 'impact_name',
-    'is_most_severe_for_variant', 'canonical', 'mane_select',
-    'hgvsc', 'hgvsp',
-    'lof_confidence',
-    'alphamissense_score', 'alphamissense_classification',
-]
-
-df[focus_cols].head(30)
-```
-
-### 4. Most-severe transcript only
-
-`most_severe_only=True` keeps one row per variant — the transcript annotation with the highest severity.
-Useful for quick summary tables and for joining with GWAS results.
-
-```python
-df_severe = bf.report.run(
-    'annotation_master_variant',
-    input_data=input_variants,
-    most_severe_only=True,
-)
-
-print(f'Rows with most_severe_only: {len(df_severe)} (one per variant)')
-
-cols = [
-    'rsid', 'chromosome', 'position_start', 'af',
-    'cadd_phred', 'revel_max', 'spliceai_ds_max',
-    'gene_symbol', 'consequence_name', 'impact_name',
-    'lof_confidence', 'hgvsp',
-    'alphamissense_score', 'alphamissense_classification',
-]
-df_severe[cols]
-```
-
-### 5. Canonical transcript only
-
-`canonical_only=True` restricts annotations to the canonical transcript per gene.
-MANE Select is the preferred choice; canonical is the fallback.
-
-```python
-df_canon = bf.report.run(
-    'annotation_master_variant',
-    input_data=input_variants,
-    canonical_only=True,
-)
-
-print(f'Rows (canonical only): {len(df_canon)}')
-df_canon[focus_cols].head(20)
-```
-
-#### 5b. MANE Select rows
-
-```python
-mane = df[df['mane_select'] == True]
-print(f'MANE Select annotations: {len(mane)}')
-mane[['rsid', 'gene_symbol', 'transcript_id', 'consequence_name', 'hgvsc', 'hgvsp']].head(20)
-```
-
-### 6. Exploring the full annotation
-
-With the full (unfiltered) DataFrame, inspect the annotation landscape across all transcripts.
-
-```python
-import matplotlib.pyplot as plt
-import pandas as pd
-
-# Consequence distribution
-if 'consequence_name' in df.columns and df['consequence_name'].notna().any():
-    fig, axes = plt.subplots(1, 2, figsize=(14, 4))
-
-    csq_counts = df['consequence_name'].value_counts().head(15)
-    csq_counts.plot(kind='barh', ax=axes[0], color='steelblue')
-    axes[0].set_title('Consequence terms (top 15)')
-    axes[0].invert_yaxis()
-
-    impact_counts = df['impact_name'].value_counts()
-    impact_counts.plot(kind='bar', ax=axes[1], color=['#d73027', '#fc8d59', '#fee090', '#91bfdb'][:len(impact_counts)])
-    axes[1].set_title('VEP impact distribution')
-    axes[1].set_xticklabels(axes[1].get_xticklabels(), rotation=0)
-
-    plt.tight_layout()
-    plt.show()
-```
-
-```python
-# Pathogenicity scores — one row per variant (most severe)
-score_cols = ['rsid', 'cadd_phred', 'revel_max', 'spliceai_ds_max', 'pangolin_largest_ds', 'sift_max', 'polyphen_max']
-df_scores = df[df['is_most_severe_for_variant'] == True][score_cols].drop_duplicates('rsid')
-
-print('Pathogenicity scores (one row per variant):')
-display(df_scores)
-```
-
-```python
-# AlphaMissense coverage
-am_available = df[df['alphamissense_score'].notna()]
-print(f'Rows with AlphaMissense: {len(am_available)} / {len(df)}')
-
-if not am_available.empty:
-    print('\nAlphaMissense classifications:')
-    display(am_available['alphamissense_classification'].value_counts())
-
-    print('\nDetailed:')
-    display(am_available[[
-        'rsid', 'gene_symbol', 'transcript_id',
-        'alphamissense_score', 'alphamissense_classification',
-        'hgvsp',
-    ]])
-```
-
-### 7. Filter: LoF variants (HC)
-
-High-confidence Loss-of-Function variants: `lof_confidence == 'HC'`.
-
-```python
-df_lof = df[df['lof_confidence'] == 'HC'].copy()
-
-print(f'LoF HC annotations: {len(df_lof)}')
-
-lof_cols = [
-    'rsid', 'gene_symbol', 'transcript_id',
-    'consequence_name', 'impact_name',
-    'lof_confidence', 'lof_filter',
-    'hgvsc', 'hgvsp',
-    'af', 'cadd_phred',
-    'canonical', 'mane_select',
-]
-df_lof[lof_cols]
-```
-
-### 8. Filter: HIGH impact on canonical transcript
-
-Canonical HIGH-impact annotations — typically the most clinically relevant rows.
-
-```python
-df_high = df[
-    (df['impact_name'] == 'HIGH') &
-    (df['canonical'] == True)
-].copy()
-
-print(f'HIGH impact on canonical transcript: {len(df_high)}')
-df_high[[
-    'rsid', 'gene_symbol', 'transcript_id',
-    'consequence_name', 'hgvsc', 'hgvsp',
-    'lof_confidence', 'af', 'cadd_phred',
-    'alphamissense_score', 'alphamissense_classification',
-]].head(30)
-```
-
-### 9. Annotation summary per variant
-
-Compact one-row-per-variant summary with counts and top annotations.
-
-```python
-def _first(series):
-    vals = series.dropna()
-    return vals.iloc[0] if not vals.empty else None
-
-summary = (
-    df.groupby(['variant_id', 'rsid', 'chromosome', 'position_start'])
-    .agg(
-        af=('af', _first),
-        cadd_phred=('cadd_phred', _first),
-        revel_max=('revel_max', _first),
-        spliceai_ds_max=('spliceai_ds_max', _first),
-        n_transcripts=('transcript_id', 'nunique'),
-        n_genes=('gene_symbol', 'nunique'),
-        worst_consequence=('consequence_name', _first),
-        worst_impact=('impact_name', _first),
-        lof_confidence=('lof_confidence', _first),
-        alphamissense_score=('alphamissense_score', _first),
-        alphamissense_classification=('alphamissense_classification', _first),
-    )
-    .reset_index()
-    .sort_values(['chromosome', 'position_start'])
-)
-
-print(f'Summary: {len(summary)} variants')
-display(summary)
-```
-
-### 10. Input from file
-
-```python
-from pathlib import Path
-
-tmp_dir = Path('tmp/annotation_master_variant_tutorial')
-tmp_dir.mkdir(parents=True, exist_ok=True)
-
-input_file = tmp_dir / 'variants.txt'
-input_file.write_text('rs429358\nrs7412\nrs11591147\n')
-
-df_file = bf.report.run(
-    'annotation_master_variant',
-    input_data=str(input_file),
-    most_severe_only=True,
-)
-
-print(f'Rows from file (most_severe_only): {len(df_file)}')
-df_file[focus_cols]
-```
-
-### 11. Not-found and invalid inputs
-
-The report gracefully handles unknown variants and malformed inputs via `status` and `note`.
-
-```python
-df_mixed = bf.report.run(
-    'annotation_master_variant',
-    input_data=[
-        'rs429358',              # valid rsID
-        'rs9999999999',          # rsID not in DB
-        'not_a_variant',         # invalid format
-        'chr19:44908684',        # valid chr:pos
-        'chr19:44908684:T:C',    # valid chr:pos:ref:alt
-        'chr1:100000:N:G',       # invalid base (N) — rejected
-    ],
-    most_severe_only=True,
-)
-
-display(df_mixed[['input_value', 'rsid', 'gene_symbol', 'consequence_name', 'status', 'note']])
-```
-
-### 12. Export
-
-```python
-# Full annotation (all transcripts)
-out_full = tmp_dir / 'annotation_master_variant_full.csv'
-df.to_csv(out_full, index=False)
-print(f'Full  → {out_full}  ({len(df):,} rows)')
-
-# Most-severe only (one row per variant)
-out_severe = tmp_dir / 'annotation_master_variant_most_severe.csv'
-df_severe.to_csv(out_severe, index=False)
-print(f'Most severe → {out_severe}  ({len(df_severe):,} rows)')
-```
-
-### 13. Running on the UPenn LPC (Apptainer)
-
-For users without local DB access, this report runs end-to-end on the **Penn LPC** cluster using the
-pre-built Apptainer image. The image bundles BF4 + PostgreSQL — no `.biofilter.toml`, no DB credentials,
-no Python environment to set up. You hand it an input file and a destination CSV path; it gives you back
-the annotated table.
-
-> **When to use the LPC/HPC**
-> - You don't want to manage the BF4 environment locally.
-> - You're already on the cluster running other genomics workflows.
-
-See also:
-- [`lpc__quickstart.md`](lpc__quickstart.md) — copy-paste minimal recipe for first-time users
-- [`lpc__deploy.md`](lpc__deploy.md) — maintainer guide for installing / updating the LPC image and DB
-
-#### 13a. Basic call — one input file → one CSV
-
-This is the smallest working invocation. The temp dir is needed because the image
-starts its own PostgreSQL inside the container; the bind mounts give it scratch space.
-Everything in `$WORKSPACE` is visible inside the container as `/workspace`.
-
-```bash
-module load apptainer
-export WORKSPACE=/project/<your-project>/bf4_runs
-
-TMP=$(mktemp -d) && mkdir -p "$TMP/tmp" "$TMP/pg-run" && \
-apptainer run --writable-tmpfs --pwd /tmp \
-  --bind /project/hall_shared/biofilter/databases/20260514/pgdata:/var/lib/postgresql/data \
-  --bind "$TMP/tmp:/tmp" \
-  --bind "$TMP/pg-run:/var/run/postgresql" \
-  --bind "$WORKSPACE:/workspace" \
-  /project/hall_shared/biofilter/images/bf4-hpc-4.1.2.sif \
-  biofilter report run \
-    --name annotation_master_variant \
-    --input-file /workspace/variants.txt \
-    --output /workspace/variant_annotations.csv && \
-rm -rf "$TMP"
-```
-
-Result: `$WORKSPACE/variant_annotations.csv`.
-
-#### 13b. Prepare the input file
-
-The file is plain text — one variant per line. Mix formats freely:
-
-```bash
-cat > "$WORKSPACE/variants.txt" <<'EOF'
-rs429358
-rs7412
-chr19:44908684
-chr19:44908684:T:C
-1:6203732:A:G
-EOF
-```
-
-The single-quoted `<<'EOF'` heredoc preserves everything literally, including the colons in
-`chr:pos:ref:alt`. For credible-set TSVs already in `chr:pos:ref:alt` form, just pipe the
-relevant column straight in.
-
-#### 13c. Passing parameters — `most_severe_only`, `canonical_only`
-
-The CLI accepts `--param KEY=VALUE`, but **the shell inside the container eats double quotes**,
-so JSON values like `["Pathway"]` break. The robust pattern is a JSON file referenced via
-`--params-file`:
-
-```bash
-cat > "$WORKSPACE/annot_params.json" <<'EOF'
-{
-  "most_severe_only": true,
-  "canonical_only": true
-}
-EOF
-
-TMP=$(mktemp -d) && mkdir -p "$TMP/tmp" "$TMP/pg-run" && \
-apptainer run --writable-tmpfs --pwd /tmp \
-  --bind /project/hall_shared/biofilter/databases/20260514/pgdata:/var/lib/postgresql/data \
-  --bind "$TMP/tmp:/tmp" \
-  --bind "$TMP/pg-run:/var/run/postgresql" \
-  --bind "$WORKSPACE:/workspace" \
-  /project/hall_shared/biofilter/images/bf4-hpc-4.1.2.sif \
-  biofilter report run \
-    --name annotation_master_variant \
-    --input-file /workspace/variants.txt \
-    --params-file /workspace/annot_params.json \
-    --output /workspace/variant_annotations_compact.csv && \
-rm -rf "$TMP"
-```
-
-Combine `most_severe_only=true` + `canonical_only=true` for a compact **1 row per variant on the
-canonical transcript** output — ideal for downstream merging with GWAS / credible-set tables.
-
-
-
-<!-- ===== SOURCE FILE: notebooks/Templates/reports__annotations_variant_regulatory_evidence.ipynb.md ===== -->
-
-# 📘 Biofilter — Report: Annotation Variant Regulatory Evidence
-
-**Variant ↔ gene regulatory evidence (eQTL / sQTL).**
-
-This report annotates variants with gene-regulatory evidence stored in `variant_gene_regulatory_evidence`. It accepts three input modes selected via `--param input_type`:
-
-- **`gene`** — list of gene symbols (HGNC), Ensembl IDs, Entrez IDs, or any alias resolvable via `entity_aliases`. Resolves to gene region and pulls variants in `[start - flanking_bp, end + flanking_bp]`.
-- **`coord`** — list of `chr:pos` coordinates. Pulls variants in `[pos - flanking_bp, pos + flanking_bp]`.
-- **`rsid`** — list of dbSNP rsids. Direct lookup against `variant_masters.rsid` (scans all chromosome partitions; small input lists only).
-
-Each emitted row joins a variant to one row of `variant_gene_regulatory_evidence` — i.e. one tissue × one regulated gene × one qtl_type per row.
-
-Output is **gene-centric**: every row carries:
-- the eQTL **target** gene (the gene the variant regulates, from the eQTL table)
-- the **position** gene (the gene whose body contains the variant, resolved via `entity_locations`)
-
-These two genes can differ, since cis-eQTLs in GTEx reach up to ±1 Mb of the TSS — a variant inside gene A may regulate gene B in cis.
-
----
-
-### Methods used
-- `bf.report.explain("annotation_variant_regulatory_evidence")`
-- `bf.report.example_input("annotation_variant_regulatory_evidence")`
-- `bf.report.run("annotation_variant_regulatory_evidence", **params)`
-
-### Required upstream data
-- A regulatory-evidence DTP must have populated `variant_gene_regulatory_evidence`. The default is GTEx v10 brain (`dtp_variant_eqtl_gtex`).
-
----
-
-### 1. Start Biofilter
-
-```python
-from biofilter import Biofilter
-
-bf = Biofilter(debug_mode=False)
-```
-
----
-
-### 2. Inspect the report contract
-
-`explain()` documents every parameter; `example_input()` returns a ready-to-tweak dict with all defaults.
-
-```python
-print(bf.report.explain("annotation_variant_regulatory_evidence"))
-```
-
-```python
-# Full parameter template with defaults
-bf.report.example_input("annotation_variant_regulatory_evidence")
-```
-
----
-
-### 3. Run with built-in example input
-
-Default example: `input_data=["APOE"]`, `input_type="gene"`, no filters.
-Returns one row per (variant × tissue × regulated gene) overlapping the APOE locus.
+`input_data="__ALL__"` annotates every gene entity instead of a list.
 
 ```python
 import time
 
-start = time.time()
-df = bf.report.run_example("annotation_variant_regulatory_evidence")
-elapsed = time.time() - start
+started = time.perf_counter()
+everything = bf.report.run(REPORT, input_data="__ALL__")
+elapsed = time.perf_counter() - started
 
-print(
-    f"Rows: {len(df)} | "
-    f"Unique variants: {df['variant_id'].nunique()} | "
-    f"Tissues: {df['bio_context'].nunique()} | "
-    f"elapsed: {elapsed:.2f}s"
-)
-df.head()
+catalog = everything.to_pandas()
+print(f"{everything.num_rows:,} genes in {elapsed:.1f}s")
+print(catalog["status"].value_counts().to_dict())
 ```
 
 ```python
-# The 5 gene columns side by side — to see when input/position/eqtl-target diverge
-gene_cols = [
-    "input_gene_symbol",
-    "position_gene_symbol", "position_gene_ensembl",
-    "eqtl_target_symbol", "eqtl_target_ensembl",
-]
-df[[c for c in gene_cols if c in df.columns]].head(20)
-```
-
----
-
-### 4. Gene mode — multiple AD-relevant genes, brain cortex only
-
-Filter to a single tissue (`Brain_Cortex`) and request a small `max_rows` for a quick preview.
-
-```python
-df_cortex = bf.report.run(
-    "annotation_variant_regulatory_evidence",
-    # input_data=["APOE", "APP", "PSEN1", "PSEN2", "BIN1", "CLU", "TOMM40"],
-    input_data=["APOE"],
-    input_type="gene",
-    # tissue="Brain_Cortex",
-    max_rows=2000,
-)
-
-print(
-    f"Rows: {len(df_cortex)} | "
-    f"Unique variants: {df_cortex['variant_id'].nunique()} | "
-    f"Input genes resolved: {df_cortex['input_gene_symbol'].nunique()}"
-)
-df_cortex.groupby("input_gene_symbol")["variant_id"].nunique().rename("variants_with_eqtl").reset_index()
+# Genes with no build 38 location are the 'partial' ones, and they are
+# also exactly the rows whose variant count is null.
+partial = catalog[catalog["status"] == "partial"]
+print(f"{len(partial):,} without a build 38 location")
+print(f"{catalog['variant_count_in_gene_range'].isna().sum():,} with a null variant count")
 ```
 
 ```python
-# Rows where the variant regulates a *different* gene than the one it sits inside.
-# These are the biologically interesting cis-eQTL events worth flagging.
-diverged = df_cortex[
-    df_cortex["position_gene_symbol"].notna()
-    & df_cortex["eqtl_target_symbol"].notna()
-    & (df_cortex["position_gene_symbol"] != df_cortex["eqtl_target_symbol"])
-]
-print(f"Variants regulating a neighboring gene: {len(diverged)} rows / {diverged['variant_id'].nunique()} unique variants")
-diverged[
-    ["rsid", "position_gene_symbol", "eqtl_target_symbol", "bio_context", "beta", "p_value"]
-].sort_values("p_value").head(20)
+# What the bundle actually covers, which is what a zero above means.
+covered = catalog.dropna(subset=["variant_count_in_gene_range"])
+covered.groupby("chromosome")["variant_count_in_gene_range"].agg(
+    genes="size", with_variants=lambda s: int((s > 0).sum())
+).sort_values("with_variants", ascending=False).head(10)
 ```
 
----
+### 7. Export
 
-### 5. `flanking_bp` — extend the gene region for cis-window queries
-
-GTEx cis-eQTLs reach up to ±1 Mb of the TSS. `flanking_bp=0` (the default) only captures evidence on variants **inside** the gene body. Bumping `flanking_bp` recovers the full cis-window.
-
-```python
-df_apoe_strict = bf.report.run(
-    "annotation_variant_regulatory_evidence",
-    input_data=["APOE"],
-    input_type="gene",
-    flanking_bp=0,
-)
-
-df_apoe_500k = bf.report.run(
-    "annotation_variant_regulatory_evidence",
-    input_data=["APOE"],
-    input_type="gene",
-    flanking_bp=500_000,
-)
-
-df_apoe_1mb = bf.report.run(
-    "annotation_variant_regulatory_evidence",
-    input_data=["APOE"],
-    input_type="gene",
-    flanking_bp=1_000_000,
-)
-
-print(f"flanking_bp=0      → {df_apoe_strict['variant_id'].nunique()} unique variants, {len(df_apoe_strict)} evidence rows")
-print(f"flanking_bp=500kb  → {df_apoe_500k['variant_id'].nunique()} unique variants, {len(df_apoe_500k)} evidence rows")
-print(f"flanking_bp=1Mb    → {df_apoe_1mb['variant_id'].nunique()} unique variants, {len(df_apoe_1mb)} evidence rows")
-```
-
----
-
-### 6. Coord mode — chr:pos lookup
-
-Useful when you have a position from external GWAS/QTL output and want to know what regulatory evidence BF4 has at that locus.
+CSV is the default. The `.provenance.json` written beside it records
+which bundle the ids came from — necessary, because `entity_id` means a
+different gene in the next build.
 
 ```python
-# Famous APOE-ε4 defining variant: rs429358 = chr19:44908684 (GRCh38)
-df_coord = bf.report.run(
-    "annotation_variant_regulatory_evidence",
-    input_data=["chr19:44908684"],
-    input_type="coord",
-    flanking_bp=0,   # exact position
-)
-
-print(f"Rows: {len(df_coord)} | Unique variants: {df_coord['variant_id'].nunique()}")
-df_coord[[
-    "input_term", "rsid", "position_gene_symbol", "eqtl_target_symbol",
-    "bio_context", "beta", "p_value",
-]].head(20)
+for path in everything.write(OUTPUT_DIR / "annotate_gene.csv"):
+    print(path)
 ```
 
 ```python
-# Same coord, but expand to ±10 kb to pick up neighboring variants with eQTL evidence
-df_coord_window = bf.report.run(
-    "annotation_variant_regulatory_evidence",
-    input_data=["chr19:44908684"],
-    input_type="coord",
-    flanking_bp=10_000,
-)
-
-print(
-    f"flanking_bp=10kb → {df_coord_window['variant_id'].nunique()} unique variants "
-    f"with regulatory evidence in this region"
-)
-df_coord_window[[
-    "rsid", "position_start", "position_gene_symbol", "eqtl_target_symbol",
-    "bio_context", "p_value",
-]].sort_values("p_value").head(15)
+# Parquet keeps the list columns as lists, and carries the provenance in
+# the file's own metadata.
+everything.write(OUTPUT_DIR / "annotate_gene.parquet")
 ```
 
----
-
-### 7. rsid mode — direct lookup
-
-Pass one or many rsids. The query scans every chromosome partition using each partition's `rsid` index — fine for small input lists, expensive for >10K rsids in a single call.
-
-```python
-df_rsids = bf.report.run(
-    "annotation_variant_regulatory_evidence",
-    input_data=["rs429358", "rs7412", "rs6859"],
-    input_type="rsid",
-)
-
-print(f"Rows: {len(df_rsids)} | Unique rsids resolved: {df_rsids['rsid'].nunique()}")
-df_rsids[[
-    "input_term", "rsid", "chromosome", "position_start",
-    "position_gene_symbol", "eqtl_target_symbol",
-    "bio_context", "beta", "p_value",
-]].sort_values(["input_term", "p_value"]).head(20)
-```
-
----
-
-### 8. Tissue filter — multiple brain regions
-
-`tissue` accepts a CSV-string or a list. Useful for asking: "is this eQTL active in cortex AND hippocampus, or just one of them?"
-
-```python
-df_multi_tissue = bf.report.run(
-    "annotation_variant_regulatory_evidence",
-    input_data=["APOE"],
-    input_type="gene",
-    tissue=["Brain_Cortex", "Brain_Hippocampus", "Brain_Frontal_Cortex_BA9"],
-)
-
-df_multi_tissue.groupby("bio_context")["variant_id"].nunique().rename("variants").reset_index()
-```
-
-```python
-# Variants that are eQTLs across ALL three tissues
-shared = (
-    df_multi_tissue.groupby("variant_id")["bio_context"].nunique()
-    .loc[lambda s: s == 3]
-    .index
-)
-df_shared = df_multi_tissue[df_multi_tissue["variant_id"].isin(shared)]
-print(f"Shared across all 3 tissues: {len(shared)} variants")
-df_shared[["rsid", "bio_context", "eqtl_target_symbol", "beta", "p_value"]].sort_values(
-    ["rsid", "bio_context"]
-).head(20)
-```
-
----
-
-### 9. Significance filter — `p_value_max`
-
-GTEx significant_pairs is already pre-filtered, but you can tighten further to focus on the strongest associations.
-
-```python
-df_strong = bf.report.run(
-    "annotation_variant_regulatory_evidence",
-    input_data=["APOE", "BIN1", "CLU"],
-    input_type="gene",
-    # tissue="Brain_Cortex",
-    p_value_max=1e-10,
-)
-
-print(f"p_value ≤ 1e-10 → {df_strong['variant_id'].nunique()} unique variants, {len(df_strong)} rows")
-df_strong[["rsid", "position_gene_symbol", "eqtl_target_symbol", "beta", "p_value"]].sort_values(
-    "p_value"
-).head(15)
-```
-
----
-
-### 10. Inspecting `details` — auxiliary fields preserved as JSON
-
-The DTP packs source-specific extras (`af`, `ma_samples`, `tss_distance`, `pval_beta`, `gene_id_versioned`, etc.) into `details` as JSON. Easy to expand into columns when needed.
-
-```python
-import json
-import pandas as pd
-
-df_details = bf.report.run(
-    "annotation_variant_regulatory_evidence",
-    input_data=["APOE"],
-    input_type="gene",
-    # tissue="Brain_Cortex",
-    max_rows=20,
-)
-
-expanded = pd.json_normalize(df_details["details"].dropna().apply(json.loads))
-expanded.head()
-```
-
----
-
-### 11. Resolution failure handling
-
-Failure cases return a single-row DataFrame with a non-null `resolution_status` — the report never raises.
-
-```python
-cases = [
-    ("unknown gene",   {"input_data": ["NOTAREALGENE99"],   "input_type": "gene"}),
-    ("unknown rsid",   {"input_data": ["rs9999999999"],     "input_type": "rsid"}),
-    ("bad coord",      {"input_data": ["chrZZ:abc"],         "input_type": "coord"}),
-    ("empty input",    {"input_data": [],                    "input_type": "gene"}),
-]
-
-for label, params in cases:
-    try:
-        result = bf.report.run("annotation_variant_regulatory_evidence", **params)
-        status = result["resolution_status"].iloc[0]
-        rows = len(result)
-        print(f"{label:<20} → status={status!r}  rows={rows}")
-    except Exception as exc:
-        print(f"{label:<20} → raised: {type(exc).__name__}: {exc}")
-```
-
----
-
-### 12. CLI reference
+### 8. The same thing on the command line
 
 ```bash
-# ── Single gene, default everything
-biofilter report run \
-  --report-name annotation_variant_regulatory_evidence \
-  --input "APOE" \
-  --param input_type=gene
-
-# ── Multiple genes, single tissue
-biofilter report run \
-  --report-name annotation_variant_regulatory_evidence \
-  --input "APOE,BIN1,CLU,TOMM40" \
-  --param input_type=gene \
-  --param tissue=Brain_Cortex \
-  --param max_rows=5000
-
-# ── Gene + cis-window 1Mb + significance filter
-biofilter report run \
-  --report-name annotation_variant_regulatory_evidence \
-  --input "APOE" \
-  --param input_type=gene \
-  --param flanking_bp=1000000 \
-  --param p_value_max=1e-8
-
-# ── Single rsid
-biofilter report run \
-  --report-name annotation_variant_regulatory_evidence \
-  --input "rs429358" \
-  --param input_type=rsid
-
-# ── Coord, tight window
-biofilter report run \
-  --report-name annotation_variant_regulatory_evidence \
-  --input "chr19:44908684" \
-  --param input_type=coord \
-  --param flanking_bp=1000
-
-# ── Save output
-biofilter report run \
-  --report-name annotation_variant_regulatory_evidence \
-  --input "APOE,BIN1,CLU" \
-  --param input_type=gene \
-  --param tissue=Brain_Cortex \
-  --output apoe_region_eqtls.csv
-
-# ── Inspect params template
-biofilter report run \
-  --report-name annotation_variant_regulatory_evidence \
-  --params-template
-
-# ── Read the explain doc
-biofilter report explain --report-name annotation_variant_regulatory_evidence
+biofilter --bundle /path/to/bundles/20260914 report run \
+    --report-name annotate_gene \
+    --input TP53 --input BRCA1 \
+    --param include_variant_summary=false \
+    --output genes.csv
 ```
 
----
+`--input-file genes.txt` takes one value per line.
 
-### 13. Practical tips
-
-- **`flanking_bp` matters for eQTLs.** Default `0` returns evidence only on variants **inside** the gene body. For typical cis-eQTL questions, use `flanking_bp=500_000` or `1_000_000`.
-- **`position_gene` vs `eqtl_target` divergence is the interesting signal.** Rows where they differ point to distal regulators (variant in gene A, but eQTL of gene B).
-- **`tissue` filter is cheap** — pushed to SQL. Use it freely.
-- **rsid mode without chromosome hint scans 25 partitions.** OK for tens to hundreds of rsids; for huge lists prefer pre-resolving to coord and using `coord` mode.
-- **`max_rows` is a hard cap, not a sample.** If you hit it, narrow down with `tissue` / `p_value_max` rather than just raising the cap.
-- **Schema dependency:** this report needs `variant_gene_regulatory_evidence` populated. As of 4.1.x the only loader is `dtp_variant_eqtl_gtex` (GTEx v10 brain — 13 tissues).
-
-
-
-<!-- ===== SOURCE FILE: notebooks/Templates/reports__db_pg_index_stats.ipynb.md ===== -->
-
-<h1> 📘 Biofilter — Report: PostgreSQL Index Stats </h1>
-
-PostgreSQL-only index observability report (size, properties, usage).
-
-### 1. Start Biofilter
+### 9. Quick QA
 
 ```python
+expected = list(bf.report.available_columns(REPORT))
+missing = [c for c in expected if c not in df.columns]
+
+print("missing columns:", missing or "none")
+print("unresolved inputs:", int((df["status"] == "not_found").sum()))
+print("bundle:", result.provenance["bundle_id"])
+display(df.dtypes.to_frame("dtype"))
+```
+
+
+
+<!-- ===== SOURCE FILE: notebooks/templates/reports__annotate_go.ipynb.md ===== -->
+
+<h1>🧭 Biofilter — Report: <code>annotate_go</code></h1>
+
+Everything the bundle knows about a list of Gene Ontology terms: id, name and namespace, where the term sits in the ontology, and what else in the bundle is linked to it.
+
+### 1. Open a bundle
+
+```python
+from pathlib import Path
+
 from biofilter import Biofilter
-bf = Biofilter(debug_mode=False)
-```
 
-### 2. Inspect report metadata
+# A bundle is a directory — the one holding manifest.json.
+# Leave as None to use `[database] bundle` from .biofilter.toml.
+BUNDLE = None
+REPORT = "annotate_go"
 
-```python
-bf.report.explain("db_pg_index_stats")
-```
+bf = Biofilter(bundle=BUNDLE, debug_mode=False) if BUNDLE else Biofilter(debug_mode=False)
 
-```python
-bf.report.available_columns("db_pg_index_stats")
-```
-
-### 3. Run report (PostgreSQL only)
-
-```python
-df = bf.report.run("db_pg_index_stats")
-print(f"Rows: {len(df)}")
-df.head()
-```
-
-### 4. Filter by table/index and choose columns
-
-```python
-df_filtered = bf.report.run(
-    "db_pg_index_stats",
-    schema="public",
-    table=["variant_masters"],
-    include_usage=True,
-    output_columns=["schema_name", "table_name", "index_name", "index_size", "idx_scan"],
+# Results land here whatever directory the kernel was started in — VS Code
+# and Jupyter disagree about that, and a bare filename ends up wherever
+# they landed. The project root is the folder holding .biofilter.toml.
+_root = next(
+    (p for p in [Path.cwd(), *Path.cwd().parents] if (p / ".biofilter.toml").is_file()),
+    Path.cwd(),
 )
-print(f"Rows: {len(df_filtered)}")
-df_filtered.head(30)
+OUTPUT_DIR = _root / "notebooks" / "templates" / "outputs"
+OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+
+bf
 ```
 
-
-
-<!-- ===== SOURCE FILE: notebooks/Templates/reports__db_pg_table_stats.ipynb.md ===== -->
-
-<h1> 📘 Biofilter — Report: PostgreSQL Table Stats </h1>
-
-PostgreSQL-only storage observability report for tables/partitions.
-
-### 1. Start Biofilter
+### 2. What the report offers
 
 ```python
-from biofilter import Biofilter
-bf = Biofilter(debug_mode=False)
-```
+print("columns:")
+for column in bf.report.available_columns(REPORT):
+    print(" ", column)
 
-### 2. Inspect report metadata
-
-```python
-print(bf.report.explain("db_pg_table_stats"))
+print("\nexample input:")
+print(bf.report.example_input(REPORT))
 ```
 
 ```python
-bf.report.available_columns("db_pg_table_stats")
+print(bf.report.explain(REPORT))
 ```
 
-### 3. Run report (PostgreSQL only)
+### 3. Run it
+
+⚠️ **Terms resolve by id, not by name.** The bundle carries GO codes as
+aliases but not term names, so `GO:0006915` resolves and
+`apoptotic process` does not. That matches the report this replaces;
+changing it would be an ETL change, not a report one.
 
 ```python
-df = bf.report.run("db_pg_table_stats")
-print(f"Rows: {len(df)}")
-df.head()
-```
-
-### 4. Filter by schema/table and choose columns
-
-```python
-df_filtered = bf.report.run(
-    "db_pg_table_stats",
-    schema="public",
-    table=["variant", "entity"],
-    output_columns=["schema_name", "table_name", "total_bytes", "n_indexes"],
-)
-print(f"Rows: {len(df_filtered)}")
-df_filtered.head(20)
-```
-
-
-
-<!-- ===== SOURCE FILE: notebooks/Templates/reports__entity_filter.ipynb.md ===== -->
-
-<h1> 📘 Biofilter — Report: Entity Filter </h1>
-
-Validate a list of entity names and inspect matching/conflict flags.
-
-### 1. Start Biofilter
-
-```python
-from biofilter import Biofilter
-bf = Biofilter(debug_mode=False)
-```
-
-### 2. Run with custom entity list (API parameters required)
-
-```python
-entity_list = ["TP53", "BRCA1", "APOE", "NOT_FOUND_ENTITY"]
-
-df = bf.report.run("entity_filter", input_data=entity_list)
-print(f"Rows: {len(df)}")
-df.head()
-```
-
-```python
-cols = [
-    "input_original", "primary_name", "group_name",
-    "has_conflict", "is_deactive", "observation"
+terms = [
+    "GO:0006915",    # apoptotic process
+    "GO:0008150",    # biological_process, near the root
+    "GO:9999999",    # kept, with status='not_found'
 ]
-df[[c for c in cols if c in df.columns]].head(50)
+
+result = bf.report.run(REPORT, input_data=terms)
+df = result.to_pandas()
+df[["input_value", "go_id", "go_name", "go_namespace", "status"]]
 ```
 
+### 4. Where the term sits in the ontology
 
-
-<!-- ===== SOURCE FILE: notebooks/Templates/reports__entity_neighborhood_summary.ipynb.md ===== -->
-
-<h1> 📘 Biofilter — Report: Entity Neighborhood Summary </h1>
-
-Resolve a heterogeneous list of inputs (genes, diseases, pathways, proteins, chemicals, GO terms) into entities and return a 1-hop neighborhood summary, with neighbor counts and primary names grouped by entity type.
-
-Engine-agnostic: works on PostgreSQL **and** SQLite. Fuzzy matching uses `rapidfuzz` client-side, no DB extension required.
-
-### 1. Start Biofilter
+`go_parent_count` and `go_child_count` are ontology edges. A term near the
+root has many children and few parents; a leaf is the reverse.
 
 ```python
-from biofilter import Biofilter
-
-bf = Biofilter(debug_mode=False)
+df[[
+    "go_id",
+    "go_name",
+    "go_parent_count",
+    "go_child_count",
+    "go_parent_relation_types",
+    "go_child_relation_types",
+]]
 ```
 
-### 2. Mixed inputs with type hints
+```python
+def as_list(value):
+    """Nullable list column to a Python list. `value or []` raises on an array."""
+    return [] if value is None else list(value)
 
-Type prefixes (`gene:`, `disease:`, `pathway:`, `protein:`, `chemical:`, `go:`) scope the resolution to the matching `EntityGroup`. This avoids cross-domain matches when the same string exists in multiple groups.
+
+for _, row in df[df["status"] == "ok"].iterrows():
+    print(f"{row['go_id']}  {row['go_name']}")
+    print("  parents:", as_list(row["go_parent_ids"])[:5])
+    print("  children:", as_list(row["go_child_ids"])[:5])
+    print()
+```
+
+The id lists are capped by `max_go_terms_per_side` (25 by default), so a
+term near the root shows the first 25 children, not all of them. **The
+counts are never capped** — trust those.
+
+### 5. Ontology edges are not relationships
+
+`go_parent_count` says where the term sits. `entity_relationships_by_group`
+says what else in the bundle is linked to it — genes annotated with the
+term, mostly. A term can be deep in the ontology and annotate nothing.
+
+```python
+df[["go_id", "go_child_count", "total_entity_relationships",
+    "entity_relationships_by_group"]]
+```
+
+### 6. Every term in the bundle
+
+```python
+import time
+
+started = time.perf_counter()
+everything = bf.report.run(REPORT, input_data="__ALL__",
+                           include_go_relation_details=False)
+catalog = everything.to_pandas()
+
+print(f"{everything.num_rows:,} terms in {time.perf_counter() - started:.1f}s")
+catalog.groupby("go_namespace")[["go_parent_count", "go_child_count"]].agg(
+    terms="size", mean_children=("go_child_count", "mean")
+) if False else catalog["go_namespace"].value_counts()
+```
+
+### 7. Export
+
+CSV by default, with a `.provenance.json` beside it naming the bundle the ids came from.
+
+```python
+for path in result.write(OUTPUT_DIR / "annotate_go.csv"):
+    print(path)
+```
+
+### 8. The same thing on the command line
+
+```bash
+biofilter report run --report-name annotate_go \\
+    --input ... \\
+    --output out.csv
+```
+
+### 9. Quick QA
+
+```python
+expected = list(bf.report.available_columns(REPORT))
+missing = [c for c in expected if c not in df.columns]
+
+print("missing columns:", missing or "none")
+print("unresolved inputs:", int((df["status"] == "not_found").sum()))
+print("bundle:", result.provenance["bundle_id"])
+display(df.dtypes.to_frame("dtype"))
+```
+
+
+
+<!-- ===== SOURCE FILE: notebooks/templates/reports__annotate_pathway.ipynb.md ===== -->
+
+<h1>🔀 Biofilter — Report: <code>annotate_pathway</code></h1>
+
+Everything the bundle knows about a list of pathways: canonical id and description, which source curated it, and what it is linked to.
+
+### 1. Open a bundle
+
+```python
+from pathlib import Path
+
+from biofilter import Biofilter
+
+# A bundle is a directory — the one holding manifest.json.
+# Leave as None to use `[database] bundle` from .biofilter.toml.
+BUNDLE = None
+REPORT = "annotate_pathway"
+
+bf = Biofilter(bundle=BUNDLE, debug_mode=False) if BUNDLE else Biofilter(debug_mode=False)
+
+# Results land here whatever directory the kernel was started in — VS Code
+# and Jupyter disagree about that, and a bare filename ends up wherever
+# they landed. The project root is the folder holding .biofilter.toml.
+_root = next(
+    (p for p in [Path.cwd(), *Path.cwd().parents] if (p / ".biofilter.toml").is_file()),
+    Path.cwd(),
+)
+OUTPUT_DIR = _root / "notebooks" / "templates" / "outputs"
+OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+
+bf
+```
+
+### 2. What the report offers
+
+```python
+print("columns:")
+for column in bf.report.available_columns(REPORT):
+    print(" ", column)
+
+print("\nexample input:")
+print(bf.report.example_input(REPORT))
+```
+
+```python
+print(bf.report.explain(REPORT))
+```
+
+### 3. Run it
+
+Pathways resolve by id — Reactome (`R-HSA-…`) or KEGG (`hsa…`).
+
+```python
+pathways = [
+    "R-HSA-109581",   # Apoptosis, Reactome
+    "hsa04210",       # Apoptosis, KEGG
+    "NOT_A_PATHWAY",  # kept, with status='not_found'
+]
+
+result = bf.report.run(REPORT, input_data=pathways)
+df = result.to_pandas()
+df[["input_value", "pathway_id", "pathway_description",
+    "pathway_source_system", "status"]]
+```
+
+### 4. The same biology, curated twice
+
+Reactome and KEGG describe overlapping biology with different granularity
+and different ids, and the bundle carries both. Two rows can be the same
+pathway under two curations — **nothing in this report merges them**, and
+`pathway_source_system` is how you tell which is which.
+
+```python
+df[["pathway_id", "pathway_source_system", "pathway_data_source",
+    "total_entity_relationships"]]
+```
+
+### 5. What makes a pathway useful
+
+A pathway with a large `Genes` count is one the bundle can expand into a
+gene set. One with none is present as a label only.
+
+```python
+for _, row in df[df["status"] == "ok"].iterrows():
+    print(f"{row['pathway_id']}  {row['pathway_description']}")
+    for entry in row["entity_relationships_by_group"]:
+        print(f"    {entry['group_name']:<12} {entry['count']:>6}")
+    print()
+```
+
+### 6. Every pathway in the bundle
+
+```python
+import time
+
+started = time.perf_counter()
+everything = bf.report.run(REPORT, input_data="__ALL__")
+catalog = everything.to_pandas()
+
+print(f"{everything.num_rows:,} pathways in {time.perf_counter() - started:.1f}s")
+catalog["pathway_source_system"].value_counts()
+```
+
+### 7. Export
+
+CSV by default, with a `.provenance.json` beside it naming the bundle the ids came from.
+
+```python
+for path in result.write(OUTPUT_DIR / "annotate_pathway.csv"):
+    print(path)
+```
+
+### 8. The same thing on the command line
+
+```bash
+biofilter report run --report-name annotate_pathway \\
+    --input ... \\
+    --output out.csv
+```
+
+### 9. Quick QA
+
+```python
+expected = list(bf.report.available_columns(REPORT))
+missing = [c for c in expected if c not in df.columns]
+
+print("missing columns:", missing or "none")
+print("unresolved inputs:", int((df["status"] == "not_found").sum()))
+print("bundle:", result.provenance["bundle_id"])
+display(df.dtypes.to_frame("dtype"))
+```
+
+
+
+<!-- ===== SOURCE FILE: notebooks/templates/reports__annotate_protein.ipynb.md ===== -->
+
+<h1>🧪 Biofilter — Report: <code>annotate_protein</code></h1>
+
+Everything the bundle knows about a list of proteins: UniProt record, isoform resolution, Pfam domains by type, and what the protein is linked to.
+
+### 1. Open a bundle
+
+```python
+from pathlib import Path
+
+from biofilter import Biofilter
+
+# A bundle is a directory — the one holding manifest.json.
+# Leave as None to use `[database] bundle` from .biofilter.toml.
+BUNDLE = None
+REPORT = "annotate_protein"
+
+bf = Biofilter(bundle=BUNDLE, debug_mode=False) if BUNDLE else Biofilter(debug_mode=False)
+
+# Results land here whatever directory the kernel was started in — VS Code
+# and Jupyter disagree about that, and a bare filename ends up wherever
+# they landed. The project root is the folder holding .biofilter.toml.
+_root = next(
+    (p for p in [Path.cwd(), *Path.cwd().parents] if (p / ".biofilter.toml").is_file()),
+    Path.cwd(),
+)
+OUTPUT_DIR = _root / "notebooks" / "templates" / "outputs"
+OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+
+bf
+```
+
+### 2. What the report offers
+
+```python
+print("columns:")
+for column in bf.report.available_columns(REPORT):
+    print(" ", column)
+
+print("\nexample input:")
+print(bf.report.example_input(REPORT))
+```
+
+```python
+print(bf.report.explain(REPORT))
+```
+
+### 3. Run it
+
+Proteins resolve by accession, by entry name, or by an **isoform**
+accession — section 4 is about what happens then.
+
+```python
+proteins = [
+    "P04637",       # TP53, canonical accession
+    "TP53_HUMAN",   # the same protein, by entry name
+    "P04637-2",     # an isoform of it
+    "NOT_A_PROT",   # kept, with status='not_found'
+]
+
+result = bf.report.run(REPORT, input_data=proteins)
+df = result.to_pandas()
+df[["input_value", "protein_id", "entity_id", "canonical_entity_id",
+    "input_is_isoform", "status"]]
+```
+
+### 4. Two entity ids, and they can differ
+
+A protein with isoforms has an entity per isoform as well as one for the
+canonical sequence.
+
+| column | what it is |
+| --- | --- |
+| `entity_id` | the entity the **input** matched — may be an isoform |
+| `canonical_entity_id` | the entity the **annotation** describes |
+
+An isoform entity carries almost nothing on its own, so the report follows
+it to the canonical protein before annotating. Reporting the isoform's zero
+relationships would be technically true and practically useless. The `note`
+says so whenever the two ids differ.
+
+```python
+df[["input_value", "entity_id", "canonical_entity_id", "isoform_count", "note"]]
+```
+
+`isoform_count` counts isoforms, not entities: a protein with
+`isoform_count = 3` has four entities.
+
+### 5. Pfam domains, by type
+
+```python
+def as_list(value):
+    """Nullable list column to a Python list. `value or []` raises on an array."""
+    return [] if value is None else list(value)
+
+
+for _, row in df[df["status"] == "ok"].iterrows():
+    print(f"{row['protein_id']}  ({row['pfam_total_count']} domains)")
+    for entry in as_list(row["pfam_ids_by_type"]):
+        print(f"    {entry['type']:<10} {list(entry['ids'])[:6]}")
+    print("   ", (row["function"] or "")[:90])
+    print()
+```
+
+Counts are **distinct accessions**: a domain appearing twice in a
+sequence is one accession. `pfam_total_count` is the sum across types.
+
+### 6. Every protein in the bundle
+
+```python
+import time
+
+started = time.perf_counter()
+everything = bf.report.run(REPORT, input_data="__ALL__", include_pfam_summary=False)
+catalog = everything.to_pandas()
+
+print(f"{everything.num_rows:,} protein entities in {time.perf_counter() - started:.1f}s")
+print("isoform inputs:", int(catalog["input_is_isoform"].fillna(False).sum()))
+catalog["status"].value_counts()
+```
+
+### 7. Export
+
+CSV by default, with a `.provenance.json` beside it naming the bundle the ids came from.
+
+```python
+for path in result.write(OUTPUT_DIR / "annotate_protein.csv"):
+    print(path)
+```
+
+### 8. The same thing on the command line
+
+```bash
+biofilter report run --report-name annotate_protein \\
+    --input ... \\
+    --output out.csv
+```
+
+### 9. Quick QA
+
+```python
+expected = list(bf.report.available_columns(REPORT))
+missing = [c for c in expected if c not in df.columns]
+
+print("missing columns:", missing or "none")
+print("unresolved inputs:", int((df["status"] == "not_found").sum()))
+print("bundle:", result.provenance["bundle_id"])
+display(df.dtypes.to_frame("dtype"))
+```
+
+
+
+<!-- ===== SOURCE FILE: notebooks/templates/reports__annotate_variant.ipynb.md ===== -->
+
+<h1>🧬 Biofilter — Report: <code>annotate_variant</code></h1>
+
+What the bundle knows about a list of variants: identity, gnomAD joint
+frequencies, in-silico predictions, and one row per transcript the
+variant was annotated against.
+
+### 1. Open a bundle
+
+```python
+from pathlib import Path
+
+from biofilter import Biofilter
+
+# Leave as None to use `[database] bundle` from .biofilter.toml.
+BUNDLE = None
+REPORT = "annotate_variant"
+
+bf = Biofilter(bundle=BUNDLE, debug_mode=False) if BUNDLE else Biofilter(debug_mode=False)
+
+_root = next(
+    (p for p in [Path.cwd(), *Path.cwd().parents] if (p / ".biofilter.toml").is_file()),
+    Path.cwd(),
+)
+OUTPUT_DIR = _root / "notebooks" / "templates" / "outputs"
+OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+
+bf
+```
+
+### 2. Which chromosomes does this bundle actually have
+
+Ask first. A bundle built for a subset returns `not_found` for everything
+outside it — true of the bundle, not of the genome.
+
+```python
+stats = bf.report.run("platform_data_statistics", sections=["variants"]).to_pandas()
+
+present = sorted(stats[stats["dimension_1"] == "variant_masters"]["dimension_2"].unique(),
+                 key=int)
+print("chromosomes in variant_masters:", present)
+```
+
+### 3. What the report offers
+
+```python
+print("columns:")
+for column in bf.report.available_columns(REPORT):
+    print(" ", column)
+
+print("\nexample input:")
+print(bf.report.example_input(REPORT))
+```
+
+### 4. Three input shapes, mixed freely
+
+| shape | matches |
+| --- | --- |
+| `rs1225039379` | the variant that rsID maps to |
+| `22:15238761` | **every** variant at that position |
+| `22:20052518:C:T` | exactly that variant |
+
+`chr`/`CHR`/`chromosome` prefixes and `:`/`-`/`_`/space separators are all
+accepted; `X`, `Y`, `MT` map to 23, 24, 25.
+
+```python
+result = bf.report.run(REPORT, input_data=[
+    "rs1225039379",
+    "22:15238761",
+    "chr22:20052518:C:T",
+    "nonsense",
+], most_severe_only=True)
+
+df = result.to_pandas()
+df[["input_value", "input_kind", "status", "variant_key", "rsid",
+    "gene_symbol", "consequence", "note"]]
+```
+
+### 5. One row per transcript
+
+A variant is annotated against every transcript it overlaps — often
+dozens. The variant-level facts repeat on each row.
+
+```python
+one = bf.report.run(REPORT, input_data=["22:20052518:C:T"]).to_pandas()
+
+print(f"{len(one)} transcripts, {one['gene_symbol'].nunique()} gene(s)")
+one[["transcript_id", "consequence", "severity_rank", "impact",
+     "canonical", "mane_select", "is_most_severe_for_variant"]].head(8)
+```
+
+`is_most_severe_for_variant` is **derived**, not stored. 4.3.0 dropped
+that flag from the schema, so it is computed from
+`variant_consequences.severity_rank` — consistent with whatever severity
+ordering the bundle carries, rather than with what the ETL believed when
+it wrote the row.
+
+### 6. Two ways to narrow it, and they disagree
+
+The most severe consequence is not always on the canonical transcript.
+
+```python
+for label, params in [
+    ("everything", {}),
+    ("most_severe_only", {"most_severe_only": True}),
+    ("canonical_only", {"canonical_only": True}),
+    ("both", {"most_severe_only": True, "canonical_only": True}),
+]:
+    out = bf.report.run(REPORT, input_data=["22:20052518:C:T"], **params).to_pandas()
+    print(f"  {label:18s} {len(out):>3} rows")
+```
+
+### 7. Frequencies and predictions
+
+```python
+severe = bf.report.run(
+    REPORT, input_data=["22:20052518:C:T"], most_severe_only=True
+).to_pandas().iloc[0]
+
+print(f"  {severe['variant_key']}  ({severe['rsid']})")
+print(f"  af_joint  {severe['af_joint']:.3e}   ac {severe['ac_joint']:,} / an {severe['an_joint']:,}")
+print(f"  CADD      {severe['cadd_phred']:.1f} phred")
+print(f"  REVEL     {severe['revel_max']}")
+print(f"  SIFT      {severe['sift_max']}     PolyPhen {severe['polyphen_max']}")
+print(f"  phyloP    {severe['phylop']}")
+```
+
+⚠️ Frequencies are the gnomAD **joint** callset. The exomes and genomes
+columns exist in `variant_masters` and are not surfaced here.
+
+### 8. AlphaMissense scores one transcript
+
+Of 89 transcripts, one carries a score. That is AlphaMissense's own
+scope — it predicts on the canonical protein sequence — not a join that
+failed.
+
+(It did fail at first: AlphaMissense writes `ENST00000327374.9` and VEP
+writes `ENST00000327374`, so the raw join matched nothing, silently.)
+
+```python
+scored = one[one["alphamissense_score"].notna()]
+
+print(f"{len(scored)} of {len(one)} transcripts scored")
+scored[["transcript_id", "consequence", "alphamissense_score",
+        "alphamissense_classification"]]
+```
+
+### 9. Where rsIDs come from
+
+`variant_masters` carries an `rsid` column and it is **entirely null** in
+4.3.0 bundles. Lookups go through `variant_rsid`, which covers roughly
+97% of variants.
+
+```python
+sample = bf.report.run(REPORT, input_data=["22:20052518:C:T"],
+                       most_severe_only=True).to_pandas()
+print("rsid from variant_rsid:", sample.iloc[0]["rsid"])
+```
+
+### 10. Export
+
+```python
+for path in result.write(OUTPUT_DIR / "annotate_variant.csv"):
+    print(path)
+```
+
+### 11. The same thing on the command line
+
+```bash
+biofilter report run --report-name annotate_variant \\
+    --input-file variants.txt \\
+    --param most_severe_only=true \\
+    --output variants.csv
+```
+
+
+
+<!-- ===== SOURCE FILE: notebooks/templates/reports__expand_entity_neighborhood.ipynb.md ===== -->
+
+<h1>🕸️ Biofilter — Report: <code>expand_entity_neighborhood</code></h1>
+
+What sits one hop from each of these entities.
+
+Takes a **heterogeneous** list — genes, diseases, proteins, GO terms, in
+any mix — and reports what each one is connected to: how many neighbours,
+of which kinds, and which ones.
+
+### 1. Open a bundle
+
+```python
+from pathlib import Path
+
+from biofilter import Biofilter
+
+# Leave as None to use `[database] bundle` from .biofilter.toml.
+BUNDLE = None
+REPORT = "expand_entity_neighborhood"
+
+bf = Biofilter(bundle=BUNDLE, debug_mode=False) if BUNDLE else Biofilter(debug_mode=False)
+
+# Results land here whatever directory the kernel was started in — VS Code
+# and Jupyter disagree about that, and a bare filename ends up wherever
+# they landed. The project root is the folder holding .biofilter.toml.
+_root = next(
+    (p for p in [Path.cwd(), *Path.cwd().parents] if (p / ".biofilter.toml").is_file()),
+    Path.cwd(),
+)
+OUTPUT_DIR = _root / "notebooks" / "templates" / "outputs"
+OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+
+bf
+```
+
+### 2. What the report offers
+
+```python
+print("columns:")
+for column in bf.report.available_columns(REPORT):
+    print(" ", column)
+
+print("\nexample input:")
+print(bf.report.example_input(REPORT))
+```
+
+```python
+print(bf.report.explain(REPORT))
+```
+
+### 3. Run it
+
+Mix whatever you like. A `gene:` style prefix narrows the search to that
+group; without one, every group is searched.
 
 ```python
 items = [
-    "gene:BRCA1",
-    "disease:Alzheimer disease",
-    "pathway:DNA repair",
-    "APOE",  # no type hint — searched across all groups
+    "gene:TP53",              # restricted to Genes
+    "protein:P04637",         # restricted to Proteins
+    "MONDO:0007254",          # a CURIE — searched everywhere
+    "APOE",                   # a bare name
+    "ZZZ_NOT_A_THING",        # kept, with status='not_found'
 ]
 
-df = bf.report.run(
-    "entity_neighborhood_summary",
-    items=items,
-    match_mode="exact",
-    aliases_top_n=10,
-    neighbors_top_n_per_type=20,
-    emit_not_found_rows=True,
-)
-
-print(f"Rows: {len(df)}")
-df.head()
+result = bf.report.run(REPORT, input_data=items)
+df = result.to_pandas()
+df[["input_value", "input_type_hint", "entity_id", "entity_group",
+    "degree_total", "status"]]
 ```
 
-### 3. Recommended demo columns
+### 4. Why `GO:0006915` is not a hint
+
+A prefix counts as a type hint **only when it names an entity group** —
+and the group names are read from the bundle, not hardcoded.
+
+That rule exists because of a defect in the report this replaces. It
+treated *any* prefix before a colon as a hint, so `GO:0006915` became the
+term `0006915`, which resolved to a **disease**. Every CURIE in the
+bundle was affected — `MONDO:`, `HGNC:`, `DOID:`, `EFO:` — and nothing
+failed loudly.
+
+`go:` is excluded from the hint vocabulary for the same reason. Use
+`go_terms:` to restrict to that group.
 
 ```python
-cols = [
-    "Input Word",
-    "Entity ID",
-    "Entity Type",
-    "Exact Match",
-    "Matched Name",
-    "Primary Alias",
-    "Degree Total (1-hop)",
-    "Degree By Type (1-hop)",
-    "Resolve Status",
+bf.report.run(REPORT, input_data=[
+    "GO:0006915",              # the GO term itself
+    "MONDO:0007254",           # the disease itself
+    "go_terms:GO:0006915",     # the same term, restricted explicitly
+]).to_pandas()[["input_value", "input_type_hint", "entity_id", "entity_group", "status"]]
+```
+
+### 5. A hint narrows, and can rule out
+
+`TP53` is a gene. Asking for it as a disease is a question with the
+answer "no".
+
+```python
+bf.report.run(REPORT, input_data=["gene:TP53", "disease:TP53"]).to_pandas()[
+    ["input_value", "entity_group", "status", "note"]
 ]
-df[[c for c in cols if c in df.columns]]
 ```
 
-### 4. `like` mode — substring matches
-
-Useful when the input is a partial term and you want to find every entity whose alias contains it. Multiple aliases of the same entity collapse into a single row.
+### 6. The neighbourhood itself
 
 ```python
-df_like = bf.report.run(
-    "entity_neighborhood_summary",
-    items=["pathway:signaling", "disease:alzheimer"],
-    match_mode="like",
-    neighbors_top_n_per_type=10,
-)
-
-print(f"Rows: {len(df_like)}")
-df_like[["Input Word", "Matched Name", "Exact Match", "Primary Alias", "Entity Type"]].head(20)
+for _, row in df[df["status"] == "ok"].iterrows():
+    print(f"{row['input_value']}  ->  {row['primary_name']}  "
+          f"({row['entity_group']}, degree {row['degree_total']:,})")
+    for entry in row["neighbors_by_type"]:
+        print(f"    {entry['group_name']:<14} {entry['count']:>6}  "
+              f"{list(entry['names'])[:3]}")
+    print()
 ```
 
-### 5. `fuzzy` mode — similarity matching
+`neighbors_by_type` is **one nested column**, not one column per entity
+group. The report this replaces added a column per group present in the
+bundle — 29 columns, 14 of them impossible to know before running it,
+each holding a JSON string.
 
-Uses `rapidfuzz` token-sort ratio for typo-tolerant matching. Lower the `similarity_threshold` (default 80) when inputs are short forms (e.g. `"alzheimer"` vs `"Alzheimer disease"`).
+The names are capped by `neighbors_top_n_per_type`; `count` and
+`degree_total` never are.
 
 ```python
-df_fuzzy = bf.report.run(
-    "entity_neighborhood_summary",
-    items=["gene:BRCA1", "disease:alzheimers"],  # legacy / typo
-    match_mode="fuzzy",
-    similarity_threshold=70,
-)
+capped = bf.report.run(REPORT, input_data=["gene:TP53"],
+                       neighbors_top_n_per_type=3).to_pandas()
 
-df_fuzzy[["Input Word", "Matched Name", "Resolve Score", "Primary Alias"]]
+entry = capped.iloc[0]["neighbors_by_type"][0]
+print(f"{entry['group_name']}: count={entry['count']:,}, names shown={len(entry['names'])}")
+print(list(entry["names"]))
 ```
 
-### 6. Inspect the per-type neighbor lists
+### 7. Degree zero is an answer
 
-Each `EntityGroup` in the database becomes a column on the output (`Genes`, `Pathways`, `Diseases`, etc.) with a JSON-encoded list of neighbor primary names. Useful for quickly seeing what an input touches.
+An entity can resolve cleanly and have nothing linked to it. GO terms are
+the usual case: this bundle carries no entity relationships for them at
+all, so the neighbourhood comes back empty and the `note` says why.
 
 ```python
-import json
+bf.report.run(REPORT, input_data=["GO:0006915"]).to_pandas()[
+    ["input_value", "entity_group", "degree_total", "status", "note"]
+]
+```
 
-row = df.iloc[0]  # first resolved entity
-print(f"{row['Input Word']} → {row['Primary Alias']} ({row['Entity Type']})")
-print(f"Total neighbors: {row['Degree Total (1-hop)']}")
-print(f"By type: {row['Degree By Type (1-hop)']}")
+### 8. Export
 
-for col in ("Genes", "Pathways", "Diseases", "Proteins"):
-    if col in df.columns:
-        neighbors = json.loads(row[col]) if row[col] else []
-        if neighbors:
-            print(f"\n{col} ({len(neighbors)}):")
-            for n in neighbors[:5]:
-                print(f"  - {n}")
+CSV by default, with a `.provenance.json` beside it. The nested column is
+written as JSON there; parquet keeps it as a real list.
+
+```python
+for path in result.write(OUTPUT_DIR / "expand_entity_neighborhood.csv"):
+    print(path)
+```
+
+### 9. The same thing on the command line
+
+```bash
+biofilter report run --report-name expand_entity_neighborhood \\
+    --input gene:BRCA1 --input "disease:breast cancer" \\
+    --param neighbors_top_n_per_type=10 \\
+    --output neighbourhood.csv
+```
+
+### 10. Quick QA
+
+```python
+expected = list(bf.report.available_columns(REPORT))
+missing = [c for c in expected if c not in df.columns]
+
+print("missing columns:", missing or "none")
+print("not found:", int((df["status"] == "not_found").sum()))
+print("resolved but isolated:",
+      int(((df["status"] == "ok") & (df["degree_total"] == 0)).sum()))
+print("bundle:", result.provenance["bundle_id"])
+display(df.dtypes.to_frame("dtype"))
 ```
 
 
 
-<!-- ===== SOURCE FILE: notebooks/Templates/reports__entity_relationship_model.ipynb.md ===== -->
+<!-- ===== SOURCE FILE: notebooks/templates/reports__expand_entity_relationship.ipynb.md ===== -->
 
-<h1> Biofilter - Report: Entity Relationship Model </h1>
+<h1>🔗 Biofilter — Report: <code>expand_entity_relationship</code></h1>
 
-Explore relationship modeling using EntityAlias resolution and EntityRelationship links.
+Which links the bundle holds for these entities.
 
-### 1. Start Biofilter
+One row per (input, relationship). Use it to answer *what is this
+connected to*, or — with `relationship_scope="between_inputs"` — *how are
+these connected to each other*.
+
+### 1. Open a bundle
 
 ```python
+from pathlib import Path
+
 from biofilter import Biofilter
 
-bf = Biofilter(debug_mode=False)
+# Leave as None to use `[database] bundle` from .biofilter.toml.
+BUNDLE = None
+REPORT = "expand_entity_relationship"
+
+bf = Biofilter(bundle=BUNDLE, debug_mode=False) if BUNDLE else Biofilter(debug_mode=False)
+
+# Results land here whatever directory the kernel was started in.
+_root = next(
+    (p for p in [Path.cwd(), *Path.cwd().parents] if (p / ".biofilter.toml").is_file()),
+    Path.cwd(),
+)
+OUTPUT_DIR = _root / "notebooks" / "templates" / "outputs"
+OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+
 bf
 ```
 
-### 2. Inspect report metadata
+### 2. What the report offers
 
 ```python
-print('name:', 'entity_relationship_model')
-print('available columns:')
-print(bf.report.available_columns('entity_relationship_model'))
+print("columns:")
+for column in bf.report.available_columns(REPORT):
+    print(" ", column)
 
-print('\nexample_input:')
-print(bf.report.example_input('entity_relationship_model'))
-
-print('\nexplain:')
-print(bf.report.explain('entity_relationship_model'))
+print("\nexample input:")
+print(bf.report.example_input(REPORT))
 ```
 
-### 3. Run scope = input_to_any (default)
-Input entities can match either side (entity_1 or entity_2).
+```python
+print(bf.report.explain(REPORT))
+```
+
+### 3. What is this connected to
+
+The default scope, `input_to_any`, returns every link where an input
+appears on either side. That is a lot: filter it.
 
 ```python
-inputs = ['TP53', 'BRCA1', 'NOT_FOUND_ENTITY']
-
-df_any = bf.report.run(
-    'entity_relationship_model',
-    input_data=inputs,
-    relationship_scope='input_to_any',
+result = bf.report.run(
+    REPORT,
+    input_data=["TP53"],
+    output_entity_groups=["Pathways"],
 )
+df = result.to_pandas()
 
-print('rows:', len(df_any))
-df_any.head(20)
+print(f"{len(df):,} rows")
+df[["input_original", "relationship_type", "related_primary_name",
+    "related_group_name", "direction"]].head(10)
 ```
 
-### 4. Restrict output related entity groups
-Example: keep only Pathway and Protein relationships.
+### 4. How are these connected to each other
+
+`between_inputs` keeps only links whose **both** ends are in your list.
+It is a different question, and usually a much smaller answer.
 
 ```python
-df_out_groups = bf.report.run(
-    'entity_relationship_model',
-    input_data=['TP53', 'BRCA1'],
-    relationship_scope='input_to_any',
-    output_entity_groups=['Pathway', 'Protein'],
-)
+genes = ["TP53", "BRCA1", "EGFR", "MDM2"]
 
-cols = [
-    'input_original',
-    'input_primary_name',
-    'relationship_type',
-    'related_primary_name',
-    'related_group_name',
-    'match_side',
-    'direction',
-    'observation',
-]
-
-df_out_groups[cols].head(30)
-```
-
-### 5. Scope = between_inputs
-Return only relationships where both terms are in the resolved input set.
-
-```python
-df_between = bf.report.run(
-    'entity_relationship_model',
-    input_data=['TP53', 'BRCA1', 'APOE'],
-    relationship_scope='between_inputs',
-    deduplicate_pairs=True,
-)
-
-df_between[cols + ['entity_1_primary_name', 'entity_2_primary_name']].head(30)
-```
-
-### 6. Restrict input entity groups
-Only resolve input aliases that belong to specific groups.
-
-```python
-df_input_groups = bf.report.run(
-    'entity_relationship_model',
-    input_data=['TP53', 'DNA_REPAIR_PATHWAY'],
-    input_entity_groups=['Gene'],
-    relationship_scope='input_to_any',
-)
-
-df_input_groups[['input_original', 'input_primary_name', 'input_group_name', 'observation']].drop_duplicates()
-```
-
-
-
-<!-- ===== SOURCE FILE: notebooks/Templates/reports__etl_packages.ipynb.md ===== -->
-
-<h1> 📘 Biofilter — Report: ETL Packages </h1>
-
-Detailed package-level ETL audit report.
-
-### 1. Start Biofilter
-
-```python
-from biofilter import Biofilter
-bf = Biofilter(debug_mode=False)
-```
-
-### 2. Inspect report metadata
-
-```python
-print(bf.report.explain("etl_packages"))
+for scope in ("input_to_any", "between_inputs"):
+    out = bf.report.run(REPORT, input_data=genes, relationship_scope=scope).to_pandas()
+    real = out[out["observation"] == ""]
+    print(f"{scope:15s} {len(real):>7,} relationship rows")
 ```
 
 ```python
-bf.report.available_columns("etl_packages")
+between = bf.report.run(
+    REPORT, input_data=genes, relationship_scope="between_inputs"
+).to_pandas()
+
+between[between["observation"] == ""][
+    ["input_primary_name", "relationship_type", "related_primary_name", "direction"]
+].head(12)
 ```
 
-### 3. Run default report
+### 5. Why a relationship can appear twice
+
+A link with an input at **both** ends is reached from each, producing two
+rows that differ in `match_side` and `direction`.
+
+In `between_inputs` that always happens, so `deduplicate_pairs` defaults
+to `True` there and `False` in `input_to_any`. Both are overridable.
 
 ```python
-df = bf.report.run("etl_packages")
-print(f"Rows: {len(df)}")
-df.head()
+for dedupe in (True, False):
+    out = bf.report.run(
+        REPORT, input_data=genes,
+        relationship_scope="between_inputs", deduplicate_pairs=dedupe,
+    ).to_pandas()
+    real = out[out["observation"] == ""]
+    print(f"deduplicate_pairs={str(dedupe):5s} {len(real):>5,} rows")
 ```
 
-### 4. Run with filters
+### 6. Three kinds of row
+
+| `observation` | meaning |
+| --- | --- |
+| *(empty)* | a real relationship |
+| `not found` | the bundle has no entity for this input |
+| `no relationships in scope` | it resolved, and nothing came back |
+
+The third is new in 4.3.0. The report this replaces emitted rows only for
+inputs it could not **resolve**, so a gene with five thousand
+relationships and none to `Chemicals` simply vanished from a
+chemicals-filtered result — indistinguishable from one never asked
+about.
 
 ```python
-df_filtered = bf.report.run(
-    "etl_packages",
-    source_system="NCBI",
-    data_sources=["dbsnp_chr1", "dbsnp_chr2"],
-    only_active=True,
-)
-print(f"Rows: {len(df_filtered)}")
-df_filtered.head()
+mixed = bf.report.run(
+    REPORT,
+    input_data=["TP53", "GO:0006915", "ZZZ_NOT_A_THING"],
+    output_entity_groups=["Chemicals"],
+).to_pandas()
+
+mixed[["input_original", "input_entity_id", "input_group_name", "observation"]]
 ```
 
-```python
-cols = [
-    "package_id", "source_system", "data_source", "status", "operation_type",
-    "extract_status", "transform_status", "load_status"
-]
-df_filtered[[c for c in cols if c in df_filtered.columns]].head(30)
-```
+### 7. Narrowing further
 
-
-
-<!-- ===== SOURCE FILE: notebooks/Templates/reports__etl_status.ipynb.md ===== -->
-
-<h1> 📘 Biofilter — Report: ETL Status </h1>
-
-This notebook demonstrates the consolidated ETL status report.
-
-### 1. Start Biofilter
+`input_entity_groups` constrains what an input may resolve to;
+`relationship_types` keeps only certain kinds of link.
 
 ```python
-from biofilter import Biofilter
-bf = Biofilter(debug_mode=False)
-```
-
-```python
-# Production (LPC, read-only):
-# db_uri = "parquet:///project/hall_shared/datasets/biofilter/<YYYYMMDD>/tables"
-# Legacy PostgreSQL server (decommissioned; see lpc__deploy.md Appendix A):
-# db_uri = "postgresql+psycopg2://<user>:<password>@<SERVER_IP>:5432/biofilter_prod"
-db_uri = "postgresql+psycopg2://admin:admin@localhost/biofilter_dev"
-bf = Biofilter(db_uri=db_uri, debug_mode=False)
-```
-
-### 2. Inspect report metadata
-
-```python
-print(bf.report.explain("etl_status"))
-```
-
-```python
-bf.report.available_columns("etl_status")
-```
-
-### 3. Run default report
-
-```python
-df = bf.report.run("etl_status")
-print(f"Rows: {len(df)}")
-df.head()
+print("relationship types in this result:")
+print(bf.report.run(REPORT, input_data=["TP53"]).to_pandas()["relationship_type"]
+      .value_counts().to_string())
 ```
 
 ```python
-df.to_clipboard()
+bf.report.run(
+    REPORT,
+    input_data=["TP53"],
+    relationship_types=["in_pathway"],
+    output_entity_groups=["Pathways"],
+).to_pandas()[["input_original", "relationship_type", "related_primary_name"]].head(5)
 ```
 
-### 4. Run with filters
+### 8. Export
 
 ```python
-df_filtered = bf.report.run(
-    "etl_status",
-    data_sources=["hgnc", "dbsnp_chr1"],
-    only_active=True,
-)
-print(f"Rows: {len(df_filtered)}")
-df_filtered.head()
+for path in result.write(OUTPUT_DIR / "expand_entity_relationship.csv"):
+    print(path)
 ```
 
+### 9. The same thing on the command line
+
+```bash
+biofilter report run --report-name expand_entity_relationship \\
+    --input TP53 --input BRCA1 \\
+    --param relationship_scope=between_inputs \\
+    --output relationships.csv
+```
+
+### 10. Quick QA
+
 ```python
-# Suggested dashboard columns
-cols = [
-    "source_system", "data_source", "extract_status", "transform_status",
-    "load_status", "pipeline_ok", "latest_error"
-]
-df_filtered[[c for c in cols if c in df_filtered.columns]].head(20)
+expected = list(bf.report.available_columns(REPORT))
+missing = [c for c in expected if c not in df.columns]
+
+print("missing columns:", missing or "none")
+print(df["observation"].value_counts(dropna=False).to_string())
+print("bundle:", result.provenance["bundle_id"])
+display(df.dtypes.to_frame("dtype"))
 ```
 
 
 
-<!-- ===== SOURCE FILE: notebooks/Templates/reports__gene_to_variant_filtering.ipynb.md ===== -->
+<!-- ===== SOURCE FILE: notebooks/templates/reports__expand_gene_to_variant.ipynb.md ===== -->
 
-# 📘 Biofilter — Report: Gene to Variant Filtering
+<h1>🎛️ Biofilter — Report: <code>expand_gene_to_variant</code></h1>
 
-**Phase 2 of the single-variant SNP×SNP interaction pipeline.**
+The variants belonging to a list of genes, with their annotation.
 
-Given a list of gene symbols, this report:
+"Belonging to" is **two different questions**, and this report makes you
+pick one. Section 3 is about why that is not a detail.
 
-1. Resolves symbols → `entity_ids` (via `entity_aliases`).
-2. Resolves `entity_ids` → genomic loci (`entity_locations`, filtrado por build).
-3. Pre-resolve consequence/impact filter names → IDs (SQL-level filtering).
-4. Queries `variant_masters` + `variant_molecular_effects` per chromosome via a **temporary gene-range table** — one query per chromosome partition.
-5. LEFT JOINs `variant_effect_predictions` for AlphaMissense scores.
-6. Returns **1 row per (gene × variant)** when `most_severe_only=True`, or **1 row per (gene × variant × transcript)** when `most_severe_only=False`.
-
-All heavy filters (impact, consequence, LoF, AF, CADD, SIFT, PolyPhen) are pushed to SQL. AlphaMissense filters are applied post-query.
-
----
-
-### Methods used
-- `bf.report.explain("gene_to_variant_filtering")`
-- `bf.report.example_input("gene_to_variant_filtering")`
-- `bf.report.run("gene_to_variant_filtering", **params)`
-
----
-
-### 1. Start Biofilter
+### 1. Open a bundle
 
 ```python
+from pathlib import Path
+
 from biofilter import Biofilter
 
-bf = Biofilter(debug_mode=False)
+BUNDLE = None
+REPORT = "expand_gene_to_variant"
+
+bf = Biofilter(bundle=BUNDLE, debug_mode=False) if BUNDLE else Biofilter(debug_mode=False)
+
+_root = next(
+    (p for p in [Path.cwd(), *Path.cwd().parents] if (p / ".biofilter.toml").is_file()),
+    Path.cwd(),
+)
+OUTPUT_DIR = _root / "notebooks" / "templates" / "outputs"
+OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+
+print(bf.core.db_uri)
 ```
 
----
+### 2. Which chromosomes does this bundle carry
 
-### 2. Inspect the report contract
+Ask first. The current bundle is chr22 only, so a gene anywhere else
+resolves fine and then finds nothing — which is a property of the build,
+not of the gene.
 
 ```python
-print(bf.report.explain("gene_to_variant_filtering"))
+from biofilter.modules.report import Bundle
+
+with Bundle.open(bf.core.db_uri.removeprefix("parquet://")) as bundle:
+    chroms = bundle.chromosomes("variant_masters")
+
+print("chromosomes with variants:", chroms)
+```
+
+### 3. The choice you have to make
+
+| `mapping` | a variant belongs to a gene when… |
+| --- | --- |
+| `position` | its coordinate falls inside the gene's build-38 range |
+| `annotation` | VEP associated it with that gene |
+
+Run the same gene both ways and compare.
+
+```python
+GENE = "CHEK2"
+
+sets = {}
+for mapping in ("position", "annotation"):
+    out = bf.report.run(REPORT, input_data=[GENE], mapping=mapping,
+                        max_variants_per_gene=0).to_pandas()
+    sets[mapping] = set(out.query("status == 'ok'").variant_key)
+    print(f"  {mapping:<11} {len(sets[mapping]):>6,} variants")
+
+p, a = sets["position"], sets["annotation"]
+print(f"\n  both         {len(p & a):>6,}")
+print(f"  only position{len(p - a):>7,}")
+print(f"  only annotation{len(a - p):>5,}")
+```
+
+For `CHEK2` the positional set turns out to be a clean subset of the
+annotated one — VEP assigns every in-body variant to the gene *and*
+reaches about 5 kb beyond it. That is common but not universal.
+
+Across all **958 chr22 genes** with build-38 coordinates and annotated
+variants:
+
+| | pairs |
+| --- | --- |
+| by position | 2,045,943 |
+| by annotation | 2,651,135 |
+| **only by position** | **144,488** (139 genes have at least one) |
+| only by annotation | ~749,680 |
+
+Only-position variants are the ones VEP attributed to a neighbouring
+gene, or to no gene at all. So neither mechanism contains the other, and
+nothing in the rows tells you which one you ran.
+
+### 4. So the report records the choice — twice
+
+Once as a column on every row, once in the provenance JSON. A CSV that
+gets separated from its provenance file still says which question it
+answers.
+
+```python
+result = bf.report.run(REPORT, input_data=[GENE], mapping="position")
+df = result.to_pandas()
+
+print("column :", df["mapping"].unique().tolist())
+print("provenance:")
+result.provenance["mapping"]
+```
+
+### 5. `window_bp` — widening the gene's range
+
+Applies to `position` only. Passing it with `mapping="annotation"` is an
+error rather than a silent no-op: VEP's own association already reaches
+past the gene body, so a window there would change nothing while looking
+like it had.
+
+```python
+for window in (0, 5_000, 50_000):
+    out = bf.report.run(REPORT, input_data=[GENE], mapping="position",
+                        window_bp=window, max_variants_per_gene=0).to_pandas()
+    print(f"  window_bp={window:>6,}  {len(out):>7,} rows")
+
+try:
+    bf.report.run(REPORT, input_data=[GENE], mapping="annotation", window_bp=5_000)
+except ValueError as exc:
+    print("\nrefused:", exc)
+```
+
+### 6. The cap, and why it announces itself
+
+`max_variants_per_gene` defaults to 5000. A capped gene looks exactly
+like a complete answer — a round number of rows and nothing admitting
+more existed — so the provenance says what was hidden, per gene.
+
+```python
+capped = bf.report.run(REPORT, input_data=["CHEK2", "SMARCB1"],
+                       mapping="position", max_variants_per_gene=200)
+
+print(capped.to_pandas().groupby("input_gene").size().to_dict())
+capped.provenance["truncation"]
 ```
 
 ```python
-# Full parameter template with defaults
-bf.report.example_input("gene_to_variant_filtering")
+# 0 means no cap — not "fall back to the default".
+uncapped = bf.report.run(REPORT, input_data=["CHEK2", "SMARCB1"],
+                         mapping="position", max_variants_per_gene=0)
+
+print(uncapped.to_pandas().groupby("input_gene").size().to_dict())
+print("applied:", uncapped.provenance["truncation"]["applied"])
 ```
 
----
+### 7. Four statuses, and one distinction that matters
 
-### 3. Run with built-in example input
+| status | means |
+| --- | --- |
+| `ok` | a variant |
+| `not_found` | the input did not resolve to a gene in this bundle |
+| `no_location` | the gene resolved, but the bundle has no build-38 coordinates — `position` cannot place it |
+| `no_variants` | the gene resolved and nothing met the criteria |
 
-Runs with `gene_symbols=["APOE"]`, `most_severe_only=True`, no filters.  
-Returns one row per variant overlapping the APOE locus.
+`no_location` is not a rare corner: **33,354 of the 72,660 genes in this
+bundle — 45.9% — have no build-38 coordinates**. For those, `annotation`
+is the only mapping that can answer anything.
+
+```python
+mixed = bf.report.run(REPORT, input_data=["CHEK2", "TP53", "NOT_A_GENE"],
+                      mapping="position", max_variants_per_gene=50).to_pandas()
+
+mixed.groupby(["input_gene", "status"]).size().to_frame("rows")
+```
+
+```python
+# TP53 is on chr17; this bundle carries chr22 only. The report says
+# which of the two reasons applies rather than returning an empty frame.
+mixed.query("status != 'ok'")[["input_gene", "status", "note"]]
+```
+
+### 8. One row per variant, or one per transcript
+
+`most_severe_only=True` (the default) collapses a variant's transcripts
+and keeps the worst consequence. Turn it off and a row becomes a
+gene-variant-**transcript** triple — counting rows then counts
+transcripts, not variants.
+
+```python
+for severe in (True, False):
+    out = bf.report.run(REPORT, input_data=[GENE], mapping="annotation",
+                        most_severe_only=severe, max_variants_per_gene=0).to_pandas()
+    print(f"  most_severe_only={str(severe):<5}  "
+          f"{len(out):>7,} rows  {out.variant_key.nunique():>6,} variants")
+```
+
+### 9. Filtering
+
+Frequency, impact, consequence and the in-silico predictors. They stack.
+
+```python
+rare_damaging = bf.report.run(
+    REPORT,
+    input_data=[GENE],
+    mapping="position",
+    af_max=0.001,
+    impact_filter=["HIGH", "MODERATE"],
+    cadd_phred_min=20,
+    max_variants_per_gene=0,
+).to_pandas()
+
+print(f"{len(rare_damaging):,} rows")
+rare_damaging[["variant_key", "rsid", "consequence", "impact",
+               "af_joint", "cadd_phred", "alphamissense_classification"]].head(8)
+```
+
+### 10. A missing predictor is a missing column, not a zero
+
+If the bundle carries no `variant_predictions` or `variant_alphamissense`
+table, those columns come back null for every row. The omission is
+recorded in the provenance `coverage` block — check it before concluding
+that nothing scored.
+
+```python
+result.provenance["coverage"]
+```
+
+```python
+# AlphaMissense needs two corrections to join, and both failures are
+# silent nulls: it versions transcript ids (ENST00000327374.9) where VEP
+# does not, and it scores a transcript VEP rarely calls most severe.
+#
+# So the join follows the grain of the row. One row per variant gets the
+# variant's score; one row per transcript gets that transcript's.
+for severe in (True, False):
+    out = bf.report.run(REPORT, input_data=[GENE], mapping="position",
+                        af_max=0.001, impact_filter=["HIGH", "MODERATE"],
+                        cadd_phred_min=20, most_severe_only=severe,
+                        max_variants_per_gene=0)
+    mis = out.to_pandas().query("consequence == 'missense_variant'")
+    scored = int(mis["alphamissense_score"].notna().sum())
+    print(f"  most_severe_only={str(severe):<5}  {len(mis):>6,} missense, "
+          f"{scored:>6,} scored  "
+          f"({out.provenance['alphamissense']['joined_on']})")
+```
+
+### 11. Export
+
+```python
+for path in result.write(OUTPUT_DIR / "expand_gene_to_variant.csv"):
+    print(path)
+```
+
+### 12. Chaining is your job, on purpose
+
+There is no report-to-report plumbing. Write the list out, look at it,
+pass it on.
+
+```python
+variants = df.query("status == 'ok'").variant_key.tolist()
+bf.report.run("expand_variant_regulatory", input_data=variants)
+```
+
+### 13. The same thing on the command line
+
+```bash
+biofilter report run --report-name expand_gene_to_variant \\
+    --input CHEK2 --input SMARCB1 \\
+    --param mapping=position \\
+    --param window_bp=5000 \\
+    --param af_max=0.01 \\
+    --output gene_variants.csv
+```
+
+
+
+<!-- ===== SOURCE FILE: notebooks/templates/reports__expand_variant_regulatory.ipynb.md ===== -->
+
+<h1>🎛️ Biofilter — Report: <code>expand_variant_regulatory</code></h1>
+
+Which genes a variant **regulates**, in which tissue, with what effect.
+
+Not the same question as `annotate_variant`, which reports the gene a
+variant sits *in*. They are usually different genes — see section 3.
+
+### 1. Open a bundle
+
+```python
+from pathlib import Path
+
+from biofilter import Biofilter
+
+BUNDLE = None
+REPORT = "expand_variant_regulatory"
+
+bf = Biofilter(bundle=BUNDLE, debug_mode=False) if BUNDLE else Biofilter(debug_mode=False)
+
+_root = next(
+    (p for p in [Path.cwd(), *Path.cwd().parents] if (p / ".biofilter.toml").is_file()),
+    Path.cwd(),
+)
+OUTPUT_DIR = _root / "notebooks" / "templates" / "outputs"
+OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+
+bf
+```
+
+### 2. Which tissues does this bundle carry
+
+Ask first. GTEx ships 50 tissues and the build loads a chosen subset, so
+absence of evidence here means absence **in these tissues**.
+
+```python
+import duckdb
+
+from biofilter.modules.report import Bundle
+
+with Bundle.open(bf.core.db_uri.removeprefix("parquet://")) as bundle:
+    tissues = bundle.con.execute(
+        "SELECT bio_context, count(*) AS n FROM variant_gtex "
+        "GROUP BY 1 ORDER BY n DESC"
+    ).to_arrow_table().to_pandas()
+
+print(f"{len(tissues)} tissues in this bundle")
+tissues
+```
+
+### 3. The gene it is in, and the gene it regulates
+
+This is the whole reason the report exists.
+
+```python
+result = bf.report.run(REPORT, input_data=["22:42914646"], p_value_max=1e-10)
+df = result.to_pandas()
+
+df[["variant_key", "position_gene_symbol", "regulated_gene_symbol",
+    "bio_context", "beta", "p_value"]].head(8)
+```
+
+On chr22 of this bundle, of 6,919,646 variant × gene pairs carrying both
+kinds of evidence, **88.5% name a different gene**. And 31,080 variants
+with regulatory evidence are classed by VEP as `intergenic`, `upstream`
+or `downstream` — outside any gene at all. For those, `annotate_variant`
+says "not in a gene" while the eQTL says "regulates this one".
+
+### 4. Three input shapes, mixed freely
+
+| shape | means |
+| --- | --- |
+| `APOE` | every variant inside that gene's range |
+| `rs429358` | that variant |
+| `22:42914646` | that position |
+
+Anything that is not an rsID or a position is read as a gene name.
+
+```python
+mixed = bf.report.run(
+    REPORT,
+    input_data=["DDT", "22:42914646", "rs4822455"],
+    p_value_max=1e-20,
+).to_pandas()
+
+mixed.groupby(["input_value", "input_kind"]).size().to_frame("rows")
+```
+
+### 5. Gene mode: what do variants in this gene regulate
+
+```python
+gene = bf.report.run(REPORT, input_data=["DDT"], p_value_max=1e-50).to_pandas()
+
+print(f"{len(gene):,} rows, "
+      f"{gene['regulated_gene_id'].nunique()} regulated genes, "
+      f"{gene['bio_context'].nunique()} tissues")
+
+gene.groupby("regulated_gene_symbol", dropna=False).agg(
+    tissues=("bio_context", "nunique"),
+    best_p=("p_value", "min"),
+).sort_values("best_p").head(10)
+```
+
+`flanking_bp` widens a gene's range, for promoter and downstream
+regions.
+
+```python
+for flank in (0, 5000, 50000):
+    out = bf.report.run(REPORT, input_data=["DDT"], flanking_bp=flank,
+                        p_value_max=1e-50).to_pandas()
+    print(f"  flanking_bp={flank:>6,}  {len(out):>6,} rows")
+```
+
+### 6. Narrowing by tissue and significance
+
+Tissue names come from the data. Pass whatever the bundle has.
+
+```python
+one_tissue = bf.report.run(
+    REPORT, input_data=["DDT"],
+    tissues=[tissues.iloc[0]["bio_context"]],
+    p_value_max=1e-50,
+).to_pandas()
+
+print(f"{tissues.iloc[0]['bio_context']}: {len(one_tissue):,} rows")
+one_tissue[["regulated_gene_symbol", "beta", "se", "p_value", "n"]].head(6)
+```
+
+### 7. Two kinds of null, both meaningful
+
+**`regulated_gene_symbol` null** — GTEx names its target by Ensembl id,
+and roughly 17% of those on chr22 have no BF4 entity (lncRNAs and
+pseudogenes without HGNC symbols). The evidence is real;
+`regulated_gene_id` is always there.
+
+**`position_gene_symbol` null** — the variant falls outside every gene
+body. Common, expected, and exactly the case this report is for.
+
+```python
+wide = bf.report.run(REPORT, input_data=["22:23913109"]).to_pandas()
+
+print("rows:", len(wide))
+print("regulated genes without a BF4 symbol:",
+      int(wide["regulated_gene_symbol"].isna().sum()))
+print("variant outside any gene body:",
+      bool(wide["position_gene_symbol"].isna().all()))
+```
+
+### 8. Export
+
+```python
+for path in result.write(OUTPUT_DIR / "expand_variant_regulatory.csv"):
+    print(path)
+```
+
+### 9. The same thing on the command line
+
+```bash
+biofilter report run --report-name expand_variant_regulatory \\
+    --input APOE \\
+    --param p_value_max=1e-8 --param flanking_bp=5000 \\
+    --output regulatory.csv
+```
+
+
+
+<!-- ===== SOURCE FILE: notebooks/templates/reports__pair_genes.ipynb.md ===== -->
+
+<h1>🎛️ Biofilter — Report: <code>pair_genes</code></h1>
+
+Which of these genes are related, and by what — and optionally, what that
+implies about a list of your own.
+
+Two stages: **connect** genes through a shared pathway, disease or
+protein, then **expand** — only if you ask — by a gene → item mapping you
+supply.
+
+Section 4 is the one to read. It is why this report exists rather than
+being a mode of `pair_variants`.
+
+### 1. Open a bundle
+
+```python
+from pathlib import Path
+
+from biofilter import Biofilter
+
+BUNDLE = None
+REPORT = "pair_genes"
+
+bf = Biofilter(bundle=BUNDLE, debug_mode=False) if BUNDLE else Biofilter(debug_mode=False)
+
+_root = next(
+    (p for p in [Path.cwd(), *Path.cwd().parents] if (p / ".biofilter.toml").is_file()),
+    Path.cwd(),
+)
+OUTPUT_DIR = _root / "notebooks" / "templates" / "outputs"
+OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+
+GENES = ["CHEK2", "SMARCB1", "NF2"]
+print(bf.core.db_uri)
+```
+
+### 2. Gene pairs, on their own
+
+No mapping: the answer is which of your genes are related, and by what.
+That question stands by itself, which is the argument for this being a
+report rather than a parameter of another one.
+
+```python
+pairs = bf.report.run(REPORT, input_data=GENES, group_types=["Proteins"])
+df = pairs.to_pandas()
+
+print(f"{len(df)} gene pairs, tables: {list(pairs.tables)}")
+df[["gene_1_symbol", "gene_2_symbol", "group_support_count",
+    "group_support_source_count", "group_support_sources"]]
+```
+
+`group_support_sources` names the curation from the bundle rather than
+guessing it from an accession prefix. Two curations agreeing is a
+different claim from one curation saying it twice, which is what
+`min_group_sources` filters on — and what `min_group_support` does not.
+
+### 3. `max_group_size` decides the size *and* the meaning
+
+A pathway naming 2,615 genes links its members while saying almost
+nothing about any of them. When a result comes back empty or thin, this
+is usually why — so the provenance says what the cut removed.
+
+```python
+for size in (200, 300, 1000, 0):
+    out = bf.report.run(REPORT, input_data=GENES, group_types=["Proteins"],
+                        max_group_size=size)
+    label = "no limit" if size == 0 else str(size)
+    print(f"  max_group_size={label:<9} {out.num_rows:>3} pairs")
+
+pairs.provenance["group_filter"]
+```
+
+### 4. Why this is not a mode of `pair_variants`
+
+`pair_variants` derives "this variant belongs to this gene" from
+coordinates. That is right for a coding variant and wrong for a
+regulatory one: a variant sits in one gene and acts on another.
+
+Ask the bundle how often those differ.
+
+```python
+from biofilter.modules.report import Bundle
+
+with Bundle.open(bf.core.db_uri.removeprefix("parquet://")) as bundle:
+    disagreement = bundle.con.execute("""
+        WITH linked AS (
+            SELECT DISTINCT
+                g.chromosome, g.position, g.reference_allele, g.alternate_allele,
+                g.gene_id AS regulated, e.gene AS sits_in
+            FROM variant_gtex g
+            JOIN variant_molecular_effects e
+              ON e.chromosome = g.chromosome AND e.position = g.position
+             AND e.reference_allele = g.reference_allele
+             AND e.alternate_allele = g.alternate_allele
+            WHERE e.gene IS NOT NULL AND g.gene_id IS NOT NULL
+        )
+        SELECT count(*) AS pairs,
+               count(*) FILTER (WHERE regulated <> sits_in) AS different_gene
+        FROM linked
+    """).to_arrow_table().to_pandas()
+
+share = disagreement.different_gene[0] / max(disagreement.pairs[0], 1)
+print(f"{disagreement.pairs[0]:,} variant x gene links carrying both kinds of evidence")
+print(f"{share:.1%} name a gene other than the one the variant sits in")
+```
+
+So when your evidence for the attachment comes from outside Biofilter —
+a colocalization, a fine-mapping, a curated list — `pair_variants` cannot
+use it: its stage 3 re-derives membership from coordinates and drops
+anything that disagrees, silently.
+
+`pair_genes` never derives it. It takes the link you supply.
+
+### 5. How you name a gene
+
+Three mechanisms, and you say which — for `input_data` and the mapping
+alike, since it is one decision about one thing.
+
+| `gene_identifier` | Looks in |
+| --- | --- |
+| `alias` (default) | every alias: symbols, synonyms, HGNC, Ensembl, Entrez |
+| a code system — `HGNC`, `ENTREZ`, `ENSEMBL`, … | only that system |
+| `entity_id` (or `biofilter_id`) | the bundle's key, skipping aliases |
+
+This is a parameter rather than something the report works out, because
+nothing can tell them apart by looking.
+
+```python
+from biofilter.modules.report import Bundle
+
+with Bundle.open(bf.core.db_uri.removeprefix("parquet://")) as bundle:
+    collisions = bundle.con.execute("""
+        SELECT count(*) AS numeric_aliases,
+               count(*) FILTER (WHERE gm.entity_id IS NOT NULL) AS also_an_entity_id
+        FROM entity_aliases a
+        LEFT JOIN gene_masters gm
+               ON gm.entity_id = TRY_CAST(a.alias_value AS BIGINT)
+              AND gm.entity_id <> a.entity_id
+        WHERE TRY_CAST(a.alias_value AS BIGINT) IS NOT NULL
+    """).to_arrow_table().to_pandas()
+
+print(f"{collisions.numeric_aliases[0]:,} aliases are bare numbers (Entrez ids)")
+print(f"{collisions.also_an_entity_id[0]:,} of them are the entity id of a *different* gene")
+print("\nEntrez 2 is A2M. Entity 2 is A1BG-AS1. A report that guessed would")
+print("return the wrong gene and say nothing.")
+```
+
+```python
+# The same three genes, named three ways.
+with Bundle.open(bf.core.db_uri.removeprefix("parquet://")) as bundle:
+    ids = bundle.con.execute(f"""
+        SELECT gm.symbol, gm.entity_id,
+               max(CASE WHEN a.xref_source='ENSEMBL' THEN a.alias_value END) AS ensembl
+        FROM gene_masters gm
+        JOIN entity_aliases a ON a.entity_id = gm.entity_id
+        WHERE gm.symbol IN ('CHEK2', 'SMARCB1', 'NF2')
+        GROUP BY 1, 2
+    """).to_arrow_table().to_pandas()
+
+for label, values, how in [
+    ("symbols",     ids.symbol.tolist(),               None),
+    ("Ensembl ids", ids.ensembl.tolist(),              "ensembl"),
+    ("entity ids",  ids.entity_id.astype(str).tolist(), "entity_id"),
+]:
+    kw = {"gene_identifier": how} if how else {}
+    out = bf.report.run(REPORT, input_data=values, group_types=["Proteins"], **kw)
+    print(f"  {label:<12} -> {out.num_rows} gene pairs")
+```
+
+Naming the code system is also a **narrower** search, not just a
+disambiguation: under `gene_identifier=entrez`, `2` can only be A2M
+because no other column is consulted.
+
+`entity_id` is the bundle's own key — exact, and scoped to the build that
+issued it (ADR-003 §2.5). A list of entity ids belongs with the
+`bundle_id` it came from.
+
+### 6. The mapping: two columns, gene then item
+
+Many-to-many in both directions. The worked example from ADR-005: three
+items on one gene, two on the other, one pair between them.
+
+```python
+MAPPING = {
+    "CHEK2":   ["111", "222", "333"],
+    "SMARCB1": ["444", "555"],
+}
+
+expanded = bf.report.run(REPORT, input_data=["CHEK2", "SMARCB1"],
+                         group_types=["Proteins"], mapping=MAPPING)
+
+print(f"tables: {list(expanded.tables)}")
+print(f"  result     {expanded.num_rows} item pairs   <- what write() exports")
+print(f"  gene_pairs {expanded.extra_tables['gene_pairs'].num_rows} gene pair")
+expanded.to_pandas()[["item_1", "item_2", "gene_1_symbol", "gene_2_symbol"]]
+```
+
+```python
+# The same thing from a file, which is what a real mapping arrives as.
+mapping_file = OUTPUT_DIR / "demo_mapping.tsv"
+mapping_file.write_text("\n".join(
+    f"{gene}\t{item}" for gene, items in MAPPING.items() for item in items) + "\n")
+
+from_file = bf.report.run(REPORT, input_data=["CHEK2", "SMARCB1"],
+                          group_types=["Proteins"], mapping_file=str(mapping_file))
+print("same answer:", from_file.num_rows == expanded.num_rows)
+```
+
+### 7. The item is never read
+
+Which is what makes gene→position, gene→rsID, gene→probe and
+gene→exposure one feature instead of four.
+
+**Biofilter is build 38 and managing build is yours** — but nothing here
+interprets a coordinate, so build-37 positions pass through correctly and
+Biofilter never has to know what one is.
+
+```python
+anything = bf.report.run(
+    REPORT, input_data=["CHEK2", "SMARCB1"], group_types=["Proteins"],
+    mapping={"CHEK2": ["17:7579472", "exposure:smoking"],
+             "SMARCB1": ["probe_0042"]},
+).to_pandas()
+
+anything[["item_1", "item_2"]]
+```
+
+The price of that is real and worth stating: the report cannot filter by
+allele frequency, resolve an rsID, or validate an item — and **two
+spellings of one thing are two things**. `22:100:A:G` and
+`chr22:100:A:G` are different items, and that bounds what the
+deduplication below can promise.
+
+### 8. Three rules the simple example does not show
+
+The cross product is not the work. These are, and they are identical for
+every caller — which is the argument for the platform owning them rather
+than each analysis re-deriving them.
+
+```python
+# An item on both genes would otherwise pair with itself.
+self_pair = bf.report.run(
+    REPORT, input_data=["CHEK2", "SMARCB1"], group_types=["Proteins"],
+    mapping={"CHEK2": ["X", "111"], "SMARCB1": ["X", "444"]},
+).to_pandas()
+
+print("pairs:", sorted(zip(self_pair.item_1, self_pair.item_2)))
+print("X paired with itself:", bool((self_pair.item_1 == self_pair.item_2).any()))
+```
+
+```python
+# Deduplication is global, not per gene pair: the same item pair arrives
+# through every gene pair linking it. On one real run that was 4.3% of
+# the answer — 72,554 against the 75,794 a naive sum(n1 x n2) reports.
+three = bf.report.run(
+    REPORT, input_data=GENES, group_types=["Proteins"],
+    mapping={"CHEK2": ["A"], "SMARCB1": ["B"], "NF2": ["A"]},
+)
+print(f"{three.extra_tables['gene_pairs'].num_rows} gene pairs "
+      f"-> {three.num_rows} item pair(s)")
+three.to_pandas()[["item_1", "item_2"]]
+```
+
+### 9. Both genes must carry an item
+
+Not "both were named". A gene can be in your input and carry nothing, and
+then there is nothing on its side to pair.
+
+For the same reason `membership="either"` is refused with a mapping: the
+partner gene came from the bundle, not from your list.
+
+```python
+partial = bf.report.run(REPORT, input_data=GENES, group_types=["Proteins"],
+                        mapping={"CHEK2": ["A"], "SMARCB1": ["B"]})
+print(f"NF2 is in the input and carries nothing -> {partial.num_rows} pair(s)")
+
+try:
+    bf.report.run(REPORT, input_data=["CHEK2"], membership="either",
+                  mapping={"CHEK2": ["A"]})
+except ValueError as exc:
+    print("\nrefused:", exc)
+```
+
+### 10. Export, and keeping both tables
+
+`write()` exports the primary table, which is the item pairs when you
+asked for them. `save()` keeps everything.
+
+```python
+for path in expanded.write(OUTPUT_DIR / "pair_genes.csv"):
+    print(path)
+
+saved = expanded.save(OUTPUT_DIR / "runs" / "pair_genes", overwrite=True)
+print("\nsaved:", saved)
+
+from biofilter.modules.report.result import ReportResult
+back = ReportResult.load(saved)
+print("tables back:", list(back.tables))
+```
+
+### 11. The same thing on the command line
+
+```bash
+biofilter report run --report-name pair_genes \\
+    --input CHEK2 --input SMARCB1 --input NF2 \\
+    --param group_types=Proteins \\
+    --param max_group_size=300 \\
+    --param mapping_file=./variant_to_gene.tsv \\
+    --output item_pairs.csv
+```
+
+
+
+<!-- ===== SOURCE FILE: notebooks/templates/reports__pair_variants.ipynb.md ===== -->
+
+<h1>🎛️ Biofilter — Report: <code>pair_variants</code></h1>
+
+Candidate variant × variant pairs whose genes share biology.
+
+**It takes variants** — rsIDs, `chr:pos`, `chr:pos:ref:alt` — and pairs
+the ones you named. Section 5 is about what it deliberately no longer
+does, and how to get it back in one visible step.
+
+### 1. Open a bundle, and get some variants
+
+```python
+from pathlib import Path
+
+from biofilter import Biofilter
+from biofilter.modules.report import Bundle
+
+BUNDLE = None
+REPORT = "pair_variants"
+
+bf = Biofilter(bundle=BUNDLE, debug_mode=False) if BUNDLE else Biofilter(debug_mode=False)
+
+_root = next(
+    (p for p in [Path.cwd(), *Path.cwd().parents] if (p / ".biofilter.toml").is_file()),
+    Path.cwd(),
+)
+OUTPUT_DIR = _root / "notebooks" / "templates" / "outputs"
+OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+
+# A realistic input: common variants in three genes that share biology.
+with Bundle.open(bf.core.db_uri.removeprefix("parquet://")) as bundle:
+    VARIANTS = [r[0] for r in bundle.con.execute("""
+        SELECT v.variant_key
+        FROM variant_masters v
+        JOIN entity_locations l ON l.build = 38 AND l.chromosome = v.chromosome
+         AND v.position BETWEEN l.start_pos AND l.end_pos
+        JOIN gene_masters gm ON gm.entity_id = l.entity_id
+        WHERE gm.symbol IN ('CHEK2', 'SMARCB1', 'NF2') AND v.af_joint > 0.05
+        ORDER BY v.af_joint DESC LIMIT 40
+    """).fetchall()]
+
+print(f"{len(VARIANTS)} variants, e.g. {VARIANTS[:2]}")
+```
+
+### 2. What can link two genes in this bundle
+
+A *group* is the entity sitting between two genes: a pathway they share,
+a disease both are implicated in, a protein both interact with.
+
+```python
+with Bundle.open(bf.core.db_uri.removeprefix("parquet://")) as bundle:
+    groups = bundle.con.execute("""
+        WITH ge AS (SELECT e.id FROM entities e JOIN entity_groups eg ON eg.id = e.group_id
+                    WHERE eg.name = 'Genes'),
+        link AS (
+            SELECT r.entity_1_id AS grp, r.entity_2_id AS gene FROM entity_relationships r
+            WHERE r.entity_2_id IN (SELECT id FROM ge) AND r.entity_1_id NOT IN (SELECT id FROM ge)
+            UNION ALL
+            SELECT r.entity_2_id, r.entity_1_id FROM entity_relationships r
+            WHERE r.entity_1_id IN (SELECT id FROM ge) AND r.entity_2_id NOT IN (SELECT id FROM ge))
+        SELECT eg.name AS group_type, count(DISTINCT l.grp) AS groups
+        FROM link l JOIN entities e ON e.id = l.grp
+        JOIN entity_groups eg ON eg.id = e.group_id
+        GROUP BY 1 ORDER BY 2 DESC
+    """).to_arrow_table().to_pandas()
+
+groups
+```
+
+### 3. Pair them
+
+One row is a pair of your variants whose genes share at least one
+group.
+
+```python
+pairs = bf.report.run(REPORT, input_data=VARIANTS, group_types=["Proteins"])
+df = pairs.to_pandas()
+
+print(f"{len(df):,} pairs from {len(VARIANTS)} variants")
+df[["variant_1_key", "gene_1_symbol", "variant_2_key", "gene_2_symbol",
+    "group_support_count", "group_support_sources"]].head(6)
+```
+
+### 4. `max_group_size`, and why an empty result is not "no biology"
+
+A pathway naming 2,615 genes links its members while saying almost
+nothing about any of them. When a result comes back empty or thin, this
+is usually why — so the provenance says what the cut removed.
+
+```python
+for size in (200, 300, 1000, 0):
+    out = bf.report.run(REPORT, input_data=VARIANTS, group_types=["Proteins"],
+                        max_group_size=size)
+    label = "no limit" if size == 0 else str(size)
+    print(f"  max_group_size={label:<9} {out.num_rows:>7,} pairs")
+
+pairs.provenance["group_filter"]
+```
+
+### 5. Starting from genes
+
+This report used to accept gene names and expand each one into the
+variants inside it. It no longer does, and the reason is not tidiness.
+
+A gene on chr22 holds about 4,000 variants. The report kept **100** of
+them, ranked by allele frequency, and you never saw which 100. Running
+the expansion yourself costs one step and puts that choice in front of
+the person making it.
+
+```python
+try:
+    bf.report.run(REPORT, input_data=["CHEK2", "SMARCB1"])
+except ValueError as exc:
+    print(exc)
+```
+
+```python
+# One visible step instead of one invisible one — and you can look at
+# and filter the list before anything is paired.
+expanded = bf.report.run("expand_gene_to_variant",
+                         input_data=["CHEK2", "SMARCB1"],
+                         mapping="position", af_max=0.01,
+                         impact_filter=["HIGH", "MODERATE"],
+                         max_variants_per_gene=0).to_pandas()
+
+keys = expanded.query("status == 'ok'").variant_key.drop_duplicates().tolist()
+print(f"{len(keys):,} rare, damaging variants — yours to filter further")
+
+from_genes = bf.report.run(REPORT, input_data=keys[:200], group_types=["Proteins"])
+print(f"{from_genes.num_rows:,} pairs")
+```
+
+Three parameters left with it. Passing one is an error rather than a
+silent change of answer:
+
+| gone | instead |
+| --- | --- |
+| gene names in `input_data` | `expand_gene_to_variant`, then pair its output |
+| `max_variants_per_gene` | the same parameter on `expand_gene_to_variant` |
+| `membership="either"` | `pair_genes(membership="either")` → expand the partners → pair |
+
+```python
+for name, value in [("membership", "either"),
+                    ("max_variants_per_gene", 10),
+                    ("output_grain", "gene_pairs")]:
+    try:
+        bf.report.run(REPORT, input_data=VARIANTS[:4], **{name: value})
+    except ValueError as exc:
+        print(f"{name}: {str(exc).splitlines()[-1].strip()}\n")
+```
+
+### 6. Support, and what it is not
+
+`group_support_count` counts the groups linking the two genes;
+`group_support_source_count` counts the **curations** that asserted them,
+read from the bundle rather than guessed from an accession prefix. Two
+curations agreeing is not one curation saying it twice.
+
+```python
+for support in (1, 10, 30):
+    out = bf.report.run(REPORT, input_data=VARIANTS, group_types=["Proteins"],
+                        min_group_support=support).to_pandas()
+    print(f"  min_group_support={support:>3}  {len(out):>7,} pairs")
+
+df.nlargest(5, "group_support_count")[
+    ["gene_1_symbol", "gene_2_symbol", "group_support_count",
+     "group_support_source_count", "group_support_sources"]
+]
+```
+
+It is a weight for ranking candidates — not a p-value, and not evidence
+of interaction. Change `max_group_size` and every count changes.
+
+### 7. Gene pairs are a different question
+
+Stage 2 on its own — which genes are related, and by what — is
+`pair_genes`. It also expands a gene pair by a list **you** supply, which
+is what to reach for when the variant-to-gene attachment comes from
+outside the bundle: a colocalization, a fine-mapping, a curated
+assignment.
+
+This report derives that attachment from coordinates, which is right for
+a coding variant and wrong for a regulatory one.
+
+```python
+partners = bf.report.run("pair_genes", input_data=["CHEK2"],
+                         group_types=["Proteins"], membership="either").to_pandas()
+
+print(f"{len(partners):,} partner genes for CHEK2")
+partners[["gene_1_symbol", "gene_2_symbol", "gene_2_from_input",
+          "group_support_count", "group_support_sources"]].head(6)
+```
+
+### 8. Export
+
+```python
+for path in pairs.write(OUTPUT_DIR / "pair_variants.csv"):
+    print(path)
+```
+
+### 9. The same thing on the command line
+
+```bash
+biofilter report run --report-name pair_variants \\
+    --input-file my_variants.txt \\
+    --param group_types=Proteins \\
+    --param max_group_size=300 \\
+    --param min_group_sources=2 \\
+    --output pairs.csv
+```
+
+
+
+<!-- ===== SOURCE FILE: notebooks/templates/reports__platform_data_statistics.ipynb.md ===== -->
+
+<h1>📊 Biofilter — Report: <code>platform_data_statistics</code></h1>
+
+What this bundle holds: how much, of what, and how big.
+
+A platform report — it describes the **bundle**, not the biology in it.
+Reach for it when you pick up a bundle you did not build and want to know
+what is actually in there.
+
+### 1. Open a bundle
+
+```python
+from pathlib import Path
+
+from biofilter import Biofilter
+
+# Leave as None to use `[database] bundle` from .biofilter.toml.
+BUNDLE = None
+REPORT = "platform_data_statistics"
+
+bf = Biofilter(bundle=BUNDLE, debug_mode=False) if BUNDLE else Biofilter(debug_mode=False)
+
+_root = next(
+    (p for p in [Path.cwd(), *Path.cwd().parents] if (p / ".biofilter.toml").is_file()),
+    Path.cwd(),
+)
+OUTPUT_DIR = _root / "notebooks" / "templates" / "outputs"
+OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+
+bf
+```
+
+### 2. One row per measurement
+
+Heterogeneous statistics do not fit a wide table, so this one is long:
+`section` and `metric` name the measurement, `dimension_1` and
+`dimension_2` say what it is measured by.
+
+Two sections cannot be held faithfully that way, and come back as tables
+of their own as well — sections 4 and 6 below.
+
+```python
+result = bf.report.run(REPORT)
+stats = result.to_pandas()
+
+print(f"{len(stats)} measurements")
+stats.groupby("section").size()
+```
+
+### 3. Which build is this
+
+`bundle_id` is what ties a result back to the data that produced it —
+the same id the provenance sidecar carries.
+
+```python
+stats[stats["section"] == "bundle"][
+    ["metric", "value_number", "value_text", "note"]
+]
+```
+
+`tables_without_rows` is the number to watch. A declared table with no
+rows is a source that was planned and did not land — it gets a
+measurement of its own rather than hiding in the per-table list.
+
+### 4. How big, per table
+
+Rows, bytes and file count come from `manifest.json`, so this section
+costs **no I/O at all** — the sizes of a multi-gigabyte bundle are read
+from a few hundred lines of JSON.
+
+In the long table a size survives twice and neither is usable:
+`value_text` rounds it to `"3.4 MB"` and `note` buries the figure in
+`"6 file(s), 3249124626 bytes"`. So `storage` also comes back as its own
+table, where `bytes` is an integer you can sort by.
+
+```python
+storage = result.extra_tables["storage"].to_pandas()
+
+print(f'{len(storage)} tables, {storage["bytes"].sum() / 1e9:.1f} GB in total')
+storage.nlargest(12, "bytes")[["table", "branch", "rows", "bytes", "files"]]
+```
 
 ```python
 import time
 
-start = time.time()
-df = bf.report.run_example("gene_to_variant_filtering")
-elapsed = time.time() - start
+# The manifest-only sections, timed.
+started = time.perf_counter()
+bf.report.run(REPORT, sections=["bundle", "storage"])
+print(f"bundle + storage: {time.perf_counter() - started:.2f}s")
 
-print(f"Rows: {len(df)} | Unique variants: {df['variant_id'].nunique()} | elapsed: {elapsed:.2f}s")
-df.head()
+started = time.perf_counter()
+bf.report.run(REPORT)
+print(f"everything:       {time.perf_counter() - started:.2f}s")
 ```
 
+### 5. What kinds of thing are in here
+
 ```python
-# Quick view of key columns
-display_cols = [
-    "gene_symbol", "chromosome", "position_start", "rsid",
-    "af", "consequence_name", "impact_name",
-    "lof_confidence", "cadd_phred",
-    "alphamissense_score", "alphamissense_classification",
-]
-df[[c for c in display_cols if c in df.columns]].head(20)
+stats[stats["section"] == "entities"][["dimension_1", "value_number"]]
 ```
 
----
+### 6. Variants per chromosome
 
-### 4. Impact filter — HIGH and MODERATE only
+Grouped from the data, not parsed out of filenames: the manifest counts
+rows per *file*, and a file happening to be one chromosome is a
+convention of the current build rather than a guarantee.
 
-The most common first-pass filter for coding-variant studies.
+It is affordable because `chromosome` is a real column with row-group
+statistics — hundreds of millions of rows group in about a second.
+
+Here too the long shape loses something: `dimension_2` is a string, so
+sorting it gives 1, 10, 11, 2. The `variants` table has the chromosome
+as an integer.
 
 ```python
-df_impact = bf.report.run(
-    "gene_to_variant_filtering",
-    # gene_symbols=["APOE", "CLU", "TOMM40", "BIN1"],
-    gene_symbols=["APOE"],
-    # impact_filter=["HIGH", "MODERATE"],
-    lof_confidence_filter=["HC", "LC"],
-    af_max=0.05,
-    most_severe_only=True,
-)
+variants = result.extra_tables.get("variants")
 
-print(f"Genes: {df_impact['gene_symbol'].nunique()} | Rows: {len(df_impact)} | Unique variants: {df_impact['variant_id'].nunique()}")
-df_impact.groupby(["gene_symbol", "impact_name"])["variant_id"].count().rename("variant_count").reset_index()
+if variants is not None:
+    frame = variants.to_pandas()
+    wide = frame.pivot_table(
+        index="chromosome", columns="table", values="rows", aggfunc="sum"
+    ).sort_index()
+    display(wide)
+else:
+    print("this bundle carries no variant tables")
 ```
 
-```python
-df_impact.to_clipboard()
-```
+⚠️ **A bundle built for a subset of chromosomes shows exactly that.**
+The chromosomes listed here are the ones the bundle has; every variant
+count elsewhere in Biofilter is about those and silent about the rest.
+Worth reading before concluding anything about the genome.
 
----
-
-### 5. Allele frequency filter — rare variants
-
-`af_max=0.01` keeps variants with frequency < 1% — standard rare-variant threshold.
+### 7. How things are connected
 
 ```python
-df_rare = bf.report.run(
-    "gene_to_variant_filtering",
-    gene_symbols=["APOE", "CLU", "TOMM40"],
-    af_max=0.01,
-    impact_filter=["HIGH", "MODERATE"],
-    most_severe_only=True,
-)
-
-df_all_freq = bf.report.run(
-    "gene_to_variant_filtering",
-    gene_symbols=["APOE", "CLU", "TOMM40"],
-    impact_filter=["HIGH", "MODERATE"],
-    most_severe_only=True,
-)
-
-print(f"AF < 0.01  → {df_rare['variant_id'].nunique()} variants")
-print(f"No AF filter → {df_all_freq['variant_id'].nunique()} variants")
-
-# AF distribution of filtered set
-df_rare["af"].describe()
-```
-
----
-
-### 6. LoF confidence filter
-
-LOFTEE annotates loss-of-function variants as `HC` (High Confidence) or `LC` (Low Confidence).  
-Note: applying this filter **keeps only** variants that have a LoF confidence annotation — it excludes non-LoF variants.
-
-```python
-df_lof_hc = bf.report.run(
-    "gene_to_variant_filtering",
-    gene_symbols=["BRCA1", "BRCA2", "TP53"],
-    lof_confidence_filter=["HC"],
-    impact_filter=["HIGH"],
-    most_severe_only=True,
-)
-
-print(f"Rows: {len(df_lof_hc)} | Unique variants: {df_lof_hc['variant_id'].nunique()}")
-
-display_cols = [
-    "gene_symbol", "rsid", "position_start", "af",
-    "consequence_name", "impact_name",
-    "lof_confidence", "hgvsc", "hgvsp",
-]
-df_lof_hc[[c for c in display_cols if c in df_lof_hc.columns]].head(20)
-```
-
----
-
-### 7. Consequence type filter
-
-`consequence_type_filter` accepts names at any level: consequence group, category, or individual consequence name.  
-They are resolved to `consequence_id`s before the main query — no post-filtering.
-
-```python
-df_missense = bf.report.run(
-    "gene_to_variant_filtering",
-    gene_symbols=["APOE", "CLU"],
-    consequence_type_filter=["missense_variant"],
-    most_severe_only=True,
-)
-
-print(f"missense_variant → {df_missense['variant_id'].nunique()} variants")
-df_missense[["gene_symbol", "rsid", "af", "consequence_name", "hgvsp", "alphamissense_score", "alphamissense_classification"]].head(15)
-```
-
----
-
-### 8. Effect prediction filters — AlphaMissense
-
-AlphaMissense classifies missense variants as `likely_pathogenic`, `ambiguous`, or `likely_benign`.  
-Filters are applied Python-side after a LEFT JOIN on `variant_effect_predictions`.
-
-```python
-df_am = bf.report.run(
-    "gene_to_variant_filtering",
-    gene_symbols=["APOE", "CLU", "TOMM40"],
-    consequence_type_filter=["missense_variant"],
-    alphamissense_classification=["likely_pathogenic"],
-    most_severe_only=True,
-)
-
-print(f"Likely pathogenic missense → {len(df_am)} rows, {df_am['variant_id'].nunique()} variants")
-df_am[["gene_symbol", "rsid", "af", "hgvsp", "alphamissense_score", "alphamissense_classification"]].sort_values("alphamissense_score", ascending=False).head(20)
-```
-
-```python
-# AlphaMissense score distribution across classifications
-df_all_missense = bf.report.run(
-    "gene_to_variant_filtering",
-    gene_symbols=["APOE"],
-    consequence_type_filter=["missense_variant"],
-    most_severe_only=True,
-)
-
-df_all_missense["alphamissense_classification"].value_counts(dropna=False)
-```
-
----
-
-### 9. CADD / SIFT / PolyPhen filters
-
-These scores are stored directly on `variant_masters` (`cadd_phred`, `sift_max`, `polyphen_max`) — filtered in SQL, no extra join.
-
-```python
-df_cadd = bf.report.run(
-    "gene_to_variant_filtering",
-    gene_symbols=["APOE", "CLU"],
-    impact_filter=["HIGH", "MODERATE"],
-    cadd_phred_min=20,
-    most_severe_only=True,
-)
-
-print(f"CADD Phred ≥ 20 → {df_cadd['variant_id'].nunique()} variants")
-df_cadd[["gene_symbol", "rsid", "af", "consequence_name", "cadd_phred", "sift_max", "polyphen_max"]].sort_values("cadd_phred", ascending=False).head(15)
-```
-
----
-
-### 10. `most_severe_only=False` — transcript-level output
-
-One row per variant × transcript. Useful for splice analysis, MANE Select filtering, or canonical-transcript studies.  
-AlphaMissense and other variant-level scores repeat on every transcript row.
-
-```python
-df_transcripts = bf.report.run(
-    "gene_to_variant_filtering",
-    gene_symbols=["APOE"],
-    impact_filter=["HIGH", "MODERATE"],
-    most_severe_only=False,   # ← transcript-level
-)
-
-print(f"most_severe_only=False → {len(df_transcripts)} rows, {df_transcripts['variant_id'].nunique()} unique variants")
-
-# Show a single variant with multiple transcripts
-ex_vid = df_transcripts["variant_id"].iloc[0]
-df_transcripts[df_transcripts["variant_id"] == ex_vid][
-    ["variant_id", "transcript_id", "consequence_name", "impact_name", "canonical", "mane_select", "hgvsc", "hgvsp"]
-]
-```
-
-```python
-# Filter to MANE Select transcript only
-df_mane = df_transcripts[df_transcripts["mane_select"] == True]
-print(f"MANE Select only → {df_mane['variant_id'].nunique()} variants")
-df_mane[["gene_symbol", "rsid", "transcript_id", "consequence_name", "impact_name", "hgvsp"]].head(10)
-```
-
----
-
-### 11. `gene_window_bp` — extend the locus
-
-Expands the gene boundary on each side before querying variants.  
-Useful to capture upstream regulatory or splice-region variants.
-
-```python
-df_no_win = bf.report.run(
-    "gene_to_variant_filtering",
-    gene_symbols=["APOE"],
-    most_severe_only=True,
-)
-
-df_with_win = bf.report.run(
-    "gene_to_variant_filtering",
-    gene_symbols=["APOE"],
-    gene_window_bp=2000,
-    most_severe_only=True,
-)
-
-print(f"No window  → {df_no_win['variant_id'].nunique()} variants")
-print(f"± 2 kb     → {df_with_win['variant_id'].nunique()} variants")
-```
-
----
-
-### 12. Resolution failure handling
-
-Failure cases return a single-row DataFrame with a non-null `resolution_status` — never raises an exception.
-
-```python
-cases = [
-    ("empty input",              {"gene_symbols": []}),
-    ("unknown gene symbol",      {"gene_symbols": ["NOTAREALGENE99"]}),
-    ("valid gene, strict LoF",   {"gene_symbols": ["APOE"], "lof_confidence_filter": ["HC"], "impact_filter": ["HIGH"], "af_max": 0.0001}),
+pairs = stats[
+    (stats["section"] == "relationships")
+    & (stats["metric"] == "relationships_by_group_pair")
 ]
 
-for label, params in cases:
-    result = bf.report.run("gene_to_variant_filtering", **params)
-    status = result["resolution_status"].iloc[0]
-    rows   = len(result)
-    print(f"{label:<35} → status={status!r}  rows={rows}")
+pairs[["dimension_1", "dimension_2", "value_number"]].head(10)
 ```
 
----
+```python
+stats[
+    (stats["section"] == "relationships")
+    & (stats["metric"] == "relationships_by_type")
+][["dimension_1", "value_number", "value_text"]]
+```
 
-### 14. CLI reference
+### 8. What each source contributed
+
+Every data source is listed, including ones that never ran — those have a
+null `value_text`. `platform_etl_status` is where to go for why.
+
+```python
+sources = stats[stats["section"] == "sources"]
+
+print(f"{len(sources)} sources; {int(sources['value_text'].isna().sum())} never ran")
+sources[["dimension_1", "dimension_2", "value_number", "value_text", "as_of"]].head(10)
+```
+
+### 9. Export
+
+```python
+for path in result.write(OUTPUT_DIR / "platform_data_statistics.csv"):
+    print(path)
+```
+
+### 10. The same thing on the command line
 
 ```bash
-# ── Basic: single gene
-biofilter report run \
-  --report-name gene_to_variant_filtering \
-  --param gene_symbols=APOE
-
-# ── Multiple genes, HIGH/MODERATE impact
-biofilter report run \
-  --report-name gene_to_variant_filtering \
-  --param gene_symbols="APOE,CLU,TOMM40,BIN1" \
-  --param impact_filter="HIGH,MODERATE" \
-  --param most_severe_only=true
-
-# ── Rare LoF HC variants
-biofilter report run \
-  --report-name gene_to_variant_filtering \
-  --param gene_symbols="BRCA1,BRCA2" \
-  --param af_max=0.001 \
-  --param lof_confidence_filter=HC \
-  --param impact_filter=HIGH
-
-# ── Missense + AlphaMissense pathogenic
-biofilter report run \
-  --report-name gene_to_variant_filtering \
-  --param gene_symbols="APOE,CLU" \
-  --param consequence_type_filter=missense_variant \
-  --param alphamissense_classification=likely_pathogenic
-
-# ── Save output
-biofilter report run \
-  --report-name gene_to_variant_filtering \
-  --param gene_symbols="APOE,CLU" \
-  --param impact_filter="HIGH,MODERATE" \
-  --output phase2_variants.csv
-
-# ── Inspect params template
-biofilter report run \
-  --report-name gene_to_variant_filtering \
-  --params-template
-```
-
----
-
-### 14. Pipeline context\n\n`
-``\nPhase 1 — Gene Discovery  (variant_single_gene_annotation)\n  input : one variant (chr:pos or rsID)\n  output: seed gene + partner-gene list with shared-group annotation\n  scale : ~8 k rows (tractable)\n          ↓ partner gene symbol list\n\nPhase 2 — Filtered Variant Collection  (this report)\n  input : list of gene symbols\n  output: 1 row per (gene × variant), all filters in SQL\n  scale : ~15 k–100 k rows, controlled by filters\n  export: lista_A.csv\n          ↓ lista_A.csv\n\nPhase 2.5 — Genotype Intersection  (variant_list_intersect)\n  input : lista_A.csv + VCF/PLINK variant list (Lista B)\n  output: variants present in BOTH — Lista C\n  export: lista_C.txt  (PLINK --extract ready)\n          ↓ [external] PLINK LD Pruning on lista_C.txt → Lista D\n\nPhase 3 — Pair Generation  (planned — snp_snp_pair_generator)\n  input : Lista D (LD-pruned, genotyped, annotated)\n  output: variant × variant interaction pairs (Lista D × Lista D)\n  scale : controlled by Phase 2 filtering\n```\n\n**Full pipeline tutorial:** `notebooks/Templates/pipeline__snp_snp_interaction.ipynb`\n\n**Why this separation matters:**  \nAPOE × 8 k partners × unfiltered variants = ~260 M rows before any filter.  \nWith `most_severe_only=True` + `impact=[HIGH, MODERATE]` + `af_max=0.05`:  \n~300 partners × ~50 variants = **~15 k rows** — Phase 3 becomes tractable.
-
-
-
-<!-- ===== SOURCE FILE: notebooks/Templates/reports__platform_data_statistics.ipynb.md ===== -->
-
-<h1> Biofilter - Report: Platform Data Statistics </h1>
-
-Dashboard-ready platform statistics:
-- entities by domain
-- variants by chromosome
-- relationships by group pair
-- datasource latest load status/recency
-
-### 1. Start Biofilter
-
-```python
-from biofilter import Biofilter
-import pandas as pd
-
-prod_uri = "parquet:///project/hall_shared/datasets/biofilter/<YYYYMMDD>/tables"
-
-# bf = Biofilter(debug_mode=False)
-bf = Biofilter(db_uri=prod_uri, debug_mode=False)
-```
-
-### 2. Inspect report metadata
-
-```python
-report_name = 'platform_data_statistics'
-
-print('name:', report_name)
-print('available columns:')
-print(bf.report.available_columns(report_name))
-
-print('\nexample_input:')
-print(bf.report.example_input(report_name))
-
-print('\nexplain:')
-print(bf.report.explain(report_name))
-```
-
-### 3. Run default dashboard dataset
-
-```python
-df = bf.report.run(
-    'platform_data_statistics',
-    only_active_entities=True,
-    relationship_mode='undirected',
-    include_totals=True,
-)
-
-print('rows:', len(df))
-```
-
-```python
-print('Sections found:')
-print(sorted(df['section'].dropna().unique().tolist()))
-df.groupby(['section', 'metric'], dropna=False).size().reset_index(name='rows').sort_values(['section', 'metric']).head(100)
-```
-
-### 4. Treemap - Entities by Omic Domain and Data Source
-
-```python
-import matplotlib.pyplot as plt
-from matplotlib import patches
-from matplotlib import colors as mcolors
-from sqlalchemy import func
-
-from biofilter.modules.db.models import ETLDataSource, Entity, EntityGroup
-
-
-def _split_treemap(items, x, y, w, h):
-    """Simple binary treemap split (no external deps)."""
-    if not items:
-        return []
-    if len(items) == 1:
-        label, size = items[0]
-        return [(label, size, x, y, w, h)]
-
-    total = sum(size for _, size in items)
-    if total <= 0:
-        return []
-
-    half = total / 2.0
-    acc = 0.0
-    split_idx = 1
-    for i, (_, size) in enumerate(items, start=1):
-        acc += size
-        split_idx = i
-        if acc >= half:
-            break
-
-    left = items[:split_idx]
-    right = items[split_idx:]
-
-    if not right:
-        left, right = items[:-1], items[-1:]
-
-    left_total = sum(size for _, size in left)
-    ratio = left_total / total if total else 0.5
-
-    if w >= h:
-        w_left = w * ratio
-        return _split_treemap(left, x, y, w_left, h) + _split_treemap(right, x + w_left, y, w - w_left, h)
-
-    h_top = h * ratio
-    return _split_treemap(left, x, y, w, h_top) + _split_treemap(right, x, y + h_top, w, h - h_top)
-
-
-with bf.db.get_session() as session:
-    q = (
-        session.query(
-            EntityGroup.name.label('omic_domain'),
-            ETLDataSource.name.label('data_source'),
-            func.count(Entity.id).label('entity_count'),
-        )
-        .join(Entity, Entity.group_id == EntityGroup.id)
-        .outerjoin(ETLDataSource, ETLDataSource.id == Entity.data_source_id)
-        .filter(Entity.is_active.isnot(False))
-        .group_by(EntityGroup.name, ETLDataSource.name)
-        .order_by(EntityGroup.name, ETLDataSource.name)
-    )
-    rows = q.all()
-
-df_entities_ds = pd.DataFrame(rows, columns=['omic_domain', 'data_source', 'entity_count'])
-
-if df_entities_ds.empty:
-    print('No entity count rows to plot.')
-else:
-    df_entities_ds['data_source'] = df_entities_ds['data_source'].fillna('unknown')
-    df_entities_ds['label'] = df_entities_ds['omic_domain'] + ' | ' + df_entities_ds['data_source']
-    df_entities_ds = df_entities_ds.sort_values('entity_count', ascending=False)
-
-    items = list(zip(df_entities_ds['label'], df_entities_ds['entity_count']))
-    rects = _split_treemap(items, 0.0, 0.0, 1.0, 1.0)
-
-    domains = sorted(df_entities_ds['omic_domain'].dropna().unique().tolist())
-    cmap = plt.get_cmap('tab20')
-    domain_color = {d: cmap(i % 20) for i, d in enumerate(domains)}
-
-    fig, ax = plt.subplots(figsize=(14, 8))
-
-    for label, size, x, y, w, h in rects:
-        domain = label.split(' | ', 1)[0]
-        color = domain_color.get(domain, '#bdbdbd')
-        ax.add_patch(
-            patches.Rectangle(
-                (x, y), w, h,
-                facecolor=color,
-                edgecolor='white',
-                linewidth=1.0,
-            )
-        )
-
-        area = w * h
-        if area >= 0.015:
-            text = f"{label}\n{int(size):,}"
-            r, g, b, _ = mcolors.to_rgba(color)
-            luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b
-            text_color = 'black' if luminance > 0.6 else 'white'
-            font_size = 11 if area >= 0.06 else 10
-            ax.text(
-                x + w / 2,
-                y + h / 2,
-                text,
-                ha='center',
-                va='center',
-                fontsize=font_size,
-                color=text_color,
-            )
-
-    ax.set_xlim(0, 1)
-    ax.set_ylim(0, 1)
-    ax.axis('off')
-    ax.set_title('Entity Count Treemap by Omic Domain and Data Source', fontsize=14)
-    plt.tight_layout()
-    plt.show()
-
-df_entities_ds.sort_values('entity_count', ascending=False).head(50)
-```
-
-### 4.1 Treemap - Entities by Omic Domain (Aggregated Data Sources)
-
-```python
-# 4.1 Aggregate all data sources into Omic Domain totals
-if 'df_entities_ds' in locals() and not df_entities_ds.empty:
-    df_domain = (
-        df_entities_ds
-        .groupby('omic_domain', as_index=False)['entity_count']
-        .sum()
-    )
-else:
-    df_domain = df[(df['section'] == 'entity_counts_by_group') & (df['metric'] == 'entity_count')].copy()
-    df_domain = df_domain.rename(columns={'dimension_1': 'omic_domain', 'value_number': 'entity_count'})
-    df_domain = df_domain[['omic_domain', 'entity_count']]
-
-df_domain = df_domain.sort_values('entity_count', ascending=False)
-
-if df_domain.empty:
-    print('No aggregated entity count rows to plot.')
-else:
-    items = list(zip(df_domain['omic_domain'], df_domain['entity_count']))
-    rects = _split_treemap(items, 0.0, 0.0, 1.0, 1.0)
-
-    domains = sorted(df_domain['omic_domain'].dropna().unique().tolist())
-    cmap = plt.get_cmap('tab20')
-    domain_color = {d: cmap(i % 20) for i, d in enumerate(domains)}
-
-    fig, ax = plt.subplots(figsize=(12, 6))
-
-    for domain, size, x, y, w, h in rects:
-        color = domain_color.get(domain, '#bdbdbd')
-        ax.add_patch(
-            patches.Rectangle(
-                (x, y), w, h,
-                facecolor=color,
-                edgecolor='white',
-                linewidth=1.2,
-            )
-        )
-
-        area = w * h
-        if area >= 0.02:
-            text = f"{domain}\n{int(size):,}"
-            r, g, b, _ = mcolors.to_rgba(color)
-            luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b
-            text_color = 'black' if luminance > 0.6 else 'white'
-            font_size = 13 if area >= 0.12 else 11
-            ax.text(
-                x + w / 2,
-                y + h / 2,
-                text,
-                ha='center',
-                va='center',
-                fontsize=font_size,
-                color=text_color,
-            )
-
-    ax.set_xlim(0, 1)
-    ax.set_ylim(0, 1)
-    ax.axis('off')
-    ax.set_title('Entity Count Treemap by Omic Domain (All Data Sources Aggregated)', fontsize=14)
-    plt.tight_layout()
-    plt.show()
-
-df_domain.head(50)
-```
-
-### 5. Plot - Variants by Chromosome
-
-```python
-from matplotlib.ticker import FuncFormatter
-
-df_var = df[(df['section'] == 'variant_counts_by_chromosome') & (df['metric'] == 'variant_count')].copy()
-
-
-def _sort_chr_key(x):
-    s = str(x).strip().lower().replace('chr', '')
-    if s == 'x':
-        return 23
-    if s == 'y':
-        return 24
-    if s in {'mt', 'm'}:
-        return 25
-    try:
-        return int(s)
-    except Exception:
-        return 10_000
-
-
-def _chr_display(x):
-    s = str(x).strip().lower().replace('chr', '')
-    if s == 'x':
-        return 'chrX'
-    if s == 'y':
-        return 'chrY'
-    if s in {'mt', 'm'}:
-        return 'chrMT'
-    return f"chr{s}"
-
-
-if df_var.empty:
-    print('No variant rows to plot (or variant_masters not available).')
-else:
-    df_var['chromosome_raw'] = df_var['dimension_1'].astype(str)
-    df_var['chromosome_sort'] = df_var['chromosome_raw'].map(_sort_chr_key)
-    df_var['chromosome_label'] = df_var['chromosome_raw'].map(_chr_display)
-    df_var = df_var.sort_values(['chromosome_sort', 'chromosome_label'], na_position='last')
-
-    fig, ax = plt.subplots(figsize=(13, 4.8))
-    bars = ax.bar(df_var['chromosome_label'], df_var['value_number'], color='#3a86ff', edgecolor='white', linewidth=0.8)
-
-    ax.set_title('Variant Count by Chromosome', fontsize=14, fontweight='bold')
-    ax.set_xlabel('Chromosome')
-    ax.set_ylabel('Variants')
-    ax.yaxis.set_major_formatter(FuncFormatter(lambda y, _: f"{int(y):,}"))
-    ax.tick_params(axis='x', rotation=45)
-    ax.grid(axis='y', alpha=0.25)
-
-    ymax = float(df_var['value_number'].max() or 0)
-    for b in bars:
-        h = b.get_height()
-        if ymax > 0 and h >= ymax * 0.08:
-            ax.text(
-                b.get_x() + b.get_width() / 2,
-                h,
-                f"{int(h):,}",
-                ha='center',
-                va='bottom',
-                fontsize=8,
-                color='#1f2d3d',
-            )
-
-    plt.tight_layout()
-    plt.show()
-
-df_var[['chromosome_label', 'value_number']].head(50)
-```
-
-### 6. Plot - Relationship Group Pairs (Top 20)
-
-```python
-from matplotlib.ticker import FuncFormatter
-
-df_rel = df[(df['section'] == 'relationship_counts_by_group_pair') & (df['metric'] == 'relationship_count')].copy()
-
-if df_rel.empty:
-    print('No relationship rows to plot.')
-else:
-    df_rel['pair'] = df_rel['dimension_1'].astype(str) + ' × ' + df_rel['dimension_2'].astype(str)
-    df_rel = df_rel.sort_values('value_number', ascending=False).head(20)
-
-    fig, ax = plt.subplots(figsize=(11.5, 7))
-    bars = ax.barh(
-        df_rel['pair'][::-1],
-        df_rel['value_number'][::-1],
-        color='#577590',
-        edgecolor='white',
-        linewidth=0.7,
-    )
-
-    ax.set_title('Top 20 Relationship Group Pairs', fontsize=14, fontweight='bold')
-    ax.set_xlabel('Relationships')
-    ax.xaxis.set_major_formatter(FuncFormatter(lambda x, _: f"{int(x):,}"))
-    ax.grid(axis='x', alpha=0.25)
-
-    xmax = float(df_rel['value_number'].max() or 0)
-    for b in bars:
-        w = b.get_width()
-        ax.text(
-            w + (xmax * 0.01 if xmax else 0.5),
-            b.get_y() + b.get_height() / 2,
-            f"{int(w):,}",
-            va='center',
-            fontsize=8,
-            color='#1d3557',
-        )
-
-    plt.tight_layout()
-    plt.show()
-
-df_rel[['pair', 'value_number']].head(20)
-```
-
-### 6.1 Plot - Relationship Group Pairs Heatmap
-
-```python
-import numpy as np
-
-df_rel_all = df[(df['section'] == 'relationship_counts_by_group_pair') & (df['metric'] == 'relationship_count')].copy()
-df_rel_all['value_number'] = pd.to_numeric(df_rel_all['value_number'], errors='coerce').fillna(0)
-
-if df_rel_all.empty:
-    print('No relationship rows to plot heatmap.')
-else:
-    groups = sorted(set(df_rel_all['dimension_1'].astype(str)) | set(df_rel_all['dimension_2'].astype(str)))
-    mat = pd.DataFrame(0.0, index=groups, columns=groups)
-
-    for _, row in df_rel_all.iterrows():
-        g1 = str(row['dimension_1'])
-        g2 = str(row['dimension_2'])
-        mat.loc[g1, g2] += float(row['value_number'])
-
-    # Symmetric view is usually easier to read for group-pair relationship density.
-    mat_view = mat.combine(mat.T, np.maximum)
-
-    fig, ax = plt.subplots(figsize=(9, 7))
-    im = ax.imshow(mat_view.values, cmap='YlOrRd')
-
-    ax.set_xticks(range(len(groups)))
-    ax.set_yticks(range(len(groups)))
-    ax.set_xticklabels(groups, rotation=45, ha='right', fontsize=10)
-    ax.set_yticklabels(groups, fontsize=10)
-    ax.set_title('Relationship Density Heatmap by Group Pair', fontsize=14)
-
-    if len(groups) <= 12:
-        vmax = float(mat_view.values.max() or 1.0)
-        for i in range(len(groups)):
-            for j in range(len(groups)):
-                value = int(mat_view.iat[i, j])
-                if value > 0:
-                    txt_color = 'black' if (value / vmax) < 0.6 else 'white'
-                    ax.text(j, i, f"{value:,}", ha='center', va='center', fontsize=9, color=txt_color)
-
-    cbar = fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
-    cbar.set_label('Relationships', rotation=90)
-
-    plt.tight_layout()
-    plt.show()
-
-mat_view if 'mat_view' in locals() else df_rel_all.head(20)
-```
-
-### 6.2 Plot - Relationship Group Network (Top Weighted Pairs)
-
-```python
-import numpy as np
-
-if 'df_rel_all' not in locals() or df_rel_all.empty:
-    df_rel_net = df[(df['section'] == 'relationship_counts_by_group_pair') & (df['metric'] == 'relationship_count')].copy()
-    df_rel_net['value_number'] = pd.to_numeric(df_rel_net['value_number'], errors='coerce').fillna(0)
-else:
-    df_rel_net = df_rel_all.copy()
-
-if df_rel_net.empty:
-    print('No relationship rows to plot network.')
-else:
-    top_edges = (
-        df_rel_net
-        .sort_values('value_number', ascending=False)
-        .head(30)
-        .copy()
-    )
-
-    top_edges['source'] = top_edges['dimension_1'].astype(str)
-    top_edges['target'] = top_edges['dimension_2'].astype(str)
-
-    nodes = sorted(set(top_edges['source']) | set(top_edges['target']))
-
-    if len(nodes) < 2:
-        print('Insufficient groups to build a network plot.')
-    else:
-        angles = np.linspace(0, 2 * np.pi, len(nodes), endpoint=False)
-        pos = {node: (np.cos(a), np.sin(a)) for node, a in zip(nodes, angles)}
-
-        node_weight = {node: 0.0 for node in nodes}
-        for _, row in top_edges.iterrows():
-            v = float(row['value_number'])
-            node_weight[row['source']] += v
-            node_weight[row['target']] += v
-
-        max_edge = float(top_edges['value_number'].max() or 1.0)
-        max_node = float(max(node_weight.values()) or 1.0)
-
-        fig, ax = plt.subplots(figsize=(9, 9))
-
-        for _, row in top_edges.iterrows():
-            s, t, v = row['source'], row['target'], float(row['value_number'])
-            x1, y1 = pos[s]
-            x2, y2 = pos[t]
-            strength = v / max_edge if max_edge else 0.0
-            lw = 0.8 + 5.0 * strength
-            alpha = 0.2 + 0.6 * strength
-            ax.plot([x1, x2], [y1, y2], color='dimgray', linewidth=lw, alpha=alpha, zorder=1)
-
-        xs = [pos[n][0] for n in nodes]
-        ys = [pos[n][1] for n in nodes]
-        sizes = [450 + 2400 * (node_weight[n] / max_node if max_node else 0.0) for n in nodes]
-
-        ax.scatter(xs, ys, s=sizes, c='#1f77b4', edgecolors='white', linewidths=1.4, zorder=3)
-
-        for node in nodes:
-            x, y = pos[node]
-            ax.text(x * 1.13, y * 1.13, node, ha='center', va='center', fontsize=11, fontweight='bold')
-
-        ax.set_title('Relationship Group Network (Top 30 Weighted Pairs)', fontsize=14)
-        ax.set_aspect('equal')
-        ax.axis('off')
-        plt.tight_layout()
-        plt.show()
-
-    top_edges[['source', 'target', 'value_number']].head(30)
-```
-
-### 6.3 Plot - Directed Relationship Sankey (Top Domains)
-
-```python
-from matplotlib.sankey import Sankey
-
-# Build a directed-only view for flow visualization.
-df_rel_dir = bf.report.run(
-    'platform_data_statistics',
-    sections=['relationship_counts_by_group_pair'],
-    relationship_mode='directed',
-    include_totals=False,
-    only_active_entities=True,
-)
-
-df_rel_dir = df_rel_dir[
-    (df_rel_dir['section'] == 'relationship_counts_by_group_pair')
-    & (df_rel_dir['metric'] == 'relationship_count')
-].copy()
-
-df_rel_dir['source'] = df_rel_dir['dimension_1'].astype(str)
-df_rel_dir['target'] = df_rel_dir['dimension_2'].astype(str)
-df_rel_dir['value_number'] = pd.to_numeric(df_rel_dir['value_number'], errors='coerce').fillna(0)
-
-if df_rel_dir.empty:
-    print('No directed relationship rows to plot Sankey.')
-else:
-    out_sum = df_rel_dir.groupby('source')['value_number'].sum()
-    in_sum = df_rel_dir.groupby('target')['value_number'].sum()
-    traffic = out_sum.add(in_sum, fill_value=0).sort_values(ascending=False)
-
-    top_n_domains = 6
-    top_domains = traffic.head(top_n_domains).index.tolist()
-
-    df_sankey = df_rel_dir[
-        df_rel_dir['source'].isin(top_domains)
-        & df_rel_dir['target'].isin(top_domains)
-    ].copy()
-
-    if df_sankey.empty:
-        print('No directed rows among top domains to plot Sankey.')
-    else:
-        out_top = df_sankey.groupby('source')['value_number'].sum().sort_values(ascending=False)
-        in_top = df_sankey.groupby('target')['value_number'].sum().sort_values(ascending=False)
-
-        out_top = out_top[out_top > 0]
-        in_top = in_top[in_top > 0]
-
-        flows = [-float(v) for v in out_top.values] + [float(v) for v in in_top.values]
-        labels = [f"out: {k}" for k in out_top.index] + [f"in: {k}" for k in in_top.index]
-        orientations = [-1] * len(out_top) + [1] * len(in_top)
-
-        if len(flows) < 2:
-            print('Insufficient flow groups to plot Sankey.')
-        else:
-            balance = sum(flows)
-            if abs(balance) > 1e-9:
-                flows[-1] -= balance
-
-            scale = 1.0 / max(sum(abs(v) for v in flows), 1.0)
-
-            fig, ax = plt.subplots(figsize=(12, 7))
-            sankey = Sankey(ax=ax, scale=scale, unit=None, format='%.0f')
-            sankey.add(
-                flows=flows,
-                labels=labels,
-                orientations=orientations,
-                trunklength=1.0,
-                pathlengths=[0.5] * len(flows),
-                facecolor='#2a9d8f',
-                alpha=0.75,
-            )
-            sankey.finish()
-
-            ax.set_title('Directed Relationship Flow Sankey (Top 6 Domains)', fontsize=14)
-            plt.tight_layout()
-            plt.show()
-
-    df_sankey[['source', 'target', 'value_number']].sort_values('value_number', ascending=False).head(30)
-```
-
-### 6.4 Plot - Entity-Level Network (Node Color = Entity Group)
-
-```python
-import numpy as np
-from matplotlib import patches as mpatches
-from sqlalchemy import case, func, select, union_all
-from sqlalchemy.orm import aliased
-
-from biofilter.modules.db.models import Entity, EntityAlias, EntityGroup, EntityRelationship
-
-# Tune for readability/performance
-max_nodes = 50
-max_edges = 3500
-label_top_n = 50
-exclude_relationship_type_id = 1  # remove hierarchy links (e.g., pathway-pathway)
-
-# 1) Pick the most connected entities (degree = in + out relationships)
-deg_src = (
-    select(
-        EntityRelationship.entity_1_id.label('entity_id'),
-        func.count(EntityRelationship.id).label('deg'),
-    )
-    .where(EntityRelationship.relationship_type_id != exclude_relationship_type_id)
-    .group_by(EntityRelationship.entity_1_id)
-)
-deg_tgt = (
-    select(
-        EntityRelationship.entity_2_id.label('entity_id'),
-        func.count(EntityRelationship.id).label('deg'),
-    )
-    .where(EntityRelationship.relationship_type_id != exclude_relationship_type_id)
-    .group_by(EntityRelationship.entity_2_id)
-)
-deg_union = union_all(deg_src, deg_tgt).subquery()
-degree_sum = func.sum(deg_union.c.deg).label('degree')
-
-A = aliased(EntityAlias)
-
-with bf.db.get_session() as session:
-    top_entities = (
-        session.query(
-            deg_union.c.entity_id.label('entity_id'),
-            degree_sum,
-        )
-        .group_by(deg_union.c.entity_id)
-        .order_by(degree_sum.desc())
-        .limit(max_nodes)
-        .all()
-    )
-
-    top_ids = [int(r.entity_id) for r in top_entities]
-
-    if not top_ids:
-        df_entity_edges = pd.DataFrame(columns=['node_a', 'node_b', 'weight'])
-        entity_meta_rows = []
-    else:
-        entity_meta_rows = (
-            session.query(
-                Entity.id.label('entity_id'),
-                EntityGroup.name.label('group_name'),
-                A.alias_value.label('entity_name'),
-            )
-            .outerjoin(EntityGroup, EntityGroup.id == Entity.group_id)
-            .outerjoin(A, (A.entity_id == Entity.id) & (A.is_primary.is_(True)))
-            .filter(Entity.id.in_(top_ids))
-            .all()
-        )
-
-        node_a = case(
-            (EntityRelationship.entity_1_id <= EntityRelationship.entity_2_id, EntityRelationship.entity_1_id),
-            else_=EntityRelationship.entity_2_id,
-        ).label('node_a')
-        node_b = case(
-            (EntityRelationship.entity_1_id <= EntityRelationship.entity_2_id, EntityRelationship.entity_2_id),
-            else_=EntityRelationship.entity_1_id,
-        ).label('node_b')
-        edge_weight = func.count(EntityRelationship.id).label('weight')
-
-        edge_rows = (
-            session.query(node_a, node_b, edge_weight)
-            .filter(
-                EntityRelationship.entity_1_id.in_(top_ids),
-                EntityRelationship.entity_2_id.in_(top_ids),
-                EntityRelationship.entity_1_id != EntityRelationship.entity_2_id,
-                EntityRelationship.relationship_type_id != exclude_relationship_type_id,
-            )
-            .group_by(node_a, node_b)
-            .order_by(edge_weight.desc())
-            .limit(max_edges)
-            .all()
-        )
-
-        df_entity_edges = pd.DataFrame(edge_rows, columns=['node_a', 'node_b', 'weight'])
-
-if df_entity_edges.empty:
-    print('No entity-level relationship edges found for the selected limits.')
-else:
-    # Build name/group maps
-    name_map = {}
-    group_map = {}
-
-    for row in entity_meta_rows:
-        eid = int(row.entity_id)
-        if eid not in name_map and row.entity_name:
-            name_map[eid] = str(row.entity_name)
-        if eid not in group_map and row.group_name:
-            group_map[eid] = str(row.group_name)
-
-    used_nodes = sorted(set(df_entity_edges['node_a'].astype(int)) | set(df_entity_edges['node_b'].astype(int)))
-
-    for eid in used_nodes:
-        name_map.setdefault(eid, f'Entity {eid}')
-        group_map.setdefault(eid, 'unknown')
-
-    # Circle layout sorted by group to make color clusters easier to read.
-    ordered_nodes = sorted(used_nodes, key=lambda n: (group_map[n], name_map[n].lower()))
-    angles = np.linspace(0, 2 * np.pi, len(ordered_nodes), endpoint=False)
-    pos = {n: (np.cos(a), np.sin(a)) for n, a in zip(ordered_nodes, angles)}
-
-    node_weight = {n: 0.0 for n in ordered_nodes}
-    for _, row in df_entity_edges.iterrows():
-        n1 = int(row['node_a'])
-        n2 = int(row['node_b'])
-        w = float(row['weight'])
-        node_weight[n1] += w
-        node_weight[n2] += w
-
-    groups = sorted({group_map[n] for n in ordered_nodes})
-    cmap = plt.get_cmap('tab20')
-    group_color = {g: cmap(i % 20) for i, g in enumerate(groups)}
-
-    max_edge = float(df_entity_edges['weight'].max() or 1.0)
-    max_node = float(max(node_weight.values()) or 1.0)
-
-    fig, ax = plt.subplots(figsize=(13, 13))
-
-    for _, row in df_entity_edges.iterrows():
-        n1 = int(row['node_a'])
-        n2 = int(row['node_b'])
-        w = float(row['weight'])
-        x1, y1 = pos[n1]
-        x2, y2 = pos[n2]
-        strength = w / max_edge if max_edge else 0.0
-        lw = 0.4 + 3.0 * strength
-        alpha = 0.10 + 0.35 * strength
-        ax.plot([x1, x2], [y1, y2], color='gray', linewidth=lw, alpha=alpha, zorder=1)
-
-    xs = [pos[n][0] for n in ordered_nodes]
-    ys = [pos[n][1] for n in ordered_nodes]
-    sizes = [80 + 900 * (node_weight[n] / max_node if max_node else 0.0) for n in ordered_nodes]
-    colors = [group_color[group_map[n]] for n in ordered_nodes]
-
-    ax.scatter(xs, ys, s=sizes, c=colors, edgecolors='white', linewidths=0.8, zorder=3)
-
-    # Label only the top hubs to avoid clutter.
-    hubs = sorted(ordered_nodes, key=lambda n: node_weight[n], reverse=True)[:label_top_n]
-    for n in hubs:
-        x, y = pos[n]
-        ax.text(x * 1.08, y * 1.08, name_map[n], fontsize=8, ha='center', va='center')
-
-    group_counts = pd.Series([group_map[n] for n in ordered_nodes]).value_counts()
-    legend_groups = group_counts.head(12).index.tolist()
-    handles = [
-        mpatches.Patch(color=group_color[g], label=f"{g} ({int(group_counts[g])})")
-        for g in legend_groups
-    ]
-    if len(group_counts) > 12:
-        handles.append(mpatches.Patch(color='#cccccc', label=f"+{len(group_counts) - 12} groups"))
-
-    ax.legend(handles=handles, title='Entity Group', loc='upper right', bbox_to_anchor=(1.35, 1.02), frameon=False)
-
-    ax.set_title('Entity-Level Relationship Network (Node Color = Entity Group)', fontsize=15)
-    ax.text(
-        0.0,
-        -1.22,
-        (
-            f"Nodes: {len(ordered_nodes)} | Edges: {len(df_entity_edges)} | "
-            f"Labels: top {label_top_n} hubs | Excluding relationship_type_id={exclude_relationship_type_id}"
-        ),
-        ha='center',
-        va='center',
-        fontsize=10,
-    )
-    ax.set_aspect('equal')
-    ax.axis('off')
-    plt.tight_layout()
-    plt.show()
-
-    df_entity_edges.sort_values('weight', ascending=False).head(30)
-```
-
-### 6.5 Plot - Relationship Group Pairs by Data Source (All Groups)
-
-```python
-from matplotlib.ticker import FuncFormatter
-from sqlalchemy import func
-from sqlalchemy.orm import aliased
-from IPython.display import display
-
-from biofilter.modules.db.models import ETLDataSource, EntityGroup, EntityRelationship
-
-# Set to an integer (e.g., 40) if you want to limit bars per datasource.
-max_pairs_per_data_source = None
-
-G1 = aliased(EntityGroup)
-G2 = aliased(EntityGroup)
-
-db = bf.core.require_db()
-with db.get_session() as session:
-    rows = (
-        session.query(
-            ETLDataSource.name.label('data_source'),
-            G1.name.label('group_1'),
-            G2.name.label('group_2'),
-            func.count(EntityRelationship.id).label('relationship_count'),
-        )
-        .select_from(EntityRelationship)
-        .outerjoin(ETLDataSource, ETLDataSource.id == EntityRelationship.data_source_id)
-        .outerjoin(G1, G1.id == EntityRelationship.entity_1_group_id)
-        .outerjoin(G2, G2.id == EntityRelationship.entity_2_group_id)
-        .group_by(ETLDataSource.name, G1.name, G2.name)
-        .all()
-    )
-
-df_rel_ds = pd.DataFrame(rows, columns=['data_source', 'group_1', 'group_2', 'relationship_count'])
-
-if df_rel_ds.empty:
-    print('No relationship rows found by data source.')
-else:
-    df_rel_ds['data_source'] = df_rel_ds['data_source'].fillna('unknown_data_source')
-    df_rel_ds['group_1'] = df_rel_ds['group_1'].fillna('unknown_group')
-    df_rel_ds['group_2'] = df_rel_ds['group_2'].fillna('unknown_group')
-    df_rel_ds['relationship_count'] = pd.to_numeric(df_rel_ds['relationship_count'], errors='coerce').fillna(0).astype(int)
-
-    # Undirected pair view to match section 6 semantics.
-    df_rel_ds['pair'] = df_rel_ds.apply(
-        lambda r: ' × '.join(sorted([str(r['group_1']), str(r['group_2'])])),
-        axis=1,
-    )
-
-    df_rel_ds = (
-        df_rel_ds
-        .groupby(['data_source', 'pair'], as_index=False)['relationship_count']
-        .sum()
-        .sort_values(['data_source', 'relationship_count'], ascending=[True, False])
-    )
-
-    data_sources = sorted(df_rel_ds['data_source'].unique().tolist())
-    n = len(data_sources)
-
-    fig_height = max(4.0 * n, 7.0)
-    fig, axes = plt.subplots(n, 1, figsize=(13, fig_height), squeeze=False)
-
-    for i, ds in enumerate(data_sources):
-        ax = axes[i, 0]
-        sub = df_rel_ds[df_rel_ds['data_source'] == ds].copy()
-
-        if max_pairs_per_data_source is not None:
-            sub = sub.head(int(max_pairs_per_data_source))
-
-        sub = sub.sort_values('relationship_count', ascending=True)
-
-        bars = ax.barh(
-            sub['pair'],
-            sub['relationship_count'],
-            color='#6c757d',
-            edgecolor='white',
-            linewidth=0.6,
-        )
-
-        ax.set_title(f"{ds} | Group pairs: {len(sub)}", fontsize=12, fontweight='bold')
-        ax.xaxis.set_major_formatter(FuncFormatter(lambda x, _: f"{int(x):,}"))
-        ax.grid(axis='x', alpha=0.25)
-
-        xmax = float(sub['relationship_count'].max() or 0)
-        for b in bars:
-            w = b.get_width()
-            ax.text(
-                w + (xmax * 0.01 if xmax else 0.5),
-                b.get_y() + b.get_height() / 2,
-                f"{int(w):,}",
-                va='center',
-                fontsize=7,
-                color='#2f3e46',
-            )
-
-        if i == n - 1:
-            ax.set_xlabel('Relationships')
-
-    fig.suptitle('Relationship Group Pairs by Data Source (All Pairs)', fontsize=15, fontweight='bold', y=1.0)
-    plt.tight_layout()
-    plt.show()
-
-    # Matrix table: relationships in rows, data sources in columns,
-    # with row/column totals and thousand-separated integers.
-    rel_matrix = (
-        df_rel_ds
-        .pivot_table(
-            index='pair',
-            columns='data_source',
-            values='relationship_count',
-            aggfunc='sum',
-            fill_value=0,
-        )
-        .astype('int64')
-    )
-
-    rel_matrix['Total'] = rel_matrix.sum(axis=1).astype('int64')
-    rel_matrix = rel_matrix.sort_values('Total', ascending=False)
-
-    totals_row = rel_matrix.sum(axis=0).astype('int64')
-    rel_matrix.loc['Total'] = totals_row
-
-    print('Relationship matrix by data source (with totals):')
-    display(
-        rel_matrix.style
-        .format('{:,.0f}')
-        .set_caption('Rows: relationship pairs | Columns: data sources | Includes row/column totals')
-    )
-```
-
-### 7. Plot - Datasource Freshness (Latest Load Age in Days)
-
-```python
-from matplotlib import patches as mpatches
-from matplotlib.ticker import FuncFormatter
-
-df_age = df[(df['section'] == 'datasource_latest_load') & (df['metric'] == 'latest_load_age_days')].copy()
-df_status = df[(df['section'] == 'datasource_latest_load') & (df['metric'] == 'latest_load_status')][['dimension_1', 'dimension_2', 'value_text']].copy()
-df_status = df_status.rename(columns={'value_text': 'load_status'})
-
-if df_age.empty:
-    print('No datasource load-age rows to plot.')
-else:
-    df_age['source_data_source'] = df_age['dimension_1'].astype(str) + ' / ' + df_age['dimension_2'].astype(str)
-    df_age = df_age.sort_values('value_number', ascending=False).head(25)
-
-    def _stale_color(days):
-        d = float(days or 0)
-        if d >= 180:
-            return '#d62828'  # critical stale
-        if d >= 60:
-            return '#f77f00'  # warning stale
-        return '#2a9d8f'      # healthy
-
-    colors = df_age['value_number'].map(_stale_color)
-
-    fig, ax = plt.subplots(figsize=(13, 7))
-    bars = ax.barh(
-        df_age['source_data_source'][::-1],
-        df_age['value_number'][::-1],
-        color=colors[::-1],
-        edgecolor='white',
-        linewidth=0.7,
-    )
-
-    ax.set_title('Latest Load Age (Days) - Top 25 Stale DataSources', fontsize=14, fontweight='bold')
-    ax.set_xlabel('Days since latest load')
-    ax.xaxis.set_major_formatter(FuncFormatter(lambda x, _: f"{int(x):,}"))
-    ax.grid(axis='x', alpha=0.25)
-
-    xmax = float(df_age['value_number'].max() or 0)
-    for b in bars:
-        w = b.get_width()
-        ax.text(
-            w + (xmax * 0.01 if xmax else 0.5),
-            b.get_y() + b.get_height() / 2,
-            f"{int(w)}d",
-            va='center',
-            fontsize=8,
-            color='#2f3e46',
-        )
-
-    legend_handles = [
-        mpatches.Patch(color='#2a9d8f', label='< 60 days'),
-        mpatches.Patch(color='#f77f00', label='60-179 days'),
-        mpatches.Patch(color='#d62828', label='>= 180 days'),
-    ]
-    ax.legend(handles=legend_handles, title='Freshness', loc='lower right', frameon=False)
-
-    plt.tight_layout()
-    plt.show()
-
-    view = df_age[['dimension_1', 'dimension_2', 'value_number']].rename(columns={'dimension_1': 'source_system', 'dimension_2': 'data_source', 'value_number': 'latest_load_age_days'})
-    view = view.merge(df_status, left_on=['source_system', 'data_source'], right_on=['dimension_1', 'dimension_2'], how='left').drop(columns=['dimension_1', 'dimension_2'])
-    view.head(50)
-```
-
-```python
-df.to_csv('platform_data_statistics.csv', index=False)
-print('Saved: platform_data_statistics.csv')
-```
-
-### 8. Schema Check (quick QA)
-
-```python
-required_cols = [
-    'section',
-    'metric',
-    'dimension_1',
-    'dimension_2',
-    'value_number',
-    'value_text',
-    'as_of',
-    'note',
-]
-
-print('Dtypes:')
-display(df.dtypes.to_frame('dtype'))
-
-missing_cols = [c for c in required_cols if c not in df.columns]
-print('\nMissing required columns:', missing_cols if missing_cols else 'none')
-
-if 'value_number' in df.columns:
-    print('value_number dtype:', df['value_number'].dtype)
+biofilter report run --report-name platform_data_statistics --output stats.csv
+
+# Just the free parts:
+biofilter report run --report-name platform_data_statistics \\
+    --param sections=bundle --param sections=storage
 ```
 
 
 
-<!-- ===== SOURCE FILE: notebooks/Templates/reports__qry_template.ipynb.md ===== -->
+<!-- ===== SOURCE FILE: notebooks/templates/reports__platform_etl.ipynb.md ===== -->
 
-<h1> 📘 Biofilter — Report: Query Template </h1>
+<h1>🏗️ Biofilter — Platform: <code>platform_etl_status</code> and <code>platform_etl_packages</code></h1>
 
-Developer notebook for `qry_template` (scaffold report).
+What ran to produce this bundle, and whether it holds up.
 
-### 1. Start Biofilter
+Platform reports describe the **bundle**, not the biology in it. They
+take no input — there is nothing to ask about.
 
-```python
-from biofilter import Biofilter
-bf = Biofilter(debug_mode=False)
-```
-
-### 2. Run template report
-
-```python
-df = bf.report.run("qry_template")
-print(type(df))
-print(f"Rows: {len(df)}")
-df.head() if hasattr(df, "head") else df
-```
-
-### 3. Next steps for new report development
-
-```python
-print("Copy report_template.py -> report_<new_name>.py")
-print("Set name/description and implement run()/explain()/available_columns()/example_input()")
-```
-
-
-
-<!-- ===== SOURCE FILE: notebooks/Templates/reports__snp_snp_model.ipynb.md ===== -->
-
-<h1> Biofilter - Report: SNP SNP Model </h1>
-
-Build BF4 candidate models in layers: seed positions -> variants -> genes (entity_locations) -> biological groups -> gene_pair and snp_pair.
-
-### 1. Start Biofilter
-
-```python
-from biofilter import Biofilter
-bf = Biofilter(debug_mode=False)
-```
-
-### 2. Inspect report metadata
-
-```python
-report_name = 'snp_snp_model'
-
-print('name:', report_name)
-print('available columns:')
-print(bf.report.available_columns(report_name))
-
-print('\nexample_input:')
-print(bf.report.example_input(report_name))
-
-print('\nexplain:')
-print(bf.report.explain(report_name))
-```
-
-### 3. Default run from seed positions
-Uses variant -> gene mapping via `entity_locations`, then group expansion (Pathway) and returns `gene_pair` + `snp_pair`.
-
-```python
-df_default = bf.report.run(
-    'snp_snp_model',
-    input_data=['chr19:44904604', 'chr22:11474744'],
-    build=38,
-    window_bp=100,
-    group_entity_groups=['Pathways'],
-    # relationship_types=['in_pathway'],
-    # gene_pair_scope='at_least_one_from_seed',
-    # snp_pair_scope='at_least_one_from_seed',
-)
-
-print('rows:', len(df_default))
-df_default.head(30)
-```
-
-### 4. Scope control: only seed-seed pairs
-
-```python
-df_seed_only = bf.report.run(
-    'snp_snp_model',
-    input_data=['chr17:150', 'chr17:280'],
-    group_entity_groups=['Pathway'],
-    relationship_types=['in_pathway'],
-    gene_pair_scope='both_from_seed',
-    snp_pair_scope='both_from_seed',
-)
-
-df_seed_only[['row_type', 'gene_1_name', 'gene_2_name', 'variant_1_rsid', 'variant_2_rsid', 'gene_pair_seed_scope', 'snp_pair_seed_scope']].head(30)
-```
-
-### 5. Disable variant expansion for expanded genes
-Keeps gene expansion, but variants are pulled only for seed genes.
-
-```python
-df_no_expand = bf.report.run(
-    'snp_snp_model',
-    input_data=['chr17:150'],
-    group_entity_groups=['Pathway'],
-    relationship_types=['in_pathway'],
-    expand_variants_from_expanded_genes=False,
-)
-
-df_no_expand[['row_type', 'gene_1_name', 'gene_2_name', 'variant_1_rsid', 'variant_2_rsid', 'observation']].head(30)
-```
-
-### 6. Restrict to specific group entities (optional)
-
-```python
-df_group_filter = bf.report.run(
-    'snp_snp_model',
-    input_data=['chr17:150'],
-    group_entity_groups=['Pathway'],
-    group_entities=['DNA_REPAIR_PATHWAY'],
-    relationship_types=['in_pathway'],
-)
-
-df_group_filter[['row_type', 'gene_1_name', 'gene_2_name', 'group_support_names', 'observation', 'note']].head(30)
-```
-
-### 7. Focused output view
-
-```python
-cols = [
-    'row_type',
-    'gene_1_name',
-    'gene_2_name',
-    'gene_pair_seed_scope',
-    'variant_1_rsid',
-    'variant_2_rsid',
-    'snp_pair_seed_scope',
-    'group_support_names',
-    'observation',
-    'note',
-]
-
-df_default[cols].head(50)
-```
-
-```python
-df_default.to_csv('snp_snp_model.csv', index=False)
-```
-
-
-
-<!-- ===== SOURCE FILE: notebooks/Templates/reports__variant_binning.ipynb.md ===== -->
-
-<h1> Biofilter - Report: Variant Binning </h1>
-
-BioBin-style rare-variant aggregation from a cohort VCF into biological bins.
-
-This tutorial shows:
-- what the report does
-- how to run a smoke test
-- how to inspect output artifacts
-- how to run a real cohort flow
-
-### 1. What this report does
-
-`variant_binning` reads a multi-sample VCF, computes internal MAF, applies rare filtering, maps variants to genes by coordinate overlap (`entity_locations`), and writes binning artifacts to disk.
-
-Current supported grouping layers:
-- `gene`
-- `gene_group`
-- `locus_type`
-- `pathway`
-
-Main output files:
-- `bin_counts.csv`
-- `variant_to_bin.csv`
-- `bin_definitions.csv`
-- `bin_member_counts.csv`
-- `sample_bin_long.csv`
-- `summary.json`
-
-### 2. Start Biofilter
-
-```python
-from biofilter import Biofilter
-
-bf = Biofilter(debug_mode=False)
-bf
-```
-
-### 3. Inspect report metadata
-
-```python
-report_name = 'variant_binning'
-
-print('name:', report_name)
-print('available columns:')
-print(bf.report.available_columns(report_name))
-
-print('\nexample_input:')
-print(bf.report.example_input(report_name))
-
-print('\nexplain:')
-print(bf.report.explain(report_name))
-```
-
-### 4. Build a reproducible smoke-test input
-
-This cell creates a tiny cohort VCF + phenotype file in `tmp/variant_binning_tutorial/` using a real gene coordinate from the DB.
-
-```python
-from pathlib import Path
-import pandas as pd
-from biofilter.modules.db.models import EntityGroup, EntityLocation, GeneMaster
-
-root = Path('tmp/variant_binning_tutorial')
-root.mkdir(parents=True, exist_ok=True)
-vcf_path = root / 'mini_cohort.vcf'
-pheno_path = root / 'mini_phenotype.csv'
-output_dir = root / 'out_gene'
-
-with bf.core.require_db().get_session() as session:
-    gene_group_ids = [r.id for r in session.query(EntityGroup.id).filter(EntityGroup.name.in_(['Gene','Genes'])).all()]
-    if not gene_group_ids:
-        raise RuntimeError('No Gene/Genes entity group found in DB')
-
-    row = (
-        session.query(
-            EntityLocation.chromosome,
-            EntityLocation.start_pos,
-            EntityLocation.end_pos,
-            GeneMaster.symbol,
-        )
-        .join(GeneMaster, GeneMaster.entity_id == EntityLocation.entity_id)
-        .filter(
-            EntityLocation.build == 38,
-            EntityLocation.entity_group_id.in_(gene_group_ids),
-            EntityLocation.start_pos.isnot(None),
-            EntityLocation.end_pos.isnot(None),
-        )
-        .order_by(EntityLocation.id.asc())
-        .first()
-    )
-
-if row is None:
-    raise RuntimeError('No gene location row available for tutorial')
-
-chrom = int(row.chromosome)
-pos = int(row.start_pos)
-gene_symbol = str(row.symbol or 'UNKNOWN')
-
-vcf_text = f"""##fileformat=VCFv4.2
-##contig=<ID=chr{chrom}>
-##FORMAT=<ID=GT,Number=1,Type=String,Description=\"Genotype\">
-#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tS1\tS2\tS3\tS4
-chr{chrom}\t{pos}\tvar1\tA\tC\t.\tPASS\t.\tGT\t0/1\t0/0\t0/0\t0/0
-chr{chrom}\t{pos+1}\tvar2\tG\tT\t.\tPASS\t.\tGT\t1/1\t0/1\t0/1\t0/1
-"""
-vcf_path.write_text(vcf_text, encoding='utf-8')
-
-pheno_df = pd.DataFrame([
-    {'SampleID': 'S1', 'Phenotype': 1},
-    {'SampleID': 'S2', 'Phenotype': 1},
-    {'SampleID': 'S3', 'Phenotype': 0},
-    {'SampleID': 'S4', 'Phenotype': 0},
-])
-pheno_df.to_csv(pheno_path, index=False)
-
-print('gene used for placement:', gene_symbol)
-print('vcf_path:', vcf_path)
-print('pheno_path:', pheno_path)
-print('output_dir:', output_dir)
-```
-
-### 5. Run the report (`group_by=gene`)
-
-With this tiny cohort, only one of the two variants should pass rarity at `maf_cutoff=0.3` and map to a gene bin.
-
-```python
-summary_df = bf.report.run(
-    'variant_binning',
-    vcf_path=str(vcf_path),
-    phenotype_path=str(pheno_path),
-    phenotype_sample_column='SampleID',
-    phenotype_value_column='Phenotype',
-    phenotype_control_value='0',
-    group_by='gene',
-    maf_cutoff=0.3,
-    rare_case_control=True,
-    overall_major_allele=True,
-    build=38,
-    output_dir=str(output_dir),
-)
-
-summary_df
-```
-
-### 6. Inspect generated artifacts
-
-```python
-import json
-
-artifacts = [
-    output_dir / 'bin_counts.csv',
-    output_dir / 'variant_to_bin.csv',
-    output_dir / 'bin_definitions.csv',
-    output_dir / 'bin_member_counts.csv',
-    output_dir / 'sample_bin_long.csv',
-    output_dir / 'summary.json',
-]
-for p in artifacts:
-    print(p.name, '->', p.exists())
-
-vtb = pd.read_csv(output_dir / 'variant_to_bin.csv')
-bc = pd.read_csv(output_dir / 'bin_counts.csv')
-sjson = json.loads((output_dir / 'summary.json').read_text(encoding='utf-8'))
-
-print('\nsummary metrics:')
-print({k: sjson[k] for k in [
-    'variants_processed',
-    'variants_rare',
-    'variants_with_gene_overlap',
-    'variants_binned',
-    'bins_generated',
-]})
-
-print('\nvariant_to_bin preview:')
-display(vtb.head(20))
-
-print('\nbin_counts preview:')
-display(bc.head(20))
-```
-
-### 7. Compare grouping layers (`gene`, `gene_group`, `locus_type`, `pathway`)
-
-```python
-comparisons = []
-for mode in ['gene', 'gene_group', 'locus_type', 'pathway']:
-    out_mode = root / f'out_{mode}'
-    sdf = bf.report.run(
-        'variant_binning',
-        vcf_path=str(vcf_path),
-        phenotype_path=str(pheno_path),
-        phenotype_sample_column='SampleID',
-        phenotype_value_column='Phenotype',
-        phenotype_control_value='0',
-        group_by=mode,
-        maf_cutoff=0.3,
-        rare_case_control=True,
-        overall_major_allele=True,
-        build=38,
-        output_dir=str(out_mode),
-    )
-    rec = sdf.to_dict(orient='records')[0]
-    comparisons.append({
-        'group_by': mode,
-        'variants_processed': rec['variants_processed'],
-        'variants_rare': rec['variants_rare'],
-        'variants_binned': rec['variants_binned'],
-        'bins_generated': rec['bins_generated'],
-        'output_dir': rec['output_dir'],
-    })
-
-pd.DataFrame(comparisons)
-```
-
-### 8. Real cohort template
-
-Replace the paths below with your real cohort files and run the cell.
-
-```python
-real_vcf_path = '/absolute/path/to/cohort.vcf.gz'
-real_phenotype_path = '/absolute/path/to/phenotype.csv'
-real_output_dir = 'outputs/variant_binning_real'
-
-# Uncomment to run with real data
-# real_summary = bf.report.run(
-#     'variant_binning',
-#     vcf_path=real_vcf_path,
-#     phenotype_path=real_phenotype_path,
-#     phenotype_sample_column='SampleID',
-#     phenotype_value_column='Phenotype',
-#     phenotype_control_value='0',
-#     group_by='gene',
-#     maf_cutoff=0.01,
-#     rare_case_control=True,
-#     overall_major_allele=True,
-#     build=38,
-#     output_dir=real_output_dir,
-# )
-# real_summary
-```
-
-### 9. Optional: enrich bins with AlphaMissense labels
-
-If `notebooks/Andre/missensse.csv` exists, this cell merges it with `variant_to_bin.csv` using coordinate+allele key.
+### 1. Open a bundle
 
 ```python
 from pathlib import Path
 
-am_candidates = [
-    Path('notebooks/Andre/missensse.csv'),
-    Path('../Andre/missensse.csv'),
-    Path('missensse.csv'),
-]
-am_path = next((p for p in am_candidates if p.exists()), None)
-
-vtb_path = output_dir / "variant_to_bin.csv"
-vtb = pd.read_csv(vtb_path)
-
-if am_path is None:
-    print('AlphaMissense file not found. Skipping merge.')
-else:
-    am = pd.read_csv(am_path, usecols=[
-        'chromosome', 'position_start', 'position_end',
-        'reference_allele', 'alternate_allele',
-        'score', 'classification', 'transcript_id'
-    ])
-    am['variant_key'] = (
-        am['chromosome'].astype(str) + ':' +
-        am['position_start'].astype(str) + ':' +
-        am['position_end'].astype(str) + ':' +
-        am['reference_allele'].astype(str) + '>' +
-        am['alternate_allele'].astype(str)
-    )
-
-    merged = vtb.merge(
-        am[["variant_key", "score", "classification", "transcript_id"]],
-        on="variant_key",
-        how="left",
-    )
-
-    print('variant_to_bin rows:', len(vtb))
-    print('rows with AlphaMissense annotation:', int(merged['classification'].notna().sum()))
-    display(merged.head(20))
-```
-
-### 10. Interpretation checklist
-
-1. Check `summary.json` for sample/variant counts and filtering behavior.
-2. Use `variant_to_bin.csv` to audit each mapping (variant -> bin).
-3. Use `bin_counts.csv` as the main matrix for downstream burden/SKAT modeling.
-4. Keep run parameters and output directory versioned for reproducibility.
-
-
-
-<!-- ===== SOURCE FILE: notebooks/Templates/reports__variant_gene_location_model.ipynb.md ===== -->
-
-<h1> Biofilter - Report: Variant Gene Location Model </h1>
-
-Map variants and genes by genomic interval overlap using variant_masters and entity_locations (build 38).
-
-### 1. Start Biofilter
-
-```python
 from biofilter import Biofilter
 
-bf = Biofilter(debug_mode=False)
+# Leave as None to use `[database] bundle` from .biofilter.toml.
+BUNDLE = None
+
+bf = Biofilter(bundle=BUNDLE, debug_mode=False) if BUNDLE else Biofilter(debug_mode=False)
+
+# Results land here whatever directory the kernel was started in.
+_root = next(
+    (p for p in [Path.cwd(), *Path.cwd().parents] if (p / ".biofilter.toml").is_file()),
+    Path.cwd(),
+)
+OUTPUT_DIR = _root / "notebooks" / "templates" / "outputs"
+OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+
 bf
 ```
 
-### 2. Inspect report metadata
+### 2. The summary: one row per data source
 
 ```python
-report_name = 'variant_gene_location_model'
+result = bf.report.run("platform_etl_status")
+status = result.to_pandas()
 
-print('name:', report_name)
-print('available columns:')
-print(bf.report.available_columns(report_name))
-
-print('\nexample_input:')
-print(bf.report.example_input(report_name))
-
-print('\nexplain:')
-print(bf.report.explain(report_name))
+print(f"{len(status)} data sources in bundle {result.provenance['bundle_id']}")
+status.groupby(["branch", "pipeline_state"]).size()
 ```
 
-### 3. Gene input mode
+### 3. `pipeline_state`, and why it is not a boolean
+
+| state | meaning | `pipeline_ok` |
+| --- | --- | --- |
+| `ok` | every required stage ran, each on the previous one's output | true |
+| `unverifiable` | every stage ran, no hashes to prove they belong together | true |
+| `misaligned` | a stage ran on something else | false |
+| `incomplete` | a required stage is missing | false |
+| `never_run` | no packages at all | false |
+
+`pipeline_ok` means **nothing is known to be wrong** — weaker than
+"everything is proven right". `unverifiable` is the gap between them.
 
 ```python
-df_gene = bf.report.run(
-    'variant_gene_location_model',
-    input_mode='gene',
-    input_data=['ZNF73P'],
-    build=38,
-    window_bp=0,
-)
-
-print('rows:', len(df_gene))
-df_gene.head(20)
-```
-
-```python
-df_gene.to_csv('variant_gene_location_model.csv', index=False)
-```
-
-### 4. rsID input mode
-
-```python
-df_rsid = bf.report.run(
-    'variant_gene_location_model',
-    input_mode='rsid',
-    input_data=['rs111', 'rs222'],
-    build=38,
-)
-
-df_rsid.head(20)
-```
-
-### 5. Auto mode with mixed inputs
-Supports gene aliases, rsID, chr:pos and chr:start-end in the same request.
-
-```python
-mixed_inputs = [
-    'TP53',
-    'rs111',
-    'chr17:150',
-    'chr17:260-320',
-    'NOT_A_GENE',
-    'chr17:XYZ',
+status[~status["pipeline_ok"]][
+    ["source_system", "data_source", "branch", "pipeline_state", "latest_error"]
 ]
-
-df_auto = bf.report.run(
-    'variant_gene_location_model',
-    input_mode='auto',
-    input_data=mixed_inputs,
-    build=38,
-    window_bp=0,
-)
-
-print('rows:', len(df_auto))
-df_auto.head(30)
 ```
 
-### 6. Focused output view
+### 4. Why this replaced a simple boolean
+
+The report this replaces returned `pipeline_ok = False` for **51 of this
+bundle's 68 sources**, and not one of them was broken.
+
+The variant branch writes parquet straight from transform — there is no
+load stage to miss. A report that flags a design decision as a failure
+teaches people to ignore it.
 
 ```python
-cols = [
-    'input_original',
-    'input_mode',
-    'input_primary_name',
-    'variant_rsid',
-    'variant_chromosome',
-    'variant_position_start',
-    'gene_primary_name',
-    'gene_start',
-    'gene_end',
-    'overlap_bp',
-    'distance_bp',
-    'observation',
-    'note',
+variant = status[status["branch"] == "variant"]
+
+print(f"{len(variant)} variant sources")
+print("with a load stage:", int(variant["load_package_id"].notna().sum()))
+print("reported ok:", int(variant["pipeline_ok"].sum()))
+```
+
+### 5. `unverifiable` is not `misaligned`
+
+Some DTPs read database state rather than a downloaded file, so they
+produce no hash and alignment cannot be shown either way.
+`transform_aligned` is **null** there rather than false — false reads as
+"this is wrong" rather than "this is unproven".
+
+```python
+status[status["pipeline_state"] == "unverifiable"][
+    ["data_source", "transform_aligned", "load_aligned", "pipeline_ok"]
 ]
-
-df_auto[cols].head(50)
 ```
 
+### 6. A failure in the history, and a source that is fine anyway
 
-
-<!-- ===== SOURCE FILE: notebooks/Templates/reports__variant_modeling.ipynb.md ===== -->
-
-# Biofilter — Report: Variant Modeling
-
-Map an input list of variants (rsID, chr:pos, or chr:pos:ref:alt) to biologically connected
-**variant×variant pairs**, where both variants in every pair come from the input.
-
-```
-Input variants (rsID, chr:pos, or chr:pos:ref:alt)
-    ↓  DB lookup + window_bp
-Genes overlapping input variants
-    ↓  group membership (Pathway, GO, Disease, …)
-Groups
-    ↓  co-membership → Gene×Gene pairs
-Gene×Gene pairs  [weight = # shared groups]
-    ↓  cartesian of input variants per gene
-Variant×Variant pairs  ← output
-```
-
-`group_support_count` is the biological weight: how many distinct groups connect the two genes.
-
-See the explain guide: `biofilter/modules/report/reports_explain/report_variant_modeling.md`
-
-### 1. Start Biofilter
+`latest_error` is the most recent failure whether or not it was retried
+successfully. `pipeline_state = 'ok'` together with a non-null
+`latest_error` means "it worked, but not on the first try".
 
 ```python
-from biofilter import Biofilter
-
-bf = Biofilter(debug_mode=False)
-bf
-```
-
-### 2. Inspect report metadata
-
-```python
-report_name = 'variant_modeling'
-
-print('name:', report_name)
-print('\navailable columns:')
-print(bf.report.available_columns(report_name))
-
-print('\nexample_input:')
-print(bf.report.example_input(report_name))
-
-print('\nexplain:')
-print(bf.report.explain(report_name))
-```
-
-### 3. Basic run — rsID inputs, Pathway grouping
-
-Input: four variants from the APOE region and PCSK9.  
-Grouping: Pathway (Reactome).  
-Both variants in every output pair are from the input list.
-
-```python
-df = bf.report.run(
-    'variant_modeling',
-    input_data=[
-        'rs429358',       # APOE ε4
-        'rs7412',         # APOE ε2
-        'rs2479409',      # PCSK9 promoter
-        'rs11591147',     # PCSK9 R46L (loss-of-function)
-    ],
-    build=38,
-    window_bp=0,
-    group_entity_groups=['Pathway'],
-)
-
-print(f'Pairs: {len(df):,}')
-df.head(20)
-```
-
-#### 3b. Top pairs by biological weight
-
-```python
-cols = [
-    'variant_1_rsid', 'gene_1_name',
-    'variant_2_rsid', 'gene_2_name',
-    'group_support_count', 'group_support_names',
-    'data_source_support_names',
+status[status["latest_error"].notna()][
+    ["data_source", "pipeline_state", "pipeline_ok", "latest_error"]
 ]
-
-df[cols].sort_values('group_support_count', ascending=False).head(20)
 ```
 
-### 4. Mixed input — rsID, chr:pos, and chr:pos:ref:alt
+### 7. The packages behind the summary
 
-The three formats can be mixed in the same list:
-
-| Format | Example | Behavior |
-|---|---|---|
-| **rsID** | `rs429358` | dbSNP lookup |
-| **chr:pos** | `chr19:44908684` | All alleles at the position (SNVs only) |
-| **chr:pos:ref:alt** | `chr19:44908684:T:C` | Only the exact ref/alt variant (SNV or indel) |
-
-Use `chr:pos:ref:alt` for credible-set / fine-mapping variants to avoid multiallelic ambiguity.
-
-**Joining back to your source table.** Since BF4 4.1.4 the output carries two new columns,
-`variant_1_input` and `variant_2_input`, that preserve the exact string you supplied. Use them
-as the join key — no need to reparse `chr:pos:ref:alt` or look up rsID-to-coords after the fact.
-Each variant also exposes `variant_*_ref` and `variant_*_alt` so multiallelic sites are
-disambiguated.
+`platform_etl_packages` is the unaggregated record: one row per package,
+which is one stage of one run. Reach for it when the summary says
+something surprising.
 
 ```python
-df_mixed = bf.report.run(
-    'variant_modeling',
-    input_data=[
-        'rs429358',                # rsID
-        'chr19:44908684',          # chr:pos (APOE region — all alleles at position)
-        '2:21044574',              # bare chr:pos (APOB region)
-        'chr19:44908684:T:C',      # chr:pos:ref:alt (exact APOE ε4 allele only)
-    ],
-    build=38,
-    group_entity_groups=['Pathway'],
-)
+packages = bf.report.run("platform_etl_packages").to_pandas()
 
-print(f'Pairs: {len(df_mixed):,}')
-
-# Show the new 4.1.4 columns alongside the basics
-preview_cols = [
-    'variant_1_input', 'variant_1_rsid', 'variant_1_ref', 'variant_1_alt', 'gene_1_name',
-    'variant_2_input', 'variant_2_rsid', 'variant_2_ref', 'variant_2_alt', 'gene_2_name',
-    'group_support_count',
-]
-df_mixed[preview_cols].head(20)
+print(f"{len(packages)} packages")
+packages.groupby(["operation_type", "status"]).size()
 ```
 
-#### 4b. Merging results back to a credible-set table
+### 8. What "aligned" actually means
 
-When the input came from a credible-set TSV (`locus / trait / SNP` columns, `SNP` in
-`chr:pos:ref:alt` form), `variant_*_input` lets you merge the pair output directly back
-to the source — no preprocessing, no rsID lookups, no allele parsing.
-
-This is the canonical post-processing step for fine-mapping workflows.
+Each stage is its own package, and the digest of the extract's output is
+carried forward — it reappears as the transform's hash, then the load's.
+Alignment means a stage ran on the previous one's output, not that two
+unrelated digests happen to match.
 
 ```python
-# Simulated credible-set table (same shape as multi_credible_sets_variants.tsv)
-import pandas as pd
+one = packages[packages["data_source"] == "biogrid"]
 
-cs = pd.DataFrame({
-    'locus': ['locus_apoe', 'locus_apoe', 'locus_apob'],
-    'trait': ['LDL', 'LDL', 'LDL'],
-    'SNP':   ['chr19:44908684:T:C', 'rs429358', '2:21044574'],
-})
-
-# Inner join on the input string — variant_1_input matches the SNP column verbatim
-merged = cs.merge(
-    df_mixed,
-    left_on='SNP',
-    right_on='variant_1_input',
-    how='inner',
-)
-
-print(f'Merged rows: {len(merged):,}')
-merged[[
-    'locus', 'trait', 'SNP',
-    'variant_1_input', 'variant_1_rsid', 'gene_1_name',
-    'variant_2_input', 'variant_2_rsid', 'gene_2_name',
-    'group_support_count',
-]].head(20)
+one[["package_id", "operation_type", "extract_hash", "transform_hash", "load_hash"]]
 ```
 
-### 5. Multiple group types — Pathway + GO + Disease
+### 9. Failures stay in the record
 
-Using multiple group types increases `group_support_count` when genes share more than one biological context.
+`platform_etl_status` reports the latest **good** stage, so a source can
+read `ok` while a failed package sits here. That is the pair to look at
+together.
 
 ```python
-df_multi = bf.report.run(
-    'variant_modeling',
-    input_data=[
-        'rs429358',
-        'rs7412',
-        'rs2479409',
-        'rs11591147',
-    ],
-    build=38,
-    group_entity_groups=['Pathway', 'GO', 'Disease'],
-)
+failed = packages[packages["status"].str.contains("fail", case=False, na=False)]
 
-print(f'Pairs: {len(df_multi):,}')
-df_multi[cols].sort_values('group_support_count', ascending=False).head(20)
+failed[["package_id", "data_source", "operation_type", "status", "note"]]
 ```
 
-#### 5b. group_support_count distribution
+### 10. Export
 
 ```python
-import matplotlib.pyplot as plt
-
-if not df_multi.empty:
-    fig, ax = plt.subplots(figsize=(8, 4))
-    df_multi['group_support_count'].value_counts().sort_index().plot(
-        kind='bar', ax=ax, color='steelblue', edgecolor='white'
-    )
-    ax.set_xlabel('group_support_count (weight)')
-    ax.set_ylabel('# variant pairs')
-    ax.set_title('Biological weight distribution across variant pairs')
-    plt.tight_layout()
-    plt.show()
+for path in result.write(OUTPUT_DIR / "platform_etl_status.csv"):
+    print(path)
 ```
 
-#### 5c. Gene pair heatmap (group_support_count)
+### 11. The same thing on the command line
 
-```python
-import pandas as pd
+```bash
+biofilter report run --report-name platform_etl_status --output status.csv
 
-if not df_multi.empty:
-    gene_pair_weight = (
-        df_multi.groupby(['gene_1_name', 'gene_2_name'])['group_support_count']
-        .max()
-        .reset_index()
-    )
-
-    pivot = gene_pair_weight.pivot(index='gene_1_name', columns='gene_2_name', values='group_support_count').fillna(0)
-
-    fig, ax = plt.subplots(figsize=(max(6, len(pivot.columns)), max(4, len(pivot))))
-    im = ax.imshow(pivot.values, aspect='auto', cmap='Blues')
-    plt.colorbar(im, ax=ax, label='group_support_count')
-    ax.set_xticks(range(len(pivot.columns)))
-    ax.set_yticks(range(len(pivot)))
-    ax.set_xticklabels(pivot.columns, rotation=45, ha='right')
-    ax.set_yticklabels(pivot.index)
-    ax.set_title('Gene pair biological weight (max group_support_count)')
-    plt.tight_layout()
-    plt.show()
-
-    print('Gene pair summary:')
-    display(gene_pair_weight.sort_values('group_support_count', ascending=False))
+biofilter report run --report-name platform_etl_packages \\
+    --param operation_type=load --output loads.csv
 ```
 
-### 6. Restrict to a specific data source
 
-Use `group_data_sources` to filter group membership to a single source (e.g., Reactome only).
 
-```python
-df_reactome = bf.report.run(
-    'variant_modeling',
-    input_data=['rs429358', 'rs7412', 'rs2479409', 'rs11591147'],
-    group_entity_groups=['Pathway'],
-    group_data_sources=['Reactome'],
-)
+<!-- ===== SOURCE FILE: notebooks/templates/reports__resolve_entity.ipynb.md ===== -->
 
-print(f'Reactome-only pairs: {len(df_reactome):,}')
-df_reactome[cols].head(20)
-```
+<h1>🔎 Biofilter — Report: <code>resolve_entity</code></h1>
 
-### 7. Window extension
+Does the bundle know these names, and unambiguously?
 
-`window_bp` extends gene boundaries when assigning variants to genes.
-Useful when variants fall in regulatory regions near gene loci.
+Run this **before** any other report. It tells you which of your inputs
+will resolve, which are ambiguous, and which the bundle has never heard
+of — the three things that quietly distort every downstream result.
 
-```python
-results = {}
-for window in [0, 5_000, 25_000]:
-    df_w = bf.report.run(
-        'variant_modeling',
-        input_data=['rs429358', 'rs7412', 'rs2479409', 'rs11591147'],
-        group_entity_groups=['Pathway'],
-        window_bp=window,
-    )
-    results[window] = len(df_w)
-    print(f'window_bp={window:>6,}  →  {len(df_w):,} pairs')
-```
-
-### 8. Input from file
-
-Pass a path to a plain-text file (one rsID or chr:pos per line).
+### 1. Open a bundle
 
 ```python
 from pathlib import Path
 
-# Create a temporary input file for the tutorial
-tmp_dir = Path('tmp/variant_modeling_tutorial')
-tmp_dir.mkdir(parents=True, exist_ok=True)
-
-input_file = tmp_dir / 'variants.txt'
-input_file.write_text('rs429358\nrs7412\nrs2479409\nrs11591147\n')
-
-df_file = bf.report.run(
-    'variant_modeling',
-    input_data=str(input_file),
-    group_entity_groups=['Pathway'],
-)
-
-print(f'Pairs from file: {len(df_file):,}')
-df_file[cols].head(10)
-```
-
-### 9. Safety check — max_pairs
-
-The report estimates pair count before materialising. If the estimate exceeds `max_pairs` it aborts safely.
-
-```python
-df_safe = bf.report.run(
-    'variant_modeling',
-    input_data=['rs429358', 'rs7412', 'rs2479409', 'rs11591147'],
-    group_entity_groups=['Pathway', 'GO', 'Disease'],
-    max_pairs=5,   # intentionally low to trigger the check
-)
-
-if 'resolution_status' in df_safe.columns:
-    print('Safety abort triggered:')
-    print(df_safe[['resolution_status', 'estimated_pairs', 'max_pairs', 'suggestion']].to_string())
-else:
-    print(f'{len(df_safe):,} pairs — no abort')
-```
-
-### 10. Export results
-
-```python
-output_path = tmp_dir / 'variant_modeling_pairs.csv'
-df_multi.to_csv(output_path, index=False)
-print(f'Saved {len(df_multi):,} pairs → {output_path}')
-```
-
-### 11. Running on the UPenn LPC (Apptainer)
-
-For cohort-scale runs (thousands of input variants × pathway/GO/Disease grouping), the **Penn LPC**
-is usually the right place to execute this report. The Apptainer image bundles BF4 + PostgreSQL —
-no local DB required.
-
-> **Why LPC for `variant_modeling` specifically**
-> - Pair generation scales as O(N²) on input — large lists hit the `max_pairs` cap fast and benefit from cluster RAM.
-> - The group co-membership joins (pathways × genes × variants) are I/O-heavy and run faster with the DB co-located in the container.
-> - Credible-set studies typically produce `chr:pos:ref:alt` lists in the 1k–10k range — local notebook connection latency adds up.
-
-See also:
-- [`lpc__quickstart.md`](lpc__quickstart.md) — minimal copy-paste recipe for first runs
-- [`lpc__deploy.md`](lpc__deploy.md) — maintainer guide for installing / updating the LPC image and DB
-
-#### 11a. Prepare the input file
-
-Plain text, one variant per line. The `chr:pos:ref:alt` form is preferred for credible sets:
-
-```bash
-module load apptainer
-export WORKSPACE=/project/<your-project>/bf4_runs
-
-cat > "$WORKSPACE/cs_variants.txt" <<'EOF'
-1:6203732:A:G
-1:46108752:C:T
-2:71307487:T:A
-chr19:44908684:T:C
-EOF
-```
-
-The single-quoted `<<'EOF'` heredoc preserves the colons literally. For a TSV in
-`locus / trait / SNP` format (typical credible-set output), pipe the `SNP` column:
-
-```bash
-awk -F'\t' 'NR>1 {print $3}' credible_sets.tsv | sort -u > "$WORKSPACE/cs_variants.txt"
-```
-
-#### 11b. Prepare the params file (avoids shell-quote breakage)
-
-`variant_modeling` takes list parameters (`group_entity_groups`, `group_data_sources`).
-**Passing them inline with `--param 'KEY=["Pathway"]'` fails** — the shell inside the container
-strips the inner double quotes and you get errors like `No valid group_entity_groups found for ['[pathway]']`.
-
-The robust pattern is a JSON file referenced via `--params-file`:
-
-```bash
-cat > "$WORKSPACE/vm_params.json" <<'EOF'
-{
-  "group_entity_groups": ["Pathway"],
-  "window_bp": 0,
-  "max_pairs": 1000000
-}
-EOF
-```
-
-For multi-group / multi-source runs:
-
-```bash
-cat > "$WORKSPACE/vm_params.json" <<'EOF'
-{
-  "group_entity_groups": ["Pathway", "GO", "Disease"],
-  "group_data_sources": ["Reactome"],
-  "window_bp": 5000,
-  "max_pairs": 5000000
-}
-EOF
-```
-
-Sanity-check the JSON before running it through the container:
-
-```bash
-python3 -c "import json; print(json.load(open('$WORKSPACE/vm_params.json')))"
-```
-
-#### 11c. Run the report
-
-Same boilerplate as `annotation_master_variant` — only `--name` and the file references change.
-The temp dir + bind mounts give PostgreSQL inside the container its scratch space.
-
-```bash
-TMP=$(mktemp -d) && mkdir -p "$TMP/tmp" "$TMP/pg-run" && \
-apptainer run --writable-tmpfs --pwd /tmp \
-  --bind /project/hall_shared/biofilter/databases/20260514/pgdata:/var/lib/postgresql/data \
-  --bind "$TMP/tmp:/tmp" \
-  --bind "$TMP/pg-run:/var/run/postgresql" \
-  --bind "$WORKSPACE:/workspace" \
-  /project/hall_shared/biofilter/images/bf4-hpc-4.1.2.sif \
-  biofilter report run \
-    --name variant_modeling \
-    --input-file /workspace/cs_variants.txt \
-    --params-file /workspace/vm_params.json \
-    --output /workspace/variant_modeling_pairs.csv && \
-rm -rf "$TMP"
-```
-
-Result: `$WORKSPACE/variant_modeling_pairs.csv`.
-
-> **Safety check first.** Start with `"max_pairs": 1000000` — if the estimator aborts, the CSV
-> will contain a single row with `resolution_status`, `estimated_pairs`, `max_pairs`, and a
-> `suggestion` column telling you how to tighten the filter. Re-tune (`group_data_sources`,
-> stricter `group_entity_groups`, smaller `window_bp`) before raising the cap.
-
-### 12. Real cohort template
-
-Replace the input list with your study variants and adjust group filters.
-
-```python
-# Option A: explicit list (rsID, chr:pos, or chr:pos:ref:alt)
-my_variants = [
-    'rs429358',
-    # ... add your variants
-]
-
-# Option B: load from file (one entry per line; mixed formats supported)
-# my_variants = '/path/to/variants.txt'
-
-# For credible-set / fine-mapping cohorts, prefer chr:pos:ref:alt to avoid
-# multiallelic ambiguity at SNP positions:
-#   ['1:6203732:A:G', 'chr19:44908684:T:C', ...]
-
-# df_cohort = bf.report.run(
-#     'variant_modeling',
-#     input_data=my_variants,
-#     build=38,
-#     window_bp=0,
-#     group_entity_groups=['Pathway', 'GO'],
-#     group_data_sources=['Reactome'],
-#     max_pairs=1_000_000,
-# )
-
-# print(f'Cohort pairs: {len(df_cohort):,}')
-# df_cohort.to_csv('outputs/variant_modeling_cohort.csv', index=False)
-# df_cohort.head(20)
-```
-
-
-
-<!-- ===== SOURCE FILE: notebooks/Templates/reports__variant_single_gene_annotation.ipynb.md ===== -->
-
-# 📘 Biofilter — Report: Variant Single Gene Annotation
-
-**Phase 1 of the single-variant SNP×SNP interaction pipeline.**
-
-Given one input variant (`chr:pos` or rsID), this report:
-
-1. Resolves the variant to a genomic position (queries `variant_masters` when an rsID is given).
-2. Finds the **seed gene** at that position using `entity_locations` (with an optional base-pair window).
-3. Expands through a configurable biological group type (Pathways, Diseases, GO, or direct Gene links) to collect **partner genes**.
-4. Enriches every partner gene with coordinates, locus group, functional gene groups, and a variant count.
-
-Output: one row per **(seed gene × partner gene)** pair.
-
----
-
-### Methods used
-- `bf.report.explain("variant_single_gene_annotation")`
-- `bf.report.available_columns("variant_single_gene_annotation")`
-- `bf.report.example_input("variant_single_gene_annotation")`
-- `bf.report.run("variant_single_gene_annotation", **params)`
-
----
-
-### 1. Start Biofilter
-
-```python
 from biofilter import Biofilter
 
-# Uses db_uri from .biofilter.toml if available
-bf = Biofilter(debug_mode=False)
-```
+# Leave as None to use `[database] bundle` from .biofilter.toml.
+BUNDLE = None
+REPORT = "resolve_entity"
 
----
+bf = Biofilter(bundle=BUNDLE, debug_mode=False) if BUNDLE else Biofilter(debug_mode=False)
 
-### 2. Inspect the report contract
-
-```python
-print(bf.report.explain("variant_single_gene_annotation"))
-```
-
-```python
-bf.report.available_columns("variant_single_gene_annotation")
-```
-
-```python
-bf.report.example_input("variant_single_gene_annotation")
-```
-
----
-
-### 3. Run with built-in example input
-
-Uses `chr19:44904604` — the **APOE** locus, a well-annotated gene with many Reactome and KEGG pathways.
-
----
-
-### 4. Positional input — chr:pos
-
-Directly supply a chromosome + position. Accepted separators: `:`, `;`, `,`, `-`, space.
-
-```python
-df_pos = bf.report.run(
-    "variant_single_gene_annotation",
-    input_variant="chr19:44904604",
-    build=38,
-    group_entity_type="Pathways",
+# Results land here whatever directory the kernel was started in — VS Code
+# and Jupyter disagree about that, and a bare filename ends up wherever
+# they landed. The project root is the folder holding .biofilter.toml.
+_root = next(
+    (p for p in [Path.cwd(), *Path.cwd().parents] if (p / ".biofilter.toml").is_file()),
+    Path.cwd(),
 )
+OUTPUT_DIR = _root / "notebooks" / "templates" / "outputs"
+OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
-print(f"Rows: {len(df_pos)}")
-print(f"Seed gene : {df_pos['seed_gene_symbol'].iloc[0]}")
-print(f"Partners  : {df_pos['partner_gene_symbol'].nunique()} unique genes")
-df_pos[["seed_gene_symbol", "partner_gene_symbol", "shared_group_count", "shared_group_names"]].head(10)
+bf
 ```
 
----
-
-### 5. rsID input
-
-Supply an rsID — the report resolves it to a position via `variant_masters` before the gene lookup.
+### 2. What the report offers
 
 ```python
-df_rs = bf.report.run(
-    "variant_single_gene_annotation",
-    input_variant="rs429358",    # APOE rs429358
-    build=38,
-    group_entity_type="Pathways",
-)
+print("columns:")
+for column in bf.report.available_columns(REPORT):
+    print(" ", column)
 
-print(f"Rows: {len(df_rs)}")
-print(f"Resolved rsid      : {df_rs['seed_rsid'].iloc[0]}")
-print(f"Resolved position  : chr{df_rs['seed_chromosome'].iloc[0]}:{df_rs['seed_position'].iloc[0]}")
-print(f"Allele count       : {df_rs['seed_allele_count'].iloc[0]}")
-df_rs[["seed_rsid", "seed_gene_symbol", "partner_gene_symbol", "shared_group_count"]].head(10)
-```
-
----
-
-### 6. Source system filter
-
-Restrict expansion to specific source systems (e.g. Reactome only).
-Filtering is done at the `entity_relationships.data_source_id` level — no post-processing.
-
-Accepts a single string or a list: `"Reactome"` or `["Reactome", "KEGG"]`.
-
-```python
-df_reactome = bf.report.run(
-    "variant_single_gene_annotation",
-    input_variant="rs429358",
-    build=38,
-    group_entity_type="Pathways",
-    source_system_filter=["Reactome"],
-)
-
-df_all = bf.report.run(
-    "variant_single_gene_annotation",
-    input_variant="rs429358",
-    build=38,
-    group_entity_type="Pathways",
-)
-
-print(f"Reactome only → {df_reactome['partner_gene_symbol'].nunique()} partner genes, {len(df_reactome)} rows")
-print(f"All sources   → {df_all['partner_gene_symbol'].nunique()} partner genes, {len(df_all)} rows")
-
-# Sources present when no filter is applied
-df_all["shared_group_sources"].str.split("|").explode().value_counts(dropna=True).head(10)
-```
-
----
-
-### 7. Direct gene-gene links (`group_entity_type="Genes"`)
-
-1-hop expansion: partner genes are directly linked to the seed gene via `entity_relationships`
-(no intermediary pathway/disease node). Useful for curated interaction databases (BioGRID, ClinGen).
-
-```python
-df_direct = bf.report.run(
-    "variant_single_gene_annotation",
-    input_variant="chr19:44904604",
-    group_entity_type="Genes",
-)
-
-print(f"Rows: {len(df_direct)}")
-df_direct[["seed_gene_symbol", "partner_gene_symbol", "partner_gene_chromosome", "shared_group_sources"]].head(10)
-```
-
----
-
-### 8. Base-pair window — closest gene logic
-
-`window_bp` extends the gene search around the given position.
-When multiple genes are within the window, the **closest** is selected:
-- distance = 0 if the position falls inside the gene body
-- distance = gap to the nearest edge otherwise
-- ties broken by smallest locus span (most specific gene)
-
-```python
-# Try a position that sits in an intergenic region — use a 10 kb window
-df_win = bf.report.run(
-    "variant_single_gene_annotation",
-    input_variant="chr7:117548628",
-    window_bp=10000,
-    group_entity_type="Pathways",
-)
-
-print(f"Rows: {len(df_win)}")
-if not df_win.empty:
-    g = df_win.iloc[0]
-    print(f"Seed gene : {g['seed_gene_symbol']}  "
-          f"(chr{g['seed_gene_chromosome']}:{g['seed_gene_start']}-{g['seed_gene_end']})")
-df_win[["resolution_status", "seed_gene_symbol", "partner_gene_symbol", "shared_group_count"]].head(10)
-```
-
----
-
-### 9. Other group types — Diseases and GO
-
-The `group_entity_type` parameter accepts any `EntityGroup` name in the database.
-Common options: `"Pathways"`, `"Diseases"`, `"GO"`, `"Genes"`.
-
-```python
-df_dis = bf.report.run(
-    "variant_single_gene_annotation",
-    input_variant="chr19:44904604",
-    group_entity_type="Diseases",
-)
-
-print(f"Diseases expansion → {len(df_dis)} rows, {df_dis['partner_gene_symbol'].nunique()} partner genes")
-df_dis[["seed_gene_symbol", "partner_gene_symbol", "shared_group_count", "shared_group_names"]].head(10)
+print("\nexample input:")
+print(bf.report.example_input(REPORT))
 ```
 
 ```python
-df_go = bf.report.run(
-    "variant_single_gene_annotation",
-    input_variant="chr19:44904604",
-    group_entity_type="GO",
-)
-
-print(f"GO expansion → {len(df_go)} rows, {df_go['partner_gene_symbol'].nunique()} partner genes")
-df_go[["seed_gene_symbol", "partner_gene_symbol", "shared_group_count", "shared_group_names"]].head(10)
+print(bf.report.explain(REPORT))
 ```
 
----
+### 3. Run it
 
-### 10. Resolution failure handling
-
-When the report cannot resolve the input, it returns a single-row DataFrame
-with `resolution_status` set to a descriptive error code — never raises an exception.
+One row per **match**, not per input. An input matching three entities
+gives three rows — that is the answer, not a problem to hide.
 
 ```python
-cases = [
-    ("invalid input string",      {"input_variant": "not-a-variant"}),
-    ("rsID not in database",      {"input_variant": "rs999999999999"}),
-    ("unknown group type",        {"input_variant": "chr19:44904604", "group_entity_type": "UnknownGroup"}),
-    ("intergenic, no window",      {"input_variant": "chr1:1", "window_bp": 0}),
-]
+names = ["TP53", "brca1", "NOT_A_GENE"]
 
-for label, params in cases:
-    result = bf.report.run("variant_single_gene_annotation", **params)
-    status = result["resolution_status"].iloc[0]
-    print(f"{label:<30} → {status}")
+result = bf.report.run(REPORT, input_data=names)
+df = result.to_pandas()
+df[["input_original", "input", "entity_id", "primary_name", "group_name",
+    "is_primary", "observation"]]
 ```
 
----
+### 4. The three things to look at
 
-### 11. Suggested presentation view
+| `observation` | what it means |
+| --- | --- |
+| `not found` | the bundle has no entity answering to this name |
+| `multiple matches` | the **name** belongs to more than one entity |
+| *(empty)* | one entity, unambiguously |
+
+`not found` rows are kept deliberately: dropping them would leave no way
+to tell "the bundle does not know this" from "you did not ask".
 
 ```python
-display_cols = [
-    "seed_gene_symbol",
-    "seed_gene_chromosome",
-    "seed_gene_start",
-    "seed_gene_end",
-    "seed_gene_locus_group",
-    "partner_gene_symbol",
-    "partner_gene_chromosome",
-    "shared_group_count",
-    "shared_group_names",
-    "seed_gene_variant_count",
-    "partner_gene_variant_count",
-]
-
-# Use the Pathways run from section 4
-present_df = (
-    df_pos[[c for c in display_cols if c in df_pos.columns]]
-    .sort_values("shared_group_count", ascending=False)
-)
-present_df.head(20)
+df["observation"].value_counts(dropna=False)
 ```
 
----
+`multiple matches` is about the name, not your search. It means
+resolving that alias requires a decision **you** have to make — which is
+worth knowing before a downstream report picks one for you.
 
-### 12. CLI reference
+```python
+ambiguous = df[df["observation"] == "multiple matches"]
+ambiguous[["input_original", "input", "entity_id", "primary_name", "group_name"]]
+```
 
-All examples above can be reproduced from the command line using `biofilter report run`.
+### 5. Match modes
+
+| mode | matches when | cost |
+| --- | --- | --- |
+| `exact` | the alias equals the input, case-insensitively | an equality join |
+| `like` | the input occurs **inside** the alias | a scan with a substring test |
+| `fuzzy` | Jaro-Winkler similarity ≥ threshold | a scan with a scored test |
+
+```python
+import time
+
+for mode in ("exact", "like", "fuzzy"):
+    started = time.perf_counter()
+    out = bf.report.run(REPORT, input_data=["BRCA1"], match_mode=mode).to_pandas()
+    print(f"{mode:6s} {len(out):>5,} rows in {time.perf_counter() - started:.2f}s")
+```
+
+`like` is one-directional on purpose: the input inside the alias, not
+the reverse. Matching an alias inside an input would make every
+one-character alias match every input containing that character.
+
+```python
+bf.report.run(REPORT, input_data=["BRCA1"], match_mode="like").to_pandas()[
+    ["input_original", "input", "primary_name", "group_name"]
+].head(10)
+```
+
+### 6. Fuzzy, and a caution
+
+Scoring happens **in the engine**. The relational version pulled all 912
+thousand aliases into Python and scored them with `rapidfuzz`, which also
+meant an ImportError wherever that optional dependency was missing.
+
+⚠️ **Scores are not comparable to the old ones.** Both scales are 0–100
+and the default threshold is still 80, but Jaro-Winkler rewards a shared
+prefix and does not reorder words. Check the threshold against your own
+inputs rather than assuming the old one transfers.
+
+```python
+fuzzy = bf.report.run(
+    REPORT, input_data=["TP53"], match_mode="fuzzy", similarity_threshold=90
+).to_pandas()
+
+fuzzy.sort_values("similarity_score", ascending=False)[
+    ["input_original", "input", "similarity_score", "primary_name", "group_name"]
+].head(12)
+```
+
+### 7. Narrowing by entity group
+
+```python
+for group in ("Genes", "Proteins"):
+    out = bf.report.run(
+        REPORT, input_data=["TP53"], match_mode="like", group_filter=group
+    ).to_pandas()
+    print(f"{group:10s} {len(out):>4} matches")
+
+bf.report.run(
+    REPORT, input_data=["TP53"], match_mode="like", group_filter="Proteins"
+).to_pandas()[["input_original", "input", "primary_name", "group_name"]]
+```
+
+### 8. Export
+
+CSV by default, with a `.provenance.json` beside it naming the bundle the
+ids came from.
+
+```python
+for path in result.write(OUTPUT_DIR / "resolve_entity.csv"):
+    print(path)
+```
+
+### 9. The same thing on the command line
 
 ```bash
-# ── Positional input, Pathways expansion
-biofilter report run \
-  --report-name variant_single_gene_annotation \
-  --param input_variant=chr19:44904604
-
-# ── rsID input with Reactome-only filter
-biofilter report run \
-  --report-name variant_single_gene_annotation \
-  --param input_variant=rs429358 \
-  --param group_entity_type=Pathways \
-  --param source_system_filter=Reactome
-
-# ── Direct gene-gene links (1-hop)
-biofilter report run \
-  --report-name variant_single_gene_annotation \
-  --param input_variant=chr19:44904604 \
-  --param group_entity_type=Genes
-
-# ── 10 kb window, Disease expansion
-biofilter report run \
-  --report-name variant_single_gene_annotation \
-  --param input_variant=chr7:117548628 \
-  --param window_bp=10000 \
-  --param group_entity_type=Diseases
-
-# ── Save output to CSV
-biofilter report run \
-  --report-name variant_single_gene_annotation \
-  --param input_variant=rs429358 \
-  --output apoe_partners.csv
-
-# ── Inspect available params
-biofilter report run \
-  --report-name variant_single_gene_annotation \
-  --params-template
+biofilter report run --report-name resolve_entity \\
+    --input TP53 --input BRCA1 \\
+    --param match_mode=fuzzy --param similarity_threshold=90 \\
+    --output lookup.csv
 ```
 
----
+### 10. Quick QA
 
-### 13. Pipeline context
+```python
+expected = list(bf.report.available_columns(REPORT))
+missing = [c for c in expected if c not in df.columns]
 
-This report is **Phase 1** of the single-variant SNP×SNP interaction pipeline.
-
+print("missing columns:", missing or "none")
+print("not found:", int((df["observation"] == "not found").sum()))
+print("ambiguous:", int((df["observation"] == "multiple matches").sum()))
+print("bundle:", result.provenance["bundle_id"])
+display(df.dtypes.to_frame("dtype"))
 ```
-Phase 1 — Gene Discovery  (this report)
-  input : one variant (chr:pos or rsID)
-  output: seed gene + partner-gene list with shared-group annotation
-  scale : ~8 k rows (tractable)
-
-Phase 2 — Filtered Variant Collection  (planned)
-  input : Phase 1 partner-gene list
-  output: variants per gene, pre-filtered to coding / functional consequences
-  scale : ~100 k rows (SQL-level filtering)
-
-Phase 3 — Pair Generation  (planned)
-  input : Phase 2 variant sets per gene
-  output: variant × variant interaction pairs (seed × partner)
-  scale : controlled by Phase 2 filtering
-```
-
-Separating gene discovery from variant enumeration avoids the **combinatorial explosion**
-that occurs when all variants are annotated before filtering
-(e.g. APOE alone has ~1 k variants → 1 k × 260 k = 260 M rows without pre-filtering).

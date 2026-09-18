@@ -1,9 +1,28 @@
-# Docker (BF4 only)
+# Docker
 
-This folder contains the Biofilter 4 container image setup (application only, no bundled database).
+Run Biofilter without installing it. **One image**, built from
+[`Dockerfile`](Dockerfile) and published to two registries:
 
-> Looking for a self-contained image that ships BF4 **together with PostgreSQL**
-> (HPC clusters, single-node deployments)? See [hpc/README.md](hpc/README.md).
+| Registry | Name | For |
+|---|---|---|
+| Docker Hub | `ricoandre/biofilter` | Local Docker, CI, cloud platforms |
+| GHCR | `ghcr.io/<owner>/biofilter-hpc` | `apptainer pull` on clusters — the name predates the merge of two images and is kept so existing scripts keep working |
+
+Same image either way.
+
+The image contains no data. A bundle is bind-mounted at run time, so the
+same image serves any bundle — and a 20+ GB bundle of ZSTD parquet is
+something an image layer would not compress anyway.
+
+The contract is two mounts:
+
+| Mount | Mode | Holds |
+|---|---|---|
+| `/bundle` | read-only | The bundle directory, the one with `manifest.json` |
+| `/workspace` | writable | Where `--output` writes |
+
+`BIOFILTER_BUNDLE` defaults to `/bundle` in the image, so binding there
+needs no extra environment.
 
 ## Build
 
@@ -13,110 +32,150 @@ From the project root:
 docker build -t biofilter:latest -f docker/Dockerfile .
 ```
 
-## Run with external DB
+## Run a report against a bundle
 
-Use `DATABASE_URL` to point to any external PostgreSQL or SQLite database URI accepted by SQLAlchemy.
+Mount the bundle read-only, mount a directory for output, and name the
+bundle path as the container sees it:
 
 ```bash
 docker run --rm \
-  -e DATABASE_URL="postgresql+psycopg2://user:password@host:5432/biofilter" \
+  -v /path/to/bundles/20260914:/bundle:ro \
+  -v "$(pwd)/out:/workspace" \
+  biofilter:latest \
+  report run --report-name annotate_gene --input TP53 --output /workspace/genes.csv
+```
+
+Four things to get right:
+
+- **Mount the bundle root**, the directory holding `manifest.json` — not
+  its `tables/` subdirectory.
+- **`--output` writes inside the container.** Point it at the mounted
+  `/workspace`, or the file disappears with the container.
+- **`:ro` is worth setting.** A bundle is read-only by nature and nothing
+  in the read path writes to it, so the mount can say so.
+- **Output ownership.** The image runs as its own user, so under Docker
+  the files land owned by that uid. Add `--user "$(id -u):$(id -g)"` to
+  get your own. Under Apptainer this does not arise — the container runs
+  as you.
+
+With an env file instead:
+
+```bash
+cp docker/.env.example docker/.env      # then edit
+docker run --rm --env-file docker/.env \
+  -v /path/to/bundles/20260914:/bundle:ro \
   biofilter:latest report list
 ```
 
-Or with env file:
+A platform that mounts elsewhere — WDL and CWL runners generally do —
+either sets `BIOFILTER_BUNDLE` to its own path or passes `--bundle`.
+
+## On a cluster, with Apptainer
+
+The same image, converted to a `.sif` on pull. Nothing else changes —
+`--bind` where Docker says `-v`, `--env` where Docker says `-e`:
 
 ```bash
-cp docker/.env.example docker/.env
-docker run --rm --env-file docker/.env biofilter:latest report list
+apptainer pull bf4.sif docker://ghcr.io/ritchielab/biofilter-hpc:latest
+
+mkdir -p ~/bf4_output
+
+apptainer run \
+  --bind /project/hall_shared/datasets/biofilter/20260914:/bundle:ro \
+  --bind ~/bf4_output:/workspace \
+  bf4.sif \
+  report run --report-name annotate_gene --input APOE --output /workspace/apoe.csv
 ```
 
-You can also mount your project configuration to keep using `.biofilter.toml`:
+Two differences from Docker worth knowing:
 
-```bash
-docker run --rm \
-  -v "$(pwd):/workspace" \
-  biofilter:latest config show
-```
+- **Output ownership is not a problem.** Apptainer runs the container as
+  the invoking user, so the image's own user is ignored and files land
+  owned by you.
+- **The container filesystem is read-only.** Anything written has to go to
+  a bind, which is what `/workspace` is for.
 
-## Resolution precedence
+### Do you need the container at all?
 
-Inside the container, DB URI resolution follows:
+Often not. On a cluster where you can create a virtualenv,
+`pip install biofilter` and pointing at the bundle works and skips the
+image entirely. The container earns its place when you want the identical
+environment across machines, or when cluster policy prefers it.
 
-1. `--db-uri` CLI option
-2. `DATABASE_URL` (or `BIOFILTER_DB_URI`)
-3. `.biofilter.toml` (`database.db_uri`)
+For the Penn LPC specifically — module tree, shared bundle location, LSF
+job templates — see
+[`notebooks/lpc__quickstart.md`](../notebooks/lpc__quickstart.md) for
+users and [`notebooks/lpc__deploy.md`](../notebooks/lpc__deploy.md) for
+whoever maintains the install.
 
-`DATABASE_URL` is automatically mirrored to `BIOFILTER_DB_URI` for Alembic compatibility.
+## Run against a database
 
-## Publish manually (Docker Hub)
-
-```bash
-docker login
-docker buildx create --use
-docker buildx build \
-  --platform linux/amd64,linux/arm64 \
-  -f docker/Dockerfile \
-  -t ricoandre/biofilter:4.1.1 \
-  -t ricoandre/biofilter:latest \
-  --provenance=false \
-  --sbom=false \
-  --push .
-```
-
-## Publish via GitHub Actions (recommended)
-
-Workflow file: `.github/workflows/docker-publish.yml`
-
-Required repository secrets:
-
-- `DOCKERHUB_USERNAME`
-- `DOCKERHUB_TOKEN` (Docker Hub access token)
-
-How to trigger:
-
-1. Push a git tag like `v4.1.1` (publishes `4.1.1` and `latest`)
-2. Or run manually via `Actions -> Publish Docker Image -> Run workflow`
-
-## Quick Start Workflows
-
-Use this section for the fastest day-to-day flows.
-
-### 1) Build image from a specific Git ref
-
-```bash
-docker build -t biofilter:bf4 -f docker/Dockerfile \
-  "https://github.com/RitchieLab/biofilter.git#biofilter3r"
-```
-
-### 2) Run a single command (non-interactive)
+Only the ETL, `bundle plan` and the `db` commands need one. Reports do
+not.
 
 ```bash
 docker run --rm \
-  -e DATABASE_URL="postgresql+psycopg2://user:password@host:5432/biofilter" \
-  biofilter:bf4 report list
+  -e DATABASE_URL="postgresql+psycopg2://user:password@host:5432/biofilter_dev" \
+  biofilter:latest db ping
 ```
 
-### 3) Run reports with local input/output files
+A full `bundle build` inside a container is possible but rarely what you
+want: it needs around 150 GB of working space and runs for about two days.
+See [Bundle Requirements](../docs/source/technical/bundle_requirements.md).
+
+## How the container finds its data
+
+The CLI resolves this itself; the entrypoint passes the environment
+through untouched. In order:
+
+1. `--bundle` on the command line
+2. `--db-uri` on the command line
+3. `BIOFILTER_BUNDLE`
+4. `DATABASE_URL`, then `BIOFILTER_DB_URI`
+5. `.biofilter.toml` — `[database] bundle`, then `[database] db_uri`
+
+`--bundle` and `--db-uri` together is an error rather than a guess about
+which you meant.
+
+Mounting your project directory at `/workspace` lets the container pick up
+a `.biofilter.toml` you already have — though inside a container, the
+paths in it have to be the paths the container sees:
 
 ```bash
-docker run --rm \
-  -e DATABASE_URL="postgresql+psycopg2://user:password@host:5432/biofilter" \
-  -v "$(pwd):/workspace" \
-  biofilter:bf4 report run \
-    --report-name annotation_master_gene \
-    --input-file /workspace/gene.txt \
-    --param include_relationships=true \
-    --param include_variant_summary=true \
-    --param emit_not_found_rows=true \
-    --output /workspace/annotation_master_gene.csv
+docker run --rm -v "$(pwd):/workspace" biofilter:latest config show
 ```
 
-### 4) Open an interactive shell in the container
+## Interactive shell
 
 ```bash
 docker run --rm -it \
-  -e DATABASE_URL="postgresql+psycopg2://user:password@host:5432/biofilter" \
-  -v "$(pwd):/workspace" \
+  -v /path/to/bundles/20260914:/bundle:ro \
+  -e BIOFILTER_BUNDLE=/bundle \
   --entrypoint /bin/bash \
-  biofilter:bf4
+  biofilter:latest
+```
+
+## Publishing
+
+Via GitHub Actions, which is the supported path:
+
+`.github/workflows/docker-publish.yml` builds once and pushes the same
+image to both registries. It triggers on a pushed git tag (`v4.3.0`
+publishes `4.3.0` and `latest`), or manually from the Actions tab.
+
+Docker Hub needs the `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN`
+repository secrets; GHCR uses the workflow token. If the Docker Hub
+secrets are absent the job still publishes to GHCR.
+
+Manually, if you have to:
+
+```bash
+docker buildx build \
+  --platform linux/amd64,linux/arm64 \
+  -f docker/Dockerfile \
+  -t ricoandre/biofilter:4.3.0 \
+  -t ricoandre/biofilter:latest \
+  -t ghcr.io/ritchielab/biofilter-hpc:4.3.0 \
+  --provenance=false --sbom=false \
+  --push .
 ```

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Optional
 from urllib.parse import urlsplit, urlunsplit
 
@@ -11,9 +12,14 @@ from biofilter.core.components import (
     SettingsComponent,
 )
 from biofilter.modules.db.database import Database
+from biofilter.utils.bundle_path import bundle_to_uri, check_bundle_path
 from biofilter.utils.config import BiofilterConfig
 from biofilter.utils.logger import Logger
 from biofilter.utils.version import __version__
+
+
+NO_DATABASE = "__no_database__"
+"""Sentinel: start with no database, ignoring the configured URI."""
 
 
 @dataclass
@@ -70,9 +76,21 @@ class BiofilterCore:
                 "🔧 Configuration file not found. Using defaults.", "WARNING"
             )
 
-        # db_uri priority: ctor > config > None
-        if not self.db_uri and self.config is not None:
-            self.db_uri = getattr(self.config, "db_uri", None)
+        # db_uri priority: ctor > config > None.
+        #
+        # NO_DATABASE is how a caller says it wants none, distinct from
+        # passing None to mean "use whatever is configured". `bundle
+        # build` needs it: it creates its own staging database, and
+        # falling back to the configured URI made it fail before starting
+        # whenever that database was absent — the normal state, since 4.3
+        # keeps no persistent database to point at.
+        if self.db_uri is NO_DATABASE:
+            self.db_uri = None
+        elif not self.db_uri and self.config is not None:
+            # Same precedence the CLI uses: a configured bundle first.
+            self.db_uri = bundle_to_uri(
+                getattr(self.config, "bundle", None)
+            ) or getattr(self.config, "db_uri", None)
 
         self.db: Optional[Database] = None
 
@@ -115,19 +133,35 @@ class Biofilter:
     Public facade.
 
     Usage:
-        bf = Biofilter("sqlite:///./biofilter.db")
-        bf.db.connect()
-        bf.etl.update(...)
+        bf = Biofilter(bundle="/path/to/bundles/20260914")
         bf.report.list()
-        bf.report.run("gene_to_snp", {...})
+        bf.report.run("annotate_gene", input_data=["TP53"])
+
+    A bundle is a directory — point at the directory, not at its
+    tables/. `db_uri=` still takes any SQLAlchemy URI, for the ETL and
+    the reports that have not been migrated yet.
     """
 
-    def __init__(self, db_uri: str | None = None, debug_mode: bool = False):
-        self.core = BiofilterCore(db_uri=db_uri, debug_mode=debug_mode)
+    def __init__(
+        self,
+        db_uri: str | None = None,
+        debug_mode: bool = False,
+        bundle: "str | Path | None" = None,
+    ):
+        # `bundle` is the shape a user has: a folder someone handed them.
+        # It wins over db_uri for the same reason --bundle does on the
+        # CLI — it is the more specific request, and it saves memorising
+        # a URI scheme with three slashes.
+        self.core = BiofilterCore(
+            db_uri=bundle_to_uri(bundle) or db_uri, debug_mode=debug_mode
+        )
 
         # Components
         self.db = DBComponent(self.core)
         if self.core.db_uri:
+            # Check the bundle path before the engine does, so a typo is
+            # reported as a typo rather than as a missing in-memory DuckDB.
+            check_bundle_path(self.core.db_uri)
             self.db.connect()
 
         self.settings = SettingsComponent(self.core)

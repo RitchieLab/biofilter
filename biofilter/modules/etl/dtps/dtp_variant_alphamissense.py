@@ -10,16 +10,21 @@ from pathlib import Path
 from typing import Any, Iterable, Optional
 
 import pandas as pd
-from sqlalchemy import text
+import pyarrow as pa
 
 from biofilter.modules.etl.mixins.base_dtp import DTPBase
+from biofilter.modules.etl.parquet_sink import ChromosomeFileWriter
 from biofilter.utils.file_hash import compute_file_hash
 
 
 @dataclass
 class AlphaMissenseConfig:
     chunk_size: int = 250_000
-    parquet_compression: str = "snappy"
+    parquet_compression: str = "zstd"
+
+    # Table the parquet feeds; also the file-name prefix, so a file
+    # names its own table and partition (variant_..._chr21.parquet).
+    table_name: str = "variant_alphamissense"
     predictor_name: str = "alphamissense"
     predictor_version: Optional[str] = None
 
@@ -434,6 +439,7 @@ class DTP(DTPBase):
 
     def transform(self, raw_dir: str, processed_dir: str):
         t0 = time.time()
+        sink = None
         msg = f"⚙️ Starting transform of {self.data_source.name} (AlphaMissense)..."
         self.logger.log(msg, "INFO")
 
@@ -499,11 +505,18 @@ class DTP(DTPBase):
                 if norm.empty:
                     continue
 
-                out_file = pred_dir / f"predictions_part_{part:04d}.parquet"
-                norm.to_parquet(
-                    out_file,
-                    index=False,
-                    compression=self.config.parquet_compression,
+                norm = self._add_provenance(norm)
+                if sink is None:
+                    sink = ChromosomeFileWriter(
+                        pred_dir,
+                        self._arrow_schema(),
+                        self.config.table_name,
+                        compression=self.config.parquet_compression,
+                    )
+                sink.write_table(
+                    pa.Table.from_pandas(
+                        norm, schema=self._arrow_schema(), preserve_index=False
+                    )
                 )
                 rows_out += len(norm.index)
                 part += 1
@@ -512,11 +525,15 @@ class DTP(DTPBase):
             msg = f"❌ ETL transform failed: {exc}"
             self.logger.log(msg, "ERROR")
             return False, msg
+        finally:
+            if sink is not None:
+                sink.close()
 
         dt = time.time() - t0
         msg = (
             f"✅ Transform done for {self.data_source.name}: "
-            f"parts={part} rows_in={rows_in} rows_out={rows_out} elapsed={dt:.1f}s"
+            f"chromosomes={len(sink.chromosomes) if sink else 0} "
+            f"rows_in={rows_in} rows_out={rows_out} elapsed={dt:.1f}s"
         )
         self.logger.log(msg, "INFO")
         return True, msg
@@ -524,260 +541,60 @@ class DTP(DTPBase):
     # ------------------------------------------------------------------
     # LOAD
     # ------------------------------------------------------------------
-    def _prepare_load_df(self, df: pd.DataFrame) -> pd.DataFrame:
-        if df.empty:
-            return df.copy()
-
-        out = df.copy()
-        out["chromosome"] = pd.to_numeric(out["chromosome"], errors="coerce").astype("Int64")
-        out["position_start"] = pd.to_numeric(out["position_start"], errors="coerce").astype(
-            "Int64"
-        )
-        out["position_end"] = pd.to_numeric(out["position_end"], errors="coerce").astype("Int64")
-        out["score"] = pd.to_numeric(out.get("score"), errors="coerce")
-
-        text_cols = [
-            "reference_allele",
-            "alternate_allele",
-            "predictor_key",
-            "transcript_id",
-            "predictor_name",
-            "predictor_version",
-            "classification",
-            "details",
-        ]
-        for col in text_cols:
-            if col not in out.columns:
-                out[col] = None
-                continue
-            out[col] = out[col].astype("string").str.strip()
-            out[col] = out[col].where(out[col].ne(""), pd.NA)
-
-        mask = (
-            out["chromosome"].notna()
-            & out["position_start"].notna()
-            & out["position_end"].notna()
-            & out["reference_allele"].notna()
-            & out["alternate_allele"].notna()
-            & out["predictor_key"].notna()
-        )
-        out = out.loc[mask].copy()
-
-        out = out.sort_values(by=["score"], ascending=False, na_position="last")
-        out = out.drop_duplicates(
-            subset=[
-                "chromosome",
-                "position_start",
-                "position_end",
-                "reference_allele",
-                "alternate_allele",
-                "predictor_key",
-            ],
-            keep="first",
-        )
-        return out
-
-    def _load_part_via_stage(self, conn, df: pd.DataFrame, stage_table: str) -> tuple[int, int]:
-        if df.empty:
-            return 0, 0
-
-        conn.execute(text(f"DROP TABLE IF EXISTS {stage_table}"))
-        df.to_sql(
-            stage_table,
-            con=conn,
-            if_exists="replace",
-            index=False,
-            method="multi",
-            chunksize=10_000,
-        )
-
-        join_sql = f"""
-            FROM {stage_table} s
-            JOIN variant_masters vm
-              ON vm.chromosome = s.chromosome
-             AND vm.position_start = s.position_start
-             AND vm.position_end = s.position_end
-             AND vm.reference_allele = s.reference_allele
-             AND vm.alternate_allele = s.alternate_allele
+    def _add_provenance(self, df: pd.DataFrame) -> pd.DataFrame:
         """
-
-        unmatched_sql = f"""
-            SELECT COUNT(*)
-            FROM {stage_table} s
-            LEFT JOIN variant_masters vm
-              ON vm.chromosome = s.chromosome
-             AND vm.position_start = s.position_start
-             AND vm.position_end = s.position_end
-             AND vm.reference_allele = s.reference_allele
-             AND vm.alternate_allele = s.alternate_allele
-            WHERE vm.variant_id IS NULL
+        Stamp the rows with the data source and ETL package that produced
+        them. The old load step added these while inserting; the parquet
+        is now the final artifact, so they are written here.
         """
+        df = df.copy()
+        df["data_source_id"] = getattr(self.data_source, "id", None)
+        df["etl_package_id"] = getattr(self.package, "id", None)
+        return df
 
-        matched_count = int(conn.execute(text(f"SELECT COUNT(*) {join_sql}")).scalar() or 0)
-        unmatched_count = int(conn.execute(text(unmatched_sql)).scalar() or 0)
+    @staticmethod
+    def _arrow_schema():
+        """
+        Declare the parquet schema instead of letting pandas infer it per
+        part. Inference is unstable across parts: a column that is empty
+        in one chunk is written as `null` type there and as a string in
+        the next, and the parts then cannot be read as one dataset.
+        """
+        import pyarrow as pa
 
-        dialect = conn.dialect.name
-        if dialect == "postgresql":
-            insert_sql = f"""
-                INSERT INTO variant_effect_predictions (
-                    chromosome,
-                    variant_id,
-                    predictor_key,
-                    transcript_id,
-                    predictor_name,
-                    predictor_version,
-                    score,
-                    classification,
-                    details,
-                    data_source_id,
-                    etl_package_id
-                )
-                SELECT
-                    s.chromosome,
-                    vm.variant_id,
-                    s.predictor_key,
-                    s.transcript_id,
-                    s.predictor_name,
-                    s.predictor_version,
-                    s.score,
-                    s.classification,
-                    s.details,
-                    :data_source_id,
-                    :etl_package_id
-                {join_sql}
-                ON CONFLICT (chromosome, variant_id, predictor_key)
-                DO UPDATE SET
-                    transcript_id = EXCLUDED.transcript_id,
-                    predictor_name = EXCLUDED.predictor_name,
-                    predictor_version = EXCLUDED.predictor_version,
-                    score = EXCLUDED.score,
-                    classification = EXCLUDED.classification,
-                    details = EXCLUDED.details,
-                    data_source_id = EXCLUDED.data_source_id,
-                    etl_package_id = EXCLUDED.etl_package_id
-            """
-        else:
-            insert_sql = f"""
-                INSERT INTO variant_effect_predictions (
-                    chromosome,
-                    variant_id,
-                    predictor_key,
-                    transcript_id,
-                    predictor_name,
-                    predictor_version,
-                    score,
-                    classification,
-                    details,
-                    data_source_id,
-                    etl_package_id
-                )
-                SELECT
-                    s.chromosome,
-                    vm.variant_id,
-                    s.predictor_key,
-                    s.transcript_id,
-                    s.predictor_name,
-                    s.predictor_version,
-                    s.score,
-                    s.classification,
-                    s.details,
-                    :data_source_id,
-                    :etl_package_id
-                {join_sql}
-                ON CONFLICT (chromosome, variant_id, predictor_key)
-                DO UPDATE SET
-                    transcript_id = excluded.transcript_id,
-                    predictor_name = excluded.predictor_name,
-                    predictor_version = excluded.predictor_version,
-                    score = excluded.score,
-                    classification = excluded.classification,
-                    details = excluded.details,
-                    data_source_id = excluded.data_source_id,
-                    etl_package_id = excluded.etl_package_id
-            """
-
-        conn.execute(
-            text(insert_sql),
-            {
-                "data_source_id": self.data_source.id,
-                "etl_package_id": self.package.id,
-            },
-        )
-
-        conn.execute(text(f"DROP TABLE IF EXISTS {stage_table}"))
-        return matched_count, unmatched_count
+        return pa.schema([
+            pa.field("chromosome", pa.int32()),
+            pa.field("position_start", pa.int64()),
+            pa.field("position_end", pa.int64()),
+            pa.field("reference_allele", pa.string()),
+            pa.field("alternate_allele", pa.string()),
+            pa.field("predictor_key", pa.string()),
+            pa.field("transcript_id", pa.string()),
+            pa.field("predictor_name", pa.string()),
+            pa.field("predictor_version", pa.string()),
+            pa.field("score", pa.float64()),
+            pa.field("classification", pa.string()),
+            pa.field("details", pa.string()),
+            pa.field("data_source_id", pa.int64()),
+            pa.field("etl_package_id", pa.int64()),
+        ])
 
     def load(self, processed_dir=None):
-        t0 = time.time()
-        msg = f"📥 Loading {self.data_source.name} AlphaMissense predictions..."
-        self.logger.log(msg, "INFO")
-
-        self.check_compatibility()
-
-        if not processed_dir:
-            msg = "⚠️ processed_dir MUST be provided."
-            self.logger.log(msg, "ERROR")
-            return False, msg
-
-        try:
-            base_path = (
-                Path(processed_dir)
-                / self.data_source.source_system.name
-                / self.data_source.name
-            )
-            pred_dir = base_path / "predictions"
-            part_files = sorted(glob.glob(str(pred_dir / "predictions_part_*.parquet")))
-            if not part_files:
-                msg = f"❌ No AlphaMissense part files found in {pred_dir}"
-                self.logger.log(msg, "ERROR")
-                return False, msg
-        except Exception as exc:
-            msg = f"⚠️ Failed to prepare processed data paths: {exc}"
-            self.logger.log(msg, "ERROR")
-            return False, msg
-
-        total_matched = 0
-        total_unmatched = 0
-        stage_table = "tmp_alphamissense_stage"
-
-        try:
-            self.db_write_mode()
-        except Exception as exc:
-            msg = f"⚠️ Failed to switch DB to write mode: {exc}"
-            self.logger.log(msg, "WARNING")
-            return False, msg
-
-        try:
-            with self.db.engine.begin() as conn:
-                conn.execute(
-                    text(
-                        "DELETE FROM variant_effect_predictions "
-                        "WHERE data_source_id = :data_source_id"
-                    ),
-                    {"data_source_id": self.data_source.id},
-                )
-
-                for part_file in part_files:
-                    df = pd.read_parquet(part_file, engine="pyarrow")
-                    df = self._prepare_load_df(df)
-                    matched, unmatched = self._load_part_via_stage(conn, df, stage_table)
-                    total_matched += matched
-                    total_unmatched += unmatched
-                    self.logger.log(
-                        f"✅ Processed {Path(part_file).name} "
-                        f"(matched={matched}, unmatched={unmatched})",
-                        "INFO",
-                    )
-
-        except Exception as exc:
-            msg = f"❌ Load failed: {exc}"
-            self.logger.log(msg, "ERROR")
-            return False, msg
-
-        dt = time.time() - t0
-        msg = (
-            f"✅ Loaded AlphaMissense predictions: matched={total_matched}, "
-            f"unmatched={total_unmatched}, elapsed={dt:.1f}s"
+        raise NotImplementedError(
+            "load() is not used by this DTP under ADR-003. The variant "
+            "branch writes parquet directly and is not staged through a "
+            "relational database.\n\n"
+            "What the previous load did was resolve the natural key "
+            "(chromosome, position, ref, alt) against variant_masters to "
+            "swap it for a generated variant_id, then drop the natural "
+            "key. That surrogate is only valid inside one bundle "
+            "(ADR-003 §2.5), and resolving it made this DTP depend on the "
+            "variants branch having been loaded first. The transform now "
+            "keeps the natural key, so this DTP is independent and its "
+            "parquet is the final artifact.\n\n"
+            "It also dropped every prediction whose variant was absent "
+            "from variant_masters (the 'unmatched' count it logged). "
+            "Those rows are now kept; pruning them, if wanted, belongs to "
+            "bundle assembly, where the variants parquet is available."
         )
-        self.logger.log(msg, "SUCCESS")
-        return True, msg
+

@@ -148,6 +148,10 @@ def test_start_process_normalizes_inputs_and_runs_each_datasource(monkeypatch):
     monkeypatch.setattr(manager, "_resolve_datasource_ids", fake_resolve)
     monkeypatch.setattr(manager, "_load_datasource", fake_load)
     monkeypatch.setattr(manager, "_run_one_datasource", fake_run_one_datasource)
+    # start_process no longer trusts the call returning: it confirms each
+    # step against the package ledger, because a DTP can report failure
+    # without raising.
+    monkeypatch.setattr(manager, "_datasource_steps_ok", lambda *a, **k: True)
 
     manager.start_process(
         source_system="NCBI",
@@ -428,8 +432,8 @@ def test_restart_etl_process_rolls_back_optionally_deletes_and_reruns(monkeypatc
 
     ds = SimpleNamespace(
         id=7,
-        name="dbsnp_chr7",
-        source_system=SimpleNamespace(name="NCBI"),
+        name="gnomad_joint_chr7",
+        source_system=SimpleNamespace(name="gnomAD"),
         source_system_id=1,
     )
     monkeypatch.setattr(manager, "_load_datasource", lambda *a, **k: ds)
@@ -453,7 +457,7 @@ def test_restart_etl_process_rolls_back_optionally_deletes_and_reruns(monkeypatc
     monkeypatch.setattr(manager, "_run_one_datasource", fake_run)
 
     ok = manager.restart_etl_process(
-        data_source=["dbsnp_chr7"],
+        data_source=["gnomad_joint_chr7"],
         delete_files=True,
         download_path="/raw",
         processed_path="/processed",
@@ -461,7 +465,7 @@ def test_restart_etl_process_rolls_back_optionally_deletes_and_reruns(monkeypatc
 
     assert ok is True
     assert captured["rolled_back"] == 1
-    assert captured["deleted"] == ["/raw/NCBI/dbsnp_chr7*", "/processed/NCBI/dbsnp_chr7*"]  # noqa E501
+    assert captured["deleted"] == ["/raw/gnomAD/gnomad_joint_chr7*", "/processed/gnomAD/gnomad_joint_chr7*"]  # noqa E501
     assert len(captured["runs"]) == 1
     run = captured["runs"][0]
     assert run["ds"] is ds
@@ -507,8 +511,8 @@ def test_rollback_etl_process_datasource_mode_uses_rollback_and_optional_delete(
 
     ds = SimpleNamespace(
         id=7,
-        name="dbsnp_chr7",
-        source_system=SimpleNamespace(name="NCBI"),
+        name="gnomad_joint_chr7",
+        source_system=SimpleNamespace(name="gnomAD"),
         source_system_id=1,
     )
     monkeypatch.setattr(manager, "_load_datasource", lambda *a, **k: ds)
@@ -528,7 +532,7 @@ def test_rollback_etl_process_datasource_mode_uses_rollback_and_optional_delete(
     monkeypatch.setattr(manager, "_delete_matching_files", fake_delete)
 
     ok = manager.rollback_etl_process(
-        data_source=["dbsnp_chr7"],
+        data_source=["gnomad_joint_chr7"],
         delete_files=True,
         download_path="/raw",
         processed_path="/processed",
@@ -536,7 +540,7 @@ def test_rollback_etl_process_datasource_mode_uses_rollback_and_optional_delete(
 
     assert ok is True
     assert captured["rolled_back"] == 1
-    assert captured["deleted"] == ["/raw/NCBI/dbsnp_chr7*", "/processed/NCBI/dbsnp_chr7*"]  # noqa E501
+    assert captured["deleted"] == ["/raw/gnomAD/gnomad_joint_chr7*", "/processed/gnomAD/gnomad_joint_chr7*"]  # noqa E501
 
 
 def test_rollback_etl_process_package_mode_uses_target_package(monkeypatch):

@@ -1,21 +1,48 @@
 # AG ETL - Update and Operations (CLI/API/Reports)
 
-Detailed guide to run and monitor ETL in Biofilter, covering:
-- CLI usage
-- API usage (Python/Notebook)
-- support reports
-- recommended flow for long and resumable runs
-- playbook for LLM assistants
+Maintainer guide for the `biofilter etl` group.
+
+**Read this first:** in 4.3 the ETL is a step inside a bundle build rather
+than an end in itself. `bundle build` runs it for every source in a plan, in
+order, and assembles the bundle when they have all succeeded. The commands
+here drive one source directly, which is what you want when developing a DTP
+or re-running a source that failed.
+
+A user with a bundle never runs any of this. Refreshing data means building a
+**new** bundle — see `docs/source/technical/building_bundles.md`.
 
 ---
 
 ## 1) Goal
 
-This guide explains how to:
-- update one or more DataSources manually (`etl update`)
-- update many DataSources sequentially with resume support (`etl update-all`)
-- monitor status and audit history (`etl status`, `etl_status`, `etl_packages`)
-- restart or rollback when needed (`etl restart`, `etl rollback`)
+Operate a single data source: run it, check it, restart it, roll it back.
+
+Each source is driven by a **DTP** (Data Transformation Package) through
+`extract`, `transform` and — for core sources only — `load`.
+
+---
+
+## 1.1) Two branches
+
+Sources fall into two groups that behave differently, and the difference
+explains most of what follows.
+
+**Core** — genes, proteins, pathways, diseases, GO, chemicals and the
+relationships between them. About 7 million rows. These DTPs resolve entities
+against each other, so they run in dependency order and load into a
+relational store: the throwaway SQLite during a build, or whatever database
+you point them at directly.
+
+**Variant** — gnomAD joint and VEP, AlphaMissense, GTEx, GWAS. Billions of
+rows, no entity ids and no foreign keys, so there is nothing to resolve and
+nothing to stage. These write their final parquet directly and have **no load
+step** — `load()` raises `NotImplementedError` by design. Run them with
+explicit steps:
+
+```bash
+biofilter etl update --data-source gnomad_joint_chr21 --run-step extract
+biofilter etl update --data-source gnomad_joint_chr21 --run-step transform
+```
 
 ---
 
@@ -174,7 +201,7 @@ poetry run biofilter --db-uri sqlite:///biofilter_dev.db etl rollback \
 
 ## 5) Operational Support Reports
 
-### 5.1 `etl_status` (DataSource-level consolidated view)
+### 5.1 `platform_etl_status` (DataSource-level consolidated view)
 
 - consolidated ETL state per DataSource
 - includes DataSources with no packages yet
@@ -188,7 +215,7 @@ poetry run biofilter --db-uri sqlite:///biofilter_dev.db report run --name etl_s
 API:
 
 ```python
-df_status = bf.report.run("etl_status", only_active=False)
+df_status = bf.report.run("platform_etl_status", only_active=False)
 ```
 
 Useful columns:
@@ -202,7 +229,7 @@ Useful columns:
 
 ---
 
-### 5.2 `etl_packages` (detailed audit)
+### 5.2 `platform_etl_packages` (detailed audit)
 
 - raw package history
 - best for debugging failures and timing
@@ -216,7 +243,7 @@ poetry run biofilter --db-uri sqlite:///biofilter_dev.db report run --name etl_p
 API:
 
 ```python
-df_pkg = bf.report.run("etl_packages", only_active=False)
+df_pkg = bf.report.run("platform_etl_packages", only_active=False)
 ```
 
 Useful columns:
@@ -284,7 +311,7 @@ Example output:
 ### 6.4 Monitoring in Notebook
 
 ```python
-df_status = bf.report.run("etl_status", only_active=False)
+df_status = bf.report.run("platform_etl_status", only_active=False)
 display(
     df_status[
         ["source_system", "data_source", "extract_status", "transform_status", "load_status", "pipeline_ok", "latest_error"]
@@ -293,7 +320,7 @@ display(
 ```
 
 ```python
-df_pkg = bf.report.run("etl_packages", only_active=False)
+df_pkg = bf.report.run("platform_etl_packages", only_active=False)
 display(
     df_pkg[
         ["package_id", "created_at", "source_system", "data_source", "operation_type", "status", "load_status"]
@@ -305,9 +332,9 @@ display(
 
 ## 7) Recommended Operational Flow
 
-1. Check current state with `etl status` + `etl_status` report.
+1. Check current state with `etl status` + `platform_etl_status` report.
 2. Run `etl update-all` (first cycles usually with `--keep-files`).
-3. Investigate failures in `etl_packages`.
+3. Investigate failures in `platform_etl_packages`.
 4. Fix source/input/runtime issues.
 5. Run `etl update-all` again (resume skips already completed DataSources).
 6. After stability, consider `--drop-files` to reduce disk usage.
@@ -321,8 +348,8 @@ display(
   - use `etl update-all` for batch runs.
 
 - **DataSource does not progress in `update-all`**
-  - check latest load package in `etl_packages`.
-  - check `latest_error` in `etl_status`.
+  - check latest load package in `platform_etl_packages`.
+  - check `latest_error` in `platform_etl_status`.
 
 - **Intermittent processing failure**
   - rerun `update-all`; flow is resumable.
@@ -367,7 +394,7 @@ display(
 You are operating Biofilter ETL.
 1) Run `biofilter etl status` and summarize pending items.
 2) Run `biofilter etl update-all --only-active`.
-3) At the end, run reports `etl_status` and `etl_packages`.
+3) At the end, run reports `platform_etl_status` and `platform_etl_packages`.
 4) Provide a summary: succeeded/failed/skipped, failed data_sources, recommendations.
 Do not execute rollback without confirmation.
 ```

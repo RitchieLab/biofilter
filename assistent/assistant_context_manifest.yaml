@@ -1,6 +1,6 @@
 assistant_name: "BF4 Assistant"
-assistant_version: "2.0.0"
-project_version_hint: "Biofilter 4.2.x"
+assistant_version: "3.0.0"
+project_version_hint: "Biofilter 4.3.x"
 default_language: "en"
 fallback_language:
   - "pt-BR"
@@ -8,21 +8,21 @@ fallback_language:
 # -----------------------------------------------------------------------------
 # Audience
 # -----------------------------------------------------------------------------
-# This assistant serves END USERS, not developers. Its job is to help people:
-#   1) run reports and get results (CSV),
-#   2) update the knowledge base (ETL),
-#   3) install / create a new database — either by pointing at a shared
-#      Parquet bundle (parquet://, read-only, no server) or by building
-#      their own PostgreSQL/SQLite database from scratch.
+# This assistant serves people who have been given a BUNDLE and want answers
+# out of it: a gene list annotated, variants filtered, a cohort matched.
 #
-# Because the audience is non-developer, the knowledge base intentionally
-# EXCLUDES Python source code. Grounding comes from user documentation,
-# operational guides, per-report explain docs, and runnable notebook
-# examples. If a question truly requires implementation details, the
-# assistant should say so and defer to the maintainer / source repo.
+# It does NOT help build a bundle or run the ETL. Both are maintainer tasks —
+# a full build needs about 150 GB of working space and two days — and the
+# right answer there is to name the guide and defer. Keeping build material
+# out of the retrieval set is deliberate: it is what stops the assistant from
+# walking a scientist through a two-day pipeline they did not ask for.
+#
+# Source code is excluded for the same kind of reason: the audience is not
+# developers, and an assistant that quotes implementation has stopped
+# answering the question it was asked.
 # -----------------------------------------------------------------------------
 
-audience: "end_users"
+audience: "bundle_readers"
 
 retrieval_policy:
   strategy: "hierarchical_rag"
@@ -32,33 +32,51 @@ retrieval_policy:
   rerank: true
 
 source_priority:
-  # 1) Official user documentation (Sphinx / Read the Docs source).
+  # 1) Official user documentation (Sphinx source).
+  #
+  #    docs/source/ is split by audience: the root and getting_started/ are
+  #    written for this assistant's users, technical/ is not. Most of
+  #    technical/ is excluded — the exceptions are the pages the assistant
+  #    needs in order to DEFER accurately rather than vaguely.
   - id: docs
     path: "docs/source"
     role: "official_user_docs"
     weight: 1.0
     include_globs:
-      - "**/*.md"
+      - "*.md"                       # index, report_catalog, reports,
+                                     # entity_and_omics, cli_reference,
+                                     # troubleshooting
+      - "getting_started/**/*.md"
+      - "technical/index.md"
+      - "technical/building_bundles.md"     # so "how do I build one" defers
+      - "technical/bundle_requirements.md"  # ...with the real cost attached
+      - "technical/configuration.md"        # .biofilter.toml is user-facing
+      - "technical/read_path.md"            # explains the errors users see
     exclude_globs:
       - "**/_build/**"
       - "**/.DS_Store"
-      # Developer-only material — not relevant to end users.
-      - "**/developer_extensions.md"
-      - "**/schema.md"
+      # Maintainer and developer material.
+      - "technical/schema.md"
+      - "technical/developer_extensions.md"
+      - "technical/etl.md"
+      - "technical/database.md"
+      - "technical/system_overview.md"
 
-  # 2) Operational guides (task-oriented, LLM-ready).
+  # 2) Operational guides. Only the two written for bundle readers; the db
+  #    and etl guides are maintainer material and stay out.
   - id: agents
     path: "biofilter_agents"
     role: "operational_guides"
     weight: 0.95
     include_globs:
-      - "**/*.md"
+      - "ag_start.md"
+      - "ag_report_en.md"
     exclude_globs:
       - "**/.DS_Store"
-      # Deep technical reference — out of scope for end users.
-      - "**/biobin_technical_reference.md"
 
-  # 3) Per-report explain docs (parameters, inputs, output columns).
+  # 3) Per-report explain docs. The authority on parameters, accepted inputs
+  #    and output columns — prefer these over anything else when they
+  #    disagree about a specific report.
   - id: reports_explain
     path: "biofilter/modules/report/reports_explain"
     role: "report_usage_truth"
@@ -67,24 +85,30 @@ source_priority:
       - "**/*.md"
     exclude_globs:
       - "**/.DS_Store"
-      # Developer scaffold template — not a real report.
-      - "**/report_template.md"
+      - "**/report_template.md"      # developer scaffold, not a report
 
-  # 4) Runnable examples: notebooks + user-facing markdown walkthroughs
-  #    (LPC quickstart/deploy, end-to-end pipelines).
+  # 4) Runnable examples. One notebook per report, plus the LPC guides.
+  #
+  #    NOTE the path: `notebooks/templates` is lowercase, and the LPC guides
+  #    sit one level above it. An earlier version of this manifest pointed at
+  #    `notebooks/Templates`, which macOS resolved case-insensitively and
+  #    Linux did not — the LPC quickstart silently left the knowledge base.
   - id: notebooks
-    path: "notebooks/Templates"
+    path: "notebooks"
     role: "examples"
     weight: 0.85
     include_globs:
-      - "**/*.ipynb"
-      - "**/*.md"
+      - "templates/*.ipynb"
+      - "lpc__quickstart.md"
     exclude_globs:
       - "**/.ipynb_checkpoints/**"
       - "**/.DS_Store"
-    note: "Prefer docs/agents over notebooks when conflicts exist."
+      - "Andre/**"                   # working notes, not documentation
+      - "data/**"
+      - "lpc__deploy.md"             # maintainer guide
+    note: "Prefer docs and agents over notebooks when they conflict."
 
-  # 5) Curated support FAQ (compact, high-signal).
+  # 5) Curated support FAQ.
   - id: faq
     path: "assistent"
     role: "support_faq"
@@ -100,24 +124,38 @@ global_exclusions:
   - "**/*.py"          # user-facing assistant: never ingest source code
   - "**/docs/build/**"
   - "**/.DS_Store"
+  - "biofilter_legacy/**"   # 4.2.x snapshot: correct for its release, wrong
+                            # for this one, and the likeliest source of a
+                            # confidently outdated answer
 
 answering_rules:
-  - "Reports first: most users just want to run a report and get a CSV."
-  - "Explain the two ways to have a database: (a) point at a shared Parquet
-     bundle via parquet:// (read-only, no server, no ETL), or (b) build your
-     own PostgreSQL/SQLite DB with migrations + ETL."
-  - "Prefer high-priority sources on conflicts and mark assumptions."
-  - "When unsure, suggest a discovery/verification command."
-  - "Do not invent unavailable commands, report names, or flags."
-  - "This knowledge base has no source code — do not answer implementation
-     questions from it; defer to the maintainer or repository."
+  - "Reports first. Most users want to run one report and get a CSV."
+  - "The user has a bundle. Point at it with --bundle, BIOFILTER_BUNDLE, or
+     [database] bundle in .biofilter.toml — the bundle root, the directory
+     holding manifest.json, never its tables/ subdirectory."
+  - "Never present parquet:// as the way to point at data, and never suggest
+     running reports against PostgreSQL or SQLite. Reports read bundles."
+  - "There are no migrations. A schema change produces a new bundle."
+  - "--input repeats; there is no comma-separated form."
+  - "Building a bundle and running the ETL are out of scope. Name the guide,
+     state the cost (~150 GB, ~2 days), and defer to whoever maintains it."
+  - "Volunteer how to read a thin result: not_found vs no_variants, a null
+     column that may mean an absent source, and coverage in the provenance."
+  - "Entity and variant ids are valid only inside the bundle that produced
+     them. Say so whenever ids leave the session."
+  - "Verify any report name against `biofilter report list`. The 4.2.x names
+     are gone and recommending one is a failure."
+  - "Prefer high-priority sources on conflict, and mark assumptions."
+  - "When unsure, give the discovery command instead of an answer."
+  - "No source code here — defer implementation questions to the repository."
 
 maintenance:
   refresh_triggers:
+    - "a report added, renamed or removed"
     - "CLI options changed"
-    - "new report added"
-    - "new DTP / data source added"
-    - "database backend or db_uri scheme changed (e.g. parquet://)"
     - "docs/source updated"
+    - "reports_explain updated"
     - "notebook examples updated"
-  minimum_refresh_cadence: "weekly"
+    - "a new bundle published with a different schema version"
+  minimum_refresh_cadence: "monthly"
+  before_publishing: "Run assistant_eval_set.md and compare answers."

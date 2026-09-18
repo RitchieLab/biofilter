@@ -19,7 +19,7 @@ from biofilter.utils.logger import Logger
 
 
 # BF4 shorthand URI scheme for "read this parquet bundle directly via DuckDB".
-# Format: parquet:///absolute/path/to/bundle/tables
+# Format: parquet:///absolute/path/to/bundle  (its tables/ also works)
 # Internally translated to an in-memory DuckDB engine with one VIEW per
 # *.parquet file in the directory (children with `_chr_N` suffix skipped).
 PARQUET_URI_SCHEME = "parquet://"
@@ -27,6 +27,10 @@ PARQUET_URI_SCHEME = "parquet://"
 # Bundle manifest filename, looked up next to (or one level above) the
 # directory a `parquet://` URI points at.
 MANIFEST_FILENAME = "manifest.json"
+
+# Subdirectory holding a bundle's parquet files. A `parquet://` URI
+# should name the bundle itself; this is where its data sits.
+BUNDLE_TABLES_DIR = "tables"
 
 
 def _tolerant_json_deserializer(value: Any) -> Any:
@@ -59,7 +63,7 @@ class Database(CreateDBMixin):
     - `postgresql://...` / `postgresql+psycopg2://...` — production writes
     - `sqlite:///...` — local dev / single-file storage
     - `duckdb:///...` — DuckDB file (advanced)
-    - `parquet:///path/to/bundle/tables` — read-only DuckDB over a parquet
+    - `parquet:///path/to/bundle` — read-only DuckDB over a parquet
       bundle (HPC use case, no DB server required). Each entry in the
       directory becomes a SQL VIEW: a `<table>.parquet` file maps to a
       view over that file, and a `<table>/` directory maps to a view over
@@ -71,6 +75,15 @@ class Database(CreateDBMixin):
     def __init__(self, db_uri: Optional[str] = None, log_level: str = "DEBUG"):
         self.logger = Logger(log_level=log_level)
         self.db_uri: Optional[str] = db_uri
+        # The URI as the caller wrote it. `_normalize_uri` rewrites
+        # `parquet://<bundle>` into `duckdb:///:memory:`, which carries no
+        # trace of the bundle — so a second connect() on the same object
+        # would normalize the already-normalized URI, find no
+        # `parquet://` scheme, and quietly bring up an empty in-memory
+        # DuckDB with none of the bundle's views. Since __init__ connects
+        # when given a URI, the documented `Biofilter(db_uri=...)` then
+        # `bf.db.connect()` was exactly that sequence.
+        self._requested_uri: Optional[str] = db_uri
 
         self.engine: Optional[Engine] = None
         self.SessionLocal = None
@@ -86,6 +99,13 @@ class Database(CreateDBMixin):
         self.read_only: bool = False
         # Set when the URI is `parquet://` — path to the tables/ dir.
         self._parquet_dir: Optional[Path] = None
+        # Bundle root, when the URI named one; None when it pointed
+        # straight at a directory of parquet files.
+        self._bundle_root: Optional[Path] = None
+        # Columns the models declare that this bundle does not carry.
+        # Populated when parquet views are registered; empty for a
+        # live database, which is the schema by definition.
+        self.schema_drift: List[str] = []
 
         # Cache of resolved SQLAlchemy Core Table objects
         self._tables: Dict[str, Table] = {}
@@ -159,13 +179,14 @@ class Database(CreateDBMixin):
         Translate user-facing URIs into a SQLAlchemy-acceptable form.
 
         - Bare filesystem path → `sqlite:///<abs path>`
-        - `parquet:///path/to/tables` → `duckdb:///:memory:` plus a stored
+        - `parquet:///path/to/bundle` → `duckdb:///:memory:` plus a stored
           path that connect() will use to register parquet VIEWs.
         - Other schemes pass through unchanged.
         """
         # Reset parquet state — successive calls (re-connect) shouldn't
         # carry the previous dir over.
         self._parquet_dir = None
+        self._bundle_root = None
 
         if uri.startswith(PARQUET_URI_SCHEME):
             raw_path = uri[len(PARQUET_URI_SCHEME):]
@@ -177,6 +198,27 @@ class Database(CreateDBMixin):
             # Strip leading slashes so both parquet://path and
             # parquet:///abs/path work; resolve to absolute.
             parquet_dir = Path(raw_path).expanduser().resolve()
+
+            # Point at the bundle, not at its tables/ subdirectory.
+            #
+            # The bundle root is what a user has a path to, and it is
+            # where manifest.json lives — the version of the data, the
+            # bundle id that stamps results, the plan that produced it.
+            # Pointing at tables/ reaches the parquet but leaves that
+            # behind one directory up.
+            #
+            # A root left unresolved failed quietly rather than loudly:
+            # view discovery would see tables/ as a directory holding
+            # parquet and register the whole bundle as a single view
+            # named `tables`.
+            if (parquet_dir / MANIFEST_FILENAME).is_file() and (
+                parquet_dir / BUNDLE_TABLES_DIR
+            ).is_dir():
+                self._bundle_root = parquet_dir
+                parquet_dir = parquet_dir / BUNDLE_TABLES_DIR
+            else:
+                self._bundle_root = None
+
             self._parquet_dir = parquet_dir
             self.read_only = True
             return "duckdb:///:memory:"
@@ -187,6 +229,28 @@ class Database(CreateDBMixin):
         if "://" in uri:
             return uri
         return f"sqlite:///{os.path.abspath(uri)}"
+
+    def bundle_manifest(self) -> Optional[dict]:
+        """
+        The manifest of the bundle this connection reads, if any.
+
+        Public because the id it carries is what identifies the data a
+        result came from. Returns None for a live database, which has no
+        bundle identity.
+        """
+        return self._bundle_manifest()
+
+    def bundle_id(self) -> Optional[str]:
+        """
+        Identifier of the bundle behind this connection, or None.
+
+        A bundle cannot be rebuilt once its sources move on, so this is
+        the handle that says *which* data an answer came from — and it is
+        derived from content, so it can be recomputed to check the bundle
+        has not changed underneath.
+        """
+        manifest = self._bundle_manifest()
+        return manifest.get("bundle_id") if manifest else None
 
     def _bundle_manifest(self) -> Optional[dict]:
         """
@@ -237,15 +301,25 @@ class Database(CreateDBMixin):
         def sql_literal(path: Path) -> str:
             return str(path).replace("'", "''")
 
+        partitioned: set = set()
         for child in sorted(base.iterdir()):
             if child.is_dir():
                 if any(child.rglob("*.parquet")):
+                    partitioned.add(child.name)
                     glob = sql_literal(child / "**" / "*.parquet")
                     sources[child.name] = (
                         f"read_parquet('{glob}', hive_partitioning = true, "
                         f"union_by_name = true)"
                     )
             elif child.suffix == ".parquet":
+                # A file named for a directory that is also here is the
+                # empty parent stub older builds exported beside the real
+                # data. Both keyed the same name and iteration order
+                # decided the winner, so every variant report against a
+                # bundle carrying stubs read zero rows without erroring.
+                # The directory holds the data; it wins.
+                if child.stem in partitioned:
+                    continue
                 sources[child.stem] = (
                     f"read_parquet('{sql_literal(child)}')"
                 )
@@ -295,7 +369,64 @@ class Database(CreateDBMixin):
                 )
             conn.commit()
 
+        self.schema_drift = self._report_schema_drift(
+            [name for name, _ in sources]
+        )
         return len(sources)
+
+    def _report_schema_drift(self, view_names: List[str]) -> List[str]:
+        """
+        Name what a bundle is missing, at connect time.
+
+        Parquet is self-describing, so compatibility is discovered rather
+        than declared (ADR-003 §2.7). The failure this prevents is a
+        DuckDB binder error thrown deep inside a report, naming a column
+        with no indication of which bundle lacks it.
+
+        Missing *tables* are not reported: a bundle built from a subset of
+        the sources legitimately has fewer, and refusing to connect would
+        make it unusable for the tables it does carry. A table that is
+        present but short a column is the real mismatch, because a query
+        that touches it will fail with no diagnosis.
+
+        Warns rather than raises, for the same reason. `db verify` is the
+        strict gate.
+        """
+        from biofilter.modules.db.base import Base
+
+        expected = {
+            table.name: {c.name for c in table.columns}
+            for table in Base.metadata.tables.values()
+        }
+        available = set(view_names)
+        problems: List[str] = []
+
+        with self.engine.connect() as conn:
+            for name in sorted(available & set(expected)):
+                quoted = name.replace('"', '""')
+                found = {
+                    row[0]
+                    for row in conn.execute(
+                        text(f'DESCRIBE SELECT * FROM "{quoted}"')
+                    )
+                }
+                missing = expected[name] - found
+                if missing:
+                    problems.append(
+                        f"{name}: missing {', '.join(sorted(missing))}"
+                    )
+
+        if problems:
+            self.logger.log(
+                f"⚠️  {len(problems)} table(s) in this bundle are missing "
+                f"columns this build expects. Queries touching them will "
+                f"fail:",
+                "WARNING",
+            )
+            for problem in problems:
+                self.logger.log(f"     {problem}", "WARNING")
+
+        return problems
 
     def connect(self, new_uri: Optional[str] = None, check_exists: bool = True) -> None:  # noqa E501
         """
@@ -307,6 +438,13 @@ class Database(CreateDBMixin):
         """
         if new_uri:
             self.db_uri = new_uri
+            self._requested_uri = new_uri
+
+        # Re-normalize from what the caller asked for, not from the
+        # result of the last normalization, so reconnecting to a bundle
+        # gives back the bundle.
+        if self._requested_uri:
+            self.db_uri = self._requested_uri
 
         if not self.db_uri:
             raise ValueError("db_uri must be provided to connect().")

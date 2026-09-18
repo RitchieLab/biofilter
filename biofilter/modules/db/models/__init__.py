@@ -1,6 +1,6 @@
 from .model_chemicals import ChemicalMaster
 from .model_config import BiofilterMetadata, GenomeAssembly, SystemConfig
-from .model_curation import OmicStatus
+from .model_status import OmicStatus
 from .model_diseases import DiseaseGroup, DiseaseGroupMembership, DiseaseMaster
 from .model_entities import (
     Entity,
@@ -27,14 +27,9 @@ from .model_proteins import (  # noqa: E501
     ProteinPfamLink,
 )
 from .model_variants import (
-    VariantBiotype,
     VariantConsequence,
-    VariantConsequenceCategory,
-    VariantConsequenceGroup,
     VariantGWAS,
-    VariantGWASSNP,
     VariantImpact,
-    VariantSNPMerge,
 )
 
 __all__ = [
@@ -67,15 +62,9 @@ __all__ = [
     "OmicStatus",
 
     # VARIANTS MODELS
-    "VariantSNP",
-    "VariantSNPMerge",
     "VariantGWAS",
-    "VariantGWASSNP",
-    "VariantConsequenceGroup",
-    "VariantConsequenceCategory",
     "VariantConsequence",
     "VariantImpact",
-    "VariantBiotype",
 
     # PATHWAY MODELS
     "PathwayMaster",

@@ -1,87 +1,95 @@
-# Report Tutorial: `platform_data_statistics`
+# platform_data_statistics
 
-## Purpose
-
-Platform-level statistics report for operational dashboards.
-Returns a compact long-format dataset with:
-
-- entity counts by omic domain (`EntityGroup`)
-- variant counts by chromosome (`variant_masters`)
-- relationship counts by group pair (`entity_relationships`)
-- datasources ingested and latest load execution metadata (`etl_packages`)
-
-## Report Name
-
-`platform_data_statistics`
-
-## Output Shape
-
-Rows are returned in long format using these columns:
-
-- `section`
-- `metric`
-- `dimension_1`
-- `dimension_2`
-- `value_number`
-- `value_text`
-- `as_of`
-- `note`
-
-This shape is ideal for pivoting and charting in notebooks.
-
-## Parameters (API)
-
-- `sections`: `list[str]` or comma-separated string (optional)
-  - Allowed values:
-    - `entity_counts_by_group`
-    - `variant_counts_by_chromosome`
-    - `relationship_counts_by_group_pair`
-    - `datasource_latest_load`
-  - Default: all sections.
-- `only_active_entities`: `bool` (default `True`)
-  - When `True`, entity counts exclude only explicit inactive rows (`is_active=False`).
-- `relationship_mode`: `"undirected" | "directed"` (default `"undirected"`)
-- `include_totals`: `bool` (default `True`)
-
-## Examples
-
-API (all sections):
-
-```python
-df = bf.report.run(
-    "platform_data_statistics",
-    only_active_entities=True,
-    relationship_mode="undirected",
-    include_totals=True,
-)
-```
-
-API (selected sections):
-
-```python
-df = bf.report.run(
-    "platform_data_statistics",
-    sections=["entity_counts_by_group", "datasource_latest_load"],
-    include_totals=False,
-)
-```
-
-CLI:
+What this bundle holds: how much, of what, and how big.
 
 ```bash
-biofilter --db-uri sqlite:///biofilter_dev.db report run \
-  --report-name platform_data_statistics \
-  --param relationship_mode=undirected \
-  --param include_totals=true
+biofilter report run --report-name platform_data_statistics --output stats.csv
 ```
 
-## Notes
+> Called the same thing before 4.3.0. A platform report — it describes
+> the bundle, not the biology in it, and takes no input beyond which
+> sections to compute.
 
-- Variant section depends on `variant_masters`; if unavailable, a note row is emitted.
-- Relationship counts are aggregated by group pair (domain-domain view), not per entity.
-- Datasource section emits multiple metrics per datasource:
-  - `latest_load_package_id`
-  - `latest_load_status`
-  - `latest_load_end`
-  - `latest_load_rows`
-  - `latest_load_age_days`
+## One row per measurement
+
+Heterogeneous statistics do not fit a wide table, so this one is long:
+
+| column | meaning |
+| --- | --- |
+| `section` | which group of measurements |
+| `metric` | what is being measured |
+| `dimension_1`, `dimension_2` | what it is measured *by* |
+| `value_number` | the number, when there is one |
+| `value_text` | the value, when it is not a number |
+| `as_of` | when the measured thing happened, not when the report ran |
+| `note` | anything that needs saying about the row |
+
+A wide table would have to change shape every time a section is added.
+
+## Sections
+
+| section | what it answers | cost |
+| --- | --- | --- |
+| `bundle` | which build is this, and how big overall | free |
+| `storage` | rows, bytes and file count per table | free |
+| `entities` | how many of each kind of thing | a scan |
+| `variants` | how many variants per chromosome, per variant table | a scan |
+| `relationships` | links by group pair, and by type | a scan |
+| `sources` | what each data source contributed, and when | a scan |
+
+```bash
+--param sections=bundle --param sections=storage
+```
+
+**`bundle` and `storage` cost nothing.** They read `manifest.json`, which
+already records rows and bytes per file. The sizes of a 21 GB bundle come
+out of a few hundred lines of JSON — measured at 0.00s against the full
+one, where the complete report takes 2.8 seconds over 3.2 billion rows.
+
+**`variants` is grouped from the data, not from filenames.** The manifest
+counts rows per *file*, and a file happening to be one chromosome is a
+convention of the current build rather than a guarantee. Grouping by the
+`chromosome` column is affordable because it has row-group statistics —
+2.2 billion rows group in about a second.
+
+## Reading the result
+
+**`tables_without_rows` is the one to watch.** A declared table with no
+rows is a source that was planned and did not land. It gets a number of
+its own rather than being buried in the per-table list, because it is the
+measurement most likely to mean something is wrong.
+
+**`storage` sums a partitioned table across its files.** `note` says how
+many, so a table spread over 25 files reads as one row.
+
+**`sources` lists every data source, including ones that never ran** —
+those have a null `value_text` and no `as_of`. `platform_etl_status` is
+where to go for why.
+
+**`as_of` is about the data, not the report.** When a source was last
+loaded, for instance. When the *report* ran is in the provenance sidecar.
+
+## The two tables beside the long one
+
+The long shape holds most of this report faithfully. Two sections it
+cannot, and in both cases what it loses is the part you would sort by —
+so those travel as tables of their own:
+
+```python
+stats = bf.report.run("platform_data_statistics")
+
+stats.table                        # the long measurements, unchanged
+stats.extra_tables["storage"]      # table, branch, rows, bytes, files
+stats.extra_tables["variants"]     # table, chromosome, rows
+```
+
+`storage.bytes` is an integer. In the long shape a table's size survives
+twice and neither is usable: `value_text` rounds it to `"3.4 MB"` and
+`note` buries the figure in `"1 file(s), 3416028 bytes"`.
+
+`variants.chromosome` is an integer. In the long shape it is a string in
+`dimension_2`, so sorting gives 1, 10, 11, 2.
+
+The other four sections keep the long shape and lose nothing by it.
+`relationships` alone carries two metrics of different shapes, which is
+why "one table per section" is not a thing this report could have.

@@ -1,6 +1,252 @@
 CHANGELOG
 
-4.2.1 (29/08/2026):
+4.3.0 (18/09/2026):
+
+- The bundle is the product, and there is no persistent database
+  (ADR-003). A build creates a throwaway SQLite, uses it, and leaves a
+  parquet bundle behind. PostgreSQL still works for building; nothing
+  reads from it.
+  - Two measurements drove it. `variant_molecular_effects` costs about
+    255 bytes per row in a row store and 4 in parquet, which puts the
+    full genome at roughly 426 GB against 6.65 GB. Everything else — the
+    entire entity model — is about 7 million rows and 105 MB, and was
+    being hosted on a server sized for the 2 billion variant rows beside
+    it.
+  - Alembic is gone. There is no migration chain: a database is built
+    once by `db create-db` with `create_all`, and a schema change
+    produces a new bundle rather than an in-place upgrade.
+
+- New command group `bundle`: `plan`, `build`, `info`
+  - `bundle plan` writes the recipe — every data source with an include
+    flag, its DTP and version, split into the two branches. List order
+    is the dependency declaration, since the core branch resolves
+    entities against what ran before it.
+  - `bundle build` runs both branches and assembles only once every
+    planned source has succeeded. A bundle missing a table looks exactly
+    like a complete one to whoever reads it, so nothing is published
+    unless everything worked.
+  - The core branch stages through SQLite because those sources resolve
+    entities against each other. The variant branch writes its final
+    parquet directly and has no load step at all — `load()` raises by
+    design.
+  - Resume is the default: an interrupted build re-runs only what is
+    pending, because the staging ledger records both branches even
+    though only one stores data there. `--restart` discards it.
+  - Disk, not CPU, is the binding constraint. Raw files are dropped as
+    soon as their parquet exists; `--keep-raw` disables that, and
+    `--min-free-gb` (default 100) stops a source starting into a disk
+    that cannot hold it.
+  - `--into` folds a run's variant output into an existing bundle, so a
+    genome can be built in stages. The bundle id changes each time
+    because it is derived from content; `build_record.json` records the
+    id before and after every merge. Re-folding a chromosome already
+    present is refused rather than silently doubling its rows.
+  - `--no-assemble` and `--keep-processed` support the same staged
+    workflow.
+  - `bundle info` prints what a bundle says about itself. `created_at`
+    is when the bundle began and `updated_at` when a merge last changed
+    it; neither reaches the fingerprint, so the id still identifies
+    content rather than a run.
+
+- The gnomAD DTP reads the joint callset, so a bundle now carries three
+  data sets where it carried one
+  - The superseded DTP read `gnomad.genomes.v4.1.sites.chr*.vcf.bgz` —
+    genomes only. The current one reads
+    `gnomad.joint.v4.1.sites.chr*.vcf.bgz`, and the 20 INFO fields it
+    keeps hold exomes, genomes and the joint aggregate side by side: AC,
+    AF, AN and nhomalt for each, plus the joint filtering allele
+    frequencies, the group-max figures, and both callsets' filter flags.
+  - Coverage grows accordingly. A variant observed only in the exome
+    callset is in the bundle now; before it was simply absent, and
+    nothing said so.
+
+- A parameterised frequency filter on the variant branch, applied at
+  build time
+  - `dtps/config/dtp_variant_gnomad_joint.json` carries `min_ac`,
+    `max_ac`, `min_af` and `max_af`, against `AC_joint` and `AF_joint`.
+    `null` disables a bound and bounds are inclusive. The default is
+    `min_ac: 5`, which produces a bundle of roughly 25 GB.
+  - Measured on chromosome 21: `AC_joint = 0` accounts for 49.5% of
+    records, singletons for a further 22.2%, and `AC > 5` keeps 14.3%.
+    So the default is already most of the size decision, and the two
+    directions cost differently — lowering the bound to reach rare
+    variants is expensive, raising it is how a smaller bundle is built.
+  - Set it before the build. Bundles are immutable (ADR-003), so a
+    variant dropped here is absent from that bundle for good: the filter
+    decides what the artifact will contain, and is not a query-time
+    option a reader can relax later.
+
+- The report layer was rewritten to read parquet natively (ADR-004).
+  The old module is deleted, not frozen.
+  - A bundle is opened, not connected to. `Bundle.open()` reads the
+    manifest, verifies every declared file is present at its declared
+    size, starts an in-process DuckDB and registers one view per logical
+    table. No Engine, no sessionmaker, no Session, no ORM.
+  - Views come from the manifest rather than a directory scan. Inferring
+    table membership from filenames is what let an empty parent file
+    shadow 177 million rows — the same defect, independently, in two
+    code paths.
+  - Each execution gets its own cursor, so temp tables and registered
+    relations no longer leak between reports sharing a process.
+  - Input arrives as a registered relation and is joined, never
+    interpolated. That is what keeps injection out and what turns a
+    ten-thousand-value filter into a hash join.
+  - A report declares `requires` (checked before the query runs, so a
+    missing source says so in one line) and `optional` (absent tables
+    are recorded, because a column null for want of a source looks
+    exactly like a null answer).
+
+- Reports renamed and consolidated. 17 reports in six families:
+  `resolve_*`, `annotate_*`, `expand_*`, `pair_*`, `aggregate_*`,
+  `platform_*`. The old names are gone; each new report's explain guide
+  names its predecessor.
+  - entity_filter                          -> resolve_entity
+  - annotation_master_gene                 -> annotate_gene
+  - annotation_master_variant              -> annotate_variant
+  - annotation_master_{disease,go,
+    pathway,protein}                       -> annotate_*
+  - entity_relationship_model              -> expand_entity_relationship
+  - entity_neighborhood_summary            -> expand_entity_neighborhood
+  - gene_to_variant_filtering,
+    variant_annotation_expanded            -> expand_gene_to_variant
+  - annotation_variant_regulatory_evidence -> expand_variant_regulatory
+  - variant_gene_location_model,
+    variant_single_gene_annotation,
+    snp_snp_model, variant_modeling,
+    snp_snp_pair_generator                 -> pair_variants
+  - variant_list_intersect,
+    variant_binning                        -> aggregate_cohort_variants
+  - etl_status                             -> platform_etl_status
+  - etl_packages                           -> platform_etl_packages
+  - annotation_master_chemical, db_pg_table_stats and db_pg_index_stats
+    are retired with no replacement.
+  - New: `pair_genes` — gene pairs linked by shared biology, and the
+    item pairs those gene pairs imply for a mapping the caller supplies
+    (ADR-005).
+
+- What a report returns is now a documented object, not a DataFrame
+  - `ReportResult` carries the main table, any further tables, the
+    provenance, and files the report wrote.
+  - Provenance records the report, the bundle id and root, the
+    parameters, the row count, the coverage gaps, and `warnings` — which
+    is always present, so an empty list means nothing went wrong rather
+    than nobody having checked.
+  - `emit(name, table)` attaches a second table when an answer is
+    genuinely two shapes. `platform_data_statistics` returns `storage`
+    and `variants` beside its long list; `aggregate_cohort_variants`
+    returns the (variant, bin) mapping beside the bins.
+  - `save(dir)` / `ReportResult.load(dir)` round-trip the whole thing,
+    losing nothing, in a bundle's own layout — so `Bundle.open` reads a
+    saved result and DuckDB queries it. `load()` reports whether the
+    source bundle is still on disk.
+  - `write(path)` remains the export: one table, nested columns
+    flattened to JSON so a spreadsheet can hold them, lossy on purpose.
+    CSV gets a `.provenance.json` sidecar; parquet carries provenance in
+    its own metadata as well.
+  - Parameter and input values are case-insensitive everywhere, across
+    14 places in 8 reports. Previously true by consistent habit; now
+    asserted by a test.
+
+- Pointing at data is a path, not a URI
+  - `--bundle <dir>` on the CLI, `BIOFILTER_BUNDLE` in the environment,
+    `[database] bundle` in `.biofilter.toml` (resolved relative to that
+    file), and `Biofilter(bundle=...)` in Python.
+  - Point at the bundle root, the directory holding `manifest.json`, not
+    at its `tables/` subdirectory.
+  - Passing `--bundle` and `--db-uri` together is an error rather than a
+    guess about which was meant.
+  - `--db-uri` remains for what is genuinely a database: a staging
+    SQLite during a build, or a development PostgreSQL.
+
+- Version checking between a bundle and the install that reads it
+  - A bundle declaring an unsupported `manifest_version` is refused,
+    with a message saying to update Biofilter rather than migrate the
+    bundle.
+  - A bundle built by a different release opens and warns, recording the
+    mismatch in `provenance["version_mismatch"]`. Advisory on purpose:
+    refusing would make an archived bundle unreadable by the only
+    install at hand, and a bundle cannot be rebuilt once its sources
+    have moved on.
+  - Opening a bundle warns about columns this build expects and does not
+    find; `db verify --in <bundle> --schema` makes the same check an
+    error, for gating.
+
+- Schema
+  - Seven variant tables that were declared and never written are
+    deleted: variant_biotypes, variant_consequence_categories,
+    variant_consequence_groups, variant_effect_predictions,
+    variant_gene_regulatory_evidence, variant_gwas_snp,
+    variant_regulatory_elements. They shipped as empty tables, which is
+    worse than absent — `db verify` counted them present and a report
+    joining one got zero rows instead of an error.
+  - variant_consequences and variant_impacts stay, keyed by name rather
+    than a surrogate id. They carry `severity_rank`, which the
+    annotation does not and which cannot be derived from it.
+  - The variant tables are keyed by chromosome, position, reference and
+    alternate allele. They carry no entity id and no foreign keys, which
+    is what lets the variant branch be built without the entity graph
+    existing yet.
+
+- Performance, all of it query shape rather than layout
+  - `aggregate_cohort_variants` resolved rsIDs by a join whose condition
+    mixed an equality with `IS NULL`, which stops DuckDB using a hash
+    join: the plan was a nested loop over 264 million rows, and it ran
+    for every cohort including the VCFs that already carry coordinates.
+  - The same join called `lower()` on an rsID column that is already
+    entirely lowercase. A plain hash join finds three rsIDs among 264
+    million in 1.22 s; the report took 68.93 s.
+  - `annotate_gene` measured all 39,306 placed genes to answer about
+    one: 63.6 s for one gene and the same 63.6 s for ten. A cost that
+    does not move with the question is a scan that ignores it.
+  - Four reports queried partitioned variant tables without naming the
+    chromosome, so every file in the bundle was read. Invisible while a
+    bundle held one chromosome; a minute per report once it held six.
+
+- Containers: one image, two mounts
+  - The two images merged. `docker/hpc/` is gone; the same image serves
+    Docker and Apptainer, published to Docker Hub and to GHCR under the
+    `biofilter-hpc` name existing pull commands already use.
+  - The contract is `/bundle` read-only and `/workspace` writable, with
+    `BIOFILTER_BUNDLE` defaulting to `/bundle`, so a normal run names no
+    paths beyond the binds.
+  - Fix: the entrypoint appended `--db-uri "$DATABASE_URL"` whenever
+    that variable was set, and since `--bundle` and `--db-uri` together
+    is a usage error, a leftover DATABASE_URL made the normal 4.3
+    invocation fail citing an argument the caller never passed.
+  - Fix: `docker run <image> report list` tried to exec `report`, the
+    `biofilter` prefix having been added only when the first argument
+    began with a dash.
+
+- Documentation reorganized by audience: the root of `docs/source` and
+  `getting_started/` for someone reading a bundle, `technical/` for
+  whoever builds one or extends Biofilter. Every page was rewritten
+  against the code. `parquet_backend.md` became `technical/read_path.md`
+  — "backend" implied a pluggability that no longer exists.
+  - New Penn LPC guides at `notebooks/lpc__quickstart.md` and
+    `lpc__deploy.md`, replacing the 4.2.x pair now frozen under
+    `biofilter_legacy/`.
+  - The GPT assistant kit is rescoped to bundle readers, with the
+    context manifest as the single source of truth for its knowledge
+    base — both sync paths read it.
+
+- Breaking changes
+  - Every report renamed; see the table above. `report list` is the
+    authority, and each explain guide names its predecessor.
+  - Reports no longer run against PostgreSQL or SQLite. They read a
+    bundle.
+  - `bf.report.run()` returns a `ReportResult`, not a DataFrame. Call
+    `.to_pandas()`.
+  - `pair_variants` takes variants and nothing else. Gene input, the
+    gene-to-variant expansion, `max_variants_per_gene` and `membership`
+    are gone (ADR-005 D13). The gene path hid a choice belonging to the
+    caller: a gene on chr22 holds about 4,000 variants and the report
+    kept 100 of them ranked by frequency, with nobody seeing which. Run
+    `expand_gene_to_variant` first and the list is in front of the
+    person filtering it.
+  - `db migrate` and the Alembic chain are gone.
+  - The dbSNP DTP and a superseded gnomAD DTP were removed.
+
+4.2.1 (29/07/2026):
 
 - Parquet bundle foundation — turns the bundle into a first-class build
   artifact rather than a one-off export

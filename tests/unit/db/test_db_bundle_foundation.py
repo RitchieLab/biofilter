@@ -353,3 +353,141 @@ def test_duckdb_reads_the_partition_key_as_a_column(tmp_path):
         .fetchall()
     )
     assert rows == [(7, 1)]
+
+
+def test_a_partition_directory_beats_its_empty_parent_stub(tmp_path):
+    """
+    The stub is what `create_all` + a full export leave behind for a
+    variant table the relational branch never filled, and it sits beside
+    the directory holding the real rows. Both keyed the same view name,
+    so iteration order decided which one reports read — and the stub won
+    often enough that every variant report against the 20260910 bundle
+    returned zero rows without erroring.
+    """
+    tables = tmp_path / "tables"
+    _write_parquet(
+        tables / "variant_masters" / "variant_masters_chr21.parquet",
+        pd.DataFrame({"variant_key": ["21:1:A:T", "21:2:C:G"]}),
+    )
+    _write_parquet(
+        tables / "variant_masters.parquet",
+        pd.DataFrame({"variant_key": pd.Series([], dtype="object")}),
+    )
+
+    db = Database()
+    db._parquet_dir = tables
+    sources = dict(db._discover_bundle_sources())
+
+    assert set(sources) == {"variant_masters"}
+    assert "hive_partitioning = true" in sources["variant_masters"]
+
+
+def test_reconnecting_to_a_bundle_keeps_its_views(tmp_path):
+    """
+    `_normalize_uri` rewrites `parquet://` to `duckdb:///:memory:`, and
+    `__init__` connects when handed a URI — so the documented
+    `Biofilter(db_uri=...)` then `bf.db.connect()` normalized an already
+    normalized URI, lost the bundle, and came up empty.
+    """
+    from sqlalchemy import text
+
+    tables = tmp_path / "bundle" / "tables"
+    _write_parquet(tables / "genes.parquet", pd.DataFrame({"id": [1, 2, 3]}))
+    (tmp_path / "bundle" / "manifest.json").write_text('{"tables": []}')
+
+    db = Database(db_uri=f"parquet:///{tmp_path / 'bundle'}")
+    db.connect()
+
+    with db.get_session() as session:
+        assert session.execute(text("SELECT count(*) FROM genes")).scalar() == 3
+
+
+def test_verify_reports_declared_tables_that_hold_no_rows(sqlite_engine, tmp_path):
+    """
+    An empty table is legitimate when the plan excluded its source and a
+    silent build failure when it did not. `verify_bundle` cannot tell
+    those apart, but naming them is what lets a human do it.
+    """
+    out = tmp_path / "bundle"
+    export_full_clone(
+        sqlite_engine,
+        out,
+        biofilter_version="4.3.0",
+        schema_version="4.3.0",
+        fmt="parquet",
+        checksums=False,
+    )
+
+    manifest = json.loads((out / "manifest.json").read_text())
+    names = {t["name"] for t in manifest["tables"] if t.get("rows") == 0}
+
+    report = verify_bundle(out, check_hashes=False)
+
+    assert report["ok"] is True
+    assert set(report["empty_tables"]) == names
+
+
+def test_the_models_declare_only_what_a_plan_can_fill():
+    """
+    `Base.metadata` is what `db verify --schema` compares a bundle
+    against, so a table declared there is a promise some plan fills it.
+
+    Seven 4.2.x tables outlived the schema that needed them. Three were
+    parked on a second metadata and four were named in an exclusion list;
+    all seven are now deleted, which is why this asserts absence rather
+    than separation.
+    """
+    from biofilter.modules.db.base import Base
+    import biofilter.modules.db.models  # noqa: F401
+
+    assert not hasattr(
+        __import__("biofilter.modules.db.base", fromlist=["base"]), "RetiredBase"
+    )
+    assert not ({
+        "variant_biotypes",
+        "variant_consequence_categories",
+        "variant_consequence_groups",
+        "variant_effect_predictions",
+        "variant_gene_regulatory_evidence",
+        "variant_gwas_snp",
+        "variant_regulatory_elements",
+    } & set(Base.metadata.tables))
+
+
+def test_create_db_builds_every_table_it_promises():
+    """
+    Regression: `CORE_PARTITIONED` listed three tables whose models had
+    been retired, and the SQLite path asserts every name there is in
+    `Base.metadata`. Creating a staging database raised outright, so a
+    `bundle build` from scratch could not start — only one resuming an
+    existing staging file worked.
+    """
+    from biofilter.modules.db.base import Base
+    from biofilter.modules.db.create_db_mixin import CORE_PARTITIONED
+    import biofilter.modules.db.models  # noqa: F401
+
+    assert CORE_PARTITIONED <= set(Base.metadata.tables)
+
+
+def test_every_variant_table_a_bundle_carries_is_declared(tmp_path):
+    """
+    The mirror of the same defect: `variant_alphamissense`,
+    `variant_gtex` and `variant_rsid` were in bundles and in no model,
+    so the drift check — which compares the intersection — never looked
+    at them. A DTP could change their columns silently.
+    """
+    from sqlalchemy import create_engine
+
+    from biofilter.modules.db.base import Base
+    from biofilter.utils.db_loader import bootstrap_models
+
+    bootstrap_models(create_engine("sqlite:///:memory:"))
+
+    assert {
+        "variant_masters",
+        "variant_molecular_effects",
+        "variant_predictions",
+        "variant_rsid",
+        "variant_alphamissense",
+        "variant_gtex",
+    } <= set(Base.metadata.tables)

@@ -92,7 +92,14 @@ def test_create_db_calls_database_create_db(monkeypatch):
     assert calls["overwrite"] is True
 
 
-def test_upgrade_runs_migration_and_seed_update(monkeypatch):
+def test_upgrade_applies_seeds_without_migrating(monkeypatch):
+    """
+    Upgrade is seed-only now.
+
+    It used to run an Alembic upgrade first; there is no migration chain
+    any more (ADR-003 §2.8), so this asserts the seed pass happens and
+    that no migration hook is left behind to call.
+    """
     core = DummyCore()
     component = dbcomp_mod.DBComponent(core)
 
@@ -106,50 +113,13 @@ def test_upgrade_runs_migration_and_seed_update(monkeypatch):
 
     core.db = FakeDB()
 
-    def fake_migrate(**kwargs):
-        calls["migrate"] = kwargs
-        return True
-
-    monkeypatch.setattr(component, "migrate", fake_migrate)
-
     ok = component.upgrade(seed_dir="custom_seed")
 
     assert ok is True
-    assert calls["migrate"] == {"action": "upgrade", "target": "head", "force": False}
     assert calls["seed_dir"] == "custom_seed"
+    assert not hasattr(component, "migrate")
 
 
-def test_migrate_raises_if_engine_not_initialized():
-    core = DummyCore()
-    core.db = SimpleNamespace(engine=None, SessionLocal="S", db_uri="sqlite:///x.db")
-    component = dbcomp_mod.DBComponent(core)
-
-    with pytest.raises(RuntimeError, match="engine not initialized"):
-        component.migrate()
-
-
-def test_migrate_calls_run_migration(monkeypatch):
-    core = DummyCore()
-    core.db = SimpleNamespace(engine=object(), SessionLocal="S", db_uri="sqlite:///x.db")
-    component = dbcomp_mod.DBComponent(core)
-
-    captured = {}
-
-    def fake_run_migration(**kwargs):
-        captured.update(kwargs)
-        return True
-
-    monkeypatch.setattr(dbcomp_mod, "run_migration", fake_run_migration)
-
-    ok = component.migrate(action="status", target="head", force=True)
-
-    assert ok is True
-    assert captured["session_factory"] == "S"
-    assert captured["engine"] is core.db.engine
-    assert captured["db_uri"] == "sqlite:///x.db"
-    assert captured["action"] == "status"
-    assert captured["target"] == "head"
-    assert captured["force"] is True
 
 
 def test_get_session_passthrough():

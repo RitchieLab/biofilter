@@ -3,6 +3,7 @@ import re
 
 import pandas as pd
 
+from biofilter.modules.etl.mixins.batched_commit import BatchedCommitMixin
 from biofilter.modules.db.models import (  # noqa: E501
     GeneGroup,
     GeneGroupMembership,
@@ -13,7 +14,7 @@ from biofilter.modules.db.models import (  # noqa: E501
 from biofilter.utils.utilities import as_list
 
 
-class GeneQueryMixin:
+class GeneQueryMixin(BatchedCommitMixin):
 
     def get_or_create_locus_group(
         self,
@@ -227,7 +228,11 @@ class GeneQueryMixin:
                     return None, conflict_flag, False
 
         try:
-            self.session.commit()
+            # Batched, not per gene. Every get_or_create_* helper the core
+            # DTPs call used to commit on its own, and HGNC calls five of
+            # them per row — batching only one of the five moved its load
+            # from 518 s to 481 s, because the other four still committed.
+            self._commit_batched()
             msg = f"Gene '{symbol}' linked with {len(group_objs)} group(s), {new_links} new links added"  # noqa: E501
             self.logger.log(msg, "DEBUG")
         except Exception as e:

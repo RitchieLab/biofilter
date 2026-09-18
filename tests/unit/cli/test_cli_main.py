@@ -10,7 +10,7 @@ mmod = importlib.import_module("biofilter.api.cli.main")
 def test_version_flag_prints_version_and_db(monkeypatch):
     runner = CliRunner()
     monkeypatch.setattr(mmod, "current_version", "9.9.9-test")
-    monkeypatch.setattr(mmod, "try_resolve_db_uri", lambda v: "sqlite:///ctx.db")
+    monkeypatch.setattr(mmod, "try_resolve_db_uri", lambda v, b=None: "sqlite:///ctx.db")
 
     result = runner.invoke(mmod.main, ["--version"])
 
@@ -21,7 +21,7 @@ def test_version_flag_prints_version_and_db(monkeypatch):
 
 def test_main_without_subcommand_shows_help_and_active_db(monkeypatch):
     runner = CliRunner()
-    monkeypatch.setattr(mmod, "try_resolve_db_uri", lambda v: "sqlite:///active.db")
+    monkeypatch.setattr(mmod, "try_resolve_db_uri", lambda v, b=None: "sqlite:///active.db")
 
     result = runner.invoke(mmod.main, [])
 
@@ -32,7 +32,7 @@ def test_main_without_subcommand_shows_help_and_active_db(monkeypatch):
 
 def test_main_without_subcommand_shows_not_set_when_no_db(monkeypatch):
     runner = CliRunner()
-    monkeypatch.setattr(mmod, "try_resolve_db_uri", lambda v: None)
+    monkeypatch.setattr(mmod, "try_resolve_db_uri", lambda v, b=None: None)
 
     result = runner.invoke(mmod.main, [])
 

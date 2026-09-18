@@ -1,86 +1,96 @@
+"""
+ReportComponent: the facade over the report module.
+
+Reports read a bundle and nothing else. What the component still has to
+get right is when a bundle is needed (running) and when it is not
+(listing, explaining), plus reporting honestly how much of the old layer
+is still waiting to be rewritten.
+"""
+
 from __future__ import annotations
 
+from pathlib import Path
+from types import SimpleNamespace
+
+import pytest
+
 import biofilter.core.components.report_component as rcmod
+from biofilter.modules.report.result import ReportResult
 
 
-class DummyLogger:
-    def __init__(self):
-        self.messages = []
-
-    def log(self, message, level="INFO"):
-        self.messages.append((level, message))
-
-
-class DummyCore:
-    def __init__(self):
-        self.logger = DummyLogger()
-        self._db = object()
-
-    def require_db(self):
-        return self._db
-
-
-def test_get_manager_is_cached(monkeypatch):
-    created = {"count": 0}
-
-    class FakeManager:
-        def __init__(self, session_factory, db, logger):
-            created["count"] += 1
-            self.session_factory = session_factory
-            self.db = db
-            self.logger = logger
-
-    monkeypatch.setattr(rcmod, "ReportManager", FakeManager)
-
-    core = DummyCore()
-    core._db = type("DB", (), {"get_session": lambda self: "SESSION"})()
-
-    comp = rcmod.ReportComponent(core)
-    m1 = comp._get_manager()
-    m2 = comp._get_manager()
-
-    assert created["count"] == 1
-    assert m1 is m2
-
-
-def test_component_methods_delegate_to_manager(monkeypatch):
-    class FakeManager:
-        def explain(self, identifier):
-            return f"explain:{identifier}"
-
-        def list_reports(self):
-            return [{"name": "x"}]
-
-        def refresh(self):
-            return None
-
-        def example_input(self, identifier):
-            return {"id": identifier}
-
-        def available_columns(self, identifier):
-            return ["a", identifier]
-
-        def run(self, identifier, **kwargs):
-            return ("run", identifier, kwargs)
-
-        def run_example(self, identifier, **kwargs):
-            return ("run_example", identifier, kwargs)
-
-        def get_class(self, identifier):
-            return f"class:{identifier}"
-
-    core = DummyCore()
-    comp = rcmod.ReportComponent(core)
-    monkeypatch.setattr(comp, "_get_manager", lambda: FakeManager())
-
-    assert comp.explain("etl_status") == "explain:etl_status"
-    assert comp.list() == [{"name": "x"}]
-    assert comp.example_input("etl_status") == {"id": "etl_status"}
-    assert comp.available_columns("etl_status") == ["a", "etl_status"]
-    assert comp.run("etl_status", p=1) == ("run", "etl_status", {"p": 1})
-    assert comp.run_example("etl_status", p=2) == (
-        "run_example",
-        "etl_status",
-        {"p": 2},
+def _core(db_uri=None):
+    return SimpleNamespace(
+        logger=SimpleNamespace(log=lambda *a, **k: None),
+        db_uri=db_uri,
+        db=None,
     )
-    assert comp.get_report_class("etl_status") == "class:etl_status"
+
+
+@pytest.fixture
+def component(fixture_bundle):
+    comp = rcmod.ReportComponent(_core(f"parquet://{fixture_bundle}"))
+    yield comp
+    comp.close()
+
+
+@pytest.fixture
+def bundleless():
+    comp = rcmod.ReportComponent(_core())
+    yield comp
+    comp.close()
+
+
+class TestWithoutABundle:
+    def test_listing_needs_no_bundle(self, bundleless):
+        """
+        Which reports exist is a question about the installed package.
+        Answering it should not require opening 21 GB of parquet, or any
+        database — the old component built its manager through
+        `require_db()` and failed wherever none was reachable.
+        """
+        names = [r["name"] for r in bundleless.list()]
+        assert "annotate_gene" in names
+
+    def test_explain_needs_no_bundle(self, bundleless):
+        assert "gene" in bundleless.explain("annotate_gene").lower()
+
+    def test_available_columns_needs_no_bundle(self, bundleless):
+        assert "entity_id" in bundleless.available_columns("annotate_gene")
+
+    def test_running_says_how_to_supply_one(self, bundleless):
+        with pytest.raises(ValueError, match="--bundle"):
+            bundleless.run("annotate_gene", input_data=["TP53"])
+
+
+class TestWithABundle:
+    def test_the_bundle_comes_from_the_parquet_uri(self, component, fixture_bundle):
+        assert component._bundle_root() == fixture_bundle
+
+    def test_running_returns_a_result_with_provenance(self, component):
+        result = component.run("annotate_gene", input_data=["TP53", "NOPE"])
+
+        assert isinstance(result, ReportResult)
+        assert result.num_rows == 2
+        assert result.provenance["bundle_id"] == "fixturebundle0001"
+
+    def test_the_manager_is_built_once(self, component, monkeypatch):
+        built = {"count": 0}
+        real = rcmod.ReportManager
+
+        class Counting(real):
+            def __init__(self, *args, **kwargs):
+                built["count"] += 1
+                super().__init__(*args, **kwargs)
+
+        monkeypatch.setattr(rcmod, "ReportManager", Counting)
+        component._manager = None
+        for _ in range(3):
+            component.list()
+
+        assert built["count"] == 1
+
+    def test_an_unknown_report_lists_what_exists(self, component):
+        with pytest.raises(ValueError, match="Report not found"):
+            component.run("no_such_report")
+
+

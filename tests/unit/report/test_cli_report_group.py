@@ -5,6 +5,7 @@ from pathlib import Path
 from click.testing import CliRunner
 
 import biofilter.api.cli.groups.report as report_cli_mod
+from biofilter.biofilter import NO_DATABASE
 
 
 class FakeDataFrame:
@@ -95,8 +96,10 @@ def test_report_list_verbose_prints_description_and_module(monkeypatch):
     assert "etl_status" in result.output
     assert "ETL Status report" in result.output
     assert "module: report_etl_status" in result.output
-    assert capture["db_uri"] == "sqlite:///test.db"
     assert capture["debug_mode"] is False
+    # Listing reads the installed package, not data: nothing is opened,
+    # so --db-uri is accepted and ignored rather than connected to.
+    assert capture["db_uri"] == NO_DATABASE
 
 
 def test_report_list_empty_prints_no_reports(monkeypatch):
@@ -400,7 +403,7 @@ def test_report_run_with_input_file_csv_and_column(monkeypatch, tmp_path):
             "--db-uri",
             "sqlite:///test.db",
             "--name",
-            "entity_filter",
+            "resolve_entity",
             "--input-file",
             str(input_file),
             "--input-column",
@@ -428,7 +431,7 @@ def test_report_run_with_input_file_csv_numeric_column_skips_header(monkeypatch,
             "--db-uri",
             "sqlite:///test.db",
             "--name",
-            "entity_filter",
+            "resolve_entity",
             "--input-file",
             str(input_file),
             "--input-column",
@@ -456,7 +459,7 @@ def test_report_run_input_column_without_csv_file_errors(monkeypatch, tmp_path):
             "--db-uri",
             "sqlite:///test.db",
             "--name",
-            "entity_filter",
+            "resolve_entity",
             "--input-file",
             str(input_file),
             "--input-column",
@@ -519,7 +522,7 @@ def test_report_run_params_json_list_maps_to_input_data(monkeypatch):
             "--db-uri",
             "sqlite:///test.db",
             "--name",
-            "entity_filter",
+            "resolve_entity",
             "--params-json",
             '["TP53", "BRCA1"]',
         ],
@@ -559,3 +562,4 @@ def test_report_run_invalid_name_prints_friendly_error_without_traceback(monkeyp
     assert "etl_status" in result.output
     assert "biofilter report list" in result.output
     assert "Traceback" not in result.output
+

@@ -16,7 +16,7 @@ def load_all_models():
     import_module("biofilter.modules.db.models.model_etl")
     import_module("biofilter.modules.db.models.model_entities")
     import_module("biofilter.modules.db.models.model_genes")
-    import_module("biofilter.modules.db.models.model_curation")
+    import_module("biofilter.modules.db.models.model_status")
     import_module("biofilter.modules.db.models.model_variants")
     import_module("biofilter.modules.db.models.model_pathways")
     import_module("biofilter.modules.db.models.model_proteins")
@@ -43,17 +43,23 @@ def register_imperative_tables(engine) -> None:
     from biofilter.modules.db.models.model_variants import (
         map_variant_masters,
         map_variant_molecular_effects,
-        map_variant_effect_predictions,
-        map_variant_regulatory_elements,
-        map_variant_gene_regulatory_evidence,
+        map_variant_predictions,
+        map_variant_rsid,
+        map_variant_alphamissense,
+        map_variant_gtex,
     )
 
+    # Every table a 4.3.0 bundle can carry, so `db verify --schema` can
+    # check the shape of all of them. The three per-source variant tables
+    # were absent from this list and therefore never compared against
+    # anything: a DTP could change their columns and nothing would say so.
     registry: list[Tuple[str, Callable]] = [
         ("variant_masters", map_variant_masters),
         ("variant_molecular_effects", map_variant_molecular_effects),
-        ("variant_effect_predictions", map_variant_effect_predictions),
-        ("variant_regulatory_elements", map_variant_regulatory_elements),
-        ("variant_gene_regulatory_evidence", map_variant_gene_regulatory_evidence),
+        ("variant_predictions", map_variant_predictions),
+        ("variant_rsid", map_variant_rsid),
+        ("variant_alphamissense", map_variant_alphamissense),
+        ("variant_gtex", map_variant_gtex),
     ]
 
     # Remove stale definitions first (important if bootstrap_models is called multiple times)

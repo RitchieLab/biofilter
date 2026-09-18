@@ -32,7 +32,7 @@ class ETLComponent(BaseComponent):
         self.core.logger.log("🚀 Starting ETL update process...", "INFO")
 
         manager = self._manager()
-        manager.start_process(
+        ok = manager.start_process(
             source_system=source_system,
             data_sources=data_sources,
             download_path=self.core.settings.get("download_path", "./downloads"),  # noqa E501
@@ -41,8 +41,14 @@ class ETLComponent(BaseComponent):
             force_steps=force_steps,
         )
 
-        self.core.logger.log("✅ ETL update process finished.", "INFO")
-        return True
+        # The last line on screen has to match what happened: this used to
+        # report success unconditionally, so an unattended run ended with a
+        # tick under its own error message.
+        if ok:
+            self.core.logger.log("✅ ETL update process finished.", "INFO")
+        else:
+            self.core.logger.log("❌ ETL update process failed.", "ERROR")
+        return ok
 
     def update_all(
         self,

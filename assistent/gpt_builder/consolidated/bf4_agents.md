@@ -2,1149 +2,281 @@
 
 
 
-<!-- ===== SOURCE FILE: biofilter_agents/ag_db_en.md ===== -->
-
-# AG DB - Database Operations in Biofilter (CLI/API)
-
-Detailed guide for database administration in Biofilter.
-
-Covers:
-- database creation
-- migrations and upgrade (schema + seeds)
-- backup and restore (physical snapshot)
-- export and import (logical table-level clone)
-- validation commands
-- API usage
-- LLM assistant playbook
-
----
-
-## 1) Goal
-
-This guide helps you operate `biofilter db` safely in dev, staging, and production.
-
-Main commands in the `db` group:
-- `create-db`
-- `migrate`
-- `upgrade`
-- `backup`
-- `restore`
-- `export`
-- `import`
-
----
-
-## 2) Strategy Overview
-
-Use this simple rule:
-
-1. **Bootstrap a new database (schema + seeds)**: `db create-db` — this is the
-   only command that creates the domain tables. `db migrate` / `db upgrade` do
-   **not** create the initial schema (the Alembic head carries no table DDL).
-2. **Refresh seeds / version tracking on an existing schema**: `db upgrade`
-   (migrate to head + idempotent seed upsert)
-3. **Run ETL**: use `etl` group commands
-4. **Monitor**: `report etl_status` and `report etl_packages`
-
-> **PostgreSQL caveat:** the target database must already exist before BF4 can
-> connect to it. Create the empty database first (`createdb <name>`), then run
-> `db create-db ... --overwrite`.
-
-When moving data across environments:
-- physical snapshot: `backup` / `restore`
-- logical table bundle: `export` / `import`
-
----
-
-## 3) DB Commands (CLI)
-
-## 3.1 `biofilter db create-db`
-
-The canonical bootstrap command. It creates **all domain tables** (`create_all`)
-and loads the **seed data** in a single step. Use this — not `migrate`/`upgrade` —
-to stand up a new database.
-
-**SQLite** — creates the file itself, no pre-creation needed:
-
-```bash
-biofilter db create-db --db-uri "sqlite:///biofilter_dev.db"
-```
-
-**PostgreSQL** — the database must already exist (BF4 connects on startup), so
-create it first, then bootstrap with `--overwrite`:
-
-```bash
-createdb -O admin biofilter_dev
-biofilter db create-db --db-uri "postgresql+psycopg2://admin:admin@localhost:5432/biofilter_dev" --overwrite
-```
-
-`--overwrite` only bypasses the "database already exists" guard; it is **not**
-destructive — `create_all` is idempotent and never drops data.
-
-When to use:
-- any new environment (SQLite or PostgreSQL)
-- the correct first step of a from-scratch bootstrap
-
----
-
-## 3.2 `biofilter db migrate`
-
-Runs Alembic migrations.
-
-Upgrade to head:
-
-```bash
-biofilter db migrate --target head
-```
-
-Revision status:
-
-```bash
-biofilter db migrate --status
-```
-
-Dry-run SQL:
-
-```bash
-biofilter db migrate --dry-run
-```
-
-Stamp head without DDL (advanced):
-
-```bash
-biofilter db migrate --stamp-head --force
-```
-
-Upgrade with force:
-
-```bash
-biofilter db migrate --target head --force
-```
-
-Notes:
-- `--force` is for risky/advanced scenarios.
-- `--stamp-head` should be used carefully in controlled environments.
-
----
-
-## 3.3 `biofilter db upgrade`
-
-Runs the upgrade flow on an **existing** schema:
-- migrate to `head`
-- apply seeds (idempotent upsert)
-
-```bash
-biofilter db upgrade
-```
-
-With explicit seed dir:
-
-```bash
-biofilter db upgrade --seed-dir seed
-```
-
-With force:
-
-```bash
-biofilter db upgrade --force
-```
-
-Practical rule:
-- `db upgrade` does **not** create the schema — it assumes the tables already
-  exist (built by `db create-db`). Use it to refresh seeds and align the Alembic
-  revision, not to bootstrap a fresh database.
-
----
-
-## 3.4 `biofilter db backup`
-
-Creates a physical snapshot of the current database.
-
-```bash
-biofilter db backup --out ./backups/biofilter_dev.snapshot
-```
-
-Examples:
-- SQLite: file copy
-- PostgreSQL: dump flow compatible with restore
-
-Best practices:
-- create backups before sensitive migrations
-- include timestamp/version in backup path naming
-
----
-
-## 3.5 `biofilter db restore`
-
-Restores a physical snapshot.
-
-```bash
-biofilter db restore --in ./backups/biofilter_dev.snapshot
-```
-
-Warning:
-- restore overwrites current target DB state.
-- confirm target `db_uri` before execution.
-
----
-
-## 3.6 `biofilter db export`
-
-Exports a logical clone bundle (`manifest.json` + `tables/`).
-
-```bash
-biofilter db export --out ./exports/biofilter_bundle --format parquet
-```
-
-With table filters:
-
-```bash
-biofilter db export \
-  --out ./exports/biofilter_bundle \
-  --format csv \
-  --table variants,variant_consequences \
-  --exclude-table etl_status
-```
-
-Useful options:
-- `--schema-version`
-- `--chunksize`
-- `--table` (include)
-- `--exclude-table` (exclude)
-
----
-
-## 3.7 `biofilter db import`
-
-Imports a previously exported logical bundle.
-
-```bash
-biofilter db import --in ./exports/biofilter_bundle --format parquet
-```
-
-Variants:
-
-```bash
-biofilter db import \
-  --in ./exports/biofilter_bundle \
-  --format csv \
-  --no-rebuild-indexes \
-  --no-reset-sequences \
-  --allow-missing-tables
-```
-
-When to use:
-- replicate state across environments
-- load a controlled logical snapshot
-
----
-
-## 4) Recommended Flows
-
-### 4.1 First bootstrap (new environment)
-
-```bash
-biofilter config show
-
-# PostgreSQL: create the empty database first
-createdb -O admin biofilter_dev
-
-# create schema + seeds (the actual bootstrap)
-biofilter db create-db --db-uri "postgresql+psycopg2://admin:admin@localhost:5432/biofilter_dev" --overwrite
-
-# (optional) baseline Alembic + refresh seeds
-biofilter db migrate --force
-biofilter db upgrade
-```
-
-> SQLite is simpler — `biofilter db create-db --db-uri "sqlite:///biofilter_dev.db"`
-> creates the file, schema, and seeds in one go (no `createdb`, no `--overwrite`).
-
-### 4.2 Safe deployment flow
-
-```bash
-biofilter db backup --out ./backups/pre_deploy.snapshot
-biofilter db migrate --status
-biofilter db migrate --target head
-biofilter db upgrade
-biofilter db migrate --status
-```
-
-### 4.3 Logical replication across environments
-
-Source:
-
-```bash
-biofilter db export --out ./exports/prod_bundle --format parquet
-```
-
-Target:
-
-```bash
-biofilter db import --in ./exports/prod_bundle --format parquet
-```
-
----
-
-## 5) Post-Operation Quick Validation
-
-Check revision:
-
-```bash
-biofilter db migrate --status
-```
-
-Check active config:
-
-```bash
-biofilter config show
-```
-
-Check ETL support reports:
-
-```bash
-biofilter report run --name etl_status
-biofilter report run --name etl_packages
-```
-
----
-
-## 6) API Usage (Python)
-
-`DBComponent` usage example:
-
-```python
-from biofilter import Biofilter
-
-bf = Biofilter(db_uri="postgresql+psycopg2://bioadmin:change_me@localhost:5432/biofilter_dev")
-bf.db.connect()
-
-# migrate
-bf.db.migrate(action="upgrade", target="head", force=False)
-
-# upgrade (schema + seed upsert)
-bf.db.upgrade(seed_dir="seed")
-
-# backup
-bf.db.backup("./backups/dev.snapshot")
-
-# export bundle
-bf.db.export(out_dir="./exports/dev_bundle", fmt="parquet")
-```
-
-Higher-risk actions:
-
-```python
-# restore
-bf.db.restore("./backups/dev.snapshot")
-
-# import bundle
-bf.db.import_(
-    in_dir="./exports/dev_bundle",
-    fmt="parquet",
-    rebuild_indexes=True,
-    reset_postgres_sequences=True,
-    allow_missing_tables=False,
-)
-```
-
----
-
-## 7) Common Errors and Fixes
-
-- **DB connection error**
-  - validate `database.db_uri` with `biofilter config show`
-  - test host/port/user/password at PostgreSQL level
-
-- **Schema mismatch with code**
-  - run `biofilter db migrate --status`
-  - apply `biofilter db migrate --target head`
-
-- **Seeds not reflected**
-  - run `biofilter db upgrade`
-
-- **Import failing due to missing tables**
-  - use `--allow-missing-tables` when appropriate
-  - or re-export a complete bundle
-
-- **Postgres sequence problems after import**
-  - avoid `--no-reset-sequences` unless you know what you are doing
-
----
-
-## 8) LLM Assistant Playbook (DB Ops)
-
-Minimum checklist before destructive commands:
-- confirm target environment (`db_uri`)
-- confirm recent backup availability
-- confirm maintenance window (for production)
-
-Recommended assistant sequence:
-
-1. `biofilter config show`
-2. `biofilter db migrate --status`
-3. If needed, `biofilter db backup --out ...`
-4. `biofilter db migrate --target head`
-5. `biofilter db upgrade`
-6. `biofilter db migrate --status`
-7. Validate with ETL support reports
-
-Safety rules:
-- never execute `restore` without explicit confirmation
-- never use `stamp-head` without clear justification
-- always provide a final summary (action, environment, result, risks)
-
-Suggested base prompt:
-
-```text
-You are operating the Biofilter DB module.
-1) Show active config and migration status.
-2) Execute migration to head and seed upgrade.
-3) Validate final status.
-4) Report summary with risks and next step.
-Do not execute restore/stamp-head without explicit confirmation.
-```
-
----
-
-## 9) Short Reference Script (DB Day-0)
-
-```bash
-# validate context
-biofilter config show
-biofilter db --help
-
-# bootstrap schema + seeds
-biofilter db migrate --target head --force
-biofilter db upgrade
-
-# validate
-biofilter db migrate --status
-
-# optional: snapshot
-biofilter db backup --out ./backups/post_upgrade.snapshot
-```
-
----
-
-## 10) Internal References
-
-- start guide: `biofilter_agents/ag_start.md`
-- ETL guide (PT): `biofilter_agents/ag_etl_pt.md`
-- ETL guide (EN): `biofilter_agents/ag_etl_en.md`
-- command map: `biofilter/api/cli/ag_01_commands.md`
-- DB CLI group: `biofilter/api/cli/groups/db.py`
-- DB component API: `biofilter/core/components/db_component.py`
-
-
-
-<!-- ===== SOURCE FILE: biofilter_agents/ag_etl_en.md ===== -->
-
-# AG ETL - Update and Operations (CLI/API/Reports)
-
-Detailed guide to run and monitor ETL in Biofilter, covering:
-- CLI usage
-- API usage (Python/Notebook)
-- support reports
-- recommended flow for long and resumable runs
-- playbook for LLM assistants
-
----
-
-## 1) Goal
-
-This guide explains how to:
-- update one or more DataSources manually (`etl update`)
-- update many DataSources sequentially with resume support (`etl update-all`)
-- monitor status and audit history (`etl status`, `etl_status`, `etl_packages`)
-- restart or rollback when needed (`etl restart`, `etl rollback`)
-
----
-
-## 2) Quick Concepts
-
-- **DataSource**: ETL source unit (for example: `hgnc`, `dbsnp_chr1`, `gnomad_chr22`).
-- **ETL pipeline**: `extract -> transform -> load`.
-- **ETLPackage**: execution record for ETL stages.
-- **Resume behavior**: in `update-all`, DataSources already successful are skipped.
-
----
-
-## 3) Prerequisites
-
-- DB configured (`--db-uri` or `.biofilter.toml`).
-- ETL paths configured (`[etl].data_root`) when needed.
-- Python environment ready (`poetry run ...` is recommended during development).
-
-Validation example:
-
-```bash
-poetry run biofilter etl --help
-```
-
----
-
-## 4) ETL Commands (CLI)
-
-### 4.1 `biofilter etl update`
-
-Manual, explicit update for a selected subset.
-
-Common usage:
-
-```bash
-poetry run biofilter --db-uri sqlite:///biofilter_dev.db etl update --data-source hgnc
-```
-
-Specific steps:
-
-```bash
-poetry run biofilter --db-uri sqlite:///biofilter_dev.db etl update \
-  --data-source dbsnp_chr22 \
-  --run-step extract --run-step transform --run-step load
-```
-
-Force a step:
-
-```bash
-poetry run biofilter --db-uri sqlite:///biofilter_dev.db etl update \
-  --data-source hgnc \
-  --force-step extract
-```
-
-Important:
-- If no `--source-system` and no `--data-source` is passed, command aborts by design.
-
----
-
-### 4.2 `biofilter etl update-all`
-
-Sequential update for multiple DataSources, with resume-friendly behavior.
-
-Basic (all active):
-
-```bash
-poetry run biofilter --db-uri sqlite:///biofilter_dev.db etl update-all
-```
-
-Filter by source system:
-
-```bash
-poetry run biofilter --db-uri sqlite:///biofilter_dev.db etl update-all \
-  --source-system NCBI
-```
-
-Drop raw/processed files after each successful load:
-
-```bash
-poetry run biofilter --db-uri sqlite:///biofilter_dev.db etl update-all \
-  --drop-files
-```
-
-Stop on first failure:
-
-```bash
-poetry run biofilter --db-uri sqlite:///biofilter_dev.db etl update-all \
-  --stop-on-error
-```
-
-Current behavior:
-- resolves DataSources in deterministic order (`data_source_id` ascending)
-- checks latest `load` status per DataSource
-- skips DataSources already in success state
-- runs `extract -> transform -> load` for pending ones
-- with `--drop-files`, deletes `raw/processed` only after successful load
-- prints a final summary: `selected`, `skipped`, `processed`, `succeeded`, `failed`
-
----
-
-### 4.3 `biofilter etl status`
-
-Quick operational view by DataSource: success/fail + latest execution time.
-
-```bash
-poetry run biofilter --db-uri sqlite:///biofilter_dev.db etl status
-```
-
-With filter:
-
-```bash
-poetry run biofilter --db-uri sqlite:///biofilter_dev.db etl status \
-  --source-system NCBI --only-active
-```
-
----
-
-### 4.4 `biofilter etl restart`
-
-Rollback DataSource data and rerun full ETL pipeline.
-
-```bash
-poetry run biofilter --db-uri sqlite:///biofilter_dev.db etl restart \
-  --data-source gnomad_chr22
-```
-
-With file cleanup:
-
-```bash
-poetry run biofilter --db-uri sqlite:///biofilter_dev.db etl restart \
-  --data-source gnomad_chr22 \
-  --delete-files
-```
-
----
-
-### 4.5 `biofilter etl rollback`
-
-Rollback without rerunning ETL.
-
-By package:
-
-```bash
-poetry run biofilter --db-uri sqlite:///biofilter_dev.db etl rollback --package-id 123
-```
-
-By DataSource:
-
-```bash
-poetry run biofilter --db-uri sqlite:///biofilter_dev.db etl rollback \
-  --data-source gnomad_chr22 \
-  --delete-files
-```
-
----
-
-## 5) Operational Support Reports
-
-### 5.1 `etl_status` (DataSource-level consolidated view)
-
-- consolidated ETL state per DataSource
-- includes DataSources with no packages yet
-
-CLI:
-
-```bash
-poetry run biofilter --db-uri sqlite:///biofilter_dev.db report run --name etl_status
-```
-
-API:
-
-```python
-df_status = bf.report.run("etl_status", only_active=False)
-```
-
-Useful columns:
-- `source_system`
-- `data_source`
-- `extract_status`
-- `transform_status`
-- `load_status`
-- `pipeline_ok`
-- `latest_error`
-
----
-
-### 5.2 `etl_packages` (detailed audit)
-
-- raw package history
-- best for debugging failures and timing
-
-CLI:
-
-```bash
-poetry run biofilter --db-uri sqlite:///biofilter_dev.db report run --name etl_packages
-```
-
-API:
-
-```python
-df_pkg = bf.report.run("etl_packages", only_active=False)
-```
-
-Useful columns:
-- `package_id`
-- `operation_type`
-- `status`
-- `extract_status`, `transform_status`, `load_status`
-- `extract_minutes`, `transform_minutes`, `load_minutes`
-
----
-
-## 6) API Usage (Python/Notebook)
-
-### 6.1 Setup
-
-```python
-from biofilter import Biofilter
-import pandas as pd
-
-bf = Biofilter(db_uri="sqlite:///biofilter_dev.db", debug_mode=False)
-bf.db.connect()
-```
-
----
-
-### 6.2 Run a targeted update
-
-```python
-bf.etl.update(
-    data_sources=["hgnc"],
-    run_steps=["extract", "transform", "load"],
-    force_steps=[],
-)
-```
-
----
-
-### 6.3 Run resumable update-all
-
-```python
-summary = bf.etl.update_all(
-    source_system=None,
-    data_sources=None,
-    drop_files_on_success=False,
-    only_active=True,
-    stop_on_error=False,
-)
-print(summary)
-```
-
-Example output:
-
-```python
-{
-    "selected": 120,
-    "skipped": 95,
-    "processed": 25,
-    "succeeded": 24,
-    "failed": 1,
-}
-```
-
----
-
-### 6.4 Monitoring in Notebook
-
-```python
-df_status = bf.report.run("etl_status", only_active=False)
-display(
-    df_status[
-        ["source_system", "data_source", "extract_status", "transform_status", "load_status", "pipeline_ok", "latest_error"]
-    ].sort_values(["source_system", "data_source"])
-)
-```
-
-```python
-df_pkg = bf.report.run("etl_packages", only_active=False)
-display(
-    df_pkg[
-        ["package_id", "created_at", "source_system", "data_source", "operation_type", "status", "load_status"]
-    ].sort_values(["package_id"], ascending=False).head(50)
-)
-```
-
----
-
-## 7) Recommended Operational Flow
-
-1. Check current state with `etl status` + `etl_status` report.
-2. Run `etl update-all` (first cycles usually with `--keep-files`).
-3. Investigate failures in `etl_packages`.
-4. Fix source/input/runtime issues.
-5. Run `etl update-all` again (resume skips already completed DataSources).
-6. After stability, consider `--drop-files` to reduce disk usage.
-
----
-
-## 8) Quick Troubleshooting
-
-- **Error: "No source_system or data_sources provided. Aborting."**
-  - expected for `etl update`; provide explicit target.
-  - use `etl update-all` for batch runs.
-
-- **DataSource does not progress in `update-all`**
-  - check latest load package in `etl_packages`.
-  - check `latest_error` in `etl_status`.
-
-- **Intermittent processing failure**
-  - rerun `update-all`; flow is resumable.
-  - use `--stop-on-error` only when you want early interruption.
-
-- **Low disk space**
-  - run with `--drop-files` after validating stable loads.
-
----
-
-## 9) LLM Assistant Playbook
-
-### 9.1 Pre-run checklist
-
-- confirm target `db_uri`
-- confirm run mode (`update` vs `update-all`)
-- confirm file policy (`--drop-files` vs `--keep-files`)
-- log executed command and timestamp
-
-### 9.2 Recommended strategy
-
-1. Run `etl status`.
-2. If broad backlog exists, run `etl update-all --only-active`.
-3. After run, collect:
-   - `report run --name etl_status`
-   - `report run --name etl_packages`
-4. Deliver summary with:
-   - processed/succeeded/failed/skipped
-   - failed DataSources
-   - next recommended action
-
-### 9.3 Safety rules
-
-- do not run rollback automatically without explicit confirmation
-- avoid `--drop-files` by default on sensitive environments
-- prefer `update-all` for controlled resumable operation
-- always report failures with context (`data_source`, stage, error)
-
-### 9.4 Suggested base prompt
-
-```text
-You are operating Biofilter ETL.
-1) Run `biofilter etl status` and summarize pending items.
-2) Run `biofilter etl update-all --only-active`.
-3) At the end, run reports `etl_status` and `etl_packages`.
-4) Provide a summary: succeeded/failed/skipped, failed data_sources, recommendations.
-Do not execute rollback without confirmation.
-```
-
----
-
-## 10) Internal References
-
-- CLI command map: `biofilter/api/cli/ag_01_commands.md`
-- ETL CLI group: `biofilter/api/cli/groups/etl.py`
-- ETL manager: `biofilter/modules/etl/etl_manager.py`
-- Reports:
-  - `biofilter/modules/report/reports/report_etl_status.py`
-  - `biofilter/modules/report/reports/report_etl_packages.py`
-
----
-
-## 11) Document Status
-
-- file: `biofilter_agents/ag_etl_en.md`
-- scope: ETL operations (CLI/API/Reports)
-- intended future use: source material for official docs
-
-
-
 <!-- ===== SOURCE FILE: biofilter_agents/ag_report_en.md ===== -->
 
 # AG Report - Report Operations in Biofilter (CLI/API/Explain Guides)
 
-Detailed guide for working with the Biofilter report layer.
+The full report workflow: find the right one, run it, read what comes back.
 
-Covers:
-- report discovery and introspection
-- report execution via CLI and API
-- dynamic parameter passing (`--input`, `--param`, JSON/YAML)
-- explain guide architecture (`reports_explain`)
-- authoring pattern for new reports
-- LLM assistant playbook
+Audience: someone with a bundle. If you have not pointed Biofilter at one yet,
+start with `ag_start.md`.
 
 ---
 
 ## 1) Goal
 
-This guide helps you run and maintain reports in a way that scales as new reports are added, without changing CLI support code for each report.
+Reports are the read interface. Each takes a list of things you have — gene
+symbols, rsIDs, disease names, a cohort's variants — and returns a table.
 
-Key design principles:
-- report logic lives in `modules/report/reports/report_*.py`
-- report explain/tutorial content lives in `modules/report/reports_explain/report_*.md`
-- CLI is generic and dynamic (`report run` with generic parameter injection)
+You do not write queries and you do not need to know how the data is laid out.
 
 ---
 
-## 2) Report Architecture
+## 2) How a report works
 
-Each report is composed of:
+A report writes SQL against the bundle and returns an Arrow table, which the
+manager wraps with a record of how it was produced. Three consequences you
+will notice:
 
-1. Python report module:
-- path: `biofilter/modules/report/reports/report_<something>.py`
-- typically defines:
-  - `name`
-  - `description`
-  - `run()`
-  - `available_columns()`
-  - `example_input()`
-  - optional `explain()` fallback
+- **Input is joined, not interpolated.** Your list is registered as a relation
+  and joined, which is why a ten-thousand-value filter is as fast as a
+  ten-value one.
+- **Each execution is isolated.** Two reports in the same process cannot
+  collide.
+- **The result carries its origin.** Which bundle, which parameters, and what
+  the bundle was missing.
 
-2. Explain/Tutorial markdown:
-- path: `biofilter/modules/report/reports_explain/report_<something>.md`
-- used by `biofilter report explain`
+Each report ships three things besides the code:
 
-Explain resolution behavior:
-- first tries `reports_explain/report_<module>.md`
-- then tries legacy paths (if present)
-- if no guide exists, falls back to report class `explain()`
-
-This gives you dynamic explain docs per report while keeping backwards compatibility.
+| Artifact | Where |
+|---|---|
+| the explain guide | `biofilter/modules/report/reports_explain/report_<name>.md` |
+| a worked notebook | `notebooks/templates/reports__<name>.ipynb` |
+| its declared needs | `requires` / `optional` on the class — see §9 |
 
 ---
 
-## 3) Discover and Inspect Reports (CLI)
-
-List reports:
+## 3) Discover and inspect
 
 ```bash
-biofilter report list
-biofilter report list --verbose
+biofilter report list                  # names
+biofilter report list --verbose        # names, descriptions, modules
+
+biofilter report explain --report-name annotate_variant
+biofilter report example-input --report-name annotate_variant
+biofilter report available-columns --report-name annotate_variant
+biofilter report run --report-name annotate_variant --params-template
 ```
 
-Show explain/tutorial:
+`explain` prints the report's full guide and is the authority for that report.
+This document describes the workflow; the guide describes the report.
 
-```bash
-biofilter report explain --report-name etl_status
-```
+Discovery needs no bundle — it asks about the installed package. Only `run`
+reads data.
 
-Show expected example input from report class:
-
-```bash
-biofilter report example-input --report-name entity_relationship_model
-```
-
-Show available output columns:
-
-```bash
-biofilter report available-columns --report-name etl_packages
-```
-
-Refresh report cache:
-
-```bash
-biofilter report refresh
-```
+`report refresh` rebuilds the index after a report is added. You will not need
+it otherwise.
 
 ---
 
-## 4) Run Reports (CLI)
-
-Basic run:
-
-```bash
-biofilter report run --report-name etl_status
-```
-
-Export CSV:
-
-```bash
-biofilter report run --report-name etl_packages --output ./etl_packages.csv
-```
-
-Show params template (from `example_input()`):
-
-```bash
-biofilter report run --report-name entity_relationship_model --params-template
-```
-
-Pass direct inputs:
-
-```bash
-biofilter report run --report-name entity_filter --input BRCA1 --input TP53
-```
-
-Pass input file:
-
-```bash
-biofilter report run --report-name entity_filter --input-file ./entities.txt
-biofilter report run --report-name entity_filter --input-file ./entities.csv --input-column symbol
-```
-
-Pass generic parameters:
+## 4) Run (CLI)
 
 ```bash
 biofilter report run \
-  --report-name entity_relationship_model \
+  --report-name annotate_gene \
   --input TP53 --input BRCA1 \
-  --param relationship_scope=input_to_any \
-  --param deduplicate_pairs=true
+  --output genes.csv
 ```
 
-Pass parameter files:
+With an explicit bundle:
 
 ```bash
-biofilter report run --report-name entity_relationship_model --params-file ./params.yaml
-biofilter report run --report-name entity_relationship_model --params-json '{"relationship_scope":"input_to_any"}'
+biofilter --bundle /path/to/bundles/20260914 \
+  report run --report-name annotate_gene --input TP53 --output genes.csv
 ```
 
-Large value from file in a single param:
+`--output` takes its format from the extension — `.csv`, or `.parquet` to keep
+the provenance inside the file. Writing also produces
+`<output>.provenance.json` beside it.
+
+`--report-name` also accepts the shorter `--name`.
+
+---
+
+## 5) Inputs vs params (important rule)
+
+They are separate channels, and mixing them is an error rather than a guess.
+
+**Input — the records you are asking about.** One channel at a time:
 
 ```bash
-biofilter report run \
-  --report-name entity_relationship_model \
-  --input TP53 \
-  --param relationship_types=@./relationship_types.txt
+--input TP53 --input BRCA1                      # repeat the flag
+--input-file genes.txt                          # one value per line
+--input-file cohort.csv --input-column symbol   # a CSV column
 ```
 
-Note:
-- `--report-name` is the canonical option (`--name` is still accepted as alias).
+**There is no comma-separated form.** `--input "TP53,BRCA1"` is one value
+named `TP53,BRCA1`, and it will not match anything.
+
+**Params — everything else:** filters, modes, thresholds.
+
+```bash
+--param mapping=annotation
+--param af_max=0.01
+```
+
+Do not pass `input_data`, `items` or `input_path` through `--param`.
 
 ---
 
-## 5) Inputs vs Params (Important Rule)
+## 6) Parameter parsing
 
-Use:
-- `--input` / `--input-file` for report inputs (`input_data`)
-- `--param` for report options (scope, filters, toggles, limits, etc.)
+Values are coerced in this order: `true`/`false`, `null`/`none`, then JSON,
+then Python literal, else a plain string.
 
-Avoid mixing input channels:
-- if `--input`/`--input-file` is provided, do not pass `input_data`, `items`, or `input_path` through `--param`/JSON/YAML.
-- CLI enforces this and returns a friendly error to prevent ambiguous execution.
+```bash
+--param most_severe_only=true          # boolean
+--param af_max=0.01                    # number
+--param impact_filter='["HIGH","MODERATE"]'   # list, as JSON
+--param consequence_type_filter=@./terms.txt  # @ reads from a file
+--param note=@@literal_at_sign                # @@ escapes a leading @
+```
 
----
+For anything longer, pass the whole option set at once:
 
-## 6) Parameter Parsing Behavior
+```bash
+--params-json '{"mapping":"annotation","af_max":0.01}'
+--params-file ./params.yaml            # .json, .yml or .yaml
+```
 
-`--param KEY=VALUE` coercion rules:
-- `true` / `false` -> boolean
-- `null` / `none` -> `None`
-- JSON/py-literal values are parsed when possible:
-  - lists: `["a","b"]`
-  - dicts: `{"k":"v"}`
-  - numbers: `123`, `4.5`
-- `@path` loads value from file
-- `@@something` escapes a literal `@something`
-
-`--params-file` supports:
-- `.json`
-- `.yml`
-- `.yaml`
-
-If JSON/YAML root is not a dict, it is mapped to `{"input_data": <value>}`.
+`--params-template` prints what a report accepts, filled with its own example
+values — the fastest way to see the surface.
 
 ---
 
-## 7) Run Reports via API (Notebook/Python)
-
-Setup:
+## 7) Run via API (notebook / Python)
 
 ```python
 from biofilter import Biofilter
 
-bf = Biofilter(db_uri="sqlite:///biofilter_dev.db", debug_mode=False)
-```
+bf = Biofilter(bundle="/path/to/bundles/20260914")
 
-Examples:
-
-```python
-df_status = bf.report.run("etl_status", only_active=False)
-
-df_rel = bf.report.run(
-    "entity_relationship_model",
-    input_data=["TP53", "BRCA1", "NOT_FOUND_ENTITY"],
-    relationship_scope="input_to_any",
+result = bf.report.run(
+    "expand_gene_to_variant",
+    input_data=["BRCA1", "CHEK2"],
+    mapping="annotation",
+    impact_filter="HIGH",
+    af_max=0.01,
 )
 
+df = result.to_pandas()
+result.write("candidates.csv")
 ```
 
-Introspection in API:
+`run()` returns a result object, not a DataFrame. `.to_pandas()` gives you
+one; the wrapper is what carries `.provenance`, `.num_rows` and `.columns`.
+
+---
+
+## 8) The reports
+
+Sixteen, in six families. `biofilter report list --verbose` is always the
+authority for what your install has.
+
+| Family | Reports |
+|---|---|
+| `annotate_*` | `annotate_gene`, `annotate_variant`, `annotate_protein`, `annotate_disease`, `annotate_pathway`, `annotate_go` |
+| `expand_*` | `expand_gene_to_variant`, `expand_variant_regulatory`, `expand_entity_neighborhood`, `expand_entity_relationship` |
+| `resolve_*` | `resolve_entity` |
+| `pair_*` | `pair_variants` |
+| `aggregate_*` | `aggregate_cohort_variants` |
+| `platform_*` | `platform_data_statistics`, `platform_etl_status`, `platform_etl_packages` |
+
+By the question instead:
+
+| You have | Start with |
+|---|---|
+| names that may not match | `resolve_entity` |
+| genes, want what is known | `annotate_gene` |
+| rsIDs or positions | `annotate_variant` |
+| genes, want the variants in them | `expand_gene_to_variant` |
+| variants, want what they regulate | `expand_variant_regulatory` |
+| variants, want candidate pairs | `pair_variants` |
+| a cohort | `aggregate_cohort_variants` |
+| a bundle you do not know | `platform_data_statistics` |
+
+The full index, organized by question, is in
+`docs/source/report_catalog.md`.
+
+---
+
+## 9) Read the result honestly
+
+A short table is not the same as a negative answer.
+
+**Per-row status.** Reports that resolve input keep the inputs that produced
+nothing, with a reason:
+
+| Status | Means |
+|---|---|
+| `not_found` | the name did not resolve in this bundle |
+| `no_location` | it resolved, but there are no coordinates for it |
+| `no_variants` | it resolved and nothing met your criteria — a real negative |
+
+**Coverage.** Each report declares what it needs:
+
+- `requires` — tables it cannot work without. Checked before the query runs,
+  so a bundle built without GTEx says so in one line.
+- `optional` — tables it uses when present. Their absence is not an error,
+  which is the risk: the columns come back null, and a null because the source
+  was never built looks exactly like a null answer.
+
+So every result records which optional tables were missing, and which
+chromosomes the bundle spans:
 
 ```python
-print(bf.report.explain("etl_status"))
-print(bf.report.example_input("entity_relationship_model"))
-print(bf.report.available_columns("etl_packages"))
+result.provenance["coverage"]
+result.provenance["bundle_id"]
+result.provenance["version_mismatch"]   # None unless built by another release
 ```
 
----
-
-## 8) Built-in Reports (Current)
-
-- `etl_status`
-- `etl_packages`
-- `entity_filter`
-- `entity_relationship_model`
-- `variant_gene_location_model`
-- `db_pg_table_stats` (Postgres only)
-- `db_pg_index_stats` (Postgres only)
-- `qry_template`
-
-Always use `biofilter report list --verbose` to confirm what is available in your runtime.
-
----
-
-## 9) Authoring New Reports (Recommended Pattern)
-
-For a new report `my_report`:
-
-1. Create Python module:
-- `biofilter/modules/report/reports/report_my_report.py`
-
-2. Define:
-- `name = "my_report"`
-- `description`
-- `run()`
-- `available_columns()`
-- `example_input()`
-
-3. Create explain guide:
-- `biofilter/modules/report/reports_explain/report_my_report.md`
-
-4. Add tests:
-- unit tests for report behavior
-- optional integration tests via CLI/API
-
-5. Validate:
-
-```bash
-biofilter report list --verbose
-biofilter report explain --report-name my_report
-biofilter report run --report-name my_report --params-template
-```
-
-Result:
-- new reports become self-documented and executable without changing CLI support code.
+**Ids are bundle-scoped.** Valid only inside the bundle that produced them,
+and a stale id still resolves — to a different gene, with no error. Pin the
+bundle, not the id.
 
 ---
 
 ## 10) Troubleshooting
 
-If report is not found:
-- run `biofilter report list`
-- check exact report name
-- use friendly suggestions from CLI output
+| Symptom | Do this |
+|---|---|
+| "report not found" | `biofilter report list --verbose`, use an exact name. 4.2.x names (`entity_filter`, `etl_status`, `annotation_master_*`, `variant_binning`) are gone. |
+| "input conflict" | keep records in `--input`/`--input-file`; do not also send `input_data` via `--param` |
+| parameter rejected | `--params-template` first; use `--params-json` for anything structured; watch shell quoting |
+| `<name> does not carry: <tables>` | the bundle lacks a source this report requires — `platform_data_statistics` shows what it has |
+| explain shows nothing | check `reports_explain/report_<name>.md` exists and matches the module name |
+| a column is entirely null | check `provenance["coverage"]` before concluding the answer is null |
+| everything is slow | first run on a cold cache reads from disk; a variant-scale join over billions of rows is seconds, not minutes — if it is minutes, check you are not on slow network storage |
 
-If explain does not show markdown:
-- verify file exists at `reports_explain/report_<module>.md`
-- ensure filename matches report module pattern
+More detail:
 
-If parameter parsing fails:
-- test with `--params-template` first
-- use `--params-json` or `--params-file` for complex objects
-- quote JSON properly in shell
-
-If Postgres-only reports fail:
-- confirm DB is PostgreSQL for `db_pg_table_stats` and `db_pg_index_stats`
+```bash
+biofilter --debug report run --report-name <name> --input <value>
+```
 
 ---
 
 ## 11) LLM Assistant Playbook
 
-When an assistant runs reports:
+1. **Discover** — `report list --verbose`. Never recommend a report name
+   without confirming it here; the 4.2.x names are gone and several are
+   plausible-sounding.
+2. **Understand** — `report explain --report-name <name>` and
+   `--params-template` before composing a command.
+3. **Execute** — start minimal, add `--input` and `--param` progressively,
+   `--output` when the user wants a file.
+4. **Interpret** — check status values and `provenance["coverage"]` before
+   reporting a result as empty. Say which bundle produced it.
+5. **Defer** — building a bundle and running the ETL are maintainer tasks.
+   Name the guide and the cost; do not improvise a pipeline.
 
-1. Discover:
-- `report list --verbose`
+---
 
-2. Understand:
-- `report explain --report-name <report>`
-- `report run --report-name <report> --params-template`
+## 12) Authoring a new report
 
-3. Execute:
-- start with minimal command
-- add `--input` / `--param` progressively
-- export with `--output` when needed
-
-4. Diagnose:
-- prefer `etl_packages` for ETL-level audit
-- prefer `etl_status` for quick consolidated health
-
-This flow keeps report operations deterministic, explainable, and easy to automate.
+Out of scope here — this guide is about running them. See
+`docs/source/technical/developer_extensions.md`, which covers the class
+contract, the SQL helpers, and the four artifacts that ship together.
 
 
 
@@ -1152,353 +284,276 @@ This flow keeps report operations deterministic, explainable, and easy to automa
 
 # AG Start - Biofilter Setup and First Run (CLI/API)
 
-Practical onboarding guide to start Biofilter from scratch.
+Practical onboarding for someone who has been given a **bundle** and wants an
+answer out of it.
 
 This guide covers:
-- installation (`pip install biofilter` and source mode)
-- PostgreSQL database setup
-- `.biofilter.toml` initialization and config commands
-- schema bootstrap (`db create-db`; then optional `db migrate` / `db upgrade`)
-- first ETL commands
-- status/audit reports
-- notebook/API quickstart
+- installation (`pip install biofilter`, Docker, or source)
+- pointing Biofilter at a bundle
+- confirming the setup
+- running a first report and reading what comes back
+
+It does **not** cover building a bundle or running the ETL. Both are
+maintainer tasks — a full build needs about 150 GB of working space and two
+days — see `ag_db_en.md` and `ag_etl_en.md`, or ask whoever maintains the
+bundle you were given.
 
 ---
 
 ## 1) Quick Outcome
 
-By the end, you will be able to:
+By the end you will be able to:
 - run `biofilter --help`
-- connect Biofilter to your DB
-- run migrations and seeds
-- run ETL and monitor status
+- point Biofilter at a bundle
+- confirm which bundle is in effect and what it contains
+- run a report and export a CSV
+- tell an empty result from a missing source
 
 ---
 
-## 2) Installation
+## 2) What you are pointing at
 
-### 2.1 Option A - Install from PyPI
+A **bundle** is a dated directory of parquet files plus a `manifest.json`
+describing them:
+
+```
+20260914/
+├── manifest.json        the catalogue: every file, its rows, its size
+├── bundle_plan.json     which sources went in, at which versions
+├── build_record.json    what each build run did, in order
+└── tables/              the parquet
+```
+
+Biofilter opens the directory and queries it with DuckDB in the same process.
+No server, no import step, no per-user copy — one bundle on shared storage
+serves any number of concurrent readers.
+
+A bundle is read-only and is never updated in place. Refreshing data means a
+**new** bundle.
+
+---
+
+## 3) Installation
+
+### 3.1 Option A - PyPI
 
 ```bash
 pip install biofilter
-```
-
-Then validate:
-
-```bash
 biofilter --help
 ```
 
-### 2.2 Option B - Install from source (recommended for contributors)
+Requires Python 3.10+.
+
+### 3.2 Option B - Container
+
+One image, two mounts: `/bundle` read-only, `/workspace` writable.
 
 ```bash
-git clone <your_repo_url>
-cd biofilter
-pip install -e .
+docker run --rm \
+  -v /path/to/bundles/20260914:/bundle:ro \
+  -v "$PWD/out:/workspace" \
+  --user "$(id -u):$(id -g)" \
+  ricoandre/biofilter:latest \
+  report run --report-name annotate_gene --input TP53 --output /workspace/genes.csv
 ```
 
-Or with Poetry:
+Under Apptainer, `--bind` replaces `-v` and output ownership takes care of
+itself:
 
 ```bash
+apptainer pull bf4.sif docker://ghcr.io/ritchielab/biofilter-hpc:latest
+```
+
+### 3.3 Option C - Source
+
+For contributors:
+
+```bash
+git clone https://github.com/RitchieLab/biofilter.git
+cd biofilter
 poetry install
 poetry run biofilter --help
 ```
 
----
+### 3.4 On a managed cluster
 
-## 3) Prepare PostgreSQL
+The environment may already be prepared. On the Penn LPC:
 
-If you already have a PostgreSQL DB ready, skip to section 4.
-
-Example with `psql` (adjust names/passwords for your environment):
-
-```sql
-CREATE ROLE bioadmin WITH LOGIN PASSWORD 'change_me';
-CREATE DATABASE biofilter_dev OWNER bioadmin;
-GRANT ALL PRIVILEGES ON DATABASE biofilter_dev TO bioadmin;
+```bash
+source /project/hall_shared/hall_shared.sh
+module load biofilter/4.3.0
 ```
 
-Connection string example:
-
-```text
-postgresql+psycopg2://bioadmin:change_me@localhost:5432/biofilter_dev
-```
+The module puts the CLI on `PATH` and sets `BIOFILTER_BUNDLE`, so you pass no
+path at all. See `notebooks/lpc__quickstart.md`.
 
 ---
 
-## 4) Initialize `.biofilter.toml`
+## 4) Point at the bundle
 
-Create template in project root:
-
-```bash
-biofilter config init --path .
-```
-
-Or prefill DB and data root:
+Three ways, highest precedence first:
 
 ```bash
-biofilter config init \
-  --path . \
-  --db-uri "postgresql+psycopg2://bioadmin:change_me@localhost:5432/biofilter_dev" \
-  --data-root "./biofilter_data"
+biofilter --bundle /path/to/bundles/20260914 report list   # one command
+export BIOFILTER_BUNDLE=/path/to/bundles/20260914          # the session
 ```
 
-Show resolved config:
-
-```bash
-biofilter config show
+```toml
+# .biofilter.toml at your project root
+[database]
+bundle = "./biofilter_data/bundles/20260914"
 ```
 
-Get one value:
+A relative path in the TOML resolves against **that file**, not your working
+directory, so it means the same thing from the project root and from a
+notebook two levels down.
 
-```bash
-biofilter config get database.db_uri
-```
+Two rules worth stating once:
 
-Set one value:
+- **Point at the bundle root**, the directory holding `manifest.json`, never
+  at its `tables/` subdirectory.
+- **`--db-uri` is for writing.** Reports read bundles. Passing `--bundle` and
+  `--db-uri` together is an error rather than a guess about which you meant.
 
-```bash
-biofilter config set database.db_uri "postgresql+psycopg2://bioadmin:change_me@localhost:5432/biofilter_dev"
-```
+### 4.1 Full resolution order
 
-Set ETL data root:
-
-```bash
-biofilter config set etl.data_root "./biofilter_data"
-```
+1. `--bundle`
+2. `--db-uri`
+3. `BIOFILTER_BUNDLE`
+4. `DATABASE_URL` / `BIOFILTER_DB_URI`
+5. `.biofilter.toml` — `[database] bundle`, then `[database] db_uri`
 
 ---
 
-## 5) Bootstrap Database Schema
-
-The schema and seeds are created by `db create-db`. This is the **only** command
-that builds the domain tables — `db migrate` / `db upgrade` do not create the
-initial schema (the Alembic head carries no table DDL).
-
-### 5.1 Create schema + seeds (`db create-db`)
-
-**SQLite** — creates the file, tables, and seeds in one step:
+## 5) Confirm the setup
 
 ```bash
-biofilter db create-db --db-uri "sqlite:///biofilter_dev.db"
+biofilter --version
+biofilter config show                 # what actually resolved, and from where
+biofilter bundle info /path/to/bundle # what the bundle says about itself
 ```
 
-**PostgreSQL** — the database must already exist before BF4 can connect, so create
-the empty database first, then bootstrap with `--overwrite`:
+`bundle info` prints its id, the versions that built it, when, and its tables
+by branch.
+
+To check a bundle against this install:
 
 ```bash
-createdb -O admin biofilter_dev
-biofilter db create-db --db-uri "postgresql+psycopg2://admin:admin@localhost:5432/biofilter_dev" --overwrite
+biofilter db verify --in /path/to/bundle --schema
 ```
 
-`--overwrite` only bypasses the "already exists" guard; it is **not** destructive
-(`create_all` is idempotent and never drops data).
-
-### 5.2 (Optional) Baseline Alembic and refresh seeds
-
-After the schema exists, you can stamp the migration baseline and re-apply seeds
-idempotently:
-
-```bash
-biofilter db migrate --force   # applies/stamps migrations up to head
-biofilter db upgrade           # migrate to head + idempotent seed upsert
-```
-
-Useful diagnostics:
-
-```bash
-biofilter db migrate --status
-biofilter db migrate --dry-run
-```
-
-> **Pitfall:** running `db migrate --target head` / `db upgrade` on an empty
-> database *without* `db create-db` first reports "Schema up-to-date" but leaves
-> the database with no domain tables. Always bootstrap with `db create-db`.
+`--schema` exits non-zero on drift, so it works as a gate in a script.
 
 ---
 
-## 7) First Validation Checks
-
-List top-level commands:
+## 6) First report
 
 ```bash
-biofilter --help
+biofilter report list --verbose
 ```
 
-Check ETL command group:
+Start with what the bundle holds — worth doing on any bundle you have just
+been handed:
 
 ```bash
-biofilter etl --help
+biofilter report run --report-name platform_data_statistics \
+  --output bundle_contents.csv
 ```
 
-Check report command group:
+Then ask it something:
 
 ```bash
-biofilter report --help
+biofilter report run --report-name annotate_gene \
+  --input TP53 --input BRCA1 \
+  --output genes.csv
 ```
 
-Check DB command group:
+`--input` repeats; there is no comma-separated form. For long lists use
+`--input-file genes.txt`, one value per line.
 
-```bash
-biofilter db --help
-```
+See `ag_report_en.md` for the full report workflow.
 
 ---
 
-## 8) First ETL Execution
+## 7) Read the result honestly
 
-### 8.1 Single DataSource
+An empty or partial table has several causes and they are not
+interchangeable.
 
-```bash
-biofilter etl update --data-source hgnc
+| What you see | What it means |
+|---|---|
+| `not_found` | the name did not resolve in this bundle |
+| `no_location` | it resolved, but there are no coordinates for it |
+| `no_variants` | it resolved and nothing met your criteria — a real negative |
+| a column entirely null | the source may never have been built into this bundle |
+
+For the last one, the provenance is where it is written down:
+
+```python
+result.provenance["coverage"]     # optional tables the bundle lacked
+result.provenance["bundle_id"]    # which build produced these rows
 ```
 
-### 8.2 Batch resumable execution
+**Ids belong to one bundle.** `entities.id`, `variant_id` and the rest are
+valid only inside the bundle that produced them. The drift between builds is
+small, which is what makes it dangerous — a stale id still resolves, to a
+different gene, with no error. Pin the bundle, not the id.
 
-```bash
-biofilter etl update-all
-```
-
-Useful variants:
-
-```bash
-biofilter etl update-all --source-system NCBI
-biofilter etl update-all --drop-files
-biofilter etl update-all --stop-on-error
-```
+Saving a result keeps that record: `--output genes.csv` also writes
+`genes.csv.provenance.json` beside it.
 
 ---
 
-## 9) Monitor ETL Progress and Results
-
-### 9.1 Fast operational status
-
-```bash
-biofilter etl status
-```
-
-### 9.2 Report: consolidated status
-
-```bash
-biofilter report run --name etl_status
-```
-
-### 9.3 Report: package audit
-
-```bash
-biofilter report run --name etl_packages
-```
-
-Export report to CSV:
-
-```bash
-biofilter report run --name etl_packages --output ./etl_packages.csv
-```
-
----
-
-## 10) API / Notebook Quickstart
+## 8) API / Notebook Quickstart
 
 ```python
 from biofilter import Biofilter
 
-bf = Biofilter(
-    db_uri="postgresql+psycopg2://bioadmin:change_me@localhost:5432/biofilter_dev",
-    debug_mode=False,
-)
-bf.db.connect()
+bf = Biofilter(bundle="/path/to/bundles/20260914")
 
-# ETL
-summary = bf.etl.update_all(only_active=True)
-print(summary)
+result = bf.report.run("annotate_gene", input_data=["TP53", "BRCA1"])
 
-# Reports
-status_df = bf.report.run("etl_status", only_active=False)
-pkg_df = bf.report.run("etl_packages", only_active=False)
+df = result.to_pandas()
+print(result.num_rows, "rows")
 
-print(status_df.head())
-print(pkg_df.head())
+result.provenance["bundle_id"]
+result.provenance["coverage"]
+result.write("genes.csv")          # writes genes.csv.provenance.json too
 ```
 
----
+`bf.report.run()` returns a result object rather than a bare DataFrame. The
+extra layer is what carries the record of where the rows came from; call
+`.to_pandas()` when you want to continue in pandas.
 
-## 11) Common Issues
+`Biofilter()` with no argument falls back to `BIOFILTER_BUNDLE` or
+`.biofilter.toml`, so in a configured environment the constructor stays empty.
 
-- **`No source_system or data_sources provided. Aborting.`**
-  - expected for `etl update`; pass a target.
-  - use `etl update-all` for broad runs.
-
-- **Migration not applied / revision mismatch**
-  - run `biofilter db migrate --status`.
-  - apply `biofilter db migrate --target head`.
-
-- **Seeds not available after migration**
-  - run `biofilter db upgrade`.
-
-- **Wrong database target**
-  - run `biofilter config show`.
-  - confirm `database.db_uri`.
+A worked notebook ships for every report at
+`notebooks/templates/reports__<name>.ipynb`.
 
 ---
 
-## 12) Minimal LLM Operator Playbook
+## 9) If something is wrong
 
-Recommended sequence for an automation assistant:
+| Symptom | Check |
+|---|---|
+| `No manifest.json in <path>` | you pointed at `tables/`, or the path is not a bundle |
+| `<name> does not carry: <tables>` | the bundle was built without those sources — run `platform_data_statistics` |
+| `declares manifest_version N` | the bundle is newer than this install; update the package |
+| warning that the bundle was built by another release | it still works; run `db verify --schema` to check |
+| output file missing, in a container | `--output` wrote inside it — point at the mounted `/workspace` |
 
-1. `biofilter config show`
-2. `biofilter db migrate --status`
-3. New database? `biofilter db create-db --db-uri <uri> [--overwrite]` (Postgres: `createdb` first) — creates schema + seeds
-4. Existing schema? `biofilter db upgrade` (migrate to head + seed refresh)
-5. `biofilter etl update-all --only-active`
-6. `biofilter etl status`
-7. `biofilter report run --name etl_status`
-8. `biofilter report run --name etl_packages`
-
-Safety rules:
-- do not run rollback automatically without explicit approval
-- avoid `--drop-files` by default in production
-- include command outputs and summary in every run report
-
----
-
-## 13) Suggested First-Day Command Script
+More detail on any failure:
 
 ```bash
-# 1) validate CLI
-biofilter --help
-
-# 2) initialize config
-biofilter config init --path . \
-  --db-uri "postgresql+psycopg2://bioadmin:change_me@localhost:5432/biofilter_dev" \
-  --data-root "./biofilter_data"
-
-# 3) check config
-biofilter config show
-
-# 4) bootstrap DB (schema + seeds)
-#    Postgres must exist first; create-db is what builds the tables.
-createdb -O bioadmin biofilter_dev
-biofilter db create-db --db-uri "postgresql+psycopg2://bioadmin:change_me@localhost:5432/biofilter_dev" --overwrite
-
-#    (optional) baseline Alembic + refresh seeds
-biofilter db migrate --force
-biofilter db upgrade
-
-# 5) run ETL
-biofilter etl update-all
-
-# 6) monitor
-biofilter etl status
-biofilter report run --name etl_status
-biofilter report run --name etl_packages
+biofilter --debug report run --report-name <name> --input <value>
 ```
 
 ---
 
-## 14) Internal References
+## 10) Where to go next
 
-- ETL operation guide: `biofilter_agents/ag_etl_en.md`
-- CLI command map: `biofilter/api/cli/ag_01_commands.md`
-- ETL CLI group: `biofilter/api/cli/groups/etl.py`
-- DB commands: `biofilter/api/cli/groups/db.py`
-- Config commands: `biofilter/api/cli/groups/config.py`
+- `ag_report_en.md` — the full report workflow
+- `docs/source/report_catalog.md` — every report, by the question it answers
+- `notebooks/lpc__quickstart.md` — the Penn LPC specifics
+- `ag_db_en.md`, `ag_etl_en.md` — maintainer territory: building a bundle

@@ -5,7 +5,6 @@ from typing import Iterable, Literal, Optional
 
 from biofilter.core.components.base_component import BaseComponent
 from biofilter.modules.db.database import Database
-from biofilter.modules.db.migrate import run_migration
 from biofilter.modules.db.transfer import (
     backup_db,
     export_full_clone,
@@ -68,12 +67,14 @@ class DBComponent(BaseComponent):
 
     def upgrade(self, *, seed_dir: str = "seed") -> bool:
         """
-        Upgrade an existing database:
-        - Connect (if needed)
-        - Run Alembic upgrade head
-        - Apply seeds idempotently (master data updates)
+        Apply seeds to an existing database, idempotently.
 
-        This is the canonical entry point used by CLI: `biofilter db upgrade`.
+        This used to run an Alembic upgrade first. There is no migration
+        chain any more: a database is built once by create_db() with
+        create_all, and a schema change produces a new bundle rather than
+        an in-place migration (ADR-003 §2.8).
+
+        Canonical entry point for `biofilter db upgrade`.
         """
         db = self.require_db()
 
@@ -82,13 +83,7 @@ class DBComponent(BaseComponent):
         if not getattr(db, "engine", None):
             self.connect()
 
-        # 1) Migrate schema to head
-        ok = self.migrate(action="upgrade", target="head", force=False)
-        if ok:
-            self.core.logger.log("✅ Schema upgraded to head.", "INFO")
-
-        # 2) Apply seeds (idempotent upsert)
-        # This must be safe to run multiple times.
+        # Seeds are an idempotent upsert, safe to run repeatedly.
         if not hasattr(db, "upgrade_db"):
             raise RuntimeError(
                 "Database.upgrade_db() not found. "
@@ -100,30 +95,14 @@ class DBComponent(BaseComponent):
         self.core.logger.log("✅ Seeds applied successfully.", "INFO")
         return True
 
-    def migrate(
-        self,
-        *,
-        action: str = "upgrade",  # "upgrade" | "status" | "stamp-head" | "dry-run"  # noqa E501
-        target: str = "head",
-        force: bool = False,
-    ) -> bool:
-        db = self.require_db()
-        if not db.engine:
-            raise RuntimeError("Database engine not initialized. Call connect() first.")  # noqa E501
 
-        ok = run_migration(
-            session_factory=db.SessionLocal,
-            engine=db.engine,
-            db_uri=db.db_uri,
-            action=action,
-            target=target,
-            force=force,
-        )
+    def bundle_id(self) -> Optional[str]:
+        """Identifier of the bundle behind this connection, or None."""
+        return self.require_db().bundle_id()
 
-        # log only if we actually ran something (opcional)
-        if ok:
-            self.core.logger.log("✅ Migration completed.", "INFO")
-        return ok
+    def bundle_manifest(self) -> Optional[dict]:
+        """Manifest of the bundle behind this connection, or None."""
+        return self.require_db().bundle_manifest()
 
     def get_session(self):
         """
@@ -254,7 +233,7 @@ class DBComponent(BaseComponent):
         Import a logical full-clone bundle into the current DB schema.
 
         Expectations:
-        - Schema already exists (project create / migrations done)
+        - Schema already exists (created by create_db)
         - This will truncate all tables and re-insert preserving PKs.
         """
         db = self.core.require_db()

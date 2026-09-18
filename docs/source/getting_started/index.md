@@ -1,42 +1,62 @@
 # Getting Started
 
-Biofilter 4 (BF4) is a biological knowledge platform that resolves entities (genes, proteins, pathways, diseases, variants), tracks their relationships, and exposes them through ready-to-use reports.
+Biofilter 4 (BF4) resolves biological entities — genes, proteins,
+pathways, diseases, variants — tracks the relationships between them, and
+exposes all of it through ready-to-use reports.
 
-This section walks you through your first run end-to-end. Pick the path that matches your situation and follow it in order.
+What you read is a **bundle**: a directory of parquet files with a
+manifest describing them. No database server, no import step. Point
+Biofilter at a bundle and run reports.
 
 ## Choose your path
 
-### I just want to run reports against a database that already exists
+### Someone gave me a bundle
 
-You have access to a Biofilter database, you don't need to do any data ingestion yourself.
+This is the common case, and it takes minutes.
 
-1. [Install Biofilter](installing.md) — pick **pip** (recommended) or **Docker**.
-2. [Connect to the database](connecting_db.md) — read **Option A: connect to an existing database**.
-3. [Find a report that fits your need](finding_reports.md) — the catalog and the GPT assistant help here.
-4. [Run your first report](running_reports.md) — CLI and Python API examples.
+1. [Install Biofilter](installing.md) — pip or Docker.
+2. [Point at the bundle](reading_a_bundle.md) — one URI, no setup.
+3. [Find a report](finding_reports.md) that fits your question.
+4. [Run it](running_reports.md) — CLI or Python.
 
-### I'm setting up my own Biofilter from scratch
+### I need to build a bundle
 
-You want a local database (SQLite for testing or PostgreSQL for production), populated by running the ETL yourself.
+Only if no one has one for the data you need. The full human genome
+means 1.5 TB of downloads, processed and discarded as the build goes, so
+plan for **150 GB of working space**.
 
-1. [Install Biofilter](installing.md) — pick **pip** or **source** if you'll contribute back.
-2. [Connect to the database](connecting_db.md) — read **Option B: bootstrap a new database**.
-3. Run the ETL pipeline (covered in **Option B** of the same page).
-4. [Run your first report](running_reports.md) once the ETL completes.
+1. [Install Biofilter](installing.md) — from source if you will change DTPs.
+2. [Build a bundle](../technical/building_bundles.md) — `bundle plan`, then `bundle build`.
+3. [Run a report](running_reports.md) against what you built.
+
+[What it costs](../technical/bundle_requirements.md) has the measured figures for
+disk, memory and runtime before you start.
 
 ## What you'll need
 
-- **Python 3.10+** for pip-based installation, or **Docker** if you prefer containers.
-- A **database connection string** if you're connecting to an existing instance — get this from whoever administrates it.
-- Roughly **1 TB of disk space** if you're bootstrapping your own local DB with the full data.
+- **Python 3.10+**, or **Docker** if you prefer containers.
+- **A bundle** — a path you can read, local or on a shared filesystem.
+
+## One thing to carry with you
+
+Ids inside a bundle — `entities.id`, `variant_id` — are internal to that
+bundle. They are not stable across bundles, and a stale one still
+resolves: to a different gene, without an error. Pin the bundle, not the
+id. [Reading a bundle](reading_a_bundle.md) explains how results carry
+their origin.
 
 ## Where this guide stops
 
-This Getting Started track is intentionally minimal. Once you can run a report, the rest of the documentation goes deeper:
+Once you can run a report, the rest goes deeper:
 
-- [Report catalog](../report_catalog.md) — every available report with descriptions and tutorials.
-- [Configuration](../configuration.md) — full options for `.biofilter.toml`.
-- [Database](../database.md) — schema, migrations, backup/restore.
-- [ETL](../etl.md) — managing data sources, ETL packages, and rollbacks.
-- [System overview](../system_overview.md) — architecture and design rationale.
-- [Troubleshooting](../troubleshooting.md) — common errors and fixes.
+- [Report catalog](../report_catalog.md) — every report, with tutorials.
+- [Building bundles](../technical/building_bundles.md) — the plan/build/inspect flow.
+- [What a build costs](../technical/bundle_requirements.md) — measured disk, time, memory.
+- [The Read Path](../technical/read_path.md) — how views are registered, and what a query costs.
+- [Data sources and ingestion](../technical/etl.md) — where the data comes from, and how it gets in.
+- [Configuration](../technical/configuration.md) — `.biofilter.toml` options.
+- [Troubleshooting](../troubleshooting.md) — common errors.
+
+Running on the Penn LPC? The cluster-specific quickstart and the
+maintainer's deployment guide live in the repository at
+`notebooks/lpc__quickstart.md` and `notebooks/lpc__deploy.md`.

@@ -20,6 +20,9 @@ class FakeETLFacade:
 
     def update(self, **kwargs):
         self.calls.append(("update", kwargs))
+        # update() reports completion now; the CLI exits non-zero when it
+        # is falsy, so the fake has to say the run succeeded.
+        return True
 
     def update_all(self, **kwargs):
         self.calls.append(("update_all", kwargs))
@@ -105,7 +108,7 @@ def test_update_calls_etl_update_with_normalized_lists(monkeypatch):
             "--source-system",
             "NCBI",
             "--data-source",
-            "dbsnp_sample",
+            "gnomad_joint_chr21",
             "--run-step",
             "extract",
             "--run-step",
@@ -123,7 +126,7 @@ def test_update_calls_etl_update_with_normalized_lists(monkeypatch):
             "update",
             {
                 "source_system": ["NCBI"],
-                "data_sources": ["dbsnp_sample"],
+                "data_sources": ["gnomad_joint_chr21"],
                 "run_steps": ["extract", "transform"],
                 "force_steps": ["load"],
             },
@@ -148,7 +151,7 @@ def test_restart_calls_etl_restart_with_normalized_lists(monkeypatch):
             "--db-uri",
             "sqlite:///etl.db",
             "--data-source",
-            "dbsnp_sample",
+            "gnomad_joint_chr21",
             "--source-system",
             "NCBI",
             "--delete-files",
@@ -162,7 +165,7 @@ def test_restart_calls_etl_restart_with_normalized_lists(monkeypatch):
         (
             "restart",
             {
-                "data_source": ["dbsnp_sample"],
+                "data_source": ["gnomad_joint_chr21"],
                 "source_system": ["NCBI"],
                 "delete_files": True,
             },

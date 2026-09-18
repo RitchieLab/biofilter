@@ -16,10 +16,6 @@ class FakeDBFacade:
             ("create_db", {"db_uri": db_uri, "overwrite": overwrite})
         )
 
-    def migrate(self, **kwargs):
-        self.calls.append(("migrate", kwargs))
-        return True
-
     def connect(self):
         self.calls.append(("connect", {}))
 
@@ -85,87 +81,11 @@ def test_create_db_calls_create_db_with_expected_args(monkeypatch):
     ]
 
 
-def test_migrate_default_action_is_upgrade(monkeypatch):
-    runner = CliRunner()
-    fake_db = FakeDBFacade()
-    capture = {}
-    _patch_biofilter(monkeypatch, fake_db, capture)
-    _patch_require_db_uri(monkeypatch, capture)
-
-    result = runner.invoke(
-        db_cli_mod.db,
-        ["migrate", "--db-uri", "sqlite:///x.db"],
-    )
-
-    assert result.exit_code == 0, result.output
-    assert "Database migration completed." in result.output
-    assert fake_db.calls == [
-        ("migrate", {"action": "upgrade", "target": "head", "force": False})
-    ]
-    assert capture["init"] == [{"db_uri": "sqlite:///x.db", "debug_mode": False}]
 
 
-def test_migrate_status_action_and_message(monkeypatch):
-    runner = CliRunner()
-    fake_db = FakeDBFacade()
-    capture = {}
-    _patch_biofilter(monkeypatch, fake_db, capture)
-    _patch_require_db_uri(monkeypatch, capture)
-
-    result = runner.invoke(
-        db_cli_mod.db,
-        ["migrate", "--db-uri", "sqlite:///x.db", "--status"],
-    )
-
-    assert result.exit_code == 0, result.output
-    assert "Status displayed." in result.output
-    assert fake_db.calls[0] == (
-        "migrate",
-        {"action": "status", "target": "head", "force": False},
-    )
 
 
-def test_migrate_stamp_head_action_and_message(monkeypatch):
-    runner = CliRunner()
-    fake_db = FakeDBFacade()
-    capture = {}
-    _patch_biofilter(monkeypatch, fake_db, capture)
-    _patch_require_db_uri(monkeypatch, capture)
-
-    result = runner.invoke(
-        db_cli_mod.db,
-        ["migrate", "--db-uri", "sqlite:///x.db", "--stamp-head"],
-    )
-
-    assert result.exit_code == 0, result.output
-    assert "Database stamped to head." in result.output
-    assert fake_db.calls[0] == (
-        "migrate",
-        {"action": "stamp-head", "target": "head", "force": False},
-    )
-
-
-def test_migrate_dry_run_action_and_message(monkeypatch):
-    runner = CliRunner()
-    fake_db = FakeDBFacade()
-    capture = {}
-    _patch_biofilter(monkeypatch, fake_db, capture)
-    _patch_require_db_uri(monkeypatch, capture)
-
-    result = runner.invoke(
-        db_cli_mod.db,
-        ["migrate", "--db-uri", "sqlite:///x.db", "--dry-run"],
-    )
-
-    assert result.exit_code == 0, result.output
-    assert "Dry-run completed" in result.output
-    assert fake_db.calls[0] == (
-        "migrate",
-        {"action": "dry-run", "target": "head", "force": False},
-    )
-
-
-def test_upgrade_calls_connect_then_migrate_then_upgrade(monkeypatch):
+def test_upgrade_connects_then_applies_seeds(monkeypatch):
     runner = CliRunner()
     fake_db = FakeDBFacade()
     capture = {}
@@ -180,15 +100,14 @@ def test_upgrade_calls_connect_then_migrate_then_upgrade(monkeypatch):
             "sqlite:///up.db",
             "--seed-dir",
             "custom_seed",
-            "--force",
         ],
     )
 
     assert result.exit_code == 0, result.output
-    assert "Database upgraded (schema + seeds)." in result.output
+    assert "Seeds applied." in result.output
+    # No migrate step: there is no migration chain any more (ADR-003 §2.8).
     assert fake_db.calls == [
         ("connect", {}),
-        ("migrate", {"action": "upgrade", "target": "head", "force": True}),
         ("upgrade", {"seed_dir": "custom_seed"}),
     ]
 

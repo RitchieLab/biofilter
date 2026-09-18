@@ -2,9 +2,11 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
 
 import click
 
+from biofilter.utils.bundle_path import bundle_to_uri
 from biofilter.utils.config import BiofilterConfig
 
 
@@ -15,16 +17,30 @@ def _clean_db_uri(value: str | None) -> str | None:
     return value or None
 
 
-def try_resolve_db_uri(cli_db_uri: str | None) -> str | None:
+def try_resolve_db_uri(
+    cli_db_uri: str | None,
+    cli_bundle: str | None = None,
+) -> str | None:
     """
     Resolve DB URI with priority:
     1) CLI --db-uri
     2) ENV DATABASE_URL / BIOFILTER_DB_URI
     3) .biofilter.toml (BiofilterConfig)
     """
+    # --bundle wins over --db-uri: it is the more specific request, and
+    # passing both is a mistake worth surfacing rather than resolving
+    # silently in one direction.
+    bundle_uri = bundle_to_uri(cli_bundle)
+    if bundle_uri:
+        return bundle_uri
+
     cli_db_uri = _clean_db_uri(cli_db_uri)
     if cli_db_uri:
         return cli_db_uri
+
+    env_bundle = bundle_to_uri(os.getenv("BIOFILTER_BUNDLE"))
+    if env_bundle:
+        return env_bundle
 
     env_db_uri = _clean_db_uri(
         os.getenv("DATABASE_URL") or os.getenv("BIOFILTER_DB_URI")
@@ -34,9 +50,17 @@ def try_resolve_db_uri(cli_db_uri: str | None) -> str | None:
 
     try:
         cfg = BiofilterConfig()
-        return _clean_db_uri(getattr(cfg, "db_uri", None))
     except FileNotFoundError:
         return None
+
+    # A configured bundle wins over a configured db_uri for the same
+    # reason --bundle wins over --db-uri: reports read bundles, and a
+    # db_uri left over from a PostgreSQL era should not shadow one.
+    cfg_bundle = bundle_to_uri(getattr(cfg, "bundle", None))
+    if cfg_bundle:
+        return cfg_bundle
+
+    return _clean_db_uri(getattr(cfg, "db_uri", None))
 
 
 def resolve_db_uri(cli_db_uri: str | None) -> str:
@@ -44,7 +68,9 @@ def resolve_db_uri(cli_db_uri: str | None) -> str:
     if db_uri:
         return db_uri
     raise click.UsageError(
-        "DB not set. Use --db-uri, DATABASE_URL, or define db_uri in .biofilter.toml."
+        "No data source. Use --bundle <path> (or --db-uri for a writable "
+        "database), set BIOFILTER_BUNDLE, or configure one under [database] "
+        "in .biofilter.toml."
     )
 
 
