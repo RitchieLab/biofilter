@@ -10,7 +10,8 @@ Biofilter 4 (BF4) is a persistent, entity-centric biological knowledge platform 
 
 **Author:** Andre Rico (`andreluis.rico@pennmedicine.upenn.edu`)  
 **Current version:** 4.3.0  
-**Active branch:** `release/4.3.0` (active development — APIs and schema still evolving)  
+**Active branch:** `main` — 4.3.0 released 18/09/2026, tagged `v4.3.0`  
+**Stability:** actively evolving; APIs and schema may change between minor releases  
 **Docs (Sphinx / Read the Docs):** https://biofilter.readthedocs.io/en/latest/
 
 ---
