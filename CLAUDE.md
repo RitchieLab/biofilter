@@ -24,7 +24,7 @@ biofilter/               # Main Python package
   modules/
     db/                  # SQLAlchemy ORM, JSON seeds
     etl/                 # ETLManager + 21 DTPs (Data Transformation Packages)
-    report/              # ReportManager + 16 reusable reports
+    report/              # ReportManager + 17 reusable reports
   utils/                 # config, logger, version helpers
   biofilter.py           # Main Python API facade
 
@@ -68,7 +68,7 @@ temp/                    # Created during binning queries — disposable
 - `ETLManager` orchestrates execution, tracking, rollback, and resume
 
 ### 3. Report layer (`modules/report/`)
-- 16 reports with dynamic parameters (no CLI changes needed when adding new reports)
+- 17 reports with dynamic parameters (no CLI changes needed when adding new reports)
 - Each report has a paired: `report_*.py` + `reports_explain/report_*.md`
 - `ReportManager` handles discovery, indexing, and routing
 
