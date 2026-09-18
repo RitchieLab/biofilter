@@ -1,6 +1,6 @@
 CHANGELOG
 
-4.3.0 (in development):
+4.3.0 (18/09/2026):
 
 - The bundle is the product, and there is no persistent database
   (ADR-003). A build creates a throwaway SQLite, uses it, and leaves a
