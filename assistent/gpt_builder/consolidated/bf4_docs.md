@@ -475,10 +475,10 @@ python -c "from biofilter import Biofilter; print('OK')"
 
 ## Docker
 
-One image, published to two registries. Pull it rather than building:
+One image, for Docker and Apptainer alike. Pull it rather than building:
 
 ```bash
-docker pull ricoandre/biofilter:latest
+docker pull ghcr.io/ritchielab/biofilter:latest
 ```
 
 The image carries no data. It expects two mounts:
@@ -496,7 +496,7 @@ docker run --rm \
   -v /shared/bundles/20260914:/bundle:ro \
   -v "$(pwd)/out:/workspace" \
   --user "$(id -u):$(id -g)" \
-  ricoandre/biofilter:latest \
+  ghcr.io/ritchielab/biofilter:latest \
   report run --report-name annotate_gene --input TP53 --output /workspace/genes.csv
 ```
 
@@ -515,7 +515,7 @@ docker run --rm -it \
   -v /shared/bundles/20260914:/bundle:ro \
   -v "$(pwd):/workspace" \
   --entrypoint /bin/bash \
-  ricoandre/biofilter:latest
+  ghcr.io/ritchielab/biofilter:latest
 ```
 
 To build it yourself from a checkout:
@@ -530,7 +530,7 @@ The same image. `--bind` replaces `-v`, and output ownership takes care of
 itself because the container runs as you:
 
 ```bash
-apptainer pull bf4.sif docker://ghcr.io/ritchielab/biofilter-hpc:latest
+apptainer pull bf4.sif docker://ghcr.io/ritchielab/biofilter:latest
 
 apptainer run \
   --bind /shared/bundles/20260914:/bundle:ro \
@@ -539,8 +539,8 @@ apptainer run \
   report run --report-name annotate_gene --input APOE --output /workspace/apoe.csv
 ```
 
-The GHCR name `biofilter-hpc` predates the merge of what used to be two
-images; it is the same image as Docker Hub's.
+It is the same image either way — what changes is `--bind` in place of
+`-v`, and that Apptainer runs the container as you.
 
 ## From source
 
@@ -2323,7 +2323,7 @@ to that path, or the file leaves with the container:
 docker run --rm \
   -v /shared/bundles/20260914:/bundle:ro \
   -v "$(pwd)/out:/workspace" \
-  ricoandre/biofilter:latest \
+  ghcr.io/ritchielab/biofilter:latest \
   report run --report-name platform_etl_status --output /workspace/etl_status.csv
 ```
 

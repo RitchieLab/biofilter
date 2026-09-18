@@ -185,7 +185,7 @@ missing source or a version mismatch are printed, not raised.
 If you prefer a container to the module:
 
 ```bash
-apptainer pull bf4.sif docker://ghcr.io/ritchielab/biofilter-hpc:latest
+apptainer pull bf4.sif docker://ghcr.io/ritchielab/biofilter:latest
 
 apptainer run \
   --bind /project/hall_shared/datasets/biofilter/<snapshot>:/bundle:ro \
@@ -1139,10 +1139,10 @@ from pathlib import Path
 
 from biofilter import Biofilter
 
-BUNDLE = "/Users/andrerico/Works/Sys/biofilter_430/biofilter_data/bundles/20260914" # change this to the path of your biofilter_data bundle
+BUNDLE = None  # set a path to override; None reads [database] bundle from .biofilter.toml
 REPORT = "annotate_gene"
 
-bf = Biofilter(bundle=BUNDLE, debug_mode=False)
+bf = Biofilter(bundle=BUNDLE, debug_mode=False) if BUNDLE else Biofilter(debug_mode=False)
 
 # Results land here whatever directory the kernel was started in — VS Code
 # and Jupyter disagree about that, and a bare filename ends up wherever
