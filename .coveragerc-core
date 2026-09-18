@@ -3,9 +3,7 @@ branch = True
 source = biofilter
 omit =
     */tests/*
-    */biofilter/alembic/*
     */biofilter/modules/etl/dtps/*
-    */biofilter/modules/report/reports_bkp/*
 
 [report]
 show_missing = True
