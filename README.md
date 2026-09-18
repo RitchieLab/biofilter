@@ -73,9 +73,13 @@ result.write("genes.csv")        # writes genes.csv.provenance.json beside it
 
 ### Don't have a bundle yet?
 
-Ask whoever maintains one for your group. Building one is a maintainer task —
-about 150 GB of working space and two days — not a setup step. See
-[Building Bundles](https://biofilter.readthedocs.io/en/latest/technical/building_bundles.html).
+Ask whoever maintains one for your group — that is how most people get one.
+
+Building your own is a maintainer task rather than a setup step. See
+[Building Bundles](https://biofilter.readthedocs.io/en/latest/technical/building_bundles.html)
+for the procedure, and
+[what it costs](https://biofilter.readthedocs.io/en/latest/technical/bundle_requirements.html)
+for the disk, time and memory it takes.
 
 ---
 
