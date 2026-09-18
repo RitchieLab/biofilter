@@ -160,12 +160,23 @@ tests/test_data/kdc/
 
 # Notebook job files (large data files, outputs, scripts)
 notebooks/Andre/jobs/
-notebooks/Andre/adsp/
+
+# The ADSP analysis is tracked — notebooks, scripts and the write-up — because
+# it is the worked example the 4.3 report layer was designed against. What it
+# reads and writes is not: the variant list and the pQTL lookup are other
+# people's data, the outputs are hundreds of megabytes, and burrao/ and
+# meetings/ are working notes.
+notebooks/Andre/adsp/data/
+notebooks/Andre/adsp/outputs/
+notebooks/Andre/adsp/burrao/
+notebooks/Andre/adsp/meetings/
+notebooks/Andre/adsp/.tmp/
+
+# The frozen 4.2.0 version of the same analysis, data files and all.
+biofilter_legacy/bf4_420/notebooks/Andre/adsp/
 
 # Claude Code settings
 .claude/
-
-adsp/
 
 # Where the template notebooks write their results.
 notebooks/templates/outputs/
