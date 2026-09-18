@@ -15,7 +15,7 @@ A **bundle**: a dated directory of Parquet files with a `manifest.json`
 describing them.
 
 ```
-20260914/
+bundle/
 ├── manifest.json        the catalogue: every file, its rows, its size
 ├── bundle_plan.json     which sources went in, at which versions
 ├── build_record.json    what each build run did, in order
@@ -87,13 +87,13 @@ for the disk, time and memory it takes.
 
 Biofilter has two halves, separated by the bundle rather than by an API.
 
-| | Builds a bundle | Reads a bundle |
-|---|---|---|
-| Who | whoever maintains the data | everyone else |
-| How often | a few times a year | constantly |
-| Engine | SQLAlchemy models, staging SQLite | DuckDB, in process |
-| Can write | yes — it is the only code that can | no, structurally |
-| Commands | `bundle`, `etl`, `db` | `report` |
+|           | Builds a bundle                    | Reads a bundle     |
+| --------- | ---------------------------------- | ------------------ |
+| Who       | whoever maintains the data         | everyone else      |
+| How often | a few times a year                 | constantly         |
+| Engine    | SQLAlchemy models, staging SQLite  | DuckDB, in process |
+| Can write | yes — it is the only code that can | no, structurally   |
+| Commands  | `bundle`, `etl`, `db`              | `report`           |
 
 The build runs in **two branches**. The core — genes, proteins, pathways,
 diseases, GO, chemicals and their relationships — is about 7 million rows and
@@ -103,7 +103,7 @@ no foreign keys, so there is nothing to resolve and nothing to stage: it writes
 its final Parquet directly.
 
 📖 [System Overview](https://biofilter.readthedocs.io/en/latest/technical/system_overview.html)
- · [The Read Path](https://biofilter.readthedocs.io/en/latest/technical/read_path.html)
+· [The Read Path](https://biofilter.readthedocs.io/en/latest/technical/read_path.html)
 
 ---
 
@@ -112,14 +112,14 @@ its final Parquet directly.
 A report takes a list of things you have and returns a table. Seventeen of
 them, in six families:
 
-| Family | What they answer |
-|---|---|
-| `resolve_*` | Which of my names does Biofilter recognise? |
-| `annotate_*` | What is known about these genes, variants, proteins, pathways, diseases, GO terms? |
-| `expand_*` | What is connected to them — neighbours, relationships, variants in a gene, regulatory evidence? |
-| `pair_*` | Which of these genes or variants share biology, and on what support? |
-| `aggregate_*` | Roll a cohort's variants up to a summary. |
-| `platform_*` | What does this bundle contain, and how was it built? |
+| Family        | What they answer                                                                                |
+| ------------- | ----------------------------------------------------------------------------------------------- |
+| `resolve_*`   | Which of my names does Biofilter recognise?                                                     |
+| `annotate_*`  | What is known about these genes, variants, proteins, pathways, diseases, GO terms?              |
+| `expand_*`    | What is connected to them — neighbours, relationships, variants in a gene, regulatory evidence? |
+| `pair_*`      | Which of these genes or variants share biology, and on what support?                            |
+| `aggregate_*` | Roll a cohort's variants up to a summary.                                                       |
+| `platform_*`  | What does this bundle contain, and how was it built?                                            |
 
 ```bash
 biofilter report list --verbose
@@ -133,14 +133,14 @@ biofilter report explain --report-name expand_gene_to_variant
 
 One per report, runnable against a bundle:
 
-| | |
-|---|---|
-| [`reports__101`](notebooks/templates/reports__101.ipynb) | **start here** — how reports work |
-| [`reports__resolve_entity`](notebooks/templates/reports__resolve_entity.ipynb) | start here for a new input list |
-| [`reports__annotate_gene`](notebooks/templates/reports__annotate_gene.ipynb) | annotating a gene list |
-| [`reports__expand_gene_to_variant`](notebooks/templates/reports__expand_gene_to_variant.ipynb) | variants in a gene, filtered by predicted damage |
-| [`reports__aggregate_cohort_variants`](notebooks/templates/reports__aggregate_cohort_variants.ipynb) | a cohort, matched and binned |
-| [`reports__TEMPLATE`](notebooks/templates/reports__TEMPLATE.ipynb) | copy this to write a new report |
+|                                                                                                      |                                                  |
+| ---------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
+| [`reports__101`](notebooks/templates/reports__101.ipynb)                                             | **start here** — how reports work                |
+| [`reports__resolve_entity`](notebooks/templates/reports__resolve_entity.ipynb)                       | start here for a new input list                  |
+| [`reports__annotate_gene`](notebooks/templates/reports__annotate_gene.ipynb)                         | annotating a gene list                           |
+| [`reports__expand_gene_to_variant`](notebooks/templates/reports__expand_gene_to_variant.ipynb)       | variants in a gene, filtered by predicted damage |
+| [`reports__aggregate_cohort_variants`](notebooks/templates/reports__aggregate_cohort_variants.ipynb) | a cohort, matched and binned                     |
+| [`reports__TEMPLATE`](notebooks/templates/reports__TEMPLATE.ipynb)                                   | copy this to write a new report                  |
 
 All of them: [`notebooks/templates/`](notebooks/templates/)
 
@@ -203,7 +203,7 @@ apptainer run \
 `--output` writes inside the container, so it has to point at `/workspace`.
 
 📖 [docker/README.md](docker/README.md) · Penn LPC users:
-[lpc__quickstart.md](notebooks/lpc__quickstart.md)
+[lpc\_\_quickstart.md](notebooks/lpc__quickstart.md)
 
 ---
 
