@@ -1301,6 +1301,23 @@ example values, which is the fastest way to see what is available:
 biofilter report run --report-name expand_gene_to_variant --params-template
 ```
 
+## Case never matters
+
+Not for anything you type. `Pathways`, `pathways` and `PATHWAYS` are the
+same option; `CHEK2` and `chek2` are the same gene; `rs429358` and
+`RS429358` the same variant; `22:10510212:A:T` and `22:10510212:a:t` the
+same alleles. A `chr` prefix is optional and `CHR22:` works too.
+
+That holds for option values (`group_types`, `gene_identifier`,
+`match_mode`, `mapping`, `output_grain`, `group_by`, `sections`,
+`qtl_type`, `tissues`, `impact_filter` and the rest), for input values,
+and for the two-column mapping `pair_genes` takes.
+
+It is not a coincidence to be relied on quietly, so a test asserts it
+across the reports. The one thing case *does* affect is the text you get
+back: a report returns the bundle's spelling, not yours, because that is
+the one another report will recognise.
+
 ## What comes back
 
 `bf.report.run()` returns a **result**, not a bare DataFrame. The extra layer

@@ -111,6 +111,21 @@ different question without saying so. `membership="either"` is now
 `pair_genes(membership="either")`, then `expand_gene_to_variant` on the
 partner genes, then pair.
 
+### A2e) Does case matter in a parameter or an input?
+
+No. `Pathways`, `pathways` and `PATHWAYS` are the same option value;
+`CHEK2` and `chek2` the same gene; `rs429358` and `RS429358` the same
+variant; `22:10510212:A:T` and `22:10510212:a:t` the same alleles. A
+`chr` prefix is optional, in any case.
+
+That covers option values, input values and the two-column mapping
+`pair_genes` takes. A test asserts it across the reports so it stays
+true.
+
+The one thing case affects is the text coming back: a report returns the
+bundle's spelling of a name, not the user's, because that is the one
+another report will recognise.
+
 ### A3) What does a report accept?
 
 ```bash
