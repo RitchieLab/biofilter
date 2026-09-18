@@ -170,7 +170,7 @@ one; the wrapper is what carries `.provenance`, `.num_rows` and `.columns`.
 
 ## 8) The reports
 
-Sixteen, in six families. `biofilter report list --verbose` is always the
+Seventeen, in six families. `biofilter report list --verbose` is always the
 authority for what your install has.
 
 | Family | Reports |
@@ -178,7 +178,7 @@ authority for what your install has.
 | `annotate_*` | `annotate_gene`, `annotate_variant`, `annotate_protein`, `annotate_disease`, `annotate_pathway`, `annotate_go` |
 | `expand_*` | `expand_gene_to_variant`, `expand_variant_regulatory`, `expand_entity_neighborhood`, `expand_entity_relationship` |
 | `resolve_*` | `resolve_entity` |
-| `pair_*` | `pair_variants` |
+| `pair_*` | `pair_genes`, `pair_variants` |
 | `aggregate_*` | `aggregate_cohort_variants` |
 | `platform_*` | `platform_data_statistics`, `platform_etl_status`, `platform_etl_packages` |
 
@@ -191,6 +191,7 @@ By the question instead:
 | rsIDs or positions | `annotate_variant` |
 | genes, want the variants in them | `expand_gene_to_variant` |
 | variants, want what they regulate | `expand_variant_regulatory` |
+| genes, want pairs that share biology | `pair_genes` |
 | variants, want candidate pairs | `pair_variants` |
 | a cohort | `aggregate_cohort_variants` |
 | a bundle you do not know | `platform_data_statistics` |
@@ -353,7 +354,7 @@ docker run --rm \
   -v /path/to/bundles/20260914:/bundle:ro \
   -v "$PWD/out:/workspace" \
   --user "$(id -u):$(id -g)" \
-  ricoandre/biofilter:latest \
+  ghcr.io/ritchielab/biofilter:latest \
   report run --report-name annotate_gene --input TP53 --output /workspace/genes.csv
 ```
 
@@ -361,7 +362,7 @@ Under Apptainer, `--bind` replaces `-v` and output ownership takes care of
 itself:
 
 ```bash
-apptainer pull bf4.sif docker://ghcr.io/ritchielab/biofilter-hpc:latest
+apptainer pull bf4.sif docker://ghcr.io/ritchielab/biofilter:latest
 ```
 
 ### 3.3 Option C - Source

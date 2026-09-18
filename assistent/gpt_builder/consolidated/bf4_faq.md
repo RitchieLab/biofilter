@@ -36,7 +36,7 @@ provenance inside the file.
 biofilter report list --verbose
 ```
 
-Sixteen, in six families. By the shape of the question:
+Seventeen, in six families. By the shape of the question:
 
 | You have | Report |
 |---|---|
@@ -53,6 +53,7 @@ Sixteen, in six families. By the shape of the question:
 | a gene-to-anything list of your own, want the pairs it implies | `pair_genes` |
 | a cohort | `aggregate_cohort_variants` |
 | a bundle you do not know | `platform_data_statistics` |
+| to know what ran to build it | `platform_etl_status`, and `platform_etl_packages` for the raw record |
 
 ### A2b) `pair_variants` or `pair_genes`?
 
@@ -399,7 +400,7 @@ docker run --rm \
   -v /path/to/bundles/20260914:/bundle:ro \
   -v "$PWD/out:/workspace" \
   --user "$(id -u):$(id -g)" \
-  ricoandre/biofilter:latest \
+  ghcr.io/ritchielab/biofilter:latest \
   report run --report-name annotate_gene --input TP53 --output /workspace/genes.csv
 ```
 
@@ -419,7 +420,7 @@ container runs as you.
 ### D4) Apptainer / Singularity
 
 ```bash
-apptainer pull bf4.sif docker://ghcr.io/ritchielab/biofilter-hpc:latest
+apptainer pull bf4.sif docker://ghcr.io/ritchielab/biofilter:latest
 
 apptainer run \
   --bind /path/to/bundles/20260914:/bundle:ro \
@@ -428,7 +429,7 @@ apptainer run \
   report run --report-name annotate_gene --input APOE --output /workspace/apoe.csv
 ```
 
-Same image as Docker Hub; the `-hpc` name is historical.
+The same image as the Docker example above; only the mount flag differs.
 
 ---
 
