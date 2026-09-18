@@ -48,6 +48,34 @@ CHANGELOG
     it; neither reaches the fingerprint, so the id still identifies
     content rather than a run.
 
+- The gnomAD DTP reads the joint callset, so a bundle now carries three
+  data sets where it carried one
+  - The superseded DTP read `gnomad.genomes.v4.1.sites.chr*.vcf.bgz` —
+    genomes only. The current one reads
+    `gnomad.joint.v4.1.sites.chr*.vcf.bgz`, and the 20 INFO fields it
+    keeps hold exomes, genomes and the joint aggregate side by side: AC,
+    AF, AN and nhomalt for each, plus the joint filtering allele
+    frequencies, the group-max figures, and both callsets' filter flags.
+  - Coverage grows accordingly. A variant observed only in the exome
+    callset is in the bundle now; before it was simply absent, and
+    nothing said so.
+
+- A parameterised frequency filter on the variant branch, applied at
+  build time
+  - `dtps/config/dtp_variant_gnomad_joint.json` carries `min_ac`,
+    `max_ac`, `min_af` and `max_af`, against `AC_joint` and `AF_joint`.
+    `null` disables a bound and bounds are inclusive. The default is
+    `min_ac: 5`, which produces a bundle of roughly 25 GB.
+  - Measured on chromosome 21: `AC_joint = 0` accounts for 49.5% of
+    records, singletons for a further 22.2%, and `AC > 5` keeps 14.3%.
+    So the default is already most of the size decision, and the two
+    directions cost differently — lowering the bound to reach rare
+    variants is expensive, raising it is how a smaller bundle is built.
+  - Set it before the build. Bundles are immutable (ADR-003), so a
+    variant dropped here is absent from that bundle for good: the filter
+    decides what the artifact will contain, and is not a query-time
+    option a reader can relax later.
+
 - The report layer was rewritten to read parquet natively (ADR-004).
   The old module is deleted, not frozen.
   - A bundle is opened, not connected to. `Bundle.open()` reads the
@@ -218,7 +246,7 @@ CHANGELOG
   - `db migrate` and the Alembic chain are gone.
   - The dbSNP DTP and a superseded gnomAD DTP were removed.
 
-4.2.1 (29/08/2026):
+4.2.1 (29/07/2026):
 
 - Parquet bundle foundation — turns the bundle into a first-class build
   artifact rather than a one-off export
