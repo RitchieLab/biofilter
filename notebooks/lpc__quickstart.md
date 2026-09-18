@@ -179,7 +179,7 @@ missing source or a version mismatch are printed, not raised.
 If you prefer a container to the module:
 
 ```bash
-apptainer pull bf4.sif docker://ghcr.io/ritchielab/biofilter-hpc:latest
+apptainer pull bf4.sif docker://ghcr.io/ritchielab/biofilter:latest
 
 apptainer run \
   --bind /project/hall_shared/datasets/biofilter/<snapshot>:/bundle:ro \

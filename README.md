@@ -175,22 +175,23 @@ table and is lossy on purpose.
 
 ## 🐳 Containers
 
-One image, published to Docker Hub and to GHCR. It carries no data: bind the
-bundle read-only at `/bundle` and a writable `/workspace` for output.
+One image, `ghcr.io/ritchielab/biofilter`, for Docker and Apptainer alike. It
+carries no data: bind the bundle read-only at `/bundle` and a writable
+`/workspace` for output.
 
 ```bash
 docker run --rm \
   -v /path/to/bundles/20260914:/bundle:ro \
   -v "$PWD/out:/workspace" \
   --user "$(id -u):$(id -g)" \
-  ricoandre/biofilter:latest \
+  ghcr.io/ritchielab/biofilter:latest \
   report run --report-name annotate_gene --input TP53 --output /workspace/genes.csv
 ```
 
 On a cluster, the same image under Apptainer:
 
 ```bash
-apptainer pull bf4.sif docker://ghcr.io/ritchielab/biofilter-hpc:latest
+apptainer pull bf4.sif docker://ghcr.io/ritchielab/biofilter:latest
 
 apptainer run \
   --bind /project/shared/bundles/20260914:/bundle:ro \

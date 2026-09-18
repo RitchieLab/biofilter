@@ -250,8 +250,8 @@ positions) and `_cohort.py` (reading VCF / PLINK files).
 
 - **Production:** read-only Parquet bundle, built by `bundle build`, on the Penn LPC (`/project/hall_shared/datasets/biofilter/<YYYYMMDD>`), accessed via `--db-uri parquet:///...`. The VPS was decommissioned; its PostgreSQL deployment procedure is kept for reference in `biofilter_legacy/bf4_420/notebooks/Templates/lpc__deploy.md` (Appendix A).
 - **Local dev:** PostgreSQL `biofilter_dev`. Note its entity IDs are a different ID space from the bundle — never export from it over the bundle.
-- **Docker:** one image (`docker/Dockerfile`), published to Docker Hub and
-  to GHCR as `biofilter-hpc`. It carries no data: bind the bundle at
+- **Docker:** one image (`docker/Dockerfile`), published to
+  `ghcr.io/ritchielab/biofilter`. It carries no data: bind the bundle at
   `/bundle` read-only and a writable `/workspace` for output.
 - **Tooling:** Poetry, tox, pytest, sphinx, testcontainers (Postgres in tests)
 - **Local config:** `.biofilter.toml` at project root — `[database] bundle` for

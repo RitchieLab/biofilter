@@ -1,8 +1,11 @@
 name: Publish Docker Image
 
-# One image, two registries. Docker Hub is the general handle; the GHCR
-# `biofilter-hpc` name predates the merge of the two images and is kept
-# so `apptainer pull` lines already in cluster scripts keep resolving.
+# One image, one registry: ghcr.io/<owner>/biofilter.
+#
+# GHCR authenticates with the workflow's own token, so publishing needs
+# no secrets and works in a fork. The image carries no data — a bundle is
+# bind-mounted at run time — so the same image serves Docker locally and
+# Apptainer on a cluster.
 
 on:
   push:
@@ -31,8 +34,7 @@ jobs:
       contents: read
       packages: write
     env:
-      DOCKERHUB_IMAGE: ricoandre/biofilter
-      GHCR_IMAGE: ghcr.io/${{ github.repository_owner }}/biofilter-hpc
+      IMAGE: ghcr.io/${{ github.repository_owner }}/biofilter
 
     steps:
       - name: Checkout
@@ -48,33 +50,13 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # Docker Hub is optional: a fork without the secrets still publishes
-      # to GHCR rather than failing the whole job.
-      - name: Check Docker Hub credentials
-        id: dockerhub
-        shell: bash
-        run: |
-          if [[ -n "${{ secrets.DOCKERHUB_USERNAME }}" && -n "${{ secrets.DOCKERHUB_TOKEN }}" ]]; then
-            echo "available=true" >> "${GITHUB_OUTPUT}"
-          else
-            echo "available=false" >> "${GITHUB_OUTPUT}"
-            echo "::warning::Docker Hub secrets absent; publishing to GHCR only."
-          fi
-
-      - name: Login to Docker Hub
-        if: steps.dockerhub.outputs.available == 'true'
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-
       - name: Resolve image tags
         id: tags
         shell: bash
         run: |
           set -euo pipefail
 
-          GHCR_LC="${GHCR_IMAGE,,}"
+          IMAGE_LC="${IMAGE,,}"
 
           if [[ "${GITHUB_EVENT_NAME}" == "push" ]]; then
             VERSION_TAG="${GITHUB_REF_NAME#v}"
@@ -85,13 +67,8 @@ jobs:
             VERSION_TAG="${INPUT_TAG:-manual-${GITHUB_SHA::7}}"
           fi
 
-          TAGS="${GHCR_LC}:${VERSION_TAG}"
-          [[ "${PUSH_LATEST}" == "true" ]] && TAGS="${TAGS},${GHCR_LC}:latest"
-
-          if [[ "${{ steps.dockerhub.outputs.available }}" == "true" ]]; then
-            TAGS="${TAGS},${DOCKERHUB_IMAGE}:${VERSION_TAG}"
-            [[ "${PUSH_LATEST}" == "true" ]] && TAGS="${TAGS},${DOCKERHUB_IMAGE}:latest"
-          fi
+          TAGS="${IMAGE_LC}:${VERSION_TAG}"
+          [[ "${PUSH_LATEST}" == "true" ]] && TAGS="${TAGS},${IMAGE_LC}:latest"
 
           echo "tags=${TAGS}" >> "${GITHUB_OUTPUT}"
           echo "Using tags: ${TAGS}"

@@ -74,7 +74,7 @@ to that path, or the file leaves with the container:
 docker run --rm \
   -v /shared/bundles/20260914:/bundle:ro \
   -v "$(pwd)/out:/workspace" \
-  ricoandre/biofilter:latest \
+  ghcr.io/ritchielab/biofilter:latest \
   report run --report-name platform_etl_status --output /workspace/etl_status.csv
 ```
 

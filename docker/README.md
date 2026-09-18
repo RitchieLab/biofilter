@@ -1,14 +1,14 @@
 # Docker
 
 Run Biofilter without installing it. **One image**, built from
-[`Dockerfile`](Dockerfile) and published to two registries:
+[`Dockerfile`](Dockerfile) and published to the GitHub Container Registry:
 
-| Registry | Name | For |
-|---|---|---|
-| Docker Hub | `ricoandre/biofilter` | Local Docker, CI, cloud platforms |
-| GHCR | `ghcr.io/<owner>/biofilter-hpc` | `apptainer pull` on clusters — the name predates the merge of two images and is kept so existing scripts keep working |
+```
+ghcr.io/ritchielab/biofilter
+```
 
-Same image either way.
+The same image serves Docker locally and Apptainer on a cluster — what
+changes is the flag that mounts the bundle, not the image.
 
 The image contains no data. A bundle is bind-mounted at run time, so the
 same image serves any bundle — and a 20+ GB bundle of ZSTD parquet is
@@ -76,7 +76,7 @@ The same image, converted to a `.sif` on pull. Nothing else changes —
 `--bind` where Docker says `-v`, `--env` where Docker says `-e`:
 
 ```bash
-apptainer pull bf4.sif docker://ghcr.io/ritchielab/biofilter-hpc:latest
+apptainer pull bf4.sif docker://ghcr.io/ritchielab/biofilter:latest
 
 mkdir -p ~/bf4_output
 
@@ -159,13 +159,12 @@ docker run --rm -it \
 
 Via GitHub Actions, which is the supported path:
 
-`.github/workflows/docker-publish.yml` builds once and pushes the same
-image to both registries. It triggers on a pushed git tag (`v4.3.0`
-publishes `4.3.0` and `latest`), or manually from the Actions tab.
+`.github/workflows/docker-publish.yml` builds and publishes. It triggers
+on a pushed git tag (`v4.3.0` publishes `4.3.0` and `latest`), or
+manually from the Actions tab.
 
-Docker Hub needs the `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN`
-repository secrets; GHCR uses the workflow token. If the Docker Hub
-secrets are absent the job still publishes to GHCR.
+GHCR authenticates with the workflow's own token, so publishing needs no
+repository secrets and works in a fork.
 
 Manually, if you have to:
 
@@ -173,9 +172,8 @@ Manually, if you have to:
 docker buildx build \
   --platform linux/amd64,linux/arm64 \
   -f docker/Dockerfile \
-  -t ricoandre/biofilter:4.3.0 \
-  -t ricoandre/biofilter:latest \
-  -t ghcr.io/ritchielab/biofilter-hpc:4.3.0 \
+  -t ghcr.io/ritchielab/biofilter:4.3.0 \
+  -t ghcr.io/ritchielab/biofilter:latest \
   --provenance=false --sbom=false \
   --push .
 ```

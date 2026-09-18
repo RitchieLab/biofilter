@@ -234,7 +234,7 @@ repository.
 
 ```bash
 apptainer pull /project/hall_shared/biofilter/images/bf4-4.3.0.sif \
-  docker://ghcr.io/ritchielab/biofilter-hpc:4.3.0
+  docker://ghcr.io/ritchielab/biofilter:4.3.0
 
 apptainer run \
   --bind /project/hall_shared/datasets/biofilter/20260914:/bundle:ro \

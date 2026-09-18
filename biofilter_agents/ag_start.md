@@ -69,7 +69,7 @@ docker run --rm \
   -v /path/to/bundles/20260914:/bundle:ro \
   -v "$PWD/out:/workspace" \
   --user "$(id -u):$(id -g)" \
-  ricoandre/biofilter:latest \
+  ghcr.io/ritchielab/biofilter:latest \
   report run --report-name annotate_gene --input TP53 --output /workspace/genes.csv
 ```
 
@@ -77,7 +77,7 @@ Under Apptainer, `--bind` replaces `-v` and output ownership takes care of
 itself:
 
 ```bash
-apptainer pull bf4.sif docker://ghcr.io/ritchielab/biofilter-hpc:latest
+apptainer pull bf4.sif docker://ghcr.io/ritchielab/biofilter:latest
 ```
 
 ### 3.3 Option C - Source

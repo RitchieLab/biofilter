@@ -394,7 +394,7 @@ docker run --rm \
   -v /path/to/bundles/20260914:/bundle:ro \
   -v "$PWD/out:/workspace" \
   --user "$(id -u):$(id -g)" \
-  ricoandre/biofilter:latest \
+  ghcr.io/ritchielab/biofilter:latest \
   report run --report-name annotate_gene --input TP53 --output /workspace/genes.csv
 ```
 
@@ -414,7 +414,7 @@ container runs as you.
 ### D4) Apptainer / Singularity
 
 ```bash
-apptainer pull bf4.sif docker://ghcr.io/ritchielab/biofilter-hpc:latest
+apptainer pull bf4.sif docker://ghcr.io/ritchielab/biofilter:latest
 
 apptainer run \
   --bind /path/to/bundles/20260914:/bundle:ro \
@@ -423,7 +423,7 @@ apptainer run \
   report run --report-name annotate_gene --input APOE --output /workspace/apoe.csv
 ```
 
-Same image as Docker Hub; the `-hpc` name is historical.
+The same image as the Docker example above; only the mount flag differs.
 
 ---
 
