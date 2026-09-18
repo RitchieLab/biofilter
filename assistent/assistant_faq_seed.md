@@ -66,6 +66,28 @@ The item in the mapping is never read, so it can be a position, an rsID,
 a probe id, an exposure — anything. Biofilter is build 38 and managing
 build is the user's; nothing in this report interprets a coordinate.
 
+### A2c) I passed Entrez ids to `pair_genes` and got the wrong genes
+
+Say which column they are:
+
+```bash
+--param gene_identifier=entrez
+```
+
+`gene_identifier` is `alias` by default, which searches every alias at
+once. That is right when a user is typing gene names and wrong when their
+list came from one source, because the same text can mean two genes:
+174,410 gene aliases in the bundle are bare numbers (Entrez ids) and
+14,335 of those are also the entity id of a different gene. Entrez `2` is
+A2M; entity `2` is A1BG-AS1.
+
+Naming the system narrows the search rather than only breaking the tie —
+under `entrez`, `2` can only be A2M. The accepted values are `alias`,
+`entity_id` (or `biofilter_id`), and any code system the bundle carries;
+asking for one it lacks is refused with the list of what it has.
+
+It governs the mapping too, not just `input_data`.
+
 ### A3) What does a report accept?
 
 ```bash

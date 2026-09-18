@@ -151,11 +151,24 @@ coordinates and drops what disagrees, with no error.
 biofilter --bundle /path/to/bundle report run \
   --report-name pair_genes \
   --input-file my_genes.txt \
+  --param gene_identifier=ensembl \
   --param mapping_file=variant_to_gene.tsv \
   --param max_group_size=300 \
   --param min_group_sources=2 \
   --output item_pairs.csv
 ```
+
+**Say how your genes are identified.** `gene_identifier` is `alias` by
+default, which searches every alias — symbols, synonyms, HGNC, Ensembl,
+Entrez. Name a code system and the search narrows to it; pass
+`entity_id` and it goes to the bundle's own key instead.
+
+This matters more than it looks. 174,410 gene aliases in the bundle are
+bare numbers, because that is what an Entrez id is, and **14,335 of those
+are also the entity id of a different gene** — Entrez `2` is A2M, entity
+`2` is A1BG-AS1. Nothing can tell them apart by looking, so a list from
+one source should say which source it came from. It applies to the
+mapping as well as the input: one decision about one thing.
 
 The mapping is two columns, gene then item, and the item is **never
 read** — which is what lets the same report pair positions, rsIDs, probe
