@@ -1290,7 +1290,8 @@ its side to pair.
 
 | parameter | default | meaning |
 | --- | --- | --- |
-| `input_data` | required | gene names, symbols or ids — anything `resolve_entity` accepts |
+| `input_data` | required | gene identifiers, read according to `gene_identifier` |
+| `gene_identifier` | `alias` | how the identifiers are read; see below |
 | `membership` | `both` | `both`: both genes from your input. `either`: one from input, the other any gene it reaches |
 | `group_types` | `["Pathways"]` | `Pathways`, `Diseases`, `Proteins`, `Genes` |
 | `max_group_size` | `300` | drop groups reaching more genes than this; `0` for no limit |
@@ -1304,6 +1305,36 @@ its side to pair.
 came from the bundle, not from your list, so there is nothing on that
 side to pair — half a pair is not a pair, and silently returning one
 would be worse than the error.
+
+## How you name a gene
+
+Three mechanisms, and you say which — for both `input_data` and the
+mapping, since it is one decision about one thing.
+
+| `gene_identifier` | Looks in | Use when |
+| --- | --- | --- |
+| `alias` (default) | every alias: symbols, synonyms, HGNC, Ensembl, Entrez, previous symbols | you are typing gene names |
+| a code system — `HGNC`, `ENTREZ`, `ENSEMBL`, … | only that system's aliases | your list came from one source |
+| `entity_id` (or `biofilter_id`) | `gene_masters.entity_id`, skipping aliases entirely | you already resolved, and want it to stay resolved |
+
+**Why this is a parameter rather than something the report works out.**
+Nothing can tell these apart by looking. 174,410 aliases in the bundle
+are bare numbers — Entrez ids — and **14,335 of those are also the entity
+id of a different gene**. Entrez `2` is A2M; entity `2` is A1BG-AS1.
+Entrez `29974` is A1CF; entity `29974` is RPS2P20. A report that guessed
+from the shape of the string would return the wrong gene and say nothing.
+
+Naming the code system is also narrower and therefore more correct. Under
+`gene_identifier=entrez`, `2` can only be A2M — the entity-id column is
+never consulted, and neither is any other source's alias.
+
+`entity_id` is the bundle's own key. It is exact and it is **scoped to
+one bundle**: ids are not stable across builds (ADR-003 §2.5), so a list
+of them belongs with the `bundle_id` that issued it.
+
+The code systems offered are read from the bundle, so one built without
+UCSC will not pretend to accept it. Asking for a system it does not carry
+is refused with the list of what it has.
 
 ## `max_group_size` decides the size *and* the meaning
 

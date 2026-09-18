@@ -726,6 +726,7 @@ def pairing_bundle(tmp_path: Path) -> Path:
     tables["gene_masters"] = pa.concat_tables(
         [tables["gene_masters"], _dgene_master()]
     )
+    tables["entity_aliases"] = _with_colliding_alias(tables["entity_aliases"])
     partitions = _variant_partitions()
     partitions[17] = pa.concat_tables([partitions[17], _brca1_variants()])
     return _write_bundle(
@@ -763,6 +764,34 @@ def _dgene_master() -> pa.Table:
         locus_type_id=pa.array([1], pa.int64()),
         chromosome=pa.array([17], pa.int32()),
     )
+
+
+def _with_colliding_alias(aliases: pa.Table) -> pa.Table:
+    """
+    Give TP53 an alias whose text is BRCA1's entity id.
+
+    This is the real shape of the problem: 174,410 aliases in the bundle
+    are bare numbers (Entrez ids) and 14,335 of those are also the entity
+    id of a different gene — Entrez 2 is A2M, entity 2 is A1BG-AS1.
+    Nothing can tell them apart by looking, which is why the caller says
+    which column they mean rather than the report guessing.
+
+    Built from the existing table's own schema so it cannot drift from it.
+    """
+    row = {name: [None] for name in aliases.column_names}
+    row.update(
+        id=[900], entity_id=[TP53], alias_value=["2"], alias_norm=["2"],
+        alias_type=["code"], xref_source=["ENTREZ"], is_primary=[False],
+    )
+    if "is_active" in row:
+        row["is_active"] = [True]
+    if "data_source_id" in row:
+        row["data_source_id"] = [DS_HGNC]
+    extra = pa.table(
+        {name: pa.array(values, type=aliases.schema.field(name).type)
+         for name, values in row.items()}
+    )
+    return pa.concat_tables([aliases, extra])
 
 
 def _brca1_variants() -> pa.Table:

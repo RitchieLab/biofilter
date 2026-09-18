@@ -2804,7 +2804,7 @@ supply.
 Section 4 is the one to read. It is why this report exists rather than
 being a mode of `pair_variants`.
 
-### 1. Open a bundle
+### 5. Open a bundle
 
 ```python
 from pathlib import Path
@@ -2827,7 +2827,7 @@ GENES = ["CHEK2", "SMARCB1", "NF2"]
 print(bf.core.db_uri)
 ```
 
-### 2. Gene pairs, on their own
+### 6. Gene pairs, on their own
 
 No mapping: the answer is which of your genes are related, and by what.
 That question stands by itself, which is the argument for this being a
@@ -2847,7 +2847,7 @@ guessing it from an accession prefix. Two curations agreeing is a
 different claim from one curation saying it twice, which is what
 `min_group_sources` filters on — and what `min_group_support` does not.
 
-### 3. `max_group_size` decides the size *and* the meaning
+### 7. `max_group_size` decides the size *and* the meaning
 
 A pathway naming 2,615 genes links its members while saying almost
 nothing about any of them. When a result comes back empty or thin, this
@@ -2863,7 +2863,7 @@ for size in (200, 300, 1000, 0):
 pairs.provenance["group_filter"]
 ```
 
-### 4. Why this is not a mode of `pair_variants`
+### 8. Why this is not a mode of `pair_variants`
 
 `pair_variants` derives "this variant belongs to this gene" from
 coordinates. That is right for a coding variant and wrong for a
@@ -2904,7 +2904,71 @@ anything that disagrees, silently.
 
 `pair_genes` never derives it. It takes the link you supply.
 
-### 5. The mapping: two columns, gene then item
+### 9. How you name a gene
+
+Three mechanisms, and you say which — for `input_data` and the mapping
+alike, since it is one decision about one thing.
+
+| `gene_identifier` | Looks in |
+| --- | --- |
+| `alias` (default) | every alias: symbols, synonyms, HGNC, Ensembl, Entrez |
+| a code system — `HGNC`, `ENTREZ`, `ENSEMBL`, … | only that system |
+| `entity_id` (or `biofilter_id`) | the bundle's key, skipping aliases |
+
+This is a parameter rather than something the report works out, because
+nothing can tell them apart by looking.
+
+```python
+from biofilter.modules.report import Bundle
+
+with Bundle.open(bf.core.db_uri.removeprefix("parquet://")) as bundle:
+    collisions = bundle.con.execute("""
+        SELECT count(*) AS numeric_aliases,
+               count(*) FILTER (WHERE gm.entity_id IS NOT NULL) AS also_an_entity_id
+        FROM entity_aliases a
+        LEFT JOIN gene_masters gm
+               ON gm.entity_id = TRY_CAST(a.alias_value AS BIGINT)
+              AND gm.entity_id <> a.entity_id
+        WHERE TRY_CAST(a.alias_value AS BIGINT) IS NOT NULL
+    """).to_arrow_table().to_pandas()
+
+print(f"{collisions.numeric_aliases[0]:,} aliases are bare numbers (Entrez ids)")
+print(f"{collisions.also_an_entity_id[0]:,} of them are the entity id of a *different* gene")
+print("\nEntrez 2 is A2M. Entity 2 is A1BG-AS1. A report that guessed would")
+print("return the wrong gene and say nothing.")
+```
+
+```python
+# The same three genes, named three ways.
+with Bundle.open(bf.core.db_uri.removeprefix("parquet://")) as bundle:
+    ids = bundle.con.execute(f"""
+        SELECT gm.symbol, gm.entity_id,
+               max(CASE WHEN a.xref_source='ENSEMBL' THEN a.alias_value END) AS ensembl
+        FROM gene_masters gm
+        JOIN entity_aliases a ON a.entity_id = gm.entity_id
+        WHERE gm.symbol IN ('CHEK2', 'SMARCB1', 'NF2')
+        GROUP BY 1, 2
+    """).to_arrow_table().to_pandas()
+
+for label, values, how in [
+    ("symbols",     ids.symbol.tolist(),               None),
+    ("Ensembl ids", ids.ensembl.tolist(),              "ensembl"),
+    ("entity ids",  ids.entity_id.astype(str).tolist(), "entity_id"),
+]:
+    kw = {"gene_identifier": how} if how else {}
+    out = bf.report.run(REPORT, input_data=values, group_types=["Proteins"], **kw)
+    print(f"  {label:<12} -> {out.num_rows} gene pairs")
+```
+
+Naming the code system is also a **narrower** search, not just a
+disambiguation: under `gene_identifier=entrez`, `2` can only be A2M
+because no other column is consulted.
+
+`entity_id` is the bundle's own key — exact, and scoped to the build that
+issued it (ADR-003 §2.5). A list of entity ids belongs with the
+`bundle_id` it came from.
+
+### 10. The mapping: two columns, gene then item
 
 Many-to-many in both directions. The worked example from ADR-005: three
 items on one gene, two on the other, one pair between them.
@@ -2935,7 +2999,7 @@ from_file = bf.report.run(REPORT, input_data=["CHEK2", "SMARCB1"],
 print("same answer:", from_file.num_rows == expanded.num_rows)
 ```
 
-### 6. The item is never read
+### 11. The item is never read
 
 Which is what makes gene→position, gene→rsID, gene→probe and
 gene→exposure one feature instead of four.
@@ -2960,7 +3024,7 @@ spellings of one thing are two things**. `22:100:A:G` and
 `chr22:100:A:G` are different items, and that bounds what the
 deduplication below can promise.
 
-### 7. Three rules the simple example does not show
+### 12. Three rules the simple example does not show
 
 The cross product is not the work. These are, and they are identical for
 every caller — which is the argument for the platform owning them rather
@@ -2990,7 +3054,7 @@ print(f"{three.extra_tables['gene_pairs'].num_rows} gene pairs "
 three.to_pandas()[["item_1", "item_2"]]
 ```
 
-### 8. Both genes must carry an item
+### 13. Both genes must carry an item
 
 Not "both were named". A gene can be in your input and carry nothing, and
 then there is nothing on its side to pair.
@@ -3010,7 +3074,7 @@ except ValueError as exc:
     print("\nrefused:", exc)
 ```
 
-### 9. Export, and keeping both tables
+### 14. Export, and keeping both tables
 
 `write()` exports the primary table, which is the item pairs when you
 asked for them. `save()` keeps everything.
@@ -3027,7 +3091,7 @@ back = ReportResult.load(saved)
 print("tables back:", list(back.tables))
 ```
 
-### 10. The same thing on the command line
+### 15. The same thing on the command line
 
 ```bash
 biofilter report run --report-name pair_genes \\

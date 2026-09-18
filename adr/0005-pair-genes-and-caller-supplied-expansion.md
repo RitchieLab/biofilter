@@ -241,6 +241,32 @@ since that is what it returns when asked nothing special, and names the
 expansion columns in a constant of their own that the explain doc and the tests
 both reference. The limitation is stated in the doc instead of being discovered.
 
+### D12 — The caller names the column, because nothing else can
+
+*Added 2026-09-18, during implementation.*
+
+`gene_identifier` says how gene identifiers are read, for `input_data`
+and the mapping alike: `alias` searches every alias, a named code system
+(`HGNC`, `ENTREZ`, `ENSEMBL`, …) searches only that one, and `entity_id`
+skips the alias table for the primary key.
+
+The first implementation guessed instead — an entity id took precedence
+when the text parsed as an integer. Measured against the bundle, that is
+wrong 14,335 ways: 174,410 gene aliases are bare numbers, and 14,335 of
+those values are also the entity id of a *different* gene. Entrez 2 is
+A2M and entity 2 is A1BG-AS1; Entrez 29974 is A1CF and entity 29974 is
+RPS2P20. The heuristic returned the wrong gene silently, which is the
+class of defect this project keeps finding.
+
+Naming the code system is not only disambiguation, it is a narrower
+search: under `entrez`, `2` can only be A2M. The systems on offer are
+read from the bundle rather than hardcoded, so a build without UCSC does
+not advertise it.
+
+`entity_id` carries the caveat ADR-003 §2.5 attaches to it: ids are
+scoped to the build that issued them, so a list of them means nothing
+without its `bundle_id`.
+
 ### D11 — Not decided here
 
 - Whether `pair_variants` should eventually be re-expressed on top of

@@ -126,6 +126,9 @@ class PairGenesReport(ReportBase):
         membership = _pairing.choice(
             "membership", self.param("membership"), _pairing.MEMBERSHIPS, "both"
         )
+        identifier = _pairing.resolve_gene_identifier(
+            self.con, self.param("gene_identifier")
+        )
         group_types = _pairing.resolve_group_types(
             self.con, self.param("group_types")
         )
@@ -170,6 +173,7 @@ class PairGenesReport(ReportBase):
                 "max_group_size": max_group_size or None,
                 "min_group_support": min_support,
                 "min_group_sources": min_sources,
+                "gene_identifier": identifier,
                 "expanded": mapping is not None,
                 "means": (
                     "Both genes come from the input."
@@ -181,7 +185,8 @@ class PairGenesReport(ReportBase):
         )
 
         common = self._common_cte(
-            membership, group_types, max_group_size, min_support, min_sources
+            membership, group_types, max_group_size, min_support, min_sources,
+            identifier,
         )
         self._note_group_filter(common, max_group_size)
 
@@ -204,7 +209,7 @@ class PairGenesReport(ReportBase):
             self._note_truncation(gene_pairs.num_rows, max_pairs, "gene pairs")
             return ReportResult(table=gene_pairs, provenance={}, artifacts=[])
 
-        items = self._expand(gene_pairs, mapping, max_pairs)
+        items = self._expand(gene_pairs, mapping, max_pairs, identifier)
         self._note_truncation(items.num_rows, max_pairs, "item pairs")
 
         # The expansion is what the caller asked for, so it is the table
@@ -224,18 +229,13 @@ class PairGenesReport(ReportBase):
         max_group_size: int,
         min_support: int,
         min_sources: int,
+        identifier: str,
     ) -> str:
         """Stage 1 here is only gene resolution: no variant is placed."""
         side_2_source = "seed_genes" if membership == "both" else "all_genes"
         return f"""
             WITH seed_genes AS (
-                SELECT DISTINCT
-                    i.input_gene AS input_value,
-                    gm.entity_id AS gene_id,
-                    gm.symbol    AS gene_symbol
-                FROM pg_input i
-                JOIN entity_aliases a ON {ALIAS_KEY} = i.input_gene_norm
-                JOIN gene_masters gm ON gm.entity_id = a.entity_id
+                {_pairing.gene_resolution(identifier, "pg_input", "input_gene")}
             ),
             {_pairing.links_cte(group_types, max_group_size)},
             {_pairing.gene_pairs_cte(
@@ -338,7 +338,8 @@ class PairGenesReport(ReportBase):
 
     # ------------------------------------------------------------------
     def _expand(
-        self, gene_pairs: pa.Table, mapping: pa.Table, max_pairs: int
+        self, gene_pairs: pa.Table, mapping: pa.Table, max_pairs: int,
+        identifier: str,
     ) -> pa.Table:
         """
         The item pairs a set of gene pairs implies.
@@ -359,7 +360,7 @@ class PairGenesReport(ReportBase):
         """
         self.con.register("pg_gene_pairs", gene_pairs)
         self.con.register("pg_mapping", mapping)
-        self._resolve_mapping_genes()
+        self._resolve_mapping_genes(identifier)
 
         return self.sql(
             f"""
@@ -394,7 +395,7 @@ class PairGenesReport(ReportBase):
             """
         )
 
-    def _resolve_mapping_genes(self) -> None:
+    def _resolve_mapping_genes(self, identifier: str) -> None:
         """
         Name the mapping's genes the same way `input_data` is named.
 
@@ -407,31 +408,18 @@ class PairGenesReport(ReportBase):
         A mapping gene the bundle cannot resolve is reported rather than
         dropped in silence: it is the caller's data going missing.
         """
-        # An entity id wins over an alias. A caller who already resolved
-        # their genes — the usual case, since the mapping came from
-        # somewhere — should not have that resolution undone here, and a
-        # symbol can be a homonym while an id cannot.
+        # The same rule the input follows: the caller says which column
+        # they are naming, and nothing here guesses from the shape of the
+        # string. Guessing is wrong 14,335 ways — that many bare-number
+        # aliases are also the entity id of a different gene.
         self.con.execute(
-            """
+            f"""
             CREATE OR REPLACE TEMP TABLE pg_mapped AS
-            WITH by_id AS (
-                SELECT DISTINCT m.gene, gm.entity_id AS gene_id, m.item
-                FROM pg_mapping m
-                JOIN gene_masters gm
-                  ON TRY_CAST(trim(m.gene) AS BIGINT) = gm.entity_id
-            ),
-            by_alias AS (
-                SELECT DISTINCT m.gene, gm.entity_id AS gene_id, m.item
-                FROM pg_mapping m
-                JOIN entity_aliases a
-                  ON lower(coalesce(a.alias_norm, a.alias_value))
-                     = lower(trim(m.gene))
-                JOIN gene_masters gm ON gm.entity_id = a.entity_id
-                WHERE m.gene NOT IN (SELECT gene FROM by_id)
+            SELECT gene AS gene, gene_id, item FROM (
+                SELECT m.item, r.input_value AS gene, r.gene_id
+                FROM ({_pairing.gene_resolution(identifier, "pg_mapping", "gene")}) r
+                JOIN pg_mapping m ON m.gene = r.input_value
             )
-            SELECT gene, gene_id, item FROM by_id
-            UNION ALL
-            SELECT gene, gene_id, item FROM by_alias
             """
         )
 

@@ -382,3 +382,111 @@ class TestTheContract:
         )
 
         assert result.provenance["group_filter"]["groups_excluded_by_size"] >= 1
+
+
+class TestHowGenesAreNamed:
+    """
+    Three mechanisms, and the caller says which — because nothing can
+    tell them apart by looking. In the fixture TP53 carries the Entrez
+    alias `2`, and `2` is also BRCA1's entity id. That is the real shape
+    of the problem: 174,410 aliases in the bundle are bare numbers and
+    14,335 of those are the entity id of a different gene.
+    """
+
+    def test_by_default_every_alias_is_searched(self, run):
+        rows, _ = run(input_data=["TP53", "BRCA1"])
+
+        assert {rows[0]["gene_1_symbol"], rows[0]["gene_2_symbol"]} == {
+            "TP53",
+            "BRCA1",
+        }
+
+    def test_an_ensembl_id_resolves(self, run):
+        rows, _ = run(input_data=["ENSG00000141510", "ENSG00000012048"])
+
+        assert {rows[0]["gene_1_symbol"], rows[0]["gene_2_symbol"]} == {
+            "TP53",
+            "BRCA1",
+        }
+
+    def test_the_same_text_means_different_genes_under_different_rules(self, run):
+        """
+        `2` is TP53's Entrez alias and BRCA1's entity id. One input and
+        `membership="either"` isolate which gene it actually reached:
+        the seed is always `gene_1`.
+        """
+        by_alias, _ = run(input_data=["2"], membership="either")
+        by_id, _ = run(input_data=["2"], membership="either",
+                       gene_identifier="entity_id")
+
+        assert by_alias[0]["gene_1_symbol"] == "TP53"
+        assert by_id[0]["gene_1_symbol"] == "BRCA1"
+
+    def test_naming_the_code_system_narrows_the_search(self, run):
+        """Under ENTREZ, `2` can only be TP53: entity ids are not consulted."""
+        rows, _ = run(input_data=["2"], membership="either",
+                      gene_identifier="entrez")
+
+        assert rows[0]["gene_1_symbol"] == "TP53"
+
+    def test_a_code_system_excludes_what_belongs_to_another(self, run):
+        """`ENSG...` is an ENSEMBL alias, so ENTREZ must not find it."""
+        rows, _ = run(
+            input_data=["ENSG00000141510", "BRCA1"], gene_identifier="entrez"
+        )
+
+        assert rows == []
+
+    def test_a_code_system_the_text_does_not_belong_to_finds_nothing(self, run):
+        """`TP53` is an HGNC symbol, so ENSEMBL must not find it."""
+        rows, _ = run(input_data=["TP53"], membership="either",
+                      gene_identifier="ensembl")
+
+        assert rows == []
+
+    def test_biofilter_id_is_a_spelling_of_entity_id(self, run):
+        by_entity, _ = run(input_data=["1", "2"], gene_identifier="entity_id")
+        by_biofilter, _ = run(input_data=["1", "2"], gene_identifier="biofilter_id")
+
+        assert by_entity == by_biofilter
+
+    def test_the_identifier_is_recorded(self, run):
+        _, result = run(input_data=["1", "2"], gene_identifier="biofilter_id")
+
+        assert result.provenance["pairing"]["gene_identifier"] == "entity_id"
+
+    def test_a_code_system_the_bundle_lacks_is_refused_with_the_list(self, run):
+        with pytest.raises(ValueError, match="code system it carries"):
+            run(input_data=["TP53"], gene_identifier="refseq")
+
+    def test_an_entity_id_that_is_not_a_number_finds_nothing(self, run):
+        rows, _ = run(input_data=["TP53", "BRCA1"], gene_identifier="entity_id")
+
+        assert rows == []
+
+    def test_the_mapping_follows_the_same_rule(self, run):
+        """
+        One decision about how the caller names genes, not two. A mapping
+        resolved differently from the input would pair items onto genes
+        the input never selected.
+        """
+        rows, _ = run(
+            input_data=["1", "2"],
+            gene_identifier="entity_id",
+            mapping={"1": ["A"], "2": ["B"]},
+        )
+
+        assert _items(rows) == [("A", "B")]
+
+    def test_a_mapping_written_in_the_other_space_resolves_nothing(self, run):
+        _, result = run(
+            input_data=["1", "2"],
+            gene_identifier="entity_id",
+            mapping={"TP53": ["A"], "BRCA1": ["B"]},
+        )
+
+        assert result.num_rows == 0
+        assert any(
+            "do not resolve" in w["message"]
+            for w in result.provenance["warnings"]
+        )

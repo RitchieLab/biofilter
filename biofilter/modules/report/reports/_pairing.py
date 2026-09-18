@@ -259,6 +259,96 @@ def group_filter_block(stats: dict[str, Any], max_group_size: int) -> dict[str, 
     }
 
 
+#: Searching every alias at once, which is the default and how a person
+#: usually names a gene.
+IDENTIFIER_ANY = "alias"
+
+#: The bundle's own primary key. Not a code system: it skips the alias
+#: table entirely and goes to `gene_masters.entity_id`.
+IDENTIFIER_PK = "entity_id"
+
+#: Spellings of the primary key that a caller might reach for.
+_PK_SPELLINGS = {IDENTIFIER_PK, "biofilter_id", "bf_id", "entity"}
+
+
+def resolve_gene_identifier(con, raw: Any) -> str:
+    """
+    Which column the caller is naming genes in.
+
+    Three mechanisms, not two. `alias` searches every alias. A named code
+    system — `HGNC`, `ENTREZ`, `ENSEMBL` — searches only that one, which
+    is both narrower and more correct. `entity_id` skips the alias table
+    and goes to the primary key.
+
+    Saying which matters because nothing can tell them apart by looking:
+    174,410 aliases in the bundle are bare numbers (Entrez ids), and
+    14,335 of those are also the entity id of a *different* gene. Entrez
+    2 is A2M; entity 2 is A1BG-AS1. A report that guessed from the shape
+    of the string would pick the wrong gene silently.
+
+    The code systems are read from the bundle rather than hardcoded: a
+    bundle built without UCSC should not offer `ucsc`.
+    """
+    value = str(raw if raw is not None else IDENTIFIER_ANY).strip().lower()
+    if value == IDENTIFIER_ANY:
+        return IDENTIFIER_ANY
+    if value in _PK_SPELLINGS:
+        return IDENTIFIER_PK
+
+    available = {
+        row[0].lower(): row[0]
+        for row in con.execute(
+            "SELECT DISTINCT xref_source FROM entity_aliases "
+            "WHERE xref_source IS NOT NULL"
+        ).fetchall()
+        if row[0]
+    }
+    if value not in available:
+        raise ValueError(
+            f"gene_identifier must be {IDENTIFIER_ANY!r} (search every alias), "
+            f"{IDENTIFIER_PK!r} (this bundle's own key), or a code system it "
+            f"carries: {sorted(available.values())}. Got: {value!r}."
+        )
+    return available[value]
+
+
+def gene_resolution(identifier: str, source: str, column: str) -> str:
+    """
+    The join that turns what the caller wrote into a gene.
+
+    `entity_id` goes straight to the primary key — exact, one gene, and
+    meaningful only next to the bundle that issued it (ADR-003 §2.5).
+    Everything else goes through `entity_aliases`, narrowed to one code
+    system when the caller named one.
+    """
+    if identifier == IDENTIFIER_PK:
+        return f"""
+            SELECT DISTINCT
+                i.{column} AS input_value,
+                gm.entity_id AS gene_id,
+                gm.symbol AS gene_symbol
+            FROM {source} i
+            JOIN gene_masters gm
+              ON gm.entity_id = TRY_CAST(trim(i.{column}) AS BIGINT)
+        """
+    narrow = (
+        ""
+        if identifier == IDENTIFIER_ANY
+        else f"AND upper(a.xref_source) = upper('{identifier}')"
+    )
+    return f"""
+        SELECT DISTINCT
+            i.{column} AS input_value,
+            gm.entity_id AS gene_id,
+            gm.symbol AS gene_symbol
+        FROM {source} i
+        JOIN entity_aliases a
+          ON lower(coalesce(a.alias_norm, a.alias_value)) = lower(trim(i.{column}))
+          {narrow}
+        JOIN gene_masters gm ON gm.entity_id = a.entity_id
+    """
+
+
 def parse_bool(value: Any, default: bool) -> bool:
     if value is None:
         return default
