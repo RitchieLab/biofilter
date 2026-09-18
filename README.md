@@ -224,7 +224,6 @@ docs/source/               # Sphinx docs, split by audience
 │                          #   root + getting_started/ — the scientist
 └── technical/             #   building bundles, internals
 
-biofilter_agents/          # Operational guides (LLM-ready)
 assistent/                 # GPT assistant kit
 notebooks/                 # templates/ + the Penn LPC guides
 adr/                       # Architecture decisions
