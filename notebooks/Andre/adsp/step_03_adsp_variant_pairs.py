@@ -91,6 +91,9 @@ def main() -> None:
     ap.add_argument("--min-group-sources", type=int, default=1,
                     help="require this many distinct curations behind a gene pair. "
                          "2 is the two-source filter.")
+    ap.add_argument("--max-pairs", type=int, default=None,
+                    help="cap on models returned; 0 for no limit. Defaults to the "
+                         "report's own cap — a result exactly at it is truncated.")
     args = ap.parse_args()
 
     step2_path = Path(args.input).expanduser().resolve()
@@ -118,6 +121,7 @@ def main() -> None:
         group_types=group_types,
         max_group_size=args.max_group_size,
         min_group_sources=args.min_group_sources,
+        **({"max_pairs": args.max_pairs} if args.max_pairs is not None else {}),
     )
     models = result.to_pandas()
     gene_pairs = result.extra_tables["gene_pairs"].to_pandas()
@@ -173,6 +177,7 @@ def main() -> None:
                 "group_types": group_types,
                 "max_group_size": args.max_group_size,
                 "min_group_sources": args.min_group_sources,
+                "max_pairs": args.max_pairs,
                 "group_filter": result.provenance.get("group_filter"),
                 "models": len(models),
             },
